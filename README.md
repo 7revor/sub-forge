@@ -20,6 +20,8 @@
 | [docs/04-client-matrix.md](docs/04-client-matrix.md) | mihomo / Surge 能力差异矩阵与输出映射 |
 | [docs/05-roadmap-and-open-questions.md](docs/05-roadmap-and-open-questions.md) | 里程碑、技术选型建议、待决问题 |
 | [docs/06-proxy-chain-research.md](docs/06-proxy-chain-research.md) | 代理链专项：基于 mihomo 源码的通解与风险 |
+| [docs/07-verification-checklist.md](docs/07-verification-checklist.md) | 待核对清单：Surge / Loon / Stash / FlClash 文档与 mihomo 实测 |
+| [docs/08-rule-repository-index.md](docs/08-rule-repository-index.md) | 新需求：内置规则仓库的搜索、索引与引用 |
 
 ## 状态
 

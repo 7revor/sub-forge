@@ -1,7 +1,7 @@
 # 04 · 客户端能力矩阵与输出映射（mihomo / Surge）
 
 > mihomo 部分已对照官方文档（MetaCubeX/Meta-Docs）核对。
-> Surge 部分基于既有知识整理，标注 ⚠ 的条目在实现前需对照 Surge 官方手册（manual.nssurge.com）再核对一次。
+> Surge 部分基于既有知识整理，标注 ⚠ 的条目在实现前需对照 Surge 官方手册（manual.nssurge.com）再核对一次。所有待核对项汇总在 [07 · 待核对清单](07-verification-checklist.md)。
 > Loon / Stash / sing-box 预留列，首期不实现。
 
 ## 1. 节点与 provider
