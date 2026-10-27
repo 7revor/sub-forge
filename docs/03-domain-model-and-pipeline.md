@@ -192,6 +192,8 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 
 ## 4. 依赖解析：代理链与规则引用 provider 节点
 
+> 原理与场景分析见 [06 · 代理链专项调研](06-proxy-chain-research.md)。本节只描述算法。
+
 ### 4.1 约束回顾（mihomo）
 
 - `dialer-proxy` / rule 出口 / 组成员 `proxies` 只能写**本地**节点名、组名或内置策略。
@@ -211,8 +213,9 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
    - 找不到 → 走 fallback；无 fallback → report.error
 3. 若 n 所在 NodeSet 输出方式为 inline → 直接用 n.name，结束
 4. 否则（n 在 provider P 中）按策略：
-   wrap  → 生成/复用组 G = { name: "__ref:<P>:<hash(n._key)>", type: select,
-                            use: [P], filter: "^" + regexEscape(n.name) + "$", hidden: true }
+   wrap  → 生成/复用组 G = { name: "__ref_<P>_<hash(n._key)>", type: select,
+                            use: [P], filter: "^" + regexEscape(n.name) + "$",
+                            hidden: true, empty-fallback: REJECT }   // 防止静默直连
            r 指向 G.name
    copy  → 在 proxies 中加入 n 的副本，名称 = n.name（冲突则 n.name + " ·local"）
            r 指向副本名
@@ -225,7 +228,9 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 6. 上游自带 dialer-proxy 的节点（REF-04）：
    - 其前置名在同一 NodeSet 中 → 视为 NodeRef(同 NodeSet, exact) 走步骤 3–4
    - 在其他地方找不到 → report.warn，并按 fallback 处理（默认移除该字段）
-7. 环检测：在“节点→前置”图上做 DFS，成环则报错
+7. 环检测：在“节点→前置”图上做 DFS（包装组、provider 节点都计入），成环则报错
+8. 引用校验：所有 dialer-proxy / 规则目标 / 组成员必须在顶层表中（mihomo 不校验 provider 内的 dialer-proxy）
+9. Profile 专属 provider 的 URL 追加 ?v=<该 provider 注入内容的哈希>
 ```
 
 要点：

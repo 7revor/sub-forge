@@ -19,6 +19,7 @@
 | [docs/03-domain-model-and-pipeline.md](docs/03-domain-model-and-pipeline.md) | 领域模型、渲染流水线、依赖解析（代理链/规则引用 provider 节点）、模板合并算法 |
 | [docs/04-client-matrix.md](docs/04-client-matrix.md) | mihomo / Surge 能力差异矩阵与输出映射 |
 | [docs/05-roadmap-and-open-questions.md](docs/05-roadmap-and-open-questions.md) | 里程碑、技术选型建议、待决问题 |
+| [docs/06-proxy-chain-research.md](docs/06-proxy-chain-research.md) | 代理链专项：基于 mihomo 源码的通解与风险 |
 
 ## 状态
 
