@@ -213,9 +213,10 @@
 
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
-| TPL-01 | 模板中的组：可设置类型、测速参数、`filter`/`exclude-filter`、展示参数；成员**只能是**其他模板组或内置策略。**不能包含任何节点/节点集** | P0 |
+| TPL-01 | 模板中的组：可设置类型、测速参数、展示参数；成员**只能是**其他模板组或内置策略。**不能包含任何节点/节点集，也不预设 `filter`/`exclude-filter`/`exclude-type`**（节点筛选全部在 Profile 中设置） | P0 |
 | TPL-02 | 模板中的规则：匹配项可为单条规则 / RuleSet / RuleBundle；**出口只能是模板组或内置策略** | P0 |
-| TPL-03 | 每个模板组可标注"填充提示"（如"建议放香港节点"、"建议放所有节点"），在 Profile 填充时展示 | P1 |
+| TPL-03 | 每个模板组可标注"填充提示"（如"建议放香港节点"、"建议放所有节点"），在 Profile 填充时展示（仅文字提示，不参与渲染） | P1 |
+| TPL-10 | **空组输出**：模板组在 Profile 中未填充任何成员时，照常输出为"空组"，并在渲染报告与 Profile 页提示。mihomo 不接受无 `proxies`/`use` 的组（报 `` `use` or `proxies` missing ``），因此输出 `proxies: [COMPATIBLE]`（mihomo 内置出站，等效 DIRECT，正是其组为空时的默认回退）；Surge 输出见 [04](04-client-matrix.md#2-策略组) | P0 |
 | TPL-04 | 模板元素（组、规则）具有**稳定 ID**；改名不影响已有 Profile 的覆盖层 | P0 |
 | TPL-05 | 模板版本：每次发布生成新版本号与变更说明；可查看版本间 diff | P0 |
 | TPL-06 | 订阅跟随策略：**跟随最新**（默认）/ 锁定某版本。跟随最新时模板发布即对所有订阅生效（订阅在渲染时合并模板，不复制） | P0 |
@@ -270,5 +271,5 @@
 2. **改名确定性**：源 X 处理链把 `香港 01 | 0.5x` 改名为 `🇭🇰 HK-01`。上游新增 `香港 02`、删除 `香港 01` 后重新拉取：结果为 `🇭🇰 HK-02`，不存在重复或残留名称。
 3. **落地走中转（provider 内节点）**：用户 B 的落地节点在源 L（provider），中转节点在源 T（provider）的 `🇭🇰 IPLC-01`。配置链规则 "L 全部 → T:`🇭🇰 IPLC-01`"。✅ 输出中生成隐藏组 `__ref_T_xxx`（`use: [T]`, `filter: ^🇭🇰 IPLC-01$`），L 的专属 provider 内容中每个节点带 `dialer-proxy: __ref_T_xxx`；`mihomo -t` 通过。
 4. **规则出口为 provider 节点**：规则 `RuleBundle(金融服务) → 源 S 中的 "🇺🇸 Home-Broadband"`。✅ 输出包装组并在规则中引用；Surge 输出等效写法。
-5. **模板更新同步**：管理员在模板中新增 "🤖 AI 服务" 组和对应规则并发布。✅ 所有"跟随最新"的 Profile 下次拉取即包含该组；该组尚未填充成员时，按模板组的空组策略输出（见 [05](05-roadmap-and-open-questions.md) 待决问题 Q3）。
+5. **模板更新同步**：管理员在模板中新增 "🤖 AI 服务" 组和对应规则并发布。✅ 所有"跟随最新"的 Profile 下次拉取即包含该组；该组尚未填充成员时，按空组输出（TPL-10），mihomo 中显示为仅含 `COMPATIBLE` 的组，配置校验通过。
 6. **进程规则分客户端**：规则 `process(path, wildcard, "/Applications/*/WeChat.app/*")`。✅ mihomo 输出 `PROCESS-PATH-WILDCARD,...`；Surge macOS 输出 `PROCESS-NAME,...`；Surge iOS 丢弃并在报告中注明。

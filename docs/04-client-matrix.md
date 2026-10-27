@@ -33,6 +33,8 @@
 | load-balance strategy | `strategy` | ⚠ |
 | 其他 | `disable-udp`、`interface-name`、`routing-mark`、`default-selected`、`empty-fallback` | `no-alert` 等 |
 
+| 空组（TPL-10） | `proxies: [COMPATIBLE]` | `select, DIRECT` ⚠（需核对 Surge 是否接受无成员的组） |
+
 > 实现建议：Surge 的"一个组一个 policy-path"限制意味着当一个组包含多个节点集时，Lowering 需要为每个节点集生成隐藏子组，再在父组中 `include-other-group`。这一点对用户透明。
 
 ## 3. 规则映射

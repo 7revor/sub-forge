@@ -23,3 +23,7 @@
 ## 状态
 
 需求整理阶段，尚无代码。
+
+## 许可证
+
+[AGPL-3.0](LICENSE)。部分协议解析代码将复用自 [Sub-Store](https://github.com/sub-store-org/Sub-Store)（AGPL-3.0）。

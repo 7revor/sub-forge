@@ -116,7 +116,7 @@ type GroupSpec = {
   id: ID; name: string;
   type: 'select' | 'url-test' | 'fallback' | 'load-balance';
   members: GroupMember[];
-  filter?: string; excludeFilter?: string; excludeType?: string;
+  filter?: string; excludeFilter?: string; excludeType?: string;   // 仅 Profile 层可设置，模板中禁止
   test?: { url?: string; interval?: number; timeout?: number; tolerance?: number; lazy?: boolean;
            maxFailedTimes?: number; expectedStatus?: string };
   strategy?: 'consistent-hashing' | 'round-robin' | 'sticky-sessions';
@@ -129,7 +129,7 @@ type RuleEntry = { id: ID; matcher: Matcher; target: Target; options?: { noResol
 
 type Template = {
   id: ID; version: number; changelog: string;
-  groups: GroupSpec[];      // members 仅允许 builtin / group
+  groups: GroupSpec[];      // members 仅允许 builtin / group；不得设置 filter 类字段
   rules: RuleEntry[];       // target 仅允许 builtin / group
   final: Target;            // MATCH 出口
 };
@@ -263,7 +263,7 @@ effective.final = overlay.final ?? template.final
 
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
-- 空组处理：模板组在 Profile 中未被填充任何成员时，按待决问题 Q3 的结论输出（建议：自动填充 `DIRECT` 并告警，避免 mihomo 因空组报错）。
+- 空组处理（TPL-10）：模板组在 Profile 中未被填充任何成员时照常输出为空组，`report.warn`。Lowering 时 mihomo 写 `proxies: [COMPATIBLE]`（mihomo 源码 `adapter/outboundgroup/parser.go`：`proxies` 与 `use` 都为空时直接报错，`COMPATIBLE` 是内置出站、等效 DIRECT）。
 
 ## 6. 规则展开与规则包拆分
 
