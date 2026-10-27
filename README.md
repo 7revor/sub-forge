@@ -25,7 +25,7 @@
 
 ## 状态
 
-需求整理阶段，尚无代码。
+需求整理阶段，尚无代码。Surge / Loon / Stash / FlClash 文档与 mihomo 实测等**待核对项正在本地采集**（见 [07](docs/07-verification-checklist.md)），采集完成后统一决策剩余问题。
 
 ## 许可证
 
