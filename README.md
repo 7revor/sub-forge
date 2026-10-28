@@ -22,6 +22,7 @@
 | [docs/06-proxy-chain-research.md](docs/06-proxy-chain-research.md) | 代理链专项：基于 mihomo 源码的通解与风险 |
 | [docs/07-verification-checklist.md](docs/07-verification-checklist.md) | 待核对清单：Surge / Loon / Stash / FlClash 文档与 mihomo 实测 |
 | [docs/08-rule-repository-index.md](docs/08-rule-repository-index.md) | 新需求：内置规则仓库的搜索、索引与引用 |
+| [docs/09-frontend-forms-plan.md](docs/09-frontend-forms-plan.md) | 前端表单化改造方案：可视化表单 + 原始配置双模式、分期 |
 
 ## 状态
 
