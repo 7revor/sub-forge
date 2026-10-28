@@ -2,6 +2,7 @@
 // 渲染结果与 token 无关：地址里先写占位符，下发时再替换成请求所用的 token，
 // 这样同一 Profile 的多个订阅链接共用缓存与"上一份成功结果"。
 
+import { createHash } from 'node:crypto';
 import {
   renderMihomo, stableHash, stableStringify,
   type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
@@ -11,11 +12,14 @@ import type { SnapshotService } from './snapshots.ts';
 import type { Store, TrafficInfo } from './store.ts';
 
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
+const GENERATION_PLACEHOLDER = '__SF_GENERATION__';
 
 export type Target = { client: 'mihomo'; platform?: Platform };
 
 /** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
 export type StoredRender = {
+  /** 配置结构版本；旧数据库中的 last-good 没有这个字段。 */
+  generation?: string;
   yaml: string;
   providers: Record<string, string>;
   rulesets: Record<string, string>;
@@ -70,6 +74,7 @@ export class RenderService {
     const pre: ReportItem[] = [];
     let attempt: Attempt;
     try {
+      this.preserveLegacy(profileId, target);
       attempt = await this.attempt(profileId, target, pre);
     } catch (e) {
       // 内核抛出的异常（如依赖解析不收敛）也按渲染失败处理，走兜底
@@ -80,6 +85,34 @@ export class RenderService {
     const last = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
     if (last) return { ok: true, source: 'last-good', render: last.data, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
     return { ok: false, message: attempt.failure ?? '渲染失败', report: attempt.report };
+  }
+
+  /** 只返回指定结构版本，未知版本不能回退到最新内容。 */
+  getVersion(profileId: string, target: Target, version: string, providerKey?: string): StoredRender | undefined {
+    if (/^[0-9a-f]{32}$/.test(version)) return this.store.getRenderGeneration(profileId, targetKey(target), version);
+    // 升级前的 provider URL 使用 8 位内容哈希。只能恢复旧 last-good 已保存的那一套。
+    if (!/^[0-9a-f]{8}$/.test(version) || providerKey === undefined) return undefined;
+    const path = `/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(providerKey)}?v=${version}`;
+    // 旧 provider 地址没有 platform，需在该 Profile 已保存的客户端版本中按内容哈希恢复。
+    const candidates: Target[] = [target, { client: 'mihomo' }, ...(['android', 'macos', 'windows', 'ios', 'linux'] as const).map(platform => ({ client: 'mihomo' as const, platform }))];
+    for (const candidate of candidates) {
+      this.preserveLegacy(profileId, candidate);
+      const old = this.store.getRenderGeneration<StoredRender>(profileId, targetKey(candidate), 'legacy');
+      if (old && (old.yaml.includes(`${path}\n`) || old.yaml.endsWith(path))) return old;
+    }
+    return undefined;
+  }
+
+  private preserveLegacy(profileId: string, target: Target): void {
+    const last = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
+    if (last && !last.data.generation && !this.store.getRenderGeneration(profileId, targetKey(target), 'legacy')) {
+      this.store.putRenderGeneration(profileId, targetKey(target), 'legacy', last.data);
+    }
+  }
+
+  private remember(profileId: string, target: Target, render: StoredRender): void {
+    if (render.generation) this.store.putRenderGeneration(profileId, targetKey(target), render.generation, render);
+    this.store.putLastGood(profileId, targetKey(target), render);
   }
 
   /**
@@ -137,23 +170,40 @@ export class RenderService {
       rulesets: rules.rulesets, bundles: rules.bundles,
     }));
     const hit = opts.dry ? undefined : this.cache.get(key);
-    if (hit) { this.cache.delete(key); this.cache.set(key, hit); return { from: 'cache', render: hit, report: pre }; }
+    if (hit) {
+      this.cache.delete(key); this.cache.set(key, hit);
+      this.remember(profileId, target, hit);
+      return { from: 'cache', render: hit, report: pre };
+    }
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
-    const qs = target.platform ? `?platform=${target.platform}` : '';
+    const qs = target.platform ? `&platform=${target.platform}` : '';
     const result = renderMihomo({
       profile, nodeSets, rules,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
       urls: {
-        provider: (k, v) => `${publicUrl}/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${v}`,
-        ruleset: (k) => `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}${qs}`,
+        provider: (k, v) => `${publicUrl}/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}&h=${v}${qs}`,
+        ruleset: (k) => `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}${qs}`,
       },
     });
     const report = [...pre, ...result.report.items];
     const errors = report.filter((i) => i.level === 'error');
     if (errors.length) return { report, result, failure: errors.map((e) => e.message).join('；') };
+
+    // 文档意图与主配置结构决定版本。远程快照不参与；兼容的节点/规则内容可在本版本独立更新。
+    // provider 的 h 仅用于主配置刷新时破除客户端缓存，不影响结构版本。
+    const contract = structuredClone(result.config);
+    for (const entry of Object.values((contract['proxy-providers'] ?? {}) as Record<string, { url: string }>)) {
+      entry.url = entry.url.replace(/&h=[0-9a-f]+/, '');
+    }
+    const generation = createHash('sha256').update(stableStringify({
+      profile, template, base, target, contract,
+      sources: nodeSets.sources, collections: nodeSets.collections, locals: nodeSets.locals,
+      rulesets: rules.rulesets, bundles: rules.bundles,
+    })).digest('hex').slice(0, 32);
+    result.yaml = result.yaml.replaceAll(GENERATION_PLACEHOLDER, generation);
 
     if (this.opts.verify) {
       const v = await this.opts.verify(result.yaml.replaceAll(TOKEN_PLACEHOLDER, 'verify'));
@@ -165,6 +215,7 @@ export class RenderService {
 
     const userinfo = this.userinfo(profile, userinfoBySource);
     const render: StoredRender = {
+      generation,
       yaml: result.yaml,
       providers: Object.fromEntries(Object.entries(result.providers).map(([k, p]) => [k, p.yaml])),
       rulesets: Object.fromEntries(Object.entries(result.rulesets).map(([k, r]) => [k, r.text])),
@@ -174,7 +225,7 @@ export class RenderService {
     if (opts.dry) return { from: 'fresh', render, report, result };
     this.cache.set(key, render);
     while (this.cache.size > (this.opts.cacheSize ?? 256)) this.cache.delete(this.cache.keys().next().value!);
-    this.store.putLastGood(profileId, targetKey(target), render);
+    this.remember(profileId, target, render);
     return { from: 'fresh', render, report };
   }
 

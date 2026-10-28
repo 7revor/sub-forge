@@ -79,8 +79,8 @@ describe('订阅接口', () => {
     const cfg = parse(await res.text()) as Record<string, any>;
     expect(cfg['mixed-port']).toBe(7890);
     expect(cfg['allow-lan']).toBe(true);
-    expect(cfg['proxy-providers']['机场 A'].url).toMatch(/^https:\/\/sub\.test\/p\/tk-mac\/source%3Aair\?v=[0-9a-f]{8}$/);
-    expect(cfg['rule-providers'].rs_tg_domain.url).toBe('https://sub.test/r/tk-mac/rs_tg_domain?platform=macos');
+    expect(cfg['proxy-providers']['机场 A'].url).toMatch(/^https:\/\/sub\.test\/p\/tk-mac\/source%3Aair\?v=[0-9a-f]{32}&h=[0-9a-f]{8}&platform=macos$/);
+    expect(cfg['rule-providers'].rs_tg_domain.url).toMatch(/^https:\/\/sub\.test\/r\/tk-mac\/rs_tg_domain\?v=[0-9a-f]{32}&platform=macos$/);
     expect(cfg.proxies[0]['dialer-proxy']).toMatch(/^__ref_air_/);
     expect(cfg.rules.at(-1)).toBe('MATCH,🚀 节点选择');
   });

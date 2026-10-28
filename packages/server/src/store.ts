@@ -1,5 +1,4 @@
-// SQLite 存储。只保存"意图"（文档）与上游原始快照，不保存渲染结果；
-// 唯一例外是每个 Profile 最近一次成功的渲染结果，用于失败时兜底（OUT-05 / TPL-12）。
+// SQLite 存储。保存文档、快照与最近成功的配置版本；旧客户端按版本取兼容资源。
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
 import Database from 'better-sqlite3';
@@ -43,7 +42,9 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
+/** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
+const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS docs (
@@ -69,6 +70,10 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
 CREATE TABLE IF NOT EXISTS last_good (
   profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL,
   PRIMARY KEY (profile_id, target)
+);
+CREATE TABLE IF NOT EXISTS render_generations (
+  profile_id TEXT NOT NULL, target TEXT NOT NULL, version TEXT NOT NULL, sequence INTEGER NOT NULL, data TEXT NOT NULL,
+  PRIMARY KEY (profile_id, target, version)
 );
 CREATE TABLE IF NOT EXISTS access_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,23 +133,25 @@ export class Store {
         const cols = (this.db.prepare('PRAGMA table_info(docs)').all() as { name: string }[]).map((c) => c.name);
         if (!cols.includes('owner')) this.db.exec('ALTER TABLE docs ADD COLUMN owner TEXT');
       }
-      if (hadSnapshots) {
+      if (hadSnapshots && version < 3) {
         const cols = this.db.prepare('PRAGMA table_info(snapshots)').all() as { name: string }[];
         if (!cols.some((c) => c.name === 'url_hash')) this.db.exec('ALTER TABLE snapshots ADD COLUMN url_hash TEXT');
         this.db.exec('DROP INDEX IF EXISTS snapshots_owner');
       }
       this.db.exec(SCHEMA);
       // v1/v2 允许旧明文文档；本次迁移一并加密，URL 改用 HMAC 查询，错误中也可能包含 URL。
-      for (const r of this.db.prepare('SELECT id, url, body, error FROM snapshots').all() as { id: number; url: string; body: string | null; error: string | null }[]) {
-        const url = this.cipher.decrypt(r.url);
-        this.db.prepare('UPDATE snapshots SET url = ?, url_hash = ?, body = ?, error = ? WHERE id = ?').run(
-          this.cipher.encrypt(url), this.cipher.hmac(url),
-          r.body === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.body)),
-          r.error === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.error)), r.id);
-      }
-      for (const table of ['docs', 'last_good'] as const) {
-        for (const r of this.db.prepare(`SELECT rowid, data FROM ${table}`).all() as { rowid: number; data: string }[]) {
-          this.db.prepare(`UPDATE ${table} SET data = ? WHERE rowid = ?`).run(this.cipher.encrypt(this.cipher.decrypt(r.data)), r.rowid);
+      if (version < 3) {
+        for (const r of this.db.prepare('SELECT id, url, body, error FROM snapshots').all() as { id: number; url: string; body: string | null; error: string | null }[]) {
+          const url = this.cipher.decrypt(r.url);
+          this.db.prepare('UPDATE snapshots SET url = ?, url_hash = ?, body = ?, error = ? WHERE id = ?').run(
+            this.cipher.encrypt(url), this.cipher.hmac(url),
+            r.body === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.body)),
+            r.error === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.error)), r.id);
+        }
+        for (const table of ['docs', 'last_good'] as const) {
+          for (const r of this.db.prepare(`SELECT rowid, data FROM ${table}`).all() as { rowid: number; data: string }[]) {
+            this.db.prepare(`UPDATE ${table} SET data = ? WHERE rowid = ?`).run(this.cipher.encrypt(this.cipher.decrypt(r.data)), r.rowid);
+          }
         }
       }
       const hasV1Tokens = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tokens'").get();
@@ -159,7 +166,7 @@ export class Store {
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
-    if (hadSnapshots) {
+    if (hadSnapshots && version < 3) {
       // 清除迁移前留在空闲页和 WAL 中的明文副本。
       this.db.pragma('wal_checkpoint(TRUNCATE)');
       this.db.exec('VACUUM');
@@ -271,6 +278,7 @@ export class Store {
     const tx = this.db.transaction(() => {
       this.db.prepare('DELETE FROM sub_tokens WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(profileId);
+      this.db.prepare('DELETE FROM render_generations WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM access_log WHERE profile_id = ?').run(profileId);
     });
     tx();
@@ -333,6 +341,22 @@ export class Store {
   getLastGood<T>(profileId: string, target: string): { renderedAt: number; data: T } | undefined {
     const row = this.db.prepare('SELECT rendered_at, data FROM last_good WHERE profile_id = ? AND target = ?').get(profileId, target) as { rendered_at: number; data: string } | undefined;
     return row ? { renderedAt: row.rendered_at, data: JSON.parse(this.cipher.decrypt(row.data)) as T } : undefined;
+  }
+
+  putRenderGeneration(profileId: string, target: string, version: string, data: unknown): void {
+    this.db.transaction(() => {
+      const row = this.db.prepare('SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM render_generations WHERE profile_id = ? AND target = ?').get(profileId, target) as { next: number };
+      this.db.prepare('INSERT INTO render_generations (profile_id, target, version, sequence, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT (profile_id, target, version) DO UPDATE SET sequence = excluded.sequence, data = excluded.data')
+        .run(profileId, target, version, row.next, this.cipher.encrypt(JSON.stringify(data)));
+      this.db.prepare(`DELETE FROM render_generations WHERE profile_id = ? AND target = ? AND version NOT IN (
+        SELECT version FROM render_generations WHERE profile_id = ? AND target = ? ORDER BY sequence DESC LIMIT ?)`)
+        .run(profileId, target, profileId, target, KEEP_RENDER_GENERATIONS);
+    })();
+  }
+
+  getRenderGeneration<T>(profileId: string, target: string, version: string): T | undefined {
+    const row = this.db.prepare('SELECT data FROM render_generations WHERE profile_id = ? AND target = ? AND version = ?').get(profileId, target, version) as { data: string } | undefined;
+    return row ? JSON.parse(this.cipher.decrypt(row.data)) as T : undefined;
   }
 
   // ---------- 访问日志 ----------

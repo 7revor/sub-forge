@@ -10,7 +10,7 @@ import { Hono, type Context } from 'hono';
 import type { Platform } from '@sub-forge/core';
 import { createApi, type ApiDeps } from './api/index.ts';
 import { detectClient } from './client.ts';
-import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService, type StoredRender } from './render.ts';
+import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService } from './render.ts';
 import type { Store, TrafficInfo } from './store.ts';
 
 const DEFAULT_INTERVAL_SEC = 86400;
@@ -106,24 +106,33 @@ export function createApp(deps: AppDeps) {
     return c.body(outcome.render.yaml.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
-  /** provider 与规则集共用：按 token 找到 Profile，取同一次渲染里的对应内容 */
-  const part = (pick: (r: StoredRender, key: string) => string | undefined, contentType: string) => async (c: Context) => {
+  /** 旧主配置只取所属结构版本的资源；无版本的旧链接保持兼容，刷新主订阅后获得版本化地址。 */
+  const part = (kind: 'providers' | 'rulesets', contentType: string) => async (c: Context) => {
     const token = c.req.param('token')!;
     const t = store.getActiveToken(token);
     if (!t) return notFound(c);
     const qp = c.req.query('platform');
     const platform = PLATFORMS.find((p) => p === qp);
-    const outcome = await renderer.render(t.profileId, platform ? { client: 'mihomo', platform } : { client: 'mihomo' });
+    const target = platform ? { client: 'mihomo' as const, platform } : { client: 'mihomo' as const };
+    const version = c.req.query('v');
+    const key = c.req.param('key')!;
+    const retained = version ? renderer.getVersion(t.profileId, target, version, kind === 'providers' ? key : undefined) : undefined;
+    if (version && !retained) return c.text('资源版本不存在或已过期，请刷新主订阅', 404);
+    const outcome = await renderer.render(t.profileId, target);
+    const selected = version ? renderer.getVersion(t.profileId, target, version, kind === 'providers' ? key : undefined) ?? retained : outcome.ok ? outcome.render : undefined;
+    if (selected) {
+      const body = selected[kind][key];
+      if (body === undefined) return notFound(c);
+      c.header('content-type', contentType);
+      c.header('cache-control', 'no-store');
+      return c.body(body.replaceAll(TOKEN_PLACEHOLDER, token));
+    }
     if (!outcome.ok) return c.text(`暂时不可用：${outcome.message}`, 503);
-    const body = pick(outcome.render, c.req.param('key')!);
-    if (body === undefined) return notFound(c);
-    c.header('content-type', contentType);
-    c.header('cache-control', 'no-store');
-    return c.body(body.replaceAll(TOKEN_PLACEHOLDER, token));
+    return notFound(c);
   };
 
-  app.get('/p/:token/:key', part((r, k) => r.providers[k], 'text/yaml; charset=utf-8'));
-  app.get('/r/:token/:key', part((r, k) => r.rulesets[k], 'text/plain; charset=utf-8'));
+  app.get('/p/:token/:key', part('providers', 'text/yaml; charset=utf-8'));
+  app.get('/r/:token/:key', part('rulesets', 'text/plain; charset=utf-8'));
 
   if (deps.webDir) serveWeb(app, deps.webDir);
 
