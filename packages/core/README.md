@@ -17,11 +17,17 @@
 pnpm --filter @sub-forge/core test
 ```
 
-代理链集成测试需要真实的 mihomo 内核（v1.19.27+），未设置 `MIHOMO` 时自动跳过：
+配置合法性校验（`test/integration/mihomo-config.test.ts`）把渲染结果交给真实 mihomo 内核（v1.19.27+）执行 `-t`，未设置 `MIHOMO` 时自动跳过：
 
 ```bash
 MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 ```
+
+- 只解析配置，不启动代理、不监听端口；macOS 上用 `sandbox-exec` 禁止 mihomo 联网，地址全部指向 `127.0.0.1:9`。
+- `-t` 不解析 provider 内容，因此每个场景还会把 provider 节点展开到顶层 `proxies` 再校验一次，覆盖节点字段与注入的 `dialer-proxy`。
+- GEOIP 规则在 `-t` 阶段就要加载 MMDB，校验用例不下载数据，所以不覆盖 GEOIP。
+
+运行时代理链测试（`test/integration/mihomo-chain.test.ts`）会在本机起 socks5 实例并转发流量，默认关闭，需要再加 `MIHOMO_RUNTIME=1`。
 
 ## 尚未实现
 

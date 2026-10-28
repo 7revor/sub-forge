@@ -76,7 +76,7 @@ rules:
   - MATCH,DIRECT
 `;
 
-describe.skipIf(!MIHOMO)('mihomo 代理链集成测试', () => {
+describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链集成测试', () => {
   const procs: ChildProcess[] = [];
   const servers: http.Server[] = [];
   const dirs: string[] = [];
