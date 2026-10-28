@@ -2,11 +2,16 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
 import { NodeSetSelect } from '../../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, Textarea, formatTime, td, th } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, formatTime, td, th } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
+import { DualEditor } from '../../components/DualEditor.tsx';
+import { OverrideForm } from '../../components/OverrideField.tsx';
+import { SchemaForm } from '../../components/SchemaForm.tsx';
+import { baseFromYaml, baseToYaml } from '../../convert/baseYaml.ts';
+import { baseFromForm, baseToForm, mihomoBaseGroups } from '../../schemas/mihomoBase.ts';
 import { useProfile } from './context.ts';
 
 function copy(text: string) {
@@ -103,10 +108,9 @@ export function TabBase() {
   const { draft, setDraft } = useProfile();
   const presets = useList('presets').data ?? [];
   const preset = presets.find((p) => p.id === draft.base?.presetId);
-  const mode = draft.base === undefined ? 'none' : draft.base.presetId ? 'preset' : 'custom';
-  const [patchText, setPatchText] = useState(() => JSON.stringify(draft.base?.patch ?? {}, null, 2));
-  const [err, setErr] = useState('');
-  useEffect(() => { setPatchText(JSON.stringify(draft.base?.patch ?? {}, null, 2)); }, [draft.id]);
+  const mode = draft.base === undefined ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
+  const patch = draft.base?.patch ?? {};
+  const changePatch = (patch: Record<string, unknown>) => setDraft({ ...draft, base: { ...draft.base, patch } });
 
   return (
     <div className="flex flex-wrap items-start gap-5">
@@ -121,6 +125,7 @@ export function TabBase() {
           {mode === 'preset' && (
             <Field label="预设" hint="预设更新会同步到这里；你只需覆盖需要不同的项">{(id) => (
               <Select id={id} value={draft.base?.presetId ?? ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, presetId: e.target.value } })}>
+                <option value="" disabled>选择预设</option>
                 {presets.map((p) => <option key={p.id} value={p.id}>{p.name}（v{p.version}）</option>)}
               </Select>
             )}</Field>
@@ -129,22 +134,19 @@ export function TabBase() {
         </div>
       </Card>
       {mode !== 'none' && (
-        <Card title={mode === 'preset' ? '覆盖项（mihomo，JSON）' : 'mihomo 基础设置（JSON）'} className="min-w-0 flex-[999_1_520px]">
+        <Card title={mode === 'preset' ? '覆盖项（mihomo）' : 'mihomo 基础设置'} className="min-w-0 flex-[999_1_520px]">
           <div className="flex flex-col gap-3">
-            <Textarea aria-label="覆盖项" rows={14} className="font-mono text-[12.5px]" value={patchText} onChange={(e) => {
-              setPatchText(e.target.value);
-              try {
-                const v = JSON.parse(e.target.value || '{}') as unknown;
-                if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('需要 JSON 对象');
-                setErr('');
-                setDraft({ ...draft, base: { ...draft.base, patch: v as Record<string, unknown> } });
-              } catch (x) { setErr((x as Error).message); }
-            }} />
-            {err ? <span className="text-[12.5px] text-err">JSON 无效：{err}</span> : <span className="text-[12.5px] text-muted">与预设深度合并，数组整体替换。例：{'{"allow-lan": true, "dns": {"enhanced-mode": "fake-ip"}}'}</span>}
+            <DualEditor key={`${draft.id}:${mode}:${draft.base?.presetId ?? ''}`} value={patch} onChange={changePatch}
+              toRaw={baseToYaml} fromRaw={baseFromYaml} rawLabel={mode === 'preset' ? '覆盖项 YAML' : 'mihomo YAML'}
+              renderForm={() => mode === 'preset'
+                ? <OverrideForm groups={mihomoBaseGroups} base={baseToForm(preset?.mihomo ?? {})} patch={baseToForm(patch)}
+                    onChange={(value) => changePatch(baseFromForm(value, patch, preset?.mihomo))} />
+                : <SchemaForm groups={mihomoBaseGroups} value={baseToForm(patch)} extra
+                    onChange={(value) => changePatch(baseFromForm(value, patch))} />} />
             {preset && (
               <details>
                 <summary className="cursor-pointer text-[13px] text-accent">查看预设「{preset.name}」的内容</summary>
-                <pre className="mt-2 overflow-x-auto rounded-lg bg-ground p-3 font-mono text-[12px]">{JSON.stringify(preset.mihomo, null, 2)}</pre>
+                <pre className="mt-2 overflow-x-auto rounded-lg bg-ground p-3 font-mono text-[12px]">{baseToYaml(preset.mihomo)}</pre>
               </details>
             )}
           </div>
