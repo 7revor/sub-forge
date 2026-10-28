@@ -114,7 +114,7 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     // 机场在本机，需要放行 localhost；同时验证生产路径上的 undici 建连与 SSRF 校验
     snapshots = new SnapshotService(store, createUpstreamFetcher({ allow: parseAllowList(['localhost']) }));
     const renderer = new RenderService(store, snapshots, { publicUrl: `http://127.0.0.1:${ports.api}` });
-    const app = createApp({ store, renderer });
+    const app = createApp({ store, renderer, snapshots });
     api = serve({ fetch: (req) => { served.push(new URL(req.url).pathname); return app.fetch(req); }, hostname: '127.0.0.1', port: ports.api });
 
     entry = startMihomo(socks(ports.entry));

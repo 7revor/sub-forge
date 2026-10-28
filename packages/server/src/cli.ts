@@ -45,7 +45,13 @@ function start(): void {
     publicUrl: env.PUBLIC_URL ?? `http://${host}:${port}`,
     ...(env.MIHOMO_BIN ? { verify: mihomoVerifier(env.MIHOMO_BIN, env.MIHOMO_DIR) } : {}),
   });
-  const server = serve({ fetch: createApp({ store, renderer }).fetch, hostname: host, port }, (info) => {
+  const publicUrl = env.PUBLIC_URL ?? `http://${host}:${port}`;
+  const app = createApp({
+    store, renderer, snapshots,
+    secureCookies: publicUrl.startsWith('https://'),
+    allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+  });
+  const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
     console.log(`sub-forge 已启动：http://${info.address}:${info.port}（数据库 ${dbPath}）`);
   });
   const shutdown = () => {

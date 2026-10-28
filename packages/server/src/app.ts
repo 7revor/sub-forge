@@ -6,6 +6,7 @@
 
 import { Hono, type Context } from 'hono';
 import type { Platform } from '@sub-forge/core';
+import { createApi, type ApiDeps } from './api/index.ts';
 import { detectClient } from './client.ts';
 import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService, type StoredRender } from './render.ts';
 import type { Store, TrafficInfo } from './store.ts';
@@ -21,12 +22,15 @@ function userinfoHeader(u: TrafficInfo | undefined): string | undefined {
 
 const notFound = (c: Context) => c.body(null, 404);
 
-export function createApp(deps: { store: Store; renderer: RenderService; now?: () => number }) {
+export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins'>>;
+
+export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
   const now = deps.now ?? Date.now;
   const app = new Hono();
 
   app.get('/healthz', (c) => c.text('ok'));
+  app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [] }));
 
   app.get('/sub/:token', async (c) => {
     const started = now();

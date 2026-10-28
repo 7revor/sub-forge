@@ -61,7 +61,7 @@ function setup(responses: Record<string, string | Error> = {}) {
   };
   const snapshots = new SnapshotService(store, fetcher, now);
   const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test/' });
-  const app = createApp({ store, renderer, now });
+  const app = createApp({ store, renderer, snapshots, now });
   return { store, app, calls, bodies, snapshots, advance: (ms: number) => { t += ms; } };
 }
 
