@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`校验 > 同一输入输出完全相同（快照） 1`] = `
+"proxies:
+  - name: 自建 SG-01
+    type: trojan
+    server: sg
+    port: 443
+    password: p
+    dialer-proxy: __ref_T_d4357ad2
+proxy-providers:
+  落地:
+    type: http
+    url: https://sub.example.com/p/TOKEN/source%3AL?v=0e66dd5c
+    interval: 3600
+    override:
+      dialer-proxy: 🇭🇰 香港
+  中转:
+    type: http
+    url: https://sub.example.com/p/TOKEN/source%3AT?v=b6f49804
+    interval: 3600
+proxy-groups:
+  - name: 🚀 节点选择
+    type: select
+    proxies:
+      - 🇭🇰 香港
+      - DIRECT
+  - name: 🇭🇰 香港
+    type: url-test
+    use:
+      - 中转
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🤖 AI 服务
+    type: select
+    proxies:
+      - REJECT
+  - name: 📺 国内媒体
+    type: select
+    proxies:
+      - COMPATIBLE
+  - name: __ref_T_d4357ad2
+    type: select
+    use:
+      - 中转
+    filter: ^🇭🇰 IPLC-01$
+    hidden: true
+    empty-fallback: REJECT
+rule-providers:
+  b_fin_domain:
+    type: http
+    behavior: domain
+    format: text
+    url: https://sub.example.com/r/TOKEN/b_fin_domain
+    interval: 86400
+  b_fin_classical:
+    type: http
+    behavior: classical
+    format: text
+    url: https://sub.example.com/r/TOKEN/b_fin_classical
+    interval: 86400
+  b_fin_ipcidr:
+    type: http
+    behavior: ipcidr
+    format: text
+    url: https://sub.example.com/r/TOKEN/b_fin_ipcidr
+    interval: 86400
+  b_fin_broker_mrs:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://example.com/broker.mrs
+    interval: 86400
+  rs_ai_domain:
+    type: http
+    behavior: domain
+    format: text
+    url: https://sub.example.com/r/TOKEN/rs_ai_domain
+    interval: 86400
+rules:
+  - RULE-SET,b_fin_domain,🚀 节点选择
+  - RULE-SET,b_fin_classical,🚀 节点选择
+  - RULE-SET,b_fin_ipcidr,🚀 节点选择,no-resolve
+  - RULE-SET,b_fin_broker_mrs,🚀 节点选择,no-resolve
+  - RULE-SET,rs_ai_domain,🤖 AI 服务
+  - PROCESS-PATH-WILDCARD,/Applications/*/WeChat.app/*,DIRECT
+  - GEOIP,CN,DIRECT,no-resolve
+  - MATCH,🚀 节点选择
+"
+`;

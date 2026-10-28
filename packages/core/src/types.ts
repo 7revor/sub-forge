@@ -122,6 +122,8 @@ export type RuleSet = {
   url?: string;
   content?: string;
   format: RuleSetFormat;
+  /** 透传的二进制规则集（mrs）必须声明 behavior，其余格式解析后自动拆分 */
+  behavior?: 'domain' | 'ipcidr' | 'classical';
   /** 行级客户端覆盖：按解析后的行号（从 1 开始）或原文精确匹配定位 */
   overrides?: { line?: number; match?: string; override: ClientOverride }[];
 };
