@@ -12,3 +12,6 @@ export * from './pipeline/flags.ts';
 export * from './pipeline/operators.ts';
 export * from './pipeline/run.ts';
 export * from './nodeset/resolve.ts';
+export * from './rules/parse.ts';
+export * from './rules/client.ts';
+export * from './rules/expand.ts';

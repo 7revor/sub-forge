@@ -1,0 +1,59 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`规则解析 > classical 文本：统一 mihomo 与 Surge 写法，记录不支持的行 1`] = `
+[
+  {
+    "type": "DOMAIN-SUFFIX",
+    "value": "notion.so",
+  },
+  {
+    "noResolve": true,
+    "type": "IP-CIDR",
+    "value": "91.108.4.0/22",
+  },
+  {
+    "type": "IP-CIDR6",
+    "value": "2001:b28:f23d::/48",
+  },
+  {
+    "type": "DST-PORT",
+    "value": "22",
+  },
+  {
+    "type": "NETWORK",
+    "value": "udp",
+  },
+  {
+    "type": "SRC-IP-CIDR",
+    "value": "192.168.1.0/24",
+  },
+  {
+    "kind": "name",
+    "mode": "exact",
+    "type": "PROCESS",
+    "value": "Notion",
+  },
+  {
+    "kind": "path",
+    "mode": "wildcard",
+    "type": "PROCESS",
+    "value": "/Applications/*/Slack.app/*",
+  },
+  {
+    "kind": "path",
+    "mode": "wildcard",
+    "type": "PROCESS",
+    "value": "/usr/bin/*",
+  },
+  {
+    "kind": "name",
+    "mode": "regex",
+    "type": "PROCESS",
+    "value": "(?i)^code$",
+  },
+  {
+    "type": "IP-ASN",
+    "value": "62041",
+  },
+]
+`;
