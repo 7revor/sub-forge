@@ -5,15 +5,21 @@ import type { Client, ClientOverride, Platform, RuleIR } from '../types.ts';
 export type ClientCtx = { client: Client; platform?: Platform };
 
 export type LoweredRule =
-  | { kind: 'ok'; text: string; noResolve?: boolean; note?: string }
+  | { kind: 'ok'; text: string; noResolve?: boolean; src?: boolean; note?: string }
   | { kind: 'drop'; reason: string };
 
 /**
  * 拼出完整规则行。mihomo 与 Surge 都把 no-resolve 写在出口之后：`IP-CIDR,x,Policy,no-resolve`；
  * 规则集文件内没有出口：`IP-CIDR,x,no-resolve`。
  */
-export function composeRule(l: { text: string; noResolve?: boolean }, target?: string): string {
-  return `${l.text}${target === undefined ? '' : `,${target}`}${l.noResolve ? ',no-resolve' : ''}`;
+export function composeRule(l: { text: string; noResolve?: boolean; src?: boolean }, target?: string): string {
+  return `${l.text}${target === undefined ? '' : `,${target}`}${l.noResolve ? ',no-resolve' : ''}${l.src ? ',src' : ''}`;
+}
+
+/** IP 选项只影响目标 IP 规则；不能把域名规则转成来源 IP 匹配。 */
+export function withIpOptions(rule: RuleIR, options: { noResolve?: boolean; src?: boolean }): RuleIR {
+  if (rule.type !== 'IP-CIDR' && rule.type !== 'IP-CIDR6' && rule.type !== 'IP-ASN' && rule.type !== 'GEOIP') return rule;
+  return { ...rule, ...(options.noResolve ? { noResolve: true } : {}), ...(options.src ? { src: true } : {}) };
 }
 
 /** 声明式客户端覆盖：命中第一条匹配的覆盖，返回替换结果（drop 返回空数组） */
@@ -60,7 +66,7 @@ const nr = (r: { noResolve?: boolean }) => (r.noResolve ? { noResolve: true } : 
 function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
-      return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
+      return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule), ...(rule.src ? { src: true } : {}) };
     case 'NETWORK':
       return { kind: 'ok', text: `NETWORK,${rule.value}` };
     case 'PROCESS': {
@@ -86,6 +92,10 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'GEOSITE':
       return { kind: 'drop', reason: 'Surge 不支持 GEOSITE' };
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
+      if (rule.src) {
+        if (rule.type === 'IP-CIDR' || rule.type === 'IP-CIDR6') return { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'src 转换为 Surge 的 SRC-IP' };
+        return { kind: 'drop', reason: `Surge 无法表达 ${rule.type} 的 src 选项，请设置客户端覆盖` };
+      }
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
     case 'SRC-IP-CIDR':
       return { kind: 'ok', text: `SRC-IP,${rule.value}` };

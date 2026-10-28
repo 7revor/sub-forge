@@ -2,7 +2,7 @@
 
 import type { Report } from '../report.ts';
 import type { ID, RuleBundle, RuleIR, RuleSet } from '../types.ts';
-import { applyOverrides, type ClientCtx } from './client.ts';
+import { applyOverrides, withIpOptions, type ClientCtx } from './client.ts';
 import { behaviorOf, parseRuleSetContent, ruleKey, type Behavior } from './parse.ts';
 
 export type RuleSetInputs = {
@@ -53,12 +53,12 @@ export function expandBundle(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, repo
   if (!bundle) { report.error('bundle.missing', '规则包不存在', where); return out; }
   const seen = new Set<string>();
   const push = (r: RuleIR) => {
+    r = withIpOptions(r, { noResolve: bundle.noResolve });
     const k = ruleKey(r);
     if (seen.has(k)) return;
     seen.add(k);
     const b = behaviorOf(r);
-    if (b === 'ipcidr' && bundle.noResolve && (r.type === 'IP-CIDR' || r.type === 'IP-CIDR6')) out[b].push({ ...r, noResolve: true });
-    else out[b].push(r);
+    out[b].push(r);
   };
   for (const item of bundle.items) {
     if (item.enabled === false) continue;

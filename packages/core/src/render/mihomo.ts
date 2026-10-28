@@ -4,7 +4,7 @@
 import { stringify } from 'yaml';
 import { NodeSetResolver, nodeSetKey, type NodeSetInputs } from '../nodeset/resolve.ts';
 import { Report } from '../report.ts';
-import { applyOverrides, composeRule, lowerRule, type ClientCtx } from '../rules/client.ts';
+import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
 import { expandBundle, type RuleSetInputs } from '../rules/expand.ts';
 import type { Behavior } from '../rules/parse.ts';
 import { mergeTemplate, type EffectiveGroup } from '../template/merge.ts';
@@ -326,33 +326,45 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     const m = r.matcher;
     if (m.kind === 'rule') {
       for (const rule of applyOverrides(m.rule, m.overrides, ctx)) {
-        const l = lowerRule(rule, ctx);
+        const l = lowerRule(withIpOptions(rule, r.options ?? {}), ctx);
         if (l.kind === 'drop') { report.info('rule.dropped', l.reason, where); continue; }
         if (l.note) report.info('rule.degraded', l.note, where);
-        ruleLines.push(composeRule({ ...l, noResolve: l.noResolve || (r.options?.noResolve && /^(IP-|GEOIP)/.test(l.text)) }, target));
+        ruleLines.push(composeRule(l, target));
       }
       continue;
     }
-    const base = `${m.kind === 'bundle' ? 'b' : 'rs'}_${safeId(m.id)}`;
+    // 不同规则级选项可能改变 classical 正文或 CIDR 分段，不能共用同名 provider。
+    const base = `${m.kind === 'bundle' ? 'b' : 'rs'}_${safeId(m.id)}${r.options?.noResolve ? '_nr' : ''}${r.options?.src ? '_src' : ''}`;
     const bundleInputs = m.kind === 'bundle' ? input.rules : { ...input.rules, bundles: { ...input.rules.bundles, [base]: { id: base, name: m.id, items: [{ kind: 'ruleset' as const, id: m.id }] } } };
     const buckets = expandBundle(m.kind === 'bundle' ? m.id : base, bundleInputs, ctx, report);
     const noResolve = (m.kind === 'bundle' && input.rules.bundles[m.id]?.noResolve) || r.options?.noResolve;
     // domain → classical → ipcidr：IP 类放最后，避免过早触发 DNS 解析（RB-03）
     for (const behavior of ['domain', 'classical', 'ipcidr'] as const) {
-      const list = buckets[behavior];
+      const list = buckets[behavior].map(rule => withIpOptions(rule, r.options ?? {}));
       if (!list.length) continue;
-      const key = `${base}_${behavior}`;
-      if (!rulesets[key]) {
-        const lines = behavior === 'domain'
-          ? list.map((x) => (x.type === 'DOMAIN-SUFFIX' ? `+.${(x as { value: string }).value}` : (x as { value: string }).value))
-          : behavior === 'ipcidr'
-            ? list.map((x) => (x as { value: string }).value)
-            : list.map((x) => lowerInline(x, where)).filter((x): x is string => x !== undefined);
-        if (!lines.length) continue;
-        rulesets[key] = { behavior, text: lines.join('\n') + '\n' };
-        ruleProviders[key] = { type: 'http', behavior, format: 'text', url: input.urls.ruleset(key), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
+      // CIDR 文本无法承载行级选项。按连续的选项组合拆段，保留原顺序及解析行为。
+      const segments: { rules: RuleIR[]; noResolve: boolean; src: boolean }[] = [];
+      for (const rule of list) {
+        const flags = { noResolve: behavior === 'ipcidr' && 'noResolve' in rule && !!rule.noResolve, src: behavior === 'ipcidr' && 'src' in rule && !!rule.src };
+        const last = segments.at(-1);
+        if (last && last.noResolve === flags.noResolve && last.src === flags.src) last.rules.push(rule);
+        else segments.push({ rules: [rule], ...flags });
       }
-      ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: behavior === 'ipcidr' && !!noResolve }, target));
+      for (const [index, segment] of segments.entries()) {
+        const key = `${base}_${behavior}${segments.length > 1 ? `_part${index + 1}` : ''}`;
+        if (!rulesets[key]) {
+          const list = segment.rules;
+          const lines = behavior === 'domain'
+            ? list.map((x) => (x.type === 'DOMAIN-SUFFIX' ? `+.${(x as { value: string }).value}` : (x as { value: string }).value))
+            : behavior === 'ipcidr'
+              ? list.map((x) => (x as { value: string }).value)
+              : list.map((x) => lowerInline(x, where)).filter((x): x is string => x !== undefined);
+          if (!lines.length) continue;
+          rulesets[key] = { behavior, text: lines.join('\n') + '\n' };
+          ruleProviders[key] = { type: 'http', behavior, format: 'text', url: input.urls.ruleset(key), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
+        }
+        ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: segment.noResolve, src: segment.src }, target));
+      }
     }
     for (const p of buckets.passthrough) {
       const rs = input.rules.rulesets[p.id];
@@ -362,7 +374,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
         continue;
       }
       ruleProviders[key] ??= { type: 'http', behavior: rs.behavior, format: 'mrs', url: p.url, interval: RULESET_INTERVAL };
-      ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: rs.behavior === 'ipcidr' && !!noResolve }, target));
+      ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: rs.behavior === 'ipcidr' && !!noResolve, src: rs.behavior === 'ipcidr' && !!r.options?.src }, target));
     }
   }
   const finalName = resolveTarget(eff.final, 'final') ?? 'DIRECT';

@@ -24,6 +24,6 @@ export function ruleToLine(rule: RuleIR): string {
     case 'PROCESS': return `PROCESS-${rule.kind === 'name' ? 'NAME' : 'PATH'}${rule.mode === 'exact' ? '' : `-${rule.mode.toUpperCase()}`},${rule.value}`;
     case 'RAW': return rule.text;
     case 'AND': case 'OR': case 'NOT': return `${rule.type},(${rule.children.map((child) => `(${ruleToLine(child)})`).join(',')})`;
-    default: return `${rule.type},${rule.value}${'noResolve' in rule && rule.noResolve ? ',no-resolve' : ''}`;
+    default: return `${rule.type},${rule.value}${'noResolve' in rule && rule.noResolve ? ',no-resolve' : ''}${'src' in rule && rule.src ? ',src' : ''}`;
   }
 }

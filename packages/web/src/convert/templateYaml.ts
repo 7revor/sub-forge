@@ -56,8 +56,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     const lowered = m.kind === 'rule' ? lowerMatcher(m) : {
       text: `RULE-SET,${(m.kind === 'ruleset' ? ctx.rulesets : ctx.bundles).find((ref) => ref.id === m.id)?.name ?? m.id}`,
     };
-    return composeRule({ ...lowered, noResolve: ('noResolve' in lowered && lowered.noResolve) || r.options?.noResolve }, targetName(r.target, t.groups))
-      + (r.options?.src ? ',src' : '');
+    return composeRule({ ...lowered, noResolve: ('noResolve' in lowered && lowered.noResolve) || r.options?.noResolve, src: ('src' in lowered && lowered.src) || r.options?.src }, targetName(r.target, t.groups));
   });
   lines.push(`MATCH,${targetName(t.final, t.groups)}`);
   const doc = new Document({ 'proxy-groups': groups, rules: lines });
@@ -78,12 +77,18 @@ function matcherKey(m: Matcher): string {
 
 function restoreRule(matcher: Matcher, old: RuleEntry | undefined, noResolve: boolean, src: boolean): Pick<RuleEntry, 'matcher' | 'options'> {
   const options = { ...old?.options };
-  if (src || old?.options?.src !== undefined) options.src = src;
+  const keepSrcInRule = old?.matcher.kind === 'rule' && 'src' in old.matcher.rule && old.options?.src === undefined;
+  if (!keepSrcInRule && (src || old?.options?.src !== undefined)) options.src = src;
   const oldNoResolve = old?.options?.noResolve || (old?.matcher.kind === 'rule' && 'noResolve' in old.matcher.rule && old.matcher.rule.noResolve) || false;
-  if (old && oldNoResolve === noResolve) {
+  const oldSrc = old?.options?.src || (old?.matcher.kind === 'rule' && 'src' in old.matcher.rule && old.matcher.rule.src) || false;
+  if (old && oldNoResolve === noResolve && oldSrc === src) {
     // YAML 无法区分选项来自 IR 还是 RuleEntry，也不承载客户端覆盖，按原表示保留。
     matcher = old.matcher;
   } else if (matcher.kind === 'rule') {
+    if (options.src !== undefined && 'src' in matcher.rule) {
+      const { src: _src, ...rule } = matcher.rule;
+      matcher = { ...matcher, rule };
+    }
     if (old?.matcher.kind === 'rule' && old.matcher.overrides !== undefined) matcher = { ...matcher, overrides: old.matcher.overrides };
     if (old?.options?.noResolve !== undefined || (noResolve && !('noResolve' in matcher.rule))) {
       options.noResolve = noResolve;

@@ -99,9 +99,9 @@ export type IpRuleType = 'IP-CIDR' | 'IP-CIDR6' | 'IP-ASN' | 'SRC-IP-CIDR';
 
 export type RuleIR =
   | { type: DomainRuleType; value: string }
-  | { type: IpRuleType; value: string; noResolve?: boolean }
+  | { type: IpRuleType; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'GEOSITE'; value: string }
-  | { type: 'GEOIP'; value: string; noResolve?: boolean }
+  | { type: 'GEOIP'; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'DST-PORT' | 'SRC-PORT'; value: string }
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string }

@@ -33,7 +33,7 @@ export function parseRuleLine(text: string): RuleIR {
   const type = (parts[0] ?? '').toUpperCase();
   const value = parts[1] ?? '';
   const opts = new Set(parts.slice(2).map((s) => s.toLowerCase()));
-  const noResolve = opts.has('no-resolve') ? { noResolve: true } : {};
+  const ipOptions = { ...(opts.has('no-resolve') ? { noResolve: true } : {}), ...(opts.has('src') ? { src: true } : {}) };
   if (!value && !['AND', 'OR', 'NOT'].includes(type)) throw new Error('缺少规则值');
 
   switch (type) {
@@ -45,14 +45,14 @@ export function parseRuleLine(text: string): RuleIR {
       return { type, value };
     case 'IP-CIDR':
     case 'IP-CIDR6':
-      return { type: isCidr6(value) ? 'IP-CIDR6' : 'IP-CIDR', value, ...noResolve };
+      return { type: isCidr6(value) ? 'IP-CIDR6' : 'IP-CIDR', value, ...ipOptions };
     case 'IP-ASN':
-      return { type, value: value.replace(/^AS/i, ''), ...noResolve };
+      return { type, value: value.replace(/^AS/i, ''), ...ipOptions };
     case 'SRC-IP-CIDR':
     case 'SRC-IP':
       return { type: 'SRC-IP-CIDR', value };
     case 'GEOIP':
-      return { type, value, ...noResolve };
+      return { type, value, ...ipOptions };
     case 'GEOSITE':
       return { type, value };
     case 'DST-PORT':
