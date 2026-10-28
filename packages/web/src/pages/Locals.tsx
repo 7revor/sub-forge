@@ -112,7 +112,7 @@ export function LocalEdit() {
                     else { const { dialer: _d, ...rest } = cur; setProxies(d.proxies.map((p, i) => (i === sel ? rest : p))); }
                   }} />
                 </div>
-                {cur.dialer && <TargetPicker label="前置" value={cur.dialer} groups={[]} nodeSets={nodeSets} onChange={(t: Target) => update({ dialer: t })} />}
+                {cur.dialer && <TargetPicker label="前置" value={cur.dialer} groups={[]} allowGroup={false} nodeSets={nodeSets} onChange={(t: Target) => update({ dialer: t })} />}
                 <span className="text-[12px] leading-relaxed text-muted">保存的是引用而不是节点快照：上游节点替换后按名称重新解析。前置所在的节点集需要同时加入使用它的配置订阅。前置为策略组时，请在配置订阅的「代理链」中设置。<Link to="/profiles" className="text-accent">前往配置订阅</Link></span>
               </fieldset>
             </div>

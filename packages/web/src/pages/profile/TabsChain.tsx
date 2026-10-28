@@ -5,6 +5,7 @@ import type { ChainRule, Platform, RefStrategy } from '@sub-forge/core';
 import { ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
+import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { NodeSetSelect, TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, ReportList, Segmented, Select, td, th } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
@@ -34,6 +35,8 @@ export function TabChains() {
     setDraft({ ...draft, chains: [...draft.chains, { id: `c_${Date.now().toString(36)}`, landing: { nodeSet: ns }, via: { kind: 'group', groupId: groupOptions[0]?.id ?? '' } }] });
   };
   const perRef = draft.refPolicy.perRef ?? {};
+  const chainReport = (preview.data?.report ?? []).filter((r) =>
+    (r.level === 'warn' || r.level === 'error') && (r.code.startsWith('chain.') || r.code.startsWith('ref.')));
 
   return (
     <>
@@ -58,6 +61,7 @@ export function TabChains() {
                   <Field label="落地筛选（正则，留空为全部）">{(id) => <Input id={id} className="font-mono" value={c.landing.filter ?? ''} onChange={(e) => setChain(i, { ...c, landing: { ...c.landing, filter: e.target.value || undefined } })} />}</Field>
                   <Field label="排除（正则）">{(id) => <Input id={id} className="font-mono" value={c.landing.excludeFilter ?? ''} onChange={(e) => setChain(i, { ...c, landing: { ...c.landing, excludeFilter: e.target.value || undefined } })} />}</Field>
                 </div>
+                <MatchPreview nodeSet={c.landing.nodeSet} filter={c.landing.filter} excludeFilter={c.landing.excludeFilter} />
                 <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">前置</span>
                   <TargetPicker label="前置" value={c.via} onChange={(via) => setChain(i, { ...c, via })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
               </div>
@@ -66,6 +70,7 @@ export function TabChains() {
         )}
       </Card>
 
+      {chainReport.length > 0 && <Card title="代理链告警" bodyClass="px-4 pb-2"><ReportList items={chainReport} /></Card>}
       <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">依赖节点</h2><span className="text-[12.5px] text-muted">系统自动引入的包装组与复制节点。默认包装组（不打平、不复制），也可以逐项切换。</span></div>}
         actions={<>
           <label className="flex items-center gap-2 text-[12.5px] text-ink-2">Profile 默认
