@@ -242,7 +242,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
       <Card className="min-w-0 flex-[999_1_480px]" bodyClass="pb-4"
         title={<div className="flex flex-col gap-0.5">
           <h2 className="m-0 text-[15px] font-semibold">{cur ? `第 ${selected + 1} 步之后 · ${OP_LABEL[step?.op ?? 'flag']}` : '逐步预览'}</h2>
-          <span className="text-[12.5px] text-muted">{loading ? '预览中…' : cur ? (cur.error ? `这一步失败，已跳过：${cur.error}` : `${cur.before} → ${cur.after} 个节点，改名 ${cur.renamed.length}，移除 ${cur.removed.length}`) : '保存后可预览每一步的结果'}</span>
+          <span className="text-[12.5px] text-muted">{loading ? '预览中…' : cur ? (cur.error ? `这一步失败，已跳过：${cur.error}` : `${cur.before} → ${cur.after} 个节点，改名 ${cur.renamed.length}，移除 ${cur.removed.length}`) : (steps.length ? '保存后可预览每一步的结果' : '添加处理步骤后可以逐步预览')}</span>
         </div>}>
         {previewError && <div className="mb-3 rounded-lg bg-err-soft px-3 py-2 text-[13px] text-err">{previewError}</div>}
         {cur && (

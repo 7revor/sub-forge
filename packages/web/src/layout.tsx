@@ -1,7 +1,8 @@
 // 外壳：左侧导航（窄屏时叠在上方）+ 内容区；未登录时跳转登录页。
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Menu, X } from 'lucide-react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { api, onUnauthorized } from './api.ts';
 import { cx } from './components/ui.tsx';
@@ -29,6 +30,9 @@ export function AppLayout() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  // 窄屏时导航折叠到菜单按钮里，切换页面后自动收起
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [location.pathname]);
 
   useEffect(() => onUnauthorized(() => {
     qc.setQueryData(['me'], null);
@@ -47,8 +51,15 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-full flex-wrap bg-ground">
-      <nav aria-label="主导航" className="flex flex-[1_1_216px] flex-col gap-3.5 bg-nav px-3 py-5 md:max-w-[240px]">
-        <Logo />
+      <nav aria-label="主导航" className={cx('flex w-full flex-col gap-3.5 bg-nav px-3 py-3 md:w-auto md:max-w-[240px] md:flex-[1_1_216px] md:py-5', !menuOpen && 'max-md:pb-3')}>
+        <div className="flex items-center justify-between">
+          <Logo />
+          <button type="button" aria-expanded={menuOpen} aria-label={menuOpen ? '收起菜单' : '展开菜单'} onClick={() => setMenuOpen(!menuOpen)}
+            className="grid h-10 w-10 cursor-pointer place-items-center rounded-md text-nav-text hover:bg-nav-hover md:hidden">
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+        <div className={cx('flex-1 flex-col gap-3.5', menuOpen ? 'flex' : 'hidden md:flex')}>
         {NAV.map((g, i) => {
           const items = g.items.filter((it) => !it.admin || isAdmin);
           if (!items.length) return null;
@@ -67,6 +78,7 @@ export function AppLayout() {
         <div className="mt-auto flex flex-col gap-1 border-t border-[#262b33] px-2.5 pt-3 text-[12.5px] text-faint">
           <NavLink to="/account" className="text-nav-text no-underline hover:text-white">{me.data.username} · {isAdmin ? '管理员' : '用户'}</NavLink>
           <button type="button" onClick={logout} className="w-fit cursor-pointer text-left text-faint hover:text-white">退出登录</button>
+        </div>
         </div>
       </nav>
       <main className="min-w-0 flex-[999_1_560px] px-4 py-7 md:px-10">
