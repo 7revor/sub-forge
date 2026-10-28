@@ -29,11 +29,13 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 
 表单为主、原始配置为辅（[docs/09](../../docs/09-frontend-forms-plan.md)）：模板、本地节点、基础设置都可以在「表单」与「原始配置（mihomo YAML）」之间切换，两者编辑同一份数据；表单没覆盖的字段在「其他字段」中按键值编辑，不会丢失。原始配置解析出错时不能切回表单，也不能保存。
 
+Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步骤跳转，支持修复或明确放弃；详情页不会把尚未解析成功的文本显示为“已保存”。模板 YAML 导出使用 `sub-forge-group` / `sub-forge-rule` 注释保留稳定 ID，因此改名或改匹配内容仍能关联已有个人覆盖。复制组或规则时，应删除复制项的 ID 注释，让系统为新项分配 ID。
+
 公共组件在 `src/components/`：`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
 
 ## 已知简化
 
-- 模板的 YAML 导入按组名匹配已有的组：改名会得到新的组 ID，Profile 中对旧组的覆盖会变成孤儿。
+- 外部 YAML 没有稳定 ID 注释时，模板导入仍按组名 / 规则匹配项识别；同时删除注释并改名无法可靠识别原组，可能需要重新关联个人覆盖。
 - Surge 基础设置只预留了数据结构，表单在 M2。
 - 订阅源的处理链需要先保存订阅源才能逐步预览（预览接口按已保存的订阅源取快照）。
 - Surge 预览在 M2。

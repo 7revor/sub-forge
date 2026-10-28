@@ -29,6 +29,8 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 运行时代理链测试（`test/integration/mihomo-chain.test.ts`）会起 socks5 实例并转发流量，默认关闭，需要再加 `MIHOMO_RUNTIME=1`。推荐在 Docker 验证镜像中运行（仓库根目录 `pnpm test:docker`），镜像内已备好 mihomo 与 MMDB，容器以 `--network none` 运行。
 
+规则参数运行时测试（`test/integration/mihomo-rule-options.test.ts`）使用同样的开关，启动容器内回环 DNS 与 HTTP 服务，实测 `no-resolve` 的查询行为和 `src` 的来源 IP 匹配；测试结束自动关闭服务与内核进程。
+
 ## 尚未实现
 
 - 脚本处理器与规则改写脚本（SRC-08、CR-03，需要沙箱，P1）

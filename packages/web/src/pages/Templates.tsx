@@ -22,7 +22,7 @@ export function TemplateList() {
   return (
     <>
       <PageHeader title="模板" actions={isAdmin && <Link to="/templates/new" className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-[14px] font-medium text-white no-underline hover:bg-accent-strong"><Plus size={16} />新建模板</Link>} />
-      <p className="m-0 -mt-2 text-[13.5px] text-muted">模板只包含分流：策略组骨架 + 规则 + 二者的关联。配置订阅跟随最新版本时，模板发布后立即生效。</p>
+      <p className="m-0 -mt-2 text-[13.5px] text-muted">模板只包含分流：策略组骨架 + 规则 + 二者的关联。配置订阅跟随最新版本时，客户端下次刷新主订阅会自动采用新模板。</p>
       <ErrorBox error={list.error} />
       <Card bodyClass="overflow-x-auto">
         {!list.data?.length ? <div className="p-4"><Empty>还没有模板。</Empty></div> : (
