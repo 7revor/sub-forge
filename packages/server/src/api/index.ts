@@ -5,6 +5,7 @@ import type { RenderService } from '../render.ts';
 import type { SnapshotService } from '../snapshots.ts';
 import type { Store } from '../store.ts';
 import { authRoutes } from './auth.ts';
+import { docRoutes } from './docs.ts';
 import { csrfGuard, HttpError, sessionLoader, type ApiEnv } from './common.ts';
 
 export type ApiDeps = {
@@ -28,5 +29,6 @@ export function createApi(deps: ApiDeps) {
   api.use('*', csrfGuard(() => deps.allowedOrigins));
   api.use('*', sessionLoader(deps.store));
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
+  api.route('/', docRoutes(deps.store));
   return api;
 }
