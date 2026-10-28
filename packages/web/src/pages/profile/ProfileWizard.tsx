@@ -9,6 +9,7 @@ import { TabBase, TabNodeSets } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
 import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
+import { ProfileEditGuard } from './ProfileEditGuard.tsx';
 
 const STEPS = ['名称与基础设置', '节点集', '模板', '填充策略组', '规则', '代理链', '预览'];
 
@@ -23,7 +24,7 @@ export function ProfileWizard() {
   const nameValid = !!draft.name.trim();
   const templateReady = !draft.template || (!!template.data && !template.isError);
   const next = () => {
-    if (!nameValid || save.isPending) return;
+    if (!nameValid || !ctx?.baseValid || save.isPending) return;
     const nextStep = Math.min(step + 1, STEPS.length - 1);
     setStep(nextStep);
     setReached(Math.max(reached, nextStep));
@@ -37,7 +38,7 @@ export function ProfileWizard() {
     setDraft({ ...rest, overlay: {}, ...(id ? { template: { id, follow: 'latest' } as const } : {}) });
   };
   const finish = () => {
-    if (!nameValid || save.isPending) return;
+    if (!nameValid || !ctx?.baseValid || !templateReady || save.isPending) return;
     const { id: _id, ...profile } = draft;
     save.mutate(profile, { onSuccess: (p) => navigate(`/profiles/${p.id}/overview`) });
   };
@@ -47,10 +48,11 @@ export function ProfileWizard() {
       <PageHeader crumbs={<><Link to="/profiles" className="text-muted no-underline">配置订阅</Link> / 新建</>} title="新建配置订阅">
         <span className="text-[13px] text-muted">完成后才会保存；离开页面会丢失当前草稿。</span>
       </PageHeader>
+      <ProfileEditGuard valid={ctx!.baseValid} onDiscard={ctx!.resetBaseEditor} />
       <nav aria-label="新建 Profile 步骤" className="flex flex-wrap gap-2">
         {STEPS.map((label, index) => (
           <Button key={label} variant={step === index ? 'primary' : 'default'} aria-current={step === index ? 'step' : undefined}
-            disabled={index > reached || save.isPending || (index > 0 && !nameValid)} onClick={() => setStep(index)}>
+            disabled={index > reached || !ctx!.baseValid || save.isPending || (index > 0 && !nameValid)} onClick={() => setStep(index)}>
             {index + 1} · {label}
           </Button>
         ))}
@@ -86,11 +88,12 @@ export function ProfileWizard() {
       </fieldset>
       <ErrorBox error={save.error} />
       <div className="flex flex-wrap justify-end gap-2">
-        <Button disabled={step === 0 || save.isPending} onClick={() => setStep(step - 1)}>上一步</Button>
+        {!ctx!.baseValid && <Button onClick={ctx!.resetBaseEditor}>放弃无效的 YAML</Button>}
+        <Button disabled={step === 0 || !ctx!.baseValid || save.isPending} onClick={() => setStep(step - 1)}>上一步</Button>
         {step < STEPS.length - 1 ? <>
-          <Button disabled={!nameValid || save.isPending} onClick={next}>跳过</Button>
-          <Button variant="primary" disabled={!nameValid || save.isPending || (step >= 2 && !templateReady)} onClick={next}>下一步</Button>
-        </> : <Button variant="primary" disabled={!nameValid || !templateReady || save.isPending} onClick={finish}>{save.isPending ? '创建中…' : '完成'}</Button>}
+          <Button disabled={!nameValid || !ctx!.baseValid || save.isPending} onClick={next}>跳过</Button>
+          <Button variant="primary" disabled={!nameValid || !ctx!.baseValid || save.isPending || (step >= 2 && !templateReady)} onClick={next}>下一步</Button>
+        </> : <Button variant="primary" disabled={!nameValid || !ctx!.baseValid || !templateReady || save.isPending} onClick={finish}>{save.isPending ? '创建中…' : '完成'}</Button>}
       </div>
     </ProfileContext.Provider>
   );

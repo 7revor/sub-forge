@@ -1,7 +1,7 @@
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
 
 import type { GroupSpec, NodeSetID, Overlay } from '@sub-forge/core';
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api.ts';
 import { useNodeSetNames, type GroupOption } from '../../components/pickers.tsx';
@@ -10,6 +10,10 @@ import type { ProfileDoc, TemplateDoc } from '../../hooks.ts';
 export type ProfileCtx = {
   draft: ProfileDoc;
   setDraft: (p: ProfileDoc) => void;
+  baseValid: boolean;
+  setBaseValid: (valid: boolean) => void;
+  baseEditorKey: number;
+  resetBaseEditor: () => void;
   patchOverlay: (fn: (o: Overlay) => Overlay) => void;
   template: TemplateDoc | undefined;
   /** 模板组 + 私有组（按输出顺序），用于各种选择器 */
@@ -43,6 +47,9 @@ export function effectiveGroups(template: TemplateDoc | undefined, overlay: Over
 
 /** 详情页和新建向导共用模板查询与草稿派生状态。 */
 export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: ProfileDoc) => void) {
+  const [baseValid, setBaseValid] = useState(true);
+  const [baseEditorKey, setBaseEditorKey] = useState(0);
+  const resetBaseEditor = useCallback(() => { setBaseValid(true); setBaseEditorKey(key => key + 1); }, []);
   const tplRef = draft?.template;
   const template = useQuery({
     queryKey: ['template', tplRef?.id, tplRef?.follow],
@@ -57,7 +64,7 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
     if (!draft) return undefined;
     const groups = effectiveGroups(template.data, draft.overlay);
     return {
-      draft, setDraft,
+      draft, setDraft, baseValid, setBaseValid, baseEditorKey, resetBaseEditor,
       patchOverlay: (fn: (o: Overlay) => Overlay) => setDraft({ ...draft, overlay: fn(draft.overlay) }),
       template: template.data,
       groups,
@@ -67,7 +74,7 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
       allNodeSets: all,
       nodeSetName: nameOf,
     };
-  }, [draft, setDraft, template.data, all, nameOf]);
+  }, [draft, setDraft, template.data, all, nameOf, baseValid, baseEditorKey, resetBaseEditor]);
 
   return { ctx, template };
 }

@@ -107,7 +107,7 @@ export function TabOverview() {
 }
 
 export function TabBase() {
-  const { draft, setDraft } = useProfile();
+  const { draft, setDraft, baseValid, setBaseValid, baseEditorKey } = useProfile();
   const presets = useList('presets').data ?? [];
   const preset = presets.find((p) => p.id === draft.base?.presetId);
   const mode = draft.base === undefined ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
@@ -117,7 +117,7 @@ export function TabBase() {
   return (
     <div className="flex flex-wrap items-start gap-5">
       <Card title="来源" className="min-w-0 flex-[1_1_320px]">
-        <div className="flex flex-col gap-3.5">
+        <fieldset disabled={!baseValid} className="m-0 flex min-w-0 flex-col gap-3.5 border-0 p-0">
           <Segmented label="基础设置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '完全自定义' }, { value: 'none', label: '不输出' }]}
             onChange={(m) => {
               if (m === 'none') { const { base: _b, ...rest } = draft; setDraft(rest); }
@@ -133,12 +133,12 @@ export function TabBase() {
             )}</Field>
           )}
           {mode === 'none' && <p className="m-0 text-[13px] text-muted">不输出通用、DNS、TUN 等设置，使用客户端自己的默认值。</p>}
-        </div>
+        </fieldset>
       </Card>
       {mode !== 'none' && (
         <Card title={mode === 'preset' ? '覆盖项（mihomo）' : 'mihomo 基础设置'} className="min-w-0 flex-[999_1_520px]">
           <div className="flex flex-col gap-3">
-            <DualEditor key={`${draft.id}:${mode}:${draft.base?.presetId ?? ''}`} value={patch} onChange={changePatch}
+            <DualEditor key={`${draft.id}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
               toRaw={baseToYaml} fromRaw={baseFromYaml} rawLabel={mode === 'preset' ? '覆盖项 YAML' : 'mihomo YAML'}
               renderForm={() => mode === 'preset'
                 ? <OverrideForm groups={mihomoBaseGroups} base={baseToForm(preset?.mihomo ?? {})} patch={baseToForm(patch)}

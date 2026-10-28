@@ -11,6 +11,7 @@ import { TabBase, TabNodeSets, TabOverview } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
 import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
+import { ProfileEditGuard } from './ProfileEditGuard.tsx';
 
 const TABS = [
   ['overview', '概览'], ['base', '基础设置'], ['nodesets', '节点集'], ['groups', '策略组'], ['rules', '规则'], ['chains', '代理链'], ['preview', '预览'],
@@ -28,15 +29,16 @@ export function ProfileDetail() {
   const { ctx, template } = useProfileCtx(draft, setDraft);
 
   if (!draft || !ctx) return doc.error ? <ErrorBox error={doc.error} /> : <div className="text-muted">加载中…</div>;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
+  const dirty = !ctx.baseValid || JSON.stringify(draft) !== JSON.stringify(doc.data);
+  const discard = () => { setDraft(doc.data); ctx.resetBaseEditor(); };
 
   return (
     <ProfileContext.Provider value={ctx}>
       <div className="flex flex-col gap-2.5">
         <PageHeader crumbs={<><Link to="/profiles" className="text-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
           actions={<>
-            {dirty && <Button onClick={() => setDraft(doc.data)}>放弃修改</Button>}
-            <Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
+            {dirty && <Button onClick={discard}>放弃修改</Button>}
+            <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
           </>}>
           {draft.template && <Badge tone="accent">模板 {template.data?.name ?? draft.template.id} v{template.data?.version ?? '?'} · {draft.template.follow === 'latest' ? '跟随最新' : '锁定'}</Badge>}
           {dirty && <Badge tone="warn">有未保存的修改</Badge>}
@@ -50,6 +52,7 @@ export function ProfileDetail() {
         </nav>
       </div>
       <ErrorBox error={save.error} />
+      <ProfileEditGuard valid={ctx.baseValid} onDiscard={discard} />
       {template.error && <ErrorBox error={template.error} />}
 
       {tab === 'overview' && <TabOverview />}
