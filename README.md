@@ -25,7 +25,7 @@
 
 ## 状态
 
-需求整理阶段，尚无代码。Surge / Loon / Stash / FlClash 文档与 mihomo 实测等**待核对项正在本地采集**（见 [07](docs/07-verification-checklist.md)），采集完成后统一决策剩余问题。
+需求整理阶段，尚无代码。待核对项**第一轮采集已完成**（Surge 手册与离线校验、mihomo 代理链实测、规则仓库），剩余需要 GUI / 真机 / 国内网络的项见 [07 §7.1](docs/07-verification-checklist.md#71-剩余采集项)，全部完成后统一决策剩余问题。实测用例见 [research/verification](research/verification/README.md)。
 
 ## 许可证
 
