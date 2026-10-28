@@ -76,7 +76,13 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, raw
         setResult(parsed);
         onValidityChange?.(parsed.ok);
         if (parsed.ok) {
-          emitted.current = { value: parsed.value, canonical: toRaw(parsed.value) };
+          const canonical = tryRaw(toRaw, parsed.value);
+          if ('error' in canonical) {
+            setResult({ ok: false, error: canonical.error });
+            onValidityChange?.(false);
+            return;
+          }
+          emitted.current = { value: parsed.value, canonical: canonical.text };
           onChange(parsed.value);
         }
       }} />

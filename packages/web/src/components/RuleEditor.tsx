@@ -3,15 +3,20 @@ import { useState } from 'react';
 import { emptyRule, RULE_TYPE_GROUPS, ruleToLine } from './rule.ts';
 import { Button, ErrorBox, Field, Input, Segmented, Select, Switch } from './ui.tsx';
 
-export function RuleEditor({ value, onChange }: { value: RuleIR | undefined; onChange: (rule: RuleIR) => void }) {
+export function RuleEditor({ value, onChange, onIncomplete }: {
+  value: RuleIR | undefined; onChange: (rule: RuleIR) => void;
+  /** 可选地把未填完的规则交给父级草稿，防止清空后仍保存旧值。 */
+  onIncomplete?: (rule: RuleIR) => void;
+}) {
   const [draft, setDraft] = useState<{ source: RuleIR | undefined; rule: RuleIR }>();
   const [line, setLine] = useState('');
   const [error, setError] = useState('');
   const rule = draft && draft.source === value ? draft.rule : value;
   const edit = (next: RuleIR) => {
     const filled = 'value' in next && next.value.trim() !== '';
-    setDraft({ source: filled ? next : value, rule: next });
+    setDraft({ source: filled || onIncomplete ? next : value, rule: next });
     if (filled) onChange(next);
+    else onIncomplete?.(next);
   };
   const readonly = rule && (rule.type === 'RAW' || rule.type === 'AND' || rule.type === 'OR' || rule.type === 'NOT');
   return <div className="flex flex-col gap-3">
