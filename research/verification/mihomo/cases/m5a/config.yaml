@@ -1,0 +1,11 @@
+mixed-port: 17890
+external-controller: 127.0.0.1:17909
+log-level: debug
+ipv6: false
+geo-auto-update: false
+proxy-providers:
+  P: {type: file, path: ./p.yaml}
+proxies: [{name: 落地, type: socks5, server: 127.0.0.1, port: 17002, dialer-proxy: __ref}]
+proxy-groups:
+  - {name: __ref, type: select, use: [P], filter: "^不存在$", hidden: true, empty-fallback: REJECT}
+rules: ["MATCH,落地"]

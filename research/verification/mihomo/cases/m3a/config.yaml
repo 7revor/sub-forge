@@ -1,0 +1,10 @@
+mixed-port: 17890
+external-controller: 127.0.0.1:17909
+log-level: debug
+ipv6: false
+geo-auto-update: false
+proxy-providers:
+  P: {type: file, path: ./p.yaml}
+proxy-groups:
+  - {name: Out, type: select, use: [P], filter: "^落地$"}
+rules: ["MATCH,Out"]

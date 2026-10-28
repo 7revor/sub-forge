@@ -1,0 +1,12 @@
+mixed-port: 17890
+external-controller: 127.0.0.1:17909
+log-level: debug
+ipv6: false
+geo-auto-update: false
+proxies: [{name: 前置, type: socks5, server: 127.0.0.1, port: 17001}]
+proxy-providers:
+  P2: {type: file, path: ./p2.yaml, override: {dialer-proxy: RelayG}}
+proxy-groups:
+  - {name: RelayG, type: select, proxies: [前置]}
+  - {name: Out, type: select, use: [P2]}
+rules: ["MATCH,Out"]

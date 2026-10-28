@@ -1,0 +1,12 @@
+mixed-port: 17890
+external-controller: 127.0.0.1:17909
+log-level: debug
+ipv6: false
+geo-auto-update: false
+proxy-providers:
+  P: {type: file, path: ./p.yaml}
+  P2: {type: file, path: ./p2.yaml}
+proxy-groups:
+  - {name: Out, type: select, use: [P2]}
+  - {name: Keep, type: select, use: [P]}
+rules: ["MATCH,Out"]

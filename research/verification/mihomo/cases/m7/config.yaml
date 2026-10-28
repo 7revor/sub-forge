@@ -1,0 +1,8 @@
+mixed-port: 17890
+external-controller: 127.0.0.1:17909
+log-level: debug
+ipv6: false
+geo-auto-update: false
+proxy-groups:
+  - {name: Empty, type: select, proxies: [COMPATIBLE]}
+rules: ["MATCH,Empty"]

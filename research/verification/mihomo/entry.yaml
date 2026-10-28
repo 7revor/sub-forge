@@ -1,0 +1,12 @@
+log-level: debug
+ipv6: false
+geodata-mode: false
+geo-auto-update: false
+listeners:
+  - name: entry-in
+    type: socks
+    listen: 127.0.0.1
+    port: 17001
+    udp: false
+rules:
+  - MATCH,DIRECT

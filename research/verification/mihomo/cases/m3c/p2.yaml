@@ -1,0 +1,1 @@
+proxies: [{name: 落地, type: socks5, server: 127.0.0.1, port: 17002, dialer-proxy: 前置}]
