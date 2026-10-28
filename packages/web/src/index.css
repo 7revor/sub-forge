@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+
+/* 设计稿配色（Claude Design 画布「Sub-Forge 前端页面设计」） */
+@theme {
+  --color-ink: #15181d;
+  --color-ink-2: #3d434d;
+  --color-muted: #5b6270;
+  --color-faint: #8b93a1;
+  --color-line: #e3e6eb;
+  --color-line-2: #edeff2;
+  --color-ground: #f5f6f8;
+  --color-panel: #ffffff;
+  --color-nav: #14171c;
+  --color-nav-hover: #22272f;
+  --color-nav-active: #2a303a;
+  --color-nav-text: #c9ced6;
+  --color-accent: #2952cc;
+  --color-accent-strong: #1c3d9e;
+  --color-accent-soft: #ebf0fd;
+  --color-accent-ink: #1f43ad;
+  --color-ok: #1d7a46;
+  --color-ok-soft: #e7f4ec;
+  --color-warn: #8f4508;
+  --color-warn-soft: #fdf1e4;
+  --color-err: #b42318;
+  --color-err-soft: #fdecea;
+  --font-sans: Inter, 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

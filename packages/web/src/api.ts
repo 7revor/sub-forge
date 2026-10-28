@@ -1,0 +1,45 @@
+// 管理接口客户端：同源请求，会话靠 cookie。401 时通知外层跳转到登录页。
+
+import type { ReportItem } from '@sub-forge/core';
+
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string, readonly details?: unknown) {
+    super(message);
+  }
+}
+
+type Listener = () => void;
+const unauthorizedListeners = new Set<Listener>();
+export const onUnauthorized = (fn: Listener) => { unauthorizedListeners.add(fn); return () => { unauthorizedListeners.delete(fn); }; };
+
+export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method,
+    credentials: 'same-origin',
+    headers: body === undefined ? {} : { 'content-type': 'application/json' },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const text = await res.text();
+  let data: unknown;
+  try { data = text ? JSON.parse(text) : undefined; } catch { data = undefined; }
+  if (!res.ok) {
+    if (res.status === 401 && path !== '/auth/login') unauthorizedListeners.forEach((fn) => fn());
+    const err = data as { error?: string; details?: unknown } | undefined;
+    throw new ApiError(res.status, err?.error ?? `请求失败（HTTP ${res.status}）`, err?.details);
+  }
+  return data as T;
+}
+
+// ---------- 接口返回的类型 ----------
+
+export type User = { id: string; username: string; role: 'admin' | 'user'; disabled: boolean; scriptAllowed: boolean; createdAt: number };
+export type TokenItem = { token: string; profileId: string; label?: string; createdAt: number; url: string };
+export type AccessLogRow = { at: number; ua: string; client: string; platform?: string; status: number; ms: number; warnings: number; source: string; token: string };
+export type SnapshotMeta = { id: number; url: string; fetchedAt: number; ok: boolean; status?: number; hash?: string; userinfo?: { upload?: number; download?: number; total?: number; expire?: number }; error?: string };
+export type NodeBrief = { name: string; type: string; server: string; port: number };
+export type TraceStep = { index: number; op: string; enabled: boolean; before: number; after: number; renamed: { from: string; to: string }[]; removed: string[]; error?: string; nodes: NodeBrief[]; truncated: boolean };
+export type PipelinePreview = { input: number; failures: { line: string; reason: string }[]; report: ReportItem[]; trace: TraceStep[]; nodes: NodeBrief[] };
+export type DependencyEntry = { refKey: string; nodeSet: string; node: string; strategy: 'wrap' | 'copy' | 'inline'; output: string; usedBy: string[] };
+export type ProfilePreview = { ok: boolean; yaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
+export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
+export type RulesetPreview = { passthrough: boolean; lines: string[]; dropped: { rule: string; reason: string }[]; notes?: string[]; rejected: { line: number; text: string; reason: string }[]; error?: string };

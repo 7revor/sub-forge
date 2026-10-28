@@ -1,0 +1,85 @@
+// 外壳：左侧导航（窄屏时叠在上方）+ 内容区；未登录时跳转登录页。
+
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, type ReactNode } from 'react';
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
+import { api, onUnauthorized } from './api.ts';
+import { cx } from './components/ui.tsx';
+import { useMe } from './hooks.ts';
+
+type NavItem = { to: string; label: string; admin?: boolean };
+const NAV: { title?: string; items: NavItem[] }[] = [
+  { items: [{ to: '/', label: '总览' }, { to: '/profiles', label: '配置订阅' }] },
+  { title: '节点', items: [{ to: '/sources', label: '订阅源' }, { to: '/collections', label: '组合' }, { to: '/locals', label: '本地节点' }] },
+  { title: '规则', items: [{ to: '/rulesets', label: '规则集' }, { to: '/bundles', label: '规则包' }, { to: '/templates', label: '模板' }] },
+  { title: '管理员', items: [{ to: '/presets', label: '基础设置预设', admin: true }, { to: '/users', label: '用户', admin: true }] },
+];
+
+function Logo() {
+  return (
+    <div className="flex items-center gap-2.5 px-2.5 pt-1 pb-2">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8FA8F0" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M3 6h12M3 12h8M3 18h5" /><circle cx="17" cy="15" r="4" /></svg>
+      <span className="font-mono text-[15px] font-semibold text-white">sub-forge</span>
+    </div>
+  );
+}
+
+export function AppLayout() {
+  const me = useMe();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => onUnauthorized(() => {
+    qc.setQueryData(['me'], null);
+    navigate('/login', { replace: true, state: { from: location.pathname } });
+  }), [qc, navigate, location.pathname]);
+
+  if (me.isLoading) return <div className="p-8 text-muted">加载中…</div>;
+  if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  const isAdmin = me.data.role === 'admin';
+
+  const logout = async () => {
+    await api('POST', '/auth/logout');
+    qc.clear();
+    navigate('/login', { replace: true });
+  };
+
+  return (
+    <div className="flex min-h-full flex-wrap bg-ground">
+      <nav aria-label="主导航" className="flex flex-[1_1_216px] flex-col gap-3.5 bg-nav px-3 py-5 md:max-w-[240px]">
+        <Logo />
+        {NAV.map((g, i) => {
+          const items = g.items.filter((it) => !it.admin || isAdmin);
+          if (!items.length) return null;
+          return (
+            <div key={i} className="flex flex-col gap-0.5">
+              {g.title && <div className="px-2.5 pt-1.5 pb-1 text-[11px] tracking-[.08em] text-faint">{g.title}</div>}
+              {items.map((it) => (
+                <NavLink key={it.to} to={it.to} end={it.to === '/'}
+                  className={({ isActive }) => cx('block rounded-md px-2.5 py-2.5 text-[13.5px] leading-5 no-underline', isActive ? 'bg-nav-active font-medium text-white' : 'text-nav-text hover:bg-nav-hover hover:text-white')}>
+                  {it.label}
+                </NavLink>
+              ))}
+            </div>
+          );
+        })}
+        <div className="mt-auto flex flex-col gap-1 border-t border-[#262b33] px-2.5 pt-3 text-[12.5px] text-faint">
+          <NavLink to="/account" className="text-nav-text no-underline hover:text-white">{me.data.username} · {isAdmin ? '管理员' : '用户'}</NavLink>
+          <button type="button" onClick={logout} className="w-fit cursor-pointer text-left text-faint hover:text-white">退出登录</button>
+        </div>
+      </nav>
+      <main className="min-w-0 flex-[999_1_560px] px-4 py-7 md:px-10">
+        <div className="mx-auto flex max-w-[1280px] flex-col gap-5">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function RequireAdmin({ children }: { children: ReactNode }) {
+  const me = useMe();
+  if (me.data?.role !== 'admin') return <div className="text-muted">需要管理员权限。</div>;
+  return <>{children}</>;
+}

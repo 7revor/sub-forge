@@ -1,0 +1,61 @@
+// 数据读写的 React Query 封装。文档种类与后端 /api/{kind} 一一对应。
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Collection, LocalProxyGroup, RuleBundle, RuleSet, Source, Template } from '@sub-forge/core';
+import { api, type User } from './api.ts';
+
+export type FetchOptions = { ua?: string; timeoutMs?: number; ttlSec?: number };
+export type SourceDoc = Source & { fetch?: FetchOptions };
+export type RuleSetDoc = RuleSet & { fetch?: FetchOptions };
+export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown> };
+export type TemplateDoc = Template & { name?: string };
+export type ProfileDoc = import('@sub-forge/core').Profile & {
+  template?: { id: string; follow: 'latest' | { pinned: number } };
+  base?: { presetId?: string; patch?: Record<string, unknown> };
+  updateIntervalSec?: number;
+  userinfo?: { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
+};
+
+export type DocMap = {
+  sources: SourceDoc;
+  collections: Collection;
+  locals: LocalProxyGroup;
+  rulesets: RuleSetDoc;
+  bundles: RuleBundle;
+  profiles: ProfileDoc;
+  presets: PresetDoc;
+};
+export type Kind = keyof DocMap;
+
+export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<{ user: User }>('GET', '/me').then((r) => r.user), retry: false, staleTime: 60_000 });
+
+export function useList<K extends Kind>(kind: K) {
+  return useQuery({ queryKey: [kind], queryFn: () => api<{ items: DocMap[K][] }>('GET', `/${kind}`).then((r) => r.items) });
+}
+
+export function useDoc<K extends Kind>(kind: K, id: string | undefined) {
+  return useQuery({ queryKey: [kind, id], enabled: !!id && id !== 'new', queryFn: () => api<{ item: DocMap[K] }>('GET', `/${kind}/${id}`).then((r) => r.item) });
+}
+
+/** 新建（无 id）或更新；成功后刷新列表与该文档 */
+export function useSaveDoc<K extends Kind>(kind: K) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (doc: Partial<DocMap[K]> & { id?: string }) =>
+      (doc.id ? api<{ item: DocMap[K] }>('PUT', `/${kind}/${doc.id}`, doc) : api<{ item: DocMap[K] }>('POST', `/${kind}`, doc)).then((r) => r.item),
+    onSuccess: (item) => {
+      qc.setQueryData([kind, (item as { id: string }).id], item);
+      void qc.invalidateQueries({ queryKey: [kind], exact: true });
+    },
+  });
+}
+
+export function useDeleteDoc(kind: Kind) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api('DELETE', `/${kind}/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [kind] }),
+  });
+}
+
+export const useTemplates = () => useQuery({ queryKey: ['templates'], queryFn: () => api<{ items: TemplateDoc[] }>('GET', '/templates').then((r) => r.items) });
