@@ -2,7 +2,7 @@
 
 import { Hono } from 'hono';
 import type { Platform } from '@sub-forge/core';
-import type { RenderService } from '../render.ts';
+import { TOKEN_PLACEHOLDER, type RenderService } from '../render.ts';
 import type { Store } from '../store.ts';
 import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
 import { validateDoc } from './validate.ts';
@@ -65,7 +65,8 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
     // 草稿同样要做归属校验，否则可以借预览读到别人的节点集
     const draft = body.profile && typeof body.profile === 'object' ? validateDoc('profile', body.profile as Record<string, unknown>, p.id, c.get('user'), store) : undefined;
     const res = await renderer.preview(p.id, platform ? { client: 'mihomo', platform } : { client: 'mihomo' }, draft ? { profile: draft } : {});
-    return c.json(res);
+    // 预览与具体订阅链接无关，地址里的 token 位置显示为 {token}
+    return c.json(res.yaml ? { ...res, yaml: res.yaml.replaceAll(TOKEN_PLACEHOLDER, '{token}') } : res);
   });
 
   // ---------- 访问日志（PRF-07）----------
