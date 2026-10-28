@@ -1,0 +1,73 @@
+{
+  "sources": [
+    {
+      "id": "demo-a",
+      "name": "演示机场",
+      "kind": "local",
+      "content": "proxies:\n  - { name: 香港 01 | 0.5x, type: trojan, server: hk.example.com, port: 443, password: demo }\n  - { name: 日本 03, type: trojan, server: jp.example.com, port: 443, password: demo }\n  - { name: 剩余流量：100G, type: trojan, server: info.example.com, port: 443, password: demo }\n",
+      "pipeline": [
+        { "op": "filter.useless" },
+        { "op": "rename.regex", "rules": [{ "pattern": "^香港\\s*(\\d+).*$", "replace": "HK-$1" }, { "pattern": "^日本\\s*(\\d+).*$", "replace": "JP-$1" }] },
+        { "op": "flag", "mode": "add" }
+      ]
+    },
+    {
+      "id": "remote-example",
+      "name": "远程订阅（示例，需改成真实地址）",
+      "kind": "remote",
+      "urls": ["https://[YOUR-SUBSCRIPTION-URL]"],
+      "fetch": { "ua": "clash.meta", "ttlSec": 3600 },
+      "pipeline": []
+    }
+  ],
+  "rulesets": [
+    { "id": "ai", "name": "AI 服务", "kind": "local", "format": "auto", "content": ".openai.com\n.anthropic.com\n.claude.ai\n" }
+  ],
+  "presets": [
+    {
+      "id": "fakeip",
+      "name": "fake-ip 推荐",
+      "version": 1,
+      "mihomo": {
+        "mixed-port": 7890,
+        "mode": "rule",
+        "log-level": "warning",
+        "find-process-mode": "strict",
+        "dns": { "enable": true, "enhanced-mode": "fake-ip", "fake-ip-range": "198.18.0.1/16", "nameserver": ["https://doh.pub/dns-query"] }
+      }
+    }
+  ],
+  "templates": [
+    {
+      "id": "std",
+      "version": 1,
+      "name": "标准分流",
+      "groups": [
+        { "id": "sel", "name": "🚀 节点选择", "type": "select", "members": [{ "kind": "group", "groupId": "hk" }, { "kind": "builtin", "name": "DIRECT" }] },
+        { "id": "hk", "name": "🇭🇰 香港", "type": "url-test", "members": [], "test": { "url": "https://www.gstatic.com/generate_204", "interval": 300 } },
+        { "id": "ai", "name": "🤖 AI 服务", "type": "select", "members": [], "whenEmpty": "reject" }
+      ],
+      "rules": [
+        { "id": "r-ai", "matcher": { "kind": "ruleset", "id": "ai" }, "target": { "kind": "group", "groupId": "ai" } }
+      ],
+      "final": { "kind": "group", "groupId": "sel" }
+    }
+  ],
+  "profiles": [
+    {
+      "id": "demo",
+      "name": "演示订阅",
+      "template": { "id": "std", "follow": "latest" },
+      "base": { "presetId": "fakeip" },
+      "nodeSets": [{ "ref": { "type": "source", "id": "demo-a" }, "output": "provider" }],
+      "overlay": {
+        "groupPatches": {
+          "hk": { "addMembers": [{ "kind": "nodeset", "ref": { "type": "source", "id": "demo-a" } }], "set": { "filter": "HK" } }
+        }
+      },
+      "chains": [],
+      "refPolicy": { "default": "wrap" }
+    }
+  ],
+  "tokens": [{ "token": "demo-token", "profileId": "demo", "label": "演示" }]
+}

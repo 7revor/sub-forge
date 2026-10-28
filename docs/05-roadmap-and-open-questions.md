@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | 前端设计稿 | ✅ | 21 张画板覆盖 PRD §7 信息架构（缺普通用户的模板浏览页）；位于 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库 |
 | **M0 内核** | 基本完成 | 见下表 |
-| M1 MVP | 未开始 | — |
+| M1 MVP | 进行中 | 服务端切片已完成（见下表）；多用户与登录、管理接口、前端未开始 |
 | M2 Surge | 未开始 | 内核中规则降级（含进程规则）已实现 Surge 分支 |
 | M3 增强 | 未开始 | — |
 
@@ -39,6 +39,19 @@ M0 明细（代码在 `packages/core`，66 个测试通过）：
 | 集成测试 | 部分 | `mihomo -t`（v1.19.33，断网沙箱）10 个场景通过，含 provider 节点展开校验；GEOIP 规则未覆盖（需 MMDB）；运行时链路测试已写好、未运行（需 `MIHOMO_RUNTIME=1`） |
 
 与文档的差异：PRD 场景 3 中落地整源走同一前置时，按 03 §4.2 输出 `override.dialer-proxy`，而非逐节点注入；只给部分落地挂前置时才注入 Profile 专属 provider。
+
+M1 服务端切片（代码在 `packages/server`，26 个测试通过）：
+
+| 范围 | 状态 | 说明 |
+| --- | --- | --- |
+| 存储 | ✅ | better-sqlite3 存 JSON 文档（未用 Drizzle）；模板按版本保存；种子文件导入 |
+| 上游拉取与快照 | ✅ | UA / 超时 / 重定向 / 大小上限；stale-while-revalidate；同 URL 并发合并；保留最近 5 份 |
+| SSRF 防护（SYS-02） | ✅ | 建连时 DNS 解析校验 + 字面 IP 预检，支持白名单 |
+| 渲染服务 | ✅ | 缓存、上一份成功结果兜底（OUT-05 / TPL-12）、可选 `mihomo -t` 校验、流量信息汇总（SRC-05） |
+| 订阅接口（OUT-01 – 06） | 部分 | mihomo 全部完成；Surge 返回 501（M2） |
+| 客户端识别（CR-04） | ✅ | URL 参数优先，其次 UA；访问日志（PRF-07） |
+| 多用户、登录、管理接口 | 未开始 | — |
+| 前端 | 未开始 | — |
 
 M1 开始前建议补上：运行时链路测试实际跑一次（需在本机起 socks5 实例）；带 MMDB 的 GEOIP 校验。
 
