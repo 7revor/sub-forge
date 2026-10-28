@@ -19,8 +19,8 @@ export type BundleDoc = RuleBundle;
 /** 模板的一个版本；同一模板的多个版本共用 id */
 export type TemplateVersionDoc = Template & { name?: string };
 
-/** 基础设置预设（BS-03），首期只有 mihomo 段 */
-export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown> };
+/** 基础设置预设（BS-03），Surge 段仅存储，暂不参与渲染 */
+export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; surge?: { general?: Record<string, unknown>; host?: Record<string, string> } };
 
 export type ProfileDoc = Profile & {
   template?: { id: string; follow: 'latest' | { pinned: number } };

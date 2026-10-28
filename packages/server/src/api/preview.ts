@@ -2,6 +2,7 @@
 //   POST /api/sources/:id/refresh            立即拉取（SRC-03 快照）
 //   GET  /api/sources/:id/snapshots          快照历史（不含正文）
 //   POST /api/{sources,collections}/:id/pipeline-preview   处理链逐步预览（SRC-06），可带未保存的处理链
+//   GET  /api/nodesets/:type/:id/nodes      已保存处理链之后的节点列表
 //   POST /api/rulesets/:id/preview           规则集按客户端 + 平台的最终输出（CR-05）
 
 import {
@@ -19,6 +20,8 @@ import { validateDoc } from './validate.ts';
 const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
 /** 逐步预览每步最多返回的节点数，避免大订阅撑爆响应 */
 const MAX_NODES_PER_STEP = 500;
+/** 节点选择器最多返回的节点数 */
+const MAX_NODE_LIST_SIZE = 5000;
 
 const brief = (n: ProxyIR) => ({ name: n.name, type: n.type, server: n.server, port: n.port });
 
@@ -27,12 +30,29 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
   app.use('/sources/:id/*', requireUser);
   app.use('/collections/:id/*', requireUser);
   app.use('/rulesets/:id/*', requireUser);
+  app.use('/nodesets/:type/:id/*', requireUser);
 
-  const own = <K extends 'source' | 'collection' | 'ruleset'>(kind: K, id: string, userId: string) => {
+  const own = <K extends 'source' | 'collection' | 'local' | 'ruleset'>(kind: K, id: string, userId: string) => {
     const row = store.getWithOwner(kind, id);
-    if (!row || row.owner !== userId) throw notFound(kind === 'source' ? '订阅源' : kind === 'collection' ? '组合' : '规则集');
+    if (!row || row.owner !== userId) throw notFound(kind === 'source' ? '订阅源' : kind === 'collection' ? '组合' : kind === 'local' ? '本地节点组' : '规则集');
     return row.doc;
   };
+
+  app.get('/nodesets/:type/:id/nodes', async (c) => {
+    const type = c.req.param('type');
+    if (type !== 'source' && type !== 'collection' && type !== 'local') throw bad('type 只能是 source、collection 或 local');
+    const doc = own(type, c.req.param('id'), c.get('user').id);
+    const ref: NodeSetID = { type, id: doc.id };
+    const loaded = await renderer.loadNodeSets([ref]);
+    const report = new Report();
+    const nodes = new NodeSetResolver(loaded.inputs, report).resolve(ref);
+    return c.json({
+      nodes: nodes.slice(0, MAX_NODE_LIST_SIZE).map(brief),
+      total: nodes.length,
+      truncated: nodes.length > MAX_NODE_LIST_SIZE,
+      report: [...loaded.report, ...report.items],
+    });
+  });
 
   app.post('/sources/:id/refresh', async (c) => {
     const src = own('source', c.req.param('id'), c.get('user').id);

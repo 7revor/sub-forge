@@ -100,3 +100,24 @@ describe('文档增删改查', () => {
     expect((await admin.del(`/api/presets/${id}`)).status).toBe(409);
   });
 });
+
+describe('预设 Surge 预留字段', () => {
+  it('保存和更新后可完整读回，允许 general 中的任意值及空段', async () => {
+    const { admin, alice } = await twoUsers();
+    const surge = { general: { ipv6: true, 'dns-server': ['1.1.1.1'], extra: { nested: null } }, host: { 'example.com': '1.2.3.4' } };
+    const created = await admin.post('/api/presets', { name: '双客户端', mihomo: {}, surge });
+    expect(created.status).toBe(201);
+    const path = `/api/presets/${created.json.item.id}`;
+    expect((await alice.get(path)).json.item.surge).toEqual(surge);
+    const updated = await admin.put(path, { name: '空段', mihomo: {}, surge: {} });
+    expect(updated.status).toBe(200);
+    expect((await alice.get(path)).json.item.surge).toEqual({});
+  });
+
+  it.each([1, null, [], { general: 1 }, { general: null }, { general: [] }, { host: 1 }, { host: null }, { host: [] }, { host: { a: 1 } }])('非法 Surge 类型 %j 返回 400', async (surge) => {
+    const { admin } = await twoUsers();
+    const res = await admin.post('/api/presets', { name: '非法预设', mihomo: {}, surge });
+    expect(res.status).toBe(400);
+    expect(res.json.error).toMatch(/surge.*必须是/);
+  });
+});

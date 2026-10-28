@@ -123,6 +123,11 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
     }
     case 'preset': {
       if (!isObj(doc.mihomo)) throw bad('mihomo 段必须是对象');
+      if (doc.surge !== undefined) {
+        if (!isObj(doc.surge)) throw bad('surge 段必须是对象');
+        if (doc.surge.general !== undefined && !isObj(doc.surge.general)) throw bad('surge.general 必须是对象');
+        if (doc.surge.host !== undefined && (!isObj(doc.surge.host) || !Object.values(doc.surge.host).every((v) => typeof v === 'string'))) throw bad('surge.host 必须是值为字符串的对象');
+      }
       if (typeof doc.version !== 'number') doc.version = 1;
       break;
     }

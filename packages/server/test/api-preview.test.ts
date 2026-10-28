@@ -85,3 +85,81 @@ describe('规则集预览（CR-05）', () => {
     expect(ios.json.dropped).toHaveLength(2);
   });
 });
+
+describe('节点集最终节点列表', () => {
+  it('本地组自动去重，只返回节点摘要', async () => {
+    const { alice } = await scenario();
+    const proxies = ['a', 'b'].map((host) => ({ name: 'HK', type: 'trojan', server: `${host}.example.com`, port: 443, password: 'secret' }));
+    const id = (await alice.post('/api/locals', { name: '本地组', proxies })).json.item.id;
+    const res = await alice.get(`/api/nodesets/local/${id}/nodes`);
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({
+      nodes: proxies.map(({ password, ...p }, i) => ({ ...p, name: i ? 'HK 2' : 'HK' })),
+      total: 2, truncated: false, report: [],
+    });
+  });
+
+  it('本地订阅源使用保存的改名与过滤，组合继续执行成员前缀和自身处理链', async () => {
+    const { alice } = await scenario();
+    const source = (await alice.post('/api/sources', {
+      name: '源', kind: 'local', content: AIRPORT,
+      pipeline: [{ op: 'rename.regex', rules: [{ pattern: '^香港.*$', replace: 'HK' }] }, { op: 'filter.regex', patterns: ['^HK$'], keep: true }],
+    })).json.item.id;
+    const local = (await alice.post('/api/locals', { name: '本地组', proxies: [{ name: 'HK', type: 'trojan', server: 'd.example.com', port: 443, password: 'pw' }] })).json.item.id;
+    const collection = (await alice.post('/api/collections', {
+      name: '组合', members: [{ ref: { type: 'source', id: source }, prefix: '成员-' }, { ref: { type: 'local', id: local }, prefix: '成员-' }],
+      pipeline: [{ op: 'rename.affix', suffix: '-最终' }],
+    })).json.item.id;
+    const src = await alice.get(`/api/nodesets/source/${source}/nodes`);
+    expect(src.status).toBe(200);
+    expect(src.json.nodes.map((n: { name: string }) => n.name)).toEqual(['HK']);
+    const col = await alice.get(`/api/nodesets/collection/${collection}/nodes`);
+    expect(col.status).toBe(200);
+    expect(col.json.nodes.map((n: { name: string }) => n.name)).toEqual(['成员-HK-最终', '成员-HK-最终 2']);
+    expect(col.json).toMatchObject({ total: 2, truncated: false, report: [] });
+  });
+
+  it.each(['source', 'collection', 'local'] as const)('%s：未登录 401，别人的或不存在的节点集 404', async (type) => {
+    const { alice, bob, app } = await scenario();
+    const path = { source: 'sources', collection: 'collections', local: 'locals' }[type];
+    const body = { source: { name: '源', kind: 'local', content: AIRPORT }, collection: { name: '组合', members: [] }, local: { name: '本地组', proxies: [] } }[type];
+    const id = (await alice.post(`/api/${path}`, body)).json.item.id;
+    expect((await client(app).get(`/api/nodesets/${type}/${id}/nodes`)).status).toBe(401);
+    expect((await bob.get(`/api/nodesets/${type}/${id}/nodes`)).status).toBe(404);
+    expect((await alice.get(`/api/nodesets/${type}/missing/nodes`)).status).toBe(404);
+  });
+
+  it('不接受其他文档类型', async () => {
+    const { alice } = await scenario();
+    expect((await alice.get('/api/nodesets/preset/missing/nodes')).status).toBe(400);
+  });
+
+  it.each([5000, 5001])('%i 个节点：截断只影响返回列表，不影响总数', async (total) => {
+    const { alice } = await scenario();
+    const proxies = Array.from({ length: total }, (_, i) => ({ name: `节点-${i}`, type: 'trojan', server: 'a.example.com', port: 443, password: 'pw' }));
+    const id = (await alice.post('/api/locals', { name: '大节点组', proxies })).json.item.id;
+    const res = await alice.get(`/api/nodesets/local/${id}/nodes`);
+    expect(res.status).toBe(200);
+    expect(res.json).toMatchObject({ total, truncated: total > 5000, report: [] });
+    expect(res.json.nodes).toHaveLength(5000);
+    expect(res.json.nodes[4999].name).toBe('节点-4999');
+  });
+
+  it('返回快照加载与解析报告，读取有效快照不重复拉取', async () => {
+    let calls = 0;
+    const { alice } = await scenario(async (url) => {
+      calls++;
+      if (url.endsWith('/bad')) throw new Error('上游不可用');
+      return { status: 200, body: AIRPORT + '\ntrojan://broken' };
+    });
+    const id = (await alice.post('/api/sources', { name: '远程源', kind: 'remote', urls: ['https://example.com/good', 'https://example.com/bad'] })).json.item.id;
+    const res = await alice.get(`/api/nodesets/source/${id}/nodes`);
+    expect(res.status).toBe(200);
+    expect(res.json.total).toBe(3);
+    expect(res.json.report.map((r: { code: string }) => r.code)).toEqual(['source.fetch-failed', 'source.parse-failure']);
+    expect(calls).toBe(2);
+    await alice.get(`/api/nodesets/source/${id}/nodes`);
+    // 从未成功的地址重试，有效快照对应的地址不再拉取。
+    expect(calls).toBe(3);
+  });
+});
