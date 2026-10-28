@@ -2,7 +2,7 @@
 
 import { Agent, fetch as undiciFetch } from 'undici';
 import type { TrafficInfo } from '../store.ts';
-import { assertUrlAllowed, guardedLookup, type AllowList } from './ssrf.ts';
+import { assertUrlAllowed, guardedLookup, SsrfError, type AllowList } from './ssrf.ts';
 
 export class UpstreamError extends Error {}
 
@@ -34,6 +34,21 @@ export function parseUserinfo(header: string | null): TrafficInfo | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+/**
+ * undici 把建连失败包成 TypeError('fetch failed')，真正原因在 cause 链里。
+ * 拆出来：SSRF 拦截原样抛出，其余用最底层的原因作为错误信息。
+ */
+function unwrapFetchError(e: unknown): Error {
+  let cur: unknown = e;
+  let deepest: Error = e instanceof Error ? e : new Error(String(e));
+  for (let i = 0; cur instanceof Error && i < 8; i++) {
+    if (cur instanceof SsrfError) return cur;
+    deepest = cur;
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return deepest === e ? deepest : new UpstreamError(deepest.message);
+}
+
 export function createUpstreamFetcher(opts: { allow: AllowList; fetchImpl?: FetchLike; maxBytes?: number }): UpstreamFetcher {
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
   const fetchImpl: FetchLike = opts.fetchImpl ?? (() => {
@@ -47,7 +62,12 @@ export function createUpstreamFetcher(opts: { allow: AllowList; fetchImpl?: Fetc
     let url = new URL(rawUrl);
     for (let hop = 0; ; hop++) {
       assertUrlAllowed(url, opts.allow);
-      const res = await fetchImpl(url.toString(), { headers, signal, redirect: 'manual' });
+      let res: Awaited<ReturnType<FetchLike>>;
+      try {
+        res = await fetchImpl(url.toString(), { headers, signal, redirect: 'manual' });
+      } catch (e) {
+        throw unwrapFetchError(e);
+      }
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get('location');
         if (!loc) throw new UpstreamError(`HTTP ${res.status} 缺少 Location`);
