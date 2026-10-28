@@ -171,27 +171,35 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
 export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: string): string[] {
   const hits: string[] = [];
   const isRef = (r: unknown) => isObj(r) && r.type === kind && r.id === id;
-  const json = (v: unknown) => JSON.stringify(v);
+  // 比较结构，不依赖 JSON 属性排列顺序，也不把字符串内容误识别成引用。
+  const contains = (value: unknown, field: 'kind' | 'type'): boolean => {
+    if (Array.isArray(value)) return value.some(v => contains(v, field));
+    if (!isObj(value)) return false;
+    return (value[field] === kind && value.id === id) || Object.values(value).some(v => contains(v, field));
+  };
   if (kind === 'source' || kind === 'collection' || kind === 'local') {
     for (const c of store.list('collection', ownerId)) if (c.members.some((m) => isRef(m.ref))) hits.push(`组合「${c.name}」`);
     for (const p of store.list('profile', ownerId)) {
-      if (p.nodeSets.some((n) => isRef(n.ref)) || json([p.overlay, p.chains]).includes(json({ type: kind, id }))) hits.push(`配置订阅「${p.name}」`);
+      if (p.nodeSets.some((n) => isRef(n.ref)) || contains([p.overlay, p.chains], 'type')) hits.push(`配置订阅「${p.name}」`);
     }
-    for (const l of store.list('local', ownerId)) if (json(l.proxies).includes(json({ type: kind, id }))) hits.push(`本地节点组「${l.name}」`);
+    for (const l of store.list('local', ownerId)) if (contains(l.proxies, 'type')) hits.push(`本地节点组「${l.name}」`);
   }
   if (kind === 'ruleset') {
-    for (const b of store.list('bundle', ownerId)) if (b.items.some((i) => i.kind === 'ruleset' && i.id === id)) hits.push(`规则包「${b.name}」`);
+    for (const b of store.list('bundle')) if (b.items.some((i) => i.kind === 'ruleset' && i.id === id)) {
+      hits.push(store.getWithOwner('bundle', b.id)?.owner === ownerId ? `规则包「${b.name}」` : '其他用户的规则包');
+    }
   }
   if (kind === 'ruleset' || kind === 'bundle') {
-    const m = json({ kind, id });
-    for (const p of store.list('profile', ownerId)) if (json(p.overlay).includes(m)) hits.push(`配置订阅「${p.name}」`);
+    for (const p of store.list('profile')) if (contains(p.overlay, 'kind')) {
+      hits.push(store.getWithOwner('profile', p.id)?.owner === ownerId ? `配置订阅「${p.name}」` : '其他用户的配置订阅');
+    }
   }
   if (kind === 'ruleset' || kind === 'bundle') {
     // 模板由管理员维护，可能引用管理员名下的公共规则集 / 规则包
-    for (const t of store.listLatestTemplates()) {
+    for (const t of store.listAllTemplateVersions()) {
       const used = t.rules.some((r) => r.matcher.kind === kind && r.matcher.id === id)
         || (kind === 'ruleset' && t.rules.some((r) => r.matcher.kind === 'bundle' && store.get('bundle', r.matcher.id)?.items.some((i) => i.kind === 'ruleset' && i.id === id)));
-      if (used) hits.push(`模板「${t.name ?? t.id}」`);
+      if (used) hits.push(`模板「${t.name ?? t.id}」v${t.version}`);
     }
   }
   if (kind === 'preset') {

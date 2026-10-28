@@ -18,6 +18,26 @@ async function twoUsers() {
 }
 
 describe('文档增删改查', () => {
+  it('旧模板版本依赖的规则不可删除，锁定旧版本的 Profile 继续可渲染', async () => {
+    const { store, renderer, admin, alice } = await twoUsers();
+    const rs = (await admin.post('/api/rulesets', { name: '旧规则', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' })).json.item.id;
+    const t = { id: 'legacy', version: 1, name: '历史模板', groups: [], rules: [{ id: 'r', matcher: { kind: 'ruleset' as const, id: rs }, target: { kind: 'builtin' as const, name: 'DIRECT' as const } }], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
+    store.putTemplateVersion(t); store.putTemplateVersion({ ...t, version: 2, rules: [] });
+    const p = (await alice.post('/api/profiles', { name: '锁定旧版', nodeSets: [], template: { id: t.id, follow: { pinned: 1 } } })).json.item.id;
+    const res = await admin.del(`/api/rulesets/${rs}`);
+    expect(res.status).toBe(409);
+    expect(res.json.details.referrers).toContain('模板「历史模板」v1');
+    expect((await renderer.preview(p, { client: 'mihomo' })).ok).toBe(true);
+  });
+
+  it('不同属性顺序的引用与跨用户共享规则也阻止删除，不暴露他人配置名称', async () => {
+    const { admin, alice } = await twoUsers();
+    const rs = (await admin.post('/api/rulesets', { name: '公共规则', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' })).json.item.id;
+    await alice.post('/api/profiles', { name: '不对管理员暴露的名称', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { id: rs, kind: 'ruleset' }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
+    const res = await admin.del(`/api/rulesets/${rs}`);
+    expect(res.status).toBe(409);
+    expect(res.json.details.referrers).toEqual(['其他用户的配置订阅']);
+  });
   it('未登录不能访问', async () => {
     const { app } = setupApp();
     expect((await client(app).get('/api/sources')).status).toBe(401);

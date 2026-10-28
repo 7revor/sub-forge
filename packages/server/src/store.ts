@@ -234,6 +234,12 @@ export class Store {
     return rows.map((r) => JSON.parse(r.data) as TemplateVersionDoc);
   }
 
+  /** 历史版本仍可被 Profile 锁定使用，依赖删除检查不能只看最新版本。 */
+  listAllTemplateVersions(): TemplateVersionDoc[] {
+    return (this.db.prepare('SELECT data FROM template_versions ORDER BY template_id, version').all() as { data: string }[])
+      .map((r) => JSON.parse(r.data) as TemplateVersionDoc);
+  }
+
   // ---------- 订阅 token ----------
 
   createToken(profileId: string, label?: string): TokenDoc {
