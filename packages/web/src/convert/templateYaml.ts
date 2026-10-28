@@ -1,0 +1,249 @@
+import { composeRule, lowerRule, parseRuleLine, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
+import { Document, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
+
+export type TemplateBody = Pick<Template, 'groups' | 'rules' | 'final'>;
+export type NamedRef = { id: string; name: string };
+export type ConvertCtx = { rulesets: NamedRef[]; bundles: NamedRef[] };
+
+const builtins = new Set<string>(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']);
+const groupTypes = new Set<string>(['select', 'url-test', 'fallback', 'load-balance']);
+const testFields = {
+  url: 'url', interval: 'interval', timeout: 'timeout', tolerance: 'tolerance',
+  lazy: 'lazy', 'max-failed-times': 'maxFailedTimes', 'expected-status': 'expectedStatus',
+} as const;
+const knownFields = new Set(['name', 'type', 'proxies', 'strategy', 'hidden', 'icon', ...Object.keys(testFields)]);
+const nodeField = (key: string) => ['use', 'filter', 'exclude-filter', 'exclude-type'].includes(key) || key.startsWith('include-all');
+
+export function newId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0')}`;
+}
+
+function lowerMatcher(matcher: Extract<Matcher, { kind: 'rule' }>) {
+  const lowered = lowerRule(matcher.rule, { client: 'mihomo' });
+  if (lowered.kind === 'drop') throw new Error(`无法导出规则：${lowered.reason}`);
+  return { ...lowered, noResolve: lowered.noResolve || ('noResolve' in matcher.rule && matcher.rule.noResolve) };
+}
+
+function targetName(target: Target, groups: GroupSpec[]): string {
+  if (target.kind === 'builtin') return target.name;
+  if (target.kind === 'group') {
+    const group = groups.find((g) => g.id === target.groupId);
+    if (group) return group.name;
+    throw new Error(`出口引用的模板组「${target.groupId}」不存在`);
+  }
+  throw new Error('模板出口不能是节点');
+}
+
+export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
+  const groups = t.groups.map((g) => {
+    const out: Record<string, unknown> = {
+      name: g.name, type: g.type,
+      proxies: g.members.map((m) => {
+        if (m.kind !== 'builtin' && m.kind !== 'group') throw new Error(`模板组「${g.name}」不能包含节点或节点集`);
+        return targetName(m, t.groups);
+      }),
+    };
+    for (const [yamlKey, key] of Object.entries(testFields)) {
+      if (g.test?.[key] !== undefined) out[yamlKey] = g.test[key];
+    }
+    if (g.strategy !== undefined) out.strategy = g.strategy;
+    if (g.display?.hidden !== undefined) out.hidden = g.display.hidden;
+    if (g.display?.icon !== undefined) out.icon = g.display.icon;
+    return { ...out, ...g.extra };
+  });
+  const lines = t.rules.map((r) => {
+    const m = r.matcher;
+    const lowered = m.kind === 'rule' ? lowerMatcher(m) : {
+      text: `RULE-SET,${(m.kind === 'ruleset' ? ctx.rulesets : ctx.bundles).find((ref) => ref.id === m.id)?.name ?? m.id}`,
+    };
+    return composeRule({ ...lowered, noResolve: ('noResolve' in lowered && lowered.noResolve) || r.options?.noResolve }, targetName(r.target, t.groups))
+      + (r.options?.src ? ',src' : '');
+  });
+  lines.push(`MATCH,${targetName(t.final, t.groups)}`);
+  const doc = new Document({ 'proxy-groups': groups, rules: lines });
+  const rules = doc.get('rules', true);
+  if (isSeq(rules)) t.rules.forEach((r, i) => {
+    const item = rules.items[i];
+    if (r.enabled === false && isNode(item)) item.commentBefore = ' disabled';
+  });
+  return doc.toString({ lineWidth: 0 });
+}
+
+// no-resolve 和 src 属于选项；修改选项或出口不应使覆盖层失去规则 ID。
+function matcherKey(m: Matcher): string {
+  if (m.kind !== 'rule') return `${m.kind}:${m.id}`;
+  const lowered = lowerRule(m.rule, { client: 'mihomo' });
+  return `rule:${lowered.kind === 'ok' ? lowered.text : JSON.stringify(m.rule)}`;
+}
+
+function restoreRule(matcher: Matcher, old: RuleEntry | undefined, noResolve: boolean, src: boolean): Pick<RuleEntry, 'matcher' | 'options'> {
+  const options = { ...old?.options };
+  if (src || old?.options?.src !== undefined) options.src = src;
+  const oldNoResolve = old?.options?.noResolve || (old?.matcher.kind === 'rule' && 'noResolve' in old.matcher.rule && old.matcher.rule.noResolve) || false;
+  if (old && oldNoResolve === noResolve) {
+    // YAML 无法区分选项来自 IR 还是 RuleEntry，也不承载客户端覆盖，按原表示保留。
+    matcher = old.matcher;
+  } else if (matcher.kind === 'rule') {
+    if (old?.matcher.kind === 'rule' && old.matcher.overrides !== undefined) matcher = { ...matcher, overrides: old.matcher.overrides };
+    if (old?.options?.noResolve !== undefined || (noResolve && !('noResolve' in matcher.rule))) {
+      options.noResolve = noResolve;
+      if ('noResolve' in matcher.rule) {
+        const { noResolve: _noResolve, ...rule } = matcher.rule;
+        matcher = { ...matcher, rule };
+      }
+    }
+  } else if (noResolve || old?.options?.noResolve !== undefined) options.noResolve = noResolve;
+  return { matcher, ...(old?.options !== undefined || Object.keys(options).length ? { options } : {}) };
+}
+
+export function templateFromYaml(text: string, current: TemplateBody, ctx: ConvertCtx):
+  | { ok: true; value: TemplateBody; notes: string[] }
+  | { ok: false; error: string; line?: number } {
+  const lineCounter = new LineCounter();
+  let line: number | undefined;
+  try {
+    const doc = parseDocument(text, { lineCounter });
+    const parseError = doc.errors[0];
+    if (parseError) return { ok: false, error: `YAML 解析失败：${parseError.message}`, line: parseError.linePos?.[0]?.line };
+    const locate = (node: unknown) => { line = isNode(node) && node.range ? lineCounter.linePos(node.range[0]).line : undefined; };
+    locate(doc.contents);
+    if (!isMap(doc.contents)) throw new Error('YAML 顶层必须是对象');
+    const notes: string[] = [];
+    const ignored = doc.contents.items.map((p) => String(p.key)).filter((key) => !['proxy-groups', 'rules'].includes(key));
+    if (ignored.length) notes.push(`已忽略：${ignored.join('、')}（仅导入 proxy-groups 和 rules）`);
+    const groupNodes = doc.get('proxy-groups', true);
+    locate(groupNodes);
+    if (groupNodes !== undefined && !isSeq(groupNodes)) throw new Error('proxy-groups 必须是列表');
+    const names = new Map<string, string>();
+    const groups: GroupSpec[] = [];
+    for (const node of isSeq(groupNodes) ? groupNodes.items : []) {
+      locate(node);
+      if (!isMap(node)) throw new Error('策略组必须是对象');
+      const raw = node.toJSON() as Record<string, unknown>;
+      if (typeof raw.name !== 'string' || !raw.name.trim()) throw new Error('策略组缺少有效名称');
+      if (names.has(raw.name)) throw new Error(`策略组名称「${raw.name}」重复`);
+      locate(node.get('type', true) ?? node);
+      if (typeof raw.type !== 'string' || !groupTypes.has(raw.type)) throw new Error(`组「${raw.name}」的类型「${String(raw.type)}」不受支持`);
+      const old = current.groups.find((g) => g.name === raw.name);
+      const g: GroupSpec = { id: old?.id ?? newId('g'), name: raw.name, type: raw.type as GroupSpec['type'], members: [] };
+      if (old?.whenEmpty !== undefined) g.whenEmpty = old.whenEmpty;
+      if (old?.hint !== undefined) g.hint = old.hint;
+      const test: Record<string, unknown> = {};
+      for (const [yamlKey, key] of Object.entries(testFields)) {
+        if (raw[yamlKey] === undefined) continue;
+        locate(node.get(yamlKey, true));
+        if (key === 'expectedStatus' && typeof raw[yamlKey] === 'number') {
+          test[key] = String(raw[yamlKey]);
+          continue;
+        }
+        const expected = key === 'lazy' ? 'boolean' : ['url', 'expectedStatus'].includes(key) ? 'string' : 'number';
+        if (typeof raw[yamlKey] !== expected) throw new Error(`组「${g.name}」的 ${yamlKey} 必须是${expected === 'boolean' ? '布尔值' : expected === 'string' ? '字符串' : '数字'}`);
+        test[key] = raw[yamlKey];
+      }
+      if (Object.keys(test).length || old?.test !== undefined) g.test = test;
+      if (raw.strategy !== undefined) {
+        locate(node.get('strategy', true));
+        if (!['consistent-hashing', 'round-robin', 'sticky-sessions'].includes(String(raw.strategy))) throw new Error(`组「${g.name}」的 strategy 不受支持`);
+        g.strategy = raw.strategy as GroupSpec['strategy'];
+      }
+      if (raw.hidden !== undefined || raw.icon !== undefined || old?.display !== undefined) {
+        g.display = {};
+        if (raw.hidden !== undefined) {
+          locate(node.get('hidden', true));
+          if (typeof raw.hidden !== 'boolean') throw new Error(`组「${g.name}」的 hidden 必须是布尔值`);
+          g.display.hidden = raw.hidden;
+        }
+        if (raw.icon !== undefined) {
+          locate(node.get('icon', true));
+          if (typeof raw.icon !== 'string') throw new Error(`组「${g.name}」的 icon 必须是字符串`);
+          g.display.icon = raw.icon;
+        }
+      }
+      const extra: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(raw)) {
+        if (nodeField(key)) notes.push(`组「${g.name}」已忽略节点相关字段：${key}`);
+        else if (!knownFields.has(key)) Object.defineProperty(extra, key, { value, enumerable: true, configurable: true, writable: true });
+      }
+      if (Object.keys(extra).length || old?.extra !== undefined) g.extra = extra;
+      names.set(g.name, g.id);
+      groups.push(g);
+    }
+    const resolve = (name: string): Exclude<Target, { kind: 'node' }> | undefined => {
+      const groupId = names.get(name);
+      if (groupId !== undefined) return { kind: 'group', groupId };
+      if (builtins.has(name)) return { kind: 'builtin', name: name as Builtin };
+      return undefined;
+    };
+    if (isSeq(groupNodes)) groupNodes.items.forEach((node, i) => {
+      if (!isMap(node)) return;
+      const proxies = node.get('proxies', true);
+      locate(proxies);
+      if (proxies === undefined) return;
+      if (!isSeq(proxies)) throw new Error(`组「${groups[i]!.name}」的 proxies 必须是列表`);
+      for (const member of proxies.items) {
+        locate(member);
+        if (!isScalar(member) || typeof member.value !== 'string') throw new Error(`组「${groups[i]!.name}」的成员必须是名称字符串`);
+        const target = resolve(member.value);
+        if (target) groups[i]!.members.push(target);
+        else notes.push(`组「${groups[i]!.name}」已忽略节点成员：${member.value}`);
+      }
+    });
+    const ruleNodes = doc.get('rules', true);
+    locate(ruleNodes);
+    if (ruleNodes !== undefined && !isSeq(ruleNodes)) throw new Error('rules 必须是列表');
+    const rules: RuleEntry[] = [];
+    const used = new Set<string>();
+    let final: Target | undefined;
+    for (const [index, node] of (isSeq(ruleNodes) ? ruleNodes.items : []).entries()) {
+      locate(node);
+      if (!isScalar(node) || typeof node.value !== 'string') throw new Error(`第 ${index + 1} 条规则必须是字符串`);
+      const original = node.value;
+      try {
+        const parts = original.split(',').map((part) => part.trim());
+        const type = parts[0]!.toUpperCase();
+        let targetIndex = parts.length - 1;
+        while (targetIndex > 0 && ['no-resolve', 'src'].includes(parts[targetIndex]!.toLowerCase())) targetIndex--;
+        if (targetIndex < (['MATCH', 'FINAL'].includes(type) ? 1 : 2)) throw new Error('缺少匹配项或出口');
+        if (['MATCH', 'FINAL'].includes(type) && final !== undefined) {
+          notes.push(`第 ${index + 1} 条 ${type} 已忽略：多条 MATCH / FINAL 仅采用第一条`);
+          continue;
+        }
+        const target = resolve(parts[targetIndex]!);
+        if (!target) throw new Error(`出口「${parts[targetIndex]}」不是本片段中的模板组或内置策略，不能使用节点名`);
+        const matchingParts = parts.filter((_, i) => i !== targetIndex);
+        const flags = matchingParts.slice(['MATCH', 'FINAL'].includes(type) ? 1 : 2).map((part) => part.toLowerCase());
+        if (flags.some((flag) => !['no-resolve', 'src'].includes(flag))) throw new Error('规则包含多余字段或不支持的选项');
+        if (['MATCH', 'FINAL'].includes(type)) {
+          final = target;
+          continue;
+        }
+        let matcher: Matcher;
+        if (type === 'RULE-SET') {
+          const name = parts[1]!;
+          const ruleset = ctx.rulesets.find((ref) => ref.name === name);
+          const bundle = ctx.bundles.find((ref) => ref.name === name);
+          if (ruleset) matcher = { kind: 'ruleset', id: ruleset.id };
+          else if (bundle) matcher = { kind: 'bundle', id: bundle.id };
+          else throw new Error(`规则集或规则包「${name}」不存在`);
+        } else {
+          matcher = { kind: 'rule', rule: parseRuleLine(matchingParts.join(',')) };
+        }
+        const key = matcherKey(matcher);
+        const old = current.rules.find((r) => !used.has(r.id) && matcherKey(r.matcher) === key);
+        if (old) used.add(old.id);
+        const r: RuleEntry = { id: old?.id ?? newId('r'), ...restoreRule(matcher, old, flags.includes('no-resolve'), flags.includes('src')), target };
+        // 第一项的前置注释可能归在 YAMLSeq 上，而非 Scalar 上。
+        const comments = [node.commentBefore, node.comment, index === 0 && isSeq(ruleNodes) ? ruleNodes.commentBefore : undefined];
+        if (comments.some((comment) => typeof comment === 'string' && comment.split('\n').some((s) => s.trim() === 'disabled'))) r.enabled = false;
+        else if (old?.enabled !== undefined) r.enabled = true;
+        rules.push(r);
+      } catch (err) {
+        throw new Error(`第 ${index + 1} 条规则「${original}」：${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    if (final === undefined) notes.push('未找到 MATCH / FINAL，已沿用当前模板的 final 出口');
+    return { ok: true, value: { groups, rules, final: final ?? current.final }, notes };
+  } catch (err) {
+    return { ok: false, error: `模板 YAML 导入失败：${err instanceof Error ? err.message : String(err)}`, ...(line === undefined ? {} : { line }) };
+  }
+}
