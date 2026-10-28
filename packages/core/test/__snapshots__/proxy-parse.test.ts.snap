@@ -1,0 +1,137 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Surge [Proxy] > 解析完整配置中的 [Proxy] 段，跳过内置策略 1`] = `
+[
+  {
+    "cipher": "aes-128-gcm",
+    "name": "HK",
+    "password": "p",
+    "plugin": "obfs",
+    "plugin-opts": {
+      "host": "bing.com",
+      "mode": "http",
+    },
+    "port": 8388,
+    "server": "hk.example.com",
+    "type": "ss",
+    "udp": true,
+  },
+  {
+    "alterId": 0,
+    "cipher": "auto",
+    "name": "VM",
+    "network": "ws",
+    "port": 443,
+    "server": "v.example.com",
+    "servername": "v.example.com",
+    "tls": true,
+    "type": "vmess",
+    "uuid": "u-1",
+    "ws-opts": {
+      "headers": {
+        "Host": "cdn.example.com",
+      },
+      "path": "/ray",
+    },
+  },
+  {
+    "name": "Home",
+    "password": "pass",
+    "port": 1080,
+    "server": "10.0.0.2",
+    "type": "socks5",
+    "upstreamDialer": "HK",
+    "username": "user",
+  },
+]
+`;
+
+exports[`URI 列表 > 解析主流协议，单个失败不中断 1`] = `
+[
+  {
+    "cipher": "aes-128-gcm",
+    "name": "香港 01 | 0.5x",
+    "password": "pass",
+    "port": 8388,
+    "server": "hk.example.com",
+    "type": "ss",
+  },
+  {
+    "cipher": "chacha20-ietf-poly1305",
+    "name": "SG",
+    "password": "p2",
+    "port": 443,
+    "server": "sg.example.com",
+    "type": "ss",
+  },
+  {
+    "alterId": 0,
+    "cipher": "auto",
+    "name": "日本 05 [原生]",
+    "network": "ws",
+    "port": 443,
+    "server": "jp.example.com",
+    "servername": "jp.example.com",
+    "tls": true,
+    "type": "vmess",
+    "uuid": "u-1",
+    "ws-opts": {
+      "headers": {
+        "Host": "cdn.example.com",
+      },
+      "path": "/ray",
+    },
+  },
+  {
+    "client-fingerprint": "chrome",
+    "flow": "xtls-rprx-vision",
+    "name": "US Reality",
+    "port": 443,
+    "reality-opts": {
+      "public-key": "PUBKEY",
+      "short-id": "ab",
+    },
+    "server": "us.example.com",
+    "servername": "www.apple.com",
+    "tls": true,
+    "type": "vless",
+    "uuid": "uuid-2",
+  },
+  {
+    "grpc-opts": {
+      "grpc-service-name": "svc",
+    },
+    "name": "TW",
+    "network": "grpc",
+    "password": "pw",
+    "port": 443,
+    "server": "tw.example.com",
+    "skip-cert-verify": true,
+    "sni": "tw.example.com",
+    "type": "trojan",
+  },
+  {
+    "name": "Hy2",
+    "obfs": "salamander",
+    "obfs-password": "op",
+    "password": "auth",
+    "port": 8443,
+    "server": "2001:db8::1",
+    "sni": "h.example.com",
+    "type": "hysteria2",
+  },
+  {
+    "alpn": [
+      "h3",
+    ],
+    "congestion-controller": "bbr",
+    "name": "TUIC",
+    "password": "p3",
+    "port": 443,
+    "server": "t.example.com",
+    "sni": "t.example.com",
+    "type": "tuic",
+    "uuid": "u3",
+  },
+]
+`;
