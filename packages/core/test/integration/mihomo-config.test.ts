@@ -6,7 +6,7 @@
 // 127.0.0.1:9 这类不可达地址，geo 数据下载地址同样指向本机。任何联网尝试都会表现为校验失败。
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -16,13 +16,15 @@ import type { Profile } from '../../src/types.ts';
 import { RULES, TEMPLATE, render } from '../fixtures/scenarios.ts';
 
 const MIHOMO = process.env.MIHOMO;
+/** GeoIP 数据库路径；提供时校验包含 GEOIP 规则（-t 阶段就要加载 MMDB，缺失时 mihomo 会尝试下载） */
+const MMDB = process.env.MIHOMO_MMDB;
 const SANDBOX = '/usr/bin/sandbox-exec';
 const NO_NETWORK = '(version 1)(allow default)(deny network*)';
 const UNREACHABLE = 'http://127.0.0.1:9';
 
-// GEOIP 规则在 -t 阶段就要加载 MMDB，而本测试不下载任何数据，所以校验用的模板去掉这条规则
+// 没有 MMDB 时去掉 GEOIP 规则：本测试不下载任何数据
 const isolated: Partial<RenderInput> = {
-  template: { ...TEMPLATE, rules: TEMPLATE.rules.filter((r) => r.id !== 'r-cn') },
+  template: MMDB ? TEMPLATE : { ...TEMPLATE, rules: TEMPLATE.rules.filter((r) => r.id !== 'r-cn') },
   urls: {
     provider: (key, v) => `${UNREACHABLE}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
     ruleset: (key) => `${UNREACHABLE}/r/TOKEN/${key}`,
@@ -44,6 +46,7 @@ function check(yaml: string): { ok: boolean; output: string } {
   const dir = mkdtempSync(join(tmpdir(), 'sf-check-'));
   dirs.push(dir);
   writeFileSync(join(dir, 'config.yaml'), yaml);
+  if (MMDB) copyFileSync(MMDB, join(dir, 'Country.mmdb'));
   const args = ['-t', '-d', dir, '-f', join(dir, 'config.yaml')];
   const r = existsSync(SANDBOX)
     ? spawnSync(SANDBOX, ['-p', NO_NETWORK, MIHOMO!, ...args], { encoding: 'utf8', timeout: 30000 })
@@ -127,6 +130,12 @@ describe.skipIf(!MIHOMO)('mihomo -t 配置合法性', () => {
     const flat = flatten(r);
     const resFlat = check(flat);
     expect(resFlat.ok, `展开校验失败\n${resFlat.output}\n---- config ----\n${flat}`).toBe(true);
+  });
+
+  it.skipIf(!MMDB)('GEOIP 规则随配置一起校验', () => {
+    const r = render({}, isolated);
+    expect(r.config.rules).toContain('GEOIP,CN,DIRECT,no-resolve');
+    expect(check(r.yaml).ok).toBe(true);
   });
 
   it('对照：组成员指向不存在的名称时 -t 失败（证明校验真的在检查）', () => {
