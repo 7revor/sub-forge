@@ -4,6 +4,8 @@
 import type { OperatorStep } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
+import { ExtraFields } from './ExtraFields.tsx';
+import { regexError, setFieldsError, updateSetField } from './pipelineForm.ts';
 import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview } from '../api.ts';
 import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, Textarea, cx, td, th } from './ui.tsx';
@@ -57,9 +59,67 @@ export function stepSummary(s: OperatorStep): string {
 
 const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
+function RegexLines({ label, patterns, onChange, flags = '' }: {
+  label: string; patterns: string[]; onChange: (patterns: string[]) => void; flags?: string;
+}) {
+  const errors = patterns.map((pattern, i) => ({ line: i + 1, error: regexError(pattern, flags) })).filter((item) => item.error);
+  return <Field label={label} hint="支持 (?i) 前缀忽略大小写">{(id) => <>
+    <Textarea id={id} rows={4} className="font-mono" value={patterns.join('\n')} aria-invalid={errors.length > 0}
+      aria-describedby={errors.length ? `${id}-errors` : undefined}
+      onChange={(e) => onChange(e.target.value.split('\n'))} onBlur={(e) => onChange(lines(e.target.value))} />
+    <div id={`${id}-errors`} role="status" className="text-[12px] text-err">
+      {errors.map(({ line, error }) => <div key={line}>第 {line} 行：{error}</div>)}
+    </div>
+  </>}</Field>;
+}
+
+const SET_BOOLS = ['udp', 'tfo', 'skip-cert-verify'];
+const SET_SELECTS = {
+  'client-fingerprint': ['chrome', 'firefox', 'safari', 'ios', 'android', 'edge', '360', 'qq', 'random', 'randomized'],
+  'ip-version': ['dual', 'ipv4', 'ipv6', 'ipv4-prefer', 'ipv6-prefer'],
+};
+const SET_KEYS = [...SET_BOOLS, ...Object.keys(SET_SELECTS)];
+const PROTOCOLS = ['ss', 'vmess', 'vless', 'trojan', 'hysteria2', 'tuic', 'anytls', 'socks5', 'http', 'snell'];
+
+function SetFieldsForm({ fields, onChange }: { fields: Record<string, unknown>; onChange: (fields: Record<string, unknown>) => void }) {
+  const [error, setError] = useState<string>();
+  const extra = Object.fromEntries(Object.entries(fields).filter(([key]) => !SET_KEYS.includes(key)));
+  // 公共 ExtraFields 没有键名校验接口，在此捕获输入并在写入前再次用内核校验。
+  return <div className="flex flex-col gap-3">
+    {SET_BOOLS.map((key) => <Field key={key} label={key}>{() => <Segmented label={key}
+      value={fields[key] === true ? 'on' : fields[key] === false ? 'off' : 'unset'}
+      options={[{ value: 'unset', label: '不设置' }, { value: 'on', label: '开' }, { value: 'off', label: '关' }]}
+      onChange={(v) => onChange(updateSetField(fields, key, v === 'unset' ? undefined : v === 'on'))} />}</Field>)}
+    {Object.entries(SET_SELECTS).map(([key, options]) => {
+      const value = fields[key] === undefined ? '' : String(fields[key]);
+      return <Field key={key} label={key}>{(id) => <Select id={id} value={value}
+        onChange={(e) => onChange(updateSetField(fields, key, e.target.value || undefined))}>
+        <option value="">不设置</option>
+        {value && !options.includes(value) && <option value={value}>{value}（当前值）</option>}
+        {options.map((v) => <option key={v} value={v}>{v}</option>)}
+      </Select>}</Field>;
+    })}
+    <div onChangeCapture={(event) => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement && (target.getAttribute('aria-label') === '新字段名称' || target.getAttribute('aria-label')?.endsWith('的字段名称'))) {
+        const key = target.value.trim();
+        setError(setFieldsError({ [key]: null }) || (SET_KEYS.includes(key) ? '请使用上方控件修改该字段' : undefined));
+      }
+    }}>
+      <ExtraFields value={extra} onChange={(next) => {
+        const error = setFieldsError(next) || (Object.keys(next).some((key) => SET_KEYS.includes(key)) ? '请使用上方控件修改该字段' : undefined);
+        setError(error);
+        if (error) return;
+        onChange({ ...Object.fromEntries(Object.entries(fields).filter(([key]) => SET_KEYS.includes(key))), ...next });
+      }} />
+      {(error || setFieldsError(extra)) && <div role="alert" className="mt-1 text-[12px] text-err">{error || setFieldsError(extra)}</div>}
+    </div>
+  </div>;
+}
+
 function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: OperatorStep) => void }) {
-  const [setText, setSetText] = useState(step.op === 'set' ? JSON.stringify(step.fields, null, 2) : '');
-  const [setErr, setSetErr] = useState('');
+  const [customType, setCustomType] = useState('');
+  const [typeError, setTypeError] = useState('');
   switch (step.op) {
     case 'filter.regex':
     case 'filter.type':
@@ -67,8 +127,29 @@ function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: Operat
         <div className="flex flex-col gap-3">
           <Segmented label="保留或剔除" value={step.keep ? 'keep' : 'drop'} options={[{ value: 'drop', label: '剔除命中' }, { value: 'keep', label: '只保留命中' }]} onChange={(v) => onChange({ ...step, keep: v === 'keep' })} />
           {step.op === 'filter.regex'
-            ? <Field label="正则（每行一条，命中任一条即算命中）" hint="支持 (?i) 前缀忽略大小写">{(id) => <Textarea id={id} rows={3} className="font-mono" value={step.patterns.join('\n')} onChange={(e) => onChange({ ...step, patterns: e.target.value.split('\n') })} onBlur={(e) => onChange({ ...step, patterns: lines(e.target.value) })} />}</Field>
-            : <Field label="协议类型（逗号分隔）">{(id) => <Input id={id} className="font-mono" value={step.types.join(', ')} onChange={(e) => onChange({ ...step, types: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} />}</Field>}
+            ? <RegexLines label="正则（每行一条，命中任一条即算命中）" patterns={step.patterns} onChange={(patterns) => onChange({ ...step, patterns })} />
+            : <fieldset className="flex flex-col gap-2">
+              <legend className="text-[12.5px] text-muted">协议类型（至少选一个）</legend>
+              <div className="grid grid-cols-3 gap-2">
+                {[...new Set([...PROTOCOLS, ...step.types])].map((type) => <label key={type} className="flex items-center gap-2 text-[13px]">
+                  <input type="checkbox" checked={step.types.includes(type)} onChange={(e) => {
+                    const types = e.target.checked ? [...step.types, type] : step.types.filter((v) => v !== type);
+                    if (!types.length) { setTypeError('至少选择一个协议类型'); return; }
+                    setTypeError(''); onChange({ ...step, types });
+                  }} />{type}
+                </label>)}
+              </div>
+              <div className="flex gap-2">
+                <Input aria-label="自定义协议类型" placeholder="其他协议类型" value={customType} onChange={(e) => setCustomType(e.target.value)} />
+                <Button size="sm" onClick={() => {
+                  const type = customType.trim().toLowerCase();
+                  if (!type) { setTypeError('请输入协议类型'); return; }
+                  onChange({ ...step, types: [...new Set([...step.types, type])] }); setCustomType(''); setTypeError('');
+                }}>添加</Button>
+              </div>
+              {(typeError || !step.types.length) && <div role="alert" className="text-[12px] text-err">{typeError || '至少选择一个协议类型'}</div>}
+            </fieldset>}
+
         </div>
       );
     case 'filter.useless':
@@ -76,7 +157,8 @@ function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: Operat
     case 'sort.regex': {
       const value = step.op === 'filter.useless' ? step.patterns ?? [] : step.patterns;
       const label = step.op === 'filter.useless' ? '关键词正则（每行一条，留空使用默认）' : step.op === 'sort.regex' ? '优先级（每行一条，先命中的排前面）' : '要删除的部分（每行一条正则）';
-      return <Field label={label}>{(id) => <Textarea id={id} rows={4} className="font-mono" value={value.join('\n')} onChange={(e) => onChange({ ...step, patterns: e.target.value.split('\n') } as OperatorStep)} onBlur={(e) => onChange({ ...step, patterns: lines(e.target.value) } as OperatorStep)} />}</Field>;
+      return <RegexLines label={label} patterns={value} flags={step.op === 'rename.delete' ? 'g' : ''}
+        onChange={(patterns) => onChange({ ...step, patterns: step.op === 'filter.useless' && patterns.length === 0 ? undefined : patterns } as OperatorStep)} />;
     }
     case 'rename.regex':
       return (
@@ -85,7 +167,12 @@ function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: Operat
           {step.rules.map((r, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="w-5 font-mono text-[12px] text-muted">{i + 1}</span>
-              <Input aria-label={`规则 ${i + 1} 正则`} className="font-mono" placeholder="^香港\s*(\d+).*$" value={r.pattern} onChange={(e) => onChange({ ...step, rules: step.rules.map((x, j) => (j === i ? { ...x, pattern: e.target.value } : x)) })} />
+              <div className="min-w-0 flex-1">
+                <Input aria-label={`规则 ${i + 1} 正则`} className="font-mono" placeholder="正则表达式" value={r.pattern}
+                  aria-invalid={!!regexError(r.pattern, (r.flags ?? '').replace('g', '') + 'g')}
+                  onChange={(e) => onChange({ ...step, rules: step.rules.map((x, j) => (j === i ? { ...x, pattern: e.target.value } : x)) })} />
+                <div role="status" className="text-[12px] text-err">{regexError(r.pattern, (r.flags ?? '').replace('g', '') + 'g')}</div>
+              </div>
               <span aria-hidden="true" className="text-faint">→</span>
               <Input aria-label={`规则 ${i + 1} 替换为`} className="font-mono" placeholder="HK-$1" value={r.replace} onChange={(e) => onChange({ ...step, rules: step.rules.map((x, j) => (j === i ? { ...x, replace: e.target.value } : x)) })} />
               <Button variant="ghost" size="sm" aria-label={`删除规则 ${i + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
@@ -113,19 +200,7 @@ function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: Operat
         </div>
       );
     case 'set':
-      return (
-        <Field label="字段（JSON，不能改 name / type / server / port）" hint={setErr || '如 {"udp": true, "skip-cert-verify": true}'}>
-          {(id) => <Textarea id={id} rows={4} className="font-mono" value={setText} onChange={(e) => {
-            setSetText(e.target.value);
-            try {
-              const v = JSON.parse(e.target.value) as unknown;
-              if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('需要 JSON 对象');
-              setSetErr('');
-              onChange({ ...step, fields: v as Record<string, unknown> });
-            } catch (err) { setSetErr(`JSON 无效：${(err as Error).message}`); }
-          }} />}
-        </Field>
-      );
+      return <SetFieldsForm fields={step.fields} onChange={(fields) => onChange({ ...step, fields })} />;
     case 'script':
       return <Field label="脚本 (nodes, ctx) => nodes" hint="在服务端沙箱中执行（P1，尚未启用）">{(id) => <Textarea id={id} rows={6} className="font-mono" value={step.code} onChange={(e) => onChange({ ...step, code: e.target.value })} />}</Field>;
   }
