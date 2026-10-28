@@ -27,7 +27,7 @@ if b.DialerProxy != "" {
 - 本地 `proxies:` 中的节点
 - 所有 `proxy-groups`（含自动生成的 `GLOBAL`）
 
-**provider 内的节点不在这张表里。**
+**provider 内的节点不在这张表里**，即便前置与落地在同一个 provider 中也一样（07 M3 实测：同源直接写名称，运行时报 `proxyName[...] not found`）。
 
 ### 1.2 加载时校验只覆盖本地节点
 
@@ -81,10 +81,10 @@ provider 内的节点不参与这一步。它们的 `dialer-proxy` 在加载时*
 | 2 | 本地 | provider | provider 内容中写 `dialer-proxy`（或整源用 `override.dialer-proxy`） | 本地节点名 | ❌ 不校验，需服务端校验 |
 | 3 | 本地 | provider | 同 2 | 同 2 | ❌ 同 2 |
 | 4 | 本地 | 本地 | `proxies` 中写 `dialer-proxy` | 本地节点名 | ✅ |
-| 5 | provider | provider（同源或异源） | provider 内容中写 `dialer-proxy` | 包装组名 | ❌ 需服务端校验 |
+| 5 | provider | provider（同源或异源） | provider 内容中写 `dialer-proxy` | 包装组名（同源也必须用包装组） | ❌ 需服务端校验 |
 | 6 | 策略组（如"🌠 中转"） | 任意 | 同上 | 组名，用户可在面板中切换前置 | 落地在本地时 ✅ |
 
-你的问题 2、3 的答案是：**可以**。provider 中的节点可以引用本地节点或本地组，这是 mihomo 官方文档推荐的迁移方案（`override.dialer-proxy: select1`），源码层面就是 §1.3 所述的运行时按名称查找。
+你的问题 2、3 的答案是：**可以**（07 M2 实测）。provider 中的节点可以引用本地节点或本地组，这是 mihomo 官方文档推荐的迁移方案（`override.dialer-proxy: select1`），源码层面就是 §1.3 所述的运行时按名称查找。
 
 场景 6 最实用：前置写成一个策略组，组里放若干中转节点（本地或 provider 的都行），用户在面板里切换中转，所有落地跟着切换，不需要重新生成配置。
 
@@ -100,10 +100,10 @@ provider 内的节点不参与这一步。它们的 `dialer-proxy` 在加载时*
 
 | 风险 | 原因 | 对策 |
 | --- | --- | --- |
-| **静默直连（泄漏）** | 包装组按 `filter` 筛不出节点时（provider 尚未下载完成、上游删除或改名了该节点），组会回退到 `empty-fallback`，默认是 `COMPATIBLE`，即直连。落地会绕过前置直连出去，用户毫无察觉 | 包装组一律输出 `empty-fallback: REJECT`，失败时拒绝连接（REF-10） |
+| **静默直连（泄漏）** | 包装组按 `filter` 筛不出节点时（provider 尚未下载完成、上游删除或改名了该节点），组会回退到 `empty-fallback`，默认是 `COMPATIBLE`，即直连。落地会绕过前置直连出去，用户毫无察觉 | 包装组一律输出 `empty-fallback: REJECT`，失败时拒绝连接（REF-10）。07 M5 已实测：不写时泄漏可复现，写了则连接被拒绝；该字段要求 mihomo v1.19.27+ |
 | **写错的名称不报错** | provider 内节点的 `dialer-proxy` 在加载时不校验（§1.2），`mihomo -t` 也查不出来 | 服务端渲染时自行校验所有 `dialer-proxy` 目标都在顶层表中（REF-08 升为 P0） |
 | **跨 provider 的环** | mihomo 的环检测只覆盖本地节点 | 服务端在"节点→前置"图上做环检测，包装组和 provider 节点都计入（REF-09） |
-| **主配置与 provider 不同步** | 客户端分别刷新主配置和 provider。主配置里的组改了名，provider 里还是旧名，在 provider 下次刷新前连接会失败 | ① 包装组名用稳定哈希（`__ref_<源>_<节点 key 哈希>`），与显示名无关；② provider URL 带内容版本 `?v=<链配置哈希>`。http provider 的缓存路径由 URL 哈希决定（`C.Path.GetPathByHash("proxies", url)`），URL 一变，客户端重载主配置时就会重新下载 provider |
+| **主配置与 provider 不同步** | 客户端分别刷新主配置和 provider。主配置里的组改了名，provider 里还是旧名，在 provider 下次刷新前连接会失败 | ① 包装组名用稳定哈希（`__ref_<源>_<节点 key 哈希>`），与显示名无关；② provider URL 带内容版本 `?v=<链配置哈希>`。http provider 的缓存路径由 URL 哈希决定（`C.Path.GetPathByHash("proxies", url)`），URL 一变，客户端重载主配置时就会重新下载 provider；③ **provider 不写 `path`**，否则缓存在 `interval` 内不会重新下载（07 M8 实测） |
 | **名称精确匹配** | `filter` 是正则 | 名称做正则转义并加 `^…$`；SRC-11 保证同源内名称唯一 |
 | **客户端侧改名** | provider 的 `override.additional-prefix` / `proxy-name` 会在 `filter` 之前改掉节点名 | 改名一律在服务端处理链中完成，生成 provider 时不使用客户端侧的改名 override |
 | **组不能当落地** | §1.5 | UI 中"把某组设为落地"会展开为给组内节点写 `dialer-proxy`。组用 `use` 引入 provider 时按 §2.1 处理 |
@@ -112,15 +112,56 @@ provider 内的节点不参与这一步。它们的 `dialer-proxy` 在加载时*
 
 和代理链的前置侧是同一个问题：rule 的目标、组的 `proxies` 成员都只能写顶层名称。做法相同，用包装组（同一个节点在一个 Profile 中只生成一个包装组，代理链、规则、组成员共用）。
 
-## 5. Surge（⚠ 待核对）
+## 5. Surge
 
-Surge 的外部节点通过组的 `policy-path` 引入；节点前置用 `underlying-proxy=`。待核对的问题：
+依据 Surge 手册与 `surge-cli --check`（07 S1–S5）。决策见 07 §8 的 Q9、D1、D2。
 
-1. `policy-path` 内容中节点的 `underlying-proxy` 能否引用主配置中的策略组或节点（对应 mihomo 的规则一）；
-2. `policy-path` 中的单个节点能否被规则或 `underlying-proxy` 直接按名称引用（若不能，用 `policy-path` + `policy-regex-filter=^name$` + `hidden=true` 的包装组，对应规则二）；
-3. 包装组筛不出节点时 Surge 怎么处理（是否同样有直连回退的风险）。
+### 5.1 与 mihomo 的对应关系
 
-若 1 不成立，Surge 下落地在 provider 中的场景退化为把这些落地节点内联到 `[Proxy]`（PRD REF-05 策略 ③）。
+| mihomo | Surge |
+| --- | --- |
+| provider | 组参数 `policy-path`（外部节点只存在于引入它的组里） |
+| 节点 `dialer-proxy` | 节点 `underlying-proxy`，只能写在 `[Proxy]` 中的节点上 |
+| `override.dialer-proxy`（整源） | **组级 `underlying-proxy`**（iOS 5.22.0+ / Mac 6.9.0+）：作用于该组的全部成员，包括 `policy-path` 引入的外部节点 |
+| 包装组 `use` + `filter` | `policy-path` + `policy-regex-filter=^name$` 的隐藏组 |
+| `empty-fallback: REJECT` | 无。组没有可用成员时回退 DIRECT（日志 `SUBSTITUTE`） |
+
+已确认：
+
+- 规则和节点级 `underlying-proxy` **不能**直接写外部节点名（`unknown policy name` / `unknown underlying proxy`），前置侧必须用包装组，即规则二同样适用；
+- `underlying-proxy` 的值**可以是策略组**（"so the entry node can be selected dynamically"），场景 6 成立（D1）。
+
+### 5.2 通解
+
+> **落地侧**：落地是本地节点 → 节点上写 `underlying-proxy`；落地在外部节点集 → 用带组级 `underlying-proxy` 的隐藏组包住这些节点。**不需要**像 mihomo 那样按 Profile 生成注入了前置的专属外部内容。
+>
+> **前置侧**：值永远是 `[Proxy]` 节点名或组名；前置在外部节点集时，用包装组。
+
+```ini
+[Proxy Group]
+; 前置在外部节点集 T：包装组（D2 暂定写法，防静默直连 ⏳）
+__ref_T_3f2a_in = select, policy-path=https://svc/p/<token>/T, policy-regex-filter=^🇭🇰 IPLC-01$, hidden=true
+__ref_T_3f2a    = fallback, __ref_T_3f2a_in, REJECT, hidden=true
+
+; 落地在外部节点集 L，其中匹配 filter 的节点走前置
+__chain_L_9b1c = select, policy-path=https://svc/p/<token>/L, policy-regex-filter=<落地 filter>, underlying-proxy=__ref_T_3f2a, hidden=true
+```
+
+用户组引用这些落地时，把 `__chain_L_9b1c` 作为嵌套成员，或用 `include-other-group="__chain_L_9b1c"` 展开（展开后是否保留 ` (via X)` 派生策略 ⏳）。
+
+要点：
+
+- 组级 `underlying-proxy` 不影响成员中的组和内置策略；成员自带的 `underlying-proxy` 会被组级值覆盖；
+- 被链接的成员显示为 `Name (via X)`，有独立的测速与流量统计；
+- 组级 `underlying-proxy` 指向自身会被拒绝；指向不存在的名称时离线校验不报错，所以服务端校验（REF-08）对 Surge 同样必要；
+- Surge iOS 5.22.0 / Mac 6.9.0 以下没有组级 `underlying-proxy`。按 Q9，不内联回退：这些版本下外部节点集上的代理链不输出，并在渲染报告中提示。
+
+### 5.3 仍需运行时验证（07 §7.1）
+
+- `fallback, Inner, REJECT` 在 Inner 筛空时是否真的拒绝连接（Inner 回退 DIRECT 后可能仍被判为可用）；
+- 组成员直接写外部节点名是否可行（离线校验不能判断）；
+- 一个组写多个 `policy-path` 是否都生效；
+- `include-other-group` 展开带组级 `underlying-proxy` 的组时，派生策略是否保留。
 
 ## 6. M0 需补的集成测试
 
@@ -130,5 +171,7 @@ Surge 的外部节点通过组的 `policy-path` 引入；节点前置用 `underl
 | --- | --- |
 | 场景 1–6 各一份配置 | `mihomo -t` 通过；请求经过前置（前置入站日志里有连向落地地址的连接） |
 | 包装组 filter 落空 | 连接被拒绝，而不是直连 |
+| 同源 provider 内直接写前置名称 | 运行时失败（证明同源也需要包装组） |
+| provider 写了 `path` 后改 `?v=` | 不重新下载（证明 Lowering 不能输出 `path`） |
 | provider 节点 dialer-proxy 写错名称 | `-t` 通过（证明 mihomo 不校验），本服务的校验器报错 |
 | 主配置改了组名、provider 未刷新 | 使用稳定包装组名 + 带版本的 URL 后不出现失败 |

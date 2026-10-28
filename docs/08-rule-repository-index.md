@@ -53,7 +53,10 @@
 - 规模：每个分支约 2.1k 个文件。
 - 命名：`name` 对应 v2fly 的列表名；`name@attr` 是只含某属性的子集（如 `apple@cn`、`openai@ads`、`cn@!cn`）。
 - 只有域名类规则，没有 IP / 进程规则。
-- 异常：存在带尾部空格的文件名（如 `openai@ads .txt`），索引时需要清洗（见 07 F3）。
+- 属性含义（07 F2）：`@cn` 为境外服务在中国大陆有接入点的域名；`@!cn` 为 v2fly 中带 `!cn` 属性的条目（已从 cn 列表剔除）。
+- 构建异常（`convert.py` 的 bug，07 F2/F3）：
+  - **带尾部空格的文件名**（如 `openai@ads .txt`）：属性切分时没有 strip，一行有多个属性时前面的属性名带空格。它与无空格的同名文件内容**不同**，两者是同一属性的互补子集，**并集才是完整集合**。surge-domain-set 分支 2109 个文件中有 97 个，其中 23 个没有无空格版本。
+  - **`@-` 开头的属性**（如 `category-games-cn@-!cn`）：来自 v2fly 的选择性包含语法 `include:x @-!cn`，被误当作属性，文件内容是 `.include:kurogames` 这类无效行，应丢弃。
 
 ### 2.3 结论
 
@@ -109,8 +112,8 @@ type VariantPolicy = { prefer?: 'smallest' | 'no-resolve' | 'classical'; perClie
 
 | 适配器 | 规则 |
 | --- | --- |
-| `blackmatrix7` | 以 `rule/Clash/<key>` 为 mihomo 来源、`rule/Surge/<key>` 为 Surge 来源（Loon 等预留）；按文件后缀识别变体；**解析 README 的"使用说明"拿到 behavior，解析"配置建议"拿到文件组合**；统计数据取自文件头注释 |
-| `zydou` | 文件名 `name[@attr]` 即 key；`clash` 分支 → mihomo domain/yaml，`mrs` 分支 → mihomo domain/mrs，`surge-domain-set` → Surge DOMAIN-SET，`surge-rule-set` → Surge RULE-SET；默认 mihomo 推荐 mrs、Surge 推荐 DOMAIN-SET |
+| `blackmatrix7` | 以 `rule/Clash/<key>` 为 mihomo 来源、`rule/Surge/<key>` 为 Surge 来源（Loon 等预留）；按文件后缀识别变体；**解析 README 的"使用说明"拿到 behavior，解析"配置建议"拿到文件组合**；统计数据取自文件头注释。README 句式是有限集合（07 F1）：`X 单独使用。`、`X、Y 共同使用。`、`纯IPv4网络` 前缀、`请使用 behavior: "…"`、`请使用RULE-SET / DOMAIN-SET`、`X与Y的区别…`，以及 `Surge 5.21.0(2952)以上/以下版本使用以下配置：` 版本分段；解析时跳过上游来源 URL 列表，遇到无法识别的句式记入索引报告 |
+| `zydou` | 文件名 `name[@attr]` 即 key；`clash` 分支 → mihomo domain/yaml，`mrs` 分支 → mihomo domain/mrs，`surge-domain-set` → Surge DOMAIN-SET，`surge-rule-set` → Surge RULE-SET；默认 mihomo 推荐 mrs、Surge 推荐 DOMAIN-SET；索引时丢弃 `@-` 开头的属性；带尾部空格的文件与无空格同名文件合并为一个 key，引用它时自动转为托管模式（直连无法合并） |
 | `generic` | 管理员给自定义仓库配置路径模板，如 `{client}/{key}/{key}{variant}.{ext}` 加后缀→behavior 映射表；不支持的布局就用"按文件索引"兜底（一个文件就是一个规则集，按内容自动识别格式） |
 
 ## 4. 引用模式
@@ -156,11 +159,11 @@ type VariantPolicy = { prefer?: 'smallest' | 'no-resolve' | 'classical'; perClie
 - 模板可以引用仓库规则集，所以管理员维护模板时能直接从仓库挑规则。模板发布前校验（TPL-07）中，"规则集可拉取可解析"对仓库规则集也有效，另外要检查 key 是否还在索引中。
 - 规则包拆分（03 §6）读取的是托管后的 IR。若规则包内全部是同一仓库的 domain 变体，可以优化为直接输出多个 passthrough provider，而不合并（P2）。
 
-## 8. 待决问题（等本地采集完成后统一决定，见 [07 §7](07-verification-checklist.md#7-采集完成后需要决策的问题)）
+## 8. 决策（2026-10-28 暂定，见 [07 §8](07-verification-checklist.md#8-决策记录)）
 
-| # | 问题 | 当前倾向（仅供参考） |
+| # | 问题 | 决策 |
 | --- | --- | --- |
-| R1 | 默认引用模式：直连还是托管 | 直连：服务端负载低，且 mrs 等格式只能直连 |
-| R2 | 托管再分发 GPL-2.0 规则内容的合规方式（本项目是 AGPL-3.0） | 规则数据不与代码链接，风险较低；保留来源注释与许可证说明 |
-| R3 | mihomo 默认选 mrs 还是 yaml | mrs（体积小、加载快）；需要改写时自动转为托管 yaml |
-| R4 | 普通用户能否添加自定义仓库 | 先仅限管理员 |
+| R1 | 默认引用模式：直连还是托管 | **直连**，可切换 jsDelivr 等镜像；需要改写或合并（如 zydou 带空格文件）时自动转为托管 |
+| R2 | 托管再分发 GPL-2.0 规则内容的合规方式（本项目是 AGPL-3.0） | 保留原文件头注释，并附来源 URL 与许可证名称（非正式法律意见） |
+| R3 | mihomo 默认选 mrs 还是 yaml | **mrs**；托管时输出 yaml |
+| R4 | 普通用户能否添加自定义仓库 | **仅限管理员** |

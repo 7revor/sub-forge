@@ -87,7 +87,7 @@
 | SRC-05 | 透传并聚合 `subscription-userinfo`（流量/到期），在 Profile 输出中可选择汇总或取某个源 | P1 |
 | SRC-06 | 处理链编辑器：可拖拽排序、单步启用/禁用、**逐步预览**（每一步之后的节点列表 + 与上一步的 diff） | P0 |
 | SRC-07 | 内置处理器（P0）：正则过滤（保留/剔除）、正则改名（**正则链**，按序多条 `pattern → replacement`）、正则删除字符、按名称排序、按正则优先级排序、去重（改名加序号 / 删除）、地区旗帜、协议类型过滤、快捷设置（udp/tfo/skip-cert-verify 等）、无用节点过滤（"剩余流量""到期"等） | P0 |
-| SRC-08 | 脚本处理器：JavaScript 脚本 `(nodes, ctx) => nodes`，在**沙箱**中执行（超时、内存限制、无网络/文件访问） | P1 |
+| SRC-08 | 脚本处理器：JavaScript 脚本 `(nodes, ctx) => nodes`，在**沙箱**中执行（超时、内存限制、无网络/文件访问）。**编写权限**：默认仅管理员，管理员可按用户授权；普通用户可引用管理员共享的脚本（Q8） | P1 |
 | SRC-09 | 处理器复用：处理链可保存为"处理链片段"，被多个源/组合引用（引用而非复制） | P1 |
 | SRC-10 | 节点稳定标识：每个节点在流水线中带隐式字段 `_source`（源 ID）、`_origName`（上游原名）、`_key`（协议+服务器+端口+凭据的哈希），供后续引用与去重使用；输出时剥离 | P0 |
 | SRC-11 | 名称冲突检查：同一 NodeSet 输出前必须保证名称唯一（处理链末尾自动追加"去重"兜底） | P0 |
@@ -118,8 +118,8 @@
 | GRP-01 | 组类型：`select`、`url-test`、`fallback`、`load-balance`（Surge 映射见 [04](04-client-matrix.md)） | P0 |
 | GRP-02 | 成员类型：<br>① 内置策略（DIRECT / REJECT / REJECT-DROP / PASS）<br>② 其他策略组（mihomo `proxies` 写组名；Surge 写组名或 `include-other-group`）<br>③ 节点集整体（mihomo `use: [provider]`；Surge `policy-path` / `include-other-group`）<br>④ 单个节点引用（见 4.6 节点引用）<br>⑤ "全部节点"（mihomo `include-all` / `include-all-proxies` / `include-all-providers`；Surge `include-all-proxies`） | P0 |
 | GRP-03 | 组内过滤：`filter`、`exclude-filter`、`exclude-type`（mihomo）/ `policy-regex-filter`（Surge），UI 中实时显示命中的节点 | P0 |
-| GRP-04 | 测速参数：`url`、`interval`、`timeout`、`tolerance`、`lazy`、`max-failed-times`、`expected-status`；负载均衡 `strategy` | P0 |
-| GRP-05 | 展示参数：`hidden`、`icon`；Surge `no-alert`、`hidden` | P1 |
+| GRP-04 | 测速参数：`url`、`interval`、`timeout`、`tolerance`、`lazy`、`max-failed-times`、`expected-status`；负载均衡 `strategy`。Surge 的 `url`、`timeout` 语义与 mihomo 不同，按 [04 §2](04-client-matrix.md#2-策略组) 转换，无法表达的参数写入渲染报告 | P0 |
+| GRP-05 | 展示参数：`hidden`、`icon`（Surge 为 `icon-url`）；Surge `no-alert` | P1 |
 | GRP-06 | 其他：`disable-udp`、`interface-name`、`routing-mark`、`default-selected`、`empty-fallback` 等以"高级参数"KV 形式支持，并标注客户端适用范围 | P1 |
 | GRP-07 | 依赖图校验：组之间不能成环；被引用的组/节点不存在时阻止保存或标红 | P0 |
 | GRP-08 | 拖拽排序（组顺序即客户端面板顺序）；成员拖拽排序 | P0 |
@@ -164,9 +164,9 @@
 
 | 语义 | mihomo | Surge |
 | --- | --- | --- |
-| 进程名精确 | `PROCESS-NAME` | `PROCESS-NAME`（Surge 的 PROCESS-NAME 同时接受名称或完整路径） |
+| 进程名精确 | `PROCESS-NAME` | `PROCESS-NAME`（Surge 的 PROCESS-NAME 同时接受名称或完整路径，区分大小写，仅 macOS） |
 | 进程路径精确 | `PROCESS-PATH` | `PROCESS-NAME,<完整路径>` |
-| 名称/路径通配（`*` `?`） | `PROCESS-NAME-WILDCARD` / `PROCESS-PATH-WILDCARD` | `PROCESS-NAME` 中直接写通配符（待核对 Surge 文档） |
+| 名称/路径通配（`*` `?`） | `PROCESS-NAME-WILDCARD` / `PROCESS-PATH-WILDCARD` | `PROCESS-NAME` 中直接写通配符（名称模式与路径模式都支持） |
 | 名称/路径正则 | `PROCESS-NAME-REGEX` / `PROCESS-PATH-REGEX` | 不支持 ⇒ 尝试转通配，否则丢弃并告警 |
 | Android 包名 | `PROCESS-NAME`（Android 上匹配包名） | 不适用 |
 
@@ -174,7 +174,7 @@
 | --- | --- | --- |
 | CR-01 | 规则 IR 中引入**语义化进程规则** `process(kind=name|path, mode=exact|wildcard|regex, value)`，渲染时按客户端降级（见 [04 §3](04-client-matrix.md#3-规则映射)）；不可表达时丢弃并在渲染报告中告警 | P0 |
 | CR-02 | 声明式客户端覆盖：任一规则（或规则集内某行）可设置 `{client: mihomo|surge, platform?: android|macos|windows|ios|linux} → 替换为 / 丢弃` | P0 |
-| CR-03 | 规则改写脚本：对 RuleSet / RuleBundle 挂 JS 脚本 `(rule, ctx) => rule | rule[] | null`，`ctx.client`、`ctx.platform` 可用；沙箱执行 | P1 |
+| CR-03 | 规则改写脚本：对 RuleSet / RuleBundle 挂 JS 脚本 `(rule, ctx) => rule | rule[] | null`，`ctx.client`、`ctx.platform` 可用；沙箱执行；编写权限同 SRC-08 | P1 |
 | CR-04 | 客户端识别：优先 URL 参数 `?target=mihomo|surge&platform=...`，其次 User-Agent 自动识别（mihomo 内核 / Clash Verge / FlClash / ClashMetaForAndroid / Surge iOS/macOS）；识别结果在访问日志中可见 | P0 |
 | CR-05 | 规则预览：选择客户端 + 平台，实时查看规则集最终输出 | P0 |
 
@@ -190,20 +190,22 @@
 
 前置和落地各自在本地还是 provider 中，四种组合都能处理，不需要打平。
 
+**Surge**（[06 §5](06-proxy-chain-research.md#5-surge)）：外部节点集用 `policy-path`（Q9）。前置侧同样用隐藏包装组；落地侧用带**组级 `underlying-proxy`** 的隐藏组包住落地节点，不需要按 Profile 注入外部内容。组级 `underlying-proxy` 要求 Surge iOS 5.22.0 / Mac 6.9.0+，低版本下外部节点集上的代理链不输出并提示。
+
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
 | REF-01 | **节点引用**：在任何可以选择"单个节点"的地方（组成员、规则出口、前置），保存的是 `NodeRef = { nodeSet: ID, match: 精确名称 | 正则, pick: first }`，而不是节点快照。上游变化后按引用重新解析 | P0 |
 | REF-02 | 引用解析失败（上游已无该节点）时的兜底：可配置 `fallback = 某个组 / DIRECT / REJECT / 报错`，并在 Profile 状态页告警 | P0 |
 | REF-03 | **代理链配置**：在 Profile 中配置"链规则"：`落地 = 某 NodeSet 中匹配 filter 的节点` → `前置 = NodeRef 或 策略组`。可配置多条，也可在本地节点上直接设置前置 | P0 |
 | REF-04 | **上游自带的 dialer-proxy**：订阅中节点本身带 `dialer-proxy`/`underlying-proxy` 时，自动识别其前置并纳入依赖解析 | P0 |
-| REF-05 | **依赖解析策略**（对每个"被引用但位于 provider 中的节点"），三选一，Profile 级默认 + 单项覆盖：<br>① **包装组**（默认）：生成隐藏 select 组 `use: [该 provider]` + `filter: ^<转义后的节点名>$` + `hidden: true`，引用方指向此组。**不打平、不复制**<br>② **复制到本地**：把该节点复制一份到 `proxies`（provider 中保留原节点），名称冲突时加后缀<br>③ **整体内联**：该 NodeSet 整体改为内联输出 | P0 |
-| REF-06 | **落地节点在 provider 中**：provider 节点可以引用主配置中的组和节点，所以系统按 Profile 生成**专属 provider 地址**，在下发的 provider 内容中给命中的落地节点注入 `dialer-proxy`；整源都需要同一前置时，直接用 `override.dialer-proxy` | P0 |
+| REF-05 | **依赖解析策略**（对每个"被引用但位于 provider 中的节点"），三选一，Profile 级默认 + 单项覆盖：<br>① **包装组**（默认）：生成隐藏 select 组 `use: [该 provider]` + `filter: ^<转义后的节点名>$` + `hidden: true`，引用方指向此组。**不打平、不复制**<br>② **复制到本地**：把该节点复制一份到 `proxies`（provider 中保留原节点），名称冲突时加后缀<br>③ **整体内联**：该 NodeSet 整体改为内联输出<br>Surge 的包装组写法见 [03 §4.3](03-domain-model-and-pipeline.md#43-surge-的对应处理) | P0 |
+| REF-06 | **落地节点在 provider 中**：provider 节点可以引用主配置中的组和节点，所以系统按 Profile 生成**专属 provider 地址**，在下发的 provider 内容中给命中的落地节点注入 `dialer-proxy`；整源都需要同一前置时，直接用 `override.dialer-proxy`。Surge 不注入外部内容，改为生成带组级 `underlying-proxy` 的隐藏组 | P0 |
 | REF-07 | "依赖节点"面板：列出本 Profile 所有自动引入的包装组/复制节点、引用来源（哪个组/规则/链）、当前策略，允许逐项切换策略 | P0 |
 | REF-08 | **服务端引用校验**（P0）：渲染时校验所有 `dialer-proxy`、规则目标、组成员都能在顶层表中找到。provider 内节点的 `dialer-proxy` 在 mihomo 加载时不校验，写错只会在运行时连接失败，必须由服务端兜住。另外可选用内置 mihomo 内核执行 `-t`（P1），校验失败时返回上一份成功版本并告警 | P0 |
 | REF-09 | 链长度与环检测：前置链不得成环（mihomo 自带的环检测只覆盖本地节点，跨 provider 的环由服务端检测）；超过 3 跳给出提示 | P0 |
-| REF-10 | **防静默直连**：包装组一律输出 `empty-fallback: REJECT`。provider 未加载完成或节点消失时，mihomo 默认回退到 `COMPATIBLE`（即直连），会让落地绕过前置 | P0 |
-| REF-11 | **主配置与 provider 一致**：包装组名用稳定哈希（不随显示名变化）；Profile 专属 provider URL 带内容版本参数，链配置变化后 URL 也变，客户端重载主配置时会重新下载 provider | P0 |
-| REF-12 | 前置可以是策略组：链规则的前置选一个组（如"🌠 中转"），用户在面板中切换中转后，所有落地随之切换 | P0 |
+| REF-10 | **防静默直连**：包装组一律输出 `empty-fallback: REJECT`。provider 未加载完成或节点消失时，mihomo 默认回退到 `COMPATIBLE`（即直连），会让落地绕过前置（已实测复现）。Surge 组无可用成员时同样回退 DIRECT，且没有对应参数：暂用 `fallback, <筛选组>, REJECT` 结构（D2），运行时验证前在 UI 与渲染报告中标注"Surge 防泄漏未验证" | P0 |
+| REF-11 | **主配置与 provider 一致**：包装组名用稳定哈希（不随显示名变化）；Profile 专属 provider URL 带内容版本参数，链配置变化后 URL 也变，客户端重载主配置时会重新下载 provider。为此 `proxy-providers` **不输出 `path`**（写了 `path` 时改 URL 不会触发重新下载，已实测） | P0 |
+| REF-12 | 前置可以是策略组：链规则的前置选一个组（如"🌠 中转"），用户在面板中切换中转后，所有落地随之切换。mihomo 与 Surge 都支持（D1） | P0 |
 
 > 说明：用户原话"最好是可选项 + 重复设置"——REF-05 的策略②即"重复"（provider 里留一份、本地再放一份），策略①是更推荐的"零重复"方案；两者都可选。
 
@@ -223,10 +225,10 @@
 
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
-| TPL-01 | 模板中的组：可设置类型、测速参数、展示参数；成员**只能是**其他模板组或内置策略。**不能包含任何节点/节点集，也不预设 `filter`/`exclude-filter`/`exclude-type`**（节点筛选全部在 Profile 中设置） | P0 |
+| TPL-01 | 模板中的组：可设置类型、测速参数、展示参数、为空时的行为（TPL-10）；成员**只能是**其他模板组或内置策略，组之间的嵌套关系属于模板、随模板同步（Q5）。**不能包含任何节点/节点集，也不预设 `filter`/`exclude-filter`/`exclude-type`**（节点筛选全部在 Profile 中设置） | P0 |
 | TPL-02 | 模板中的规则：匹配项可为单条规则 / RuleSet / RuleBundle；**出口只能是模板组或内置策略** | P0 |
 | TPL-03 | 每个模板组可标注"填充提示"（如"建议放香港节点"、"建议放所有节点"），在 Profile 填充时展示（仅文字提示，不参与渲染） | P1 |
-| TPL-10 | **空组输出**：模板组在 Profile 中未填充任何成员时，照常输出为"空组"，并在渲染报告与 Profile 页提示。mihomo 不接受无 `proxies`/`use` 的组（报 `` `use` or `proxies` missing ``），因此输出 `proxies: [COMPATIBLE]`（mihomo 内置出站，等效 DIRECT，正是其组为空时的默认回退）；Surge 输出见 [04](04-client-matrix.md#2-策略组) | P0 |
+| TPL-10 | **空组输出**：模板组在 Profile 中未填充任何成员时，照常输出为"空组"，并在渲染报告与 Profile 页提示。每个模板组声明**为空时**的行为：**拒绝（默认）**或直连。例如"🤖 AI 服务"保持拒绝，避免未填充时流量悄悄直连；"国内媒体"可设为直连。输出：拒绝 → mihomo `proxies: [REJECT]`、Surge `select, REJECT`；直连 → mihomo `proxies: [COMPATIBLE]`、Surge `select, DIRECT`（两个客户端都不接受无成员的组，必须写一个内置成员） | P0 |
 | TPL-04 | 模板元素（组、规则）具有**稳定 ID**；改名不影响已有 Profile 的覆盖层 | P0 |
 | TPL-05 | 模板版本：每次发布生成新版本号与变更说明；可查看版本间 diff | P0 |
 | TPL-06 | 订阅跟随策略：**跟随最新**（默认）/ 锁定某版本。跟随最新时模板发布即对所有订阅生效（订阅在渲染时合并模板，不复制） | P0 |
@@ -242,11 +244,11 @@
 
 1. **基础设置**（可选）：选预设 / 自定义 / 不输出（使用客户端默认）。
 2. **节点**：选择若干 NodeSet（Source / Collection / 本地节点组），每个指定输出方式：
-   - `provider`（默认，mihomo 输出为 `proxy-providers`，指向本服务的 provider 地址；Surge 为 `policy-path` 或内联，见 [04](04-client-matrix.md)）
+   - `provider`（默认，mihomo 输出为 `proxy-providers`，指向本服务的 provider 地址；Surge 输出为 `policy-path`，见 [04](04-client-matrix.md)）
    - `inline`（展开到 `proxies` / `[Proxy]`）
    - 代理链与依赖节点**无需在此显式添加**，由 4.6 自动解析。
 3. **模板**：选择模板（或空白）。
-4. **填充策略组**：对每个模板组添加成员（节点集 / 单节点引用 / 其他组），可覆盖组参数；可新增 Profile 私有组。
+4. **填充策略组**：对每个模板组添加成员（节点集 / 单节点引用 / 其他组），可覆盖组参数；模板组**不能删除、改名或隐藏**（Q6）；可新增 Profile 私有组。
 5. **规则**：继承模板规则；可：禁用某条模板规则、把某条模板规则的出口改为**已加入的节点**、在指定锚点前后插入私有规则。
 6. **代理链**：配置链规则（REF-03），查看依赖节点面板（REF-07）。
 7. **预览与发布**：选择客户端+平台预览最终配置、渲染报告（告警/降级/丢弃项）。
@@ -261,6 +263,7 @@
 | PRF-06 | 渲染缓存：按 (Profile, 客户端, 平台, 各依赖的版本/快照哈希) 缓存；任一依赖变化自动失效 | P1 |
 | PRF-07 | 访问日志：最近访问时间、UA、识别出的客户端、渲染耗时、告警数 | P1 |
 | PRF-08 | 复制 Profile；导出当前渲染结果为文件 | P1 |
+| PRF-09 | 模板组在 Profile 中只能填充成员、调整类型与测速等参数，**不能删除、改名或隐藏**（Q6）；用户不需要某个模板组时，可以不填充，由 TPL-10 的空组行为兜底 | P0 |
 
 ### 4.10 系统与安全
 
@@ -281,7 +284,7 @@
 
 1. **多源不打平**：用户 A 有 8 个机场。创建 Profile，8 个源均以 provider 输出；Clash Verge 中可按 provider 查看与单独更新。✅ 生成的 YAML `proxies` 为空或只含本地节点。
 2. **改名确定性**：源 X 处理链把 `香港 01 | 0.5x` 改名为 `🇭🇰 HK-01`。上游新增 `香港 02`、删除 `香港 01` 后重新拉取：结果为 `🇭🇰 HK-02`，不存在重复或残留名称。
-3. **落地走中转（provider 内节点）**：用户 B 的落地节点在源 L（provider），中转节点在源 T（provider）的 `🇭🇰 IPLC-01`。配置链规则 "L 全部 → T:`🇭🇰 IPLC-01`"。✅ 输出中生成隐藏组 `__ref_T_xxx`（`use: [T]`, `filter: ^🇭🇰 IPLC-01$`），L 的专属 provider 内容中每个节点带 `dialer-proxy: __ref_T_xxx`；`mihomo -t` 通过。
-4. **规则出口为 provider 节点**：规则 `RuleBundle(金融服务) → 源 S 中的 "🇺🇸 Home-Broadband"`。✅ 输出包装组并在规则中引用；Surge 输出等效写法。
-5. **模板更新同步**：管理员在模板中新增 "🤖 AI 服务" 组和对应规则并发布。✅ 所有"跟随最新"的 Profile 下次拉取即包含该组；该组尚未填充成员时，按空组输出（TPL-10），mihomo 中显示为仅含 `COMPATIBLE` 的组，配置校验通过。
+3. **落地走中转（provider 内节点）**：用户 B 的落地节点在源 L（provider），中转节点在源 T（provider）的 `🇭🇰 IPLC-01`。配置链规则 "L 全部 → T:`🇭🇰 IPLC-01`"。✅ mihomo：输出中生成隐藏组 `__ref_T_xxx`（`use: [T]`, `filter: ^🇭🇰 IPLC-01$`, `empty-fallback: REJECT`），L 的专属 provider 内容中每个节点带 `dialer-proxy: __ref_T_xxx`；`mihomo -t` 通过。✅ Surge（Mac 6.9.0+）：生成包装组 `__ref_T_xxx` 与 `__chain_L_xxx = select, policy-path=<L>, underlying-proxy=__ref_T_xxx, hidden=true`，L 的节点在面板中显示为 `Name (via __ref_T_xxx)`；`surge-cli --check` 通过。
+4. **规则出口为 provider 节点**：规则 `RuleBundle(金融服务) → 源 S 中的 "🇺🇸 Home-Broadband"`。✅ mihomo 输出包装组并在规则中引用；Surge 输出 `select` + `fallback, …, REJECT` 两层包装组并在规则中引用。
+5. **模板更新同步**：管理员在模板中新增 "🤖 AI 服务" 组和对应规则并发布。✅ 所有"跟随最新"的 Profile 下次拉取即包含该组；该组尚未填充成员时，按空组输出（TPL-10），默认拒绝：mihomo 中显示为仅含 `REJECT` 的组，相关流量被拒绝而不是直连，配置校验通过。
 6. **进程规则分客户端**：规则 `process(path, wildcard, "/Applications/*/WeChat.app/*")`。✅ mihomo 输出 `PROCESS-PATH-WILDCARD,...`；Surge macOS 输出 `PROCESS-NAME,...`；Surge iOS 丢弃并在报告中注明。

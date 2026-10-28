@@ -123,6 +123,7 @@ type GroupSpec = {
   display?: { hidden?: boolean; icon?: string };
   extra?: Record<string, unknown>;             // 高级参数，带客户端适用范围
   hint?: string;                               // 模板填充提示
+  whenEmpty?: 'reject' | 'direct';             // 模板组为空时的行为，默认 reject（TPL-10）
 };
 
 type RuleEntry = { id: ID; matcher: Matcher; target: Target; options?: { noResolve?: boolean; src?: boolean }; enabled: boolean };
@@ -185,7 +186,7 @@ type ChainRule = {
 | 地址 | 用途 |
 | --- | --- |
 | `GET /sub/:token` | Profile 主配置（UA 识别客户端） |
-| `GET /p/:token/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06） |
+| `GET /p/:token/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge 的 `policy-path` 也指向此地址，内容不注入前置 |
 | `GET /r/:token/:rulesetKey?behavior=domain\|ipcidr\|classical&format=yaml\|text` | 转换后的规则集 / 规则包拆分结果 |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
@@ -230,7 +231,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
    - 在其他地方找不到 → report.warn，并按 fallback 处理（默认移除该字段）
 7. 环检测：在“节点→前置”图上做 DFS（包装组、provider 节点都计入），成环则报错
 8. 引用校验：所有 dialer-proxy / 规则目标 / 组成员必须在顶层表中（mihomo 不校验 provider 内的 dialer-proxy）
-9. Profile 专属 provider 的 URL 追加 ?v=<该 provider 注入内容的哈希>
+9. Profile 专属 provider 的 URL 追加 ?v=<该 provider 注入内容的哈希>；proxy-providers 不输出 path（否则改 URL 不会触发重新下载，06 §3）
 ```
 
 要点：
@@ -241,13 +242,29 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 
 ### 4.3 Surge 的对应处理
 
-Surge 的外部节点通过组的 `policy-path` 引入，同样不能被 `underlying-proxy` 或规则直接按名引用（**待核对 Surge 手册**）。对应方案：
+原理见 [06 §5](06-proxy-chain-research.md#5-surge)。步骤 1–3、7、8 与 mihomo 相同，差异在步骤 4、5：
 
-- wrap → 生成 `__ref_xxx = select, policy-path=<provider 地址>, policy-regex-filter=^name$, hidden=true`
-- copy → 节点写入 `[Proxy]`
-- 落地侧链注入：在 Profile 专属的 policy-path 内容中给节点附加 `underlying-proxy=<前置名>`
+```
+4'. n 在外部节点集 P（policy-path）中：
+   wrap  → 生成包装组（D2 暂定写法）：
+             __ref_<P>_<hash>_in = select, policy-path=<P 地址>, policy-regex-filter=^<转义名>$, hidden=true
+             __ref_<P>_<hash>    = fallback, __ref_<P>_<hash>_in, REJECT, hidden=true
+           r 指向 __ref_<P>_<hash>；report.info("Surge 防泄漏未验证")
+   copy  → 节点写入 [Proxy]，r 指向副本名
+   inline→ 将 P 整体切换为 inline，重跑本步骤
+5'. ChainRule 的落地侧：
+   - 落地 NodeSet 为 inline → 给匹配节点写 underlying-proxy=<前置名>
+   - 落地 NodeSet 为 policy-path →
+       客户端版本 ≥ iOS 5.22.0 / Mac 6.9.0：
+         生成 __chain_<P>_<hash> = select, policy-path=<P 地址>,
+               [policy-regex-filter=<落地 filter>], underlying-proxy=<前置名>, hidden=true
+         原本引用 P 的组改为把 __chain_<P>_<hash> 作为嵌套成员；未被 filter 命中的节点仍走原组
+       否则：不输出该链规则，report.warn("Surge 版本过低，外部节点集上的代理链不可用")
+```
 
-若核对后发现 Surge 支持更直接的写法，以 Lowering 层替换实现，IR 与 UI 不变。
+- Surge 的外部内容不需要注入前置，因此 `/p/:token/:key` 对 Surge 只输出处理链结果；
+- 落地 `excludeFilter` 没有对应参数，转为负向前瞻合并进 `policy-regex-filter`，或服务端预过滤后用精确名称列表构造正则；
+- 运行时待验证的点见 06 §5.3，验证结果若不同，只替换 Lowering 实现，IR 与 UI 不变。
 
 ## 5. 模板 ⊕ 覆盖层 合并
 
@@ -256,7 +273,7 @@ effective.groups = template.groups 按序
   对每个组 g：
     p = overlay.groupPatches[g.id]
     g.members = (p.memberOrder == 'prepend') ? p.addMembers ++ g.members : g.members ++ p.addMembers
-    g = { ...g, ...p.set }                 // 不允许改 id；允许改 name、type、测速参数
+    g = { ...g, ...p.set }                 // 允许改 type、测速参数、高级参数；不允许改 id / name / hidden（Q6）
   按 after 锚点插入 overlay.extraGroups
 effective.rules = template.rules 按序
   对每条 r：应用 rulePatches[r.id]（enabled / target）
@@ -268,7 +285,8 @@ effective.final = overlay.final ?? template.final
 
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
-- 空组处理（TPL-10）：模板组在 Profile 中未被填充任何成员时照常输出为空组，`report.warn`。Lowering 时 mihomo 写 `proxies: [COMPATIBLE]`（mihomo 源码 `adapter/outboundgroup/parser.go`：`proxies` 与 `use` 都为空时直接报错，`COMPATIBLE` 是内置出站、等效 DIRECT）。
+- 模板组不能在 Profile 中删除、改名或隐藏（Q6）；`groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。Profile 私有组（`extraGroups`）不受此限制。
+- 空组处理（TPL-10）：模板组在 Profile 中未被填充任何成员时照常输出为空组，`report.warn`。按 `whenEmpty` 输出：`reject`（默认）→ mihomo `proxies: [REJECT]`、Surge `select, REJECT`；`direct` → mihomo `proxies: [COMPATIBLE]`、Surge `select, DIRECT`。mihomo 的 `proxies` 与 `use` 都为空时直接报错，Surge 不接受无成员无参数的组，所以必须写一个内置成员；`COMPATIBLE` 实测等效直连（07 M7）。
 
 ## 6. 规则展开与规则包拆分
 

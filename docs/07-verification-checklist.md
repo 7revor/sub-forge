@@ -225,7 +225,7 @@
 
 | 类别 | 项目 | 建议做法 |
 | --- | --- | --- |
-| Surge 运行时 | S1④ 两个 `policy-path` 是否都生效；S2 组成员直接写外部节点名；S3 外部节点自带 `underlying-proxy`；S5 `select, hidden=true` 空组的表现；S5 候选防泄漏写法 `fallback, Inner, REJECT` | 新建一份**独立的**测试 Profile（不改现用配置），使用 `research/verification/surge/` 中的配置，配合本地 socks5（`research/verification/mihomo/run.sh` 起的 17001/17002 实例），在请求查看器中看实际走向 |
+| Surge 运行时 | S1④ 两个 `policy-path` 是否都生效；S2 组成员直接写外部节点名；S3 外部节点自带 `underlying-proxy`；S5 `select, hidden=true` 空组的表现；S5 候选防泄漏写法 `fallback, Inner, REJECT`；`include-other-group` 展开带组级 `underlying-proxy` 的组时是否保留 ` (via X)` 派生策略（06 §5.3） | 新建一份**独立的**测试 Profile（不改现用配置），使用 `research/verification/surge/` 中的配置，配合本地 socks5（`research/verification/mihomo/run.sh` 起的 17001/17002 实例），在请求查看器中看实际走向 |
 | UA 与响应头 | S12②、C1、C4、L5、T5 | 本地起 HTTP 服务记录请求头，各客户端导入订阅 URL |
 | 面板 | M7、M9 | 各面板截图 |
 | 客户端行为 | C3、C5、C6 导入实测；C2 的 Windows / Android | 导入测试配置 |
