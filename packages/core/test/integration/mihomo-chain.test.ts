@@ -155,7 +155,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
     return renderMihomo(input);
   };
 
-  async function runClient(result: MihomoRenderResult): Promise<{ status: number | string; entryLog: string; exitLog: string }> {
+  async function runClient(result: MihomoRenderResult): Promise<{ status: number | string; entryLog: string; exitLog: string; clientLog: string; config: string }> {
     served = result;
     const mixed = await freePort();
     const ctl = await freePort();
@@ -174,7 +174,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
       await sleep(500);
       const status = await viaProxy(mixed, `http://127.0.0.1:${ports.target}/`);
       await sleep(300);
-      return { status, entryLog: entry.log().slice(e0), exitLog: exit.log().slice(x0) };
+      return { status, entryLog: entry.log().slice(e0), exitLog: exit.log().slice(x0), clientLog: client.log(), config };
     } finally {
       client.proc.kill();
     }
@@ -189,7 +189,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
     expect(r.report.items.filter((i) => i.level === 'error')).toEqual([]);
     const hits = targetHits;
     const out = await runClient(r);
-    expect(out.status).toBe(200);
+    expect(out.status, `${out.clientLog}\n---- config ----\n${out.config}`).toBe(200);
     expect(targetHits).toBe(hits + 1);
     expect(out.entryLog).toContain(`127.0.0.1:${ports.exit}`);
     expect(out.exitLog).toContain(`127.0.0.1:${ports.target}`);

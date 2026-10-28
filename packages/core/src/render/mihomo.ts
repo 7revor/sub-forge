@@ -56,6 +56,12 @@ export type MihomoRenderResult = {
 const BUILTINS = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS', 'COMPATIBLE']);
 const PROVIDER_INTERVAL = 3600;
 const RULESET_INTERVAL = 86400;
+/**
+ * 从本服务下载 provider / 规则集时走直连。mihomo 默认让这类下载也经过分流规则：
+ * 若 MATCH 指向的组依赖代理链，而链的前置又在待下载的 provider 里，就会互相等待、永远加载不上
+ * （Docker 集成测试"落地内联"用例复现）。
+ */
+const FETCH_VIA = 'DIRECT';
 
 const safeId = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, '_');
 
@@ -342,7 +348,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
             : list.map((x) => lowerInline(x, where)).filter((x): x is string => x !== undefined);
         if (!lines.length) continue;
         rulesets[key] = { behavior, text: lines.join('\n') + '\n' };
-        ruleProviders[key] = { type: 'http', behavior, format: 'text', url: input.urls.ruleset(key), interval: RULESET_INTERVAL };
+        ruleProviders[key] = { type: 'http', behavior, format: 'text', url: input.urls.ruleset(key), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
       }
       ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: behavior === 'ipcidr' && !!noResolve }, target));
     }
@@ -370,7 +376,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     // 版本号随内容（含注入的前置）变化，客户端重载主配置即重新下载；不输出 path（REF-11）
     const version = shortHash(`${yaml}|${providerOverride.get(s.key) ?? ''}`, 8);
     providers[s.key] = { name: s.providerName, version, yaml };
-    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: PROVIDER_INTERVAL };
+    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: PROVIDER_INTERVAL, proxy: FETCH_VIA };
     const ov = providerOverride.get(s.key);
     if (ov) entry.override = { 'dialer-proxy': ov };
     proxyProviders[s.providerName] = entry;

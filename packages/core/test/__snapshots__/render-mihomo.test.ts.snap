@@ -13,12 +13,14 @@ proxy-providers:
     type: http
     url: https://sub.example.com/p/TOKEN/source%3AL?v=0e66dd5c
     interval: 3600
+    proxy: DIRECT
     override:
       dialer-proxy: 🇭🇰 香港
   中转:
     type: http
     url: https://sub.example.com/p/TOKEN/source%3AT?v=b6f49804
     interval: 3600
+    proxy: DIRECT
 proxy-groups:
   - name: 🚀 节点选择
     type: select
@@ -54,18 +56,21 @@ rule-providers:
     format: text
     url: https://sub.example.com/r/TOKEN/b_fin_domain
     interval: 86400
+    proxy: DIRECT
   b_fin_classical:
     type: http
     behavior: classical
     format: text
     url: https://sub.example.com/r/TOKEN/b_fin_classical
     interval: 86400
+    proxy: DIRECT
   b_fin_ipcidr:
     type: http
     behavior: ipcidr
     format: text
     url: https://sub.example.com/r/TOKEN/b_fin_ipcidr
     interval: 86400
+    proxy: DIRECT
   b_fin_broker_mrs:
     type: http
     behavior: ipcidr
@@ -78,6 +83,7 @@ rule-providers:
     format: text
     url: https://sub.example.com/r/TOKEN/rs_ai_domain
     interval: 86400
+    proxy: DIRECT
 rules:
   - RULE-SET,b_fin_domain,🚀 节点选择
   - RULE-SET,b_fin_classical,🚀 节点选择
