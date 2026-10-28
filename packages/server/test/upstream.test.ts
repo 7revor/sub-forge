@@ -1,0 +1,132 @@
+import { describe, expect, it } from 'vitest';
+import { assertUrlAllowed, guardedLookup, isBlockedAddress, parseAllowList, SsrfError } from '../src/net/ssrf.ts';
+import { createUpstreamFetcher, parseUserinfo, type FetchLike } from '../src/net/upstream.ts';
+import { SnapshotService } from '../src/snapshots.ts';
+import { Store } from '../src/store.ts';
+
+const NONE = parseAllowList([]);
+
+describe('SSRF 防护', () => {
+  it('内网与保留地址被拦截，公网放行', () => {
+    for (const a of ['127.0.0.1', '10.1.2.3', '172.20.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1']) {
+      expect(isBlockedAddress(a, NONE), a).toBe(true);
+    }
+    for (const a of ['1.1.1.1', '8.8.8.8', '2606:4700:4700::1111']) expect(isBlockedAddress(a, NONE), a).toBe(false);
+  });
+
+  it('白名单可放行指定 IP / 网段 / 主机名', () => {
+    const allow = parseAllowList(['192.168.1.10', '10.8.0.0/16', 'sub.home.arpa']);
+    expect(isBlockedAddress('192.168.1.10', allow)).toBe(false);
+    expect(isBlockedAddress('192.168.1.11', allow)).toBe(true);
+    expect(isBlockedAddress('10.8.3.4', allow)).toBe(false);
+    expect(() => assertUrlAllowed(new URL('http://sub.home.arpa/x'), allow)).not.toThrow();
+  });
+
+  it('URL 预检：协议与字面 IP', () => {
+    expect(() => assertUrlAllowed(new URL('file:///etc/passwd'), NONE)).toThrow(SsrfError);
+    expect(() => assertUrlAllowed(new URL('http://127.0.0.1:8080/'), NONE)).toThrow(SsrfError);
+    expect(() => assertUrlAllowed(new URL('http://[::1]/'), NONE)).toThrow(SsrfError);
+    expect(() => assertUrlAllowed(new URL('https://example.com/'), NONE)).not.toThrow();
+  });
+
+  it('建连时的 DNS 解析：任一地址落在内网即拒绝', async () => {
+    const fake = (addrs: string[]) => (_h: string, cb: (e: null, a: { address: string; family: number }[]) => void) => cb(null, addrs.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })));
+    const run = (addrs: string[], host = 'evil.example.com') => new Promise<unknown>((resolve) => {
+      guardedLookup(NONE, fake(addrs))(host, {}, (err: unknown, addr: unknown) => resolve(err ?? addr));
+    });
+    expect(await run(['93.184.216.34'])).toBe('93.184.216.34');
+    expect(await run(['93.184.216.34', '10.0.0.1'])).toBeInstanceOf(SsrfError);
+  });
+});
+
+describe('上游拉取', () => {
+  const respond = (status: number, body = '', headers: Record<string, string> = {}) => ({
+    status,
+    headers: { get: (n: string) => headers[n.toLowerCase()] ?? null },
+    text: async () => body,
+  });
+
+  it('透传 UA、解析 subscription-userinfo', async () => {
+    let ua = '';
+    const fetchImpl: FetchLike = async (_u, init) => { ua = init.headers['user-agent']!; return respond(200, 'body', { 'subscription-userinfo': 'upload=1; download=2; total=10; expire=1700000000' }); };
+    const f = createUpstreamFetcher({ allow: NONE, fetchImpl });
+    expect(await f('https://a.example.com/sub', { ua: 'FlClash' })).toEqual({ status: 200, body: 'body', userinfo: { upload: 1, download: 2, total: 10, expire: 1700000000 } });
+    expect(ua).toBe('FlClash');
+  });
+
+  it('跟随重定向，并逐跳校验目标地址', async () => {
+    const seen: string[] = [];
+    const fetchImpl: FetchLike = async (u) => {
+      seen.push(u);
+      if (u.endsWith('/a')) return respond(302, '', { location: '/b' });
+      if (u.endsWith('/b')) return respond(301, '', { location: 'http://127.0.0.1/secret' });
+      return respond(200, 'x');
+    };
+    const f = createUpstreamFetcher({ allow: NONE, fetchImpl });
+    await expect(f('https://a.example.com/a')).rejects.toThrow(SsrfError);
+    expect(seen).toEqual(['https://a.example.com/a', 'https://a.example.com/b']);
+  });
+
+  it('非 2xx 与过大的响应报错', async () => {
+    const f1 = createUpstreamFetcher({ allow: NONE, fetchImpl: async () => respond(403) });
+    await expect(f1('https://a.example.com/')).rejects.toThrow('HTTP 403');
+    const f2 = createUpstreamFetcher({ allow: NONE, maxBytes: 3, fetchImpl: async () => respond(200, 'abcd') });
+    await expect(f2('https://a.example.com/')).rejects.toThrow(/过大/);
+  });
+
+  it('userinfo 解析忽略无效字段', () => {
+    expect(parseUserinfo('upload=x; total=5; foo=1')).toEqual({ total: 5 });
+    expect(parseUserinfo(null)).toBeUndefined();
+  });
+});
+
+describe('快照服务', () => {
+  const setup = (bodies: (string | Error)[]) => {
+    let t = 1_000_000;
+    let calls = 0;
+    const store = new Store(':memory:', () => t);
+    const fetcher = async () => {
+      const b = bodies[Math.min(calls++, bodies.length - 1)]!;
+      await new Promise((r) => setTimeout(r, 5));
+      if (b instanceof Error) throw b;
+      return { status: 200, body: b };
+    };
+    const svc = new SnapshotService(store, fetcher, () => t);
+    return { store, svc, advance: (ms: number) => { t += ms; }, calls: () => calls };
+  };
+
+  it('首次同步拉取；并发请求只拉一次', async () => {
+    const { svc, calls } = setup(['v1']);
+    const [a, b] = await Promise.all([svc.get('source', 's', 'u', { ttlSec: 60 }), svc.get('source', 's', 'u', { ttlSec: 60 })]);
+    expect(a.snapshot!.body).toBe('v1');
+    expect(b.snapshot!.body).toBe('v1');
+    expect(calls()).toBe(1);
+  });
+
+  it('过期后先返回旧快照，后台刷新', async () => {
+    const { svc, advance, calls } = setup(['v1', 'v2']);
+    await svc.get('source', 's', 'u', { ttlSec: 60 });
+    advance(61_000);
+    const r = await svc.get('source', 's', 'u', { ttlSec: 60 });
+    expect(r).toMatchObject({ stale: true, snapshot: { body: 'v1' } });
+    await svc.settled();
+    expect(calls()).toBe(2);
+    expect((await svc.get('source', 's', 'u', { ttlSec: 60 })).snapshot!.body).toBe('v2');
+  });
+
+  it('刷新失败时继续使用旧快照，并带上失败原因', async () => {
+    const { svc, advance } = setup(['v1', new Error('connect timeout')]);
+    await svc.get('source', 's', 'u', { ttlSec: 60 });
+    advance(61_000);
+    await svc.get('source', 's', 'u', { ttlSec: 60 });
+    await svc.settled();
+    const r = await svc.get('source', 's', 'u', { ttlSec: 60 });
+    expect(r.snapshot!.body).toBe('v1');
+    expect(r.error).toBe('connect timeout');
+  });
+
+  it('从未成功过时返回错误', async () => {
+    const { svc } = setup([new Error('HTTP 500')]);
+    expect(await svc.get('source', 's', 'u', { ttlSec: 60 })).toEqual({ stale: false, error: 'HTTP 500' });
+  });
+});
