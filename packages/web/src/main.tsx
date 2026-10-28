@@ -8,6 +8,8 @@ import { AppLayout } from './layout.tsx';
 import { Account } from './pages/Account.tsx';
 import { Login } from './pages/Login.tsx';
 import { Overview } from './pages/Overview.tsx';
+import { ProfileDetail } from './pages/profile/ProfileDetail.tsx';
+import { ProfileList, ProfileNew } from './pages/profile/ProfileList.tsx';
 import { SourceEdit, SourceList } from './pages/Sources.tsx';
 
 const queryClient = new QueryClient({
@@ -30,6 +32,9 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<Overview />} />
             <Route path="sources" element={<SourceList />} />
             <Route path="sources/:id" element={<SourceEdit />} />
+            <Route path="profiles" element={<ProfileList />} />
+            <Route path="profiles/new" element={<ProfileNew />} />
+            <Route path="profiles/:id/:tab?" element={<ProfileDetail />} />
             {/* ROUTES */}
             <Route path="account" element={<Account />} />
             <Route path="*" element={<div className="text-muted">页面不存在</div>} />

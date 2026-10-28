@@ -9,7 +9,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: '127.0.0.1',
-    proxy: Object.fromEntries(['/api', '/sub', '/p', '/r', '/healthz'].map((p) => [p, { target, changeOrigin: false }])),
+    // 按完整路径段匹配：/p 与 /r 不能吞掉前端路由 /profiles、/rulesets
+    proxy: { '^/(api|sub|p|r)/.*': { target, changeOrigin: false }, '/healthz': { target, changeOrigin: false } },
   },
   build: { outDir: 'dist', sourcemap: true },
 });
