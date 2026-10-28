@@ -12,6 +12,36 @@
 
 建议 M0 先行：所有棘手问题（依赖解析、模板合并、客户端降级）都在内核里，可以完全用单元测试/快照测试驱动，不依赖 UI。
 
+### 1.1 进度
+
+更新于 2026-10-28。
+
+| 阶段 | 状态 | 说明 |
+| --- | --- | --- |
+| 前端设计稿 | ✅ | 21 张画板覆盖 PRD §7 信息架构（缺普通用户的模板浏览页）；在 Claude Design 画布中，未纳入仓库 |
+| **M0 内核** | 基本完成 | 见下表 |
+| M1 MVP | 未开始 | — |
+| M2 Surge | 未开始 | 内核中规则降级（含进程规则）已实现 Surge 分支 |
+| M3 增强 | 未开始 | — |
+
+M0 明细（代码在 `packages/core`，66 个测试通过）：
+
+| 范围 | 状态 | 说明 |
+| --- | --- | --- |
+| 节点解析器 | ✅ | URI / Base64 / Clash YAML / Surge `[Proxy]`；ss、vmess、vless(reality)、trojan、hysteria2、tuic、anytls、socks5、http。**未复用 Sub-Store**，自行实现 |
+| 处理链（P0 处理器） | ✅ | 逐步 trace、末尾去重兜底；脚本处理器（SRC-08）未做，需沙箱 |
+| Collection | ✅ | 前后缀、环检测；成员拉取失败策略（COL-05，P1）未做 |
+| 规则 IR 与解析 | ✅ | classical / DOMAIN-SET / 纯 CIDR / YAML payload，mrs 透传；逻辑规则（RS-04，P1）未做 |
+| 按客户端降级 | ✅ | mihomo 与 Surge 规则写法、进程规则降级、行级覆盖 |
+| 模板 ⊕ 覆盖层、模板校验器 | ✅ | 发布前影响分析（TPL-07 ②）需服务层逐个试渲染，未做 |
+| mihomo Lowering 与依赖解析 | ✅ | wrap / copy / inline、四类代理链、引用校验、跨 provider 环检测 |
+| 快照测试 | ✅ | PRD 场景 1–6 均有用例 |
+| 集成测试 | 部分 | `mihomo -t`（v1.19.33，断网沙箱）10 个场景通过，含 provider 节点展开校验；GEOIP 规则未覆盖（需 MMDB）；运行时链路测试已写好、未运行（需 `MIHOMO_RUNTIME=1`） |
+
+与文档的差异：PRD 场景 3 中落地整源走同一前置时，按 03 §4.2 输出 `override.dialer-proxy`，而非逐节点注入；只给部分落地挂前置时才注入 Profile 专属 provider。
+
+M1 开始前建议补上：运行时链路测试实际跑一次（需在本机起 socks5 实例）；带 MMDB 的 GEOIP 校验。
+
 ## 2. 技术选型建议
 
 | 层 | 建议 | 理由 |

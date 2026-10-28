@@ -25,7 +25,16 @@
 
 ## 状态
 
-需求整理阶段，尚无代码。PRD v0.2：第一轮待核对项已采集，待决问题已暂定（[07 §8](docs/07-verification-checklist.md#8-决策记录)）。剩余需要 GUI / 真机 / 国内网络的采集项见 [07 §7.1](docs/07-verification-checklist.md#71-剩余采集项)，结果与暂定决策冲突时再修订。实测用例见 [research/verification](research/verification/README.md)。
+**M0 内核基本完成**（[packages/core](packages/core/README.md)），下一步 M1 MVP。各里程碑进度见 [05 §1.1](docs/05-roadmap-and-open-questions.md#11-进度)。
+
+- 需求：PRD v0.2，待决问题已暂定（[07 §8](docs/07-verification-checklist.md#8-决策记录)）；剩余需要 GUI / 真机 / 国内网络的采集项见 [07 §7.1](docs/07-verification-checklist.md#71-剩余采集项)，结果与暂定决策冲突时再修订。实测用例见 [research/verification](research/verification/README.md)。
+- 设计：前端页面设计稿（21 张画板）在 Claude Design 画布中，未纳入仓库。
+
+```bash
+pnpm install
+pnpm test                                   # 单元测试与快照测试
+MIHOMO=/path/to/mihomo pnpm test            # 另跑 mihomo -t 配置合法性校验（断网沙箱）
+```
 
 ## 许可证
 
