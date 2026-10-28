@@ -59,3 +59,12 @@ export function useDeleteDoc(kind: Kind) {
 }
 
 export const useTemplates = () => useQuery({ queryKey: ['templates'], queryFn: () => api<{ items: TemplateDoc[] }>('GET', '/templates').then((r) => r.items) });
+
+export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined) {
+  return useQuery({
+    queryKey: ['nodes', ref?.type, ref?.id],
+    enabled: !!ref?.id,
+    staleTime: 30_000,
+    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes`),
+  });
+}

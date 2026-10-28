@@ -23,7 +23,7 @@ function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => voi
     if (kind === 'nodeset' && ns) onAdd({ kind: 'nodeset', ref: ns });
     else if (kind === 'group' && (groupId || groups[0])) onAdd({ kind: 'group', groupId: groupId || groups[0]!.id });
     else if (kind === 'builtin') onAdd({ kind: 'builtin', name: builtin });
-    else if (kind === 'node' && 'exact' in node.ref.match && node.ref.match.exact) onAdd({ kind: 'node', ref: node.ref });
+    else if (kind === 'node' && ('exact' in node.ref.match ? node.ref.match.exact : node.ref.match.regex)) onAdd({ kind: 'node', ref: node.ref });
     else if (kind === 'all') onAdd({ kind: 'all', scope: 'providers' });
   };
 

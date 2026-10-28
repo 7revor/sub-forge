@@ -2,7 +2,8 @@
 
 import type { Builtin, GroupMember, NodeSetID, Target } from '@sub-forge/core';
 import { useList } from '../hooks.ts';
-import { Input, Select } from './ui.tsx';
+import { Select } from './ui.tsx';
+import { NodePicker } from './NodePicker.tsx';
 
 export const BUILTINS: Builtin[] = ['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS'];
 const NS_LABEL = { source: '订阅源', collection: '组合', local: '本地节点组' } as const;
@@ -37,7 +38,7 @@ export function NodeSetSelect({ value, onChange, options, label, placeholder = '
 
 export type GroupOption = { id: string; name: string };
 
-/** 出口 / 前置选择：内置策略、组、或某个节点集里的单个节点（精确名称） */
+/** 出口 / 前置选择：内置策略、组、或某个节点集里的单个节点（精确名称 / 正则） */
 export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = true, label }: {
   value: Target; onChange: (t: Target) => void; groups: GroupOption[]; nodeSets: { ref: NodeSetID; name: string }[]; allowNode?: boolean; label: string;
 }) {
@@ -66,17 +67,7 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
         </Select>
       )}
       {value.kind === 'node' && (
-        <>
-          <div className="w-auto min-w-44"><NodeSetSelect label={`${label}所在节点集`} value={value.ref.nodeSet} options={nodeSets} onChange={(nodeSet) => onChange({ ...value, ref: { ...value.ref, nodeSet } })} /></div>
-          <Input aria-label={`${label}节点名称`} className="w-auto min-w-44 font-mono" placeholder="节点名称（处理链之后）" value={'exact' in value.ref.match ? value.ref.match.exact : ''} onChange={(e) => onChange({ ...value, ref: { ...value.ref, match: { exact: e.target.value } } })} />
-          <span className="text-[12px] text-muted">找不到时</span>
-          <Select aria-label={`${label}兜底`} className="w-auto" value={value.ref.fallback === 'error' || !value.ref.fallback ? 'error' : value.ref.fallback.kind === 'builtin' ? value.ref.fallback.name : 'error'}
-            onChange={(e) => onChange({ ...value, ref: { ...value.ref, fallback: e.target.value === 'error' ? 'error' : { kind: 'builtin', name: e.target.value as Builtin } } })}>
-            <option value="REJECT">REJECT</option>
-            <option value="DIRECT">DIRECT</option>
-            <option value="error">报错</option>
-          </Select>
-        </>
+        <NodePicker label={label} nodeSets={nodeSets} value={value.ref} onChange={(ref) => onChange({ ...value, ref })} />
       )}
     </div>
   );
