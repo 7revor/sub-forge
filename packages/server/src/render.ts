@@ -105,23 +105,11 @@ export class RenderService {
     const template = opts.template ?? (profile.template ? this.store.getTemplate(profile.template.id, profile.template.follow === 'latest' ? undefined : profile.template.follow.pinned) : undefined);
     if (profile.template && !template) pre.push({ level: 'error', code: 'template.missing', message: `模板 ${profile.template.id} 不存在` });
 
-    const { inputs: nodeSets, sources } = this.collectNodeSets(profile);
-    const userinfoBySource = new Map<string, TrafficInfo>();
-    // 缓存键用快照哈希而不是正文
-    const snapshotHashes: string[] = [];
-    for (const src of sources) {
-      const bodies: string[] = [];
-      for (const url of src.urls ?? []) {
-        const r = await this.snapshots.get('source', src.id, url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
-        if (r.snapshot?.body !== undefined) {
-          bodies.push(r.snapshot.body);
-          snapshotHashes.push(`${src.id}|${url}|${r.snapshot.hash}`);
-          if (r.snapshot.userinfo) userinfoBySource.set(src.id, r.snapshot.userinfo);
-        }
-        if (r.error) pre.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
-      }
-      if (bodies.length) nodeSets.snapshots[src.id] = bodies;
-    }
+    const loaded = await this.loadNodeSets(profile.nodeSets.map((n) => n.ref));
+    const nodeSets = loaded.inputs;
+    const userinfoBySource = loaded.userinfo;
+    const snapshotHashes = loaded.hashes;
+    pre.push(...loaded.report);
 
     const rules = this.collectRules(profile, template);
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
@@ -185,8 +173,32 @@ export class RenderService {
     return { from: 'fresh', render, report };
   }
 
-  /** Profile 用到的节点集（含组合的成员，递归） */
-  private collectNodeSets(profile: ProfileDoc): { inputs: NodeSetInputs; sources: SourceDoc[] } {
+  /**
+   * 收集节点集（含组合成员，递归）并取得远程订阅源的快照。处理链逐步预览也用它。
+   * 返回的 hashes 用作缓存键的一部分（用快照哈希而不是正文）。
+   */
+  async loadNodeSets(refs: NodeSetID[]): Promise<{ inputs: NodeSetInputs; userinfo: Map<string, TrafficInfo>; hashes: string[]; report: ReportItem[] }> {
+    const { inputs, sources } = this.collectNodeSets(refs);
+    const userinfo = new Map<string, TrafficInfo>();
+    const hashes: string[] = [];
+    const report: ReportItem[] = [];
+    for (const src of sources) {
+      const bodies: string[] = [];
+      for (const url of src.urls ?? []) {
+        const r = await this.snapshots.get('source', src.id, url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
+        if (r.snapshot?.body !== undefined) {
+          bodies.push(r.snapshot.body);
+          hashes.push(`${src.id}|${url}|${r.snapshot.hash}`);
+          if (r.snapshot.userinfo) userinfo.set(src.id, r.snapshot.userinfo);
+        }
+        if (r.error) report.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
+      }
+      if (bodies.length) inputs.snapshots[src.id] = bodies;
+    }
+    return { inputs, userinfo, hashes, report };
+  }
+
+  private collectNodeSets(refs: NodeSetID[]): { inputs: NodeSetInputs; sources: SourceDoc[] } {
     const inputs: NodeSetInputs = { sources: {}, collections: {}, locals: {}, snapshots: {} };
     const seen = new Set<string>();
     const walk = (ref: NodeSetID) => {
@@ -197,7 +209,7 @@ export class RenderService {
       else if (ref.type === 'local') { const d = this.store.get('local', ref.id); if (d) inputs.locals[d.id] = d; }
       else { const d = this.store.get('collection', ref.id); if (d) { inputs.collections[d.id] = d; d.members.forEach((m) => walk(m.ref)); } }
     };
-    profile.nodeSets.forEach((n) => walk(n.ref));
+    refs.forEach(walk);
     const sources = (Object.values(inputs.sources) as SourceDoc[]).filter((s) => s.kind === 'remote');
     return { inputs, sources };
   }
