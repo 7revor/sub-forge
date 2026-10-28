@@ -9,7 +9,7 @@ function SortableRow({ id, index, locked, blocked, render }: {
   id: UniqueIdentifier; index: number; locked: boolean; blocked: boolean; render: (handle: ReactNode) => ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id, disabled: { draggable: locked, droppable: locked || blocked },
+    id, disabled: { draggable: locked, droppable: blocked },
   });
   const handle = locked
     ? <span role="img" aria-label={`第 ${index + 1} 项已锁定`} className="grid h-8 w-6 place-items-center text-muted"><LockKeyhole size={16} /></span>
@@ -18,9 +18,14 @@ function SortableRow({ id, index, locked, blocked, render }: {
     className={cx(isDragging && 'relative z-10 shadow-md')}>{render(handle)}</li>;
 }
 
-export function SortableList<T>({ items, getKey, onReorder, renderItem, isLocked }: {
+/**
+ * 锁定项自身不能拖动，但未锁定项可以越过锁定项（只移动一项，锁定项之间的相对顺序不变）；
+ * 需要额外限制落点时传 canDrop。
+ */
+export function SortableList<T>({ items, getKey, onReorder, renderItem, isLocked, canDrop }: {
   items: T[]; getKey?: (item: T, index: number) => UniqueIdentifier; onReorder: (items: T[], move: { from: number; to: number }) => void;
   renderItem: (item: T, index: number, handle: ReactNode) => ReactNode; isLocked?: (item: T, index: number) => boolean;
+  canDrop?: (from: number, to: number) => boolean;
 }) {
   const [identity, setIdentity] = useState(() => ({ ids: items.map((_, i) => `s${i}`), seq: items.length }));
   const [active, setActive] = useState<UniqueIdentifier | null>(null);
@@ -32,8 +37,7 @@ export function SortableList<T>({ items, getKey, onReorder, renderItem, isLocked
   }
   const keys = items.map((item, i) => getKey ? getKey(item, i) : ids[i]!);
   const locked = items.map((item, i) => isLocked?.(item, i) ?? false);
-  const canMove = (from: number, to: number) => from >= 0 && to >= 0 &&
-    !locked.slice(Math.min(from, to), Math.max(from, to) + 1).some(Boolean);
+  const canMove = (from: number, to: number) => from >= 0 && to >= 0 && !locked[from] && (canDrop?.(from, to) ?? true);
   const activeIndex = active === null ? -1 : keys.indexOf(active);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   return <DndContext sensors={sensors} collisionDetection={(args) => closestCenter({
@@ -48,7 +52,7 @@ export function SortableList<T>({ items, getKey, onReorder, renderItem, isLocked
   }}>
     <SortableContext items={keys} strategy={verticalListSortingStrategy}>
       <ol className="m-0 list-none p-0">{items.map((item, index) => <SortableRow key={keys[index]} id={keys[index]!} index={index}
-        locked={locked[index]!} blocked={activeIndex >= 0 && !canMove(activeIndex, index)}
+        locked={locked[index]!} blocked={activeIndex >= 0 && activeIndex !== index && !canMove(activeIndex, index)}
         render={(handle) => renderItem(item, index, handle)} />)}</ol>
     </SortableContext>
   </DndContext>;
