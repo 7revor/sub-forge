@@ -15,3 +15,5 @@ export * from './nodeset/resolve.ts';
 export * from './rules/parse.ts';
 export * from './rules/client.ts';
 export * from './rules/expand.ts';
+export * from './template/merge.ts';
+export * from './template/validate.ts';
