@@ -79,6 +79,7 @@ async function start(): Promise<void> {
   });
   const app = createApp({
     store, renderer, snapshots, publicUrl,
+    ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   });

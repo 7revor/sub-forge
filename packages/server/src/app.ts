@@ -4,6 +4,8 @@
 //   GET /r/:token/:key       转换后的规则集
 // token 无效一律 404 且不暴露 Profile 是否存在；从未成功渲染时 503 + 纯文本说明，不返回半成品。
 
+import { readFile, stat } from 'node:fs/promises';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { Hono, type Context } from 'hono';
 import type { Platform } from '@sub-forge/core';
 import { createApi, type ApiDeps } from './api/index.ts';
@@ -22,7 +24,40 @@ function userinfoHeader(u: TrafficInfo | undefined): string | undefined {
 
 const notFound = (c: Context) => c.body(null, 404);
 
-export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'>>;
+export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'>> & {
+  /** 前端构建产物目录（packages/web/dist）；设置后托管静态文件，其余路径回落到 index.html */
+  webDir?: string;
+};
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.map': 'application/json',
+};
+/** 这些前缀属于接口，不回落到前端页面 */
+const RESERVED = ['/api/', '/sub/', '/p/', '/r/'];
+
+/** 托管前端：/assets 下的文件名带内容哈希，可长期缓存；index.html 不缓存 */
+function serveWeb(app: Hono, webDir: string) {
+  const root = resolve(webDir);
+  const send = async (c: Context, file: string, immutable: boolean) => {
+    const body = await readFile(file);
+    c.header('content-type', MIME[extname(file)] ?? 'application/octet-stream');
+    c.header('cache-control', immutable ? 'public, max-age=31536000, immutable' : 'no-cache');
+    c.header('x-content-type-options', 'nosniff');
+    return c.body(body);
+  };
+  app.get('*', async (c) => {
+    const path = decodeURIComponent(new URL(c.req.url).pathname);
+    if (RESERVED.some((p) => path.startsWith(p)) || path === '/api') return c.body(null, 404);
+    const file = normalize(join(root, path));
+    if (file.startsWith(root + sep) && extname(file)) {
+      const st = await stat(file).catch(() => undefined);
+      if (st?.isFile()) return send(c, file, path.startsWith('/assets/'));
+      return c.body(null, 404);
+    }
+    return send(c, join(root, 'index.html'), false);
+  });
+}
 
 export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
@@ -89,6 +124,8 @@ export function createApp(deps: AppDeps) {
 
   app.get('/p/:token/:key', part((r, k) => r.providers[k], 'text/yaml; charset=utf-8'));
   app.get('/r/:token/:key', part((r, k) => r.rulesets[k], 'text/plain; charset=utf-8'));
+
+  if (deps.webDir) serveWeb(app, deps.webDir);
 
   return app;
 }
