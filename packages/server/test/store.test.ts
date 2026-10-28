@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -52,7 +52,8 @@ describe('加密与迁移', () => {
   it('文档、快照正文、token 落盘时加密；token 按 HMAC 查找', () => {
     const s = new Store(':memory:');
     s.put('source', { id: 'a', name: 'A', kind: 'remote', urls: ['https://secret.example.com/sub?token=xyz'], pipeline: [] }, 'u1');
-    s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'u', fetchedAt: 1, ok: true, body: 'password: hunter2' });
+    const url = 'https://secret.example.com/sub?token=xyz';
+    s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url, fetchedAt: 1, ok: true, body: 'password: hunter2', error: `连接 ${url} 失败` });
     const t = s.createToken('p', 'Mac');
     const dump = JSON.stringify([
       s.db.prepare('SELECT * FROM docs').all(),
@@ -64,6 +65,8 @@ describe('加密与迁移', () => {
     expect(dump).not.toContain(t.token);
     expect(s.get('source', 'a')!.urls).toEqual(['https://secret.example.com/sub?token=xyz']);
     expect(s.getWithOwner('source', 'a')!.owner).toBe('u1');
+    expect(s.latestSnapshot('source', 'a', url)).toMatchObject({ url, body: 'password: hunter2', error: `连接 ${url} 失败` });
+    expect(s.snapshotHistory('source', 'a')[0]!.url).toBe(url);
     expect(s.getToken(t.token)).toEqual({ token: t.token, profileId: 'p', label: 'Mac' });
     expect(s.listTokens('p').map((x) => x.token)).toEqual([t.token]);
   });
@@ -86,5 +89,29 @@ describe('加密与迁移', () => {
 
   it('持久化数据库必须提供密钥', () => {
     expect(() => new Store('/tmp/never-created.db')).toThrow(/密钥/);
+  });
+
+  it('v2 快照 URL 与错误迁移为密文，查询、历史与再次启动保持有效', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-url-migration-'));
+    const file = join(dir, 'old.db');
+    const cipher = new Cipher(randomBytes(32));
+    const url = 'https://example.test/sub?token=MIGRATION_SECRET';
+    try {
+      const original = new Store(file, { cipher });
+      original.addSnapshot({ ownerKind: 'source', ownerId: 's', url, fetchedAt: 42, ok: true, body: '旧正文' });
+      original.close();
+      const old = new Database(file);
+      old.exec('DROP INDEX snapshots_owner; ALTER TABLE snapshots DROP COLUMN url_hash; PRAGMA user_version = 2;');
+      old.prepare('UPDATE snapshots SET url = ?, body = ?, error = ?').run(url, '旧正文', `拉取 ${url} 失败`);
+      old.close();
+      for (let i = 0; i < 2; i++) {
+        const upgraded = new Store(file, { cipher });
+        expect(upgraded.latestSnapshot('source', 's', url)).toMatchObject({ url, body: '旧正文', error: `拉取 ${url} 失败` });
+        expect(upgraded.countSnapshots('source', 's', url)).toEqual({ ok: 1, failed: 0 });
+        expect(JSON.stringify(upgraded.db.prepare('SELECT * FROM snapshots').all())).not.toContain('MIGRATION_SECRET');
+        upgraded.close();
+      }
+      expect(readFileSync(file).includes(Buffer.from('MIGRATION_SECRET'))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

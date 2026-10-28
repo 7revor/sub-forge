@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import { hashPassword, verifyPassword } from '../src/crypto.ts';
 import { addUser, client, setupApp } from './helpers.ts';
 
@@ -70,6 +71,23 @@ describe('CSRF 防护', () => {
 });
 
 describe('用户管理（管理员）', () => {
+  it('禁用用户同时阻断已有主订阅、provider 和规则集，重新启用后恢复', async () => {
+    const { app, store } = setupApp();
+    await addUser(store, 'root', 'admin');
+    const user = await addUser(store, 'alice');
+    store.put('source', { id: 's', name: 'S', kind: 'local', pipeline: [], content: 'socks5://host.test:1080#A' }, user.id);
+    store.put('ruleset', { id: 'rs', name: 'R', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' }, user.id);
+    store.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'provider' }], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } } }] }, chains: [], refPolicy: { default: 'wrap' } }, user.id);
+    const token = store.createToken('p').token;
+    const cfg = parse(await (await app.request(`/sub/${token}`)).text());
+    const paths = [`/sub/${token}`, cfg['proxy-providers'].S.url, cfg['rule-providers'].rs_rs_domain.url].map((url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; });
+    const admin = client(app); await admin.login('root');
+    for (const path of paths) expect((await app.request(path)).status).toBe(200);
+    await admin.patch(`/api/users/${user.id}`, { disabled: true });
+    for (const path of paths) expect((await app.request(path)).status).toBe(404);
+    await admin.patch(`/api/users/${user.id}`, { disabled: false });
+    for (const path of paths) expect((await app.request(path)).status).toBe(200);
+  });
   it('普通用户不能访问；管理员可创建、禁用、重置密码', async () => {
     const { app, store } = setupApp();
     await addUser(store, 'root', 'admin');

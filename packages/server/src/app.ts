@@ -70,7 +70,7 @@ export function createApp(deps: AppDeps) {
   app.get('/sub/:token', async (c) => {
     const started = now();
     const token = c.req.param('token');
-    const t = store.getToken(token);
+    const t = store.getActiveToken(token);
     if (!t) return notFound(c);
     const profile = store.get('profile', t.profileId);
     if (!profile) return notFound(c);
@@ -109,7 +109,7 @@ export function createApp(deps: AppDeps) {
   /** provider 与规则集共用：按 token 找到 Profile，取同一次渲染里的对应内容 */
   const part = (pick: (r: StoredRender, key: string) => string | undefined, contentType: string) => async (c: Context) => {
     const token = c.req.param('token')!;
-    const t = store.getToken(token);
+    const t = store.getActiveToken(token);
     if (!t) return notFound(c);
     const qp = c.req.query('platform');
     const platform = PLATFORMS.find((p) => p === qp);

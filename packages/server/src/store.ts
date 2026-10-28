@@ -1,6 +1,6 @@
 // SQLite 存储。只保存"意图"（文档）与上游原始快照，不保存渲染结果；
 // 唯一例外是每个 Profile 最近一次成功的渲染结果，用于失败时兜底（OUT-05 / TPL-12）。
-// 文档正文、快照正文、订阅 token 均加密落盘（SYS-04）。
+// 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
 import Database from 'better-sqlite3';
 import { randomBytes } from 'node:crypto';
@@ -43,7 +43,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS docs (
@@ -57,11 +57,11 @@ CREATE TABLE IF NOT EXISTS template_versions (
 );
 CREATE TABLE IF NOT EXISTS snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  owner_kind TEXT NOT NULL, owner_id TEXT NOT NULL, url TEXT NOT NULL,
+  owner_kind TEXT NOT NULL, owner_id TEXT NOT NULL, url TEXT NOT NULL, url_hash TEXT NOT NULL,
   fetched_at INTEGER NOT NULL, ok INTEGER NOT NULL, status INTEGER,
   body TEXT, hash TEXT, userinfo TEXT, error TEXT
 );
-CREATE INDEX IF NOT EXISTS snapshots_owner ON snapshots (owner_kind, owner_id, url, fetched_at);
+CREATE INDEX IF NOT EXISTS snapshots_owner ON snapshots (owner_kind, owner_id, url_hash, fetched_at);
 CREATE TABLE IF NOT EXISTS sub_tokens (
   token_hash TEXT PRIMARY KEY, token_enc TEXT NOT NULL, profile_id TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL
 );
@@ -111,6 +111,7 @@ export class Store {
     this.cipher = opts.cipher ?? new Cipher(randomBytes(32));
     this.db = new Database(path);
     this.db.pragma('journal_mode = WAL');
+    this.db.pragma('secure_delete = ON');
     this.migrate();
   }
 
@@ -120,13 +121,32 @@ export class Store {
   private migrate(): void {
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version >= SCHEMA_VERSION) return;
+    const hadSnapshots = !!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'snapshots'").get();
     const tx = this.db.transaction(() => {
       const hasDocs = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'docs'").get();
       if (hasDocs) {
         const cols = (this.db.prepare('PRAGMA table_info(docs)').all() as { name: string }[]).map((c) => c.name);
         if (!cols.includes('owner')) this.db.exec('ALTER TABLE docs ADD COLUMN owner TEXT');
       }
+      if (hadSnapshots) {
+        const cols = this.db.prepare('PRAGMA table_info(snapshots)').all() as { name: string }[];
+        if (!cols.some((c) => c.name === 'url_hash')) this.db.exec('ALTER TABLE snapshots ADD COLUMN url_hash TEXT');
+        this.db.exec('DROP INDEX IF EXISTS snapshots_owner');
+      }
       this.db.exec(SCHEMA);
+      // v1/v2 允许旧明文文档；本次迁移一并加密，URL 改用 HMAC 查询，错误中也可能包含 URL。
+      for (const r of this.db.prepare('SELECT id, url, body, error FROM snapshots').all() as { id: number; url: string; body: string | null; error: string | null }[]) {
+        const url = this.cipher.decrypt(r.url);
+        this.db.prepare('UPDATE snapshots SET url = ?, url_hash = ?, body = ?, error = ? WHERE id = ?').run(
+          this.cipher.encrypt(url), this.cipher.hmac(url),
+          r.body === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.body)),
+          r.error === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.error)), r.id);
+      }
+      for (const table of ['docs', 'last_good'] as const) {
+        for (const r of this.db.prepare(`SELECT rowid, data FROM ${table}`).all() as { rowid: number; data: string }[]) {
+          this.db.prepare(`UPDATE ${table} SET data = ? WHERE rowid = ?`).run(this.cipher.encrypt(this.cipher.decrypt(r.data)), r.rowid);
+        }
+      }
       const hasV1Tokens = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tokens'").get();
       if (hasV1Tokens) {
         const rows = this.db.prepare('SELECT token, profile_id, label, created_at FROM tokens').all() as { token: string; profile_id: string; label: string | null; created_at: number }[];
@@ -139,6 +159,12 @@ export class Store {
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
+    if (hadSnapshots) {
+      // 清除迁移前留在空闲页和 WAL 中的明文副本。
+      this.db.pragma('wal_checkpoint(TRUNCATE)');
+      this.db.exec('VACUUM');
+      this.db.pragma('wal_checkpoint(TRUNCATE)');
+    }
   }
 
   // ---------- 文档 ----------
@@ -220,6 +246,15 @@ export class Store {
     return row.label === null ? { token, profileId: row.profile_id } : { token, profileId: row.profile_id, label: row.label };
   }
 
+  /** 订阅入口同时检查所属用户；无归属的种子 Profile 仍允许使用。 */
+  getActiveToken(token: string): TokenDoc | undefined {
+    const t = this.getToken(token);
+    if (!t) return undefined;
+    const row = this.getWithOwner('profile', t.profileId);
+    if (!row || (row.owner !== null && this.getUser(row.owner)?.disabled !== false)) return undefined;
+    return t;
+  }
+
   listTokens(profileId: string): (TokenDoc & { createdAt: number })[] {
     const rows = this.db.prepare('SELECT token_enc, label, created_at FROM sub_tokens WHERE profile_id = ? ORDER BY created_at, token_hash').all(profileId) as { token_enc: string; label: string | null; created_at: number }[];
     return rows.map((r) => {
@@ -244,33 +279,34 @@ export class Store {
   // ---------- 快照 ----------
 
   addSnapshot(s: Omit<SnapshotRow, 'id'>): void {
+    const urlHash = this.cipher.hmac(s.url);
     const tx = this.db.transaction(() => {
-      this.db.prepare('INSERT INTO snapshots (owner_kind, owner_id, url, fetched_at, ok, status, body, hash, userinfo, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(s.ownerKind, s.ownerId, s.url, s.fetchedAt, s.ok ? 1 : 0, s.status ?? null, s.body === undefined ? null : this.cipher.encrypt(s.body), s.hash ?? null, s.userinfo ? JSON.stringify(s.userinfo) : null, s.error ?? null);
+      this.db.prepare('INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(s.ownerKind, s.ownerId, this.cipher.encrypt(s.url), urlHash, s.fetchedAt, s.ok ? 1 : 0, s.status ?? null, s.body === undefined ? null : this.cipher.encrypt(s.body), s.hash ?? null, s.userinfo ? JSON.stringify(s.userinfo) : null, s.error === undefined ? null : this.cipher.encrypt(s.error));
       // 成功快照保留最近 N 份；失败记录只保留最新一条（用于 UI 标红）
-      this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url = ? AND ok = 1 AND id NOT IN (
-        SELECT id FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url = ? AND ok = 1 ORDER BY fetched_at DESC, id DESC LIMIT ?)`)
-        .run(s.ownerKind, s.ownerId, s.url, s.ownerKind, s.ownerId, s.url, KEEP_OK_SNAPSHOTS);
-      this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url = ? AND ok = 0 AND id NOT IN (
-        SELECT id FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url = ? AND ok = 0 ORDER BY fetched_at DESC, id DESC LIMIT 1)`)
-        .run(s.ownerKind, s.ownerId, s.url, s.ownerKind, s.ownerId, s.url);
+      this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 1 AND id NOT IN (
+        SELECT id FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 1 ORDER BY fetched_at DESC, id DESC LIMIT ?)`)
+        .run(s.ownerKind, s.ownerId, urlHash, s.ownerKind, s.ownerId, urlHash, KEEP_OK_SNAPSHOTS);
+      this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 0 AND id NOT IN (
+        SELECT id FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 0 ORDER BY fetched_at DESC, id DESC LIMIT 1)`)
+        .run(s.ownerKind, s.ownerId, urlHash, s.ownerKind, s.ownerId, urlHash);
     });
     tx();
   }
 
   private toSnapshot(r: RawSnapshot): SnapshotRow {
-    const s: SnapshotRow = { id: r.id, ownerKind: r.owner_kind, ownerId: r.owner_id, url: r.url, fetchedAt: r.fetched_at, ok: r.ok === 1 };
+    const s: SnapshotRow = { id: r.id, ownerKind: r.owner_kind, ownerId: r.owner_id, url: this.cipher.decrypt(r.url), fetchedAt: r.fetched_at, ok: r.ok === 1 };
     if (r.status !== null) s.status = r.status;
     if (r.body !== null) s.body = this.cipher.decrypt(r.body);
     if (r.hash !== null) s.hash = r.hash;
     if (r.userinfo !== null) s.userinfo = JSON.parse(r.userinfo) as TrafficInfo;
-    if (r.error !== null) s.error = r.error;
+    if (r.error !== null) s.error = this.cipher.decrypt(r.error);
     return s;
   }
 
   latestSnapshot(ownerKind: SnapshotOwner, ownerId: string, url: string, okOnly = true): SnapshotRow | undefined {
-    const row = this.db.prepare(`SELECT * FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
-      .get(ownerKind, ownerId, url) as RawSnapshot | undefined;
+    const row = this.db.prepare(`SELECT * FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
+      .get(ownerKind, ownerId, this.cipher.hmac(url)) as RawSnapshot | undefined;
     return row ? this.toSnapshot(row) : undefined;
   }
 
@@ -282,8 +318,8 @@ export class Store {
   }
 
   countSnapshots(ownerKind: SnapshotOwner, ownerId: string, url: string): { ok: number; failed: number } {
-    const row = this.db.prepare('SELECT SUM(ok = 1) ok, SUM(ok = 0) failed FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url = ?')
-      .get(ownerKind, ownerId, url) as { ok: number | null; failed: number | null };
+    const row = this.db.prepare('SELECT SUM(ok = 1) ok, SUM(ok = 0) failed FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?')
+      .get(ownerKind, ownerId, this.cipher.hmac(url)) as { ok: number | null; failed: number | null };
     return { ok: row.ok ?? 0, failed: row.failed ?? 0 };
   }
 
