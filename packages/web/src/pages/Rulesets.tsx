@@ -1,10 +1,13 @@
 // 规则集：本地 / 远程，按客户端与平台预览最终输出（RS-01–03、CR-05）；规则包：两层组合，只配一个出口（RB-01–05）。
 
 import { useQuery } from '@tanstack/react-query';
-import { parseRuleLine, type Client, type Platform, type RuleBundle, type RuleSetFormat } from '@sub-forge/core';
+import type { Client, Platform, RuleBundle, RuleIR, RuleSetFormat } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, type RulesetPreview } from '../api.ts';
+import { ClientOverrides, clientOverridesError, newClientOverride, ruleInputError } from '../components/ClientOverrides.tsx';
+import { RuleEditor } from '../components/RuleEditor.tsx';
+import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, Switch, Textarea } from '../components/ui.tsx';
@@ -49,10 +52,11 @@ export function RulesetEdit() {
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
+  const overridesError = rulesetOverridesError(d.overrides ?? []);
 
   return (
     <DetailShell listPath="/rulesets" listLabel="规则集" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
-      onSave={() => e.submit((x) => (x.kind === 'remote' ? { ...x, content: undefined } : { ...x, url: undefined }))} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
+      onSave={() => { if (!overridesError) e.submit((x) => (x.kind === 'remote' ? { ...x, content: undefined } : { ...x, url: undefined })); }} saveError={overridesError ?? e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
       <div className="flex flex-wrap items-start gap-5">
         <Card title="来源" className="min-w-0 flex-[999_1_520px]">
           <div className="flex flex-col gap-3.5">
@@ -87,8 +91,53 @@ export function RulesetEdit() {
           </div>
         </Card>
       </div>
+      <RulesetOverrides value={d.overrides ?? []} onChange={(overrides) => set({ overrides })} />
     </DetailShell>
   );
+}
+
+type LineOverride = NonNullable<RuleSetDoc['overrides']>[number];
+
+function rulesetOverridesError(value: LineOverride[]): string | undefined {
+  for (const [i, item] of value.entries()) {
+    if (item.line !== undefined ? !Number.isSafeInteger(item.line) || item.line < 1 : !item.match?.trim()) {
+      return `行级覆盖第 ${i + 1} 条：请填写从 1 开始的整数行号或原文。`;
+    }
+    const error = clientOverridesError([item.override]);
+    if (error) return `行级覆盖第 ${i + 1} 条：${error}`;
+  }
+  return undefined;
+}
+
+function RulesetOverrides({ value, onChange }: { value: LineOverride[]; onChange: (value: LineOverride[]) => void }) {
+  const update = (index: number, item: LineOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
+  return <Card title="行级客户端覆盖" actions={<Button onClick={() => onChange([...value, { line: 1, override: newClientOverride() }])}><Plus size={15} />添加行级覆盖</Button>}>
+    <p className="mt-0 text-[12.5px] text-muted">按解析后的行号（从 1 开始）或原文精确匹配定位。同一行命中第一条客户端与平台匹配的覆盖，可拖拽调整优先级；mrs / srs 透传格式不应用行级覆盖。</p>
+    {!value.length ? <Empty>没有行级覆盖。</Empty> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => {
+      const mode = item.match !== undefined && item.line === undefined ? 'match' : 'line';
+      return <div className="my-3 flex items-start gap-2 rounded-lg border border-line p-3">
+        {handle}<div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Segmented label={`第 ${i + 1} 条定位方式`} value={mode} options={[{ value: 'line', label: '按行号' }, { value: 'match', label: '按原文精确匹配' }]} onChange={(next) => {
+              if (next === mode) return;
+              const { line: _, match: __, ...rest } = item;
+              update(i, next === 'line' ? { ...rest, line: 1 } : { ...rest, match: '' });
+            }} />
+            <Button size="sm" variant="ghost" aria-label={`删除行级覆盖 ${i + 1}`} onClick={() => onChange(value.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
+          </div>
+          {mode === 'line' ? <Field label="行号" hint="从 1 开始，以解析结果中的行号为准">{(id) => <Input id={id} type="number" min={1} step={1} value={item.line ?? ''} onChange={(e) => {
+            const { match: _, ...rest } = item;
+            update(i, { ...rest, line: e.target.value === '' ? undefined : Number(e.target.value) });
+          }} />}</Field> : <Field label="原文精确匹配" hint="保持规则原文，不含出口">{(id) => <Input id={id} className="font-mono" value={item.match ?? ''} onChange={(e) => {
+            const { line: _, ...rest } = item;
+            update(i, { ...rest, match: e.target.value });
+          }} />}</Field>}
+          <ClientOverrides single value={[item.override]} onChange={(overrides) => update(i, { ...item, override: overrides[0]! })} />
+        </div>
+      </div>;
+    }} />}
+    <ErrorBox error={rulesetOverridesError(value)} />
+  </Card>;
 }
 
 // ---------- 规则包 ----------
@@ -98,7 +147,7 @@ export function BundleList() {
     <DocList kind="bundles" title="规则包" intro="多个规则集或单条规则打包成一项，只配一个出口；输出时按 domain → classical → ipcidr 拆分（最多两层）。"
       columns={[
         { header: '名称', cell: (b) => b.name },
-        { header: '子项', cell: (b) => <span className="font-mono">{b.items.length}</span> },
+        { header: '子项', cell: (b) => <span className="font-mono">{b.items.length} 项 · 启用中 {b.items.filter((item) => item.enabled !== false).length} 项</span> },
         { header: 'IP 类 no-resolve', cell: (b) => (b.noResolve ? '是' : '否') },
       ]} />
   );
@@ -106,17 +155,18 @@ export function BundleList() {
 
 const EMPTY_B: RuleBundle = { id: '', name: '', items: [] };
 
-function RuleLineInput({ onAdd }: { onAdd: (rule: ReturnType<typeof parseRuleLine>) => void }) {
-  const [line, setLine] = useState('');
-  const [err, setErr] = useState('');
-  useEffect(() => setErr(''), [line]);
-  const add = () => { try { onAdd(parseRuleLine(line.trim())); setLine(''); } catch (x) { setErr((x as Error).message); } };
-  return (
-    <div className="flex flex-1 flex-col gap-1">
-      <div className="flex gap-2"><Input aria-label="单条规则" className="font-mono" placeholder="DOMAIN-SUFFIX,example.com" value={line} onChange={(x) => setLine(x.target.value)} onKeyDown={(x) => { if (x.key === 'Enter') add(); }} /><Button onClick={add} disabled={!line.trim()}><Plus size={15} />添加规则</Button></div>
-      {err && <span className="text-[12px] text-err">{err}</span>}
-    </div>
-  );
+function RuleLineInput({ onAdd }: { onAdd: (rule: RuleIR) => void }) {
+  const [rule, setRule] = useState<RuleIR>();
+  const [revision, setRevision] = useState(0);
+  const error = ruleInputError(rule);
+  return <div className="flex min-w-64 flex-1 flex-col gap-3">
+    <RuleEditor key={revision} value={rule} onChange={setRule} onIncomplete={setRule} />
+    {rule && <ErrorBox error={error} />}
+    <Button className="self-start" disabled={!!error} onClick={() => {
+      if (!rule || error) return;
+      onAdd(rule); setRule(undefined); setRevision((value) => value + 1);
+    }}><Plus size={15} />添加规则</Button>
+  </div>;
 }
 
 export function BundleEdit() {
@@ -137,18 +187,16 @@ export function BundleEdit() {
           <label className="flex h-[38px] items-center gap-2.5 text-[13px]"><Switch label="IP 类规则统一 no-resolve" checked={!!d.noResolve} onChange={(v) => set({ noResolve: v })} />IP 类规则统一加 no-resolve</label>
         </div>
       </Card>
-      <Card title="子项" bodyClass="pb-3">
+      <Card title={`子项 ${d.items.length} 项 · 启用中 ${d.items.filter((item) => item.enabled !== false).length} 项`} bodyClass="px-4 pb-3">
         {!d.items.length ? <Empty>还没有子项。</Empty> : (
-          <ul className="-mx-4 m-0 list-none p-0">
-            {d.items.map((it, i) => (
-              <li key={i} className={`flex items-center gap-3 border-t border-line-2 px-4 py-2.5 ${it.enabled === false ? 'opacity-55' : ''}`}>
-                <Badge>{it.kind === 'ruleset' ? '规则集' : '单条规则'}</Badge>
+          <SortableList items={d.items} onReorder={(items) => set({ items })} renderItem={(it, i, handle) => (
+              <div className={`flex items-center gap-3 border-t border-line-2 py-2.5 ${it.enabled === false ? 'opacity-55' : ''}`}>
+                {handle}<Badge>{it.kind === 'ruleset' ? '规则集' : '单条规则'}</Badge>
                 <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{it.kind === 'ruleset' ? name(it.id) : ruleText(it.rule)}</span>
                 <Switch label={`启用子项 ${i + 1}`} checked={it.enabled !== false} onChange={(v) => set({ items: d.items.map((x, j) => (j === i ? { ...x, enabled: v } : x)) })} />
                 <Button size="sm" variant="ghost" aria-label={`删除子项 ${i + 1}`} onClick={() => set({ items: d.items.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
-              </li>
-            ))}
-          </ul>
+              </div>
+            )} />
         )}
         <div className="-mx-4 mt-1 flex flex-wrap gap-3 border-t border-line-2 px-4 pt-3">
           <div className="flex gap-2">

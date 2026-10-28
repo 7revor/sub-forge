@@ -1,12 +1,16 @@
-// 规则：继承模板规则（可禁用、改出口，出口可改为已加入节点集中的单个节点），在锚点前后插入私有规则，改 MATCH 出口。
+// 模板规则只改启用和出口；私有规则支持拖拽、匹配项及客户端覆盖编辑。
 
-import { parseRuleLine, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
+import type { Matcher, RuleEntry, RuleIR, Target } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Modal, Select, Switch, cx, td, th } from '../../components/ui.tsx';
+import { RuleEditor } from '../../components/RuleEditor.tsx';
+import { SortableList } from '../../components/SortableList.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Modal, Select, Switch, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
 import { useProfile } from './context.ts';
+import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
 
 export function ruleText(r: RuleIR): string {
   switch (r.type) {
@@ -27,63 +31,75 @@ function useMatcherLabel() {
   };
 }
 
-type Anchor = 'top' | 'bottom' | { before: string } | { after: string };
+function privateRuleError(rule: RuleEntry): string | undefined {
+  const matcher = rule.matcher;
+  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : '请选择规则集或规则包。';
+}
 
-function ExtraRuleModal({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (anchor: Anchor, rule: RuleEntry) => void }) {
-  const { template, groupOptions, profileNodeSets } = useProfile();
+function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (value: RuleEntry) => void }) {
+  const { groupOptions, profileNodeSets } = useProfile();
   const rulesets = useList('rulesets').data ?? [];
   const bundles = useList('bundles').data ?? [];
-  const [kind, setKind] = useState<Matcher['kind']>('rule');
-  const [line, setLine] = useState('');
-  const [setId, setSetId] = useState('');
-  const [anchor, setAnchor] = useState('top');
-  const [target, setTarget] = useState<Target>({ kind: 'builtin', name: 'DIRECT' });
-  let parsed: RuleIR | undefined;
-  let parseError = '';
-  if (kind === 'rule' && line.trim()) {
-    try { parsed = parseRuleLine(line.trim()); } catch (e) { parseError = (e as Error).message; }
-  }
-  const options = kind === 'ruleset' ? rulesets.map((r) => ({ id: r.id, name: r.name })) : bundles.map((b) => ({ id: b.id, name: b.name }));
-  const matcher: Matcher | undefined = kind === 'rule' ? (parsed ? { kind: 'rule', rule: parsed } : undefined) : (setId || options[0]?.id) ? { kind, id: setId || options[0]!.id } : undefined;
-
-  const submit = () => {
-    if (!matcher) return;
-    const a: Anchor = anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
-    onAdd(a, { id: `p_${Date.now().toString(36)}`, matcher, target, enabled: true });
-    setLine('');
-    onClose();
+  const matcher = value.matcher;
+  const options = matcher.kind === 'ruleset' ? rulesets : bundles;
+  const changeRule = (rule: RuleIR) => {
+    if (matcher.kind === 'rule') onChange({ ...value, matcher: { ...matcher, rule } });
   };
+  return <div className="flex flex-col gap-3.5">
+    <Field label="匹配项">{(id) => <Select id={id} value={matcher.kind} onChange={(e) => {
+      const kind = e.target.value as Matcher['kind'];
+      const { rule: _, id: __, overrides: ___, ...rest } = matcher as { rule?: RuleIR; id?: string; overrides?: unknown };
+      onChange({ ...value, matcher: kind === 'rule' ? { ...rest, kind, rule: { type: 'DOMAIN', value: '' } } : { ...rest, kind, id: '' } });
+    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option><option value="bundle">规则包</option></Select>}</Field>
+    {matcher.kind === 'rule' ? <RuleEditor value={matcher.rule} onChange={changeRule} onIncomplete={changeRule} /> :
+      <Field label={matcher.kind === 'ruleset' ? '规则集' : '规则包'}>{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...value, matcher: { ...matcher, id: e.target.value } })}>
+        <option value="">请选择</option>
+        {matcher.id && !options.some((item) => item.id === matcher.id) && <option value={matcher.id}>{matcher.id}（当前不可用）</option>}
+        {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+      </Select>}</Field>}
+    <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">出口</span>
+      <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
+    <div className="flex flex-wrap gap-5">
+      <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 no-resolve" checked={value.options?.noResolve === true}
+        onChange={(noResolve) => onChange({ ...value, options: { ...value.options, noResolve } })} />no-resolve</label>
+      <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={value.options?.src === true}
+        onChange={(src) => onChange({ ...value, options: { ...value.options, src } })} />src</label>
+    </div>
+    {matcher.kind === 'rule' && <details>
+      <summary className="cursor-pointer text-[13px] font-medium">客户端覆盖（{matcher.overrides?.length ?? 0} 条）</summary>
+      <div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={(overrides) => onChange({ ...value, matcher: { ...matcher, overrides } })} /></div>
+    </details>}
+  </div>;
+}
 
-  return (
-    <Modal title="插入私有规则" open={open} onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!matcher} onClick={submit}>插入</Button></>}>
-      <Field label="位置">{(id) => (
-        <Select id={id} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
-          <option value="top">最前面</option>
-          <option value="bottom">最后面（MATCH 之前）</option>
-          {(template?.rules ?? []).map((r, i) => <option key={`b${r.id}`} value={`before:${r.id}`}>模板规则 #{i + 1} 之前</option>)}
-          {(template?.rules ?? []).map((r, i) => <option key={`a${r.id}`} value={`after:${r.id}`}>模板规则 #{i + 1} 之后</option>)}
-        </Select>
-      )}</Field>
-      <Field label="匹配项">{(id) => (
-        <Select id={id} value={kind} onChange={(e) => { setKind(e.target.value as Matcher['kind']); setSetId(''); }}>
-          <option value="rule">单条规则</option><option value="ruleset">规则集</option><option value="bundle">规则包</option>
-        </Select>
-      )}</Field>
-      {kind === 'rule' ? (
-        <Field label="规则（不含出口）" hint={parseError ? <span className="text-err">{parseError}</span> : parsed ? `解析为：${ruleText(parsed)}` : '如 DOMAIN-SUFFIX,example.com 或 PROCESS-PATH-WILDCARD,/Applications/*/WeChat.app/*'}>
-          {(id) => <Input id={id} className="font-mono" value={line} onChange={(e) => setLine(e.target.value)} />}
-        </Field>
-      ) : (
-        <Field label={kind === 'ruleset' ? '规则集' : '规则包'}>{(id) => (
-          <Select id={id} value={setId || options[0]?.id || ''} onChange={(e) => setSetId(e.target.value)}>
-            {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </Select>
-        )}</Field>
-      )}
-      <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">出口</span>
-        <TargetPicker label="出口" value={target} onChange={setTarget} groups={groupOptions} nodeSets={profileNodeSets} /></div>
-    </Modal>
-  );
+function ExtraRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (anchor: ExtraRule['anchor'], rule: RuleEntry) => void }) {
+  const { template } = useProfile();
+  const [anchor, setAnchor] = useState('top');
+  const [rule, setRule] = useState<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'DIRECT' }, enabled: true }));
+  const error = privateRuleError(rule);
+  return <Modal title="插入私有规则" open onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
+    const position: ExtraRule['anchor'] = anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
+    onAdd(position, rule); onClose();
+  }}>插入</Button></>}>
+    <Field label="位置">{(id) => <Select id={id} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
+      <option value="top">最前面</option><option value="bottom">最后面（MATCH 之前）</option>
+      {(template?.rules ?? []).map((r, i) => <option key={`b${r.id}`} value={`before:${r.id}`}>模板规则 #{i + 1} 之前</option>)}
+      {(template?.rules ?? []).map((r, i) => <option key={`a${r.id}`} value={`after:${r.id}`}>模板规则 #{i + 1} 之后</option>)}
+    </Select>}</Field>
+    <PrivateRuleFields value={rule} onChange={setRule} />
+    <ErrorBox error={error} />
+  </Modal>;
+}
+
+function PrivateRuleEdit({ rule, onApply, onClose }: { rule: RuleEntry; onApply: (rule: RuleEntry) => void; onClose: () => void }) {
+  const [value, setValue] = useState(rule);
+  const error = privateRuleError(value);
+  return <div className="flex flex-col gap-3 border-t border-line-2 bg-ground p-4">
+    <p className="m-0 text-[12.5px] text-muted">编辑后点击「应用修改」，再保存 Profile。</p>
+    <PrivateRuleFields value={value} onChange={setValue} />
+    <ErrorBox error={error} />
+    <div className="flex gap-2"><Button variant="primary" disabled={!!error} onClick={() => { onApply(value); onClose(); }}>应用修改</Button><Button onClick={onClose}>取消</Button></div>
+  </div>;
 }
 
 export function TabRules() {
@@ -93,85 +109,61 @@ export function TabRules() {
   const [editing, setEditing] = useState<string>();
   const patches = draft.overlay.rulePatches ?? {};
   const orphans = Object.keys(patches).filter((id) => !template?.rules.some((r) => r.id === id));
-
-  // 合并后的顺序（与内核一致），私有规则可删除
-  type Row = RuleEntry & { origin: 'template' | 'profile' };
-  const rows: Row[] = (template?.rules ?? []).map((r) => ({ ...r, origin: 'template' as const, ...(patches[r.id]?.enabled !== undefined ? { enabled: patches[r.id]!.enabled } : {}), ...(patches[r.id]?.target ? { target: patches[r.id]!.target! } : {}) }));
-  for (const { anchor, rule } of draft.overlay.extraRules ?? []) {
-    const r: Row = { ...rule, origin: 'profile' };
-    if (anchor === 'top') rows.unshift(r);
-    else if (anchor === 'bottom') rows.push(r);
-    else {
-      const id = 'before' in anchor ? anchor.before : anchor.after;
-      const at = rows.findIndex((x) => x.id === id);
-      if (at >= 0) rows.splice('before' in anchor ? at : at + 1, 0, r);
-    }
-  }
+  const rows = mergeRuleRows(template?.rules ?? [], draft.overlay);
   const final = draft.overlay.final ?? template?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const };
-
   const patchRule = (id: string, p: { enabled?: boolean; target?: Target }) => patchOverlay((o) => ({ ...o, rulePatches: { ...o.rulePatches, [id]: { ...(o.rulePatches?.[id] ?? {}), ...p } } }));
   const setExtra = (id: string, fn: (r: RuleEntry) => RuleEntry | undefined) => patchOverlay((o) => ({
     ...o,
     extraRules: (o.extraRules ?? []).flatMap((e) => { if (e.rule.id !== id) return [e]; const r = fn(e.rule); return r ? [{ ...e, rule: r }] : []; }),
   }));
 
-  return (
-    <>
-      {orphans.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-warn-soft px-4 py-3 text-[#6b3406]">
-          <span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span>
-          <Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>
-        </div>
-      )}
-      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（自上而下匹配）</h2><span className="text-[12.5px] text-muted">继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则</span></div>}
-        actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>} bodyClass="overflow-x-auto">
-        {!rows.length ? <div className="px-4 pb-4"><Empty>没有规则，所有流量走 MATCH。</Empty></div> : (
-          <table className="w-full min-w-[820px] border-collapse">
-            <thead><tr><th className={th}>#</th><th className={th}>匹配项</th><th className={th}>出口</th><th className={th}>来源</th><th className={th}>启用</th></tr></thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const l = label(r.matcher);
-                const overridden = r.origin === 'template' && patches[r.id]?.target;
-                const off = r.enabled === false;
-                return (
-                  <tr key={r.id} className={off ? 'bg-[#fafafb]' : ''}>
-                    <td className={`${td} font-mono text-muted`}>{i + 1}</td>
-                    <td className={td}><span className="flex flex-wrap items-center gap-2"><Badge>{l.kind}</Badge><span className={cx('font-mono text-[13px]', off && 'line-through')}>{l.text}</span></span></td>
-                    <td className={td}>
-                      {editing === r.id ? (
-                        <div className="flex flex-col gap-2">
-                          <TargetPicker label="出口" value={r.target} groups={groupOptions} nodeSets={profileNodeSets}
-                            onChange={(t) => (r.origin === 'template' ? patchRule(r.id, { target: t }) : setExtra(r.id, (x) => ({ ...x, target: t })))} />
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => setEditing(undefined)}>完成</Button>
-                            {overridden && <Button size="sm" variant="ghost" onClick={() => { patchOverlay((o) => { const { target: _t, ...rest } = o.rulePatches?.[r.id] ?? {}; return { ...o, rulePatches: { ...o.rulePatches, [r.id]: rest } }; }); setEditing(undefined); }}>还原为模板出口</Button>}
-                          </div>
-                        </div>
-                      ) : (
-                        <button type="button" className="cursor-pointer text-left font-medium hover:text-accent" onClick={() => setEditing(r.id)}>
-                          {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-[12px] font-normal text-accent">已改出口</span>}
-                        </button>
-                      )}
-                    </td>
-                    <td className={td}>{r.origin === 'template' ? <Badge>{off && patches[r.id]?.enabled === false ? '模板 · 已禁用' : overridden ? '覆盖' : '模板'}</Badge> : <Badge tone="ok">私有</Badge>}</td>
-                    <td className={td}>
-                      {r.origin === 'template'
-                        ? <Switch label={`启用规则 ${i + 1}`} checked={!off} onChange={(v) => patchRule(r.id, { enabled: v })} />
-                        : <Button size="sm" variant="ghost" aria-label={`删除私有规则 ${i + 1}`} onClick={() => setExtra(r.id, () => undefined)}><Trash2 size={14} /></Button>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-        <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
-          <span className="font-mono text-[13px]">MATCH</span>
-          <TargetPicker label="MATCH 出口" value={final} groups={groupOptions} nodeSets={profileNodeSets} onChange={(t) => patchOverlay((o) => ({ ...o, final: t }))} />
-          {draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _f, ...rest } = o; return rest; })}>还原为模板</Button>}
-        </div>
-      </Card>
-      <ExtraRuleModal open={adding} onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />
-    </>
-  );
+  return <>
+    {orphans.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-warn-soft px-4 py-3 text-[#6b3406]">
+      <span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span>
+      <Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>
+    </div>}
+    <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（自上而下匹配）</h2><span className="text-[12.5px] text-muted">模板规则可禁用、改出口；私有规则可拖拽到任意位置，点击行展开编辑。</span></div>}
+      actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>}>
+      {!rows.length ? <Empty>没有规则，所有流量走 MATCH。</Empty> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
+        onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}
+        renderItem={(r, i, handle) => {
+          const l = label(r.matcher);
+          const overridden = r.origin === 'template' && patches[r.id]?.target;
+          const off = r.enabled === false;
+          return <div className="border-t border-line-2">
+            <div className={cx('flex flex-wrap items-center gap-3 py-3', off && 'bg-ground', r.origin === 'profile' && 'cursor-pointer')}
+              onClick={() => { if (r.origin === 'profile') setEditing(r.id); }}>
+              <span onClick={(e) => e.stopPropagation()}>{handle}</span>
+              <span className="font-mono text-[12px] text-muted">{i + 1}</span>
+              <button type="button" className="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-2 text-left" aria-expanded={editing === r.id}
+                onClick={(e) => { e.stopPropagation(); setEditing(editing === r.id ? undefined : r.id); }}>
+                <Badge>{l.kind}</Badge><span className={cx('break-all font-mono text-[13px]', off && 'line-through')}>{l.text}</span>
+              </button>
+              <button type="button" className="cursor-pointer text-left text-[13px] font-medium hover:text-accent" onClick={() => setEditing(r.id)}>
+                {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-[12px] font-normal text-accent">已改出口</span>}
+              </button>
+              <Badge tone={r.origin === 'profile' ? 'ok' : 'neutral'}>{r.origin === 'profile' ? '私有' : '模板'}</Badge>
+              <span onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
+                <Switch label={`启用规则 ${i + 1}`} checked={!off} onChange={(enabled) => r.origin === 'template' ? patchRule(r.id, { enabled }) : setExtra(r.id, (rule) => ({ ...rule, enabled }))} />
+                {r.origin === 'profile' && <Button size="sm" variant="ghost" aria-label={`删除私有规则 ${i + 1}`} onClick={() => { setExtra(r.id, () => undefined); if (editing === r.id) setEditing(undefined); }}><Trash2 size={14} /></Button>}
+              </span>
+            </div>
+            {editing === r.id && (r.origin === 'profile' ? <PrivateRuleEdit key={r.id} rule={draft.overlay.extraRules!.find((e) => e.rule.id === r.id)!.rule}
+              onApply={(value) => setExtra(r.id, (current) => ({ ...value, enabled: current.enabled }))} onClose={() => setEditing(undefined)} /> :
+              <div className="flex flex-col gap-2 pb-3">
+                <TargetPicker label="出口" value={r.target} groups={groupOptions} nodeSets={profileNodeSets} onChange={(target) => patchRule(r.id, { target })} />
+                <div className="flex gap-2"><Button size="sm" onClick={() => setEditing(undefined)}>完成</Button>
+                  {overridden && <Button size="sm" variant="ghost" onClick={() => { patchOverlay((o) => { const { target: _, ...rest } = o.rulePatches?.[r.id] ?? {}; return { ...o, rulePatches: { ...o.rulePatches, [r.id]: rest } }; }); setEditing(undefined); }}>还原为模板出口</Button>}
+                </div>
+              </div>)}
+          </div>;
+        }} />}
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+        <span className="font-mono text-[13px]">MATCH</span>
+        <TargetPicker label="MATCH 出口" value={final} groups={groupOptions} nodeSets={profileNodeSets} onChange={(target) => patchOverlay((o) => ({ ...o, final: target }))} />
+        {draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _, ...rest } = o; return rest; })}>还原为模板</Button>}
+      </div>
+    </Card>
+    {adding && <ExtraRuleModal onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />}
+  </>;
 }
