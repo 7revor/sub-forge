@@ -1,0 +1,29 @@
+{
+  "name": "@sub-forge/server",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "description": "订阅服务：存储、上游拉取与快照、渲染缓存、订阅接口。",
+  "scripts": {
+    "start": "tsx src/cli.ts serve",
+    "seed": "tsx src/cli.ts seed",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "@sub-forge/core": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "hono": "^4.13.14",
+    "tsx": "^4.23.15",
+    "undici": "^7.30.1",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
+  }
+}
