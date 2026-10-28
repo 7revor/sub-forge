@@ -22,7 +22,7 @@ function userinfoHeader(u: TrafficInfo | undefined): string | undefined {
 
 const notFound = (c: Context) => c.body(null, 404);
 
-export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins'>>;
+export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'>>;
 
 export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
@@ -30,7 +30,7 @@ export function createApp(deps: AppDeps) {
   const app = new Hono();
 
   app.get('/healthz', (c) => c.text('ok'));
-  app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [] }));
+  app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' }));
 
   app.get('/sub/:token', async (c) => {
     const started = now();

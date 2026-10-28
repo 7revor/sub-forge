@@ -4,7 +4,7 @@
 
 import {
   renderMihomo, stableHash, stableStringify,
-  type Matcher, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
+  type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
 import type { SnapshotService } from './snapshots.ts';
@@ -51,7 +51,9 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
   return out;
 }
 
-type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string };
+type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
+
+export type PreviewOutcome = { ok: boolean; yaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
 
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
@@ -80,11 +82,27 @@ export class RenderService {
     return { ok: false, message: attempt.failure ?? '渲染失败', report: attempt.report };
   }
 
-  private async attempt(profileId: string, target: Target, pre: ReportItem[]): Promise<Attempt> {
-    const profile = this.store.get('profile', profileId);
+  /**
+   * 预演：不读写缓存、不更新"上一份成功结果"。用于 Profile 预览，以及模板发布前对现有 Profile 的试渲染（TPL-07 ②）。
+   * template 传入时代替 Profile 当前引用的模板版本。
+   */
+  async preview(profileId: string, target: Target, overrides: { profile?: ProfileDoc; template?: TemplateVersionDoc } = {}): Promise<PreviewOutcome> {
+    const pre: ReportItem[] = [];
+    try {
+      const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
+      return a.result
+        ? { ok: !a.failure, yaml: a.result.yaml, dependencies: a.result.dependencies, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
+        : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
+    } catch (e) {
+      return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
+    }
+  }
+
+  private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc } = {}): Promise<Attempt> {
+    const profile = opts.profile ?? this.store.get('profile', profileId);
     if (!profile) return { report: pre, failure: 'Profile 不存在' };
 
-    const template = profile.template ? this.store.getTemplate(profile.template.id, profile.template.follow === 'latest' ? undefined : profile.template.follow.pinned) : undefined;
+    const template = opts.template ?? (profile.template ? this.store.getTemplate(profile.template.id, profile.template.follow === 'latest' ? undefined : profile.template.follow.pinned) : undefined);
     if (profile.template && !template) pre.push({ level: 'error', code: 'template.missing', message: `模板 ${profile.template.id} 不存在` });
 
     const { inputs: nodeSets, sources } = this.collectNodeSets(profile);
@@ -125,7 +143,7 @@ export class RenderService {
       sources: nodeSets.sources, collections: nodeSets.collections, locals: nodeSets.locals,
       rulesets: rules.rulesets, bundles: rules.bundles,
     }));
-    const hit = this.cache.get(key);
+    const hit = opts.dry ? undefined : this.cache.get(key);
     if (hit) { this.cache.delete(key); this.cache.set(key, hit); return { from: 'cache', render: hit, report: pre }; }
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
@@ -142,13 +160,13 @@ export class RenderService {
     });
     const report = [...pre, ...result.report.items];
     const errors = report.filter((i) => i.level === 'error');
-    if (errors.length) return { report, failure: errors.map((e) => e.message).join('；') };
+    if (errors.length) return { report, result, failure: errors.map((e) => e.message).join('；') };
 
     if (this.opts.verify) {
       const v = await this.opts.verify(result.yaml.replaceAll(TOKEN_PLACEHOLDER, 'verify'));
       if (!v.ok) {
         report.push({ level: 'error', code: 'verify.mihomo', message: `mihomo -t 校验失败：${v.output.trim().split('\n').slice(-3).join(' ')}` });
-        return { report, failure: 'mihomo -t 校验失败' };
+        return { report, result, failure: 'mihomo -t 校验失败' };
       }
     }
 
@@ -160,6 +178,7 @@ export class RenderService {
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };
+    if (opts.dry) return { from: 'fresh', render, report, result };
     this.cache.set(key, render);
     while (this.cache.size > (this.opts.cacheSize ?? 256)) this.cache.delete(this.cache.keys().next().value!);
     this.store.putLastGood(profileId, targetKey(target), render);

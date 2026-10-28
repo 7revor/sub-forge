@@ -39,6 +39,14 @@ export class RefChecker {
     return !!row && row.owner === this.user.id;
   }
 
+  /** 规则集 / 规则包：自己的，或管理员名下的公共规则（模板由管理员维护，会引用这些） */
+  ruleVisible(kind: 'ruleset' | 'bundle', id: string): boolean {
+    const row = this.store.getWithOwner(kind, id);
+    if (!row) return false;
+    if (row.owner === this.user.id) return true;
+    return row.owner !== null && this.store.getUser(row.owner)?.role === 'admin';
+  }
+
   nodeSet(ref: unknown, where: string): NodeSetID {
     if (!isObj(ref) || !NODESET_KINDS.has(ref.type as string) || !isStr(ref.id)) throw bad(`${where}：节点集引用格式错误`);
     const r = ref as NodeSetID;
@@ -108,7 +116,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       (doc.items as unknown[]).forEach((it, i) => {
         if (!isObj(it)) throw bad(`子项 ${i + 1} 格式错误`);
         if (it.kind === 'bundle') throw bad('规则包不能包含规则包（最多两层）');
-        if (it.kind === 'ruleset') { if (!isStr(it.id) || !refs.owned('ruleset', it.id)) throw bad(`子项 ${i + 1}：规则集不存在`); }
+        if (it.kind === 'ruleset') { if (!isStr(it.id) || !refs.ruleVisible('ruleset', it.id)) throw bad(`子项 ${i + 1}：规则集不存在`); }
         else if (it.kind !== 'rule' || !isObj(it.rule)) throw bad(`子项 ${i + 1} 格式错误`);
       });
       break;
@@ -133,6 +141,15 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];
       doc.refPolicy = isObj(doc.refPolicy) ? doc.refPolicy : { default: 'wrap' };
+      const extraRules = (doc.overlay as { extraRules?: unknown }).extraRules;
+      if (extraRules !== undefined) {
+        if (!Array.isArray(extraRules)) throw bad('extraRules 必须是数组');
+        extraRules.forEach((er: unknown, i) => {
+          const m = isObj(er) && isObj(er.rule) && isObj(er.rule.matcher) ? er.rule.matcher : undefined;
+          if (!m) throw bad(`私有规则 ${i + 1} 格式错误`);
+          if ((m.kind === 'ruleset' || m.kind === 'bundle') && !(isStr(m.id) && refs.ruleVisible(m.kind, m.id))) throw bad(`私有规则 ${i + 1}：${m.kind === 'ruleset' ? '规则集' : '规则包'}不存在`);
+        });
+      }
       (doc.chains as Record<string, unknown>[]).forEach((ch, i) => {
         if (!isObj(ch) || !isObj(ch.landing)) throw bad(`链规则 ${i + 1} 格式错误`);
         refs.nodeSet(ch.landing.nodeSet, `链规则 ${i + 1} 的落地`);

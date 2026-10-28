@@ -47,7 +47,7 @@ function start(): void {
   });
   const publicUrl = env.PUBLIC_URL ?? `http://${host}:${port}`;
   const app = createApp({
-    store, renderer, snapshots,
+    store, renderer, snapshots, publicUrl,
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   });

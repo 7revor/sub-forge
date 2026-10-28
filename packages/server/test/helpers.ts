@@ -14,7 +14,7 @@ export function setupApp(opts: { fetcher?: UpstreamFetcher; now?: () => number }
   const fetcher: UpstreamFetcher = opts.fetcher ?? (async (url) => { throw new Error(`测试中未提供 ${url}`); });
   const snapshots = new SnapshotService(store, fetcher, now);
   const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test' });
-  const app = createApp({ store, renderer, snapshots, now });
+  const app = createApp({ store, renderer, snapshots, now, publicUrl: 'https://sub.test' });
   return { store, app, snapshots, renderer, advance: (ms: number) => { t += ms; } };
 }
 
