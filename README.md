@@ -28,7 +28,7 @@
 **M0 内核基本完成**（[packages/core](packages/core/README.md)），下一步 M1 MVP。各里程碑进度见 [05 §1.1](docs/05-roadmap-and-open-questions.md#11-进度)。
 
 - 需求：PRD v0.2，待决问题已暂定（[07 §8](docs/07-verification-checklist.md#8-决策记录)）；剩余需要 GUI / 真机 / 国内网络的采集项见 [07 §7.1](docs/07-verification-checklist.md#71-剩余采集项)，结果与暂定决策冲突时再修订。实测用例见 [research/verification](research/verification/README.md)。
-- 设计：前端页面设计稿（21 张画板）在 Claude Design 画布中，未纳入仓库。
+- 设计：前端页面设计稿（21 张画板）在 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库；链接默认仅所有者可见，需要在页面的 Share 菜单中分享给他人。
 
 ```bash
 pnpm install

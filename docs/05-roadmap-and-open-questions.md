@@ -18,7 +18,7 @@
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| 前端设计稿 | ✅ | 21 张画板覆盖 PRD §7 信息架构（缺普通用户的模板浏览页）；在 Claude Design 画布中，未纳入仓库 |
+| 前端设计稿 | ✅ | 21 张画板覆盖 PRD §7 信息架构（缺普通用户的模板浏览页）；位于 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库 |
 | **M0 内核** | 基本完成 | 见下表 |
 | M1 MVP | 未开始 | — |
 | M2 Surge | 未开始 | 内核中规则降级（含进程规则）已实现 Surge 分支 |
