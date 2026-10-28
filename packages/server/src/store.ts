@@ -341,7 +341,7 @@ export class Store {
   }
 
   listUsers(): User[] {
-    return (this.db.prepare('SELECT * FROM users ORDER BY created_at, id').all() as RawUser[]).map(toUser);
+    return (this.db.prepare('SELECT * FROM users ORDER BY created_at, rowid').all() as RawUser[]).map(toUser);
   }
 
   countUsers(): number {
