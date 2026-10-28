@@ -124,7 +124,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
     final: { kind: 'group', groupId: 'land' },
   };
 
-  const renderScenario = (opts: { entryName: string; landingProvider: boolean; chainFilter?: string }) => {
+  const renderScenario = (opts: { entryName: string; landingProvider: boolean; chainFilter?: string; viaGroup?: boolean; oldSelfDialer?: boolean }) => {
     const socks = (name: string, port: number) => `- { name: "${name}", type: socks5, server: 127.0.0.1, port: ${port} }`;
     const profile: Profile = {
       id: 'p', name: 'P',
@@ -152,6 +152,11 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
       },
       base: { 'log-level': 'debug', ipv6: false, 'geodata-mode': false, 'geo-auto-update': false },
     };
+    if (opts.viaGroup) {
+      profile.overlay.extraGroups = [{ group: { id: 'pre', name: '普通前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'source', id: 'T' } }], filter: '^前置$', whenEmpty: 'reject' } }];
+      profile.chains[0]!.via = { kind: 'group', groupId: 'pre' };
+    }
+    if (opts.oldSelfDialer) input.nodeSets.sources.L!.content = input.nodeSets.sources.L!.content!.replace(`port: ${ports.exit}`, `port: ${ports.exit}, dialer-proxy: 落地组`);
     return renderMihomo(input);
   };
 
@@ -205,5 +210,26 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
     expect(out.status).not.toBe(200);
     expect(targetHits).toBe(hits);
     expect(out.exitLog).not.toContain(`127.0.0.1:${ports.target}`);
+  }, 30000);
+
+  it('普通前置组筛空后拒绝连接，provider 刷新也不能绕行', async () => {
+    const r = renderScenario({ entryName: '前置', landingProvider: true, viaGroup: true });
+    const healthy = await runClient(r);
+    expect(healthy.status, healthy.clientLog).toBe(200);
+    expect(healthy.entryLog).toContain(`127.0.0.1:${ports.exit}`);
+    const t = r.providers['source:T']!;
+    const hits = targetHits;
+    const broken = await runClient({ ...r, providers: { ...r.providers, 'source:T': { ...t, yaml: t.yaml.replace('前置', '已经改名') } } });
+    expect(broken.status).not.toBe(200);
+    expect(targetHits).toBe(hits);
+    expect(broken.exitLog).not.toContain(`127.0.0.1:${ports.target}`);
+  }, 30000);
+
+  it('整源 override 优先于节点原有前置，环检测与运行时一致', async () => {
+    const r = renderScenario({ entryName: '前置', landingProvider: true, oldSelfDialer: true });
+    expect(r.report.items.filter((item) => item.level === 'error')).toEqual([]);
+    const out = await runClient(r);
+    expect(out.status, out.clientLog).toBe(200);
+    expect(out.entryLog).toContain(`127.0.0.1:${ports.exit}`);
   }, 30000);
 });

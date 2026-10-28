@@ -249,6 +249,8 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     if (proxies.length) out.proxies = proxies;
     if (use.length) out.use = use;
     if (use.length || hasInclude) {
+      // 动态成员在客户端刷新后也可能筛空，不能只保护渲染时的静态空组。
+      out['empty-fallback'] = g.whenEmpty === 'direct' ? 'COMPATIBLE' : 'REJECT';
       if (g.filter) out.filter = g.filter;
       if (g.excludeFilter) out['exclude-filter'] = g.excludeFilter;
       if (g.excludeType) out['exclude-type'] = g.excludeType;
@@ -281,7 +283,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
         const target = set.nodes.find((x) => x !== n && (x._origName === n.upstreamDialer || x.name === n.upstreamDialer));
         const via = target ? nameForNode(set, target, where) : topNames.has(n.upstreamDialer) || groups.some((g) => g.name === n.upstreamDialer) ? n.upstreamDialer : undefined;
         if (via) setDialer(set, n, via);
-        else report.warn('ref.upstream-dialer-missing', `节点「${n.name}」自带的前置「${n.upstreamDialer}」找不到，已移除`, where);
+        else report.error('ref.upstream-dialer-missing', `节点「${n.name}」自带的前置「${n.upstreamDialer}」找不到，拒绝发布缺少前置的配置`, where);
       }
       if (n.dialer) {
         const via = resolveTarget(n.dialer, `node:${set.key}:${n.name}`);
@@ -303,7 +305,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
   }
 
   // ---------- 链环与跳数（REF-09）----------
-  checkChains(sets, groups, wrappers, wrapperNode, providerOverride, report);
+  checkChains(sets, groups, wrappers, wrapperNode, copies, providerOverride, report);
 
   // ---------- 规则 ----------
   const ruleLines: string[] = [];
@@ -440,6 +442,7 @@ function checkChains(
   groups: MihomoGroup[],
   wrappers: MihomoGroup[],
   wrapperNode: Map<string, { set: NS; node: ProxyIR }>,
+  copies: { node: ProxyIR; name: string }[],
   providerOverride: Map<string, string>,
   report: Report,
 ): void {
@@ -455,7 +458,11 @@ function checkChains(
       ids.push(nid);
       if (s.output === 'inline') byName.set(n.name, [nid]);
     }
-    providerNodes.set(s.providerName, ids);
+    if (s.output === 'provider') providerNodes.set(s.providerName, ids);
+  }
+  for (const c of copies) {
+    const entry = [...nodeById].find(([, value]) => value.node === c.node);
+    if (entry) byName.set(c.name, [entry[0]]);
   }
   const groupByName = new Map([...groups, ...wrappers].map((g) => [g.name, g]));
 
@@ -466,12 +473,27 @@ function checkChains(
     if (direct) return direct;
     const g = groupByName.get(name);
     if (!g || seen.has(name)) return [];
-    seen.add(name);
-    return [...(g.proxies ?? []).flatMap((p) => expand(p, seen)), ...(g.use ?? []).flatMap((u) => providerNodes.get(u) ?? [])];
+    const next = new Set([...seen, name]);
+    const filter = {
+      ...(typeof g.filter === 'string' ? { filter: g.filter } : {}),
+      ...(typeof g['exclude-filter'] === 'string' ? { excludeFilter: g['exclude-filter'] } : {}),
+      ...(typeof g['exclude-type'] === 'string' ? { excludeType: g['exclude-type'] } : {}),
+    };
+    const dynamic: { nid: string; node: ProxyIR }[] = [];
+    const providers = g['include-all'] || g['include-all-providers'] ? [...providerNodes.keys()] : g.use ?? [];
+    for (const u of providers) for (const nid of providerNodes.get(u) ?? []) dynamic.push({ nid, node: nodeById.get(nid)!.node });
+    if (g['include-all'] || g['include-all-proxies']) {
+      for (const [proxyName, ids] of byName) for (const nid of ids) dynamic.push({ nid, node: { ...nodeById.get(nid)!.node, name: proxyName } });
+    }
+    // 显式 proxies 不受动态 filter 约束；use/include-all 按客户端相同的筛选条件展开。
+    return [...new Set([
+      ...(g.proxies ?? []).flatMap((p) => expand(p, next)),
+      ...dynamic.filter(({ node }) => filterNodes([node], filter).length > 0).map(({ nid }) => nid),
+    ])];
   };
   const dialerOf = (nid: string): string | undefined => {
     const { set, node } = nodeById.get(nid)!;
-    return (node['dialer-proxy'] as string | undefined) ?? providerOverride.get(set.key);
+    return providerOverride.get(set.key) ?? (node['dialer-proxy'] as string | undefined);
   };
 
   const depth = new Map<string, number>();

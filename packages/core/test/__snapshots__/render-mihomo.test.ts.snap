@@ -31,6 +31,7 @@ proxy-groups:
     type: url-test
     use:
       - 中转
+    empty-fallback: REJECT
     url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
