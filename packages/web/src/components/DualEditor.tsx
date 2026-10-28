@@ -9,10 +9,12 @@ function tryRaw<T>(toRaw: (value: T) => string, value: T): { text: string } | { 
   try { return { text: toRaw(value) }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 }
 
-export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rawLabel = '原始配置', mode, onModeChange }: {
+export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rawLabel = '原始配置', mode, onModeChange, onValidityChange }: {
   value: T; onChange: (value: T) => void; renderForm: () => ReactNode;
   toRaw: (value: T) => string; fromRaw: (text: string) => RawResult<T>;
   rawLabel?: string; mode?: EditorMode; onModeChange?: (mode: EditorMode) => void;
+  /** 让外层保存按钮同步阻止提交尚未解析成功的原始配置。 */
+  onValidityChange?: (valid: boolean) => void;
 }) {
   const [localMode, setLocalMode] = useState<EditorMode>('form');
   const current = mode ?? localMode;
@@ -42,6 +44,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, raw
   }, [value, current, toRaw, fromRaw]);
 
   const error = !result.ok ? `${result.line !== undefined ? `第 ${result.line} 行：` : ''}${result.error}` : '';
+  useEffect(() => { onValidityChange?.(current !== 'raw' || result.ok); }, [current, result.ok, onValidityChange]);
   const changeMode = (next: EditorMode) => {
     if (next === 'form' && error) return;
     if (next === 'raw') {
@@ -71,6 +74,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, raw
         setText(raw); setCopyMessage('');
         const parsed = fromRaw(raw);
         setResult(parsed);
+        onValidityChange?.(parsed.ok);
         if (parsed.ok) {
           emitted.current = { value: parsed.value, canonical: toRaw(parsed.value) };
           onChange(parsed.value);

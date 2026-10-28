@@ -1,0 +1,59 @@
+import type { LocalProxy } from '@sub-forge/core';
+import { isNode, LineCounter, parseDocument, stringify } from 'yaml';
+import type { RawResult } from '../components/DualEditor.tsx';
+import { isRecord } from '../components/schema.ts';
+
+const withoutDialer = ({ dialer: _dialer, ...proxy }: LocalProxy) => proxy;
+export const proxyToYaml = (proxy: LocalProxy): string => stringify(withoutDialer(proxy));
+export const groupToYaml = (proxies: LocalProxy[]): string => stringify({ proxies: proxies.map(withoutDialer) });
+
+function validate(value: unknown, current?: LocalProxy): LocalProxy {
+  if (!isRecord(value)) throw new Error('节点必须是 YAML 映射');
+  for (const key of ['name', 'type', 'server']) {
+    if (typeof value[key] !== 'string' || !value[key].trim()) throw new Error(`缺少或无效的 ${key}（需要非空字符串）`);
+  }
+  if (typeof value.port !== 'number' || !Number.isFinite(value.port)) throw new Error('缺少或无效的 port（需要数字）');
+  const { dialer: _dialer, ...rest } = value;
+  return { ...rest, ...(current?.dialer ? { dialer: current.dialer } : {}) } as LocalProxy;
+}
+
+class ProxyYamlError extends Error {
+  constructor(message: string, readonly line: number) { super(message); }
+}
+
+function read<T>(text: string, group: boolean, convert: (value: unknown, line: (index: number) => number) => T): RawResult<T> {
+  const lines = new LineCounter();
+  try {
+    const doc = parseDocument(text, { lineCounter: lines });
+    const error = doc.errors[0] ?? doc.warnings[0];
+    if (error) return { ok: false, error: error.message, line: lines.linePos(error.pos[0]).line };
+    const line = (index: number) => {
+      const node = group ? doc.getIn(['proxies', index], true) : doc.contents;
+      return isNode(node) && node.range ? lines.linePos(node.range[0]).line : 1;
+    };
+    return { ok: true, value: convert(doc.toJS({ maxAliasCount: 100 }), line) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error), line: error instanceof ProxyYamlError ? error.line : 1 };
+  }
+}
+
+/** 当前节点独立于名称匹配，允许在 YAML 中改名而保留前置。 */
+export function proxyFromYaml(text: string, current?: LocalProxy): RawResult<LocalProxy> {
+  return read(text, false, (value, line) => {
+    try { return validate(value, current); }
+    catch (error) { throw new ProxyYamlError(error instanceof Error ? error.message : String(error), line(0)); }
+  });
+}
+
+export function groupFromYaml(text: string, current: LocalProxy[]): RawResult<LocalProxy[]> {
+  return read(text, true, (value, line) => {
+    if (!isRecord(value) || !Array.isArray(value.proxies)) throw new Error('需要包含 proxies 列表的 YAML 映射');
+    return value.proxies.map((item: unknown, index: number) => {
+      try {
+        return validate(item, isRecord(item) ? current.find((p) => p.name === item.name) : undefined);
+      } catch (error) {
+        throw new ProxyYamlError(`第 ${index + 1} 个节点：${error instanceof Error ? error.message : String(error)}`, line(index));
+      }
+    });
+  });
+}
