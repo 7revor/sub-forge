@@ -84,7 +84,7 @@ describe('快照服务', () => {
   const setup = (bodies: (string | Error)[]) => {
     let t = 1_000_000;
     let calls = 0;
-    const store = new Store(':memory:', () => t);
+    const store = new Store(':memory:', { now: () => t });
     const fetcher = async () => {
       const b = bodies[Math.min(calls++, bodies.length - 1)]!;
       await new Promise((r) => setTimeout(r, 5));

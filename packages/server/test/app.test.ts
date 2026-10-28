@@ -45,7 +45,7 @@ const SEED: Seed = {
 function setup(responses: Record<string, string | Error> = {}) {
   let t = 1_700_000_000_000;
   const now = () => t;
-  const store = new Store(':memory:', now);
+  const store = new Store(':memory:', { now });
   store.importSeed(SEED);
   const calls: string[] = [];
   const bodies: Record<string, string | Error> = {

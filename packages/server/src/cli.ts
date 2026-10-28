@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.ts';
+import { Cipher, loadMasterKey } from './crypto.ts';
 import type { Seed } from './docs.ts';
 import { parseAllowList } from './net/ssrf.ts';
 import { createUpstreamFetcher } from './net/upstream.ts';
@@ -20,7 +21,7 @@ const dbPath = env.SUBFORGE_DB ?? './data/sub-forge.db';
 
 function openStore(): Store {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
-  return new Store(dbPath);
+  return new Store(dbPath, { cipher: new Cipher(loadMasterKey(dbPath, env.SUBFORGE_SECRET)) });
 }
 
 function seed(file: string | undefined): void {

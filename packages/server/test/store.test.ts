@@ -1,4 +1,10 @@
+import { randomBytes } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
+import { Cipher } from '../src/crypto.ts';
 import { Store } from '../src/store.ts';
 
 const T = (version: number) => ({ id: 'std', version, groups: [], rules: [], final: { kind: 'builtin' as const, name: 'DIRECT' as const } });
@@ -23,7 +29,7 @@ describe('Store', () => {
 
   it('快照：成功的保留最近 5 份，失败的只留最新一条', () => {
     let t = 0;
-    const s = new Store(':memory:', () => t);
+    const s = new Store(':memory:', { now: () => t });
     for (let i = 0; i < 8; i++) s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'u', fetchedAt: ++t, ok: true, body: `b${i}`, hash: `h${i}` });
     for (let i = 0; i < 3; i++) s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'u', fetchedAt: ++t, ok: false, error: `e${i}` });
     expect(s.countSnapshots('source', 'a', 'u')).toEqual({ ok: 5, failed: 1 });
@@ -32,12 +38,53 @@ describe('Store', () => {
   });
 
   it('token、最近一次成功渲染、访问日志', () => {
-    const s = new Store(':memory:', () => 42);
+    const s = new Store(':memory:', { now: () => 42 });
     s.putToken({ token: 'tk', profileId: 'p', label: 'Mac' });
     expect(s.getToken('tk')).toEqual({ token: 'tk', profileId: 'p', label: 'Mac' });
     s.putLastGood('p', 'mihomo', { yaml: 'a' });
     expect(s.getLastGood('p', 'mihomo')).toEqual({ renderedAt: 42, data: { yaml: 'a' } });
     s.logAccess({ token: 'tk', profileId: 'p', at: 1, ua: 'clash.meta', client: 'mihomo', status: 200, ms: 3, warnings: 0, source: 'fresh' });
     expect(s.recentAccess('p')).toHaveLength(1);
+  });
+});
+
+describe('加密与迁移', () => {
+  it('文档、快照正文、token 落盘时加密；token 按 HMAC 查找', () => {
+    const s = new Store(':memory:');
+    s.put('source', { id: 'a', name: 'A', kind: 'remote', urls: ['https://secret.example.com/sub?token=xyz'], pipeline: [] }, 'u1');
+    s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'u', fetchedAt: 1, ok: true, body: 'password: hunter2' });
+    const t = s.createToken('p', 'Mac');
+    const dump = JSON.stringify([
+      s.db.prepare('SELECT * FROM docs').all(),
+      s.db.prepare('SELECT * FROM snapshots').all(),
+      s.db.prepare('SELECT * FROM sub_tokens').all(),
+    ]);
+    expect(dump).not.toContain('secret.example.com');
+    expect(dump).not.toContain('hunter2');
+    expect(dump).not.toContain(t.token);
+    expect(s.get('source', 'a')!.urls).toEqual(['https://secret.example.com/sub?token=xyz']);
+    expect(s.getWithOwner('source', 'a')!.owner).toBe('u1');
+    expect(s.getToken(t.token)).toEqual({ token: t.token, profileId: 'p', label: 'Mac' });
+    expect(s.listTokens('p').map((x) => x.token)).toEqual([t.token]);
+  });
+
+  it('旧版数据库（docs 无 owner、token 明文）自动升级', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-mig-'));
+    const file = join(dir, 'old.db');
+    const old = new Database(file);
+    old.exec(`CREATE TABLE docs (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (kind, id));
+      CREATE TABLE tokens (token TEXT PRIMARY KEY, profile_id TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL);
+      INSERT INTO docs VALUES ('profile', 'p', '{"id":"p","name":"旧"}', 1);
+      INSERT INTO tokens VALUES ('old-token', 'p', NULL, 1);`);
+    old.close();
+    const s = new Store(file, { cipher: new Cipher(randomBytes(32)) });
+    expect(s.get('profile', 'p')!.name).toBe('旧');
+    expect(s.getToken('old-token')).toEqual({ token: 'old-token', profileId: 'p' });
+    s.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('持久化数据库必须提供密钥', () => {
+    expect(() => new Store('/tmp/never-created.db')).toThrow(/密钥/);
   });
 });
