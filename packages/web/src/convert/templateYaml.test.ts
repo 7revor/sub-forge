@@ -66,19 +66,30 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(validateTemplate({ id: 't', version: 1, ...result.value }).hasErrors).toBe(false);
   });
 
-  it('按组名匹配：改名分配新 ID，成员与规则出口同步引用新 ID', () => {
+  it('在导出的 YAML 中改名保留稳定 ID、成员、覆盖提示和规则引用', () => {
     const t = fixture();
     t.rules.push({ id: 'r_renamed', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'rename.example' } }, target: { kind: 'group', groupId: 'g_url' } });
     const result = imported(templateToYaml(t, ctx).replaceAll('自动测速', '新的测速组'), t).value;
     const renamed = result.groups[1]!;
     expect(renamed.name).toBe('新的测速组');
-    expect(renamed.id).toMatch(/^g_[a-z0-9]+$/);
-    expect(renamed.id).not.toBe('g_url');
-    expect(renamed.whenEmpty).toBeUndefined();
-    expect(renamed.hint).toBeUndefined();
+    expect(renamed.id).toBe('g_url');
+    expect(renamed.whenEmpty).toBe('direct');
+    expect(renamed.hint).toBe('建议香港节点');
     expect(result.groups[0]!.members[0]).toEqual({ kind: 'group', groupId: renamed.id });
     expect(result.rules.at(-1)).toMatchObject({ id: 'r_renamed', target: { kind: 'group', groupId: renamed.id } });
     expect(result.groups[0]!.id).toBe(t.groups[0]!.id);
+  });
+
+  it('编辑规则匹配内容保留 ID，但不会恢复旧的匹配内容', () => {
+    const t = fixture();
+    const result = imported(templateToYaml(t, ctx).replace('DOMAIN-SUFFIX,example.com', 'DOMAIN-SUFFIX,new.example.com'), t).value;
+    expect(result.rules.find(r => r.id === 'r_domain')!.matcher).toEqual({ kind: 'rule', rule: { type: 'DOMAIN-SUFFIX', value: 'new.example.com' }, overrides: t.rules[1]!.matcher.kind === 'rule' ? t.rules[1]!.matcher.overrides : undefined });
+  });
+
+  it('复制稳定 ID 注释不会生成两个同 ID 的组', () => {
+    const t: TemplateBody = { groups: [{ id: 'g1', name: '甲', type: 'select', members: [] }], rules: [], final: direct };
+    const yaml = 'proxy-groups:\n  # sub-forge-group: g1\n  - { name: 甲, type: select }\n  # sub-forge-group: g1\n  - { name: 乙, type: select }\nrules: [MATCH,DIRECT]';
+    expect(templateFromYaml(yaml, t, ctx)).toMatchObject({ ok: false, error: expect.stringContaining('重复使用同一个稳定 ID') });
   });
 
   it('只调整规则顺序或出口时复用 ID，重复匹配项依次消费旧 ID', () => {

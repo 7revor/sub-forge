@@ -60,10 +60,15 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
   });
   lines.push(`MATCH,${targetName(t.final, t.groups)}`);
   const doc = new Document({ 'proxy-groups': groups, rules: lines });
+  const groupNodes = doc.get('proxy-groups', true);
+  if (isSeq(groupNodes)) t.groups.forEach((g, i) => {
+    const item = groupNodes.items[i];
+    if (isNode(item)) item.commentBefore = ` sub-forge-group: ${encodeURIComponent(g.id)}`;
+  });
   const rules = doc.get('rules', true);
   if (isSeq(rules)) t.rules.forEach((r, i) => {
     const item = rules.items[i];
-    if (r.enabled === false && isNode(item)) item.commentBefore = ' disabled';
+    if (isNode(item)) item.commentBefore = ` sub-forge-rule: ${encodeURIComponent(r.id)}${r.enabled === false ? '\n disabled' : ''}`;
   });
   return doc.toString({ lineWidth: 0 });
 }
@@ -81,7 +86,7 @@ function restoreRule(matcher: Matcher, old: RuleEntry | undefined, noResolve: bo
   if (!keepSrcInRule && (src || old?.options?.src !== undefined)) options.src = src;
   const oldNoResolve = old?.options?.noResolve || (old?.matcher.kind === 'rule' && 'noResolve' in old.matcher.rule && old.matcher.rule.noResolve) || false;
   const oldSrc = old?.options?.src || (old?.matcher.kind === 'rule' && 'src' in old.matcher.rule && old.matcher.rule.src) || false;
-  if (old && oldNoResolve === noResolve && oldSrc === src) {
+  if (old && matcherKey(old.matcher) === matcherKey(matcher) && oldNoResolve === noResolve && oldSrc === src) {
     // YAML 无法区分选项来自 IR 还是 RuleEntry，也不承载客户端覆盖，按原表示保留。
     matcher = old.matcher;
   } else if (matcher.kind === 'rule') {
@@ -111,6 +116,11 @@ export function templateFromYaml(text: string, current: TemplateBody, ctx: Conve
     const parseError = doc.errors[0];
     if (parseError) return { ok: false, error: `YAML 解析失败：${parseError.message}`, line: parseError.linePos?.[0]?.line };
     const locate = (node: unknown) => { line = isNode(node) && node.range ? lineCounter.linePos(node.range[0]).line : undefined; };
+    const identity = (node: unknown, kind: 'group' | 'rule', parent?: unknown): string | undefined => {
+      const comments = [isNode(node) ? node.commentBefore : undefined, isNode(node) ? node.comment : undefined, isNode(parent) ? parent.commentBefore : undefined];
+      const match = comments.filter(Boolean).join('\n').match(new RegExp(`^\\s*sub-forge-${kind}:\\s*(\\S+)\\s*$`, 'm'));
+      return match ? decodeURIComponent(match[1]!) : undefined;
+    };
     locate(doc.contents);
     if (!isMap(doc.contents)) throw new Error('YAML 顶层必须是对象');
     const notes: string[] = [];
@@ -121,7 +131,8 @@ export function templateFromYaml(text: string, current: TemplateBody, ctx: Conve
     if (groupNodes !== undefined && !isSeq(groupNodes)) throw new Error('proxy-groups 必须是列表');
     const names = new Map<string, string>();
     const groups: GroupSpec[] = [];
-    for (const node of isSeq(groupNodes) ? groupNodes.items : []) {
+    const usedGroups = new Set<string>();
+    for (const [index, node] of (isSeq(groupNodes) ? groupNodes.items : []).entries()) {
       locate(node);
       if (!isMap(node)) throw new Error('策略组必须是对象');
       const raw = node.toJSON() as Record<string, unknown>;
@@ -129,8 +140,11 @@ export function templateFromYaml(text: string, current: TemplateBody, ctx: Conve
       if (names.has(raw.name)) throw new Error(`策略组名称「${raw.name}」重复`);
       locate(node.get('type', true) ?? node);
       if (typeof raw.type !== 'string' || !groupTypes.has(raw.type)) throw new Error(`组「${raw.name}」的类型「${String(raw.type)}」不受支持`);
-      const old = current.groups.find((g) => g.name === raw.name);
+      const tagged = identity(node, 'group', index === 0 ? groupNodes : undefined);
+      const old = current.groups.find((g) => g.id === tagged) ?? current.groups.find((g) => g.name === raw.name);
+      if (old && usedGroups.has(old.id)) throw new Error(`组「${raw.name}」重复使用同一个稳定 ID，请删除复制项的 sub-forge-group 注释后再导入`);
       const g: GroupSpec = { id: old?.id ?? newId('g'), name: raw.name, type: raw.type as GroupSpec['type'], members: [] };
+      usedGroups.add(g.id);
       if (old?.whenEmpty !== undefined) g.whenEmpty = old.whenEmpty;
       if (old?.hint !== undefined) g.hint = old.hint;
       const test: Record<string, unknown> = {};
@@ -234,7 +248,10 @@ export function templateFromYaml(text: string, current: TemplateBody, ctx: Conve
           matcher = { kind: 'rule', rule: parseRuleLine(matchingParts.join(',')) };
         }
         const key = matcherKey(matcher);
-        const old = current.rules.find((r) => !used.has(r.id) && matcherKey(r.matcher) === key);
+        const tagged = identity(node, 'rule', index === 0 ? ruleNodes : undefined);
+        const byId = current.rules.find((r) => r.id === tagged);
+        if (byId && used.has(byId.id)) throw new Error('重复使用同一个稳定 ID，请删除复制项的 sub-forge-rule 注释后再导入');
+        const old = byId ?? current.rules.find((r) => !used.has(r.id) && matcherKey(r.matcher) === key);
         if (old) used.add(old.id);
         const r: RuleEntry = { id: old?.id ?? newId('r'), ...restoreRule(matcher, old, flags.includes('no-resolve'), flags.includes('src')), target };
         // 第一项的前置注释可能归在 YAMLSeq 上，而非 Scalar 上。
