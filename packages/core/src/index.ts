@@ -8,3 +8,7 @@ export * from './proxy/key.ts';
 export * from './proxy/uri.ts';
 export * from './proxy/surge.ts';
 export * from './proxy/parse.ts';
+export * from './pipeline/flags.ts';
+export * from './pipeline/operators.ts';
+export * from './pipeline/run.ts';
+export * from './nodeset/resolve.ts';

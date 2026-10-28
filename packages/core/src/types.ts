@@ -60,7 +60,17 @@ export type LocalProxyGroup = {
   id: ID;
   name: string;
   /** 用户手写的节点（不含隐式字段，解析时补上） */
-  proxies: (Omit<ProxyIR, '_source' | '_origName' | '_key'>)[];
+  proxies: LocalProxy[];
+};
+
+export type LocalProxy = {
+  name: string;
+  type: string;
+  server: string;
+  port: number;
+  /** 前置（LOC-02） */
+  dialer?: Target;
+  [k: string]: unknown;
 };
 
 // ---------- 引用 ----------
