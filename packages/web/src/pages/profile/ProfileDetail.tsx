@@ -1,16 +1,12 @@
 // Profile 详情：头部 + 分区标签（概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览）。
 // 除"概览"中的订阅链接外，各标签编辑同一份草稿，统一用右上角"保存"提交。
 
-import { useQuery } from '@tanstack/react-query';
-import type { Overlay } from '@sub-forge/core';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
-import { api } from '../../api.ts';
 import { deleteErrorText } from '../../components/DocList.tsx';
-import { useNodeSetNames } from '../../components/pickers.tsx';
 import { Badge, Button, ErrorBox, PageHeader, cx } from '../../components/ui.tsx';
-import { useDeleteDoc, useDoc, useSaveDoc, type ProfileDoc, type TemplateDoc } from '../../hooks.ts';
-import { ProfileContext, effectiveGroups, type ProfileCtx } from './context.ts';
+import { useDeleteDoc, useDoc, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
+import { ProfileContext, useProfileCtx } from './context.ts';
 import { TabBase, TabNodeSets, TabOverview } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
 import { TabGroups } from './TabGroups.tsx';
@@ -29,31 +25,7 @@ export function ProfileDetail() {
   const [draft, setDraft] = useState<ProfileDoc>();
   useEffect(() => { if (doc.data) setDraft(doc.data); }, [doc.data]);
 
-  const tplRef = draft?.template;
-  const template = useQuery({
-    queryKey: ['template', tplRef?.id, tplRef?.follow],
-    enabled: !!tplRef,
-    queryFn: () => tplRef!.follow === 'latest'
-      ? api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}`).then((r) => r.item)
-      : api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}/versions/${tplRef!.follow.pinned}`).then((r) => r.item),
-  });
-  const { all, nameOf } = useNodeSetNames();
-
-  const ctx = useMemo<ProfileCtx | undefined>(() => {
-    if (!draft) return undefined;
-    const groups = effectiveGroups(template.data, draft.overlay);
-    return {
-      draft, setDraft,
-      patchOverlay: (fn: (o: Overlay) => Overlay) => setDraft({ ...draft, overlay: fn(draft.overlay) }),
-      template: template.data,
-      groups,
-      groupOptions: groups.map((g) => ({ id: g.id, name: g.name })),
-      groupName: (gid: string) => groups.find((g) => g.id === gid)?.name ?? `（已不存在：${gid}）`,
-      profileNodeSets: draft.nodeSets.map((n) => ({ ref: n.ref, name: nameOf(n.ref) })),
-      allNodeSets: all,
-      nodeSetName: nameOf,
-    };
-  }, [draft, template.data, all, nameOf]);
+  const { ctx, template } = useProfileCtx(draft, setDraft);
 
   if (!draft || !ctx) return doc.error ? <ErrorBox error={doc.error} /> : <div className="text-muted">加载中…</div>;
   const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);

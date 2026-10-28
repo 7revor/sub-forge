@@ -98,6 +98,11 @@ export class RenderService {
     }
   }
 
+  /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不读写渲染缓存、last-good 或访问日志。 */
+  async previewDraft(profile: ProfileDoc, target: Target): Promise<PreviewOutcome> {
+    return this.preview('', target, { profile: { ...profile, id: '' } });
+  }
+
   private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc } = {}): Promise<Attempt> {
     const profile = opts.profile ?? this.store.get('profile', profileId);
     if (!profile) return { report: pre, failure: 'Profile 不存在' };

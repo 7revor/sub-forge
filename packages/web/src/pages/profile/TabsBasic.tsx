@@ -13,6 +13,7 @@ import { SchemaForm } from '../../components/SchemaForm.tsx';
 import { baseFromYaml, baseToYaml } from '../../convert/baseYaml.ts';
 import { baseFromForm, baseToForm, mihomoBaseGroups } from '../../schemas/mihomoBase.ts';
 import { useProfile } from './context.ts';
+import { TemplateCard } from './TemplateCard.tsx';
 
 function copy(text: string) {
   void navigator.clipboard?.writeText(text);
@@ -33,6 +34,7 @@ export function TabOverview() {
 
   return (
     <>
+      <TemplateCard />
       <div className="flex flex-wrap items-start gap-5">
         <Card title="订阅链接" className="min-w-0 flex-[999_1_560px]"
           actions={<form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>

@@ -11,6 +11,16 @@ const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
 
 export function profileRoutes(store: Store, renderer: RenderService, publicUrl: string) {
   const app = new Hono<ApiEnv>();
+  // 静态路径先注册；新建草稿不绑定任何已保存的 Profile。
+  app.post('/profiles/preview', requireUser, async (c) => {
+    const body = await jsonBody<{ profile?: unknown; platform?: unknown }>(c);
+    if (!body.profile || typeof body.profile !== 'object' || Array.isArray(body.profile)) throw bad('profile 必须是对象');
+    const platform = PLATFORMS.find((x) => x === body.platform);
+    if (body.platform !== undefined && !platform) throw bad('platform 不合法');
+    const draft = validateDoc('profile', body.profile as Record<string, unknown>, '', c.get('user'), store);
+    const res = await renderer.previewDraft(draft, platform ? { client: 'mihomo', platform } : { client: 'mihomo' });
+    return c.json(res.yaml ? { ...res, yaml: res.yaml.replaceAll(TOKEN_PLACEHOLDER, '{token}') } : res);
+  });
   app.use('/profiles/:id/*', requireUser);
 
   const own = (id: string, userId: string) => {

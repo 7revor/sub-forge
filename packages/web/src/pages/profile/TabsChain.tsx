@@ -14,7 +14,7 @@ const STRATEGIES: { value: RefStrategy; label: string }[] = [{ value: 'wrap', la
 
 function usePreview() {
   const { draft } = useProfile();
-  return useMutation({ mutationFn: (platform?: Platform) => api<ProfilePreview>('POST', `/profiles/${draft.id}/preview`, { profile: draft, ...(platform ? { platform } : {}) }) });
+  return useMutation({ mutationFn: (platform?: Platform) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: draft, ...(platform ? { platform } : {}) }) });
 }
 
 function Hop({ k, v, accent }: { k: string; v: string; accent?: boolean }) {

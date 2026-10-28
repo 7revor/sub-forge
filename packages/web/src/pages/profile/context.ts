@@ -1,8 +1,10 @@
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
 
 import type { GroupSpec, NodeSetID, Overlay } from '@sub-forge/core';
-import { createContext, useContext } from 'react';
-import type { GroupOption } from '../../components/pickers.tsx';
+import { createContext, useContext, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../api.ts';
+import { useNodeSetNames, type GroupOption } from '../../components/pickers.tsx';
 import type { ProfileDoc, TemplateDoc } from '../../hooks.ts';
 
 export type ProfileCtx = {
@@ -37,4 +39,35 @@ export function effectiveGroups(template: TemplateDoc | undefined, overlay: Over
     if (at < 0) groups.push(eg); else groups.splice(at + 1, 0, eg);
   }
   return groups;
+}
+
+/** 详情页和新建向导共用模板查询与草稿派生状态。 */
+export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: ProfileDoc) => void) {
+  const tplRef = draft?.template;
+  const template = useQuery({
+    queryKey: ['template', tplRef?.id, tplRef?.follow],
+    enabled: !!tplRef,
+    queryFn: () => tplRef!.follow === 'latest'
+      ? api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}`).then((r) => r.item)
+      : api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}/versions/${tplRef!.follow.pinned}`).then((r) => r.item),
+  });
+  const { all, nameOf } = useNodeSetNames();
+
+  const ctx = useMemo<ProfileCtx | undefined>(() => {
+    if (!draft) return undefined;
+    const groups = effectiveGroups(template.data, draft.overlay);
+    return {
+      draft, setDraft,
+      patchOverlay: (fn: (o: Overlay) => Overlay) => setDraft({ ...draft, overlay: fn(draft.overlay) }),
+      template: template.data,
+      groups,
+      groupOptions: groups.map((g) => ({ id: g.id, name: g.name })),
+      groupName: (gid: string) => groups.find((g) => g.id === gid)?.name ?? `（已不存在：${gid}）`,
+      profileNodeSets: draft.nodeSets.map((n) => ({ ref: n.ref, name: nameOf(n.ref) })),
+      allNodeSets: all,
+      nodeSetName: nameOf,
+    };
+  }, [draft, setDraft, template.data, all, nameOf]);
+
+  return { ctx, template };
 }
