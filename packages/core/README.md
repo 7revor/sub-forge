@@ -25,9 +25,9 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 - 只解析配置，不启动代理、不监听端口；macOS 上用 `sandbox-exec` 禁止 mihomo 联网，地址全部指向 `127.0.0.1:9`。
 - `-t` 不解析 provider 内容，因此每个场景还会把 provider 节点展开到顶层 `proxies` 再校验一次，覆盖节点字段与注入的 `dialer-proxy`。
-- GEOIP 规则在 `-t` 阶段就要加载 MMDB，校验用例不下载数据，所以不覆盖 GEOIP。
+- GEOIP 规则在 `-t` 阶段就要加载 MMDB；设置 `MIHOMO_MMDB=<Country.mmdb 路径>` 时一并校验，否则跳过 GEOIP。
 
-运行时代理链测试（`test/integration/mihomo-chain.test.ts`）会在本机起 socks5 实例并转发流量，默认关闭，需要再加 `MIHOMO_RUNTIME=1`。
+运行时代理链测试（`test/integration/mihomo-chain.test.ts`）会起 socks5 实例并转发流量，默认关闭，需要再加 `MIHOMO_RUNTIME=1`。推荐在 Docker 验证镜像中运行（仓库根目录 `pnpm test:docker`），镜像内已备好 mihomo 与 MMDB，容器以 `--network none` 运行。
 
 ## 尚未实现
 

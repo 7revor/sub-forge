@@ -24,7 +24,7 @@
 | M2 Surge | 未开始 | 内核中规则降级（含进程规则）已实现 Surge 分支 |
 | M3 增强 | 未开始 | — |
 
-M0 明细（代码在 `packages/core`，66 个测试通过）：
+M0 明细（代码在 `packages/core`，71 个测试通过）：
 
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
@@ -36,11 +36,11 @@ M0 明细（代码在 `packages/core`，66 个测试通过）：
 | 模板 ⊕ 覆盖层、模板校验器 | ✅ | 发布前影响分析（TPL-07 ②）需服务层逐个试渲染，未做 |
 | mihomo Lowering 与依赖解析 | ✅ | wrap / copy / inline、四类代理链、引用校验、跨 provider 环检测 |
 | 快照测试 | ✅ | PRD 场景 1–6 均有用例 |
-| 集成测试 | 部分 | `mihomo -t`（v1.19.33，断网沙箱）10 个场景通过，含 provider 节点展开校验；GEOIP 规则未覆盖（需 MMDB）；运行时链路测试已写好、未运行（需 `MIHOMO_RUNTIME=1`） |
+| 集成测试 | ✅ | Docker 验证镜像（`--network none`）内运行：`mihomo -t` 10 个场景 + provider 节点展开校验 + GEOIP；运行时代理链 4 个用例（经前置、包装组筛空时拒绝） |
 
 与文档的差异：PRD 场景 3 中落地整源走同一前置时，按 03 §4.2 输出 `override.dialer-proxy`，而非逐节点注入；只给部分落地挂前置时才注入 Profile 专属 provider。
 
-M1 服务端切片（代码在 `packages/server`，26 个测试通过）：
+M1 服务端切片（代码在 `packages/server`，34 个测试通过）：
 
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
@@ -49,11 +49,17 @@ M1 服务端切片（代码在 `packages/server`，26 个测试通过）：
 | SSRF 防护（SYS-02） | ✅ | 建连时 DNS 解析校验 + 字面 IP 预检，支持白名单 |
 | 渲染服务 | ✅ | 缓存、上一份成功结果兜底（OUT-05 / TPL-12）、可选 `mihomo -t` 校验、流量信息汇总（SRC-05） |
 | 订阅接口（OUT-01 – 06） | 部分 | mihomo 全部完成；Surge 返回 501（M2） |
+| 端到端验证 | ✅ | Docker 内：服务经 undici 拉取上游、mihomo 客户端用订阅地址加载配置并从服务下载 provider，流量经代理链（落地在 provider / 内联） |
 | 客户端识别（CR-04） | ✅ | URL 参数优先，其次 UA；访问日志（PRF-07） |
 | 多用户、登录、管理接口 | 未开始 | — |
 | 前端 | 未开始 | — |
 
-M1 开始前建议补上：运行时链路测试实际跑一次（需在本机起 socks5 实例）；带 MMDB 的 GEOIP 校验。
+Docker 验证中发现并修复的问题：
+
+- mihomo 默认让 provider 下载也经过分流规则；当 MATCH 指向的组依赖代理链、链的前置又在待下载的 provider 里时互相等待，provider 永远加载不上。现在本服务的 provider 与规则集都输出 `proxy: DIRECT`。
+- undici 把建连失败统一报成 "fetch failed"，SSRF 拦截原因丢失；现在报告真实原因。
+
+仍无法在 Docker 中验证：Surge（只有 macOS / iOS 客户端）；图形界面客户端（Clash Verge、FlClash）对响应头的读取（07 C4）。
 
 ## 2. 技术选型建议
 

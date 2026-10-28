@@ -39,6 +39,12 @@ curl http://127.0.0.1:8080/sub/demo-token
 - 同一 URL 的并发拉取合并为一次；成功快照保留最近 5 份，失败只记录最新一条。
 - SSRF：禁止内网与保留地址。校验在建连时的 DNS 解析环节进行，重定向逐跳检查，DNS rebinding 同样受约束。
 
+## 测试
+
+- 单元测试：`pnpm --filter @sub-forge/server test`。
+- `test/integration/upstream-real.test.ts`：真实连接下的拉取与 SSRF 校验，只访问回环地址，默认运行。
+- `test/integration/e2e-mihomo.test.ts`：服务真实运行，mihomo 客户端用订阅地址加载配置并经代理链访问目标。需要 `MIHOMO` 与 `MIHOMO_RUNTIME=1`，推荐在 Docker 验证镜像中运行（仓库根目录 `pnpm test:docker`）。
+
 ## 种子文件
 
 结构见 `src/docs.ts` 的 `Seed`，示例见 `examples/seed.example.json`（演示源为本地内容，不需要联网）。同一模板的多个版本作为多条记录写入 `templates`，Profile 用 `follow: "latest"` 或 `{ "pinned": n }` 引用。

@@ -34,6 +34,7 @@
 pnpm install
 pnpm test                                   # 单元测试与快照测试
 MIHOMO=/path/to/mihomo pnpm test            # 另跑 mihomo -t 配置合法性校验（断网沙箱）
+pnpm test:docker                            # Docker 断网容器内跑全部测试（含 GEOIP、代理链运行时、端到端）
 ```
 
 本地试用订阅服务见 [packages/server](packages/server/README.md#运行)。
