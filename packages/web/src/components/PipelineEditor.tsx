@@ -1,12 +1,10 @@
 // 处理链编辑器（SRC-06）：左侧步骤列表（拖拽排序、启用开关、删除），选中步骤在下方编辑；
 // 右侧是"这一步之后"的逐步预览：与上一步的改名 / 移除差异，以及节点列表。
 
-import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import type { OperatorStep } from '@sub-forge/core';
-import { GripVertical, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview } from '../api.ts';
 import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, Textarea, cx, td, th } from './ui.tsx';
 
@@ -133,17 +131,16 @@ function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: Operat
   }
 }
 
-function StepRow({ id, index, step, selected, onSelect, onToggle, onRemove, trace }: {
-  id: string; index: number; step: OperatorStep; selected: boolean;
+function StepRow({ handle, index, step, selected, onSelect, onToggle, onRemove, trace }: {
+  handle: ReactNode; index: number; step: OperatorStep; selected: boolean;
   onSelect: () => void; onToggle: (v: boolean) => void; onRemove: () => void;
   trace?: { before: number; after: number; error?: string };
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const enabled = step.enabled !== false;
   return (
-    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cx('flex items-center gap-2 border-t border-line-2 px-3 py-2', selected ? 'bg-accent-soft' : 'bg-panel', isDragging && 'relative z-10 shadow-md')}>
-      <button type="button" aria-label={`拖动第 ${index + 1} 步`} className="grid h-8 w-6 cursor-grab place-items-center text-faint" {...attributes} {...listeners}><GripVertical size={16} /></button>
+    <div
+      className={cx('flex items-center gap-2 border-t border-line-2 px-3 py-2', selected ? 'bg-accent-soft' : 'bg-panel')}>
+      {handle}
       <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left">
         <span className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md font-mono text-[12px]', selected ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}>{index + 1}</span>
         <span className={cx('flex min-w-0 flex-col gap-0.5', !enabled && 'opacity-50')}>
@@ -156,7 +153,7 @@ function StepRow({ id, index, step, selected, onSelect, onToggle, onRemove, trac
         : <span className="shrink-0 font-mono text-[12px] text-ink-2">{trace.after}{trace.after !== trace.before && <span className={trace.after < trace.before ? 'text-err' : 'text-ok'}> {trace.after - trace.before > 0 ? '+' : ''}{trace.after - trace.before}</span>}</span>)}
       <Switch label={`启用第 ${index + 1} 步`} checked={enabled} onChange={onToggle} />
       <Button variant="ghost" size="sm" aria-label={`删除第 ${index + 1} 步`} onClick={onRemove}><Trash2 size={14} /></Button>
-    </li>
+    </div>
   );
 }
 
@@ -174,16 +171,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   const [selected, setSelected] = useState(0);
   const [adding, setAdding] = useState<OperatorStep['op']>('rename.regex');
   const keys = ids.length === steps.length ? ids : steps.map((_, i) => ids[i] ?? `x${i}`);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-
-  const onDragEnd = (e: DragEndEvent) => {
-    if (!e.over || e.active.id === e.over.id) return;
-    const from = keys.indexOf(String(e.active.id));
-    const to = keys.indexOf(String(e.over.id));
-    setIds(arrayMove(keys, from, to));
-    onChange(arrayMove(steps, from, to));
-    setSelected(to);
-  };
   const add = () => {
     onChange([...steps, NEW_STEP[adding]()]);
     setIds([...keys, `s${seq}`]);
@@ -209,17 +196,19 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
       <Card title="处理链" className="min-w-0 flex-[1_1_380px]" bodyClass="pb-2"
         actions={<span className="text-[12.5px] text-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>}>
         {steps.length === 0 && <div className="px-1 pb-3"><Empty>还没有处理步骤，节点会原样输出。</Empty></div>}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={keys} strategy={verticalListSortingStrategy}>
-            <ol className="-mx-4 m-0 list-none p-0">
-              {steps.map((s, i) => (
-                <StepRow key={keys[i]} id={keys[i]!} index={i} step={s} selected={i === selected} onSelect={() => setSelected(i)}
-                  onToggle={(v) => onChange(steps.map((x, j) => (j === i ? { ...x, enabled: v } : x)))}
-                  onRemove={() => remove(i)} {...(trace?.[i] ? { trace: trace[i] } : {})} />
-              ))}
-            </ol>
-          </SortableContext>
-        </DndContext>
+        <div className="-mx-4">
+          <SortableList items={steps.map((step, i) => ({ step, id: keys[i]! }))} getKey={(item) => item.id}
+            onReorder={(items, { to }) => {
+              setIds(items.map((item) => item.id));
+              onChange(items.map((item) => item.step));
+              setSelected(to);
+            }}
+            renderItem={({ step: s }, i, handle) => (
+              <StepRow handle={handle} index={i} step={s} selected={i === selected} onSelect={() => setSelected(i)}
+                onToggle={(v) => onChange(steps.map((x, j) => (j === i ? { ...x, enabled: v } : x)))}
+                onRemove={() => remove(i)} {...(trace?.[i] ? { trace: trace[i] } : {})} />
+            )} />
+        </div>
         {autoDedupe && (
           <div className="-mx-4 flex items-center gap-3 border-t border-line-2 bg-ground px-4 py-2.5 text-[12.5px] text-muted">
             <span className="font-medium text-ink-2">去重 · 加序号</span>自动兜底：{autoDedupe.renamed.length} 个重名节点追加了序号
