@@ -2,9 +2,10 @@
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
 import Database from 'better-sqlite3';
+import { NodeSetResolver, type LocalProxy } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
-import type { DocKind, DocTypes, Seed, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import type { DocKind, DocTypes, LocalDoc, Seed, TemplateVersionDoc, TokenDoc } from './docs.ts';
 
 export type SnapshotOwner = 'source' | 'ruleset';
 
@@ -42,7 +43,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -122,7 +123,7 @@ export class Store {
 
   close(): void { this.db.close(); }
 
-  /** 旧版数据库（v1：docs 无 owner、token 明文）升级到当前结构 */
+  /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容） */
   private migrate(): void {
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version >= SCHEMA_VERSION) return;
@@ -163,6 +164,7 @@ export class Store {
         }
         this.db.exec('DROP TABLE tokens');
       }
+      if (hasDocs && version < 5) this.convertLocalSources();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -171,6 +173,50 @@ export class Store {
       this.db.pragma('wal_checkpoint(TRUNCATE)');
       this.db.exec('VACUUM');
       this.db.pragma('wal_checkpoint(TRUNCATE)');
+    }
+  }
+
+  /**
+   * 订阅源去掉了「本地内容」：旧的本地内容订阅源转成同 id、同归属的本地节点组。
+   * 节点按原处理链跑完后的结果保存（本地节点组没有处理链），组合与 Profile 中的引用改指向本地节点组。
+   */
+  private convertLocalSources(): void {
+    const rows = this.db.prepare("SELECT id, owner, data FROM docs WHERE kind = 'source'").all() as { id: string; owner: string | null; data: string }[];
+    const moved = new Set<string>();
+    for (const r of rows) {
+      const src = JSON.parse(this.cipher.decrypt(r.data)) as Record<string, unknown>;
+      if (src.kind !== 'local') continue;
+      const { kind: _kind, content, ...rest } = src;
+      const id = r.id;
+      const resolver = new NodeSetResolver({
+        sources: { [id]: { ...(rest as { name: string; pipeline: [] }), id, urls: ['local'] } },
+        collections: {}, locals: {}, snapshots: { [id]: [typeof content === 'string' ? content : ''] },
+      });
+      const nodes = resolver.resolve({ type: 'source', id });
+      for (const item of resolver.report.items) console.warn(`[迁移] 本地内容订阅源「${String(src.name)}」转为本地节点组：${item.message}`);
+      const proxies = nodes.map(({ _source, _origName, _key, dialer, upstreamDialer, ...p }) => {
+        // 处理链改过名，上游自带前置按原名指向同组节点时换成新名
+        const via = upstreamDialer && (nodes.find((x) => x._origName === upstreamDialer)?.name ?? upstreamDialer);
+        return { ...p, ...(via ? { 'dialer-proxy': via } : {}) } as LocalProxy;
+      });
+      const group: LocalDoc = { id, name: String(src.name), proxies };
+      this.db.prepare("DELETE FROM docs WHERE kind = 'source' AND id = ?").run(id);
+      this.db.prepare("INSERT OR REPLACE INTO docs (kind, id, owner, data, updated_at) VALUES ('local', ?, ?, ?, ?)")
+        .run(id, r.owner, this.cipher.encrypt(JSON.stringify(group)), this.now());
+      moved.add(id);
+    }
+    if (!moved.size) return;
+    const retarget = (v: unknown): unknown => {
+      if (Array.isArray(v)) return v.map(retarget);
+      if (!v || typeof v !== 'object') return v;
+      const o = v as Record<string, unknown>;
+      if (o.type === 'source' && typeof o.id === 'string' && moved.has(o.id) && Object.keys(o).length === 2) return { type: 'local', id: o.id };
+      return Object.fromEntries(Object.entries(o).map(([k, x]) => [k, retarget(x)]));
+    };
+    for (const r of this.db.prepare("SELECT rowid, data FROM docs WHERE kind IN ('collection', 'local', 'profile')").all() as { rowid: number; data: string }[]) {
+      const before = this.cipher.decrypt(r.data);
+      const after = JSON.stringify(retarget(JSON.parse(before)));
+      if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(after), r.rowid);
     }
   }
 
@@ -471,6 +517,8 @@ export class Store {
         this.putTemplateVersion(t);
       }
       for (const t of seed.tokens ?? []) this.putToken(t);
+      // 旧种子里的本地内容订阅源同样转成本地节点组
+      this.convertLocalSources();
     });
     tx();
   }

@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { addUser, client, setupApp } from './helpers.ts';
+import { addUser, client, serve, setupApp } from './helpers.ts';
 
-const h = setupApp();
+const url = 'https://sub.example.test/pipeline';
+const h = setupApp({ fetcher: serve({ [url]: 'trojan://test@node.example.test:443#节点' }) });
 const admin = client(h.app);
-const source = { name: '原始订阅', kind: 'local', content: 'trojan://test@node.example.test:443#节点', pipeline: [] };
+const source = { name: '原始订阅', urls: [url], pipeline: [] };
 let id: string;
 let collectionId: string;
 beforeAll(async () => {

@@ -17,7 +17,7 @@ function setup(urls: string[]) {
     return { status: 200, body };
   } });
   envs.push(h);
-  h.store.put('source', { id: 's', name: '多地址源', kind: 'remote', urls, pipeline: [] });
+  h.store.put('source', { id: 's', name: '多地址源', urls, pipeline: [] });
   h.store.put('profile', { id: 'p', name: '测试订阅', nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'inline' }], overlay: {}, chains: [], refPolicy: { default: 'wrap' } });
   h.store.putToken({ token: 'token', profileId: 'p' });
   return { ...h, responses };
@@ -66,7 +66,7 @@ describe('同一订阅源的部分 URL 失败', () => {
 
   it('组合的某个成员整体不可用时仍失败，不新增成员跳过策略', async () => {
     const h = setup([good]);
-    h.store.put('source', { id: 'failed', name: '失败成员', kind: 'remote', urls: [bad], pipeline: [] });
+    h.store.put('source', { id: 'failed', name: '失败成员', urls: [bad], pipeline: [] });
     h.store.put('collection', { id: 'c', name: '组合', members: [{ ref: { type: 'source', id: 's' } }, { ref: { type: 'source', id: 'failed' } }], pipeline: [] });
     h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: [{ ref: { type: 'collection', id: 'c' }, output: 'inline' }] });
     expect((await h.app.request('/sub/token')).status).toBe(503);

@@ -1,6 +1,6 @@
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
-import { addUser, client, setupApp } from './helpers.ts';
+import { addUser, client, serve, setupApp } from './helpers.ts';
 
 const TEMPLATE = (rulesetId: string) => ({
   name: '标准分流',
@@ -13,7 +13,7 @@ const TEMPLATE = (rulesetId: string) => ({
 });
 
 async function scenario() {
-  const env = setupApp();
+  const env = setupApp({ fetcher: serve({ 'https://air.example.com/sub': 'trojan://pw@hk.example.com:443#HK-01\ntrojan://pw@jp.example.com:443#JP-01' }) });
   await addUser(env.store, 'root', 'admin');
   await addUser(env.store, 'alice');
   await addUser(env.store, 'bob');
@@ -26,7 +26,7 @@ async function scenario() {
   const rs = (await admin.post('/api/rulesets', { name: 'AI', kind: 'local', format: 'auto', content: '.openai.com\n' })).json.item.id as string;
   const published = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), changelog: '初版' });
   const tplId = published.json.item.id as string;
-  const src = (await alice.post('/api/sources', { name: '机场', kind: 'local', content: 'trojan://pw@hk.example.com:443#HK-01\ntrojan://pw@jp.example.com:443#JP-01', pipeline: [] })).json.item.id as string;
+  const src = (await alice.post('/api/sources', { name: '机场', urls: ['https://air.example.com/sub'], pipeline: [] })).json.item.id as string;
   const profile = (await alice.post('/api/profiles', {
     name: '我的订阅',
     template: { id: tplId, follow: 'latest' },

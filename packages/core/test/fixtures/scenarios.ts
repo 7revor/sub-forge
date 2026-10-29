@@ -4,20 +4,20 @@ import type { NodeSetInputs } from '../../src/nodeset/resolve.ts';
 import type { Profile, Source, Template } from '../../src/types.ts';
 
 export const trojan = (name: string, host: string) => `trojan://pw@${host}:443#${encodeURIComponent(name)}`;
-export const src = (id: string, name: string, lines: string[]): Source => ({ id, name, kind: 'local', content: lines.join('\n'), pipeline: [] });
+export const src = (id: string, name: string): Source => ({ id, name, urls: [`https://${id.toLowerCase()}.example.com/sub`], pipeline: [] });
 
 export const NODESETS: NodeSetInputs = {
-  sources: {
-    L: src('L', '落地', [trojan('L-01', 'l1'), trojan('L-02', 'l2'), trojan('L-JP', 'l3')]),
-    T: src('T', '中转', [trojan('🇭🇰 IPLC-01', 't1'), trojan('🇭🇰 IPLC-02', 't2')]),
-    S: src('S', '家宽', [trojan('🇺🇸 Home-Broadband', 's1')]),
-    A: src('A', '机场 A', [trojan('🇭🇰 HK-01', 'a1'), trojan('🇯🇵 JP-01', 'a2')]),
-  },
+  sources: { L: src('L', '落地'), T: src('T', '中转'), S: src('S', '家宽'), A: src('A', '机场 A') },
   collections: {},
   locals: {
     self: { id: 'self', name: '自建', proxies: [{ name: '自建 SG-01', type: 'trojan', server: 'sg', port: 443, password: 'p', dialer: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'T' }, match: { exact: '🇭🇰 IPLC-01' } } } }] },
   },
-  snapshots: {},
+  snapshots: {
+    L: [[trojan('L-01', 'l1'), trojan('L-02', 'l2'), trojan('L-JP', 'l3')].join('\n')],
+    T: [[trojan('🇭🇰 IPLC-01', 't1'), trojan('🇭🇰 IPLC-02', 't2')].join('\n')],
+    S: [trojan('🇺🇸 Home-Broadband', 's1')],
+    A: [[trojan('🇭🇰 HK-01', 'a1'), trojan('🇯🇵 JP-01', 'a2')].join('\n')],
+  },
 };
 
 export const TEMPLATE: Template = {

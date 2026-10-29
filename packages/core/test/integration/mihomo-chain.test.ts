@@ -140,10 +140,11 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
       profile, template,
       nodeSets: {
         sources: {
-          T: { id: 'T', name: '中转', kind: 'local', pipeline: [], content: `proxies:\n  ${socks(opts.entryName, ports.entry)}\n` },
-          L: { id: 'L', name: '落地源', kind: 'local', pipeline: [], content: `proxies:\n  ${socks('落地', ports.exit)}\n` },
+          T: { id: 'T', name: '中转', urls: ['https://t.test/sub'], pipeline: [] },
+          L: { id: 'L', name: '落地源', urls: ['https://l.test/sub'], pipeline: [] },
         },
-        collections: {}, locals: {}, snapshots: {},
+        collections: {}, locals: {},
+        snapshots: { T: [`proxies:\n  ${socks(opts.entryName, ports.entry)}\n`], L: [`proxies:\n  ${socks('落地', ports.exit)}\n`] },
       },
       rules: { rulesets: {}, bundles: {}, snapshots: {} },
       urls: {
@@ -156,7 +157,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
       profile.overlay.extraGroups = [{ group: { id: 'pre', name: '普通前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'source', id: 'T' } }], filter: '^前置$', whenEmpty: 'reject' } }];
       profile.chains[0]!.via = { kind: 'group', groupId: 'pre' };
     }
-    if (opts.oldSelfDialer) input.nodeSets.sources.L!.content = input.nodeSets.sources.L!.content!.replace(`port: ${ports.exit}`, `port: ${ports.exit}, dialer-proxy: 落地组`);
+    if (opts.oldSelfDialer) input.nodeSets.snapshots.L = [input.nodeSets.snapshots.L![0]!.replace(`port: ${ports.exit}`, `port: ${ports.exit}, dialer-proxy: 落地组`)];
     return renderMihomo(input);
   };
 

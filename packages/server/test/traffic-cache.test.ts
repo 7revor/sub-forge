@@ -17,7 +17,7 @@ function setup(urls = [a]) {
     return { status: 200, body: 'trojan://test@node.example.test:443#节点', ...(traffic[url] ? { userinfo: traffic[url] } : {}) };
   } });
   envs.push(h);
-  h.store.put('source', { id: 's', name: '源', kind: 'remote', urls, pipeline: [] });
+  h.store.put('source', { id: 's', name: '源', urls, pipeline: [] });
   h.store.put('profile', { id: 'p', name: '测试', nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'provider' }], overlay: {}, chains: [], refPolicy: { default: 'wrap' } });
   h.store.putToken({ token: 'token', profileId: 'p' });
   return { ...h, traffic, fail: () => { failed = true; }, refresh: async () => {

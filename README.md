@@ -49,6 +49,10 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 
 本地开发：运行 [start](scripts/start)（`./scripts/start`）启动 Vite 前端热更新与后端源码监听，访问 `http://127.0.0.1:5173`；运行 [stop](scripts/stop)（`./scripts/stop`）同时停止两者。启动不打包，停止保留数据库和密钥；使用方法与数据位置见 [本地脚本说明](scripts/README.md)。
 
+## 开发规范
+
+见 [CLAUDE.md](CLAUDE.md)：每次变动都要同时修改设计稿、前端和后端三处，并更新相关文档。
+
 ## 许可证
 
 [AGPL-3.0](LICENSE)。部分协议解析代码将复用自 [Sub-Store](https://github.com/sub-store-org/Sub-Store)（AGPL-3.0）。

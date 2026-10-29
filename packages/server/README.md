@@ -118,7 +118,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 ## 种子文件
 
-结构见 `src/docs.ts` 的 `Seed`，示例见 `examples/seed.example.json`（演示源为本地内容，不需要联网）。`seed <文件> <用户名>` 把有归属的文档写到该用户名下；不指定用户时文档无归属，登录后看不到，只能通过订阅接口使用。同一模板的多个版本作为多条记录写入 `templates`。
+结构见 `src/docs.ts` 的 `Seed`，示例见 `examples/seed.example.json`（演示订阅只用本地节点组，不需要联网；旧种子里 `kind: "local"` 的订阅源导入时自动转为本地节点组）。`seed <文件> <用户名>` 把有归属的文档写到该用户名下；不指定用户时文档无归属，登录后看不到，只能通过订阅接口使用。同一模板的多个版本作为多条记录写入 `templates`。
 
 ## 与设计文档的差异
 

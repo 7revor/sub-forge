@@ -3,7 +3,7 @@
 //   docker run --rm --network none sub-forge-test
 //
 // 拓扑：本地 HTTP 目标 ← "落地" socks5 ← "前置" socks5 ← 客户端 mihomo
-//       "前置"节点来自远程订阅（本机临时"机场"），"落地"节点是本地订阅源。
+//       "前置"节点来自远程订阅（本机临时"机场"），"落地"节点是本地节点组。
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -81,9 +81,9 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
   const profile = (id: string, landing: 'provider' | 'inline', chainFilter?: string): ProfileDoc => ({
     id, name: `E2E ${landing}`,
     template: { id: 'tpl', follow: 'latest' },
-    nodeSets: [{ ref: { type: 'source', id: 'airport' }, output: 'provider' }, { ref: { type: 'source', id: 'land' }, output: landing }],
-    overlay: { groupPatches: { land: { addMembers: [{ kind: 'nodeset', ref: { type: 'source', id: 'land' } }] } } },
-    chains: [{ id: 'c', landing: { nodeSet: { type: 'source', id: 'land' }, ...(chainFilter ? { filter: chainFilter } : {}) }, via: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'airport' }, match: { exact: '🇭🇰 香港 前置' } } } }],
+    nodeSets: [{ ref: { type: 'source', id: 'airport' }, output: 'provider' }, { ref: { type: 'local', id: 'land' }, output: landing }],
+    overlay: { groupPatches: { land: { addMembers: [{ kind: 'nodeset', ref: { type: 'local', id: 'land' } }] } } },
+    chains: [{ id: 'c', landing: { nodeSet: { type: 'local', id: 'land' }, ...(chainFilter ? { filter: chainFilter } : {}) }, via: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'airport' }, match: { exact: '🇭🇰 香港 前置' } } } }],
     refPolicy: { default: 'wrap' },
   });
 
@@ -103,9 +103,9 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     store = new Store(':memory:');
     const seed: Seed = {
       sources: [
-        { id: 'airport', name: '机场', kind: 'remote', urls: [`http://localhost:${ports.airport}/sub`], pipeline: [{ op: 'filter.useless' }, { op: 'flag', mode: 'add' }] },
-        { id: 'land', name: '落地源', kind: 'local', pipeline: [], content: `proxies:\n  - { name: 落地, type: socks5, server: 127.0.0.1, port: ${ports.exit} }\n` },
+        { id: 'airport', name: '机场', urls: [`http://localhost:${ports.airport}/sub`], pipeline: [{ op: 'filter.useless' }, { op: 'flag', mode: 'add' }] },
       ],
+      locals: [{ id: 'land', name: '落地源', proxies: [{ name: '落地', type: 'socks5', server: '127.0.0.1', port: ports.exit }] }],
       templates: [{ id: 'tpl', version: 1, groups: [{ id: 'land', name: '落地组', type: 'select', members: [] }], rules: [], final: { kind: 'group', groupId: 'land' } }],
       profiles: [profile('p-provider', 'provider', '^落地$'), profile('p-inline', 'inline')],
       tokens: [{ token: 'tk-provider', profileId: 'p-provider' }, { token: 'tk-inline', profileId: 'p-inline' }],

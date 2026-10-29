@@ -9,7 +9,7 @@ const base = (group: GroupSpec, output: 'provider' | 'inline' = 'provider'): Ren
     chains: [{ id: 'c', landing: { nodeSet: { type: 'source', id: 's' }, filter: '^落地$' }, via: { kind: 'group', groupId: 'g' } }],
     refPolicy: { default: 'wrap' },
   },
-  nodeSets: { sources: { s: { id: 's', name: '源', kind: 'local', pipeline: [], content: 'proxies:\n  - { name: 落地, type: socks5, server: landing.test, port: 1080 }\n  - { name: 前置, type: http, server: relay.test, port: 8080 }\n' } }, collections: {}, locals: {}, snapshots: {} },
+  nodeSets: { sources: { s: { id: 's', name: '源', urls: ['https://s.test/sub'], pipeline: [] } }, collections: {}, locals: {}, snapshots: { s: ['proxies:\n  - { name: 落地, type: socks5, server: landing.test, port: 1080 }\n  - { name: 前置, type: http, server: relay.test, port: 8080 }\n'] } },
   rules: { rulesets: {}, bundles: {}, snapshots: {} },
   urls: { provider: (key, v) => `https://test/p/${key}?v=${v}`, ruleset: key => `https://test/r/${key}` },
 });
@@ -41,7 +41,7 @@ describe('代理链的失败保护与真实成员展开', () => {
   it('上游自带前置丢失时禁止发布', () => {
     const input = base(group());
     input.profile.chains = [];
-    input.nodeSets.sources.s!.content = 'proxies:\n  - { name: 落地, type: socks5, server: landing.test, port: 1080, dialer-proxy: 已消失 }';
+    input.nodeSets.snapshots.s = ['proxies:\n  - { name: 落地, type: socks5, server: landing.test, port: 1080, dialer-proxy: 已消失 }'];
     expect(renderMihomo(input).report.byCode('ref.upstream-dialer-missing')).toEqual([expect.objectContaining({ level: 'error' })]);
   });
 

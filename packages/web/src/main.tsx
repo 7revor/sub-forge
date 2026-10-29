@@ -7,7 +7,7 @@ import './index.css';
 import { AppLayout, RequireAdmin } from './layout.tsx';
 import { Account } from './pages/Account.tsx';
 import { CollectionEdit, CollectionList } from './pages/Collections.tsx';
-import { LocalEdit, LocalList } from './pages/Locals.tsx';
+import { LocalEdit, LocalList, LocalNodeEdit } from './pages/Locals.tsx';
 import { Login } from './pages/Login.tsx';
 import { Overview } from './pages/Overview.tsx';
 import { PresetEdit, PresetList } from './pages/Presets.tsx';
@@ -44,6 +44,7 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="collections/:id/:tab?" element={<CollectionEdit />} />
       <Route path="locals" element={<LocalList />} />
       <Route path="locals/:id" element={<LocalEdit />} />
+      <Route path="locals/:id/nodes/:index" element={<LocalNodeEdit />} />
       <Route path="rulesets" element={<RulesetList />} />
       <Route path="rulesets/:id" element={<RulesetEdit />} />
       <Route path="bundles" element={<BundleList />} />

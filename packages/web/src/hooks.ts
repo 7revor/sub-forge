@@ -70,16 +70,15 @@ export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined
   });
 }
 
-/** 远程订阅源的拉取状态：最近一次成功的快照、最近一次是否失败（与总览共用缓存） */
+/** 订阅源的拉取状态：最近一次成功的快照、最近一次是否失败（与总览共用缓存） */
 export function useSourceFetchState(source: SourceDoc | undefined) {
-  const remote = source?.kind === 'remote';
   const snaps = useQuery({
     queryKey: ['snapshots', source?.id],
-    enabled: !!source?.id && remote,
+    enabled: !!source?.id,
     queryFn: () => api<{ items: import('./api.ts').SnapshotMeta[] }>('GET', `/sources/${source!.id}/snapshots`).then((r) => r.items),
   });
   const items = snaps.data ?? [];
   const lastOk = items.find((x) => x.ok);
   const lastFail = items.find((x) => !x.ok);
-  return { snaps, remote, lastOk, failing: !!lastFail && (!lastOk || lastFail.fetchedAt > lastOk.fetchedAt), okCount: items.filter((x) => x.ok).length };
+  return { snaps, lastOk, failing: !!lastFail && (!lastOk || lastFail.fetchedAt > lastOk.fetchedAt), okCount: items.filter((x) => x.ok).length };
 }

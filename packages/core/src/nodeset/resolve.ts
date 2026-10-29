@@ -10,7 +10,7 @@ export type NodeSetInputs = {
   sources: Record<ID, Source>;
   collections: Record<ID, Collection>;
   locals: Record<ID, LocalProxyGroup>;
-  /** 订阅源的原始快照：按 Source.urls 顺序（本地源为 content）给出正文；缺失表示从未拉取成功 */
+  /** 订阅源的原始快照：按 Source.urls 顺序给出正文；缺失表示从未拉取成功 */
   snapshots: Record<ID, string[]>;
 };
 
@@ -72,7 +72,7 @@ export class NodeSetResolver {
     const src = this.inputs.sources[id];
     const where = `source:${id}`;
     if (!src) { this.report.error('nodeset.missing', `订阅源不存在`, where); return []; }
-    const bodies = src.kind === 'local' ? [src.content ?? ''] : this.inputs.snapshots[id];
+    const bodies = this.inputs.snapshots[id];
     if (!bodies) { this.report.error('source.no-snapshot', `订阅源「${src.name}」没有可用快照`, where); return []; }
     const ref: NodeSetID = { type: 'source', id };
     const parsed: ProxyIR[] = [];

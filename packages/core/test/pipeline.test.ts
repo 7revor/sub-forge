@@ -20,7 +20,7 @@ const HK_PIPELINE: OperatorStep[] = [
 
 describe('PRD 场景 2：改名确定性', () => {
   const src = (body: string): NodeSetInputs => ({
-    sources: { x: { id: 'x', name: 'X', kind: 'remote', urls: ['u'], pipeline: HK_PIPELINE } },
+    sources: { x: { id: 'x', name: 'X', urls: ['u'], pipeline: HK_PIPELINE } },
     collections: {},
     locals: {},
     snapshots: { x: [body] },
@@ -118,16 +118,16 @@ describe('处理链执行', () => {
 });
 
 describe('组合', () => {
-  const srcOf = (id: string, body: string): Source => ({ id, name: id, kind: 'local', content: body, pipeline: [] });
+  const srcOf = (id: string): Source => ({ id, name: id, urls: ['u'], pipeline: [] });
 
   it('按成员顺序合并，成员前缀生效，再跑组合自身处理链', () => {
     const inputs: NodeSetInputs = {
-      sources: { a: srcOf('a', trojan('HK-01', 'a1')), b: srcOf('b', [trojan('HK-01', 'b1'), trojan('JP-01', 'b2')].join('\n')) },
+      sources: { a: srcOf('a'), b: srcOf('b') },
       collections: {
         all: { id: 'all', name: '全部', members: [{ ref: { type: 'source', id: 'a' }, prefix: 'A·' }, { ref: { type: 'source', id: 'b' }, prefix: 'B·' }, { ref: { type: 'local', id: 'self' }, suffix: ' [自建]' }], pipeline: [{ op: 'sort.name', order: 'asc' }] },
       },
       locals: { self: { id: 'self', name: '自建', proxies: [{ name: 'SG', type: 'trojan', server: 's', port: 443, password: 'p' }] } },
-      snapshots: {},
+      snapshots: { a: [trojan('HK-01', 'a1')], b: [[trojan('HK-01', 'b1'), trojan('JP-01', 'b2')].join('\n')] },
     };
     const res = new NodeSetResolver(inputs);
     expect(res.resolve({ type: 'collection', id: 'all' }).map((n) => n.name)).toEqual(['A·HK-01', 'B·HK-01', 'B·JP-01', 'SG [自建]']);
@@ -146,7 +146,7 @@ describe('组合', () => {
   });
 
   it('订阅源没有快照时报错', () => {
-    const res = new NodeSetResolver({ sources: { r: { id: 'r', name: 'R', kind: 'remote', urls: ['u'], pipeline: [] } }, collections: {}, locals: {}, snapshots: {} });
+    const res = new NodeSetResolver({ sources: { r: { id: 'r', name: 'R', urls: ['u'], pipeline: [] } }, collections: {}, locals: {}, snapshots: {} });
     expect(res.resolve({ type: 'source', id: 'r' })).toEqual([]);
     expect(res.report.byCode('source.no-snapshot')).toHaveLength(1);
   });

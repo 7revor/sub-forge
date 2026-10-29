@@ -27,7 +27,7 @@ function harness(store = new Store(':memory:')) {
   return { store, renderer, snapshots, app, bodies, get, main, advance: () => { now += 100_000_000; } };
 }
 function seed(store: Store) {
-  store.put('source', { id: 's', name: 'S', kind: 'remote', urls: ['https://example.test/source'], pipeline: [] });
+  store.put('source', { id: 's', name: 'S', urls: ['https://example.test/source'], pipeline: [] });
   store.put('ruleset', { id: 'rs', name: 'R', kind: 'remote', format: 'classical', url: 'https://example.test/rules' });
   store.putTemplateVersion(template());
   store.put('profile', structuredClone(profile));

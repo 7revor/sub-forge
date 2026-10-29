@@ -1,6 +1,6 @@
 # 11 · 前端页面与设计稿对照
 
-设计稿：Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，共 29 张画板：原有 21 张，加上 2026-10-29 补画的 8 张（画布底部「补充设计：编辑细节、列表、对话框与账户」一行），用于前端已有、原画板没画的功能。
+设计稿：Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，共 30 张画板：原有 21 张，加上 2026-10-29 补画的 8 张（画布底部「补充设计：编辑细节、列表、对话框与账户」一行），用于前端已有、原画板没画的功能；同日本地节点拆为两张（`LocalNodes` 分组列表与详情、`LocalNodeEdit` 编辑节点）。
 
 现状（2026-10-29）：`packages/web` 的所有页面都按画板实现。画板上有、服务端还不支持的功能，界面照样做出来，服务端先提供占位接口（`packages/server/src/api/pending.ts`）：读接口返回空数据并带 `pending: true`，页面显示「服务端尚未实现」提示；写接口返回 501。
 
@@ -11,9 +11,9 @@
 | 总览 `Main` | `/` | 四项统计按访问日志与当前模板计算；待处理包括拉取失败、孤儿覆盖项、最近渲染告警、未加入节点集 |
 | 订阅源 · 处理链编辑器 `Source` + 补充 `Pipeline`、`PipelineForms` | `/sources/:id` | 步骤列表、参数区、diff 命中列、12 种处理器表单 |
 | 补充 `SourceFetch` | `/sources/:id` 的「拉取参数」 | 对话框：来源与拉取、快照历史、删除入口 |
-| 补充 `Lists` | `/sources`、`/collections`、`/profiles`、`/rulesets`、`/bundles` | 搜索、计数、空状态卡片；订阅源新建为对话框 |
+| 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles`、`/rulesets`、`/bundles` | 搜索、计数、空状态卡片；订阅源新建为对话框 |
 | 组合 `Collection` | `/collections/:id`、`/collections/:id/pipeline` | 成员表含「拉取失败时」 |
-| 本地节点 `LocalNodes` | `/locals/:id` | 单页：分组标签、节点表、右侧编辑 |
+| 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML、前置）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由 |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集「下发地址」显示路径模式 |
 | 规则集 `RuleSets` | `/rulesets/:id` | 解析结果、编辑来源对话框、输出预览、客户端改写、下载地址 |

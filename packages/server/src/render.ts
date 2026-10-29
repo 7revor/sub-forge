@@ -256,7 +256,7 @@ export class RenderService {
       const bodies: string[] = [];
       const failures: ReportItem[] = [];
       const trafficByUrl = new Map<string, TrafficInfo>();
-      for (const url of src.urls ?? []) {
+      for (const url of src.urls) {
         const r = await this.snapshots.get('source', src.id, url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
         if (r.snapshot?.body !== undefined) {
           bodies.push(r.snapshot.body);
@@ -289,8 +289,7 @@ export class RenderService {
       else { const d = this.store.get('collection', ref.id); if (d) { inputs.collections[d.id] = d; d.members.forEach((m) => walk(m.ref)); } }
     };
     refs.forEach(walk);
-    const sources = (Object.values(inputs.sources) as SourceDoc[]).filter((s) => s.kind === 'remote');
-    return { inputs, sources };
+    return { inputs, sources: Object.values(inputs.sources) as SourceDoc[] };
   }
 
   /** 模板规则与 Profile 私有规则引用到的规则集 / 规则包 */
