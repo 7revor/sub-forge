@@ -187,6 +187,34 @@ describe('规则仓库索引', () => {
 });
 
 describe('规则仓库接口', () => {
+  it('文件搜索不受目录/路径分组影响，按完整路径搜索并在去重后分页', async () => {
+    const h = setup(); const c = client(h.app);
+    expect((await c.get('/api/rule-repos/search?view=files')).status).toBe(401);
+    const definition = h.service.definition('blackmatrix7');
+    for (const scan of definition.scans) if (scan.client === 'surge') scan.groupBy = 'path';
+    h.store.db.prepare('UPDATE rule_repos SET definition=? WHERE id=?').run(JSON.stringify(definition), 'blackmatrix7');
+    h.setPaths(['rule/Clash/Claude/Claude.list', 'rule/Clash/Claude/Claude_Domain.list', 'rule/Surge/Claude/Claude.list']);
+    await h.service.refresh('blackmatrix7'); await h.service.refresh('zydou');
+    await addUser(h.store, 'alice'); await c.login('alice'); h.fetcher.mockClear();
+    const result = await c.get('/api/rule-repos/search?view=files&q=claude');
+    expect(result.json.total).toBe(3);
+    expect(result.json.items).toEqual([
+      { repo: 'blackmatrix7', path: 'Claude', name: 'Claude.list', filePath: 'rule/Clash/Claude/Claude.list' },
+      { repo: 'blackmatrix7', path: 'rule/Surge/Claude/Claude.list', name: 'Claude.list', filePath: 'rule/Surge/Claude/Claude.list' },
+      { repo: 'blackmatrix7', path: 'Claude', name: 'Claude_Domain.list', filePath: 'rule/Clash/Claude/Claude_Domain.list' },
+    ]);
+    expect((await c.get('/api/rule-repos/search?view=files&q=rule%2FClash%2FClaude')).json.total).toBe(2);
+    expect((await c.get('/api/rule-repos/search?view=files&q=claude&client=surge')).json.total).toBe(1);
+    expect((await c.get('/api/rule-repos/search?view=files&q=claude&offset=1&limit=1')).json.items).toEqual([result.json.items[1]]);
+    const branches = await c.get('/api/rule-repos/search?view=files&repo=zydou&q=openai.txt');
+    expect(branches.json.total).toBe(1);
+    expect((await c.get('/api/rule-repos/files?repo=zydou&path=openai')).json.item.files).toHaveLength(2);
+    expect((await c.get('/api/rule-repos/search?q=claude')).json.total).toBe(2);
+    expect((await c.get('/api/rule-repos/search?view=bad')).status).toBe(400);
+    h.service.setEnabled('blackmatrix7', false);
+    expect((await c.get('/api/rule-repos/search?view=files&q=claude')).json.total).toBe(0);
+    expect(h.fetcher).not.toHaveBeenCalled();
+  });
   it('文件列表只读索引并按分支与路径去重，不请求推荐组合或内容', async () => {
     const h = setup(); const c = client(h.app);
     expect((await c.get('/api/rule-repos/files?repo=zydou&path=openai')).status).toBe(401);
