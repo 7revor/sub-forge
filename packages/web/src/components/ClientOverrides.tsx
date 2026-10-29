@@ -25,8 +25,9 @@ export function clientOverridesError(overrides: ClientOverride[]): string | unde
 
 export const newClientOverride = (): ClientOverride => ({ when: { client: 'mihomo' }, action: { replace: [emptyRule('DOMAIN')] } });
 
-export function ClientOverrides({ value, onChange, single = false, allowAppend = false, matchInput }: {
+export function ClientOverrides({ value, onChange, single = false, allowAppend = false, matchInput, leading, trailing }: {
   value: ClientOverride[]; onChange: (value: ClientOverride[]) => void; single?: boolean; allowAppend?: boolean; matchInput?: ReactNode;
+  leading?: ReactNode; trailing?: ReactNode;
 }) {
   const update = (index: number, override: ClientOverride) => onChange(value.map((item, i) => i === index ? override : item));
   const render = (override: ClientOverride, index: number) => {
@@ -36,32 +37,37 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
     const setRules = (rules: RuleIR[]) => update(index, { ...override, action: action === 'append' ? { append: rules } : { replace: rules } });
     return <div className="flex min-w-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-end gap-3">
+        {leading && <div className="flex h-[38px] items-center">{leading}</div>}
         <Segmented label="改写方式" value={action} options={[{ value: 'replace', label: '替换' }, { value: 'drop', label: '丢弃' }, ...(allowAppend ? [{ value: 'append', label: '追加' }] : [])]}
           onChange={(next) => {
             if (next === action) return;
             update(index, { ...override, action: next === 'drop' ? { drop: true } : next === 'append' ? { append: replacements ?? [emptyRule('DOMAIN')] } : { replace: replacements ?? [emptyRule('DOMAIN')] } });
           }} />
 
-        <Field label="客户端">{(id) => <Select id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
+        <Field label="客户端" className="w-[112px]">{(id) => <Select id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
           <option value="mihomo">mihomo</option><option value="surge">Surge</option>
         </Select>}</Field>
-        <Field label="平台">{(id) => <Select id={id} value={override.when.platform ?? ''} onChange={(e) => {
+        <Field label="平台" className="w-[112px]">{(id) => <Select id={id} value={override.when.platform ?? ''} onChange={(e) => {
           const { platform: _, ...when } = override.when;
           update(index, { ...override, when: e.target.value ? { ...when, platform: e.target.value as Platform } : when });
         }}><option value="">不限</option>{(['android', 'macos', 'windows', 'ios', 'linux'] as const).map((platform) => <option key={platform} value={platform}>{platform}</option>)}</Select>}</Field>
         {!single && <Button size="sm" variant="ghost" aria-label={`删除客户端覆盖 ${index + 1}`} onClick={() => onChange(value.filter((_, i) => i !== index))}><Trash2 size={14} /></Button>}
+        {trailing && <div className="ml-auto flex h-[38px] items-center">{trailing}</div>}
       </div>
       {matchInput}
       {replacements && <>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[12.5px] font-medium text-muted">{action === 'append' ? '追加规则' : '替换为'}</span>
+          <Button size="sm" variant="ghost" onClick={() => setRules([...replacements, emptyRule('DOMAIN')])}><Plus size={14} />添加{ruleLabel}规则</Button>
+        </div>
         <SortableList items={replacements} onReorder={setRules}
-          renderItem={(rule, i, handle) => <div className="my-2 flex items-start gap-2 rounded-lg border border-line-2 p-3">
-            {handle}<div className="min-w-0 flex-1"><RuleEditor value={rule}
+          renderItem={(rule, i, handle) => <div className="flex items-start gap-2 py-2">
+            <div className="pt-6">{handle}</div><div className="min-w-0 flex-1"><RuleEditor compact value={rule}
               onChange={(next) => setRules(replacements.map((item, j) => j === i ? next : item))}
               onIncomplete={(next) => setRules(replacements.map((item, j) => j === i ? next : item))} /></div>
-            <Button size="sm" variant="ghost" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
+            <Button size="sm" variant="ghost" className="mt-6" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
               onClick={() => setRules(replacements.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
           </div>} />
-        <Button size="sm" className="self-start" onClick={() => setRules([...replacements, emptyRule('DOMAIN')])}><Plus size={14} />添加{ruleLabel}规则</Button>
       </>}
     </div>;
   };
@@ -69,7 +75,7 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
     {!single && <p className="m-0 text-[12.5px] text-muted">命中第一条匹配的覆盖</p>}
     {single ? value.map((override, i) => <div key={i}>{render(override, i)}</div>) : <SortableList items={value} onReorder={onChange}
       renderItem={(override, i, handle) => <div className="my-2 flex items-start gap-2 rounded-lg border border-line p-3">{handle}{render(override, i)}</div>} />}
-    <FieldError error={clientOverridesError(value)} />
+    {!single && <FieldError error={clientOverridesError(value)} />}
     {!single && <Button className="self-start" size="sm" onClick={() => onChange([...value, newClientOverride()])}><Plus size={14} />添加客户端覆盖</Button>}
   </div>;
 }
