@@ -64,14 +64,14 @@ describe('PRD 场景 4：规则出口为 provider 节点', () => {
     });
     const w = r.dependencies[0]!.output;
     expect((r.config.rules as string[]).slice(0, 4)).toEqual([
-      `RULE-SET,b_fin_domain,${w}`,
-      `RULE-SET,b_fin_classical,${w}`,
-      `RULE-SET,b_fin_ipcidr,${w},no-resolve`,
-      `RULE-SET,b_fin_broker_mrs,${w},no-resolve`,
+      `RULE-SET,rs_fin_domain,${w}`,
+      `RULE-SET,rs_fin_classical,${w}`,
+      `RULE-SET,rs_fin_ipcidr,${w},no-resolve`,
+      `RULE-SET,rs_fin_broker_mrs,${w},no-resolve`,
     ]);
-    expect(r.rulesets.b_fin_domain).toEqual({ behavior: 'domain', text: '+.paypal.com\n' });
-    expect(r.rulesets.b_fin_classical).toEqual({ behavior: 'classical', text: 'DOMAIN-KEYWORD,paypal\n' });
-    expect((r.config['rule-providers'] as Record<string, unknown>).b_fin_broker_mrs).toMatchObject({ format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' });
+    expect(r.rulesets.rs_fin_domain).toEqual({ behavior: 'domain', text: '+.paypal.com\n' });
+    expect(r.rulesets.rs_fin_classical).toEqual({ behavior: 'classical', text: 'DOMAIN-KEYWORD,paypal\n' });
+    expect((r.config['rule-providers'] as Record<string, unknown>).rs_fin_broker_mrs).toMatchObject({ format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' });
   });
 });
 

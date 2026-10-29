@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useDeleteDoc, useList, type DocMap, type Kind } from '../hooks.ts';
-import { Button, buttonClass, Card, cx, ErrorBox, Input, PageHeader, td, th } from './ui.tsx';
+import { Button, buttonClass, Card, cx, Empty, ErrorBox, Input, PageHeader, td, th } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { DeleteDialog } from './MoreMenu.tsx';
 
@@ -36,11 +36,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
       <PageHeader title={title} subtitle={intro} actions={canCreate && createButton('md', 'primary')} />
       <ErrorBox error={list.error} />
       {list.isLoading ? <div className="text-muted">加载中…</div> : !list.data?.length ? (
-        <section className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-7 py-7 text-center">
-          <span className="text-[14px] font-semibold">还没有{name}</span>
-          {empty && <span className="max-w-[420px] text-[12.5px] leading-relaxed text-muted">{empty}</span>}
-          {canCreate && createButton('sm', 'default')}
-        </section>
+        <Empty title={`还没有${name}`} description={empty} action={canCreate && createButton('sm', 'default')} />
       ) : (
         <Card bodyClass="overflow-x-auto" title={<Input aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-[280px]" value={q} onChange={(e) => setQ(e.target.value)} />}
           actions={<span className="text-[12.5px] text-muted">{q.trim() ? `${rows.length} / ` : ''}{list.data.length} 个{name}</span>}>
@@ -60,7 +56,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                   </td>
                 </DocTableRow>
               ))}
-              {!rows.length && <tr><td className={cx(td, 'text-muted')} colSpan={columns.length + 1}>没有名称包含「{q.trim()}」的{name}</td></tr>}
+              {!rows.length && <tr><td className={td} colSpan={columns.length + 1}><Empty title={`没有名称包含「${q.trim()}」的${name}`} /></td></tr>}
             </tbody>
           </table>
         </Card>

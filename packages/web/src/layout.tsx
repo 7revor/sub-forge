@@ -13,8 +13,8 @@ type NavItem = { to: string; label: string; admin?: boolean; end?: boolean };
 const NAV: { title?: string; items: NavItem[] }[] = [
   { items: [{ to: '/', label: '总览' }, { to: '/profiles', label: '配置订阅' }] },
   { title: '节点', items: [{ to: '/sources', label: '订阅源' }, { to: '/collections', label: '组合' }, { to: '/locals', label: '本地节点' }] },
-  { title: '规则', items: [{ to: '/rulesets', label: '规则集' }, { to: '/bundles', label: '规则包' }, { to: '/rule-repo', label: '规则仓库' }, { to: '/templates', label: '模板', end: true }] },
-  { title: '管理员', items: [{ to: '/templates/manage', label: '模板管理', admin: true }, { to: '/presets', label: '基础设置预设', admin: true }, { to: '/users', label: '用户', admin: true }, { to: '/system', label: '系统', admin: true }] },
+  { title: '规则', items: [{ to: '/rulesets', label: '规则集' }, { to: '/rule-repo', label: '规则仓库' }, { to: '/templates', label: '模板', admin: true, end: true }] },
+  { title: '管理员', items: [{ to: '/presets', label: '基础设置预设', admin: true }, { to: '/users', label: '用户', admin: true }, { to: '/system', label: '系统', admin: true }] },
 ];
 
 function Logo() {

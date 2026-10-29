@@ -137,10 +137,66 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
+    expect(s.db.pragma('user_version', { simple: true })).toBe(7);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
     s.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it.each([5, 6])('v%i 升级到 v7：规则包迁移与本地前置迁移兼容，重启不重复执行', (version) => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-mig-'));
+    const file = join(dir, `v${version}.db`);
+    const cipher = new Cipher(randomBytes(32));
+    const old = new Store(file, { cipher });
+    const raw = (kind: string, doc: { id: string }, owner: string | null) => old.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, 0)').run(kind, doc.id, owner, cipher.encrypt(JSON.stringify(doc)));
+    const overrides = [{ line: 1, override: { when: { client: 'surge' }, action: { drop: true } } }];
+    raw('ruleset', { id: 'tg', name: 'Telegram', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } } as never, 'u1');
+    raw('ruleset', { id: 'own', name: '自定', kind: 'local', format: 'auto', content: 'DOMAIN,a.test', overrides } as never, 'u1');
+    raw('bundle', { id: 'fin', name: '金融', noResolve: true, items: [
+      { kind: 'ruleset', id: 'tg' }, { kind: 'ruleset', id: 'own', enabled: false }, { kind: 'ruleset', id: 'gone' },
+      { kind: 'rule', rule: { type: 'IP-CIDR', value: '10.0.0.0/8' } }, { kind: 'rule', rule: { type: 'DOMAIN', value: 'off.test' }, enabled: false },
+    ] } as never, 'u1');
+    // 与已有规则集同 id 的规则包换新 id
+    raw('bundle', { id: 'own', name: '撞名', items: [] } as never, 'u2');
+    old.addSnapshot({ ownerKind: 'ruleset', ownerId: 'tg', url: 'https://r.test/tg.list', fetchedAt: 1, ok: true, body: 'DOMAIN,t.me', hash: 'h' });
+    const via = { kind: 'builtin' as const, name: 'DIRECT' as const };
+    const chain = { id: 'existing', landing: { nodeSet: { type: 'local' as const, id: 'self' }, filter: '^SG$' }, via };
+    old.put('local', { id: 'self', name: '自建', proxies: [{ name: 'SG', type: 'trojan', server: 'sg.test', port: 443, password: 'p', ...(version < 6 ? { dialer: via } : {}) }] }, 'u2');
+    old.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'x', matcher: { kind: 'bundle', id: 'own' } as never, target: { kind: 'builtin', name: 'DIRECT' } } }] }, chains: version < 6 ? [] : [chain], refPolicy: { default: 'wrap' } }, 'u2');
+    old.putTemplateVersion({ ...T(1), rules: [{ id: 'f', matcher: { kind: 'bundle', id: 'fin' } as never, target: { kind: 'builtin', name: 'DIRECT' } }] });
+    old.db.pragma(`user_version = ${version}`);
+    old.close();
+
+    const s = new Store(file, { cipher });
+    expect(s.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } }] });
+    expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test', overrides }] });
+    expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', noResolve: true, sources: [
+      { id: 'tg', name: 'Telegram', kind: 'remote', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } },
+      { id: 'own', name: '自定', kind: 'local', content: 'DOMAIN,a.test', overrides, enabled: false },
+      { id: 'rules', name: '单条规则', kind: 'local', format: 'classical', content: 'IP-CIDR,10.0.0.0/8' },
+      { id: 'rules-off', name: '单条规则（停用）', kind: 'local', format: 'classical', content: 'DOMAIN,off.test', enabled: false },
+    ] } });
+    expect(s.latestSnapshot('ruleset', 'fin', 'https://r.test/tg.list')?.body).toBe('DOMAIN,t.me');
+    const renamed = s.list('ruleset', 'u2');
+    expect(renamed).toHaveLength(1);
+    expect(renamed[0]!.id).not.toBe('own');
+    expect(s.get('profile', 'p')!.overlay.extraRules![0]!.rule.matcher).toEqual({ kind: 'ruleset', id: renamed[0]!.id });
+    expect(s.get('local', 'self')!.proxies[0]).not.toHaveProperty('dialer');
+    const migratedProfile = s.get('profile', 'p')!;
+    expect(migratedProfile.chains).toEqual([{ ...chain, id: version < 6 ? expect.stringMatching(/^c_/) : 'existing' }]);
+    expect(s.getTemplate('std')!.rules[0]!.matcher).toEqual({ kind: 'ruleset', id: 'fin' });
+    expect(s.db.prepare("SELECT COUNT(*) n FROM docs WHERE kind = 'bundle'").get()).toEqual({ n: 0 });
+    const migratedRulesets = s.list('ruleset');
+    s.close();
+    const reopened = new Store(file, { cipher });
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
+    expect(reopened.list('ruleset')).toEqual(migratedRulesets);
+    expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });
+    reopened.close();
     rmSync(dir, { recursive: true, force: true });
   });
 

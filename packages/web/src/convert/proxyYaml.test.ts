@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import snapshots from '../../../core/test/__snapshots__/proxy-parse.test.ts.snap?raw';
 import { getPath, otherFields, setPath } from '../components/schema.ts';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFormFromYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
+import { groupFromYaml, groupToYaml, parseProxyImport, proxyDraftFromYaml, proxyFormFromYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
 
 const node: LocalProxy = {
   name: '测试节点', type: 'vless', server: 'example.com', port: 443, uuid: 'uuid', tls: true,
@@ -12,6 +12,33 @@ const node: LocalProxy = {
   'ws-opts': { path: '/ws', headers: { Host: 'cdn.example.com', 'X-Test': 'keep' } },
   future: { list: [1, false, '值'], nested: { enabled: true } },
 };
+
+describe('列表粘贴导入', () => {
+  it('与单节点原始配置识别相同字段', () => {
+    const text = proxyToYaml(node);
+    const imported = parseProxyImport(text);
+    const raw = proxyFromYaml(text);
+    expect(raw.ok).toBe(true);
+    expect(imported.failures).toEqual([]);
+    expect(imported.proxies).toHaveLength(1);
+    const { _source, _origName, _key, ...fields } = imported.proxies[0]!;
+    if (raw.ok) expect(fields).toEqual(raw.value);
+  });
+
+  it.each([
+    'name: [未闭合\ntype: vless',
+    '- name: [未闭合\n  type: vless',
+    'proxies:\n  - name: [未闭合',
+    'name: 重复\nname: 键\ntype: vless',
+    'proxies: 不是列表',
+  ])('显示无效 YAML 的诊断，禁止导入：%s', (text) => {
+    const result = parseProxyImport(text);
+    expect(result.format).toBe('clash');
+    expect(result.proxies).toEqual([]);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]!.reason).not.toBe('不是 URI');
+  });
+});
 
 describe('节点 YAML 转换', () => {
   it('错误类型返回表单时清空，保留 UUID 和扩展字段', () => {

@@ -11,7 +11,7 @@ import { NodeSetPickerDialog, RenameDialog } from '../components/dialogs.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { useNodeSetNames } from '../components/pickers.tsx';
-import { Badge, Button, Card, ErrorBox, Field, Input, Select, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useList, useNodeList } from '../hooks.ts';
 import { usePipelinePreview } from './Sources.tsx';
@@ -68,7 +68,7 @@ export function CollectionEdit() {
       <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">成员</h2><span className="text-[12.5px] text-muted">按顺序合并。每个成员先跑自己的处理链，前后缀等价于自动追加一个改名处理器。组合之间不能成环。</span></div>}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加成员</Button>}
         bodyClass="overflow-x-auto pb-1">
-        {!d.members.length ? <div className="px-4 pb-4 text-[13px] text-muted">还没有成员。点击「添加成员」选择订阅源、组合或本地节点组。</div> : (
+        {!d.members.length ? <div className="px-4 pb-4"><Empty title="还没有成员" description="点击「添加成员」选择订阅源、组合或本地节点组。" /></div> : (
           <div className="min-w-[900px]">
             <div className={cx(GRID, 'border-y border-line py-2 text-[12px] font-medium text-muted')}><span /><span>成员</span><span>类型</span><span>节点</span><span>前缀</span><span>后缀</span><span>拉取失败时</span><span /></div>
             <SortableList items={d.members} onReorder={(members) => set({ members })} renderItem={(m, i, handle) => (

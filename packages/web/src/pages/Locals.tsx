@@ -3,7 +3,7 @@
 // 本地节点只录入节点信息，不设置前置：代理链统一在配置订阅的「代理链」中配置（REF-03）。
 // 每个分组是一个节点集文档；节点子页直接保存整个分组。离开有未保存修改的页面前先确认。
 
-import { parseContent, type LocalProxy, type LocalProxyGroup } from '@sub-forge/core';
+import type { LocalProxy, LocalProxyGroup } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useBeforeUnload, useBlocker, useLocation, useNavigate, useParams, type Blocker, type NavigateOptions } from 'react-router';
@@ -12,10 +12,10 @@ import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../c
 import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
+import { groupFromYaml, groupToYaml, parseProxyImport, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, DeleteDialog, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
@@ -93,14 +93,14 @@ export function LocalList() {
 
 function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () => void; onImport: (p: LocalProxy[]) => void }) {
   const [text, setText] = useState('');
-  const parsed = text.trim() ? parseContent(text, { type: 'local', id: 'paste' }) : undefined;
+  const parsed = text.trim() ? parseProxyImport(text) : undefined;
   // 本地节点不处理代理链：节点自带的 dialer-proxy / underlying-proxy 不导入，并提示到配置订阅中设置
   const proxies: LocalProxy[] = (parsed?.proxies ?? []).map(({ _source, _origName, _key, upstreamDialer, ...rest }) => rest as LocalProxy);
   const dropped = (parsed?.proxies ?? []).filter((p) => p.upstreamDialer).length;
   return (
     <Modal title="粘贴导入节点" open={open} onClose={onClose} wide
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!proxies.length} onClick={() => { onImport(proxies); setText(''); onClose(); }}>导入 {proxies.length} 个节点</Button></>}>
-      <Field label="URI 列表、Base64、Clash YAML 或 Surge [Proxy] 行">
+      <Field label="URI 列表、Base64、Clash YAML 或 Surge [Proxy] 行" hint="YAML 支持单个节点、节点列表或带 proxies 的完整配置。">
         {(id) => <Textarea id={id} rows={8} className="font-mono text-[12.5px]" value={text} onChange={(e) => setText(e.target.value)} />}
       </Field>
       {parsed && <div className="flex flex-wrap gap-2">
@@ -147,7 +147,7 @@ export function LocalEdit() {
       <Card bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
         actions={<><Button size="sm" onClick={() => setPasting(true)}>粘贴导入</Button><Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link></>}>
-        {!d.proxies.length ? <div className="px-4 pb-4 text-[13px] text-muted">这个分组还没有节点。新增一个，或粘贴 URI / YAML 一次导入多个。</div> : (
+        {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增一个，或粘贴 URI / YAML 一次导入多个。" /></div> : (
           <table className="w-full min-w-[620px] border-collapse">
             <thead><tr><th className={cx(th, 'px-3.5')}>名称</th><th className={cx(th, 'px-3.5')}>协议</th><th className={cx(th, 'px-3.5')}>服务器</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>

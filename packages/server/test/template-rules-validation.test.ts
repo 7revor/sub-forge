@@ -15,7 +15,7 @@ async function setup() {
   envs.push(h);
   const user = await addUser(h.store, 'admin', 'admin');
   const admin = client(h.app); await admin.login('admin');
-  h.store.put('ruleset', { id: 'r', name: '远程规则', kind: 'remote', format: 'classical', url: 'https://rules.example.test/list' }, user.id);
+  h.store.put('ruleset', { id: 'r', name: '远程规则', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://rules.example.test/list' }] }, user.id);
   const template = { name: '自检模板', groups: [], rules: [{ id: 'rule', matcher: { kind: 'ruleset', id: 'r' }, target: { kind: 'builtin', name: 'REJECT' } }], final: { kind: 'builtin', name: 'DIRECT' } };
   return { ...h, admin, template, calls, respond: (next: string | Error) => { response = next; h.advance(1000); } };
 }
@@ -38,13 +38,12 @@ describe('模板自身的规则可用性检查', () => {
     expect(h.store.listLatestTemplates()).toEqual([]);
   });
 
-  it('本地规则和规则包内规则同样检查，输出具体位置', async () => {
+  it('本地来源同样检查，输出具体规则集与来源', async () => {
     const h = await setup();
-    h.store.put('ruleset', { id: 'r', name: '坏规则', kind: 'local', format: 'yaml', content: 'payload: [' });
-    h.store.put('bundle', { id: 'b', name: '规则包', items: [{ kind: 'ruleset', id: 'r' }] });
-    const res = await h.admin.post('/api/templates/new/publish', { ...h.template, rules: [{ ...h.template.rules[0], matcher: { kind: 'bundle', id: 'b' } }] });
+    h.store.put('ruleset', { id: 'r', name: '坏规则', sources: [{ id: 'ok', kind: 'local', format: 'classical', content: 'DOMAIN,a.test' }, { id: 'bad', name: '坏来源', kind: 'local', format: 'yaml', content: 'payload: [' }] });
+    const res = await h.admin.post('/api/templates/new/publish', h.template);
     expect(res.status).toBe(400);
-    expect(res.json.details.report).toContainEqual(expect.objectContaining({ code: 'template.ruleset-invalid', where: 'ruleset:r' }));
+    expect(res.json.details.report).toContainEqual(expect.objectContaining({ code: 'template.ruleset-invalid', where: 'ruleset:r', message: expect.stringContaining('来源「坏来源」') }));
     expect(h.calls).toEqual([]);
   });
 
@@ -53,7 +52,7 @@ describe('模板自身的规则可用性检查', () => {
     const first = await h.admin.post('/api/templates/new/publish', h.template);
     expect(first.status).toBe(201);
     const id = first.json.item.id;
-    h.store.put('ruleset', { id: 'r', name: '坏规则', kind: 'local', format: 'classical', content: 'invalid' });
+    h.store.put('ruleset', { id: 'r', name: '坏规则', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'invalid' }] });
     const impact = await h.admin.post(`/api/templates/${id}/impact`, h.template);
     expect(impact.json.report).toContainEqual(expect.objectContaining({ level: 'error' }));
     expect((await h.admin.post(`/api/templates/${id}/publish`, { ...h.template, force: true })).status).toBe(400);
@@ -70,12 +69,15 @@ describe('模板自身的规则可用性检查', () => {
     expect(res.json.report).toContainEqual(expect.objectContaining({ level: 'warn', code: 'template.ruleset-snapshot' }));
   });
 
-  it('禁用规则与规则包禁用子项不触发拉取', async () => {
+  it('禁用规则与规则集停用的来源不触发拉取', async () => {
     const h = await setup();
-    h.store.put('bundle', { id: 'b', name: '规则包', items: [{ kind: 'ruleset', id: 'r', enabled: false }] });
+    h.store.put('ruleset', { id: 'b', name: '多来源', sources: [
+      { id: 'off', kind: 'remote', format: 'classical', url: 'https://rules.example.test/list', enabled: false },
+      { id: 'on', kind: 'local', format: 'classical', content: 'DOMAIN,a.test' },
+    ] });
     const res = await h.admin.post('/api/templates/new/publish', { ...h.template, rules: [
       { ...h.template.rules[0], enabled: false },
-      { ...h.template.rules[0], id: 'bundle', matcher: { kind: 'bundle', id: 'b' } },
+      { ...h.template.rules[0], id: 'multi', matcher: { kind: 'ruleset', id: 'b' } },
     ] });
     expect(res.status).toBe(201);
     expect(h.calls).toEqual([]);
@@ -83,7 +85,8 @@ describe('模板自身的规则可用性检查', () => {
 
   it('二进制透传明确标注未检查内容和可达性，不执行服务端下载', async () => {
     const h = await setup();
-    h.store.put('ruleset', { ...h.store.get('ruleset', 'r')!, format: 'mrs', behavior: 'domain' });
+    const rs = h.store.get('ruleset', 'r')!;
+    h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, format: 'mrs', behavior: 'domain' }] });
     const res = await h.admin.post('/api/templates/new/publish', h.template);
     expect(res.status).toBe(201);
     expect(res.json.report).toContainEqual(expect.objectContaining({ code: 'template.ruleset-passthrough', level: 'info' }));

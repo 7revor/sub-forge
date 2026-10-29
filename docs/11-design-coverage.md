@@ -1,6 +1,6 @@
 # 11 · 前端页面与设计稿对照
 
-设计稿：Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，共 30 张画板：原有 21 张，加上 2026-10-29 补画的 8 张（画布底部「补充设计：编辑细节、列表、对话框与账户」一行），用于前端已有、原画板没画的功能；同日本地节点拆为两张（`LocalNodes` 分组列表与详情、`LocalNodeEdit` 编辑节点）。
+设计稿：Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，共 30 张画板：原有 21 张，加上 2026-10-29 补画的 8 张（画布底部「补充设计：编辑细节、列表、对话框与账户」一行），用于前端已有、原画板没画的功能；同日本地节点拆为两张（`LocalNodes` 分组列表与详情、`LocalNodeEdit` 编辑节点）；同日规则包并入规则集，`RuleBundle` 画板换成 `RuleSetNew`（规则集列表与新建），张数不变。
 
 现状（2026-10-29）：`packages/web` 的所有页面都按画板实现。画板上有、服务端还不支持的功能，界面照样做出来，服务端先提供占位接口（`packages/server/src/api/pending.ts`）：读接口返回空数据并带 `pending: true`，页面显示「服务端尚未实现」提示；写接口返回 501。
 
@@ -11,22 +11,28 @@
 | 总览 `Main` | `/` | 四项统计按访问日志与当前模板计算；待处理包括拉取失败、孤儿覆盖项、最近渲染告警、未加入节点集 |
 | 订阅源 · 处理链编辑器 `Source` + 补充 `Pipeline`、`PipelineForms` | `/sources/:id` | 步骤列表、参数区、diff 命中列、12 种处理器表单 |
 | 补充 `SourceFetch` | `/sources/:id` 的「拉取参数」 | 对话框：来源与拉取、快照历史、删除入口 |
-| 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles`、`/rulesets`、`/bundles` | 搜索、计数、空状态卡片；订阅源新建为对话框；每行「删除」「编辑」 |
+| 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles` | 搜索、计数、空状态卡片；订阅源新建为对话框；每行「删除」「编辑」 |
 | 组合 `Collection` | `/collections/:id` | 成员表含「拉取失败时」；成员表下方直接展开「组合自身的处理链」编辑器与逐步预览，被引用的配置订阅显示为头部徽章。2026-10-29 起 `/collections/:id/pipeline` 跳回详情页 |
 | 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由，同日去掉前置卡片与「前置」列，代理链只在 Profile「代理链」中设置 |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集「下发地址」显示路径模式 |
-| 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：客户端改写、解析结果（仅本地文本规则集，远程与 mrs / srs 不显示）、输出预览，每块独占一行；编辑来源对话框（2026-10-29 移除「下载地址」卡片，实际地址见配置订阅预览） |
-| 规则包 `RuleBundle` | `/bundles/:id` | 本地规则集在浏览器解析出 behavior 与条数；远程规则集显示为未知 |
+| 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：来源（多个远程地址 / 本地规则，可排序、启停，选中后展开地址、格式、缓存等字段）、客户端改写（作用于选中的来源）、输出预览（选中来源时为该来源，本地规则在预览里实时编辑；不选时为合并结果与 domain / classical / ipcidr 统计），每块独占一行。2026-10-29 取消「编辑来源」对话框与「解析结果」表，规则包并入规则集 |
+| 规则集 `RuleSetNew` | `/rulesets`、`/rulesets/new` | 列表（名称、来源概况、no-resolve）；新建直接打开与编辑页同一个页面，默认带一个选中的本地来源，不再有单独的新建表单或对话框（2026-10-29 取代原 `RuleBundle` 画板） |
 | 规则仓库 `RuleRepo` | `/rule-repo` | 占位接口 |
-| 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish`、`/templates/manage` | 草稿在两页之间共用；发布页自动试渲染 |
-| 补充 `TemplateBrowse` | `/templates` | 所有人浏览；管理员多一个「编辑新版本」 |
+| 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish` | 草稿在两页之间共用；发布页自动试渲染；仅管理员可进入 |
+| 补充 `TemplateBrowse` | `/templates` | 2026-10-29 统一为唯一模板入口，仅管理员可见，可新建、编辑与发布；旧 `/templates/manage` 重定向到此页。普通用户在配置订阅向导中选择模板 |
 | 基础设置预设 `Presets` | `/presets/:id` | 单页；Surge 段为 M2 占位说明 |
 | 用户 `Users` | `/users` | 统计列与共享走占位接口 |
 | 系统 `System` | `/system` | 占位接口 |
 | 补充 `Dialogs` | 全部详情页 | 头部「更多」菜单与最右侧的独立删除按钮、删除确认、各类对话框、表单 / YAML 双视图、离开前保存（2026-10-29 删除从「更多」菜单移出） |
 | 补充 `Login`、`Account` | `/login`、`/account` | — |
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
+
+## 设计稿待同步
+
+- 2026-10-29 本地节点粘贴导入：前端补充提示「YAML 支持单个节点、节点列表或带 proxies 的完整配置。」，内核已补齐相应解析。外部 Claude Design 画布打开后要求登录，本轮未能更新 `LocalNodes` / `Dialogs` 画板；前端实际效果见 [验收截图](../research/verification/local-node-yaml-import-20261029/single-node-import.png)。
+- 模板入口与空状态：管理员只显示一个「模板」入口，普通用户不显示独立模板页；各页面的空状态统一白底虚线框。画布仍待同步，要求与参考截图见 [13 · 画布待同步](13-design-canvas-sync.md)。
+- 2026-10-29 地区旗帜：`PipelineForms` 的「添加旗帜」提示已补充流量、到期说明节点不加旗帜。Claude Design 画布仍要求登录，未能同步该画板文案；前端与内核、服务端预览已同步。
 
 ## 下拉组件
 

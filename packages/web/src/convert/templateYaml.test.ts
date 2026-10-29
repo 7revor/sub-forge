@@ -4,8 +4,7 @@ import { parse, stringify } from 'yaml';
 import { newId, templateFormFromYaml, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from './templateYaml';
 
 const ctx: ConvertCtx = {
-  rulesets: [{ id: 'rs_ads', name: '广告规则' }],
-  bundles: [{ id: 'b_media', name: '媒体规则包' }],
+  rulesets: [{ id: 'rs_ads', name: '广告规则' }, { id: 'b_media', name: '媒体规则包' }],
 };
 const direct = { kind: 'builtin', name: 'DIRECT' } as const;
 const proxy = { kind: 'group', groupId: 'g_select' } as const;
@@ -35,7 +34,7 @@ function fixture(): TemplateBody {
       { id: 'r_options', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN' } }, target: direct, options: { noResolve: true, src: true } },
       { id: 'r_process', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'path', mode: 'wildcard', value: '/Applications/*' } }, target: proxy },
       { id: 'r_ruleset', matcher: { kind: 'ruleset', id: 'rs_ads' }, target: { kind: 'builtin', name: 'REJECT' }, enabled: false },
-      { id: 'r_bundle', matcher: { kind: 'bundle', id: 'b_media' }, target: proxy, options: { noResolve: true } },
+      { id: 'r_bundle', matcher: { kind: 'ruleset', id: 'b_media' }, target: proxy, options: { noResolve: true } },
     ],
     final: proxy,
   };
@@ -176,7 +175,7 @@ rules:
     expect(select!.extra).toEqual({ 'custom-field': { keep: true } });
     expect(auto!.members).toEqual([]);
     const report = validateTemplate({ id: 'imported', version: 1, ...result.value }, {
-      rulesets: { rs_ads: { id: 'rs_ads', name: '广告规则', kind: 'local', content: '', format: 'classical' } }, bundles: {},
+      rulesets: { rs_ads: { id: 'rs_ads', name: '广告规则', sources: [] } },
     });
     expect(report.items.filter((item) => item.level === 'error')).toEqual([]);
   });
@@ -185,7 +184,7 @@ rules:
     ['YAML 语法错', 'proxy-groups: [\nrules: []', 'YAML 解析失败'],
     ['未知组类型', 'proxy-groups:\n  - name: 代理\n    type: relay\nrules: []', '类型「relay」不受支持'],
     ['节点出口', 'rules:\n  - DOMAIN,example.com,香港节点', '第 1 条规则「DOMAIN,example.com,香港节点」'],
-    ['不存在的规则集', 'rules:\n  - RULE-SET,不存在,DIRECT', '规则集或规则包「不存在」不存在'],
+    ['不存在的规则集', 'rules:\n  - RULE-SET,不存在,DIRECT', '规则集「不存在」不存在'],
     ['规则解析失败', 'rules:\n  - UNKNOWN,example.com,DIRECT', '第 1 条规则「UNKNOWN,example.com,DIRECT」'],
   ])('%s 返回中文错误和行号', (_name, yaml, error) => {
     const result = templateFromYaml(yaml, empty, ctx);
@@ -204,10 +203,10 @@ rules:
     expect(missing.notes.join()).toContain('沿用');
   });
 
-  it('同名规则集优先于规则包，导出找不到名称时使用 ID', () => {
-    const context: ConvertCtx = { rulesets: [{ id: 'rs', name: '同名' }], bundles: [{ id: 'b', name: '同名' }] };
+  it('按名称导入规则集，导出找不到名称时使用 ID', () => {
+    const context: ConvertCtx = { rulesets: [{ id: 'rs', name: '同名' }] };
     expect(imported('rules: ["RULE-SET,同名,DIRECT"]', empty, context).value.rules[0]!.matcher).toEqual({ kind: 'ruleset', id: 'rs' });
-    expect(templateToYaml({ ...empty, rules: [{ id: 'r', matcher: { kind: 'bundle', id: 'missing' }, target: direct }] }, ctx)).toContain('RULE-SET,missing,DIRECT');
+    expect(templateToYaml({ ...empty, rules: [{ id: 'r', matcher: { kind: 'ruleset', id: 'missing' }, target: direct }] }, ctx)).toContain('RULE-SET,missing,DIRECT');
   });
 
   it('增删 no-resolve/src 选项保持规则 ID，并移除禁用注释后重新启用', () => {

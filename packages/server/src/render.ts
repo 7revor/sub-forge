@@ -4,7 +4,7 @@
 
 import { createHash } from 'node:crypto';
 import {
-  mergeTemplate, Report, renderMihomo, stableHash, stableStringify,
+  mergeTemplate, Report, renderMihomo, sourceKey, sourceLabel, stableHash, stableStringify,
   type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -161,13 +161,15 @@ export class RenderService {
 
     const rules = this.collectRules(profile, template);
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
-      if (rs.kind !== 'remote' || !rs.url || rs.format === 'mrs' || rs.format === 'srs') continue;
-      const r = await this.snapshots.get('ruleset', rs.id, rs.url, { ttlSec: rs.fetch?.ttlSec ?? RULESET_TTL_SEC, ...rs.fetch });
-      if (r.snapshot?.body !== undefined) {
-        rules.snapshots[rs.id] = r.snapshot.body;
-        snapshotHashes.push(`${rs.id}|${rs.url}|${r.snapshot.hash}`);
+      for (const src of rs.sources) {
+        if (src.enabled === false || src.kind !== 'remote' || !src.url || src.format === 'mrs' || src.format === 'srs') continue;
+        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ttlSec: src.fetch?.ttlSec ?? RULESET_TTL_SEC, ...src.fetch, format: src.format });
+        if (r.snapshot?.body !== undefined) {
+          rules.snapshots[sourceKey(rs.id, src.id)] = r.snapshot.body;
+          snapshotHashes.push(`${rs.id}|${src.url}|${r.snapshot.hash}`);
+        }
+        if (r.error) pre.push({ level: r.snapshot ? 'warn' : 'error', code: 'ruleset.fetch-failed', message: `规则集「${rs.name}」的来源「${sourceLabel(src)}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `ruleset:${rs.id}` });
       }
-      if (r.error) pre.push({ level: r.snapshot ? 'warn' : 'error', code: 'ruleset.fetch-failed', message: `规则集「${rs.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `ruleset:${rs.id}` });
     }
 
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
@@ -178,7 +180,7 @@ export class RenderService {
     const key = stableHash(stableStringify({
       profile, template, base, target, snapshotHashes,
       sources: nodeSets.sources, collections: nodeSets.collections, locals: nodeSets.locals,
-      rulesets: rules.rulesets, bundles: rules.bundles,
+      rulesets: rules.rulesets,
     }));
     const hit = opts.dry ? undefined : this.cache.get(key);
     if (hit && !pre.some(i => i.level === 'error')) {
@@ -216,7 +218,7 @@ export class RenderService {
     const generation = createHash('sha256').update(stableStringify({
       profile, template, base, target, contract,
       sources: nodeSets.sources, collections: nodeSets.collections, locals: nodeSets.locals,
-      rulesets: rules.rulesets, bundles: rules.bundles,
+      rulesets: rules.rulesets,
     })).digest('hex').slice(0, 32);
     result.yaml = result.yaml.replaceAll(GENERATION_PLACEHOLDER, generation);
 
@@ -292,18 +294,13 @@ export class RenderService {
     return { inputs, sources: Object.values(inputs.sources) as SourceDoc[] };
   }
 
-  /** 模板规则与 Profile 私有规则引用到的规则集 / 规则包 */
+  /** 模板规则与 Profile 私有规则引用到的规则集 */
   private collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RuleSetInputs {
-    const out: RuleSetInputs = { rulesets: {}, bundles: {}, snapshots: {} };
-    const addRuleset = (id: string) => { const d = this.store.get('ruleset', id); if (d) out.rulesets[id] = d; };
+    const out: RuleSetInputs = { rulesets: {}, snapshots: {} };
     const visit = (m: Matcher) => {
-      if (m.kind === 'ruleset') addRuleset(m.id);
-      else if (m.kind === 'bundle') {
-        const b = this.store.get('bundle', m.id);
-        if (!b) return;
-        out.bundles[b.id] = b;
-        for (const i of b.items) if (i.kind === 'ruleset' && i.enabled !== false) addRuleset(i.id);
-      }
+      if (m.kind !== 'ruleset') return;
+      const d = this.store.get('ruleset', m.id);
+      if (d) out.rulesets[m.id] = d;
     };
     // 与内核渲染使用同一份有效规则：覆盖层可禁用或重新启用模板规则，孤儿锚点也不再参与拉取。
     // 合并报告由 renderMihomo 统一返回，避免重复记录。

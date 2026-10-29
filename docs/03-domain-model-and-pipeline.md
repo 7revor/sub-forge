@@ -83,24 +83,28 @@ type ClientOverride = {
   action: { replace: RuleIR[] } | { drop: true };
 };
 
-type RuleSet = {
-  id: ID; name: string;
+// 规则集由多个来源合并（2026-10-29 起；原 RuleBundle 并入规则集，旧数据迁移为同 id 的规则集）
+type RuleSetSource = {
+  id: ID;                        // 规则集内唯一；远程快照按 (规则集 id, URL) 定位
   kind: 'remote' | 'local';
+  name?: string;                 // 缺省显示 URL 或「本地规则」
   url?: string; content?: string; format: 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
-  overrides?: { line?: number; match?: string; override: ClientOverride }[];
-  script?: string;               // (rule, ctx) => rule | rule[] | null
+  behavior?: 'domain' | 'ipcidr' | 'classical';   // mrs 透传必须声明
+  overrides?: { line?: number; match?: string; override: ClientOverride }[];  // 行号按该来源解析后的行
+  enabled?: boolean;
+  fetch?: FetchOptions;          // 服务层：远程来源的拉取参数
 };
 
-type RuleBundle = {              // 最多两层：items 内不得出现 bundle
+type RuleSet = {
   id: ID; name: string;
-  items: ({ kind: 'ruleset'; id: ID } | { kind: 'rule'; rule: RuleIR })[];
-  noResolve?: boolean;
+  sources: RuleSetSource[];      // 按序合并、去重
+  noResolve?: boolean;           // IP 类规则统一加 no-resolve
+  script?: string;               // (rule, ctx) => rule | rule[] | null（P1）
 };
 
 type Matcher =
   | { kind: 'rule'; rule: RuleIR; overrides?: ClientOverride[] }
-  | { kind: 'ruleset'; id: ID }
-  | { kind: 'bundle'; id: ID };
+  | { kind: 'ruleset'; id: ID };
 
 // ---------- 分流 ----------
 type GroupMember =
@@ -160,6 +164,8 @@ type ChainRule = {
 };
 ```
 
+`{ op: 'flag', mode: 'add' }` 根据节点名称中的地区名或代码添加旗帜；已带旗帜的名称保持不变。以 Traffic、Expire、Remaining 等或流量、到期等开头的说明节点跳过识别，避免把流量单位 GB 当作英国代码。需要移除这类伪节点时，另用 `filter.useless`。
+
 ## 3. 渲染流水线
 
 ```
@@ -169,7 +175,7 @@ type ChainRule = {
  ① Resolve NodeSets     各 NodeSet：解析快照 → ProxyIR[] → 跑处理链（含 Collection 递归）
  ② Merge Template       Template@v ⊕ Overlay → 有效 groups / rules / final（见 §5）
  ③ Resolve Refs         收集所有 NodeRef / ChainRule / 上游自带 dialer → 依赖解析（见 §4）
- ④ Expand Rules         RuleSet/Bundle → RuleIR[]（读取规则快照，应用 overrides/script）
+ ④ Expand Rules         RuleSet（逐个来源）→ RuleIR[]（读取规则快照，应用各来源的 overrides/script）
  ⑤ Validate (IR)        环检测、悬挂引用、名称唯一、空组
  ⑥ Lower(client, plat)  IR → mihomo YAML / Surge INI（见 04）
  ⑦ Verify               mihomo -t（可选）/ 静态校验
@@ -178,6 +184,7 @@ type ChainRule = {
 
 - ①④ 的结果按 `(nodeSet, pipelineHash, snapshotHash)` 缓存；②③⑥ 很便宜，每次请求重算即可。
 - `report` 记录：降级项、丢弃项、解析失败节点、孤儿覆盖项、引用兜底触发、校验结果。UI 预览与订阅访问日志共用。
+- 节点 YAML 入口统一接受单节点映射、裸节点列表及带 `proxies` 的配置，转换为相同的 `ProxyIR[]`，不改变节点存储模型。语法损坏继续使订阅解析失败；本地粘贴入口捕获并显示诊断，避免中断页面。
 
 ### 3.1 服务端对外地址
 
@@ -185,7 +192,7 @@ type ChainRule = {
 | --- | --- |
 | `GET /sub/:token` | Profile 主配置（UA 识别客户端） |
 | `GET /p/:token/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge 的 `policy-path` 也指向此地址，内容不注入前置 |
-| `GET /r/:token/:rulesetKey?behavior=domain\|ipcidr\|classical&format=yaml\|text` | 转换后的规则集 / 规则包拆分结果 |
+| `GET /r/:token/:rulesetKey?behavior=domain\|ipcidr\|classical&format=yaml\|text` | 转换后的规则集拆分结果（合并全部启用来源后按 behavior 拆分） |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
 
@@ -266,6 +273,8 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 
 ## 5. 模板 ⊕ 覆盖层 合并
 
+2026-10-29 界面调整只合并管理员的模板入口并统一空状态样式，不改变 `Template`、`Profile` 的字段或本节合并规则。普通用户仍在新建配置订阅时读取已发布模板。
+
 ```
 effective.groups = template.groups 按序
   对每个组 g：
@@ -286,11 +295,12 @@ effective.final = overlay.final ?? template.final
 - 模板组不能在 Profile 中删除、改名或隐藏（Q6）；`groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。Profile 私有组（`extraGroups`）不受此限制。
 - 空组处理（TPL-10）：模板组在 Profile 中未被填充任何成员时照常输出为空组，`report.warn`。按 `whenEmpty` 输出：`reject`（默认）→ mihomo `proxies: [REJECT]`、Surge `select, REJECT`；`direct` → mihomo `proxies: [COMPATIBLE]`、Surge `select, DIRECT`。mihomo 的 `proxies` 与 `use` 都为空时直接报错，Surge 不接受无成员无参数的组，所以必须写一个内置成员；`COMPATIBLE` 实测等效直连（07 M7）。
 
-## 6. 规则展开与规则包拆分
+## 6. 规则集展开与拆分
 
 ```
-expand(bundle):
-  rules = concat(items.map(i => i.kind == 'ruleset' ? load(i.id).rules : [i.rule]))
+expand(ruleset):
+  rules = concat(sources.filter(enabled).map(s => applyOverrides(parse(s.kind == 'local' ? s.content : snapshot(ruleset.id, s.url)), s.overrides)))
+  mrs / srs 来源不解析，单独透传为一个 rule-provider（mihomo 需要 URL 与 domain/ipcidr behavior）
   去重（按 type+value）
   按 behavior 分桶：
     domain   : DOMAIN / DOMAIN-SUFFIX（可转为 mihomo domain behavior: +.suffix）
@@ -299,7 +309,7 @@ expand(bundle):
   输出顺序：domain → classical(非 IP 类) → ipcidr（IP 类统一 no-resolve 可选）
 ```
 
-同一出口的规则在包内部的相对顺序不影响命中结果，唯一需要关心的是 IP 类规则会触发 DNS 解析，因此放在最后。
+同一出口的规则在规则集内部的相对顺序不影响命中结果，唯一需要关心的是 IP 类规则会触发 DNS 解析，因此放在最后。
 
 ## 7. 缓存与刷新
 
@@ -307,7 +317,7 @@ expand(bundle):
 | --- | --- | --- |
 | 原始快照 | sourceId + url | TTL 到期 / 手动刷新；拉取失败保留旧快照，失败后退避（见下） |
 | NodeSet 结果 | nodeSetId + pipelineHash + 成员快照哈希 | 任一变化 |
-| 规则集展开 | rulesetId + snapshotHash + overridesHash + client/platform | 任一变化 |
+| 规则集展开 | rulesetId + 各远程来源的 snapshotHash + 来源定义（含 overrides）+ client/platform | 任一变化 |
 | 渲染结果 | profileId + templateVersion + presetVersion + 上述哈希 + client/platform | 任一变化 |
 
 客户端每次拉取订阅时：快照未过期则直接用缓存渲染；过期则后台刷新、本次先返回旧结果（stale-while-revalidate），避免订阅请求超时。

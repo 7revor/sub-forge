@@ -7,7 +7,7 @@
       "fetch": { "ua": "clash.meta", "ttlSec": 3600 },
       "pipeline": [
         { "op": "filter.useless" },
-        { "op": "rename.regex", "rules": [{ "pattern": "^香港\\s*(\\d+).*$", "replace": "HK-$1" }, { "pattern": "^日本\\s*(\\d+).*$", "replace": "JP-$1" }] },
+        { "op": "rename.regex", "rules": [{ "pattern": "^香港\\s*(\\d+).*$", "replace": "HK-$1" }, { "pattern": "^日本\\s*(\\d+).*$", "replace": "JP-$1" }, { "pattern": "^摩尔多瓦\\s*(\\d+).*$", "replace": "MD-$1" }] },
         { "op": "flag", "mode": "add" }
       ]
     }
@@ -23,7 +23,10 @@
     }
   ],
   "rulesets": [
-    { "id": "ai", "name": "AI 服务", "kind": "local", "format": "auto", "content": ".openai.com\n.anthropic.com\n.claude.ai\n" }
+    { "id": "ai", "name": "AI 服务", "sources": [
+      { "id": "main", "name": "常用 AI", "kind": "local", "format": "auto", "content": ".openai.com\n.anthropic.com\n.claude.ai\n" },
+      { "id": "extra", "name": "补充", "kind": "local", "format": "classical", "content": "DOMAIN-SUFFIX,perplexity.ai\nDOMAIN-SUFFIX,claude.ai\n" }
+    ] }
   ],
   "presets": [
     {

@@ -1,0 +1,23 @@
+Browser tab: 2, Title: "Sub Forge", URL: "http://127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/0".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 38-144
+~				36 checkbox 表单, Value: 0
+~				37 checkbox 原始配置, Value: 1
++			151 text 节点 YAML
++			152 button 复制
++			153 text entry area (settable) Description: 节点 YAML, Value: name: 🇺🇸 Reality 测试
+server: us.example.com
+port: 443
+type: vless
+uuid: 00000000-0000-4000-8000-000000000001
+tls: true
+flow: xtls-rprx-vision
+reality-opts:
+  public-key: test-public-key
+  short-id: "01234567"
+servername: www.example.com
+client-fingerprint: chrome
+network: tcp
+udp: true
+
+The focused UI element is 37 checkbox 原始配置, Value: 1

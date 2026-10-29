@@ -146,7 +146,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
         collections: {}, locals: {},
         snapshots: { T: [`proxies:\n  ${socks(opts.entryName, ports.entry)}\n`], L: [`proxies:\n  ${socks('落地', ports.exit)}\n`] },
       },
-      rules: { rulesets: {}, bundles: {}, snapshots: {} },
+      rules: { rulesets: {}, snapshots: {} },
       urls: {
         provider: (key, v) => `http://127.0.0.1:${ports.files}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
         ruleset: (key) => `http://127.0.0.1:${ports.files}/r/TOKEN/${key}`,

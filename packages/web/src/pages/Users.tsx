@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
-import { Badge, Button, Card, ErrorBox, Field, Input, Modal, PageHeader, PendingNotice, Select, Switch, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PendingNotice, Select, Switch, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
 
 function ago(ms: number): string {
@@ -95,7 +95,7 @@ export function Users() {
               <span className="text-[12.5px] text-muted">共享给：{x.to.map(nameOf).join('、') || '—'}</span>
             </div>
           ))}
-          {!shares.data?.items.length && <span className="text-[13px] text-muted">还没有共享。</span>}
+          {!shares.data?.items.length && <Empty title="还没有共享" />}
         </div>
       </Card>
 

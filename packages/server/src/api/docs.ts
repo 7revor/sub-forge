@@ -1,4 +1,4 @@
-// 文档增删改查：订阅源、组合、本地节点组、规则集、规则包、配置订阅（按用户隔离），基础设置预设（管理员维护，所有人可读）。
+// 文档增删改查：订阅源、组合、本地节点组、规则集、配置订阅（按用户隔离），基础设置预设（管理员维护，所有人可读）。
 
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
@@ -12,12 +12,11 @@ const SEGMENTS: Record<string, DocKind> = {
   collections: 'collection',
   locals: 'local',
   rulesets: 'ruleset',
-  bundles: 'bundle',
   profiles: 'profile',
   presets: 'preset',
 };
 
-const LABEL: Record<DocKind, string> = { source: '订阅源', collection: '组合', local: '本地节点组', ruleset: '规则集', bundle: '规则包', profile: '配置订阅', preset: '基础设置预设' };
+const LABEL: Record<DocKind, string> = { source: '订阅源', collection: '组合', local: '本地节点组', ruleset: '规则集', profile: '配置订阅', preset: '基础设置预设' };
 
 export function docRoutes(store: Store) {
   const app = new Hono<ApiEnv>();

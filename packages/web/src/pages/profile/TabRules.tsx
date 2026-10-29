@@ -23,25 +23,22 @@ export function ruleText(r: RuleIR): string {
 
 function useMatcherLabel() {
   const rulesets = useList('rulesets').data ?? [];
-  const bundles = useList('bundles').data ?? [];
   return (m: Matcher): { kind: string; text: string } => {
     if (m.kind === 'rule') return { kind: '单条规则', text: ruleText(m.rule) };
-    if (m.kind === 'ruleset') return { kind: '规则集', text: rulesets.find((r) => r.id === m.id)?.name ?? m.id };
-    return { kind: '规则包', text: bundles.find((b) => b.id === m.id)?.name ?? m.id };
+    return { kind: '规则集', text: rulesets.find((r) => r.id === m.id)?.name ?? m.id };
   };
 }
 
 function privateRuleError(rule: RuleEntry): string | undefined {
   const matcher = rule.matcher;
-  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : '请选择规则集或规则包。';
+  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : '请选择规则集。';
 }
 
 function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (value: RuleEntry) => void }) {
   const { groupOptions, profileNodeSets } = useProfile();
   const rulesets = useList('rulesets').data ?? [];
-  const bundles = useList('bundles').data ?? [];
   const matcher = value.matcher;
-  const options = matcher.kind === 'ruleset' ? rulesets : bundles;
+  const options = rulesets;
   const changeRule = (rule: RuleIR) => {
     if (matcher.kind === 'rule') onChange({ ...value, matcher: { ...matcher, rule } });
   };
@@ -50,9 +47,9 @@ function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (v
       const kind = e.target.value as Matcher['kind'];
       const { rule: _, id: __, overrides: ___, ...rest } = matcher as { rule?: RuleIR; id?: string; overrides?: unknown };
       onChange({ ...value, matcher: kind === 'rule' ? { ...rest, kind, rule: { type: 'DOMAIN', value: '' } } : { ...rest, kind, id: '' } });
-    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option><option value="bundle">规则包</option></Select>}</Field>
+    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option></Select>}</Field>
     {matcher.kind === 'rule' ? <RuleEditor value={matcher.rule} onChange={changeRule} onIncomplete={changeRule} /> :
-      <Field label={matcher.kind === 'ruleset' ? '规则集' : '规则包'}>{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...value, matcher: { ...matcher, id: e.target.value } })}>
+      <Field label="规则集">{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...value, matcher: { ...matcher, id: e.target.value } })}>
         <option value="">请选择</option>
         {matcher.id && !options.some((item) => item.id === matcher.id) && <option value={matcher.id}>{matcher.id}（当前不可用）</option>}
         {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -124,7 +121,7 @@ export function TabRules() {
     </div>}
     <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（自上而下匹配）</h2><span className="text-[12.5px] text-muted">继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则；点击行展开编辑。</span></div>}
       actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>}>
-      {!rows.length ? <Empty>没有规则，所有流量走 MATCH。</Empty> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
+      {!rows.length ? <Empty title="没有规则" description="所有流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
         onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}
         renderItem={(r, i, handle) => {
           const l = label(r.matcher);

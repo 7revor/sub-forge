@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router';
+import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from 'react-router';
 import { ApiError } from './api.ts';
 import './index.css';
 import { AppLayout, RequireAdmin } from './layout.tsx';
@@ -13,9 +13,9 @@ import { Overview } from './pages/Overview.tsx';
 import { PresetEdit, PresetList } from './pages/Presets.tsx';
 import { ProfileDetail } from './pages/profile/ProfileDetail.tsx';
 import { ProfileList, ProfileNew } from './pages/profile/ProfileList.tsx';
-import { BundleEdit, BundleList, RulesetEdit, RulesetList } from './pages/Rulesets.tsx';
+import { RulesetEdit, RulesetList } from './pages/Rulesets.tsx';
 import { SourceEdit, SourceList } from './pages/Sources.tsx';
-import { TemplateEdit, TemplateList, TemplateManage } from './pages/Templates.tsx';
+import { TemplateEdit, TemplateList } from './pages/Templates.tsx';
 import { RuleRepoPage } from './pages/RuleRepo.tsx';
 import { System } from './pages/System.tsx';
 import { Users } from './pages/Users.tsx';
@@ -47,11 +47,9 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="locals/:id/nodes/:index" element={<LocalNodeEdit />} />
       <Route path="rulesets" element={<RulesetList />} />
       <Route path="rulesets/:id" element={<RulesetEdit />} />
-      <Route path="bundles" element={<BundleList />} />
-      <Route path="bundles/:id" element={<BundleEdit />} />
-      <Route path="templates" element={<TemplateList />} />
-      <Route path="templates/manage" element={<RequireAdmin><TemplateManage /></RequireAdmin>} />
-      <Route path="templates/:id/:tab?" element={<TemplateEdit />} />
+      <Route path="templates" element={<RequireAdmin><TemplateList /></RequireAdmin>} />
+      <Route path="templates/manage" element={<RequireAdmin><Navigate to="/templates" replace /></RequireAdmin>} />
+      <Route path="templates/:id/:tab?" element={<RequireAdmin><TemplateEdit /></RequireAdmin>} />
       <Route path="rule-repo" element={<RuleRepoPage />} />
       <Route path="system" element={<RequireAdmin><System /></RequireAdmin>} />
       <Route path="presets" element={<RequireAdmin><PresetList /></RequireAdmin>} />

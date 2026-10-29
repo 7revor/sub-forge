@@ -1,7 +1,7 @@
 // 订阅内容解析入口：自动识别 Clash YAML / Surge [Proxy] / Base64 / URI 列表（SRC-01、SRC-04）。
 // 单个节点解析失败只记入 failures，不中断整体。
 
-import { parse as parseYaml } from 'yaml';
+import { isMap, isSeq, parseDocument } from 'yaml';
 import type { NodeSetID, ProxyIR } from '../types.ts';
 import { tryDecodeBase64 } from '../util/base64.ts';
 import { proxyKey } from './key.ts';
@@ -14,12 +14,23 @@ export type ContentFormat = 'clash' | 'surge' | 'uri' | 'base64' | 'empty';
 export type ParseResult = { format: ContentFormat; proxies: ProxyIR[]; failures: ParseFailure[] };
 
 function tryClashYaml(text: string): unknown[] | undefined {
-  if (!/^\s*proxies\s*:/m.test(text)) return undefined;
-  const doc = parseYaml(text) as unknown;
-  if (doc && typeof doc === 'object' && Array.isArray((doc as { proxies?: unknown }).proxies)) {
-    return (doc as { proxies: unknown[] }).proxies;
+  const doc = parseDocument(text);
+  const root = doc.contents;
+  const isProxyMap = (node: unknown) => isMap(node) && ['name', 'type', 'server', 'port'].some((key) => node.has(key));
+  // 先检查结构，避免把 URI 标量或 Surge 的 [Proxy] 段误认为 YAML 节点。
+  const wrapped = isMap(root) && root.has('proxies');
+  const list = isSeq(root) && (root.items.length === 0 || root.items.some(isProxyMap));
+  if (!wrapped && !list && !isProxyMap(root)) return undefined;
+  if (doc.errors.length) throw doc.errors[0];
+
+  const value: unknown = doc.toJS({ maxAliasCount: 100 });
+  if (Array.isArray(value)) return value;
+  if (wrapped) {
+    const proxies = (value as { proxies: unknown }).proxies;
+    if (!Array.isArray(proxies)) throw new Error('proxies 必须是节点列表');
+    return proxies;
   }
-  return undefined;
+  return [value];
 }
 
 function looksLikeSurge(text: string): boolean {
@@ -79,7 +90,8 @@ export function parseContent(text: string, nodeSet: NodeSetID): ParseResult {
     }
   };
 
-  const clash = tryClashYaml(trimmed);
+  // 保留首行缩进，否则从配置中复制的整体缩进片段会被 trim 破坏层级。
+  const clash = tryClashYaml(text);
   if (clash) {
     collect(clash, fromClashObject, (x) => JSON.stringify(x));
     return { format: 'clash', proxies, failures };

@@ -140,7 +140,7 @@ export function TabGroups() {
                 </div>
               );
             }} /></div>
-          {!groups.length && <Empty>没有组。选择模板或新增私有组。</Empty>}
+          {!groups.length && <Empty title="没有组" description="选择模板或新增私有组。" />}
           <div className="-mx-4 border-t border-line-2 px-4 pt-2.5"><Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button></div>
         </Card>
 
@@ -182,7 +182,7 @@ export function TabGroups() {
                     </div>;
                   }} />
                   {patch.memberOrder === 'prepend' && templateMembers}
-                  {!allMembers.length && <p className="m-0 px-3.5 py-3 text-[13px] text-muted">没有成员，按“为空时”的设定输出。</p>}
+                  {!allMembers.length && <div className="p-3.5"><Empty title="没有成员" description="按“为空时”的设定输出。" /></div>}
                 </div>
                 <MemberAdder key={g.id} excludeGroupId={g.id} onAdd={(m) => setMembers([...added, m])} />
               </div>
