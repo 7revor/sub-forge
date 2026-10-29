@@ -37,7 +37,7 @@ export function System() {
       <PageScroll>
         <div className="flex flex-wrap items-start gap-5">
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
-            <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">远程拉取 · SSRF 防护</h2><span className="text-[12.5px] text-muted">默认禁止拉取内网与保留地址。以下地址例外放行。</span></div>}>
+            <Card title={`远程拉取 · SSRF 防护`} subtitle={`默认禁止拉取内网与保留地址。以下地址例外放行。`}>
               <div className="flex flex-col">
                 {draft.ssrfAllow.map((a, i) => (
                   <div key={a.value} className="flex items-center gap-3 border-t border-line-2 py-2.5 first:border-0">

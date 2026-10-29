@@ -18,6 +18,42 @@ async function twoUsers() {
 }
 
 describe('文档增删改查', () => {
+  it.each([
+    ['sources', remoteSource()],
+    ['locals', { name: '本地分组', proxies: [] }],
+    ['collections', { name: '组合', members: [], pipeline: [] }],
+    ['rulesets', { name: '规则集', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,example.test' }] }],
+  ])('%s 的备注支持旧数据、新建、更新、清空与列表读取，并拒绝非法类型', async (segment, body) => {
+    const { alice, store } = await twoUsers();
+    try {
+      const path = `/api/${segment}`;
+      const old = await alice.post(path, body);
+      expect(old.status).toBe(201);
+      expect(old.json.item).not.toHaveProperty('note');
+      const note = '用途说明\n第二行：中文与 emoji 🌏';
+      const created = await alice.post(path, { ...body, note });
+      expect(created.status).toBe(201);
+      const itemPath = `${path}/${created.json.item.id}`;
+      expect((await alice.get(itemPath)).json.item.note).toBe(note);
+      expect((await alice.get(path)).json.items.find((d: { id: string }) => d.id === created.json.item.id).note).toBe(note);
+      const updated = await alice.put(itemPath, { ...created.json.item, note: '修改后的备注' });
+      expect(updated.status).toBe(200);
+      expect((await alice.get(itemPath)).json.item.note).toBe('修改后的备注');
+      for (const invalid of [null, 42, {}, []]) {
+        const response = await alice.put(itemPath, { ...created.json.item, note: invalid });
+        expect(response.status).toBe(400);
+        expect(response.json.error).toBe('备注必须是字符串');
+      }
+      expect((await alice.get(itemPath)).json.item.note).toBe('修改后的备注');
+      expect((await alice.put(itemPath, { ...created.json.item, note: '' })).status).toBe(200);
+      expect((await alice.get(path)).json.items.find((d: { id: string }) => d.id === created.json.item.id).note).toBe('');
+      // 没有备注的旧记录也可以补填。
+      expect((await alice.put(`${path}/${old.json.item.id}`, { ...old.json.item, note })).json.item.note).toBe(note);
+    } finally {
+      store.close();
+    }
+  });
+
   it('旧模板版本依赖的规则不可删除，锁定旧版本的 Profile 继续可渲染', async () => {
     const { store, renderer, admin, alice } = await twoUsers();
     const rs = (await admin.post('/api/rulesets', { name: '旧规则', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' })).json.item.id;

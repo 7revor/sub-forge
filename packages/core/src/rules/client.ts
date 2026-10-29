@@ -22,11 +22,11 @@ export function withIpOptions(rule: RuleIR, options: { noResolve?: boolean; src?
   return { ...rule, ...(options.noResolve ? { noResolve: true } : {}), ...(options.src ? { src: true } : {}) };
 }
 
-/** 声明式客户端覆盖：命中第一条匹配的覆盖，返回替换结果（drop 返回空数组） */
+/** 声明式客户端覆盖：命中第一条匹配的覆盖，返回替换结果、保留原规则并追加，或丢弃（空数组） */
 export function applyOverrides(rule: RuleIR, overrides: ClientOverride[] | undefined, ctx: ClientCtx): RuleIR[] {
   const hit = overrides?.find((o) => o.when.client === ctx.client && (o.when.platform === undefined || o.when.platform === ctx.platform));
   if (!hit) return [rule];
-  return 'drop' in hit.action ? [] : hit.action.replace;
+  return 'drop' in hit.action ? [] : 'append' in hit.action ? [rule, ...hit.action.append] : hit.action.replace;
 }
 
 /**

@@ -1,3 +1,5 @@
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
+import { CodePreview } from '../components/CodePreview.tsx';
 // 规则仓库（设计稿「规则仓库」）：搜索内置 GitHub 规则仓库、查看按客户端挑选的变体与内容预览，引用为规则集或作为远程来源加入已有规则集。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,13 +17,12 @@ export function RuleRepoPage() {
   const [params] = useSearchParams();
   const ruleset = params.get('ruleset');
   const [q, setQ] = useState(params.get('q') ?? '');
-  const [debounced, setDebounced] = useState(q);
+  const debounced = useDebouncedValue(q.trim(), 300);
   const [repo, setRepo] = useState<string>();
   const [client, setClient] = useState('');
   const [offset, setOffset] = useState(0);
   const [variant, setVariant] = useState('');
   const [sel, setSel] = useState<RepoEntry>();
-  useEffect(() => { const t = setTimeout(() => setDebounced(q.trim()), 300); return () => clearTimeout(t); }, [q]);
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
   const refresh = useMutation({ mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
   useEffect(() => { setOffset(0); setSel(undefined); setVariant(''); }, [debounced, repo, client]);
@@ -116,7 +117,7 @@ export function RuleRepoPage() {
                 <span className="text-[12px] text-muted">预览为推荐文本变体。导入后保存为远程来源，可在规则集内合并、改写并托管输出。</span>
                 {d.previewError && <div className="text-[13px] text-err">{d.previewError}<Button size="sm" onClick={() => void detail.refetch()}>重试预览</Button></div>}
                 <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">内容预览</span>
-                  <pre className="m-0 max-h-64 overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7]">{d.preview.join('\n')}</pre></div>
+                  <CodePreview text={d.preview.join('\n')} bodyClassName="max-h-64" /></div>
               </>}
               <ErrorBox error={use.error} />
               <div className="flex flex-wrap gap-2">

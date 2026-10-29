@@ -28,10 +28,10 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 | `/collections`、`/collections/:id` | 组合：成员表（类型、节点数、前后缀、拉取失败时），下方当页展开处理链编辑器与逐步预览（预览跟随成员草稿），头部显示引用方；旧地址 `/collections/:id/pipeline` 跳回详情页 |
 | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 本地节点：分组列表（与订阅源一致：搜索、节点数、协议，新建分组为对话框）；分组详情为节点表，分组 YAML、重命名为对话框；「编辑」「新增节点」进入节点子页（`index` 为 `new` 时新增），表单 / YAML 编辑（不设置前置，代理链在配置订阅中设置），保存即写回分组，删除节点使用独立按钮。有未保存修改时离开前确认 |
 | `/profiles`、`/profiles/new`、`/profiles/:id/:tab` | 配置订阅：七步向导；详情头部显示模板（点开可更换 / 锁定版本）、预设与最近告警。概览（订阅链接与最近访问、输出设置、访问日志）、基础设置（来源条、进程规则提醒、按分区覆盖 / 来自预设、原样片段）、节点集（添加对话框、输出方式与下发地址）、策略组、规则（客户端输出列）、代理链（唯一的代理链入口：只读卡片 + 编辑对话框、依赖节点）、预览（打开即渲染、导出文件） |
-| `/rulesets`、`/rulesets/:id` | 规则集：列表（来源概况、no-resolve）；新建（`/rulesets/new`）与编辑共用同一页面。自上而下为来源（多个远程地址 / 本地规则，拖拽排序、启停，点选展开地址、格式、缓存等字段）、独立的客户端改写区块（作用于整个规则集，只按规则内容精确匹配）、输出预览（选中来源时为该来源，本地规则在预览里实时编辑；不选时为合并结果），每块独占一行；预览跟随未保存的草稿。原规则包页面 `/bundles` 已并入规则集（2026-10-29） |
+| `/rulesets`、`/rulesets/:id` | 规则集：列表（来源概况、no-resolve）；新建（`/rulesets/new`）与编辑共用同一页面。自上而下为来源（多个远程地址 / 本地规则，拖拽排序、启停，点选展开地址、格式、缓存等字段，本地规则输入框紧跟对应配置）、独立的客户端改写区块（先选替换、丢弃或追加；替换和丢弃再填写规则内容精确匹配；追加按客户端与平台条件直接加入规则，无需匹配）、最终结果（只读展示整组合并输出，不随选中来源切换），每块独占一行；预览跟随未保存的草稿。原规则包页面 `/bundles` 已并入规则集（2026-10-29） |
 | `/rule-repo` | 规则仓库：搜索、仓库筛选、按客户端的变体与内容预览、引用为规则集或作为远程来源加入已有规则集（`?ruleset=` 进入，内置仓库已接通） |
 | `/templates`、`/templates/:id`、`/templates/:id/publish` | 仅管理员显示唯一「模板」入口，可新建、编辑与发布（骨架表格、规则、版本、自检、从 YAML 导入）；旧 `/templates/manage` 跳转到 `/templates`。普通用户在配置订阅向导中选择已发布模板 |
-| `/presets/:id` | 基础设置预设（单页）：预设列表、分区跳转编辑、引用方 |
+| `/presets`、`/presets/:id` | 基础设置预设：列表支持搜索、新建、删除和编辑；独立详情页按通用、外部控制、DNS、嗅探、TUN、GEO 数据折叠分组（默认收起，可独立展开），支持表单 / YAML 编辑、发布与引用方，未发布修改离开前确认 |
 | `/users`、`/system` | 管理员：用户（统计列、脚本权限、共享的订阅源与组合）；系统（SSRF 白名单、mihomo 校验、内置规则仓库已接通，其余系统设置、备份恢复仍待实现） |
 | `/login`、`/account` | 登录、账户（修改密码） |
 
@@ -54,6 +54,17 @@ Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步
 全局 blank 使用 `Empty.tsx` 的公共 `Empty`（由 `ui.tsx` 导出），包括列表、详情、预览、功能占位和下拉无结果。说明与空框间距由 `Card description` 或 `gap-4` 保证 16 px，不依赖默认段落 margin。尺寸、适用范围与设计稿待同步项见 [空状态规范](../../docs/14-empty-state-guidelines.md)。
 
 公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` 与删除确认 `DeleteDialog`）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
+
+公共展示与业务表单的复用边界：
+
+- `CopyButton` / `useClipboard`：等待剪贴板写入成功再反馈，失败显示原因；文本变化与卸载使旧反馈失效。
+- `CodePreview`、`Notice`、`NodeSetCount`、`SourceFetchStatus`、`Card subtitle`：统一预览、提示、节点计数、拉取状态与卡片标题说明。`ReportList` 可由调用方提供定位操作；模板版本列表复用 `template/VersionHistory`。
+- `GroupSettingsFields`、`MatcherEditor`、`OptionalBoolean`：模板与配置订阅共用字段；权限、继承和覆盖写入仍由页面负责。布尔值区分未设置、开启和关闭，数值 `0` 保留。规则匹配类型切换清理旧类型专属字段。
+- `NamedCreateDialog`：本地分组与预设共用名称校验、回车提交、重复提交保护和错误展示。`ExtraFields.validateName` 同时用于新增和重命名，调用方通过业务校验函数限制字段，不依赖 DOM 事件捕获。
+- `useLeaveGuard` / `LeaveDialog`：本地节点及预设有未保存修改或无效 YAML 时保护路由跳转与刷新；合法内容可以保存后离开，无效内容需继续编辑或明确放弃。Profile 保持仅无效 YAML 阻断的原策略。
+- `hooks/documentQueries` 集中定义 token、访问日志和快照查询；`usePipelinePreview` 供订阅源与组合使用；`useDebouncedValue` 复用普通值防抖。节点集标识、匹配项切换、拉取状态及删除错误归入 `domain/`，时间与流量格式化归入 `utils/format.ts`。
+
+本次抽取的验收范围与截图见 [公共组件验收记录](../../research/verification/shared-components-20261029/README.md)。
 
 ## 已知简化
 

@@ -42,6 +42,8 @@ export type OperatorStep = Operator & { enabled?: boolean };
 export type Source = {
   id: ID;
   name: string;
+  /** 管理备注，仅用于界面展示 */
+  note?: string;
   url: string;
   pipeline: OperatorStep[];
 };
@@ -49,6 +51,8 @@ export type Source = {
 export type Collection = {
   id: ID;
   name: string;
+  /** 管理备注，仅用于界面展示 */
+  note?: string;
   /** onFail：成员拉取失败时的处理（使用快照 / 跳过该成员 / 整体失败）；界面已提供，渲染尚未读取，见 docs/11 */
   members: { ref: NodeSetID; prefix?: string; suffix?: string; onFail?: 'snapshot' | 'skip' | 'fail' }[];
   pipeline: OperatorStep[];
@@ -57,6 +61,8 @@ export type Collection = {
 export type LocalProxyGroup = {
   id: ID;
   name: string;
+  /** 管理备注，仅用于界面展示 */
+  note?: string;
   /** 用户手写的节点（不含隐式字段，解析时补上） */
   proxies: LocalProxy[];
 };
@@ -107,7 +113,7 @@ export type RuleIR =
 
 export type ClientOverride = {
   when: { client: Client; platform?: Platform };
-  action: { replace: RuleIR[] } | { drop: true };
+  action: { replace: RuleIR[] } | { drop: true } | { append: RuleIR[] };
 };
 
 export type RuleSetFormat = 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
@@ -136,9 +142,11 @@ export type RuleSetSource = {
 export type RuleSet = {
   id: ID;
   name: string;
+  /** 管理备注，仅用于界面展示 */
+  note?: string;
   sources: RuleSetSource[];
-  /** 按所有来源的规则原文精确匹配；同一规则命中第一条客户端与平台匹配的改写 */
-  overrides?: { match: string; override: ClientOverride }[];
+  /** 替换、丢弃按原文匹配且首条命中生效；追加无需 match，按条件向整组加入规则 */
+  overrides?: { match?: string; override: ClientOverride }[];
   /** IP 类规则统一加 no-resolve */
   noResolve?: boolean;
 };

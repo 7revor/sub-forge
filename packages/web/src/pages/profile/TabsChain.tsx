@@ -1,3 +1,4 @@
+import { CodePreview } from '../../components/CodePreview.tsx';
 // 代理链（链规则 + 依赖节点面板，REF-03 / REF-07）与预览（按平台查看最终配置与渲染报告）。
 
 import { useMutation } from '@tanstack/react-query';
@@ -48,7 +49,7 @@ export function TabChains() {
 
   return (
     <>
-      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">链规则</h2><span className="text-[12.5px] text-muted">代理链只在这里设置：落地 = 已加入节点集中命中筛选的节点 → 前置 = 策略组或单个节点。本地节点只保存节点信息，订阅源自带的前置会自动识别。</span></div>}
+      <Card title={`链规则`} subtitle={`代理链只在这里设置：落地 = 已加入节点集中命中筛选的节点 → 前置 = 策略组或单个节点。本地节点只保存节点信息，订阅源自带的前置会自动识别。`}
         actions={<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加链规则</Button>}>
         {!draft.chains.length ? <Empty title={profileNodeSets.length ? '还没有链规则' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
           <div className="flex flex-col gap-3">
@@ -77,7 +78,7 @@ export function TabChains() {
       </Card>
 
       {chainReport.length > 0 && <Card title="代理链告警" bodyClass="px-4 pb-2"><ReportList items={chainReport} /></Card>}
-      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">依赖节点</h2><span className="text-[12.5px] text-muted">系统自动引入的包装组与复制节点。默认包装组（不打平、不复制），也可以逐项切换。</span></div>}
+      <Card title={`依赖节点`} subtitle={`系统自动引入的包装组与复制节点。默认包装组（不打平、不复制），也可以逐项切换。`}
         actions={<>
           <label className="flex items-center gap-2 text-[12.5px] text-ink-2">Profile 默认
             <Select className="h-9 w-auto" value={draft.refPolicy.default} onChange={(e) => setDraft({ ...draft, refPolicy: { ...draft.refPolicy, default: e.target.value as RefStrategy } })}>
@@ -160,13 +161,7 @@ export function TabPreview() {
       <ErrorBox error={preview.error} />
       {preview.data && (
         <div className="flex flex-wrap items-start gap-5">
-          <section aria-label="最终配置" className="min-w-0 flex-[999_1_560px] overflow-hidden rounded-[10px] bg-nav">
-            <div className="flex items-center justify-between border-b border-[#262b33] px-4 py-2.5">
-              <span className="font-mono text-[12.5px] text-nav-text">config.yaml · {preview.data.yaml?.split('\n').length ?? 0} 行</span>
-              {preview.data.yaml && <Button size="sm" variant="ghost" className="text-nav-text hover:bg-nav-hover" onClick={() => navigator.clipboard?.writeText(preview.data!.yaml!)}>复制</Button>}
-            </div>
-            <pre className="m-0 max-h-[720px] overflow-auto p-4 font-mono text-[12.5px] leading-[1.75] text-[#dde1e7]">{preview.data.yaml ?? preview.data.failure}</pre>
-          </section>
+          <CodePreview label="最终配置" className="flex-[999_1_560px] rounded-[10px]" title={`config.yaml · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="max-h-[720px] p-4 text-[12.5px] leading-[1.75]" />
           <section aria-label="渲染报告" className="flex min-w-0 flex-[1_1_340px] flex-col gap-3">
             <div className="grid grid-cols-3 gap-2">
               {[['错误', count('error'), 'text-err'], ['告警', count('warn'), 'text-warn'], ['提示', count('info'), 'text-accent-ink']].map(([t, n, c]) => (
