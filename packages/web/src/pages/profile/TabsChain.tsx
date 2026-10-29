@@ -50,7 +50,7 @@ export function TabChains() {
     <>
       <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">链规则</h2><span className="text-[12.5px] text-muted">代理链只在这里设置：落地 = 已加入节点集中命中筛选的节点 → 前置 = 策略组或单个节点。本地节点只保存节点信息，订阅源自带的前置会自动识别。</span></div>}
         actions={<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加链规则</Button>}>
-        {!draft.chains.length ? <Empty>{profileNodeSets.length ? '还没有链规则。' : '先在「节点集」中加入节点集。'}</Empty> : (
+        {!draft.chains.length ? <Empty title={profileNodeSets.length ? '还没有链规则' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
           <div className="flex flex-col gap-3">
             {draft.chains.map((c, i) => (
               <div key={c.id} className="flex flex-col gap-3 rounded-[10px] border border-line bg-[#fafbfc] p-3.5">
@@ -86,7 +86,7 @@ export function TabChains() {
           <Button onClick={() => preview.mutate(undefined)} disabled={preview.isPending}>{preview.isPending ? '解析中…' : '解析依赖'}</Button>
         </>} bodyClass="overflow-x-auto">
         <ErrorBox error={preview.error} />
-        {!preview.data ? <div className="px-4 pb-4"><Empty>点「解析依赖」用当前草稿试渲染，列出被引用的 provider 节点。</Empty></div> : !preview.data.dependencies?.length ? <div className="px-4 pb-4"><Empty>没有引用 provider 中的单个节点。</Empty></div> : (
+        {!preview.data ? <div className="px-4 pb-4"><Empty title="还没有依赖解析结果" description="点「解析依赖」用当前草稿试渲染，列出被引用的 provider 节点。" /></div> : !preview.data.dependencies?.length ? <div className="px-4 pb-4"><Empty title="没有引用 provider 中的单个节点" /></div> : (
           <table className="w-full min-w-[760px] border-collapse">
             <thead><tr><th className={th}>被引用的节点</th><th className={th}>生成项</th><th className={th}>引用来源</th><th className={th}>解析策略</th></tr></thead>
             <tbody>

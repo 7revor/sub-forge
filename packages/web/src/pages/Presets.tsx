@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { DeleteAction, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Button, Card, ErrorBox, Input, Modal, PageHeader, Segmented, cx } from '../components/ui.tsx';
+import { Button, Card, Empty, ErrorBox, Input, Modal, PageHeader, Segmented, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { DualEditor, type EditorMode } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
@@ -45,11 +45,8 @@ export function PresetList() {
     <>
       <PageHeader title="基础设置预设" subtitle={INTRO} actions={<Button variant="primary" onClick={() => setCreating(true)}><Plus size={16} />新建预设</Button>} />
       <ErrorBox error={list.error} />
-      <section className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-7 py-7 text-center">
-        <span className="text-[14px] font-semibold">还没有预设</span>
-        <span className="max-w-[420px] text-[12.5px] leading-relaxed text-muted">把 DNS、TUN、嗅探等通用设置做成预设，配置订阅引用后自动同步。</span>
-        <Button size="sm" onClick={() => setCreating(true)}>新建预设</Button>
-      </section>
+      <Empty title="还没有预设" description="把 DNS、TUN、嗅探等通用设置做成预设，配置订阅引用后自动同步。"
+        action={<Button size="sm" onClick={() => setCreating(true)}>新建预设</Button>} />
       <NewPresetModal open={creating} onClose={() => setCreating(false)} />
     </>
   );
@@ -130,7 +127,7 @@ export function PresetEdit() {
               </div>
             );
           })}
-          {!refs.length && <span className="text-[13px] text-muted">你的配置订阅中还没有引用它的。</span>}
+          {!refs.length && <Empty title="还没有配置订阅引用它" />}
         </Card>
       </div>
       <NewPresetModal open={creating} onClose={() => setCreating(false)} />

@@ -2,7 +2,7 @@
 
 import type { NodeSetID } from '@sub-forge/core';
 import { useEffect, useState } from 'react';
-import { Button, Input, Modal } from './ui.tsx';
+import { Button, Empty, Input, Modal } from './ui.tsx';
 
 export function RenameDialog({ open, title, name, onClose, onRename }: { open: boolean; title: string; name: string; onClose: () => void; onRename: (name: string) => void }) {
   const [value, setValue] = useState(name);
@@ -46,7 +46,7 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
             </label>
           );
         })}
-        {!shown.length && <div className="px-3 py-4 text-center text-[13px] text-muted">{options.length ? '没有匹配的节点集' : '还没有可加入的节点集'}</div>}
+        {!shown.length && <div className="p-3"><Empty title={options.length ? '没有匹配的节点集' : '还没有可加入的节点集'} /></div>}
       </div>
       {hint && <span className="text-[12px] leading-relaxed text-muted">{hint}</span>}
     </Modal>

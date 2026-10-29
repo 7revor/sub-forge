@@ -15,7 +15,7 @@ import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
 import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, DeleteDialog, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
@@ -147,7 +147,7 @@ export function LocalEdit() {
       <Card bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
         actions={<><Button size="sm" onClick={() => setPasting(true)}>粘贴导入</Button><Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link></>}>
-        {!d.proxies.length ? <div className="px-4 pb-4 text-[13px] text-muted">这个分组还没有节点。新增一个，或粘贴 URI / YAML 一次导入多个。</div> : (
+        {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增一个，或粘贴 URI / YAML 一次导入多个。" /></div> : (
           <table className="w-full min-w-[620px] border-collapse">
             <thead><tr><th className={cx(th, 'px-3.5')}>名称</th><th className={cx(th, 'px-3.5')}>协议</th><th className={cx(th, 'px-3.5')}>服务器</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>

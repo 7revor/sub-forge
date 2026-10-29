@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api, type RepoEntry, type RepoEntryDetail, type RuleRepo } from '../api.ts';
-import { Badge, Button, buttonClass, Card, ErrorBox, Input, PageHeader, PendingNotice, cx, formatTime, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Input, PageHeader, PendingNotice, cx, formatTime, td, th } from '../components/ui.tsx';
 
 export function RuleRepoPage() {
   const navigate = useNavigate();
@@ -63,11 +63,11 @@ export function RuleRepoPage() {
               </button>
             );
           })}
-          {!items.length && !search.isFetching && <div className="px-4 py-6 text-center text-[13px] text-muted">{debounced ? `没有找到「${debounced}」` : '输入关键词开始搜索'}</div>}
+          {!items.length && !search.isFetching && <div className="px-4 py-4"><Empty title={debounced ? `没有找到「${debounced}」` : '输入关键词开始搜索'} /></div>}
         </section>
 
         <section aria-label="详情" className="flex min-w-0 flex-[999_1_520px] flex-col gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-          {!sel ? <span className="text-[13px] text-muted">从左侧选择一个规则查看详情。</span> : <>
+          {!sel ? <Empty title="还没有选择规则" description="从左侧选择一个规则查看详情。" /> : <>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>

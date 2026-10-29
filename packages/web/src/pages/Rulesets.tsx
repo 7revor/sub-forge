@@ -112,7 +112,7 @@ export function RulesetEdit() {
                     <td className={td}>{r.reason ? <Badge tone="warn">{r.reason}</Badge> : <Badge tone="ok">正常</Badge>}</td>
                   </tr>
                 ))}
-                {!shown.length && <tr><td colSpan={4} className={cx(td, 'text-muted')}>{rows.length ? `没有包含「${q.trim()}」的行` : '内容为空。点击「编辑来源」填写规则。'}</td></tr>}
+                {!shown.length && <tr><td colSpan={4} className={td}><Empty title={rows.length ? `没有包含「${q.trim()}」的行` : '内容为空'} description={rows.length ? undefined : '点击「编辑来源」填写规则。'} /></td></tr>}
               </tbody>
             </table>
             {shown.length > 300 && <div className="px-4 py-2.5 text-[12.5px] text-muted">显示前 300 行，共 {shown.length} 行</div>}
@@ -123,7 +123,7 @@ export function RulesetEdit() {
                 {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
                   className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
               </div>
-              {!saved ? <Empty>保存后预览。</Empty> : preview.error ? <ErrorBox error={preview.error} /> : preview.data && (
+              {!saved ? <Empty title="还没有输出预览" description="保存后预览。" /> : preview.error ? <ErrorBox error={preview.error} /> : preview.data && (
                 preview.data.passthrough ? <p className="m-0 text-[13px] text-muted">mrs / srs 二进制规则集只做透传，不解析。</p> : (
                   <>
                     {preview.data.error && <ErrorBox error={`拉取失败：${preview.data.error}`} />}
@@ -165,7 +165,7 @@ function RulesetOverrides({ value, onChange }: { value: LineOverride[]; onChange
   const update = (index: number, item: LineOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
   return <Card title="客户端改写" actions={<Button onClick={() => onChange([...value, { line: 1, override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
     <p className="mt-0 text-[12.5px] text-muted">按解析后的行号（从 1 开始）或原文精确匹配定位。同一行命中第一条客户端与平台匹配的覆盖，可拖拽调整优先级；mrs / srs 透传格式不应用行级覆盖。</p>
-    {!value.length ? <Empty>没有行级覆盖。</Empty> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => {
+    {!value.length ? <Empty title="没有行级覆盖" /> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => {
       const mode = item.match !== undefined && item.line === undefined ? 'match' : 'line';
       return <div className="my-3 flex items-start gap-2 rounded-lg border border-line p-3">
         {handle}<div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -266,7 +266,7 @@ export function BundleEdit() {
       <div className="flex flex-wrap items-start gap-5">
         <Card className="min-w-0 flex-[999_1_560px]" bodyClass="pb-1" title={<h2 className="m-0 text-[15px] font-semibold">子项</h2>}
           actions={<><Button className="h-9" onClick={() => setPickRs(true)}>添加规则集</Button><Button className="h-9" onClick={() => setAddRule(true)}>添加单条规则</Button></>}>
-          {!d.items.length ? <div className="px-4 pb-4 text-[13px] text-muted">还没有子项。添加规则集或单条规则。</div> : (
+          {!d.items.length ? <div className="px-4 pb-4"><Empty title="还没有子项" description="添加规则集或单条规则。" /></div> : (
             <SortableList items={d.items} onReorder={(items) => set({ items })} renderItem={(it, i, handle) => {
               const st = stats[i]!;
               const on = it.enabled !== false;

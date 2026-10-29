@@ -102,7 +102,7 @@ export function Overview() {
 
       <div className="flex flex-wrap items-start gap-5">
         <Card title="我的配置订阅" actions={<span className="text-[12.5px] text-muted">{profiles.data?.length ?? 0} 个</span>} className="min-w-0 flex-[999_1_640px]" bodyClass="overflow-x-auto">
-          {profiles.data?.length === 0 ? <div className="px-4 pb-4"><Empty>还没有配置订阅。<Link to="/profiles/new" className="text-accent">新建一个</Link></Empty></div> : (
+          {profiles.data?.length === 0 ? <div className="px-4 pb-4"><Empty title="还没有配置订阅" action={<Link to="/profiles/new" className="text-accent">新建一个</Link>} /></div> : (
             <table className="w-full border-collapse">
               <thead><tr><th className={th}>名称</th><th className={th}>模板</th><th className={th}>节点集</th><th className={th}>最近访问</th><th className={th}>状态</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
               <tbody>
@@ -122,7 +122,7 @@ export function Overview() {
         </Card>
 
         <Card title="待处理" className="min-w-0 flex-[1_1_340px]" bodyClass="px-4 pb-2">
-          {!todos.length ? <p className="m-0 pb-2 text-[13px] text-muted">没有待处理事项。</p> : (
+          {!todos.length ? <Empty title="没有待处理事项" /> : (
             <ul className="m-0 flex list-none flex-col p-0">
               {todos.map((t, i) => (
                 <li key={i} className="flex gap-3 border-t border-line-2 py-3">
@@ -140,7 +140,7 @@ export function Overview() {
       </div>
 
       <Card title="订阅源拉取" actions={<Link to="/sources" className="text-[13px] text-accent">全部订阅源</Link>} bodyClass="overflow-x-auto">
-        {!sources.data?.length ? <div className="px-4 pb-4"><Empty>还没有订阅源。</Empty></div> : (
+        {!sources.data?.length ? <div className="px-4 pb-4"><Empty title="还没有订阅源" /></div> : (
           <table className="w-full border-collapse">
             <thead><tr><th className={th}>订阅源</th><th className={th}>节点</th><th className={th}>上次成功</th><th className={th}>流量</th><th className={th}>到期</th><th className={th}>状态</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>

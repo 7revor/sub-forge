@@ -8,7 +8,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
-import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
 import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { templateDiff } from '../convert/templateDiff.ts';
@@ -19,10 +19,9 @@ import { draftIssues } from './template/model.ts';
 
 type TemplateDetailData = { item: TemplateDoc; versions: { version: number; changelog?: string; createdAt: number }[] };
 
-/** 模板浏览（设计稿「模板 · 普通用户浏览」）：左侧模板列表，右侧选中模板的骨架、规则与版本 */
+/** 管理员模板列表：左侧选择模板，右侧查看骨架、规则与版本，并进入编辑或发布。 */
 export function TemplateList() {
   const list = useTemplates();
-  const isAdmin = useMe().data?.role === 'admin';
   const [params, setParams] = useSearchParams();
   const profiles = useList('profiles');
   const sel = list.data?.find((t) => t.id === params.get('id')) ?? list.data?.[0];
@@ -30,13 +29,10 @@ export function TemplateList() {
   return (
     <>
       <PageHeader title="模板" subtitle="管理员维护的分流骨架：策略组和规则，不含节点。配置订阅选择一个模板，再填充自己的节点。"
-        actions={isAdmin && <Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
+        actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
       <ErrorBox error={list.error} />
       {list.isLoading ? <div className="text-muted">加载中…</div> : !list.data?.length ? (
-        <section className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-7 py-7 text-center">
-          <span className="text-[14px] font-semibold">还没有模板</span>
-          <span className="max-w-[420px] text-[12.5px] leading-relaxed text-muted">{isAdmin ? '新建一个模板：定义策略组骨架和规则，用户的配置订阅会以它为基础。' : '管理员还没有发布模板。'}</span>
-        </section>
+        <Empty title="还没有模板" description="新建一个模板：定义策略组骨架和规则，用户的配置订阅会以它为基础。" />
       ) : (
         <div className="flex flex-wrap items-start gap-5">
           <nav aria-label="模板列表" className="min-w-0 flex-[1_1_260px] overflow-hidden rounded-[10px] border border-line bg-panel py-1.5">
@@ -55,43 +51,13 @@ export function TemplateList() {
           </nav>
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
             {sel && <TemplateDetail key={sel.id} id={sel.id} inUse={inUse(sel.id)} actions={<>
-              {isAdmin && <Link to={`/templates/${sel.id}`} className={buttonClass()}>编辑新版本</Link>}
+              <Link to={`/templates/${sel.id}`} className={buttonClass()}>编辑新版本</Link>
+              <Link to={`/templates/${sel.id}/publish`} className={buttonClass()}>发布</Link>
               <Link to={`/profiles/new?template=${encodeURIComponent(sel.id)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
             </>} />}
           </div>
         </div>
       )}
-    </>
-  );
-}
-
-/** 模板管理（管理员）：所有模板的列表，进入编辑器或新建 */
-export function TemplateManage() {
-  const list = useTemplates();
-  const profiles = useList('profiles');
-  return (
-    <>
-      <PageHeader title="模板管理" subtitle="发布新版本后，跟随最新的配置订阅在客户端下次刷新时采用新模板。发布前会逐个试渲染检查影响。"
-        actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
-      <ErrorBox error={list.error} />
-      <Card bodyClass="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse">
-          <thead><tr><th className={th}>模板</th><th className={th}>版本</th><th className={th}>策略组</th><th className={th}>规则</th><th className={th}>你的配置订阅在用</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
-          <tbody>
-            {(list.data ?? []).map((t) => (
-              <tr key={t.id}>
-                <td className={cx(td, 'font-medium')}><Link to={`/templates/${t.id}`} className="text-ink no-underline hover:text-accent">{t.name ?? t.id}</Link></td>
-                <td className={cx(td, 'font-mono')}>v{t.version}</td>
-                <td className={cx(td, 'font-mono')}>{t.groups.length}</td>
-                <td className={cx(td, 'font-mono')}>{t.rules.length}</td>
-                <td className={cx(td, 'font-mono')}>{(profiles.data ?? []).filter((p) => p.template?.id === t.id).length}</td>
-                <td className={cx(td, 'text-right whitespace-nowrap')}><Link to={`/templates/${t.id}`} className={buttonClass('default', 'sm')}>编辑</Link> <Link to={`/templates/${t.id}/publish`} className={buttonClass('default', 'sm')}>发布</Link></td>
-              </tr>
-            ))}
-            {!list.data?.length && <tr><td colSpan={6} className={cx(td, 'text-muted')}>还没有模板。</td></tr>}
-          </tbody>
-        </table>
-      </Card>
     </>
   );
 }
@@ -272,7 +238,7 @@ function TemplatePage({ id }: { id: string }) {
   const blocking = (impact?.impact ?? []).filter((i) => i.level === 'error');
   const warnings = (impact?.impact ?? []).filter((i) => i.level === 'warn');
   const canPublish = ready && !errors.length && !!name.trim() && !publish.isPending && (!blocking.length || confirmed);
-  const crumbs = <><Link to="/templates/manage" className="text-muted no-underline">模板管理</Link> / {isNew ? '新建' : <Link to={`/templates/${id}`} className="text-muted no-underline">{t?.name ?? id}</Link>}{tab === 'publish' ? ' / 发布' : ''}</>;
+  const crumbs = <><Link to="/templates" className="text-muted no-underline">模板</Link> / {isNew ? '新建' : <Link to={`/templates/${id}`} className="text-muted no-underline">{t?.name ?? id}</Link>}{tab === 'publish' ? ' / 发布' : ''}</>;
 
   if (tab === 'publish') {
     const diff = published ? templateDiff(published, body) : undefined;

@@ -266,6 +266,8 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 
 ## 5. 模板 ⊕ 覆盖层 合并
 
+2026-10-29 界面调整只合并管理员的模板入口并统一空状态样式，不改变 `Template`、`Profile` 的字段或本节合并规则。普通用户仍在新建配置订阅时读取已发布模板。
+
 ```
 effective.groups = template.groups 按序
   对每个组 g：

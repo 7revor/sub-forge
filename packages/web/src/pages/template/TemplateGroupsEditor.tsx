@@ -2,7 +2,7 @@ import type { GroupSpec, ReportItem } from '@sub-forge/core';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
@@ -78,7 +78,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
       </div>}
         </div>;
       }} />
-      {!value.groups.length && <div className="px-4 py-4 text-[13px] text-muted">还没有组。</div>}
+      {!value.groups.length && <div className="px-4 pb-4"><Empty title="还没有组" /></div>}
     </div>
   </Card>;
 }

@@ -10,7 +10,7 @@ import { api, type PipelinePreview } from '../api.ts';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/MoreMenu.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
-import { Badge, Button, ErrorBox, Input, Modal, PageHeader, Segmented, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Empty, ErrorBox, Input, Modal, PageHeader, Segmented, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useNodeList, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
 function SourceNodes({ source }: { source: SourceDoc }) {
@@ -147,7 +147,7 @@ function FetchDialog({ open, draft, set, onClose, onDelete }: {
                   <td className={td}>{s.ok ? <Badge tone="ok">成功</Badge> : <Badge tone="err">{s.error ?? '失败'}</Badge>}</td>
                 </tr>
               ))}
-              {!state.snaps.data?.length && <tr><td className={cx(td, 'text-muted')} colSpan={3}>还没有拉取过</td></tr>}
+              {!state.snaps.data?.length && <tr><td className={td} colSpan={3}><Empty title="还没有拉取过" /></td></tr>}
             </tbody>
           </table>
           <p className="mx-3 mt-2.5 mb-0 text-[12px] text-muted">订阅请求总是使用最新一份成功快照。</p>

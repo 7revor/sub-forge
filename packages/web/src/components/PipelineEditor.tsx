@@ -11,7 +11,7 @@ import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetF
 import { mapRows, mapStats, removedAtStep, renamedAtSteps, rowChanged, type MapRow } from './pipelineMap.ts';
 import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview, TraceStep } from '../api.ts';
-import { Badge, Button, DraftInput, DraftTextarea, Input, Segmented, Select, Switch, cx } from './ui.tsx';
+import { Badge, Button, DraftInput, DraftTextarea, Empty, Input, Segmented, Select, Switch, cx } from './ui.tsx';
 
 export const OP_LABEL: Record<OperatorStep['op'], string> = {
   'filter.useless': '无用节点过滤',
@@ -454,7 +454,7 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
           })}
         </tbody>
       </table>
-    </div> : <div className="px-4 pb-4 text-[13px] text-muted">{rows.length ? '没有任何节点发生变化。' : '没有节点。'}</div>}
+    </div> : <div className="px-4 pb-4"><Empty title={rows.length ? '没有任何节点发生变化' : '没有节点'} /></div>}
     <div ref={footer} className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-muted">
       显示 {shown.length} / {rows.length} 行 · 「位置」是在保留下来的节点中名次的变化{truncated && ' · 节点较多，预览只包含前 500 个'}
     </div>

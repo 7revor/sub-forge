@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type RuleRepo, type SystemInfo } from '../api.ts';
-import { Badge, Button, Card, ErrorBox, Field, Input, Modal, PageHeader, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
 export function System() {
   const qc = useQueryClient();
@@ -42,7 +42,7 @@ export function System() {
                   <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${a.value}`} onClick={() => setDraft({ ...draft, ssrfAllow: draft.ssrfAllow.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
                 </div>
               ))}
-              {!draft.ssrfAllow.length && <span className="py-1 text-[13px] text-muted">没有例外。</span>}
+              {!draft.ssrfAllow.length && <Empty title="没有白名单例外" />}
             </div>
             <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (allow.trim()) { setDraft({ ...draft, ssrfAllow: [...draft.ssrfAllow, { value: allow.trim() }] }); setAllow(''); } }}>
               <Input aria-label="新增白名单" placeholder="主机名或 CIDR" className="font-mono" value={allow} onChange={(e) => setAllow(e.target.value)} />
@@ -76,7 +76,7 @@ export function System() {
                     {!r.builtIn && <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${r.name}`} onClick={() => removeRepo.mutate(r.id)}><Trash2 size={14} /></Button>}
                   </div>
                 ))}
-                {!repos.data?.repos.length && <span className="text-[13px] text-muted">还没有仓库索引。</span>}
+                {!repos.data?.repos.length && <Empty title="还没有仓库索引" />}
               </div>
               <ErrorBox error={removeRepo.error} />
               <Field label="GitHub 镜像地址" hint="用于在无法直连 GitHub 时拉取规则">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>

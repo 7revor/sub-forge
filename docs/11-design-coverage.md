@@ -19,14 +19,16 @@
 | 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：客户端改写、解析结果（仅本地文本规则集，远程与 mrs / srs 不显示）、输出预览，每块独占一行；编辑来源对话框（2026-10-29 移除「下载地址」卡片，实际地址见配置订阅预览） |
 | 规则包 `RuleBundle` | `/bundles/:id` | 本地规则集在浏览器解析出 behavior 与条数；远程规则集显示为未知 |
 | 规则仓库 `RuleRepo` | `/rule-repo` | 占位接口 |
-| 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish`、`/templates/manage` | 草稿在两页之间共用；发布页自动试渲染 |
-| 补充 `TemplateBrowse` | `/templates` | 所有人浏览；管理员多一个「编辑新版本」 |
+| 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish` | 草稿在两页之间共用；发布页自动试渲染；仅管理员可进入 |
+| 补充 `TemplateBrowse` | `/templates` | 2026-10-29 统一为唯一模板入口，仅管理员可见，可新建、编辑与发布；旧 `/templates/manage` 重定向到此页。普通用户在配置订阅向导中选择模板 |
 | 基础设置预设 `Presets` | `/presets/:id` | 单页；Surge 段为 M2 占位说明 |
 | 用户 `Users` | `/users` | 统计列与共享走占位接口 |
 | 系统 `System` | `/system` | 占位接口 |
 | 补充 `Dialogs` | 全部详情页 | 头部「更多」菜单与最右侧的独立删除按钮、删除确认、各类对话框、表单 / YAML 双视图、离开前保存（2026-10-29 删除从「更多」菜单移出） |
 | 补充 `Login`、`Account` | `/login`、`/account` | — |
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
+
+空状态统一使用截图确认的白底虚线框，标题和说明居中；列表、详情卡片及无搜索结果共用 `Empty` 组件。设计画布中的旧双入口与旧空状态待同步。
 
 ## 下拉组件
 
