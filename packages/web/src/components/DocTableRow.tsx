@@ -1,9 +1,13 @@
 // 名称与操作保留原生链接，鼠标也可以点击行内的非交互区域进入详情。
 import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Pencil, ArrowRight } from 'lucide-react';
+import { buttonClass } from './ui.tsx';
 
-export const docNameLinkClass = 'font-medium text-accent no-underline hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+// 与设计稿一致：名称为正文色，悬停变为强调色
+export const docNameLinkClass = 'font-medium text-ink no-underline hover:text-accent';
+
+/** 行操作列的表头：设计稿中留空，只给读屏提供文字 */
+export const actionHeader = <span className="sr-only">操作</span>;
 
 export function DocTableRow({ to, children }: { to: string; children: ReactNode }) {
   const navigate = useNavigate();
@@ -19,12 +23,8 @@ export function DocTableRow({ to, children }: { to: string; children: ReactNode 
   );
 }
 
+/** 行内次要操作：与设计稿表格行里的「编辑」「重置密码」相同的小号次要按钮，不带图标 */
 export function DocActionLink({ to, name, viewOnly = false }: { to: string; name: string; viewOnly?: boolean }) {
-  const Icon = viewOnly ? ArrowRight : Pencil;
-  const label = viewOnly ? '查看详情' : '编辑';
-  return (
-    <Link to={to} aria-label={`${label} ${name}`} className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-line bg-panel px-3 text-[13px] font-medium text-accent no-underline hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-      <Icon size={14} aria-hidden="true" />{label}
-    </Link>
-  );
+  const label = viewOnly ? '查看' : '编辑';
+  return <Link to={to} aria-label={`${label} ${name}`} className={buttonClass('default', 'sm')}>{label}</Link>;
 }

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useList, type DocMap, type Kind } from '../hooks.ts';
 import { Card, cx, Empty, ErrorBox, PageHeader, td, th } from './ui.tsx';
-import { DocActionLink, DocTableRow, docNameLinkClass } from './DocTableRow.tsx';
+import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 
 export type Column<K extends Kind> = { header: string; cell: (d: DocMap[K]) => ReactNode; className?: string };
 
@@ -22,7 +22,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
       <Card bodyClass="overflow-x-auto">
         {list.isLoading ? <div className="p-4 text-muted">加载中…</div> : !list.data?.length ? <div className="p-4"><Empty>还没有内容。</Empty></div> : (
           <table className="w-full border-collapse">
-            <thead><tr>{columns.map((c) => <th key={c.header} className={th}>{c.header}</th>)}<th className={cx(th, 'w-px text-right')}>操作</th></tr></thead>
+            <thead><tr>{columns.map((c) => <th key={c.header} className={th}>{c.header}</th>)}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>
               {list.data.map((d) => (
                 <DocTableRow key={d.id} to={`/${kind}/${d.id}`}>
