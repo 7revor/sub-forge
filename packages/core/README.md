@@ -50,3 +50,5 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 
 规则仓库首期（2026-10-29）在服务端将文本变体转换为本内核已有的多个远程来源，再复用规则集解析、合并与去重。内核数据模型不变；动态 `repo` 来源与客户端变体切换仍为后续能力。
+
+规则来源可带 `repository: { repo, entry, ref, path }` 表示仓库文件关联；仍为远程来源，URL 约束由服务端负责，内核解析、合并、去重不变。

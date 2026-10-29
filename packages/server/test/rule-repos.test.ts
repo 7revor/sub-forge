@@ -172,6 +172,41 @@ describe('规则仓库接口', () => {
     expect((await c.get('/api/rule-repos/search?client=bad')).status).toBe(400);
     expect((await c.get('/api/rule-repos/entry?repo=zydou&path=missing')).status).toBe(404);
   });
+  it('关联解析不落库，保存后锁定地址和关联身份，停用或索引删除后仍可保存既有来源', async () => {
+    const h = setup(); await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
+    await h.service.refresh('blackmatrix7');
+    const resolved = await c.post('/api/rule-repos/resolve', { repo: 'blackmatrix7', path: 'China' });
+    expect(resolved.status).toBe(200);
+    expect(resolved.json.sources).toHaveLength(2);
+    expect(h.store.list('ruleset')).toHaveLength(0);
+    const created = await c.post('/api/rulesets', { name: '关联测试', sources: resolved.json.sources });
+    expect(created.status).toBe(201);
+    const doc = created.json.item;
+    expect(doc.sources[0].repository).toMatchObject({ repo: 'blackmatrix7', entry: 'China', ref: 'master' });
+    for (const patch of [{ url: 'https://example.com/custom.txt' }, { repository: undefined }, { kind: 'local', content: 'example.com' }, { repository: { ...doc.sources[0].repository, path: 'fake' } }]) {
+      const result = await c.put(`/api/rulesets/${doc.id}`, { ...doc, sources: [{ ...doc.sources[0], ...patch }] });
+      expect(result.status).toBe(400);
+    }
+    expect((await c.post('/api/rulesets', { name: '伪造', sources: [{ ...doc.sources[0], url: 'https://example.com/fake' }] })).status).toBe(400);
+    expect((await c.post('/api/rulesets/preview', { id: doc.id, ruleset: { ...doc, sources: [{ ...doc.sources[0], url: 'https://example.com/fake' }] }, client: 'mihomo' })).status).toBe(400);
+    h.service.setEnabled('blackmatrix7', false);
+    h.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run('blackmatrix7');
+    expect((await c.put(`/api/rulesets/${doc.id}`, { ...doc, note: '可修改备注', sources: doc.sources.map((s: object) => ({ ...s, enabled: false })) })).status).toBe(200);
+    expect((await c.post('/api/rulesets', { name: '不可新增停用关联', sources: doc.sources })).status).toBe(400);
+    expect((await c.put(`/api/rulesets/${doc.id}`, { ...doc, sources: [{ id: 'custom', kind: 'remote', url: 'https://example.com/custom', format: 'auto' }] })).status).toBe(200);
+  });
+  it('旧导入按完整名称与 URL 识别关联，自定义同 URL 和已改地址不被误判', async () => {
+    const h = setup(); const user = await addUser(h.store, 'alice');
+    await h.service.refresh('zydou');
+    const old = { id: 'old', kind: 'remote' as const, name: 'zydou · openai.txt', url: 'https://raw.githubusercontent.com/zydou/domain-list-community-converter/surge-domain-set/openai.txt', format: 'domain-set' as const };
+    h.store.put('ruleset', { id: 'legacy', name: '旧导入', sources: [old, { ...old, id: 'manual', name: '自定义' }, { ...old, id: 'changed', url: 'https://example.com/file' }] }, user.id);
+    const restart = new RuleRepoService(h.store, h.fetcher);
+    const migrated = h.store.getWithOwner('ruleset', 'legacy')!;
+    expect(migrated.owner).toBe(user.id);
+    expect(migrated.doc.sources[0]!.repository).toEqual({ repo: 'zydou', entry: 'openai', ref: 'surge-domain-set', path: 'openai.txt' });
+    expect(migrated.doc.sources.slice(1).every(s => !s.repository)).toBe(true);
+    await restart.stop();
+  });
   it('管理员异步更新、停用与重新启用', async () => {
     const h = setup(); await addUser(h.store, 'root', 'admin'); const c = client(h.app); await c.login('root');
     expect((await c.post('/api/rule-repos/blackmatrix7/refresh')).status).toBe(202);

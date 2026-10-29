@@ -1,5 +1,5 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
-import { parseRuleSetContent, ruleKey } from '@sub-forge/core';
+import { parseRuleSetContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import type { Store } from '../store.ts';
 import type { UpstreamFetcher } from '../net/upstream.ts';
 import { HttpError, bad, notFound } from '../api/common.ts';
@@ -17,6 +17,37 @@ export class RuleRepoService {
   constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now) {
     const insert = store.db.prepare('INSERT OR IGNORE INTO rule_repos (id) VALUES (?)');
     for (const repo of BUILTIN_REPOS) insert.run(repo.id);
+    this.upgradeLegacySources();
+  }
+  /** 旧导入没有标识：仅匹配旧导入器生成的名称和完整 URL，不将一般自定义地址升级。 */
+  private upgradeLegacySources() {
+    const files = new Map<string, NonNullable<RuleSetSource['repository']>>();
+    for (const row of this.store.db.prepare('SELECT data FROM rule_repo_entries').all() as { data: string }[]) {
+      const entry = JSON.parse(row.data) as IndexedEntry;
+      const repo = this.definition(entry.repo);
+      for (const file of entry.variants.flatMap(v => v.files)) {
+        files.set(`${entry.repo} · ${file.path}\n${rawUrl(repo, file)}`, { repo: entry.repo, entry: entry.path, ref: file.ref, path: file.path });
+      }
+    }
+    if (!files.size) return;
+    for (const doc of this.store.list('ruleset')) {
+      let changed = false;
+      for (const src of doc.sources) {
+        if (src.kind !== 'remote' || src.repository) continue;
+        const repository = files.get(`${src.name}\n${src.url}`);
+        if (repository) { src.repository = repository; changed = true; }
+      }
+      if (changed) this.store.put('ruleset', doc, this.store.getWithOwner('ruleset', doc.id)!.owner);
+    }
+  }
+  async linkedSources(repo: string, path: string, variantId?: string) {
+    const entry = await this.resolvedEntry(repo, path);
+    const variant = this.importVariant(entry, variantId);
+    return { name: entry.name, sources: variant.files.map(file => ({
+      kind: 'remote' as const, name: `${repo} · ${file.path}`, url: rawUrl(this.definition(repo), file),
+      format: file.format, behavior: file.behavior,
+      repository: { repo, entry: path, ref: file.ref, path: file.path },
+    })) };
   }
   definition(id: string): RepoDefinition {
     const repo = BUILTIN_REPOS.find(r => r.id === id);
@@ -125,6 +156,7 @@ export class RuleRepoService {
           this.store.db.prepare('UPDATE rule_repos SET built_at = ?, revisions = ? WHERE id = ?').run(this.now(), JSON.stringify(revisions), id);
         })();
         this.details.clear();
+        this.upgradeLegacySources();
       }
       this.store.db.prepare('UPDATE rule_repos SET checked_at = ?, error = NULL WHERE id = ?').run(this.now(), id);
     } catch (error) {

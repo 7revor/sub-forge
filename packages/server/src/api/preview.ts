@@ -17,7 +17,7 @@ import type { SnapshotService } from '../snapshots.ts';
 import { sourceUrl } from '../source-url.ts';
 import type { Store } from '../store.ts';
 import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
-import { checkRuleSetOverrides, validateDoc } from './validate.ts';
+import { checkRepositorySource, checkRuleSetOverrides, validateDoc } from './validate.ts';
 
 const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
 /** 逐步预览每步最多返回的节点数，避免大订阅撑爆响应 */
@@ -192,6 +192,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRule[] }[] = [];
     for (const src of rs.sources) {
       if (!src || typeof src !== 'object' || typeof src.id !== 'string') throw bad('来源格式错误');
+      checkRepositorySource(src, saved?.sources.find(s => s.id === src.id), store, '来源');
       const passthrough = src.format === 'mrs' || src.format === 'srs';
       let content = src.kind === 'local' ? src.content ?? '' : undefined;
       let error: string | undefined;
