@@ -556,8 +556,9 @@ export class Store {
         this.putTemplateVersion(t);
       }
       for (const t of seed.tokens ?? []) this.putToken(t);
-      // 旧种子里的本地内容订阅源同样转成本地节点组
+      // 旧种子里的本地内容订阅源同样转成本地节点组，本地节点上的前置同样转成链规则
       this.convertLocalSources();
+      this.moveLocalDialers();
     });
     tx();
   }
