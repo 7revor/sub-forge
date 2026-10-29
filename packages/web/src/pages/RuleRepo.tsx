@@ -54,6 +54,7 @@ export function RuleRepoPage() {
   return (
     <>
       <PageHeader title="规则仓库" />
+      <p className="m-0 text-[12.5px] text-muted">仅索引 .list 和 .txt 文件；其他格式可在规则集中添加远程地址并自动转换为托管文本。</p>
       <div className="flex flex-wrap gap-2" aria-label="索引状态">
         {(repos.data?.repos ?? []).map(r => <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-[12px]">
           <span>{r.name} · {!r.enabled ? '已停用' : r.indexing ? '正在更新索引…' : r.builtAt ? `${r.entries} 个规则` : '等待首次索引'}</span>
@@ -121,7 +122,7 @@ export function RuleRepoPage() {
                 </Card>
                 <Select aria-label="导入变体" value={variant} onChange={e => setVariant(e.target.value)}>
                   <option value="">自动选择推荐文本变体</option>
-                  {d.variants.filter(v => v.files.every(f => f.format !== 'mrs')).map(v => <option key={v.id} value={v.id}>{clientLabel(v.client)} · {v.label}</option>)}
+                  {d.variants.map(v => <option key={v.id} value={v.id}>{clientLabel(v.client)} · {v.label}</option>)}
                 </Select>
                 <span className="text-[12px] text-muted">预览为推荐文本变体。导入后保存为远程来源，可在规则集内合并、改写并托管输出。</span>
                 {d.previewError && <div className="text-[13px] text-err">{d.previewError}<Button size="sm" onClick={() => void detail.refetch()}>重试预览</Button></div>}

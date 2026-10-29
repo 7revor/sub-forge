@@ -1,6 +1,6 @@
 // GitHub 文件树转为逻辑规则；只索引已知的规则格式，不把 README 和脚本当成规则。
 import type { RuleSetFormat } from '@sub-forge/core';
-import { matchesGeneric, type GenericOptions } from './generic.ts';
+import { isIndexedRuleFile, matchesGeneric, type GenericOptions } from './generic.ts';
 
 export type RepoDefinition = {
   id: string; name: string; owner: string; repo: string; refs: string[]; license: string;
@@ -9,7 +9,7 @@ export type RepoDefinition = {
 };
 export const BUILTIN_REPOS: RepoDefinition[] = [
   { id: 'blackmatrix7', name: 'blackmatrix7/ios_rule_script', owner: 'blackmatrix7', repo: 'ios_rule_script', refs: ['master'], license: 'GPL-2.0', adapter: 'blackmatrix7' },
-  { id: 'zydou', name: 'zydou/domain-list-community-converter', owner: 'zydou', repo: 'domain-list-community-converter', refs: ['clash', 'mrs', 'surge-rule-set', 'surge-domain-set'], license: '见上游仓库许可证', adapter: 'zydou' },
+  { id: 'zydou', name: 'zydou/domain-list-community-converter', owner: 'zydou', repo: 'domain-list-community-converter', refs: ['surge-rule-set', 'surge-domain-set'], license: '见上游仓库许可证', adapter: 'zydou' },
 ];
 export type RepoFile = { path: string; ref: string; format: RuleSetFormat; behavior?: 'classical' | 'domain' | 'ipcidr' };
 export type RepoVariant = { id: string; client: 'mihomo' | 'surge' | 'any'; label: string; files: RepoFile[]; recommended?: boolean };
@@ -31,24 +31,26 @@ export function buildEntries(repo: RepoDefinition, trees: Record<string, string[
   };
   for (const [ref, paths] of Object.entries(trees)) {
     for (const path of paths.sort()) {
+      if (!isIndexedRuleFile(path)) continue;
       if (repo.adapter === 'generic') {
         if (!repo.options || !matchesGeneric(path, repo.options)) continue;
         add(path, 'any', '通用文本', { ref, path, format: repo.options.format });
         entries.get(path)!.name = path.replace(/\.[^.]+$/, '');
       } else if (repo.adapter === 'zydou') {
-        const ext = ref === 'clash' ? '.yml' : ref === 'mrs' ? '.mrs' : '.txt';
+        if (ref !== 'surge-rule-set' && ref !== 'surge-domain-set') continue;
+        const ext = path.slice(path.lastIndexOf('.'));
         if (path.includes('/') || !path.endsWith(ext)) continue;
         const key = path.slice(0, -ext.length).trimEnd();
         if (!key || /@-/.test(key)) continue;
-        const client = ref.startsWith('surge-') ? 'surge' : 'mihomo';
-        const format = ref === 'clash' ? 'yaml' : ref === 'mrs' ? 'mrs' : ref === 'surge-domain-set' ? 'domain-set' : 'classical';
+        const client = 'surge';
+        const format = ref === 'surge-domain-set' ? 'domain-set' : 'classical';
         add(key, client, ref, { ref, path, format, behavior: ref === 'surge-rule-set' ? 'classical' : 'domain' }, key);
       } else {
-        const match = /^rule\/(Clash|Surge)\/(.+)\/([^/]+\.(yaml|list|txt))$/.exec(path);
+        const match = /^rule\/(Clash|Surge)\/(.+)\/([^/]+\.(list|txt))$/.exec(path);
         if (!match) continue;
-        const [, clientDir, key, filename, ext] = match;
+        const [, clientDir, key, filename] = match;
         const behavior = /_Domain(?:_|\.)/.test(filename!) ? 'domain' : /_IP(?:_|\.)/.test(filename!) ? 'ipcidr' : 'classical';
-        const format = ext === 'yaml' ? 'yaml' : behavior === 'domain' ? (clientDir === 'Surge' ? 'domain-set' : 'domain') : behavior;
+        const format = behavior === 'domain' ? (clientDir === 'Surge' ? 'domain-set' : 'domain') : behavior;
         add(key!, clientDir === 'Clash' ? 'mihomo' : 'surge', filename!, { ref, path, format, behavior });
       }
     }
@@ -56,12 +58,12 @@ export function buildEntries(repo: RepoDefinition, trees: Record<string, string[
   for (const entry of entries.values()) {
     for (const client of ['mihomo', 'surge', 'any'] as const) {
       const choices = entry.variants.filter(v => v.client === client);
-      // 文本导入默认优先完整 classical；zydou 用 YAML / RULE-SET，可由现有内核托管合并。
+      // 文本导入默认优先完整 classical；zydou 用 RULE-SET，可由现有内核托管合并。
       const score = (v: RepoVariant) => {
-        if (repo.adapter === 'zydou') return v.label === 'clash' || v.label === 'surge-rule-set' ? 0 : v.label === 'mrs' ? 3 : 1;
+        if (repo.adapter === 'zydou') return v.label === 'surge-rule-set' ? 0 : 1;
         const base = entry.path.split('/').at(-1)!;
-        if (v.label === `${base}_Classical.yaml` || v.label === `${base}_All.list`) return 0;
-        if (v.label === `${base}.yaml` || v.label === `${base}.list`) return 1;
+        if (v.label === `${base}_All.list`) return 0;
+        if (v.label === `${base}.list`) return 1;
         return 2;
       };
       choices.sort((a, b) => score(a) - score(b) || a.id.localeCompare(b.id));

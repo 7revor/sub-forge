@@ -54,3 +54,5 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 2026-10-29：自定义 GitHub 仓库复用 `parseRuleSetContent` 的自动识别/classical/域名/CIDR/YAML 文本解析、拒绝行诊断和既有渲染流程；不增加新领域来源类型。仓库配置与文件索引归服务端管理，导入后仍为 remote。
 
 规则来源可带 `repository: { repo, entry, ref, path }` 表示仓库文件关联；仍为远程来源，URL 约束由服务端负责，内核解析、合并、去重不变。
+
+远程输入的 YAML payload（含带引号和流式 payload）仍支持自动解析；解析结果 `conversion: yaml-to-list` 表示只能经过 IR 转换为托管文本，不能透传 YAML 地址。仓库索引不提供 YAML 文件。输入格式与最终 provider 文本格式分别处理，保留不支持行诊断。
