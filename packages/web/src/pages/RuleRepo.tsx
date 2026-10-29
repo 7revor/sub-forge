@@ -21,7 +21,7 @@ function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos:
   return <>
     <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
       <table aria-label="规则文件" aria-busy={page.isFetching} className="w-full min-w-[640px] border-collapse">
-        <thead className="sticky top-0 z-10 bg-panel"><tr>{['文件名', '仓库', '分支', '路径'].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
+        <thead className="sticky top-0 z-10 bg-panel"><tr>{['文件名', '路径', '仓库', '分支'].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
         <tbody>{page.options.map(option => {
           const selection = JSON.parse(option.value) as RepositoryFile;
           const repoName = repos.find(repo => repo.id === selection.repo)?.name ?? selection.repo;
@@ -31,9 +31,9 @@ function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos:
             if (!window.getSelection()?.toString()) onSelect(option.value);
           }}>
             <td className={td}><button type="button" className="cursor-pointer rounded-sm text-left font-medium text-ink hover:text-accent focus-visible:outline-2 focus-visible:outline-accent" aria-label={`预览 ${option.label}，${repoName}，${selection.file.ref}，${selection.file.path}`} onClick={() => onSelect(option.value)}><HighlightedText text={option.label} matches={option.matches?.label} /></button></td>
+            <td className={`${td} break-all font-mono text-[12px] text-muted`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></td>
             <td className={`${td} text-muted`}>{repoName}</td>
             <td className={`${td} text-muted`}>{selection.file.ref}</td>
-            <td className={`${td} break-all font-mono text-[12px] text-muted`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></td>
           </tr>;
         })}</tbody>
       </table>
