@@ -147,7 +147,7 @@ describe('节点集最终节点列表', () => {
 
   it('返回快照加载与解析报告，读取有效快照不重复拉取', async () => {
     let calls = 0;
-    const { alice } = await scenario(async (url) => {
+    const { alice, advance } = await scenario(async (url) => {
       calls++;
       if (url.endsWith('/bad')) throw new Error('上游不可用');
       return { status: 200, body: AIRPORT + '\ntrojan://broken' };
@@ -158,8 +158,13 @@ describe('节点集最终节点列表', () => {
     expect(res.json.total).toBe(3);
     expect(res.json.report.map((r: { code: string }) => r.code)).toEqual(['source.fetch-failed', 'source.parse-failure']);
     expect(calls).toBe(2);
+    // 刚失败的地址在退避期内不重试，仍报告失败；有效快照对应的地址不再拉取。
+    const again = await alice.get(`/api/nodesets/source/${id}/nodes`);
+    expect(again.json.report.map((r: { code: string }) => r.code)).toContain('source.fetch-failed');
+    expect(calls).toBe(2);
+    // 退避期过后，从未成功的地址重试。
+    advance(301_000);
     await alice.get(`/api/nodesets/source/${id}/nodes`);
-    // 从未成功的地址重试，有效快照对应的地址不再拉取。
     expect(calls).toBe(3);
   });
 });

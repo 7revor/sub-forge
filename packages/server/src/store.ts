@@ -308,6 +308,12 @@ export class Store {
     tx();
   }
 
+  /** 上游内容与最近一份成功快照相同：只更新拉取时间、状态码与流量信息，不新增一份，避免挤掉历史版本 */
+  touchSnapshot(id: number, s: { fetchedAt: number; status?: number; userinfo?: TrafficInfo }): void {
+    this.db.prepare('UPDATE snapshots SET fetched_at = ?, status = ?, userinfo = ? WHERE id = ?')
+      .run(s.fetchedAt, s.status ?? null, s.userinfo ? JSON.stringify(s.userinfo) : null, id);
+  }
+
   private toSnapshot(r: RawSnapshot): SnapshotRow {
     const s: SnapshotRow = { id: r.id, ownerKind: r.owner_kind, ownerId: r.owner_id, url: this.cipher.decrypt(r.url), fetchedAt: r.fetched_at, ok: r.ok === 1 };
     if (r.status !== null) s.status = r.status;

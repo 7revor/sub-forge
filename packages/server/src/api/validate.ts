@@ -4,6 +4,7 @@
 import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID, type OperatorStep, type Target } from '@sub-forge/core';
 import type { DocKind, DocTypes } from '../docs.ts';
 import type { Store, User } from '../store.ts';
+import { MIN_TTL_SEC } from '../snapshots.ts';
 import { bad, isStr } from './common.ts';
 
 const OPS = new Set(['filter.regex', 'filter.type', 'filter.useless', 'rename.regex', 'rename.delete', 'rename.affix', 'flag', 'sort.name', 'sort.regex', 'dedupe', 'set', 'script']);
@@ -16,6 +17,12 @@ const isHttpUrl = (v: unknown) => { if (typeof v !== 'string') return false; try
 function checkRegex(pattern: unknown, where: string): void {
   if (typeof pattern !== 'string') throw bad(`${where}：正则必须是字符串`);
   try { compileUserRegex(pattern); } catch (e) { throw bad(`${where}：${(e as Error).message}`); }
+}
+
+function checkFetch(fetch: unknown): void {
+  if (fetch === undefined) return;
+  if (!isObj(fetch)) throw bad('拉取参数格式错误');
+  if (fetch.ttlSec !== undefined && !(typeof fetch.ttlSec === 'number' && fetch.ttlSec >= MIN_TTL_SEC)) throw bad(`快照有效期不能短于 ${MIN_TTL_SEC / 60} 分钟`);
 }
 
 function checkPipeline(steps: unknown, where: string, user: User): void {
@@ -75,6 +82,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       } else if (doc.kind === 'local') {
         if (typeof doc.content !== 'string') throw bad('本地订阅源需要 content');
       } else throw bad('kind 只能是 remote 或 local');
+      checkFetch(doc.fetch);
       if (doc.pipeline === undefined) doc.pipeline = [];
       checkPipeline(doc.pipeline, '处理链', user);
       break;
@@ -108,6 +116,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (doc.kind === 'remote') { if (!isHttpUrl(doc.url)) throw bad('远程规则集需要 http(s) 地址'); }
       else if (doc.kind === 'local') { if (typeof doc.content !== 'string') throw bad('本地规则集需要 content'); }
       else throw bad('kind 只能是 remote 或 local');
+      checkFetch(doc.fetch);
       if ((doc.format === 'mrs') && doc.behavior !== 'domain' && doc.behavior !== 'ipcidr') throw bad('mrs 规则集需要声明 behavior 为 domain 或 ipcidr');
       break;
     }
