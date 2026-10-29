@@ -13,6 +13,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
+import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, Modal, PageHeader, PageScroll, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
@@ -25,52 +26,64 @@ import { draftIssues } from './template/model.ts';
 
 type TemplateDetailData = { item: TemplateDoc; versions: { version: number; changelog?: string; createdAt: number }[] };
 
-/** 管理员模板列表：左侧选择模板，右侧查看骨架、规则与版本，并进入编辑或发布。 */
+/** 模板列表与其他文档列表保持一致；骨架、规则与版本记录在独立详情页查看。 */
 export function TemplateList() {
   const list = usePagedList('templates');
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const profiles = useList('profiles');
-  const selId = params.get('id') ?? list.data?.items[0]?.id;
+  const selectedId = params.get('id');
   const inUse = (id: string) => (profiles.data ?? []).filter((p) => p.template?.id === id).length;
+  // 兼容发布完成和旧书签中的模板定位链接。
+  if (selectedId) return <Navigate to={`/templates/${encodeURIComponent(selectedId)}/overview`} replace />;
   return (
     <>
       <PageHeader title="模板"
         actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
       <ErrorAlert error={list.error} />
-      <div className="template-list-layout grid min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-1">
-        <section className="list-panel" aria-busy={list.isFetching}>
-          <div className="shrink-0 px-4 py-3.5"><Input aria-label="搜索模板" placeholder="搜索名称" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
-          <nav key={`${list.data?.page}-${list.pageSize}-${list.q}`} aria-label="模板列表" className="min-h-0 flex-1 overflow-auto overscroll-contain">
-            {!list.data ? <div className="p-4 text-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !list.data.items.length ? <Empty title={list.q.trim() ? `没有名称包含「${list.q.trim()}」的模板` : '还没有模板'} /> : list.data.items.map(t => {
-              const on = t.id === selId;
+      <section className="list-panel" aria-label="模板列表" aria-busy={list.isFetching}>
+        <div className="shrink-0 px-4 py-3.5"><Input aria-label="搜索模板" placeholder="搜索名称" className="max-w-[280px]" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
+        <div key={`${list.data?.page}-${list.pageSize}-${list.q}`} className="min-h-0 flex-1 overflow-auto overscroll-contain">
+          {!list.data ? <div className="p-4 text-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !list.data.items.length ? (
+            <div className="p-4"><Empty title={list.q.trim() ? `没有名称包含「${list.q.trim()}」的模板` : '还没有模板'} action={!list.q.trim() && <Link to="/templates/new" className={buttonClass('default', 'sm')}>新建模板</Link>} /></div>
+          ) : <table className="w-full border-collapse">
+            <thead><tr>{['名称', '版本', '策略组', '规则', '使用情况'].map(label => <th key={label} className={th}>{label}</th>)}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
+            <tbody>{list.data.items.map(t => {
               const n = inUse(t.id);
-              return (
-                <button key={t.id} type="button" aria-current={on || undefined} onClick={() => setParams(previous => {
-                  const next = new URLSearchParams(previous); next.set('id', t.id); return next;
-                }, { replace: true })}
-                  className={cx('flex w-full cursor-pointer flex-col gap-1 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'bg-panel hover:bg-ground')}>
-                  <span className="flex justify-between gap-2"><span className="text-[13.5px] font-semibold">{t.name ?? t.id}</span><span className="font-mono text-[12px] text-muted">v{t.version}</span></span>
-                  <span className="text-[12px] text-muted">{t.groups.length} 个策略组 · {t.rules.length} 条规则</span>
-                  <span className="text-[12px] text-ink-2">{n ? `你有 ${n} 个配置订阅在用` : '未使用'}</span>
-                </button>
-              );
-            })}
-          </nav>
-          <Pagination compact page={list.data?.page ?? list.page} pageSize={list.pageSize} total={list.data?.total ?? 0} totalPages={list.data?.totalPages ?? 1}
-            busy={list.isFetching || !list.data} onPage={list.setPage} onPageSize={list.setPageSize} />
-        </section>
-        <div className="min-h-0 min-w-0 overflow-auto overscroll-contain">
-          <div className="flex min-w-0 flex-col gap-5">
-            {selId && <TemplateDetail key={selId} id={selId} inUse={inUse(selId)} actions={<>
-              <Link to={`/templates/${selId}`} className={buttonClass()}>编辑新版本</Link>
-              <Link to={`/templates/${selId}/publish`} className={buttonClass()}>发布</Link>
-              <Link to={`/profiles/new?template=${encodeURIComponent(selId)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
-            </>} />}
-          </div>
+              const path = `/templates/${encodeURIComponent(t.id)}`;
+              return <DocTableRow key={t.id} to={path}>
+                <td className={td}><Link to={path} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
+                <td className={cx(td, 'font-mono')}>v{t.version}</td>
+                <td className={td}>{t.groups.length} 个</td>
+                <td className={td}>{t.rules.length} 条</td>
+                <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{n ? `${n} 个配置订阅在用` : '未使用'}</td>
+                <td className={cx(td, 'whitespace-nowrap text-right')}><div className="flex justify-end gap-2">
+                  <DocActionLink to={`${path}/overview`} name={t.name ?? t.id} viewOnly />
+                  <DocActionLink to={path} name={t.name ?? t.id} />
+                  <Link to={`${path}/publish`} className={buttonClass('default', 'sm')}>发布</Link>
+                  <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
+                </div></td>
+              </DocTableRow>;
+            })}</tbody>
+          </table>}
         </div>
-      </div>
+        <Pagination page={list.data?.page ?? list.page} pageSize={list.pageSize} total={list.data?.total ?? 0} totalPages={list.data?.totalPages ?? 1}
+          busy={list.isFetching || !list.data} onPage={list.setPage} onPageSize={list.setPageSize} />
+      </section>
     </>
   );
+}
+
+function TemplateOverview({ id }: { id: string }) {
+  const profiles = useList('profiles');
+  return <>
+    <PageHeader title="模板详情" crumbs={<Link to="/templates" className="text-muted no-underline">模板</Link>}
+      actions={<Link to="/templates" className={buttonClass()}>返回列表</Link>} />
+    <PageScroll><TemplateDetail id={id} inUse={(profiles.data ?? []).filter(p => p.template?.id === id).length} actions={<>
+      <Link to={`/templates/${id}`} className={buttonClass()}>编辑新版本</Link>
+      <Link to={`/templates/${id}/publish`} className={buttonClass()}>发布</Link>
+      <Link to={`/profiles/new?template=${encodeURIComponent(id)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
+    </>} /></PageScroll>
+  </>;
 }
 
 const RULE_PREVIEW = 8;
@@ -149,7 +162,8 @@ function skeleton(): TemplateBody {
 }
 
 export function TemplateEdit() {
-  const { id = 'new' } = useParams();
+  const { id = 'new', tab } = useParams();
+  if (id !== 'new' && tab === 'overview') return <TemplateOverview key={id} id={id} />;
   return <TemplatePage key={id} id={id} />;
 }
 

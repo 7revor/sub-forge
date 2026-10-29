@@ -1,7 +1,8 @@
 import type { Builtin, Matcher, ReportItem, Target } from '@sub-forge/core';
+import { Plus } from 'lucide-react';
 import { BUILTINS } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
-import { ReportList, Select } from '../../components/ui.tsx';
+import { buttonClass, ReportList, Select } from '../../components/ui.tsx';
 import type { ConvertCtx, NamedRef } from '../../convert/templateYaml.ts';
 
 export function matcherLabel(matcher: Matcher, ctx: ConvertCtx): string {
@@ -9,17 +10,17 @@ export function matcherLabel(matcher: Matcher, ctx: ConvertCtx): string {
   return matcher.repository?.name ?? `本地 · ${ctx.rulesets.find((r) => r.id === matcher.id)?.name ?? (matcher.id || '未选择')}`;
 }
 
-export function TemplateTargetSelect({ value, onChange, groups, label }: {
-  value: Target | undefined; onChange: (value: Extract<Target, { kind: 'group' | 'builtin' }>) => void; groups: NamedRef[]; label: string;
+export function TemplateTargetSelect({ value, onChange, groups, label, action = false }: {
+  value: Target | undefined; onChange: (value: Extract<Target, { kind: 'group' | 'builtin' }>) => void; groups: NamedRef[]; label: string; action?: boolean;
 }) {
   const key = value?.kind === 'group' ? `group:${value.groupId}` : value?.kind === 'builtin' ? `builtin:${value.name}` : '';
   const missing = value?.kind === 'group' && !groups.some((g) => g.id === value.groupId);
-  return <Select aria-label={label} value={key} onChange={(e) => {
+  return <Select aria-label={label} value={key} className={action ? buttonClass('default', 'sm', 'self-start') : undefined} style={action ? { width: 'auto' } : undefined} onChange={(e) => {
     const key = e.target.value;
     if (key.startsWith('group:')) onChange({ kind: 'group', groupId: key.slice(6) });
     else if (key.startsWith('builtin:')) onChange({ kind: 'builtin', name: key.slice(8) as Builtin });
   }}>
-    <option value="" disabled>{value?.kind === 'node' ? '不支持节点出口，请重新选择' : '请选择'}</option>
+    <option value="" disabled>{action ? <span className="inline-flex items-center gap-2"><Plus size={14} />添加成员</span> : value?.kind === 'node' ? '不支持节点出口，请重新选择' : '请选择'}</option>
     {missing && <option value={key}>已不存在：{value.groupId}</option>}
     <optgroup label="模板组">{groups.map((g) => <option key={g.id} value={`group:${g.id}`}>{g.name || '未命名组'}</option>)}</optgroup>
     <optgroup label="内置策略">{BUILTINS.map((name) => <option key={name} value={`builtin:${name}`}>{name}</option>)}</optgroup>

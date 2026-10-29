@@ -52,8 +52,9 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           <div className="flex h-[38px] items-center gap-2"><Switch label="隐藏策略组" checked={group.display?.hidden ?? false} onChange={(hidden) => update({ display: { ...group.display, hidden } })} /><span className="text-[13px]">隐藏策略组</span></div>
         </div>
         <section className="flex min-w-0 flex-col gap-3 border-t border-line pt-4" aria-label="策略组成员">
-          <div className="flex items-center justify-between"><h3 className="m-0 text-[14px] font-semibold">成员</h3><span className="text-[12px] text-muted">{group.members.length} 个</span></div>
-          <Field label="添加成员">{() => <TemplateTargetSelect label="添加成员" value={undefined} groups={value.groups.filter((g) => g.id !== group.id)} onChange={(member) => update({ members: [...group.members, member] })} />}</Field>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-muted">{group.members.length} 个</span></h3>
+            <TemplateTargetSelect action label="添加成员" value={undefined} groups={value.groups.filter((g) => g.id !== group.id)} onChange={(member) => update({ members: [...group.members, member] })} />
+          </div>
           {!group.members.length ? <Empty title="还没有成员" /> : <div className="rounded-lg border border-line bg-panel px-3">
             <SortableList items={group.members} onReorder={(members) => update({ members })} renderItem={(m, index, handle) => <div className="flex items-center gap-2 border-b border-line-2 py-2 last:border-0">
               {handle}<span className="min-w-0 flex-1 break-all text-[13px]">{memberLabel(m, groupName, (ref) => ref.id).text}</span>
