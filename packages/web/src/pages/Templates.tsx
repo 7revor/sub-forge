@@ -13,8 +13,7 @@ import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError,
 import { useList, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { usePagedList } from '../hooks/usePagedList.ts';
-import { alertError } from '../feedback.ts';
-import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
+import { newId, templateFromYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { boundTemplateId } from './profile/routing.ts';
 import { TemplateGroupsEditor } from './template/TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from './template/TemplateRulesEditor.tsx';
@@ -104,13 +103,13 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
     else next.add(id);
     return next;
   });
-  const [yaml, setYaml] = useState<{ mode: 'edit' | 'import'; text: string; original: string }>();
+  const [yaml, setYaml] = useState<string>();
   const [discardYaml, setDiscardYaml] = useState(false);
   const [validation, setValidation] = useState<{ draft: TemplateDraft; report: ReportItem[]; error?: string }>();
   const [savedWarnings, setSavedWarnings] = useState<ReportItem[]>([]);
   const body = draft.body;
   const dirty = stableStringify(draft) !== stableStringify(base);
-  const yamlDirty = !!yaml && yaml.text !== yaml.original;
+  const yamlDirty = yaml !== undefined && yaml !== '';
   const { blocker, leave } = useLeaveGuard(dirty || yamlDirty);
   const showingLeave = blocker.state === 'blocked';
   const currentValidation = validation?.draft === draft ? validation : undefined;
@@ -156,14 +155,9 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   });
   useEffect(() => { save.reset(); if (dirty) setSavedWarnings([]); }, [draft]); // 草稿变化后清除上一次保存结果。
   const failure = save.error instanceof ApiError && save.error.details && typeof save.error.details === 'object' ? save.error.details as { report?: ReportItem[]; impact?: ImpactEntry[] } : undefined;
-  const canSave = !!draft.name.trim() && !errors.length && !currentValidation?.error && !yaml && !save.isPending;
-  const yamlResult = useMemo(() => yaml ? templateFromYaml(yaml.text, body, ctx) : undefined, [yaml?.text, body, rulesets.data]);
-  const openYaml = (mode: 'edit' | 'import') => {
-    try {
-      const text = mode === 'edit' ? templateToYaml(body, ctx) : '';
-      setYaml({ mode, text, original: text }); setDiscardYaml(false);
-    } catch (error) { alertError(error instanceof Error ? error.message : String(error)); }
-  };
+  const canSave = !!draft.name.trim() && !errors.length && !currentValidation?.error && yaml === undefined && !save.isPending;
+  const yamlResult = useMemo(() => yaml !== undefined ? templateFromYaml(yaml, body, ctx) : undefined, [yaml, body, rulesets.data]);
+  const openYaml = () => { setYaml(''); setDiscardYaml(false); };
   const closeYaml = () => { if (yamlDirty) setDiscardYaml(true); else setYaml(undefined); };
 
   return <>
@@ -192,8 +186,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
             <span className="text-[12.5px] text-muted">{body.groups.length} 个策略组 · {body.rules.length} 条规则{!isNew && ` · ${inUse} 个绑定订阅`}</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => openYaml('import')}>从 YAML 导入</Button>
-            <Button disabled={!!draftIssues(body).length} onClick={() => openYaml('edit')}>编辑 YAML</Button>
+            <Button onClick={openYaml}>从 YAML 导入</Button>
             {!isNew && <Link to={`/profiles/new?template=${encodeURIComponent(id)}`} className={buttonClass()}>新建配置订阅</Link>}
           </div>
         </section>
@@ -201,11 +194,11 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
         <TemplateRulesEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : rule} onSelect={setRule} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
     </PageScroll>
-    <Modal title={yaml?.mode === 'import' ? '从 YAML 导入' : '编辑 YAML'} open={!!yaml && !showingLeave} onClose={closeYaml} wide footer={discardYaml ? <>
-      <span className="mr-auto self-center text-[12px] text-muted">放弃这次 YAML 修改？</span><Button onClick={() => setDiscardYaml(false)}>继续编辑</Button><Button variant="danger" onClick={() => { setYaml(undefined); setDiscardYaml(false); }}>放弃修改</Button>
+    <Modal title="从 YAML 导入" open={yaml !== undefined && !showingLeave} onClose={closeYaml} wide footer={discardYaml ? <>
+      <span className="mr-auto self-center text-[12px] text-muted">放弃这次 YAML 导入？</span><Button onClick={() => setDiscardYaml(false)}>继续导入</Button><Button variant="danger" onClick={() => { setYaml(undefined); setDiscardYaml(false); }}>放弃导入</Button>
     </> : <><Button onClick={closeYaml}>取消</Button><Button variant="primary" disabled={!yamlResult?.ok} onClick={() => { if (yamlResult?.ok) { updateBody(yamlResult.value); setYaml(undefined); } }}>应用到模板</Button></>}>
-      <Field label="mihomo YAML" hint="应用后仍需保存模板。">{fid => <YamlTextarea id={fid} rows={18} spellCheck={false} value={yaml?.text ?? ''} onChange={e => { setYaml(current => current && { ...current, text: e.target.value }); setDiscardYaml(false); }} />}</Field>
-      {!!yaml?.text.trim() && yamlResult && !yamlResult.ok && <FieldError error={`第 ${yamlResult.line ?? 1} 行：${yamlResult.error}`} />}
+      <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，应用后仍需保存模板。">{fid => <YamlTextarea id={fid} rows={18} spellCheck={false} value={yaml ?? ''} onChange={e => { setYaml(e.target.value); setDiscardYaml(false); }} />}</Field>
+      {!!yaml?.trim() && yamlResult && !yamlResult.ok && <FieldError error={`第 ${yamlResult.line ?? 1} 行：${yamlResult.error}`} />}
       {yamlResult?.ok && yamlResult.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-muted">{yamlResult.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
     </Modal>
     <LeaveDialog blocker={blocker} what="模板" canSave={canSave} pending={save.isPending} error={save.error}
