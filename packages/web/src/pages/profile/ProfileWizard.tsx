@@ -2,7 +2,7 @@
 
 import { Check } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Button, Card, ErrorBox, Field, Input, PageHeader, cx } from '../../components/ui.tsx';
 import { useSaveDoc, useTemplates, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
@@ -18,7 +18,9 @@ export function ProfileWizard() {
   const navigate = useNavigate();
   const templates = useTemplates();
   const save = useSaveDoc('profiles');
-  const [draft, setDraft] = useState<ProfileDoc>({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' } });
+  // 从模板页「用这个模板新建配置订阅」进入时预选模板
+  const preset = useSearchParams()[0].get('template');
+  const [draft, setDraft] = useState<ProfileDoc>({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, ...(preset ? { template: { id: preset, follow: 'latest' as const } } : {}) });
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const { ctx, template } = useProfileCtx(draft, setDraft);
