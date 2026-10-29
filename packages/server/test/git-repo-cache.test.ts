@@ -13,7 +13,7 @@ vi.mock('node:child_process', async importOriginal => {
     const [command, input, options] = args;
     if (command !== 'git') return original.spawn(...args);
     if (transport.hang) {
-      const child = original.spawn(process.execPath, ['-e', "const {spawn}=require('child_process');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(child.pid);setInterval(()=>{},1000)"], options);
+      const child = original.spawn(process.execPath, ['-e', "const {spawn}=require('child_process');const child=spawn(process.execPath,['-e','process.on(\"SIGTERM\",()=>{});setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(child.pid);setInterval(()=>{},1000)"], options);
       if (child.pid) transport.pids.push(child.pid);
       child.stdout?.on('data', data => { const pid = Number(String(data).trim()); if (pid) transport.pids.push(pid); });
       return child;

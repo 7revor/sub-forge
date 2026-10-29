@@ -255,6 +255,7 @@ export class RuleRepoService {
     return JSON.parse(response.body) as T;
   }
   private async readFile(repo: RepoDefinition, file: RepoFile): Promise<string> {
+    this.assertEnabled(repo.id);
     if (file.commit) return this.cache.read(repo, file.commit, file.path);
     // 迁移前的旧索引仍可使用；首次 Git 同步后每个文件均携带固定提交。
     const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
@@ -327,13 +328,16 @@ export class RuleRepoService {
     const version = this.snapshotVersion(id);
     const entry = this.entry(id, path);
     const repo = this.definition(id, true);
-    if (entry.variants.some(v => v.readme)) {
-      for (const client of ['mihomo', 'surge', 'any'] as const) {
-        const file = entry.variants.find(v => v.client === client && v.readme)?.files[0];
-        if (!file) continue;
-        const readme = { ...file, path: file.path.replace(/[^/]+$/, 'README.md') };
-        applyReadme(entry, client, await this.readFile(repo, readme));
-      }
+    const readmes = new Set<string>();
+    for (const variant of [...entry.variants]) {
+      const file = variant.files[0];
+      if (!variant.readme || !file) continue;
+      const directory = file.path.slice(0, file.path.lastIndexOf('/') + 1);
+      const key = JSON.stringify([variant.client, file.ref, directory]);
+      if (readmes.has(key)) continue;
+      readmes.add(key);
+      const readme = { ...file, path: directory + 'README.md' };
+      applyReadme(entry, variant.client, await this.readFile(repo, readme), { ref: file.ref, directory });
     }
     this.assertSnapshot(id, version);
     return entry;

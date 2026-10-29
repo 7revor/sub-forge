@@ -44,6 +44,16 @@ describe('规则仓库适配器', () => {
     applyReadme(china, 'surge', readme);
     expect(china.variants.find(v => v.recommended)?.files.map(f => f.behavior)).toEqual(['classical', 'domain']);
   });
+  it('README 建议限定同分支和目录，不混用其他扫描范围的文件', () => {
+    const base = BUILTIN_REPOS[0]!;
+    const repo = { ...base, id: '任意仓库', refs: ['one', 'two'], scans: ['one', 'two'].map(ref => ({ ...base.scans[5]!, ref, directory: 'custom', include: ['**/*.list'], exclude: [], format: 'auto' as const })) };
+    const paths = ['custom/China/China.list', 'custom/China/China_Domain.list'];
+    const entry = buildEntries(repo, { one: paths, two: paths })[0]!;
+    applyReadme(entry, 'surge', readme, { ref: 'two', directory: 'custom/China/' });
+    const combination = entry.variants.find(v => v.files.length === 2)!;
+    expect(combination.files.every(f => f.ref === 'two')).toBe(true);
+    expect(entry.variants.filter(v => v.files[0]?.ref === 'one').every(v => v.files.every(f => f.format === 'auto'))).toBe(true);
+  });
   it('所有适配器仅接受 list/txt，Clash YAML 与二进制不进入索引', () => {
     const black = buildEntries(BUILTIN_REPOS[0]!, { master: ['rule/Clash/OnlyYaml/OnlyYaml.yaml', 'rule/Clash/OnlyYml/OnlyYml.yml', 'rule/Surge/OpenAI/OpenAI.list', 'rule/Clash/Text/Text.txt', 'rule/Surge/Binary/Binary.mrs'] });
     expect(black.map(e => e.path)).toEqual(['OpenAI', 'Text']);

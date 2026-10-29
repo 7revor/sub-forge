@@ -66,9 +66,10 @@ export function buildEntries(repo: RepoDefinition, trees: Record<string, string[
 }
 
 /** 只读取「使用说明 / 配置建议」段，避免把上游来源中的文件名误当成组合。 */
-export function applyReadme(entry: IndexedEntry, client: RepoVariant['client'], readme: string): void {
+export function applyReadme(entry: IndexedEntry, client: RepoVariant['client'], readme: string, scope?: { ref: string; directory: string }): void {
+  const matches = (v: RepoVariant) => v.client === client && (!scope || v.files.every(f => f.ref === scope.ref && f.path.slice(0, f.path.lastIndexOf('/') + 1) === scope.directory));
   const usage = /#### 使用说明\s*([\s\S]*?)(?=#### |## |$)/.exec(readme)?.[1] ?? '';
-  for (const variant of entry.variants.filter(v => v.client === client)) {
+  for (const variant of entry.variants.filter(matches)) {
     const file = variant.files[0]!;
     const filename = file.path.split('/').at(-1)!;
     const line = usage.split('\n').find(l => l.startsWith(`- ${filename}，`));
@@ -83,16 +84,16 @@ export function applyReadme(entry: IndexedEntry, client: RepoVariant['client'], 
     const match = /^- ([^。]+?)\s+(单独使用|共同使用)。/.exec(line);
     if (!match) continue;
     const names = match[1]!.split('、');
-    const parts = names.map(name => entry.variants.find(v => v.client === client && v.files.length === 1 && v.files[0]!.path.split('/').at(-1) === name));
+    const parts = names.map(name => entry.variants.find(v => matches(v) && v.files.length === 1 && v.files[0]!.path.split('/').at(-1) === name));
     if (parts.some(p => !p)) continue;
     let variant = parts[0]!;
     if (parts.length > 1) {
-      variant = { id: `${client}:组合:${names.join('+')}`, client, label: names.join(' + '), files: parts.flatMap(p => p!.files) };
+      variant = { id: `${client}:组合:${scope ? `${scope.ref}:${scope.directory}:` : ''}${names.join('+')}`, client, label: names.join(' + '), files: parts.flatMap(p => p!.files) };
       if (!entry.variants.some(v => v.id === variant.id)) entry.variants.push(variant);
     }
     first ??= variant;
   }
   if (first) {
-    for (const v of entry.variants.filter(v => v.client === client)) v.recommended = v.id === first.id;
+    for (const v of entry.variants.filter(matches)) v.recommended = v.id === first.id;
   }
 }

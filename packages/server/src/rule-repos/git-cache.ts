@@ -24,7 +24,7 @@ export class GitRepoCache implements RepoCache {
     const dir = this.directory(repo);
     const previous = this.queues.get(dir);
     const job = (async () => {
-      if (previous) await previous.catch(() => undefined); // 前一调用已向调用方报告错误，队列仍允许重试。
+      if (previous) await Promise.allSettled([previous]); // 前一调用已向调用方报告错误，队列仍允许重试。
       if (this.stopped) throw new Error('Git 缓存已停止');
       await mkdir(dir, { recursive: true });
       const lockPath = join(dir, 'sync.lock');
@@ -72,7 +72,9 @@ export class GitRepoCache implements RepoCache {
       child.stderr.on('data', (data: Buffer) => { errors = (errors + data.toString('utf8')).slice(-4000); });
       child.on('error', error => { failure = error; });
       child.on('close', code => {
-        clearTimeout(timeout); if (killTimer) clearTimeout(killTimer); this.running.delete(cancel);
+        clearTimeout(timeout);
+        if (killTimer) { kill('SIGKILL'); clearTimeout(killTimer); }
+        this.running.delete(cancel);
         if (failure || code !== 0) reject(failure ?? new Error(`Git 更新失败（${code}）：${errors.trim()}`));
         else resolveResult(output.toString('utf8'));
       });

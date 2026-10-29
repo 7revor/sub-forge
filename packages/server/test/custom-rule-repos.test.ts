@@ -198,7 +198,7 @@ describe('动态仓库编辑与一致性', () => {
   });
 });
 
-it('数据库写入失败回滚整个快照，删除失败不影响既有索引', async () => {
+it('数据库写入失败回滚整个快照，恢复后可重新同步', async () => {
   const h = setup(); const id = await h.service.addCustom({ url }); await h.service.refresh(id);
   const before = h.service.search('', id, undefined, 0, 50);
   const revisions = h.service.list().find(r => r.id === id)!.revisions;
