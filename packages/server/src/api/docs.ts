@@ -1,5 +1,6 @@
 // 文档增删改查：订阅源、组合、本地节点组、规则集、配置订阅（按用户隔离），基础设置预设（管理员维护，所有人可读）。
 
+import { readPagination } from './pagination.ts';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { DocKind } from '../docs.ts';
@@ -35,7 +36,11 @@ export function docRoutes(store: Store) {
       if (shared && role !== 'admin') throw new HttpError(403, '需要管理员权限');
     };
 
-    app.get(`/${seg}`, (c) => c.json({ items: shared ? store.list(kind) : store.list(kind, c.get('user').id) }));
+    app.get(`/${seg}`, (c) => {
+      const options = readPagination(c.req.query());
+      const owner = shared ? undefined : c.get('user').id;
+      return c.json(options ? store.listPage(kind, options, owner) : { items: store.list(kind, owner) });
+    });
 
     app.get(`/${seg}/:id`, (c) => {
       const row = load(c.req.param('id'), c.get('user').id);

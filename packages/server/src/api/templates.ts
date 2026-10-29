@@ -5,6 +5,7 @@
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
 import { ruleSetDelivery, parseRuleSourceContent, validateTemplate, sourceLabel, type ReportItem, type RuleSet, type Template } from '@sub-forge/core';
+import { readPagination } from './pagination.ts';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { TemplateVersionDoc } from '../docs.ts';
@@ -72,7 +73,10 @@ function draftFrom(body: Record<string, unknown>, id: string, version: number): 
 export function templateRoutes(store: Store, renderer: RenderService, snapshots: SnapshotService) {
   const app = new Hono<ApiEnv>();
 
-  app.get('/templates', requireUser, (c) => c.json({ items: store.listLatestTemplates() }));
+  app.get('/templates', requireUser, (c) => {
+    const options = readPagination(c.req.query());
+    return c.json(options ? store.listLatestTemplatesPage(options) : { items: store.listLatestTemplates() });
+  });
 
   app.get('/templates/:id', requireUser, (c) => {
     const t = store.getTemplate(c.req.param('id'));
