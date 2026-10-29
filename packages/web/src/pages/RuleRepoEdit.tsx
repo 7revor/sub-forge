@@ -1,13 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type RepoScan, type RuleRepo } from '../api.ts';
+import { api, type RuleRepo } from '../api.ts';
 import { Button, Card, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Textarea } from '../components/ui.tsx';
 
-const blankScan = () => ({ ref: '', directory: '', include: '**/*.list\n**/*.txt', exclude: '', format: 'auto', client: 'any', groupBy: 'path', readme: false, preferred: '' });
-const lines = (text: string) => text.split('\n').map(s => s.trim()).filter(Boolean);
-const toForm = (scan: RepoScan) => ({ ...scan, include: scan.include.join('\n'), exclude: scan.exclude.join('\n'), preferred: scan.preferred.join('\n') });
+import { blankRepoFilter, blankRepoLocation, groupRepoLocations, patternLines, serializeRepoLocations, type RepoFileFilter, type RepoLocation } from '../domain/repoLocations.ts';
 
 export function RuleRepoEditorPage() {
   const { id } = useParams();
@@ -27,15 +25,17 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
   const { search } = useLocation();
   const back = `/rule-repo${search}`;
   // 保留打开页面时的配置版本；后台刷新只更新同步状态，不覆盖编辑草稿。
-  const [initial] = useState(() => ({ repo, form: { name: repo?.name ?? '', url: repo?.url ?? '', license: repo?.license ?? '' }, scans: repo?.scans.map(toForm) ?? [blankScan()] }));
+  const [initial] = useState(() => ({ repo, form: { name: repo?.name ?? '', url: repo?.url ?? '', license: repo?.license ?? '' }, locations: repo ? groupRepoLocations(repo.scans) : [blankRepoLocation(0)] }));
   const [form, setForm] = useState(initial.form);
-  const [scans, setScans] = useState(initial.scans);
-  const dirty = JSON.stringify({ form, scans }) !== JSON.stringify({ form: initial.form, scans: initial.scans });
+  const [locations, setLocations] = useState(initial.locations);
+  const nextLocationId = useRef(locations.length);
+  const scanCount = locations.reduce((sum, l) => sum + l.filters.length, 0);
+  const dirty = JSON.stringify({ form, locations }) !== JSON.stringify({ form: initial.form, locations: initial.locations });
   const save = useMutation({
     meta: { successMessage: initial.repo ? '仓库配置已保存' : '仓库已添加，正在建立索引' },
     mutationFn: () => api(initial.repo ? 'PUT' : 'POST', initial.repo ? `/rule-repos/${initial.repo.id}` : '/rule-repos', {
       ...form, ...(form.license ? {} : { license: undefined }), configRevision: initial.repo?.configRevision,
-      scans: scans.map(s => ({ ...s, include: lines(s.include), exclude: lines(s.exclude), preferred: lines(s.preferred) })),
+      scans: serializeRepoLocations(locations),
     }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['rule-repos'] });
@@ -43,9 +43,9 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
     },
   });
   const { blocker, leave } = useLeaveGuard(dirty || save.isPending);
-  const canSave = !!form.url.trim() && scans.every(s => lines(s.include).length) && !save.isPending && !repo?.indexing;
+  const canSave = !!form.url.trim() && locations.every(l => l.filters.every(f => patternLines(f.include).length)) && !save.isPending && !repo?.indexing;
   const submit = () => { if (canSave) save.mutate(); };
-  const update = (index: number, patch: Partial<ReturnType<typeof blankScan>>) => setScans(scans.map((s, i) => i === index ? { ...s, ...patch } : s));
+  const updateLocation = (id: number, patch: Partial<RepoLocation>) => setLocations(locations.map(l => l.id === id ? { ...l, ...patch } : l));
   return <>
     <PageHeader title={repo ? '编辑仓库' : '新增仓库'} subtitle={repo?.name}
       crumbs={<><Link to={back} className="text-muted hover:text-accent">规则仓库</Link> / {repo ? '编辑' : '新增'}</>}
@@ -65,32 +65,52 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
     <Card title="基本信息" bodyClass="grid gap-4 px-4 pb-4 md:grid-cols-2">
       <Field label="GitHub 仓库地址" hint="公开仓库，如 https://github.com/owner/repo">{id => <Input id={id} autoFocus value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} />}</Field>
       <Field label="显示名称" hint="留空使用 owner/repo">{id => <Input id={id} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />}</Field>
-      <Field label="许可证说明" hint="留空使用上游信息">{id => <Input id={id} value={form.license} onChange={e => setForm({ ...form, license: e.target.value })} />}</Field>
+      <details className="md:col-span-2"><summary className="cursor-pointer text-[13px] text-muted">许可证说明</summary><div className="mt-3">
+        <Field label="许可证" hint="留空使用上游信息">{id => <Input id={id} value={form.license} onChange={e => setForm({ ...form, license: e.target.value })} />}</Field>
+      </div></details>
     </Card>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="m-0 text-[17px] font-semibold">扫描范围</h2><Button disabled={scans.length >= 20} onClick={() => setScans([...scans, blankScan()])}>添加扫描范围</Button></div>
-    <div className="grid items-start gap-4 xl:grid-cols-2">
-      {scans.map((scan, i) => <section key={i} aria-label={`扫描范围 ${i + 1}`} className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-panel p-4">
-        <div className="flex items-center justify-between"><strong className="text-[13px]">扫描范围 {i + 1}</strong><Button size="sm" disabled={scans.length === 1} onClick={() => setScans(scans.filter((_, n) => n !== i))}>移除范围</Button></div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-          <Field label="分支" hint="留空使用默认分支">{id => <Input id={id} value={scan.ref} onChange={e => update(i, { ref: e.target.value })} />}</Field>
-          <Field label="扫描目录" hint="留空扫描整个仓库，包含所有子目录">{id => <Input id={id} value={scan.directory} onChange={e => update(i, { directory: e.target.value })} />}</Field>
-        </div>
-        <Field label="包含文件" hint="相对扫描目录，每行一个模式；** 可跨目录。仅支持 .list 和 .txt。">{id => <Textarea id={id} rows={2} className="font-mono" value={scan.include} onChange={e => update(i, { include: e.target.value })} />}</Field>
-        <Field label="排除文件" hint="选填，每行一个模式，例如 tests/**">{id => <Textarea id={id} rows={2} className="font-mono" value={scan.exclude} onChange={e => update(i, { exclude: e.target.value })} />}</Field>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-          <Field label="规则格式">{id => <Select id={id} value={scan.format} onChange={e => update(i, { format: e.target.value })}><option value="auto">自动识别</option><option value="classical">classical 文本</option><option value="domain">域名文本</option><option value="domain-set">DOMAIN-SET 域名列表</option><option value="ipcidr">纯 CIDR</option></Select>}</Field>
-          <Field label="适用客户端">{id => <Select id={id} value={scan.client} onChange={e => update(i, { client: e.target.value })}><option value="any">通用</option><option value="mihomo">Mihomo</option><option value="surge">Surge</option></Select>}</Field>
-        </div>
-        <details><summary className="cursor-pointer text-[13px] text-muted">分组与推荐设置</summary><div className="mt-3 flex flex-col gap-3">
-          <Field label="文件分组" hint="同组文件显示为同一规则的不同变体">{id => <Select id={id} value={scan.groupBy} onChange={e => update(i, { groupBy: e.target.value })}><option value="path">每个完整路径独立展示</option><option value="directory">按扫描目录内的父目录分组</option><option value="stem">按相对路径去除扩展名和尾空格分组</option></Select>}</Field>
-          <Field label="优先推荐文件" hint="选填，按文件名匹配，每行一个通配模式">{id => <Textarea id={id} rows={2} value={scan.preferred} onChange={e => update(i, { preferred: e.target.value })} />}</Field>
-          <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={scan.readme} onChange={e => update(i, { readme: e.target.checked })} />读取同目录 README 的使用说明与配置建议</label>
-        </div></details>
-      </section>)}
-    </div>
-      <p className="m-0 text-[12px] text-muted">范围重叠时使用上方配置。更新失败会保留旧索引；已导入的来源地址不随配置修改。</p>
+    <Card title="规则位置" subtitle="默认扫描所有子目录中的 .list 和 .txt 文件，内容自动识别。"
+      actions={<Button disabled={scanCount >= 20} onClick={() => setLocations([...locations, blankRepoLocation(nextLocationId.current++)])}>添加位置</Button>}>
+      <div className="grid items-start gap-3 xl:grid-cols-2">
+        {locations.map((location, i) => <section key={location.id} aria-label={`规则位置 ${i + 1}`} className="rounded-lg border border-line-2 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3"><strong className="text-[13px]">位置 {i + 1}</strong>
+            {locations.length > 1 && <Button size="sm" variant="ghost" onClick={() => setLocations(locations.filter(l => l.id !== location.id))}>移除位置</Button>}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="分支" hint="留空使用默认分支">{id => <Input id={id} value={location.ref} onChange={e => updateLocation(location.id, { ref: e.target.value })} />}</Field>
+            <Field label="目录" hint="留空扫描整个仓库">{id => <Input id={id} value={location.directory} onChange={e => updateLocation(location.id, { directory: e.target.value })} />}</Field>
+          </div>
+          <details className="mt-3"><summary className="cursor-pointer text-[13px] text-muted">文件筛选与更多设置{location.filters.length > 1 ? ` · ${location.filters.length} 组` : ''}</summary>
+            <div className="mt-3 flex flex-col gap-4">
+              <p className="m-0 text-[12px] text-muted">已有设置会保留，通常无需修改。多组筛选按从上到下的顺序匹配。</p>
+              {location.filters.map((filter, n) => <section key={n} aria-label={`位置 ${i + 1} 文件筛选 ${n + 1}`} className="flex flex-col gap-3 border-t border-line-2 pt-3">
+                {location.filters.length > 1 && <div className="flex items-center justify-between"><strong className="text-[13px]">筛选 {n + 1}</strong><Button size="sm" onClick={() => updateLocation(location.id, { filters: location.filters.filter((_, k) => k !== n) })}>移除筛选</Button></div>}
+                <FileFilterFields filter={filter} onChange={patch => updateLocation(location.id, { filters: location.filters.map((f, k) => k === n ? { ...f, ...patch } : f) })} />
+              </section>)}
+              <div><Button size="sm" disabled={scanCount >= 20} onClick={() => updateLocation(location.id, { filters: [...location.filters, blankRepoFilter()] })}>添加文件筛选</Button></div>
+            </div>
+          </details>
+        </section>)}
+      </div>
+    </Card>
     </fieldset>
     </form>
     </PageScroll>
+  </>;
+}
+
+function FileFilterFields({ filter, onChange }: { filter: RepoFileFilter; onChange: (patch: Partial<RepoFileFilter>) => void }) {
+  return <>
+    <div className="grid gap-3 md:grid-cols-2">
+      <Field label="包含文件" hint="每行一个模式；** 可跨目录">{id => <Textarea id={id} rows={2} className="font-mono" value={filter.include} onChange={e => onChange({ include: e.target.value })} />}</Field>
+      <Field label="排除文件" hint="选填，例如 tests/**">{id => <Textarea id={id} rows={2} className="font-mono" value={filter.exclude} onChange={e => onChange({ exclude: e.target.value })} />}</Field>
+    </div>
+    <details><summary className="cursor-pointer text-[13px] text-muted">兼容与展示设置</summary><div className="mt-3 grid gap-3 md:grid-cols-2">
+      <Field label="格式标记" hint="保留已有标记；预览和导入仍按内容识别">{id => <Select id={id} value={filter.format} onChange={e => onChange({ format: e.target.value })}><option value="auto">自动识别</option><option value="classical">classical 文本</option><option value="domain">域名文本</option><option value="domain-set">DOMAIN-SET 域名列表</option><option value="ipcidr">纯 CIDR</option></Select>}</Field>
+      <Field label="客户端分类">{id => <Select id={id} value={filter.client} onChange={e => onChange({ client: e.target.value as RepoFileFilter['client'] })}><option value="any">通用</option><option value="mihomo">Mihomo</option><option value="surge">Surge</option></Select>}</Field>
+      <Field label="文件分组">{id => <Select id={id} value={filter.groupBy} onChange={e => onChange({ groupBy: e.target.value as RepoFileFilter['groupBy'] })}><option value="path">每个完整路径独立展示</option><option value="directory">按父目录分组</option><option value="stem">按相对路径去除扩展名分组</option></Select>}</Field>
+      <Field label="优先推荐文件" hint="选填，按文件名匹配，每行一个模式">{id => <Textarea id={id} rows={2} value={filter.preferred} onChange={e => onChange({ preferred: e.target.value })} />}</Field>
+      <label className="flex items-center gap-2 text-[13px] md:col-span-2"><input type="checkbox" checked={filter.readme} onChange={e => onChange({ readme: e.target.checked })} />读取同目录 README 的使用说明与配置建议</label>
+    </div></details>
   </>;
 }
