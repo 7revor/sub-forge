@@ -95,6 +95,7 @@ body {
   min-width: 0;
 }
 
+/* 滚动条按需出现，避免短表格和表单右侧常驻一条空白。 */
 .page-scroll {
   /* 将 sr-only 等绝对定位后代也限制在滚动区内，避免撑大文档。 */
   position: relative;
@@ -102,7 +103,6 @@ body {
   flex-direction: column;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .scroll-card {
@@ -121,7 +121,6 @@ body {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .scroll-card thead {
@@ -152,5 +151,4 @@ body {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
