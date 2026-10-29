@@ -176,3 +176,10 @@ RuleSets 来源行、TemplateEditor 规则行、ProfileDetail 独立规则与绑
 ## 2026-10-29：正文暗色样式统一
 
 规则仓库的正文改用公共 `CodePreview`，采用 `bg-nav` 深色底、浅色正文和暗色滚动条，提供复制按钮，并撑满预览区域。设计画布的既有登录阻塞仍未解除；实际视觉证据见 `research/verification/repository-dark-preview-20261029/dark-preview.png`。
+
+
+## 2026-10-29：来源搜索文件树与分页
+
+此项替代上方左右级联方案：TemplateEdit、ProfileRules、RuleSets 的来源选择使用同一单列文件树弹层；初始所有分支折叠，输入关键词后匹配路径默认展开，清空关键词回到折叠状态。每层 30 项，保留「加载更多」、局部加载/失败重试和空状态。RuleRepo 的左侧目录复用文件树，右侧正文预览保持原布局。前后端已同步；领域模型和示例种子不变。外部 Claude Design 画布本轮实查显示「Sign in to view this page」，未修改画布，同步细节登记 docs/13。
+
+本轮[验收记录与截图](../research/verification/rule-catalog-pagination-20261029/README.md)可供画布同步。

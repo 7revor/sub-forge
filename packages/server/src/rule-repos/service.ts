@@ -304,6 +304,47 @@ export class RuleRepoService {
     for (const entry of entries) for (const variant of entry.variants) for (const file of variant.files) (trees[file.ref] ??= []).push(file.path);
     return { nodes: buildCatalog(this.definition(id, true), trees, entries).filter(node => matchesNameSearch(node.path, query)), complete: false };
   }
+  private catalogData(id: string) {
+    this.assertEnabled(id);
+    const complete = !!this.store.db.prepare('SELECT 1 FROM rule_repo_catalog WHERE repo = ?').get(id);
+    return { complete, fallback: complete ? '[]' : JSON.stringify(this.catalog(id).nodes) };
+  }
+  catalogStatus(id: string, query: string) {
+    const { complete, fallback } = this.catalogData(id);
+    const matches = !normalizeNameSearch(query) || !!this.store.db.prepare(`SELECT 1 FROM json_each(
+      COALESCE((SELECT data FROM rule_repo_catalog WHERE repo = ?), ?)) n
+      WHERE search_fold(json_extract(n.value, '$.path')) LIKE ? ESCAPE '\\' LIMIT 1`).get(id, fallback, nameLikePattern(query));
+    return { complete, matches };
+  }
+  /** 先在完整索引搜索，再合并当前层目录并分页；不向调用方展开后代文件。 */
+  catalogPage(id: string, query: string, directory: string, offset: number, limit: number) {
+    const { complete, fallback } = this.catalogData(id);
+    const prefix = directory ? `${directory}/` : '';
+    const sql = `WITH nodes AS (
+      SELECT n.value AS data, json_extract(n.value, '$.kind') AS kind,
+        substr(json_extract(n.value, '$.path'), CASE WHEN json_extract(n.value, '$.root') = '' THEN 1 ELSE length(json_extract(n.value, '$.root')) + 2 END) AS relative
+      FROM json_each(COALESCE((SELECT data FROM rule_repo_catalog WHERE repo = @repo), @fallback)) n
+      WHERE search_fold(json_extract(n.value, '$.path')) LIKE @query ESCAPE '\\'
+    ), descendants AS (
+      SELECT *, substr(relative, length(@prefix) + 1) AS tail FROM nodes
+      WHERE substr(relative, 1, length(@prefix)) = @prefix AND length(relative) > length(@prefix)
+    ), children AS (
+      SELECT DISTINCT 'directory' AS kind,
+        CASE WHEN instr(tail, '/') > 0 THEN substr(tail, 1, instr(tail, '/') - 1) ELSE tail END AS name,
+        @prefix || CASE WHEN instr(tail, '/') > 0 THEN substr(tail, 1, instr(tail, '/') - 1) ELSE tail END AS path,
+        NULL AS ref, NULL AS entry
+      FROM descendants WHERE kind = 'directory' OR instr(tail, '/') > 0
+      UNION
+      SELECT 'file', tail, json_extract(data, '$.path'), json_extract(data, '$.ref'), json_extract(data, '$.entry')
+      FROM descendants WHERE kind = 'file' AND instr(tail, '/') = 0
+    )`;
+    const params = { repo: id, fallback, prefix, query: nameLikePattern(query) };
+    const { total } = this.store.db.prepare(`${sql} SELECT count(*) AS total FROM children`).get(params) as { total: number };
+    const rows = this.store.db.prepare(`${sql} SELECT * FROM children ORDER BY kind, name COLLATE NOCASE, path, ref LIMIT @limit OFFSET @offset`)
+      .all({ ...params, offset, limit }) as { kind: 'directory' | 'file'; name: string; path: string; ref: string | null; entry: string | null }[];
+    const items = rows.map(({ ref, entry, ...item }) => ({ ...item, repo: id, ...(ref !== null ? { ref } : {}), ...(entry !== null ? { entry } : {}) }));
+    return { items, total, complete };
+  }
   private entry(repo: string, path: string): IndexedEntry {
     this.assertEnabled(repo);
     const row = this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ? AND key = ?').get(repo, path) as { data: string } | undefined;

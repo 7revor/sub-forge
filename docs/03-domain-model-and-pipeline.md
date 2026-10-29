@@ -474,3 +474,10 @@ SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`�
 ## 2026-10-29：按物理文件读取正文
 
 `GET /api/rule-repos/file-preview?repo&ref&path` 先检查启用仓库和平面目录成员资格，再按索引固定 commit 读取单个 list/txt 文件。返回原始 content、文件名、路径、分支、许可证与源链接，不解析 README、不合并同目录文件、不创建本地文档。读取结束重验索引快照；索引变化或仓库停用时拒绝返回过期内容。目录与名称查询仍走 SQLite，正文通过现有 Git 对象缓存按需读取。原有来源和规则领域结构不变。
+
+
+## 2026-10-29：规则目录逐层分页
+
+`GET /api/rule-options/catalog` 改为有界分页响应 `{items,total,offset,limit,nextOffset?,notices}`，不再返回全部仓库平面节点。`scope=all|repository` 控制本地候选；不传 `repo` 只返回可见本地规则集与仓库入口，传 `repo` 和扫描根相对路径 `directory` 返回当前层。默认 `offset=0&limit=30`，最多 100 项；非法分页/目录返回 400，停用或不存在仓库返回 404。
+
+`q` 在完整 SQLite 目录索引中按既有名称规则筛选，再投影当前层、合并重复目录、稳定排序并执行 LIMIT/OFFSET。扫描根隐藏，文件保留仓库、完整路径、分支与 entry；跨扫描根和分支的同名文件保持独立。正常分页查询不在应用层读取完整目录；缺失目录缓存时回退已有条目，并返回索引待更新提示。读取目录不拉正文，选中叶子后沿用现有单文件解析与授权。持久化领域模型、核心 IR、示例种子无需变更。

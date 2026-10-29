@@ -1,10 +1,12 @@
 import { matchesNameSearch, normalizeNameSearch } from '@sub-forge/core';
 import { alertError } from '../feedback.ts';
 import { Empty } from './Empty.tsx';
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
+import { RuleFileTree } from './RuleFileTree.tsx';
 // 下拉选择组件：所有下拉都用这里的 Select / Combobox，不使用浏览器自带的 <select> 弹层与 <datalist>（见仓库 CLAUDE.md）。
 // 弹层渲染到 body，避免被卡片、表格的 overflow 裁掉；层级高于对话框。
 
-import { ChevronDown, ChevronRight, FileText, Folder } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import {
   Children, Fragment, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState,
   type HTMLAttributes, type KeyboardEvent, type ReactElement, type ReactNode, type RefObject,
@@ -338,60 +340,29 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
   </>;
 }
 
-export type CascaderOption = { value: string; label: string; hint?: string; disabled?: boolean; children?: CascaderOption[] };
-export type CascaderPage = { options: CascaderOption[]; notices?: string[] };
+export type TreeOption = { value: string; label: string; hint?: string; disabled?: boolean; branch?: boolean };
+export type TreePage = { options: TreeOption[]; total: number; nextOffset?: number; notices?: string[] };
+export type TreeLoader = (query: string, offset: number, parent?: string) => Promise<TreePage>;
 
-/** 只允许选择文件叶子的嵌套级联；每次打开重新加载最新目录。 */
-export function Cascader({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon }: {
-  loadOptions: (query: string) => Promise<CascaderPage>; onChange: (value: string) => void;
+/** 单列文件树选择器；无搜索时折叠，搜索展开当前页命中路径，逐层分页。 */
+export function TreeSelect({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon }: {
+  loadOptions: TreeLoader; onChange: (value: string) => void;
   label: string; ariaLabel?: string; disabled?: boolean; id?: string; triggerClassName?: string; triggerIcon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState<CascaderPage>({ options: [] });
-  const [trail, setTrail] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [retry, setRetry] = useState(0);
+  const debounced = useDebouncedValue(query, 250);
   const btn = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
-  const columnsRef = useRef<HTMLDivElement>(null);
   const popupId = useId();
-  const pos = usePopoverPos(btn, open, 760, 420);
+  const pos = usePopoverPos(btn, open, 560, 420);
   const close = () => { setOpen(false); btn.current?.focus(); };
+  const show = () => { setQuery(''); setOpen(true); };
   useOutside([btn, popup], open, () => setOpen(false));
-  useEffect(() => {
-    let current = true;
-    if (!open) return;
-    setTrail([]); setPage({ options: [] }); setLoading(true); setError('');
-    const timer = setTimeout(() => { void loadOptions(query).then(result => { if (current) setPage(result); })
-      .catch(error => { if (current) { setError(error instanceof Error ? error.message : String(error)); alertError(error); } })
-      .finally(() => { if (current) setLoading(false); }); }, query ? 250 : 0);
-    return () => { current = false; clearTimeout(timer); };
-  }, [open, query, loadOptions, retry]);
-  useEffect(() => {
-    const columns = columnsRef.current;
-    if (columns) {
-      columns.scrollLeft = columns.scrollWidth;
-      const lists = columns.querySelectorAll('[role="listbox"]');
-      if (document.activeElement?.tagName !== 'INPUT') lists[lists.length - 1]?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus();
-    }
-  }, [trail, page.options]);
-  const columns = [{ label: '规则来源', options: page.options }];
-  for (const value of trail) {
-    const selected = columns.at(-1)!.options.find(option => option.value === value);
-    if (!selected?.children) break;
-    columns.push({ label: selected.label, options: selected.children });
-  }
-  const pick = (option: CascaderOption, depth: number) => {
-    if (option.disabled) return;
-    if (option.children) setTrail([...trail.slice(0, depth), option.value]);
-    else { close(); onChange(option.value); }
-  };
   return <>
     <button ref={btn} id={id} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? popupId : undefined}
       disabled={disabled} className={triggerClassName ?? cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
-      onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setQuery(''); setOpen(true); } }}>
+      onClick={() => open ? close() : show()} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); show(); } }}>
       {triggerIcon}<span title={label} className={cx('min-w-0 truncate', !triggerClassName && 'flex-1')}>{label}</span>{!triggerClassName && <ChevronDown size={15} />}
     </button>
     {open && pos && createPortal(<div ref={popup} id={popupId} role="dialog" aria-label={ariaLabel}
@@ -399,34 +370,11 @@ export function Cascader({ loadOptions, onChange, label, ariaLabel = label, disa
       className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
       <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="筛选名称" placeholder="输入名称筛选，忽略大小写" value={query}
-        className={fieldCls} onChange={event => { setQuery(event.target.value); setPage({ options: [] }); setLoading(true); }}
-        onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); popup.current?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus(); } }} /></div>
-      {!!page.notices?.length && <div role="status" className="shrink-0 border-b border-line-2 px-3 py-2 text-[12px] text-muted">{page.notices.join('；')}</div>}
-      {loading ? <div role="status" className="p-4 text-[13px] text-muted">正在读取目录…</div> : error ? <div role="alert" className="flex items-center gap-3 p-4 text-[13px]"><span>目录读取失败</span><button type="button" className="text-accent" onClick={() => setRetry(x => x + 1)}>重试</button></div> :
-        <div ref={columnsRef} className="flex min-h-0 overflow-x-auto overscroll-contain">
-          {columns.map((column, depth) => <div key={depth} className="flex min-w-[220px] flex-1 flex-col border-r border-line-2 last:border-r-0">
-            <div className="shrink-0 break-all border-b border-line-2 px-3 py-2 text-[12px] font-medium text-muted">{column.label}</div>
-            <div role="listbox" aria-label={column.label} className="min-h-0 overflow-y-auto overscroll-contain p-1.5">
-              {!column.options.length && <Empty size="compact" title="没有可用条目" />}
-              {column.options.map(option => <button key={option.value} type="button" role="option" aria-selected={trail[depth] === option.value} disabled={option.disabled}
-                className={cx('flex w-full cursor-pointer items-start gap-2 rounded-md px-2.5 py-2 text-left text-[13px] hover:bg-ground focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45', trail[depth] === option.value && 'bg-accent-soft text-accent-ink')}
-                onClick={() => pick(option, depth)} onKeyDown={event => {
-                  if (event.key === 'ArrowRight' && option.children) { event.preventDefault(); pick(option, depth); }
-                  if (event.key === 'ArrowLeft' && depth > 0) { event.preventDefault(); setTrail(trail.slice(0, depth - 1)); }
-                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    const siblings = [...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)') ?? [])];
-                    const next = siblings.indexOf(event.currentTarget) + (event.key === 'ArrowDown' ? 1 : -1);
-                    siblings[(next + siblings.length) % siblings.length]?.focus();
-                  }
-                }}>
-                {option.children ? <Folder size={15} className="mt-0.5 shrink-0" /> : <FileText size={15} className="mt-0.5 shrink-0" />}
-                <span className="min-w-0 flex-1"><span className="block break-all">{option.label}</span>{option.hint && <span className="mt-0.5 block break-all text-[11px] leading-4 text-muted">{option.hint}</span>}</span>
-                {option.children && <ChevronRight size={15} className="mt-0.5 shrink-0" />}
-              </button>)}
-            </div>
-          </div>)}
-        </div>}
+        className={fieldCls} onChange={event => setQuery(event.target.value)}
+        onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); popup.current?.querySelector<HTMLButtonElement>('button[role="treeitem"]:not(:disabled)')?.focus(); } }} /></div>
+      {query !== debounced ? <div role="status" className="p-4 text-[13px] text-muted">搜索中…</div> : <div className="min-h-0 overflow-y-auto overscroll-contain">
+        <RuleFileTree key={query} loadOptions={loadOptions} query={query} onSelect={value => { close(); onChange(value); }} />
+      </div>}
     </div>, document.body)}
   </>;
 }

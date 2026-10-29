@@ -17,20 +17,37 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
     return c.json({ items: store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(({ id, name }) => ({ id, name })) });
   });
   app.get('/rule-options/catalog', c => {
-    const scope = c.req.query('scope') ?? 'all';
-    const query = c.req.query('q') ?? '';
+    const { scope = 'all', q: query = '', repo, directory = '', offset = '0', limit = '30' } = c.req.query();
     if (query.length > 200) throw bad('关键词最多 200 个字符');
     if (!['all', 'repository'].includes(scope)) throw bad('规则集作用域不合法');
-    const refs = new RefChecker(store, c.get('user'));
+    if (!/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || !/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100) throw bad('分页参数不合法');
+    if (directory.length > 4096 || (directory && (!repo || directory.split('/').some(part => !part || part === '.' || part === '..')))) throw bad('目录参数不合法');
     const notices: string[] = [];
-    const repositories = repos.list().filter(r => r.enabled).map(repo => {
-      const catalog = repos.catalog(repo.id, matchesNameSearch(repo.name, query) ? '' : query);
-      if (repo.error) notices.push(`${repo.name}：索引更新失败，保留已有目录`);
-      else if (!catalog.complete) notices.push(`${repo.name}：完整目录索引待更新`);
-      return { id: repo.id, name: repo.name, ...catalog };
-    }).filter(repo => !normalize(query) || matchesNameSearch(repo.name, query) || repo.nodes.length);
-    const locals = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id) && matchesNameSearch(rs.name, query)).map(rs => ({ id: rs.id, name: rs.name, hint: rs.note || `${rs.sources.length} 个来源` }));
-    return c.json({ repositories, locals, notices });
+    const repositories = repos.list().filter(r => r.enabled);
+    const notice = (repository: typeof repositories[number], complete: boolean) => {
+      if (repository.error) notices.push(`${repository.name}：索引更新失败，保留已有目录`);
+      else if (!complete) notices.push(`${repository.name}：完整目录索引待更新`);
+    };
+    const page = <T,>(items: T[], total: number) => ({ items, total, offset: Number(offset), limit: Number(limit),
+      ...(Number(offset) + items.length < total ? { nextOffset: Number(offset) + items.length } : {}), notices });
+    if (repo !== undefined) {
+      const repository = repositories.find(item => item.id === repo);
+      if (!repository) throw new HttpError(404, '规则仓库不可用');
+      const result = repos.catalogPage(repo, matchesNameSearch(repository.name, query) ? '' : query, directory, Number(offset), Number(limit));
+      notice(repository, result.complete);
+      return c.json(page(result.items, result.total));
+    }
+    const refs = new RefChecker(store, c.get('user'));
+    const locals = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id) && matchesNameSearch(rs.name, query))
+      .map(rs => ({ kind: 'local' as const, id: rs.id, name: rs.name, hint: rs.note || `${rs.sources.length} 个来源` }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') || a.id.localeCompare(b.id));
+    const remote = repositories.filter(repository => {
+      const status = repos.catalogStatus(repository.id, matchesNameSearch(repository.name, query) ? '' : query);
+      notice(repository, status.complete);
+      return status.matches;
+    }).map(repository => ({ kind: 'repository' as const, repo: repository.id, name: repository.name }));
+    const items = [...locals, ...remote];
+    return c.json(page(items.slice(Number(offset), Number(offset) + Number(limit)), items.length));
   });
   app.get('/rule-options/search', c => {
     const { q = '', offset = '0', limit = '30', scope = 'all' } = c.req.query();

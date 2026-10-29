@@ -292,3 +292,8 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 ### 2026-10-29：仓库单文件正文预览
 
 `GET /api/rule-repos/file-preview?repo&ref&path` 只读取所选 list/txt 原文，按目录索引校验成员资格并使用索引 commit；响应含 content、name、entry（可关联时）、ref、path、url、upstream、license。仅登录用户可用；目录或伪造文件返回 400，停用仓库返回 404，上游读取异常返回 502，可重试。空文件、纯注释与无有效规则文本仍能预览；创建操作另行执行既有解析校验。预览不组合文件，不请求 README，也不写本地规则集。
+
+
+### 2026-10-29：目录分页接口（替代全量清单响应）
+
+`GET /api/rule-options/catalog?scope=all|repository&q=&offset=0&limit=30` 返回 `{items,total,offset,limit,nextOffset?,notices}`。不传 `repo` 返回本地规则与仓库入口；传 `repo`、可选 `directory`（相对扫描根）仅返回当前层。默认每页 30 项，上限 100。SQL 先在完整索引搜索、合并同名目录，再稳定排序和分页，文件按完整路径与分支区分。缺失目录缓存时回退旧条目且同样分页并提示；不传分页参数也不会返回全量文件。数据模型和示例种子无需迁移。

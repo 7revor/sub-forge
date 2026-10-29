@@ -224,3 +224,15 @@
 USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayPal*` 应计为已解析；Surge macOS / iOS 显示有效行，mihomo / Android 显示“当前客户端无法输出：mihomo 不支持 USER-AGENT”的注释。保留现有布局与诊断区域。本轮未修改外部画布。
 
 2026-10-29 Stash 待同步画板：规则集预览增加 Stash macOS / iOS，客户端改写下拉增加 Stash；Profile 预览增加 Stash 与 iOS/macOS 平台、节点快照内联及文件内嵌规则说明；概览增加复制 Stash 链接；预设/基础设置增加 Stash 分区。Stash 使用自身的 YAML 表单和覆盖，不沿用 Mihomo 字段目录。外部画布本轮未修改。
+
+
+### 2026-10-29：规则来源分页文件树（待同步，替代左右级联）
+
+本轮访问画布仍显示「Sign in to view this page」，无法编辑。
+
+- TemplateEdit、ProfileRules、RuleSets 的来源弹层改为单列缩进文件树；不再绘制左右分栏级联。
+- 无搜索时仓库和目录初始折叠；有搜索结果时匹配路径默认展开；清空搜索恢复折叠。
+- 每层默认显示 30 项，未完页显示加载数量与「加载更多」；搜索展开不自动读取后续页。失败在相应层显示重试，已有页保留。
+- RuleRepo 左侧同样分页、搜索自动展开，右侧保留选中文件正文。
+
+本轮[验收记录与截图](../research/verification/rule-catalog-pagination-20261029/README.md)可供画布同步。
