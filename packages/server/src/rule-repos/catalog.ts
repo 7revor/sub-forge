@@ -1,4 +1,4 @@
-// 保存平面的目录和文本文件清单，嵌套结构由前端按扫描根目录组装。
+// 保存平面的目录和文本文件清单，分页目录保留仓库根目录下的原始路径。
 import type { IndexedEntry, RepoDefinition } from './adapters.ts';
 import { isIndexedRuleFile } from './generic.ts';
 

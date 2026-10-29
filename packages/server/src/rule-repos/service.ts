@@ -316,13 +316,13 @@ export class RuleRepoService {
       WHERE search_fold(json_extract(n.value, '$.path')) LIKE ? ESCAPE '\\' LIMIT 1`).get(id, fallback, nameLikePattern(query));
     return { complete, matches };
   }
-  /** 先在完整索引搜索，再合并当前层目录并分页；不向调用方展开后代文件。 */
+  /** 先在完整索引搜索，再按仓库原始路径列出当前层并分页；不向调用方展开后代文件。 */
   catalogPage(id: string, query: string, directory: string, offset: number, limit: number) {
     const { complete, fallback } = this.catalogData(id);
     const prefix = directory ? `${directory}/` : '';
     const sql = `WITH nodes AS (
       SELECT n.value AS data, json_extract(n.value, '$.kind') AS kind,
-        substr(json_extract(n.value, '$.path'), CASE WHEN json_extract(n.value, '$.root') = '' THEN 1 ELSE length(json_extract(n.value, '$.root')) + 2 END) AS relative
+        json_extract(n.value, '$.path') AS relative
       FROM json_each(COALESCE((SELECT data FROM rule_repo_catalog WHERE repo = @repo), @fallback)) n
       WHERE search_fold(json_extract(n.value, '$.path')) LIKE @query ESCAPE '\\'
     ), descendants AS (

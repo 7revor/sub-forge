@@ -236,3 +236,8 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 - RuleRepo 左侧同样分页、搜索自动展开，右侧保留选中文件正文。
 
 本轮[验收记录与截图](../research/verification/rule-catalog-pagination-20261029/README.md)可供画布同步。
+
+
+2026-10-29 待同步补充：文件树不得剥离扫描根或合并同名分类；示例应画为 `blackmatrix7/ios_rule_script → rule → Clash → China → China.list` 和独立的 `rule → Surge → China → China.list`。两条路径分别分页和选择，初始折叠、搜索展开行为不变。
+
+原始目录结构的[验收记录与截图](../research/verification/rule-catalog-original-paths-20261029/README.md)。

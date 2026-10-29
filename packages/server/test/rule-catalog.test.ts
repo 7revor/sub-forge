@@ -32,13 +32,38 @@ describe('平面目录索引与级联文件引用', () => {
     expect((await h.admin.get('/api/rule-options/catalog?scope=repository')).json.items).toHaveLength(1);
     h.setPaths(['rule/Clash/China/China.list', 'rule/Clash/China/China_Domain.list', 'rule/Surge/China/China.list', 'rule/Clash/China/data.yaml']);
     await h.repos.refresh('blackmatrix7');
-    const second = await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=China');
-    expect(second.json.items).toHaveLength(3);
+    const second = await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/China');
+    expect(second.json.items).toHaveLength(2);
     expect(second.json.items.every((node: { entry: string; path: string }) => node.entry === 'China' && node.path.endsWith('.list'))).toBe(true);
-    expect(new Set(second.json.items.map((node: { path: string }) => node.path)).size).toBe(3);
+    expect(new Set(second.json.items.map((node: { path: string }) => node.path)).size).toBe(2);
     h.repos.setEnabled('blackmatrix7', false);
     expect((await h.admin.get('/api/rule-options/catalog?scope=repository')).json.items).toEqual([]);
     expect((await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7')).status).toBe(404);
+  });
+
+  it('保留原始 Clash、Surge 目录，同名文件在各自目录独立分页和搜索', async () => {
+    const h = await setup();
+    h.setPaths(['Clash', 'Surge'].flatMap(directory => Array.from({ length: 35 }, (_, i) => `rule/${directory}/China/file-${String(i).padStart(2, '0')}.list`)));
+    await h.repos.refresh('blackmatrix7');
+    const list = async (directory: string, extra = '') => (await h.admin.get(`/api/rule-options/catalog?repo=blackmatrix7&directory=${directory}${extra}`)).json;
+    expect((await list('')).items).toEqual([{ kind: 'directory', repo: 'blackmatrix7', name: 'rule', path: 'rule' }]);
+    expect(await list('rule', '&limit=1')).toMatchObject({ total: 2, nextOffset: 1, items: [{ name: 'Clash', path: 'rule/Clash' }] });
+    expect(await list('rule', '&limit=1&offset=1')).toMatchObject({ total: 2, items: [{ name: 'Surge', path: 'rule/Surge' }] });
+    for (const directory of ['Clash', 'Surge']) {
+      const path = `rule/${directory}/China`;
+      expect((await list(`rule/${directory}`)).items).toEqual([{ kind: 'directory', repo: 'blackmatrix7', name: 'China', path }]);
+      const first = await list(path);
+      const last = await list(path, '&offset=30');
+      expect(first).toMatchObject({ total: 35, nextOffset: 30 });
+      expect(first.items).toHaveLength(30);
+      expect(last).toMatchObject({ total: 35 });
+      expect(last.items).toHaveLength(5);
+      expect([...first.items, ...last.items].every((item: { path: string }) => item.path.startsWith(`${path}/`))).toBe(true);
+      expect((await list(path, '&q=file-34')).items).toMatchObject([{ path: `${path}/file-34.list` }]);
+    }
+    expect((await list('rule', '&q=file-34')).items.map((item: { path: string }) => item.path)).toEqual(['rule/Clash', 'rule/Surge']);
+    expect((await list('China')).items).toEqual([]);
+    expect(h.reads).toEqual([]);
   });
 
   it('默认每页 30 项，每层稳定翻页不重不漏，后代不会随父目录返回', async () => {
@@ -50,18 +75,20 @@ describe('平面目录索引与级联文件引用', () => {
     const root = (await h.admin.get('/api/rule-options/catalog?scope=repository')).json;
     expect(root.items).toEqual([{ kind: 'repository', repo: 'blackmatrix7', name: 'blackmatrix7/ios_rule_script' }]);
     const repo = (await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7')).json;
-    expect(repo.items.map((item: { name: string }) => item.name)).toEqual(['Cloud', 'Many', 'root.list']);
+    expect(repo.items.map((item: { name: string }) => item.name)).toEqual(['rule']);
+    const clash = (await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash')).json;
+    expect(clash.items.map((item: { name: string }) => item.name)).toEqual(['Cloud', 'Many', 'root.list']);
     expect(repo.items.every((item: object) => !('children' in item) && !('nodes' in item))).toBe(true);
     const pages = [];
     for (const offset of [0, 30, 60]) {
-      const page = (await h.admin.get(`/api/rule-options/catalog?repo=blackmatrix7&directory=Many&offset=${offset}`)).json;
+      const page = (await h.admin.get(`/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/Many&offset=${offset}`)).json;
       expect(page).toMatchObject({ total: 75, offset, limit: 30 });
       expect(page.items).toHaveLength(offset === 60 ? 15 : 30);
       expect(page.nextOffset).toBe(offset === 60 ? undefined : offset + 30);
       pages.push(...page.items);
     }
     expect(new Set(pages.map(item => item.path)).size).toBe(75);
-    expect((await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=Many&offset=999')).json).toMatchObject({ items: [], total: 75 });
+    expect((await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/Many&offset=999')).json).toMatchObject({ items: [], total: 75 });
     expect(fullCatalog).not.toHaveBeenCalled();
     expect(h.reads).toEqual([]);
     fullCatalog.mockRestore();
@@ -72,17 +99,17 @@ describe('平面目录索引与级联文件引用', () => {
     h.setPaths([...Array.from({ length: 40 }, (_, index) => `rule/Clash/Other/other-${index}.list`), 'rule/Clash/China/China.list', 'rule/Clash/China/100%_Target.list', 'rule/Clash/China/100XXTarget.list', 'rule/Clash/Other/ÄPFEL.txt']);
     await h.repos.refresh('blackmatrix7');
     for (const q of ['CHINA', 'china', 'ChInA']) {
-      const result = (await h.admin.get(`/api/rule-options/catalog?repo=blackmatrix7&directory=China&q=${q}`)).json;
+      const result = (await h.admin.get(`/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/China&q=${q}`)).json;
       expect(result.items).toHaveLength(3);
     }
-    const literal = (await h.admin.get(`/api/rule-options/catalog?repo=blackmatrix7&directory=China&q=${encodeURIComponent('%_')}`)).json;
+    const literal = (await h.admin.get(`/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/China&q=${encodeURIComponent('%_')}`)).json;
     expect(literal.items.map((node: { path: string }) => node.path)).toEqual(['rule/Clash/China/100%_Target.list']);
     const deep = (await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&q=äpfel')).json;
-    expect(deep.items).toEqual([{ kind: 'directory', repo: 'blackmatrix7', name: 'Other', path: 'Other' }]);
-    expect((await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=Other&q=äpfel')).json.items).toMatchObject([{ name: 'ÄPFEL.txt' }]);
+    expect(deep.items).toEqual([{ kind: 'directory', repo: 'blackmatrix7', name: 'rule', path: 'rule' }]);
+    expect((await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/Other&q=äpfel')).json.items).toMatchObject([{ name: 'ÄPFEL.txt' }]);
     expect((await h.admin.get('/api/rule-options/catalog?q=GOOGLE')).json.items).toMatchObject([{ kind: 'local', id: 'local-google' }]);
     expect((await h.admin.get('/api/rule-options/catalog?q=not-found')).json).toMatchObject({ items: [], total: 0 });
-    expect((await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=China&q=blackmatrix7')).json.total).toBe(3);
+    expect((await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/China&q=blackmatrix7')).json.total).toBe(3);
   });
 
   it('分页也适用于本地候选，隔离其他用户的规则并拒绝非法参数', async () => {
@@ -94,7 +121,7 @@ describe('平面目录索引与级联文件引用', () => {
     expect(first.items).toHaveLength(30);
     expect((await h.admin.get('/api/rule-options/catalog?q=候选&offset=60')).json.items).toHaveLength(5);
     expect((await h.admin.get('/api/rule-options/catalog?q=私有')).json.total).toBe(0);
-    for (const query of ['offset=-1', 'offset=1.2', 'offset=9007199254740992', 'limit=0', 'limit=101', 'limit=abc', 'directory=China', 'repo=blackmatrix7&directory=../China', 'repo=blackmatrix7&directory=/China']) {
+    for (const query of ['offset=-1', 'offset=1.2', 'offset=9007199254740992', 'limit=0', 'limit=101', 'limit=abc', 'directory=rule/Clash/China', 'repo=blackmatrix7&directory=../China', 'repo=blackmatrix7&directory=/China']) {
       expect((await h.admin.get(`/api/rule-options/catalog?${query}`)).status, query).toBe(400);
     }
   });
@@ -104,7 +131,7 @@ describe('平面目录索引与级联文件引用', () => {
     h.setPaths(Array.from({ length: 40 }, (_, i) => `rule/Clash/Many/file-${i}.list`));
     await h.repos.refresh('blackmatrix7');
     h.store.db.prepare('DELETE FROM rule_repo_catalog WHERE repo = ?').run('blackmatrix7');
-    const page = (await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=Many')).json;
+    const page = (await h.admin.get('/api/rule-options/catalog?repo=blackmatrix7&directory=rule/Clash/Many')).json;
     expect(page).toMatchObject({ total: 40, nextOffset: 30 });
     expect(page.items).toHaveLength(30);
     expect(page.notices.join('')).toContain('完整目录索引待更新');

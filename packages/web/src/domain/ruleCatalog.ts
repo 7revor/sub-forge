@@ -4,7 +4,7 @@ import type { TreeLoader, TreePage } from '../components/listbox.tsx';
 export type RuleCatalogSelection = { source: 'local'; id: string } | { source: 'repository'; repo: string; entry: string; file: { ref: string; path: string } };
 type CatalogBranch = { kind: 'repository'; repo: string } | { kind: 'directory'; repo: string; path: string };
 
-/** 每页只映射当前层；目录值用于下一层请求，文件值保留完整路径和分支。 */
+/** 每页只映射当前层；目录完整路径原样传给下一层请求，不按名称重组；文件保留路径和分支。 */
 export function buildRuleCatalog(catalog: RuleCatalog): TreePage {
   return { total: catalog.total, nextOffset: catalog.nextOffset, notices: catalog.notices, options: catalog.items.map(item => {
     if (item.kind === 'local') return { value: JSON.stringify({ source: 'local', id: item.id }), label: `本地 · ${item.name}`, hint: item.hint };
