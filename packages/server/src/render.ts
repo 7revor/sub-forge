@@ -41,7 +41,7 @@ export type RenderServiceOptions = {
   cacheSize?: number;
 };
 
-const SOURCE_TTL_SEC = 3600;
+const SOURCE_TTL_SEC = 86400;
 const RULESET_TTL_SEC = 86400;
 
 function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {

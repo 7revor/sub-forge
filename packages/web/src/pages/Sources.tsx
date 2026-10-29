@@ -94,9 +94,9 @@ export function SourceEdit() {
             <>
               <Field label="订阅地址（每行一个，多个地址按顺序合并）">{(fid) => <Textarea id={fid} rows={3} className="font-mono" value={(draft.urls ?? []).join('\n')} onChange={(e) => set({ urls: e.target.value.split('\n') })} />}</Field>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-                <Field label="User-Agent" hint="默认 clash.meta">{(fid) => <Input id={fid} value={draft.fetch?.ua ?? ''} onChange={(e) => set({ fetch: { ...draft.fetch, ua: e.target.value || undefined } })} />}</Field>
-                <Field label="快照有效期（秒）" hint="默认 3600，过期后后台刷新">{(fid) => <Input id={fid} type="number" min={300} value={draft.fetch?.ttlSec ?? ''} onChange={(e) => set({ fetch: { ...draft.fetch, ttlSec: e.target.value ? Number(e.target.value) : undefined } })} />}</Field>
-                <Field label="超时（毫秒）" hint="默认 10000">{(fid) => <Input id={fid} type="number" min={1000} value={draft.fetch?.timeoutMs ?? ''} onChange={(e) => set({ fetch: { ...draft.fetch, timeoutMs: e.target.value ? Number(e.target.value) : undefined } })} />}</Field>
+                <Field label="User-Agent">{(fid) => <Input id={fid} placeholder="默认 clash.meta" value={draft.fetch?.ua ?? ''} onChange={(e) => set({ fetch: { ...draft.fetch, ua: e.target.value || undefined } })} />}</Field>
+                <Field label="快照有效期（秒）" hint="过期后后台刷新；刷新失败时继续使用上一份快照">{(fid) => <Input id={fid} type="number" min={300} placeholder="默认 86400（24 小时）" value={draft.fetch?.ttlSec ?? ''} onChange={(e) => set({ fetch: { ...draft.fetch, ttlSec: e.target.value ? Number(e.target.value) : undefined } })} />}</Field>
+                <Field label="超时（毫秒）">{(fid) => <Input id={fid} type="number" min={1000} placeholder="默认 10000" value={draft.fetch?.timeoutMs ?? ''} onChange={(e) => set({ fetch: { ...draft.fetch, timeoutMs: e.target.value ? Number(e.target.value) : undefined } })} />}</Field>
               </div>
             </>
           ) : (
