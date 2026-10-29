@@ -37,7 +37,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     onSelect(matcher.kind === 'rule' ? id : undefined);
   };
   return <section className="-mx-4">
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
       <div className="flex min-w-0 flex-col gap-0.5">
         <h2 className="m-0 text-[15px] font-semibold">规则（{value.rules.length} 条）</h2>
         <span className="text-[12.5px] text-muted">出口只能是模板组或内置策略。</span>

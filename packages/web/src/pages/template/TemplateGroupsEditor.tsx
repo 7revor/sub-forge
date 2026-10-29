@@ -24,7 +24,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
     onChange(removeGroup(value, id));
   };
   return <section className="-mx-4">
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
       <h2 className="m-0 text-[15px] font-semibold">策略组（{value.groups.length}）</h2>
       <div className="flex flex-wrap gap-2"><Button disabled={REGION_GROUPS.every(region => value.groups.some(group => group.name === region.name))} onClick={() => {
         const added = createRegionGroups(value.groups);
@@ -53,7 +53,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           </div>;
         }} />
       </nav>
-      <div key={group.id} id={`template-group-${group.id}`} className="flex min-w-0 flex-col gap-5 p-4 md:p-5">
+      <div key={group.id} id={`template-group-${group.id}`} className="flex min-w-0 flex-col gap-4 p-4">
         <ItemIssues report={report} where={`group:${group.id}`} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="组名称">{(id) => <Input id={id} value={group.name} onChange={(e) => update({ name: e.target.value })} />}</Field>
@@ -67,7 +67,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={group.excludeFilter ?? ''} onChange={(event) => update({ excludeFilter: event.target.value || undefined })} />}</Field>
           <Field label="exclude-type">{(id) => <Input id={id} className="font-mono" value={group.excludeType ?? ''} onChange={(event) => update({ excludeType: event.target.value || undefined })} />}</Field>
         </div>
-        <section className="flex min-w-0 flex-col gap-3 pt-4" aria-label="策略组成员">
+        <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-muted">{group.members.length} 个</span></h3>
             <TemplateTargetSelect action label="添加成员" value={undefined} groups={value.groups.filter((g) => g.id !== group.id)} onChange={(member) => update({ members: [...group.members, member] })} />
           </div>
@@ -78,7 +78,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             </div>} />
           </div>}
         </section>
-        <div className="flex justify-end pt-4"><Button variant="danger" size="sm" onClick={() => remove(group.id)}>删除组</Button></div>
+        <div className="flex justify-end pt-2"><Button variant="danger" size="sm" onClick={() => remove(group.id)}>删除组</Button></div>
       </div>
     </div>}
   </section>;

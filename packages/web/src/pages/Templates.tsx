@@ -10,7 +10,7 @@ import { VersionHistory } from './template/VersionHistory.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReportItem } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
@@ -177,6 +177,8 @@ function TemplatePage({ id }: { id: string }) {
   const isAdmin = me.data?.role === 'admin';
   const tpl = useQuery({ queryKey: ['template', id], enabled: !isNew, queryFn: () => api<TemplateDetailData>('GET', `/templates/${id}`) });
   const [name, setName] = useState('');
+  const nameInputId = useId();
+  const [modeControlContainer, setModeControlContainer] = useState<HTMLDivElement | null>(null);
   const [body, setBody] = useState<TemplateBody>(skeleton);
   const [rawValid, setRawValid] = useState(true);
   const [step, setStep] = useState(0);
@@ -351,12 +353,16 @@ function TemplatePage({ id }: { id: string }) {
         </li>)}
       </ol>
       <section className="list-panel" aria-label="模板编辑">
-        <div className="shrink-0 p-4">
-          <Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
+        <div className="shrink-0 px-4 pt-3 pb-2">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label htmlFor={nameInputId} className="text-[12.5px] font-medium text-muted">模板名称</label>
+            <div ref={setModeControlContainer} className="min-h-9 shrink-0" />
+          </div>
+          <Input id={nameInputId} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain">
           <ErrorAlert error={rulesets.error} />
-          <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} />
+          <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} modeControlContainer={modeControlContainer} />
           {!isNew && <details className="border-t border-line p-4">
             <summary className="cursor-pointer text-[13px] font-medium">版本记录</summary>
             <div className="pt-3"><VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} /></div>
