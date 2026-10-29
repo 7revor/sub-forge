@@ -56,3 +56,6 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 ## 许可证
 
 [AGPL-3.0](LICENSE)。部分协议解析代码将复用自 [Sub-Store](https://github.com/sub-store-org/Sub-Store)（AGPL-3.0）。
+
+
+规则仓库索引与搜索已接通（2026-10-29）：启动服务后自动索引两个内置 GitHub 仓库，可搜索、筛选、查看预览并把文本变体导入规则集；管理员可更新与启停。当前导入使用文本托管，完整范围与后续项见 [规则仓库说明](docs/08-rule-repository-index.md)。

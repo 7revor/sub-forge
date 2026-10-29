@@ -14,6 +14,7 @@ import { parseAllowList } from './net/ssrf.ts';
 import { createUpstreamFetcher } from './net/upstream.ts';
 import { RenderService } from './render.ts';
 import { SnapshotService } from './snapshots.ts';
+import { RuleRepoService } from './rule-repos/service.ts';
 import { Store } from './store.ts';
 import { mihomoVerifier } from './verify.ts';
 
@@ -77,12 +78,14 @@ async function start(): Promise<void> {
     publicUrl,
     ...(env.MIHOMO_BIN ? { verify: mihomoVerifier(env.MIHOMO_BIN, env.MIHOMO_DIR) } : {}),
   });
+  const ruleRepos = new RuleRepoService(store, fetcher);
   const app = createApp({
-    store, renderer, snapshots, publicUrl,
+    store, renderer, snapshots, publicUrl, ruleRepos,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   });
+  ruleRepos.start();
   store.pruneAccessLog();
   const prune = setInterval(() => store.pruneAccessLog(), DAY_MS);
   prune.unref();
@@ -93,6 +96,7 @@ async function start(): Promise<void> {
   const shutdown = () => {
     clearInterval(prune);
     server.close(async () => {
+      await ruleRepos.stop();
       await snapshots.settled();
       store.close();
       process.exit(0);

@@ -9,7 +9,8 @@ describe('尚未实现的接口', () => {
     await c.login('root');
     const repos = await c.get('/api/rule-repos/search?q=telegram');
     expect(repos.status).toBe(200);
-    expect(repos.json).toMatchObject({ pending: true, items: [] });
+    expect(repos.json).toMatchObject({ items: [], total: 0 });
+    expect(repos.json.pending).toBeUndefined();
     expect((await c.get('/api/system')).json.pending).toBe(true);
     expect((await c.get('/api/shares')).json.items).toEqual([]);
     expect((await c.get('/api/users/stats')).json.items).toEqual({});

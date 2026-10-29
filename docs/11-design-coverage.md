@@ -18,17 +18,19 @@
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集「下发地址」显示路径模式 |
 | 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：来源（多个远程地址 / 本地规则，可排序、启停，选中后展开地址、格式、缓存等字段）、独立的客户端改写区块（作用于整个规则集，只按规则内容精确匹配）、输出预览（选中来源时为该来源，本地规则在预览里实时编辑；不选时为合并结果与 domain / classical / ipcidr 统计），每块独占一行。2026-10-29 取消「编辑来源」对话框与「解析结果」表，规则包并入规则集 |
 | 规则集 `RuleSetNew` | `/rulesets`、`/rulesets/new` | 列表（名称、来源概况、no-resolve）；新建直接打开与编辑页同一个页面，默认带一个选中的本地来源，不再有单独的新建表单或对话框（2026-10-29 取代原 `RuleBundle` 画板） |
-| 规则仓库 `RuleRepo` | `/rule-repo` | 占位接口 |
+| 规则仓库 `RuleRepo` | `/rule-repo` | 已接通内置索引、名称搜索、仓库/客户端筛选、分页、文本预览与变体导入；新增状态与手动更新 |
 | 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish` | 草稿在两页之间共用；发布页自动试渲染；仅管理员可进入 |
 | 补充 `TemplateBrowse` | `/templates` | 2026-10-29 统一为唯一模板入口，仅管理员可见，可新建、编辑与发布；旧 `/templates/manage` 重定向到此页。普通用户在配置订阅向导中选择模板 |
 | 基础设置预设 `Presets` | `/presets`、`/presets/:id` | 列表 → 独立详情：搜索、新建、删除、编辑；详情配置按 mihomo 类别折叠展开，保留引用方，离开前可发布或放弃修改；Surge 段为 M2 占位说明 |
 | 用户 `Users` | `/users` | 统计列与共享走占位接口 |
-| 系统 `System` | `/system` | 占位接口 |
+| 系统 `System` | `/system` | 内置仓库状态、启停与更新已接通；其余仍为占位 |
 | 补充 `Dialogs` | 全部详情页 | 头部「更多」菜单与最右侧的独立删除按钮、删除确认、各类对话框、表单 / YAML 双视图、离开前保存（2026-10-29 删除从「更多」菜单移出） |
 | 补充 `Login`、`Account` | `/login`、`/account` | — |
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
 
 ## 设计稿待同步
+
+- 2026-10-29 规则仓库索引：`RuleRepo` 移除占位提示，补充索引状态/失败回退、手动更新、客户端筛选、分页、文本变体选择与预览错误；`System` 增加内置仓库启停与更新。外部画布实测仍显示「Sign in to view this page」，未更新；见 [13](13-design-canvas-sync.md)。
 
 - 2026-10-29 订阅源：原「拉取参数」改为顶部「基础设置」，单 URL、Field / Input 对齐；下方处理链与总览保持左右结构。`Source` / `SourceFetch` / `Pipeline` / `Lists` 按 [待同步要求](13-design-canvas-sync.md) 更新；本轮按用户要求只记录待同步，不修改外部画布。
 - 2026-10-29 规则集组级客户端改写：`RuleSets` / `RuleSetNew` 改写区块始终独立显示；只保留「规则内容精确匹配」，移除行号与来源绑定。前后端和文档已同步；Claude Design 画布打开后显示「Sign in to view this page」，外部画板未更新。实际界面见 [独立区块截图](../research/verification/ruleset-group-overrides-20261029/independent-block.png)。
@@ -45,7 +47,7 @@
 
 | 功能 | 前端 | 服务端现状 |
 |---|---|---|
-| 规则仓库（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | `GET /api/rule-repos*` 返回空，引用与增删 501 |
+| 规则仓库后续（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | 内置索引/搜索/预览/文本导入已实现；自定义仓库增删仍 501，镜像、动态 repo 引用及 mrs 导入待实现 |
 | 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制；保存、备份、恢复 501 |
 | 共享订阅源 / 组合（SYS-06） | 用户页「共享的订阅源与组合」 | `GET /api/shares` 返回空，写 501 |
 | 用户统计列 | 用户页「配置订阅 / 订阅源 / 最近订阅请求」 | `GET /api/users/stats` 返回空，显示「—」 |
