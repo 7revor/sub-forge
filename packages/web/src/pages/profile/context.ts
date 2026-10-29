@@ -1,7 +1,9 @@
+import { profileEditorOverlay } from '@sub-forge/core';
+import { persistedProfile, updateEditorOverlay } from './routing.ts';
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
 
 import type { GroupSpec, NodeSetID, Overlay } from '@sub-forge/core';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api.ts';
 import { useNodeSetNames, type GroupOption } from '../../components/pickers.tsx';
@@ -50,7 +52,7 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
   const [baseValid, setBaseValid] = useState(true);
   const [baseEditorKey, setBaseEditorKey] = useState(0);
   const resetBaseEditor = useCallback(() => { setBaseValid(true); setBaseEditorKey(key => key + 1); }, []);
-  const tplRef = draft?.template;
+  const tplRef = draft?.routing?.mode === 'bound' ? { id: draft.routing.templateId, follow: 'latest' as const } : draft?.routing ? undefined : draft?.template;
   const template = useQuery({
     queryKey: ['template', tplRef?.id, tplRef?.follow],
     enabled: !!tplRef,
@@ -58,14 +60,18 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
       ? api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}`).then((r) => r.item)
       : api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}/versions/${tplRef!.follow.pinned}`).then((r) => r.item),
   });
+  useEffect(() => {
+    if (draft?.routing?.mode === 'bound' && draft.templateVersion === undefined && template.data?.id === draft.routing.templateId) setDraft({ ...draft, templateVersion: template.data.version });
+  }, [draft, template.data, setDraft]);
   const { all, nameOf } = useNodeSetNames();
 
   const ctx = useMemo<ProfileCtx | undefined>(() => {
     if (!draft) return undefined;
-    const groups = effectiveGroups(template.data, draft.overlay);
+    const overlay = profileEditorOverlay(draft);
+    const groups = effectiveGroups(template.data, overlay);
     return {
-      draft, setDraft, baseValid, setBaseValid, baseEditorKey, resetBaseEditor,
-      patchOverlay: (fn: (o: Overlay) => Overlay) => setDraft({ ...draft, overlay: fn(draft.overlay) }),
+      draft: { ...draft, overlay }, setDraft: (next) => setDraft(persistedProfile(next)), baseValid, setBaseValid, baseEditorKey, resetBaseEditor,
+      patchOverlay: (fn: (o: Overlay) => Overlay) => setDraft(updateEditorOverlay(draft, fn)),
       template: template.data,
       groups,
       groupOptions: groups.map((g) => ({ id: g.id, name: g.name })),

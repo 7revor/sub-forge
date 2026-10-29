@@ -1,3 +1,4 @@
+import { boundTemplateId } from './profile/routing.ts';
 import { usePagedList } from '../hooks/usePagedList.ts';
 import { Pagination } from '../components/Pagination.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
@@ -32,7 +33,7 @@ export function TemplateList() {
   const [params] = useSearchParams();
   const profiles = useList('profiles');
   const selectedId = params.get('id');
-  const inUse = (id: string) => (profiles.data ?? []).filter((p) => p.template?.id === id).length;
+  const inUse = (id: string) => (profiles.data ?? []).filter((p) => boundTemplateId(p) === id).length;
   // 兼容发布完成和旧书签中的模板定位链接。
   if (selectedId) return <Navigate to={`/templates/${encodeURIComponent(selectedId)}/overview`} replace />;
   return (
@@ -78,7 +79,7 @@ function TemplateOverview({ id }: { id: string }) {
   return <>
     <PageHeader title="模板详情" crumbs={<Link to="/templates" className="text-muted no-underline">模板</Link>}
       actions={<Link to="/templates" className={buttonClass()}>返回列表</Link>} />
-    <PageScroll><TemplateDetail id={id} inUse={(profiles.data ?? []).filter(p => p.template?.id === id).length} actions={<>
+    <PageScroll><TemplateDetail id={id} inUse={(profiles.data ?? []).filter(p => boundTemplateId(p) === id).length} actions={<>
       <Link to={`/templates/${id}`} className={buttonClass()}>编辑新版本</Link>
       <Link to={`/templates/${id}/publish`} className={buttonClass()}>发布</Link>
       <Link to={`/profiles/new?template=${encodeURIComponent(id)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
@@ -241,7 +242,7 @@ function TemplatePage({ id }: { id: string }) {
       navigate(`/templates?id=${encodeURIComponent(r.item.id)}`);
     },
     onError: (e) => {
-      if (e instanceof ApiError && e.status === 409) setImpact(e.details as { report: ReportItem[]; impact: ImpactEntry[] });
+      if (e instanceof ApiError && e.status === 409 && e.details && typeof e.details === 'object' && 'impact' in e.details) setImpact(e.details as { report: ReportItem[]; impact: ImpactEntry[] });
     },
   });
 
@@ -252,8 +253,9 @@ function TemplatePage({ id }: { id: string }) {
   const changed = !published || JSON.stringify(published) !== JSON.stringify(body) || (t?.name ?? '') !== name;
   const nextVersion = (t?.version ?? 0) + 1;
   const blocking = (impact?.impact ?? []).filter((i) => i.level === 'error');
+  const bindingBlocked = blocking.some(i => i.forceable === false);
   const warnings = (impact?.impact ?? []).filter((i) => i.level === 'warn');
-  const canPublish = ready && !errors.length && !!name.trim() && !publish.isPending && (!blocking.length || confirmed);
+  const canPublish = !bindingBlocked && ready && !errors.length && !!name.trim() && !publish.isPending && (!blocking.length || confirmed);
   const crumbs = <><Link to="/templates" className="text-muted no-underline">模板</Link> / {isNew ? '新建' : <Link to={`/templates/${id}`} className="text-muted no-underline">{t?.name ?? id}</Link>}{tab === 'publish' ? ' / 发布' : ''}</>;
 
   if (tab === 'publish') {
@@ -312,17 +314,18 @@ function TemplatePage({ id }: { id: string }) {
                 {lines.map(([op, text], i) => <li key={i} className="flex gap-2 text-[13px]"><span className={cx('w-3 shrink-0 font-mono font-semibold', op === '+' ? 'text-ok' : op === '−' ? 'text-err' : 'text-accent')}>{op}</span><span className="min-w-0 break-all">{text}</span></li>)}
               </ul> : <span className="text-[13px] text-muted">与 v{t?.version} 相同，没有需要发布的变更。</span>}
               <Field label="变更说明">{(fid) => <Textarea id={fid} rows={3} value={changelog} onChange={(e) => setChangelog(e.target.value)} />}</Field>
-              {blocking.length > 0 && <label className="flex items-start gap-2.5 rounded-lg bg-err-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8f2a1f]">
+              {bindingBlocked && <p className="rounded-lg bg-err-soft p-3 text-[13px]">绑定订阅存在冲突。请先修复成员或引用，再发布模板；不能强制发布。</p>}
+              {blocking.length > 0 && !bindingBlocked && <label className="flex items-start gap-2.5 rounded-lg bg-err-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8f2a1f]">
                 <input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
                 我知道 {blocking.map((b) => `「${b.owner ? `${userName(b.owner)} / ` : ''}${b.profileName}」`).join('、')} 将渲染失败；它们会继续返回上一份成功结果，并在其页面提示。
               </label>}
-              <ErrorAlert error={publish.error && !(publish.error instanceof ApiError && publish.error.status === 409) ? publish.error : undefined} />
+              <ErrorAlert error={publish.error} />
             </aside>
           </div>
         </PageScroll>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <Button variant={blocking.length ? 'danger' : 'primary'} disabled={!canPublish || (!isNew && !changed)} onClick={() => publish.mutate(blocking.length > 0)}>
-            {publish.isPending ? '发布中…' : isNew ? '创建 v1' : blocking.length ? (confirmed ? `强制发布 v${nextVersion}` : '存在阻断项，确认后才能发布') : `发布 v${nextVersion}`}
+            {publish.isPending ? '发布中…' : bindingBlocked ? '请先修复绑定订阅冲突' : isNew ? '创建 v1' : blocking.length ? (confirmed ? `强制发布 v${nextVersion}` : '存在阻断项，确认后才能发布') : `发布 v${nextVersion}`}
           </Button>
           <Link to={isNew ? '/templates/new' : `/templates/${id}`} className={buttonClass()}>返回编辑器</Link>
         </div>
