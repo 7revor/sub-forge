@@ -152,3 +152,34 @@ body {
   overflow: auto;
   overscroll-behavior: contain;
 }
+
+/* 深色导航使用细滚动条和透明轨道，悬停或键盘聚焦时增强滑块对比度。 */
+.nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-2) transparent;
+}
+
+.nav-scroll:hover,
+.nav-scroll:focus-within {
+  scrollbar-color: var(--color-muted) transparent;
+}
+
+@supports not (scrollbar-color: auto) {
+  .nav-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .nav-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .nav-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--color-ink-2);
+  }
+
+  .nav-scroll:hover::-webkit-scrollbar-thumb,
+  .nav-scroll:focus-within::-webkit-scrollbar-thumb {
+    background: var(--color-muted);
+  }
+}
