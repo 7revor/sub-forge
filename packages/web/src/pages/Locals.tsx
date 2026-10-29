@@ -16,7 +16,7 @@ import { useDocEditor } from '../components/useDocEditor.ts';
 
 export function LocalList() {
   return (
-    <DocList kind="locals" title="本地节点" intro="自建、中转等手写节点。每个分组就是一个节点集，可单独加入配置订阅。"
+    <DocList kind="locals" title="本地节点" noun="本地节点组" empty="自建、中转等手写节点按分组管理，每个分组都能单独加入配置订阅。" intro="自建、中转等手写节点。每个分组就是一个节点集，可单独加入配置订阅。"
       columns={[
         { header: '分组', cell: (l) => l.name },
         { header: '节点', cell: (l) => <span className="font-mono">{l.proxies.length}</span> },

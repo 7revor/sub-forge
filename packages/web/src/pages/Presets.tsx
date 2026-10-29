@@ -13,7 +13,7 @@ import type { PresetDoc } from '../hooks.ts';
 
 export function PresetList() {
   return (
-    <DocList kind="presets" title="基础设置预设" intro="通用、DNS、TUN、嗅探等设置。预设更新会同步到引用它的配置订阅，它们自己覆盖的项保持不变。"
+    <DocList kind="presets" title="基础设置预设" noun="预设" empty="把 DNS、TUN、嗅探等通用设置做成预设，配置订阅引用后自动同步。" intro="通用、DNS、TUN、嗅探等设置。预设更新会同步到引用它的配置订阅，它们自己覆盖的项保持不变。"
       columns={[
         { header: '名称', cell: (p) => p.name },
         { header: '版本', cell: (p) => <span className="font-mono">v{p.version}</span> },

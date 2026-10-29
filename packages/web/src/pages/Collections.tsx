@@ -14,7 +14,7 @@ import { usePipelinePreview } from './Sources.tsx';
 
 export function CollectionList() {
   return (
-    <DocList kind="collections" title="组合" intro="把多个订阅源、组合或本地节点组按顺序合并成一个节点集，可整体加入配置订阅。"
+    <DocList kind="collections" title="组合" empty="把多个订阅源、本地节点组合并成一个节点集，成员可以加前后缀区分来源。" intro="把多个订阅源、组合或本地节点组按顺序合并成一个节点集，可整体加入配置订阅。"
       columns={[
         { header: '名称', cell: (c) => c.name },
         { header: '成员', cell: (c) => <span className="font-mono">{c.members.length}</span> },

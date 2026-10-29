@@ -22,7 +22,7 @@ const FORMATS: { value: RuleSetFormat; label: string }[] = [
 
 export function RulesetList() {
   return (
-    <DocList kind="rulesets" title="规则集" intro="一组匹配条件（不含出口）。解析成统一的中间表示后按客户端输出；管理员名下的规则集可被所有人引用。"
+    <DocList kind="rulesets" title="规则集" empty="一组匹配条件，可以来自远程地址或手写，在配置订阅的规则里配上出口。" intro="一组匹配条件（不含出口）。解析成统一的中间表示后按客户端输出；管理员名下的规则集可被所有人引用。"
       columns={[
         { header: '名称', cell: (r) => r.name },
         { header: '来源', cell: (r) => <Badge>{r.kind === 'remote' ? '远程' : '本地'}</Badge> },
@@ -145,7 +145,7 @@ function RulesetOverrides({ value, onChange }: { value: LineOverride[]; onChange
 
 export function BundleList() {
   return (
-    <DocList kind="bundles" title="规则包" intro="多个规则集或单条规则打包成一项，只配一个出口；输出时按 domain → classical → ipcidr 拆分（最多两层）。"
+    <DocList kind="bundles" title="规则包" empty="把多个规则集或单条规则打包，在规则列表里只占一行、只配一个出口。" intro="多个规则集或单条规则打包成一项，只配一个出口；输出时按 domain → classical → ipcidr 拆分（最多两层）。"
       columns={[
         { header: '名称', cell: (b) => b.name },
         { header: '子项', cell: (b) => <span className="font-mono">{b.items.length} 项 · 启用中 {b.items.filter((item) => item.enabled !== false).length} 项</span> },
