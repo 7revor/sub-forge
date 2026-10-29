@@ -29,6 +29,12 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
   }
   const parsed = parseRuleSetContent(body, rs.format);
   if (parsed.passthrough) return rs.url ? { passthrough: true, format: parsed.format, url: rs.url } : { passthrough: true, format: parsed.format };
+  // 旧版本可能已经把错误页面保存为成功快照；读取时也要阻止这些内容变成空分流配置。
+  // 此处在客户端覆盖之前检查，显式 drop 所有规则仍是合法操作。
+  if (rs.kind === 'remote' && !parsed.rules.length) {
+    report.error('ruleset.invalid-content', `规则集「${rs.name}」的远程快照没有可用规则，请重新拉取`, where);
+    return { passthrough: false, rules: [] };
+  }
   if (parsed.rejected.length) {
     report.info('ruleset.rejected-lines', `规则集「${rs.name}」有 ${parsed.rejected.length} 行无法解析或不支持`, where);
   }
