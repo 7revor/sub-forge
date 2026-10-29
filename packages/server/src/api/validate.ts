@@ -1,7 +1,7 @@
 // 保存前的校验：结构必填项、正则能否编译、引用是否存在且属于当前用户、组合是否成环。
 // 深层结构（规则、组参数等）由渲染报告兜住，这里只拦截保存后必然无法使用的数据。
 
-import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID, type OperatorStep, type Target } from '@sub-forge/core';
+import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID, type Target } from '@sub-forge/core';
 import type { DocKind, DocTypes } from '../docs.ts';
 import type { Store, User } from '../store.ts';
 import { bad, isStr } from './common.ts';
@@ -13,9 +13,9 @@ const NODESET_KINDS = new Set(['source', 'collection', 'local']);
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isHttpUrl = (v: unknown) => { if (typeof v !== 'string') return false; try { const u = new URL(v); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; } };
 
-function checkRegex(pattern: unknown, where: string): void {
+function checkRegex(pattern: unknown, where: string, flags = ''): void {
   if (typeof pattern !== 'string') throw bad(`${where}：正则必须是字符串`);
-  try { compileUserRegex(pattern); } catch (e) { throw bad(`${where}：${(e as Error).message}`); }
+  try { compileUserRegex(pattern, flags); } catch (e) { throw bad(`${where}：${(e as Error).message}`); }
 }
 
 function checkPipeline(steps: unknown, where: string, user: User): void {
@@ -23,11 +23,54 @@ function checkPipeline(steps: unknown, where: string, user: User): void {
   steps.forEach((s: unknown, i) => {
     const at = `${where} 第 ${i + 1} 步`;
     if (!isObj(s) || typeof s.op !== 'string' || !OPS.has(s.op)) throw bad(`${at}：未知的处理器`);
-    const step = s as OperatorStep;
-    if (step.op === 'script' && !(user.role === 'admin' || user.scriptAllowed)) throw bad(`${at}：没有编写脚本的权限（SRC-08）`);
-    if (step.op === 'filter.regex' || step.op === 'sort.regex' || step.op === 'rename.delete') step.patterns.forEach((p) => checkRegex(p, at));
-    if (step.op === 'filter.useless') step.patterns?.forEach((p) => checkRegex(p, at));
-    if (step.op === 'rename.regex') step.rules.forEach((r) => checkRegex(r.pattern, at));
+    if (s.enabled !== undefined && typeof s.enabled !== 'boolean') throw bad(`${at}：enabled 必须是布尔值`);
+    const string = (value: unknown, key: string, optional = false) => {
+      if (!(optional && value === undefined) && typeof value !== 'string') throw bad(`${at}：${key} 必须是字符串`);
+    };
+    const choice = (value: unknown, values: string[], key: string, optional = false) => {
+      if (!(optional && value === undefined) && !values.includes(value as string)) throw bad(`${at}：${key} 只能是 ${values.join(' / ')}`);
+    };
+    const patterns = (value: unknown) => {
+      if (!Array.isArray(value)) throw bad(`${at}：patterns 必须是数组`);
+      value.forEach((p, j) => checkRegex(p, `${at} patterns[${j}]`));
+    };
+    switch (s.op) {
+      case 'filter.regex':
+        patterns(s.patterns);
+        if (typeof s.keep !== 'boolean') throw bad(`${at}：keep 必须是布尔值`);
+        break;
+      case 'sort.regex': case 'rename.delete':
+        patterns(s.patterns); break;
+      case 'filter.useless':
+        if (s.patterns !== undefined) patterns(s.patterns);
+        break;
+      case 'filter.type':
+        if (!Array.isArray(s.types) || !s.types.every(t => typeof t === 'string')) throw bad(`${at}：types 必须是字符串数组`);
+        if (typeof s.keep !== 'boolean') throw bad(`${at}：keep 必须是布尔值`);
+        break;
+      case 'rename.regex':
+        if (!Array.isArray(s.rules)) throw bad(`${at}：rules 必须是数组`);
+        s.rules.forEach((r: unknown, j: number) => {
+          if (!isObj(r)) throw bad(`${at}：rules[${j}] 必须是对象`);
+          string(r.replace, `rules[${j}].replace`);
+          string(r.flags, `rules[${j}].flags`, true);
+          checkRegex(r.pattern, `${at} rules[${j}].pattern`, ((r.flags as string | undefined) ?? '').replace('g', '') + 'g');
+        });
+        break;
+      case 'rename.affix':
+        string(s.prefix, 'prefix', true); string(s.suffix, 'suffix', true); break;
+      case 'flag': choice(s.mode, ['add', 'remove'], 'mode'); break;
+      case 'sort.name': choice(s.order, ['asc', 'desc'], 'order'); break;
+      case 'dedupe':
+        choice(s.strategy, ['suffix', 'drop'], 'strategy'); choice(s.by, ['name', 'key'], 'by', true); break;
+      case 'set':
+        if (!isObj(s.fields)) throw bad(`${at}：fields 必须是对象`);
+        if (Object.keys(s.fields).some(k => ['name', 'type', 'server', 'port'].includes(k) || k.startsWith('_'))) throw bad(`${at}：fields 不能修改节点身份或隐式字段`);
+        break;
+      case 'script':
+        if (!(user.role === 'admin' || user.scriptAllowed)) throw bad(`${at}：没有编写脚本的权限（SRC-08）`);
+        string(s.code, 'code'); break;
+    }
   });
 }
 
