@@ -1,0 +1,76 @@
+.yaml-textarea {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d5d9e0;
+  border-radius: 8px;
+  background: #fafbfc;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.yaml-textarea:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.yaml-textarea:has(textarea[aria-invalid='true']) { border-color: var(--color-err); }
+.yaml-textarea[data-disabled] { opacity: .55; }
+
+/* 两层必须使用相同的字形、内边距和换行规则，避免滚动及中文输入时错位。 */
+.yaml-textarea > textarea,
+.yaml-textarea-highlight {
+  margin: 0;
+  border: 0;
+  padding: 10px 12px;
+  font: inherit;
+  letter-spacing: normal;
+  text-align: left;
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+  font-variant-ligatures: none;
+}
+
+.yaml-textarea > textarea {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: inherit;
+  resize: vertical;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--color-ink);
+}
+
+.yaml-textarea > textarea[rows='1'] { resize: none; }
+.yaml-textarea > textarea::placeholder { color: var(--color-faint); -webkit-text-fill-color: var(--color-faint); }
+.yaml-textarea > textarea::selection { background: rgb(41 82 204 / .2); }
+.yaml-textarea-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  color: var(--color-ink-2);
+}
+
+.yaml-key { color: #1f43ad; }
+.yaml-string { color: #24623d; }
+.yaml-number { color: #914506; }
+.yaml-literal { color: #7b36a1; }
+.yaml-comment { color: #6b7280; }
+.yaml-meta { color: #986112; }
+.yaml-punctuation { color: #5b6270; }
+
+@media (forced-colors: active) {
+  .yaml-textarea-highlight { display: none; }
+  .yaml-textarea > textarea { color: CanvasText; -webkit-text-fill-color: CanvasText; caret-color: CanvasText; }
+}

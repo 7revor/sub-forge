@@ -1,3 +1,4 @@
+import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { AsyncSelect, type AsyncSelectPage } from '../components/listbox.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
@@ -227,8 +228,8 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
             const { ttlSec: _, ...rest } = src.fetch ?? {};
             onChange({ fetch: h > 0 && h !== 24 ? { ...rest, ttlSec: h * 3600 } : Object.keys(rest).length ? rest : undefined });
           }} />}</Field>}
-          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="每行一条，支持 classical 规则、域名或 CIDR。">{(id) => (
-            <Textarea id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
+          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint={src.format === 'yaml' ? '填写包含 payload 列表的 YAML。' : '每行一条，支持 classical 规则、域名或 CIDR。'}>{(id) => (
+            <LocalContentInput format={src.format} id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
           )}</Field>}
         </div>
       )}
@@ -271,4 +272,8 @@ function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
       ))}
     </>
   );
+}
+
+function LocalContentInput({ format, ...props }: React.ComponentProps<typeof YamlTextarea> & { format?: string }) {
+  return format === 'yaml' ? <YamlTextarea {...props} /> : <Textarea {...props} />;
 }

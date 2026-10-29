@@ -82,8 +82,8 @@ export function AppLayout() {
         </div>
         </div>
       </nav>
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 py-4 md:px-10 md:py-7">
-        <div className="page-layout mx-auto w-full max-w-[1280px]">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="page-layout">
           <Outlet />
         </div>
       </main>

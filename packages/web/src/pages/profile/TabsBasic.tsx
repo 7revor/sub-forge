@@ -1,3 +1,4 @@
+import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { Notice } from '../../components/Notice.tsx';
@@ -11,7 +12,7 @@ import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type TokenItem } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, Textarea, formatTime, td, th, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
@@ -183,7 +184,7 @@ export function TabBase() {
           <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-2.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
             <div className="flex items-center justify-between"><h2 className="m-0 text-[14px] font-semibold">原样片段</h2></div>
             <label htmlFor="raw-snippet" className="text-[12.5px] text-muted">{client === 'mihomo' ? 'YAML' : 'INI'}</label>
-            <Textarea id="raw-snippet" rows={10} className="bg-[#fafbfc] font-mono text-[12.5px] leading-relaxed" spellCheck={false}
+            <YamlTextarea id="raw-snippet" rows={10} className="bg-[#fafbfc] font-mono text-[12.5px] leading-relaxed" spellCheck={false}
               disabled={client === 'surge'} placeholder={client === 'mihomo' ? 'hosts:\n  router.home: 192.168.1.1' : '暂未开放'}
               value={client === 'mihomo' ? draft.base?.raw ?? '' : ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, raw: e.target.value || undefined } })} />
             <span className="text-[12px] leading-normal text-muted">原样片段暂不输出。</span>

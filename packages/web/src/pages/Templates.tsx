@@ -1,3 +1,4 @@
+import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { Notice } from '../components/Notice.tsx';
 import { VersionHistory } from './template/VersionHistory.tsx';
 // 模板：所有人在列表页浏览（组骨架、规则、版本记录）；管理员在详情页编辑并发布新版本。
@@ -349,7 +350,7 @@ function TemplatePage({ id }: { id: string }) {
           if (r.ok) { setBody(r.value); setImporting(undefined); }
         }}>导入</Button></>}>
         <Field label="mihomo 的 proxy-groups 与 rules（不含节点）" hint="导入会替换当前草稿的组与规则。">
-          {(fid) => <Textarea id={fid} rows={16} className="font-mono text-[12.5px]" spellCheck={false} value={importing ?? ''} onChange={(e) => setImporting(e.target.value)} />}
+          {(fid) => <YamlTextarea id={fid} rows={16} className="font-mono text-[12.5px]" spellCheck={false} value={importing ?? ''} onChange={(e) => setImporting(e.target.value)} />}
         </Field>
         {importing !== undefined && (() => { const r = templateFromYaml(importing, body, ctx); return r.ok ? null : <ErrorBox error={`第 ${r.line ?? 1} 行：${r.error}`} />; })()}
       </Modal>

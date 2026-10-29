@@ -1,6 +1,7 @@
+import { YamlTextarea } from './YamlTextarea.tsx';
 import { CopyButton } from './CopyButton.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ErrorBox, Segmented, Textarea } from './ui.tsx';
+import { ErrorBox, Segmented } from './ui.tsx';
 
 export type EditorMode = 'form' | 'raw';
 export type RawResult<T> = { ok: true; value: T; notes?: string[] } | { ok: false; error: string; line?: number };
@@ -83,7 +84,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           <CopyButton size="sm" text={text} />
         </div>
         {rawHint && <span className="text-[12px] leading-relaxed text-muted">{rawHint}</span>}
-        <Textarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
+        <YamlTextarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
           const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
           if (!imported) return;
           event.preventDefault();
