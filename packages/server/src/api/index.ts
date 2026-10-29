@@ -1,5 +1,7 @@
 // 管理接口入口：/api/*。所有接口都返回 JSON；错误格式为 { error, details? }。
 
+import { nodeProbeRoutes } from './node-probe.ts';
+import type { NodeProbe } from '../node-probe.ts';
 import { Hono } from 'hono';
 import type { RenderService } from '../render.ts';
 import type { SnapshotService } from '../snapshots.ts';
@@ -18,6 +20,7 @@ import { csrfGuard, HttpError, sessionLoader, type ApiEnv } from './common.ts';
 
 export type ApiDeps = {
   store: Store;
+  nodeProbe?: NodeProbe;
   ruleRepos?: RuleRepoService;
   renderer: RenderService;
   snapshots: SnapshotService;
@@ -42,6 +45,7 @@ export function createApi(deps: ApiDeps) {
   // 占位接口先于 /users/:id 等通配路由注册
   api.route('/', ruleRepoRoutes(deps.store, deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now)));
   api.route('/', pendingRoutes());
+  api.route('/', nodeProbeRoutes(deps.nodeProbe));
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
   api.route('/', templateRoutes(deps.store, deps.renderer, deps.snapshots));
   api.route('/', profileRoutes(deps.store, deps.renderer, deps.publicUrl));

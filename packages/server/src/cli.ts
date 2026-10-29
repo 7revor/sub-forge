@@ -16,6 +16,7 @@ import { RenderService } from './render.ts';
 import { SnapshotService } from './snapshots.ts';
 import { RuleRepoService } from './rule-repos/service.ts';
 import { Store } from './store.ts';
+import { createNodeProbe } from './node-probe.ts';
 import { mihomoVerifier } from './verify.ts';
 
 const env = process.env;
@@ -79,8 +80,9 @@ async function start(): Promise<void> {
     ...(env.MIHOMO_BIN ? { verify: mihomoVerifier(env.MIHOMO_BIN, env.MIHOMO_DIR) } : {}),
   });
   const ruleRepos = new RuleRepoService(store, fetcher);
+  const nodeProbe = env.MIHOMO_BIN ? createNodeProbe(env.MIHOMO_BIN, { allow: parseAllowList((env.SSRF_ALLOW ?? '').split(',')) }) : undefined;
   const app = createApp({
-    store, renderer, snapshots, publicUrl, ruleRepos,
+    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
@@ -95,7 +97,9 @@ async function start(): Promise<void> {
   });
   const shutdown = () => {
     clearInterval(prune);
+    void nodeProbe?.close();
     server.close(async () => {
+      await nodeProbe?.close();
       await ruleRepos.stop();
       await snapshots.settled();
       store.close();

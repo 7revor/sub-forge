@@ -19,3 +19,4 @@ export * from './rules/expand.ts';
 export * from './template/merge.ts';
 export * from './template/validate.ts';
 export * from './render/mihomo.ts';
+export * from './proxy/validateLocal.ts';
