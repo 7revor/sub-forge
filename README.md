@@ -33,7 +33,7 @@
 
 已完成 [M1 稳定化验收](docs/10-m1-stabilization.md)：Docker 内 377 项通过、2 项原有用例跳过，并完成内置浏览器验收。跟随最新模板的订阅会在客户端下次刷新主订阅时采用新模板；主配置与节点 / 规则资源按结构版本配套，兼容的远程内容仍可独立刷新。修复已合入 main，本地服务使用主分支；尚未部署到生产环境。
 
-2026-10-29 后端复查的六项问题已在 `codex/backend-six-fixes` 修复，新增 80 项回归用例；当前工作树的 Docker 全量验证为 core 93、server 187、web 183 项通过，2 项原有前端用例跳过。修复范围、行为边界及复现方式见 [12](docs/12-backend-regression-fixes.md)。本轮仅修复既有功能，尚未合并或部署。
+2026-10-29 后端复查的六项问题已修复并合入 `main`，新增 80 项回归用例；整合主分支更新后的 Docker 全量验证为 core 94、server 196、web 187 项通过，2 项原有前端用例跳过。修复范围、行为边界及复现方式见 [12](docs/12-backend-regression-fixes.md)。本轮仅修复既有功能，未推送或部署。
 
 - 需求：PRD v0.2，待决问题已暂定（[07 §8](docs/07-verification-checklist.md#8-决策记录)）；剩余需要 GUI / 真机 / 国内网络的采集项见 [07 §7.1](docs/07-verification-checklist.md#71-剩余采集项)，结果与暂定决策冲突时再修订。实测用例见 [research/verification](research/verification/README.md)。
 - 设计：前端页面设计稿（29 张画板，前端按画板实现，对照见 [docs/11](docs/11-design-coverage.md)）在 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库；链接默认仅所有者可见，需要在页面的 Share 菜单中分享给他人。
