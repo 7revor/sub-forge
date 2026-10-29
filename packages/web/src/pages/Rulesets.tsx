@@ -1,16 +1,17 @@
 // 规则集：本地 / 远程，按客户端与平台预览最终输出（RS-01–03、CR-05）；规则包：两层组合，只配一个出口（RB-01–05）。
 
 import { useQuery } from '@tanstack/react-query';
-import { parseRuleSetContent, type Client, type Platform, type RuleBundle, type RuleIR, type RuleSetFormat } from '@sub-forge/core';
+import { behaviorOf, parseRuleSetContent, ruleKey, type Client, type Platform, type RuleBundle, type RuleIR, type RuleSetFormat } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { api, type RulesetPreview } from '../api.ts';
 import { ClientOverrides, clientOverridesError, newClientOverride, ruleInputError } from '../components/ClientOverrides.tsx';
 import { RuleEditor } from '../components/RuleEditor.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, Switch, Textarea, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, Switch, Textarea, cx, td, th } from '../components/ui.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useList, type RuleSetDoc } from '../hooks.ts';
@@ -217,56 +218,107 @@ function RuleLineInput({ onAdd }: { onAdd: (rule: RuleIR) => void }) {
   const [rule, setRule] = useState<RuleIR>();
   const [revision, setRevision] = useState(0);
   const error = ruleInputError(rule);
-  return <div className="flex min-w-64 flex-1 flex-col gap-3">
+  return <div className="flex flex-col gap-3">
     <RuleEditor key={revision} value={rule} onChange={setRule} onIncomplete={setRule} />
     {rule && <ErrorBox error={error} />}
-    <Button className="self-start" disabled={!!error} onClick={() => {
+    <Button variant="primary" className="self-end" disabled={!rule || !!error} onClick={() => {
       if (!rule || error) return;
       onAdd(rule); setRule(undefined); setRevision((value) => value + 1);
-    }}><Plus size={15} />添加规则</Button>
+    }}>添加规则</Button>
   </div>;
 }
 
+type Behavior = 'domain' | 'classical' | 'ipcidr';
+/** 子项的 behavior 与条数：本地规则集在浏览器里解析，远程规则集要等服务端拉取，显示为未知 */
+function itemStats(item: RuleBundle['items'][number], rulesets: RuleSetDoc[]): { behavior?: Behavior | '混合'; keys?: { key: string; behavior: Behavior }[]; src: string; name: string } {
+  if (item.kind === 'rule') return { name: ruleText(item.rule), src: '单条规则', behavior: behaviorOf(item.rule), keys: [{ key: ruleKey(item.rule), behavior: behaviorOf(item.rule) }] };
+  const rs = rulesets.find((r) => r.id === item.id);
+  if (!rs) return { name: item.id, src: '规则集不存在' };
+  if (rs.kind === 'remote') return { name: rs.name, src: `远程 · ${rs.format}`, ...(rs.behavior ? { behavior: rs.behavior } : {}) };
+  const parsed = parseRuleSetContent(rs.content ?? '', rs.format, rs.behavior);
+  if (parsed.passthrough) return { name: rs.name, src: `本地 · ${rs.format}`, ...(rs.behavior ? { behavior: rs.behavior } : {}) };
+  const keys = parsed.rules.map((r) => ({ key: ruleKey(r.rule), behavior: behaviorOf(r.rule) }));
+  const kinds = new Set(keys.map((k) => k.behavior));
+  return { name: rs.name, src: `本地规则集 · ${parsed.format}`, keys, behavior: kinds.size === 1 ? [...kinds][0] : kinds.size ? '混合' : undefined };
+}
+
+/** 规则包（设计稿「规则包」）：子项列表 + 合并结果 + 同一出口下的输出顺序 */
 export function BundleEdit() {
   const e = useDocEditor('bundles', EMPTY_B);
   const rulesets = useList('rulesets').data ?? [];
+  const bundles = useList('bundles').data ?? [];
+  const [pickRs, setPickRs] = useState(false);
+  const [addRule, setAddRule] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const [rs, setRs] = useState('');
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const set = (p: Partial<RuleBundle>) => e.setDraft({ ...d, ...p });
-  const name = (id: string) => rulesets.find((r) => r.id === id)?.name ?? id;
+  const stats = d.items.map((it) => itemStats(it, rulesets));
+  const enabled = stats.filter((_, i) => d.items[i]!.enabled !== false);
+  const known = enabled.flatMap((s) => s.keys ?? []);
+  const unique = new Map(known.map((k) => [k.key, k.behavior]));
+  const merged = (['domain', 'classical', 'ipcidr'] as Behavior[]).map((b) => [b, [...unique.values()].filter((x) => x === b).length] as const);
+  const unknownCount = enabled.filter((s) => !s.keys).length;
+  const slug = d.id || 'new';
+  const present = merged.filter(([, n]) => n > 0).map(([b]) => b);
 
   return (
     <DetailShell listPath="/bundles" listLabel="规则包" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
-      onSave={() => e.submit()} saveError={e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}>
-      <Card title="基本信息">
-        <div className="flex flex-wrap items-end gap-5">
-          <Field label="名称" className="min-w-64 flex-1">{(id) => <Input id={id} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
-          <label className="flex h-[38px] items-center gap-2.5 text-[13px]"><Switch label="IP 类规则统一 no-resolve" checked={!!d.noResolve} onChange={(v) => set({ noResolve: v })} />IP 类规则统一加 no-resolve</label>
+      onSave={() => e.submit()} saveError={e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
+      moreItems={[{ label: '重命名…', onSelect: () => setRenaming(true) }]}
+      extraActions={!e.isNew && <Link to={`/rule-repo?bundle=${encodeURIComponent(d.id)}`} className={buttonClass()}>从规则仓库添加</Link>}>
+      <p className="m-0 -mt-2 text-[13px] text-muted">一个规则包在规则列表中只占一行、只配一个出口。包内最多两层：不能再放规则包。</p>
+      {e.isNew && <Card title="名称"><Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field></Card>}
+      <div className="flex flex-wrap items-start gap-5">
+        <Card className="min-w-0 flex-[999_1_560px]" bodyClass="pb-1" title={<h2 className="m-0 text-[15px] font-semibold">子项</h2>}
+          actions={<><Button className="h-9" onClick={() => setPickRs(true)}>添加规则集</Button><Button className="h-9" onClick={() => setAddRule(true)}>添加单条规则</Button></>}>
+          {!d.items.length ? <div className="px-4 pb-4 text-[13px] text-muted">还没有子项。添加规则集或单条规则。</div> : (
+            <SortableList items={d.items} onReorder={(items) => set({ items })} renderItem={(it, i, handle) => {
+              const st = stats[i]!;
+              const on = it.enabled !== false;
+              return (
+                <div className={cx('flex flex-wrap items-center gap-x-3.5 gap-y-2 border-t border-line-2 py-3 pr-4 pl-2', !on && 'opacity-55')}>
+                  {handle}
+                  <span className="flex min-w-0 flex-[1_1_240px] flex-col gap-0.5"><span className={cx('truncate text-[13.5px] font-medium', it.kind === 'rule' && 'font-mono')}>{st.name}</span><span className="text-[12px] text-muted">{st.src}</span></span>
+                  <span className="rounded bg-[#ebedf1] px-2 py-0.5 font-mono text-[12px] text-ink-2">{st.behavior ?? '未知'}</span>
+                  <span className="w-16 text-right font-mono text-[12.5px]">{st.keys ? st.keys.length : '—'}</span>
+                  <Switch label={`启用 ${st.name}`} checked={on} onChange={(v) => set({ items: d.items.map((x, j) => (j === i ? { ...x, enabled: v } : x)) })} />
+                  <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${st.name}`} onClick={() => set({ items: d.items.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
+                </div>
+              );
+            }} />
+          )}
+          {bundles.some((b) => b.id !== d.id) && <div className="mx-4 mt-1 mb-3 rounded-lg bg-ground px-3 py-2.5 text-[12.5px] text-muted">规则包不能放进规则包（最多两层），所以添加规则集时不会列出其他规则包。</div>}
+        </Card>
+        <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-3">
+          <section className="flex flex-col gap-3 rounded-[10px] border border-line bg-panel px-4 py-3.5">
+            <h2 className="m-0 text-[15px] font-semibold">合并结果</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {merged.map(([t, n]) => <div key={t} className="flex flex-col gap-0.5 rounded-lg bg-ground p-2.5"><span className="font-mono text-[11.5px] text-muted">{t}</span><span className="text-xl font-semibold">{n}</span></div>)}
+            </div>
+            <span className="text-[12.5px] text-ink-2">启用 {known.length} 条，去重 {known.length - unique.size} 条，输出 {unique.size} 条{unknownCount ? `；另有 ${unknownCount} 个远程或二进制规则集在下发时合并` : ''}</span>
+            <label className="flex items-center gap-2.5 text-[13px]"><input type="checkbox" className="h-[18px] w-[18px] accent-accent" checked={!!d.noResolve} onChange={(x) => set({ noResolve: x.target.checked })} />IP 类规则统一加 <span className="font-mono">no-resolve</span></label>
+          </section>
+          <section className="flex flex-col gap-2 rounded-[10px] border border-line bg-panel px-4 py-3.5">
+            <h2 className="m-0 text-[14px] font-semibold">输出顺序（同一出口）</h2>
+            <pre className="m-0 overflow-x-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7]">{(present.length ? present : ['domain', 'classical', 'ipcidr']).map((b) => `RULE-SET,b_${slug}_${b},[出口]${b === 'ipcidr' && d.noResolve ? ',no-resolve' : ''}`).join('\n')}</pre>
+            <span className="text-[12px] leading-normal text-muted">domain 类在前、IP 类在后，避免过早触发 DNS 解析。</span>
+          </section>
         </div>
-      </Card>
-      <Card title={`子项 ${d.items.length} 项 · 启用中 ${d.items.filter((item) => item.enabled !== false).length} 项`} bodyClass="px-4 pb-3">
-        {!d.items.length ? <Empty>还没有子项。</Empty> : (
-          <SortableList items={d.items} onReorder={(items) => set({ items })} renderItem={(it, i, handle) => (
-              <div className={`flex items-center gap-3 border-t border-line-2 py-2.5 ${it.enabled === false ? 'opacity-55' : ''}`}>
-                {handle}<Badge>{it.kind === 'ruleset' ? '规则集' : '单条规则'}</Badge>
-                <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{it.kind === 'ruleset' ? name(it.id) : ruleText(it.rule)}</span>
-                <Switch label={`启用子项 ${i + 1}`} checked={it.enabled !== false} onChange={(v) => set({ items: d.items.map((x, j) => (j === i ? { ...x, enabled: v } : x)) })} />
-                <Button size="sm" variant="ghost" aria-label={`删除子项 ${i + 1}`} onClick={() => set({ items: d.items.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
-              </div>
-            )} />
-        )}
-        <div className="-mx-4 mt-1 flex flex-wrap gap-3 border-t border-line-2 px-4 pt-3">
-          <div className="flex gap-2">
-            <Select aria-label="规则集" className="w-56" value={rs} onChange={(x) => setRs(x.target.value)}>
-              <option value="">选择规则集</option>
-              {rulesets.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </Select>
-            <Button disabled={!rs} onClick={() => { set({ items: [...d.items, { kind: 'ruleset', id: rs }] }); setRs(''); }}><Plus size={15} />添加规则集</Button>
-          </div>
-          <RuleLineInput onAdd={(rule) => set({ items: [...d.items, { kind: 'rule', rule }] })} />
-        </div>
-      </Card>
+      </div>
+      <Modal title="添加规则集" open={pickRs} onClose={() => setPickRs(false)}
+        footer={<><Button onClick={() => setPickRs(false)}>取消</Button><Button variant="primary" disabled={!rs} onClick={() => { set({ items: [...d.items, { kind: 'ruleset', id: rs }] }); setRs(''); setPickRs(false); }}>添加</Button></>}>
+        <Field label="规则集">{(id) => <Select id={id} value={rs} onChange={(x) => setRs(x.target.value)}>
+          <option value="">选择规则集</option>
+          {rulesets.map((r) => <option key={r.id} value={r.id} disabled={d.items.some((it) => it.kind === 'ruleset' && it.id === r.id)}>{r.name}（{r.kind === 'remote' ? '远程' : '本地'}）</option>)}
+        </Select>}</Field>
+        <span className="text-[12px] text-muted">也可以从<Link to={`/rule-repo?bundle=${encodeURIComponent(d.id)}`} className="text-accent">规则仓库</Link>直接引用。</span>
+      </Modal>
+      <Modal title="添加单条规则" open={addRule} onClose={() => setAddRule(false)} wide>
+        <RuleLineInput onAdd={(rule) => { set({ items: [...d.items, { kind: 'rule', rule }] }); setAddRule(false); }} />
+      </Modal>
+      <RenameDialog open={renaming} title="重命名规则包" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => set({ name })} />
     </DetailShell>
   );
 }
