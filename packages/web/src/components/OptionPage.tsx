@@ -1,8 +1,10 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useId } from 'react';
+import type { SearchMatch } from '@sub-forge/core';
+import { HighlightedText } from './HighlightedText.tsx';
 import { cx } from './cx.ts';
 
-export type PageOption = { value: string; label: string; hint?: string; disabled?: boolean };
+export type PageOption = { value: string; label: string; hint?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
 export type OptionPage = { options: PageOption[]; total: number; nextOffset?: number; notices?: string[] };
 export type OptionLoader = (query: string, offset: number) => Promise<OptionPage>;
 
@@ -50,8 +52,8 @@ export function PagedOptionList({ loadOptions, query, onSelect, selected, allowU
       {page.options.map(option => <button key={option.value} type="button" role="option" aria-selected={selected === option.value}
         disabled={!allowUnavailable && option.disabled} onClick={() => onSelect(option.value)}
         className={cx('flex min-h-14 w-full cursor-pointer flex-col justify-center gap-0.5 rounded-md px-3 py-2 text-left text-[13px] hover:bg-ground focus:bg-ground focus:outline-none focus-visible:ring-1 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50', selected === option.value && 'bg-ground')}>
-        <span className="w-full truncate" title={option.label}>{option.label}</span>
-        <span className="w-full truncate text-[11.5px] text-muted" title={option.hint}>{option.hint}</span>
+        <span className="w-full truncate" title={option.label}><HighlightedText text={option.label} matches={option.matches?.label} /></span>
+        <span className="w-full truncate text-[11.5px] text-muted" title={option.hint}><HighlightedText text={option.hint ?? ''} matches={option.matches?.hint} /></span>
       </button>)}
     </div>
     <OptionPageStatus page={page} />

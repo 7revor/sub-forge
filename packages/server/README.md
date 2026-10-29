@@ -309,3 +309,5 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 移除 `/rule-options/catalog` 及目录树查询；新文件缓存不再生成目录节点，兼容旧缓存并在下次更新替换。正文预览只查询所选文件。单文件 resolve、历史引用和种子格式不变。隔离浏览器验收：`pnpm exec tsx test/manual-rule-options-server.ts`，使用内存数据和模拟 Git，结束后停止该进程。
 
 2026-10-29：`/api/rule-options/search` 的仓库文件搜索仅匹配完整 path（包含文件名），仓库名与分支仅展示，不参与匹配。可避免 `ai` 命中仓库名 `domain` 导致整库出现；分页、大小写规范化、权限与文件身份保持不变。
+
+2026-10-29：规则候选 hint 只显示父目录（根目录 `/`）与仓库／分支说明，完整 path 仍保存在 value。新增 `matches:{label:[{start,end}],hint:[{start,end}]}`，为对应显示字符串的 UTF-16 半开区间；只对本页实际搜索字段生成高亮，兼容 NFKC、大小写和跨目录／文件名匹配，不高亮仓库名与分支。

@@ -91,3 +91,5 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 ### 2026-10-29：统一名称搜索工具
 
 `normalizeNameSearch`、`matchesNameSearch` 与 `nameLikePattern` 提供忽略大小写的字面包含匹配及 LIKE 参数转义，保留名称空格和标点。仅用于候选搜索，不改写节点精确匹配与处理链正则。
+
+2026-10-29：`nameSearchRanges` 复用名称搜索的 NFKC、首尾空白与大小写规则，将命中映射为原始文本 UTF-16 半开区间，保留全角、兼容字符与组合字形，供分页候选高亮使用。领域模型与种子格式不变。

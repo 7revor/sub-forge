@@ -38,7 +38,7 @@ describe('物理文件平铺搜索与分页', () => {
     const searched = (await h.admin.get('/api/rule-options/search?scope=repository&q=file-34')).json;
     expect(searched.items).toHaveLength(2);
     expect(searched.items.map((item: { value: string }) => JSON.parse(item.value).file.path)).toEqual(['rule/Clash/China/file-34.list', 'rule/Surge/China/file-34.list']);
-    expect(searched.items[0]).toMatchObject({ label: 'file-34.list', hint: 'blackmatrix7/ios_rule_script · rule/Clash/China/file-34.list · 分支：master' });
+    expect(searched.items[0]).toMatchObject({ label: 'file-34.list', hint: 'blackmatrix7/ios_rule_script · rule/Clash/China/ · 分支：master' });
     expect((await h.admin.get('/api/rule-options/search?offset=999')).json).toMatchObject({ items: [], total: 71 });
     expect(full).not.toHaveBeenCalled();
     expect(h.reads).toEqual([]);
@@ -83,8 +83,35 @@ describe('物理文件平铺搜索与分页', () => {
     }
     expect((await search('v2fly')).total).toBe(0);
     expect((await search('surge-domain-set')).total).toBe(0);
-    expect((await search('36kr')).items).toMatchObject([{ label: '36kr.txt', hint: 'v2fly-domain-list · 36kr.txt · 分支：surge-domain-set' }]);
+    expect((await search('36kr')).items).toMatchObject([{ label: '36kr.txt', hint: 'v2fly-domain-list · / · 分支：surge-domain-set' }]);
     expect((await search('')).total).toBe(39);
+  });
+
+  it('第二行仅显示目录，高亮真实路径命中并支持跨目录与文件名的查询', async () => {
+    const h = await setup();
+    h.repos.setEnabled('blackmatrix7', false);
+    h.setPaths(['AI/OpenＡＩ.txt', 'OpenAI.txt', '36kr.txt']);
+    const repo = await h.repos.addCustom({ url: 'https://github.com/example/highlight-fixture', name: 'v2fly-domain-list', ref: 'surge-domain-set' });
+    await h.repos.refresh(repo);
+    const search = async (q: string) => (await h.admin.get(`/api/rule-options/search?q=${encodeURIComponent(q)}`)).json;
+    const marked = (item: { label: string; hint: string; matches: { label: { start: number; end: number }[]; hint: { start: number; end: number }[] } }, field: 'label' | 'hint') => item.matches[field].map(range => item[field].slice(range.start, range.end));
+    const page = await search('ai');
+    expect(page.total).toBe(2);
+    const nested = page.items.find((item: { label: string }) => item.label === 'OpenＡＩ.txt');
+    expect(nested.hint).toBe('v2fly-domain-list · AI/ · 分支：surge-domain-set');
+    expect(marked(nested, 'label')).toEqual(['ＡＩ']);
+    expect(marked(nested, 'hint')).toEqual(['AI']);
+    const root = page.items.find((item: { label: string }) => item.label === 'OpenAI.txt');
+    expect(root.hint).toBe('v2fly-domain-list · / · 分支：surge-domain-set');
+    expect(marked(root, 'label')).toEqual(['AI']);
+    expect(marked(root, 'hint')).toEqual([]);
+    expect(JSON.parse(nested.value).file.path).toBe('AI/OpenＡＩ.txt');
+    const cross = (await search('ai/openai')).items[0];
+    expect(marked(cross, 'hint')).toEqual(['AI/']);
+    expect(marked(cross, 'label')).toEqual(['OpenＡＩ']);
+    const local = (await search('google')).items[0];
+    expect(marked(local, 'label')).toEqual(['Google']);
+    expect((await search('')).items.every((item: typeof nested) => !item.matches.label.length && !item.matches.hint.length)).toBe(true);
   });
 
   it('本地候选共用分页，鉴权、私有隔离与分页上限保持有效', async () => {
