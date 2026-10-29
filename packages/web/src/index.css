@@ -183,3 +183,28 @@ body {
     background: var(--scrollbar-thumb-active);
   }
 }
+
+/* 分页列表占满剩余高度；搜索与分页器固定，仅中间内容滚动。 */
+.page-layout > .list-panel,
+.page-layout > .template-list-layout {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.list-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-panel);
+}
+
+.list-panel thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-panel);
+}

@@ -386,3 +386,7 @@ SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使
 - 旧 MRS/SRS 仅保留已有透传能力，不新增解码器；无法转换时报告错误，订阅服务沿用已有失败回退。
 
 格式支持依据：[mihomo rule-providers](https://wiki.metacubex.one/en/config/rule-providers/)、[文件内容格式](https://wiki.metacubex.one/en/config/rule-providers/content/)。当前完整订阅下载实现为 mihomo；Surge 继续用于规则预览。
+
+## 管理列表查询模型（2026-10-29）
+
+列表分页不改变领域文档、种子格式或数据库结构。查询参数为 `page`、`pageSize`、`q`，返回 `items` 及 `total/page/pageSize/totalPages`；`total` 为用户可见且名称匹配的文档数，模板仅统计最新版本。未传参数仍返回全量 `items`，用于关联选择与旧客户端。无搜索时数据库分页；加密文档名称在服务端解密后筛选，不新增明文索引。

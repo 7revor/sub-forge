@@ -48,7 +48,7 @@ export function useSaveDoc<K extends Kind>(kind: K) {
       (doc.id ? api<{ item: DocMap[K] }>('PUT', `/${kind}/${doc.id}`, doc) : api<{ item: DocMap[K] }>('POST', `/${kind}`, doc)).then((r) => r.item),
     onSuccess: (item) => {
       qc.setQueryData([kind, (item as { id: string }).id], item);
-      void qc.invalidateQueries({ queryKey: [kind], exact: true });
+      void qc.invalidateQueries({ queryKey: [kind] });
     },
   });
 }

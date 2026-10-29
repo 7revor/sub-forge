@@ -1,3 +1,5 @@
+import { usePagedList } from '../hooks/usePagedList.ts';
+import { Pagination } from '../components/Pagination.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { Notice } from '../components/Notice.tsx';
@@ -13,7 +15,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, Modal, PageHeader, PageScroll, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
-import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
+import { useList, useMe, type TemplateDoc } from '../hooks.ts';
 import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { templateDiff } from '../convert/templateDiff.ts';
 import { TemplateEditor } from './template/TemplateEditor.tsx';
@@ -25,45 +27,48 @@ type TemplateDetailData = { item: TemplateDoc; versions: { version: number; chan
 
 /** 管理员模板列表：左侧选择模板，右侧查看骨架、规则与版本，并进入编辑或发布。 */
 export function TemplateList() {
-  const list = useTemplates();
+  const list = usePagedList('templates');
   const [params, setParams] = useSearchParams();
   const profiles = useList('profiles');
-  const sel = list.data?.find((t) => t.id === params.get('id')) ?? list.data?.[0];
+  const selId = params.get('id') ?? list.data?.items[0]?.id;
   const inUse = (id: string) => (profiles.data ?? []).filter((p) => p.template?.id === id).length;
   return (
     <>
       <PageHeader title="模板"
         actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
       <ErrorAlert error={list.error} />
-      <PageScroll>
-        {list.isLoading ? <div className="text-muted">加载中…</div> : !list.data?.length ? (
-          <Empty title="还没有模板" />
-        ) : (
-          <div className="flex flex-wrap items-start gap-5">
-            <nav aria-label="模板列表" className="min-w-0 flex-[1_1_260px] overflow-hidden rounded-[10px] border border-line bg-panel py-1.5">
-              {list.data.map((t) => {
-                const on = t.id === sel?.id;
-                const n = inUse(t.id);
-                return (
-                  <button key={t.id} type="button" aria-current={on || undefined} onClick={() => setParams({ id: t.id }, { replace: true })}
-                    className={cx('flex w-full cursor-pointer flex-col gap-1 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'bg-panel hover:bg-ground')}>
-                    <span className="flex justify-between gap-2"><span className="text-[13.5px] font-semibold">{t.name ?? t.id}</span><span className="font-mono text-[12px] text-muted">v{t.version}</span></span>
-                    <span className="text-[12px] text-muted">{t.groups.length} 个策略组 · {t.rules.length} 条规则</span>
-                    <span className="text-[12px] text-ink-2">{n ? `你有 ${n} 个配置订阅在用` : '未使用'}</span>
-                  </button>
-                );
-              })}
-            </nav>
-            <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
-              {sel && <TemplateDetail key={sel.id} id={sel.id} inUse={inUse(sel.id)} actions={<>
-                <Link to={`/templates/${sel.id}`} className={buttonClass()}>编辑新版本</Link>
-                <Link to={`/templates/${sel.id}/publish`} className={buttonClass()}>发布</Link>
-                <Link to={`/profiles/new?template=${encodeURIComponent(sel.id)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
-              </>} />}
-            </div>
+      <div className="template-list-layout grid min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-1">
+        <section className="list-panel" aria-busy={list.isFetching}>
+          <div className="shrink-0 px-4 py-3.5"><Input aria-label="搜索模板" placeholder="搜索名称" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
+          <nav key={`${list.data?.page}-${list.pageSize}-${list.q}`} aria-label="模板列表" className="min-h-0 flex-1 overflow-auto overscroll-contain">
+            {!list.data ? <div className="p-4 text-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !list.data.items.length ? <Empty title={list.q.trim() ? `没有名称包含「${list.q.trim()}」的模板` : '还没有模板'} /> : list.data.items.map(t => {
+              const on = t.id === selId;
+              const n = inUse(t.id);
+              return (
+                <button key={t.id} type="button" aria-current={on || undefined} onClick={() => setParams(previous => {
+                  const next = new URLSearchParams(previous); next.set('id', t.id); return next;
+                }, { replace: true })}
+                  className={cx('flex w-full cursor-pointer flex-col gap-1 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'bg-panel hover:bg-ground')}>
+                  <span className="flex justify-between gap-2"><span className="text-[13.5px] font-semibold">{t.name ?? t.id}</span><span className="font-mono text-[12px] text-muted">v{t.version}</span></span>
+                  <span className="text-[12px] text-muted">{t.groups.length} 个策略组 · {t.rules.length} 条规则</span>
+                  <span className="text-[12px] text-ink-2">{n ? `你有 ${n} 个配置订阅在用` : '未使用'}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <Pagination compact page={list.data?.page ?? list.page} pageSize={list.pageSize} total={list.data?.total ?? 0} totalPages={list.data?.totalPages ?? 1}
+            busy={list.isFetching || !list.data} onPage={list.setPage} onPageSize={list.setPageSize} />
+        </section>
+        <div className="min-h-0 min-w-0 overflow-auto overscroll-contain">
+          <div className="flex min-w-0 flex-col gap-5">
+            {selId && <TemplateDetail key={selId} id={selId} inUse={inUse(selId)} actions={<>
+              <Link to={`/templates/${selId}`} className={buttonClass()}>编辑新版本</Link>
+              <Link to={`/templates/${selId}/publish`} className={buttonClass()}>发布</Link>
+              <Link to={`/profiles/new?template=${encodeURIComponent(selId)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
+            </>} />}
           </div>
-        )}
-      </PageScroll>
+        </div>
+      </div>
     </>
   );
 }
