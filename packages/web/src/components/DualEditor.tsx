@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, ErrorBox, Textarea } from './ui.tsx';
+import { Button, ErrorBox, Segmented, Textarea } from './ui.tsx';
 
 export type EditorMode = 'form' | 'raw';
 export type RawResult<T> = { ok: true; value: T; notes?: string[] } | { ok: false; error: string; line?: number };
@@ -65,10 +65,10 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
     onModeChange?.(next);
   };
   return <div className="flex flex-col gap-3">
-    <div className="flex items-center gap-2" role="group" aria-label="编辑视图">
-      <Button aria-pressed={current === 'form'} variant={current === 'form' ? 'primary' : 'default'} size="sm" onClick={() => changeMode('form')}>表单</Button>
-      <Button aria-pressed={current === 'raw'} variant={current === 'raw' ? 'primary' : 'default'} size="sm" onClick={() => changeMode('raw')}>原始配置</Button>
-    </div>
+    <Segmented label="编辑视图" size="sm" value={current} onChange={changeMode} options={[
+      { value: 'form', label: '表单' },
+      { value: 'raw', label: '原始配置' },
+    ]} />
     <ErrorBox error={rawError} />
     {current === 'form' && result.ok && !!result.notes?.length && <div role="status" className="text-[13px] text-muted">
       已返回表单，保留可识别的有效字段：

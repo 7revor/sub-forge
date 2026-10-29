@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { NodeSetSelect, TargetPicker, targetLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, ReportList, Segmented, Select, td, th } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, ReportList, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 const STRATEGIES: { value: RefStrategy; label: string }[] = [{ value: 'wrap', label: '包装组' }, { value: 'copy', label: '复制到本地' }, { value: 'inline', label: '整体内联' }];
@@ -87,8 +87,8 @@ export function TabChains() {
               {preview.data.dependencies.map((d) => (
                 <tr key={d.refKey}>
                   <td className={td}><div className="flex flex-col gap-0.5"><span className="font-medium">{d.node}</span><span className="text-[12px] text-muted">{d.nodeSet}</span></div></td>
-                  <td className={`${td} font-mono text-[12.5px]`}>{d.output}</td>
-                  <td className={`${td} text-[12.5px] text-ink-2`}>{d.usedBy.join('、')}</td>
+                  <td className={cx(td, 'font-mono text-[12.5px]')}>{d.output}</td>
+                  <td className={cx(td, 'text-[12.5px] text-ink-2')}>{d.usedBy.join('、')}</td>
                   <td className={td}><Segmented label="解析策略" value={perRef[d.refKey] ?? draft.refPolicy.default} options={STRATEGIES}
                     onChange={(v) => setDraft({ ...draft, refPolicy: { ...draft.refPolicy, perRef: { ...perRef, [d.refKey]: v } } })} /></td>
                 </tr>

@@ -119,16 +119,16 @@ export function TabGroups() {
         </div>
       )}
       <div className="flex flex-wrap items-start gap-5">
-        <Card title="策略组" actions={<span className="text-[12px] text-muted">顺序即面板顺序</span>} className="min-w-0 flex-[1_1_300px]" bodyClass="pb-2">
-          {templateIds.length > 0 && <p className="mx-4 mt-0 text-[12px] text-muted">模板组顺序固定；私有组不能放在第一个模板组之前。</p>}
-          <SortableList items={groups} getKey={(x) => x.id} isLocked={(x) => x.origin === 'template'}
+        <Card title="策略组" actions={<span className="text-[12px] text-muted">顺序即面板顺序</span>} className="min-w-0 flex-[1_1_300px]" bodyClass="px-4 pb-2">
+          {templateIds.length > 0 && <p className="mt-0 text-[12px] text-muted">模板组顺序固定；私有组不能放在第一个模板组之前。</p>}
+          <div className="-mx-4"><SortableList items={groups} getKey={(x) => x.id} isLocked={(x) => x.origin === 'template'}
             canDrop={(_from, to) => !templateIds.length || to > 0}
             onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraGroups: reorderExtraGroups(templateIds, ordered.map((x) => x.id), o.extraGroups ?? []) }))}
             renderItem={(x, _index, handle) => {
               const n = totalMembers(x);
               const current = x.origin === 'template' ? { ...x, ...draft.overlay.groupPatches?.[x.id]?.set } : x;
               return (
-                <div className={cx('flex items-center gap-1 border-t border-line-2 pl-2', x.id === g?.id ? 'bg-accent-soft' : 'bg-panel hover:bg-ground')}>
+                <div className={cx('flex items-center gap-1 border-t border-line-2 px-2', x.id === g?.id ? 'bg-accent-soft' : 'bg-panel hover:bg-ground')}>
                   {handle}
                   <button type="button" onClick={() => setSelectedId(x.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-2.5 text-left">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -139,7 +139,7 @@ export function TabGroups() {
                   </button>
                 </div>
               );
-            }} />
+            }} /></div>
           {!groups.length && <Empty>没有组。选择模板或新增私有组。</Empty>}
           <div className="-mx-4 border-t border-line-2 px-4 pt-2.5"><Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button></div>
         </Card>

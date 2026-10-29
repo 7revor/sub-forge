@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type User } from '../api.ts';
-import { Badge, Button, Card, ErrorBox, Field, Input, Modal, PageHeader, Select, Switch, formatTime, td, th } from '../components/ui.tsx';
+import { Badge, Button, Card, ErrorBox, Field, Input, Modal, PageHeader, Select, Switch, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useMe } from '../hooks.ts';
 
 export function Users() {
@@ -32,13 +32,13 @@ export function Users() {
               const self = u.id === me?.id;
               return (
                 <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
-                  <td className={`${td} font-medium`}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-muted">（我）</span>}</td>
+                  <td className={cx(td, 'font-medium')}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-muted">（我）</span>}</td>
                   <td className={td}>
                     <Select aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
                       <option value="user">用户</option><option value="admin">管理员</option>
                     </Select>
                   </td>
-                  <td className={`${td} text-muted`}>{formatTime(u.createdAt)}</td>
+                  <td className={cx(td, 'text-muted')}>{formatTime(u.createdAt)}</td>
                   <td className={td}>{u.role === 'admin' ? <span className="text-[12.5px] text-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
                   <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
                   <td className={td}>

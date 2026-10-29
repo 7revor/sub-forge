@@ -206,6 +206,17 @@ function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: Operat
   }
 }
 
+function NodeChips({ title, nodes, truncated }: { title: string; nodes: PipelinePreview['nodes']; truncated?: boolean }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[13px] font-semibold">{title}（{nodes.length}{truncated ? '+' : ''}）</span>
+      <div className="flex flex-wrap gap-1.5">
+        {nodes.map((n, i) => <span key={i} title={`${n.type} ${n.server}:${n.port}`} className="rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]">{n.name}</span>)}
+      </div>
+    </div>
+  );
+}
+
 function StepRow({ handle, index, step, selected, onSelect, onToggle, onRemove, trace }: {
   handle: ReactNode; index: number; step: OperatorStep; selected: boolean;
   onSelect: () => void; onToggle: (v: boolean) => void; onRemove: () => void;
@@ -268,9 +279,9 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
   return (
     <div className="flex flex-wrap items-start gap-5">
-      <Card title="处理链" className="min-w-0 flex-[1_1_380px]" bodyClass="pb-2"
+      <Card title="处理链" className="min-w-0 flex-[1_1_380px]" bodyClass="px-4 pb-2"
         actions={<span className="text-[12.5px] text-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>}>
-        {steps.length === 0 && <div className="px-1 pb-3"><Empty>还没有处理步骤，节点会原样输出。</Empty></div>}
+        {steps.length === 0 && <div className="pb-3"><Empty>还没有处理步骤，节点会原样输出。</Empty></div>}
         <div className="-mx-4">
           <SortableList items={steps.map((step, i) => ({ step, id: keys[i]! }))} getKey={(item) => item.id}
             onReorder={(items, { to }) => {
@@ -303,7 +314,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
         )}
       </Card>
 
-      <Card className="min-w-0 flex-[999_1_480px]" bodyClass="pb-4"
+      <Card className="min-w-0 flex-[999_1_480px]"
         title={<div className="flex flex-col gap-0.5">
           <h2 className="m-0 text-[15px] font-semibold">{cur ? `第 ${selected + 1} 步之后 · ${OP_LABEL[step?.op ?? 'flag']}` : '逐步预览'}</h2>
           <span className="text-[12.5px] text-muted">{loading ? '预览中…' : cur ? (cur.error ? `这一步失败，已跳过：${cur.error}` : `${cur.before} → ${cur.after} 个节点，改名 ${cur.renamed.length}，移除 ${cur.removed.length}`) : (steps.length ? '保存后可预览每一步的结果' : '添加处理步骤后可以逐步预览')}</span>
@@ -314,27 +325,23 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
             {diffRows.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-[13px]">
-                  <thead><tr><th className={th}>上一步</th><th className={th} aria-hidden="true" /><th className={th}>这一步之后</th></tr></thead>
+                  <thead><tr><th className={th}>上一步</th><th className={cx(th, 'w-8')} aria-hidden="true" /><th className={th}>这一步之后</th></tr></thead>
                   <tbody>
                     {diffRows.slice(0, 200).map((d, i) => (
                       <tr key={i}>
-                        <td className={`${td} bg-[#fdf4f3] font-mono text-[#8f2a1f]`}>{d.from}</td>
-                        <td className={`${td} text-center text-faint`} aria-hidden="true">→</td>
-                        <td className={`${td} font-mono ${d.kind === 'remove' ? 'text-muted italic' : 'bg-[#f2faf5] text-[#17633a]'}`}>{d.kind === 'remove' ? '（移除）' : d.to}</td>
+                        <td className={cx(td, 'bg-[#fdf4f3] font-mono text-[#8f2a1f]')}>{d.from}</td>
+                        <td className={cx(td, 'text-center text-faint')} aria-hidden="true">→</td>
+                        <td className={cx(td, 'font-mono', d.kind === 'remove' ? 'text-muted italic' : 'bg-[#f2faf5] text-[#17633a]')}>{d.kind === 'remove' ? '（移除）' : d.to}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-semibold">节点（{cur.nodes.length}{cur.truncated ? '+' : ''}）</span>
-              <div className="flex flex-wrap gap-1.5">
-                {cur.nodes.map((n, i) => <span key={i} title={`${n.type} ${n.server}:${n.port}`} className="rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]">{n.name}</span>)}
-              </div>
-            </div>
+            <NodeChips title="节点" nodes={cur.nodes} truncated={cur.truncated} />
           </div>
         )}
+        {!cur && !steps.length && preview && preview.nodes.length > 0 && <NodeChips title="输出节点" nodes={preview.nodes} />}
         {preview && preview.failures.length > 0 && (
           <details className="mt-4 text-[12.5px]">
             <summary className="cursor-pointer text-accent">{preview.failures.length} 个节点解析失败</summary>

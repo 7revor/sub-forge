@@ -1,5 +1,6 @@
 // 七步新建向导：所有步骤共用前端草稿，仅在完成时创建文档。
 
+import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Button, Card, ErrorBox, Field, Input, PageHeader, cx } from '../../components/ui.tsx';
@@ -11,7 +12,7 @@ import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
 import { ProfileEditGuard } from './ProfileEditGuard.tsx';
 
-const STEPS = ['名称与基础设置', '节点集', '模板', '填充策略组', '规则', '代理链', '预览'];
+const STEPS = [['名称与基础设置', '预设 / 自定义 / 不输出'], ['节点集', '选择节点集'], ['模板', '分流骨架'], ['填充策略组', '给模板组加成员'], ['规则', '继承与覆盖'], ['代理链', '链规则与依赖'], ['预览', '按客户端查看']] as const;
 
 export function ProfileWizard() {
   const navigate = useNavigate();
@@ -49,14 +50,20 @@ export function ProfileWizard() {
         <span className="text-[13px] text-muted">完成后才会保存；离开页面会丢失当前草稿。</span>
       </PageHeader>
       <ProfileEditGuard valid={ctx!.baseValid} onDiscard={ctx!.resetBaseEditor} />
-      <nav aria-label="新建 Profile 步骤" className="flex flex-wrap gap-2">
-        {STEPS.map((label, index) => (
-          <Button key={label} variant={step === index ? 'primary' : 'default'} aria-current={step === index ? 'step' : undefined}
-            disabled={index > reached || !ctx!.baseValid || save.isPending || (index > 0 && !nameValid)} onClick={() => setStep(index)}>
-            {index + 1} · {label}
-          </Button>
-        ))}
-      </nav>
+      <ol aria-label="新建 Profile 步骤" className="m-0 flex list-none flex-wrap gap-2 p-0">
+        {STEPS.map(([label, sub], index) => {
+          const now = step === index, done = index < reached && !now;
+          return (
+            <li key={label} className="flex-[1_1_140px]">
+              <button type="button" aria-current={now ? 'step' : undefined} disabled={index > reached || !ctx!.baseValid || save.isPending || (index > 0 && !nameValid)} onClick={() => setStep(index)}
+                className={cx('flex min-h-14 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60', now ? 'border-accent bg-[#f5f8ff]' : 'border-line bg-panel hover:bg-ground')}>
+                <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[12px]', now || done ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}>{done ? <Check size={13} /> : index + 1}</span>
+                <span className="flex flex-col gap-px"><span className="text-[13.5px] font-semibold">{label}</span><span className="text-[11.5px] text-muted">{sub}</span></span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
       <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
         {step === 0 && <>
           <Card title="名称与基础设置">
