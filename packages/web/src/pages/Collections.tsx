@@ -16,7 +16,7 @@ import { useNodeSetNames } from '../components/pickers.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useList } from '../hooks.ts';
-import { usePipelinePreview } from './Sources.tsx';
+import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 
 export function CollectionList() {
   return (

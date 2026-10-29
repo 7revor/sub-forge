@@ -3,7 +3,7 @@ import type { GroupSpec, ReportItem } from '@sub-forge/core';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Segmented, Switch, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, Field, Input, Segmented, Switch, cx } from '../../components/ui.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';

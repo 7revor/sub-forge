@@ -1,9 +1,10 @@
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
 // 规则仓库（设计稿「规则仓库」）：搜索内置 GitHub 规则仓库、查看按客户端挑选的变体与内容预览，引用为规则集或作为远程来源加入已有规则集。
 // 服务端索引尚未实现：搜索返回空结果并带 pending，引用返回 501。
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api, type RepoEntry, type RepoEntryDetail, type RuleRepo } from '../api.ts';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Input, PageHeader, PageScroll, PendingNotice, cx, formatTime, td, th } from '../components/ui.tsx';
@@ -13,10 +14,9 @@ export function RuleRepoPage() {
   const [params] = useSearchParams();
   const ruleset = params.get('ruleset');
   const [q, setQ] = useState(params.get('q') ?? '');
-  const [debounced, setDebounced] = useState(q);
+  const debounced = useDebouncedValue(q.trim(), 300);
   const [repo, setRepo] = useState<string>();
   const [sel, setSel] = useState<RepoEntry>();
-  useEffect(() => { const t = setTimeout(() => setDebounced(q.trim()), 300); return () => clearTimeout(t); }, [q]);
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ pending?: boolean; repos: RuleRepo[] }>('GET', '/rule-repos') });
   const search = useQuery({
     queryKey: ['rule-repos', 'search', debounced, repo],

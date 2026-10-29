@@ -1,3 +1,5 @@
+import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
+import { LeaveDialog } from '../components/LeaveDialog.tsx';
 import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 // 本地节点（LOC-01）：与订阅源一致的三层页面——
 // /locals 分组列表 → /locals/:id 分组详情（节点表、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（表单 / YAML）。
@@ -6,8 +8,8 @@ import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 
 import type { LocalProxy, LocalProxyGroup } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useBeforeUnload, useBlocker, useLocation, useNavigate, useParams, type Blocker, type NavigateOptions } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { DocList } from '../components/DocList.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { DualEditor } from '../components/DualEditor.tsx';
@@ -24,36 +26,6 @@ const INTRO = '自建、中转等手写节点。每个分组就是一个节点�
 const EMPTY: LocalProxyGroup = { id: '', name: '', proxies: [] };
 const CORE = new Set(['name', 'type', 'server', 'port']);
 const crumbLink = 'text-muted no-underline';
-
-/** 有未保存修改时拦截站内跳转与关闭页面；leave 用于保存/删除成功后的主动跳转，不再拦截 */
-function useLeaveGuard(dirty: boolean) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const skip = useRef(false);
-  useEffect(() => { skip.current = false; }, [location.key]);
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && !skip.current && currentLocation.pathname !== nextLocation.pathname);
-  useBeforeUnload(useCallback((event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }, [dirty]));
-  const leave = (to: string, options?: NavigateOptions) => { skip.current = true; void navigate(to, options); };
-  return { blocker, leave };
-}
-
-function LeaveModal({ blocker, what, canSave, pending, error, onSave }: {
-  blocker: Blocker; what: string; canSave: boolean; pending: boolean; error: unknown; onSave: (done: () => void) => void;
-}) {
-  const blocked = blocker.state === 'blocked';
-  const stay = () => { if (blocked) blocker.reset(); };
-  return (
-    <Modal title="离开前保存修改？" open={blocked} onClose={stay}
-      footer={<>
-        <Button onClick={() => { if (blocked) blocker.proceed(); }}>放弃修改</Button>
-        <Button onClick={stay}>继续编辑</Button>
-        <Button variant="primary" disabled={!canSave || pending} onClick={() => onSave(() => { if (blocker.state === 'blocked') blocker.proceed(); })}>{pending ? '保存中…' : '保存并离开'}</Button>
-      </>}>
-      <span className="text-[13.5px] leading-relaxed">{what}有未保存的修改。离开后修改会丢失。</span>
-      <ErrorBox error={error} />
-    </Modal>
-  );
-}
 
 function NewGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
@@ -151,7 +123,7 @@ export function LocalEdit() {
         节点会从分组「{d.name}」中移除并立即保存{e.dirty ? '；分组里其他未保存的修改也会一起保存' : ''}。
       </DeleteDialog>
       <RenameDialog open={renaming} title="重命名分组" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
-      <LeaveModal blocker={blocker} what={`分组「${d.name}」`} canSave pending={e.save.isPending} error={e.save.error}
+      <LeaveDialog blocker={blocker} what={`分组「${d.name}」`} canSave pending={e.save.isPending} error={e.save.error}
         onSave={(done) => e.save.mutate(d, { onSuccess: done })} />
     </>
   );
@@ -174,7 +146,7 @@ export function LocalNodeEdit() {
     setBase(p); setDraft(p);
   }, [doc.data, index]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = !!draft && JSON.stringify(draft) !== JSON.stringify(base);
-  const { blocker, leave } = useLeaveGuard(dirty);
+  const { blocker, leave } = useLeaveGuard(dirty || !rawValid);
   const groupPath = `/locals/${id}`;
 
   if (doc.error) return <ErrorBox error={doc.error} />;
@@ -235,7 +207,7 @@ export function LocalNodeEdit() {
         onClose={() => setDeleting(false)} onConfirm={remove}>
         节点会从分组「{g.name}」中移除并立即保存。
       </DeleteDialog>
-      <LeaveModal blocker={blocker} what={isNew ? '新节点' : `节点「${base?.name ?? ''}」`} canSave={rawValid} pending={save.isPending} error={save.error}
+      <LeaveDialog blocker={blocker} what={isNew ? '新节点' : `节点「${base?.name ?? ''}」`} canSave={rawValid} pending={save.isPending} error={save.error}
         onSave={(done) => persist(done)} />
     </>
   );

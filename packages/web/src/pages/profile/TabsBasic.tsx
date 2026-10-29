@@ -1,3 +1,5 @@
+import { formatRelativeTime } from '../../utils/format.ts';
+import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { Notice } from '../../components/Notice.tsx';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
@@ -7,10 +9,10 @@ import { CopyButton } from '../../components/CopyButton.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
+import { api, type TokenItem } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, Textarea, formatTime, td, th, cx } from '../../components/ui.tsx';
-import { useList, type ProfileDoc } from '../../hooks.ts';
+import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
 import { SchemaForm } from '../../components/SchemaForm.tsx';
@@ -20,20 +22,12 @@ import { useProfile } from './context.ts';
 
 const SOURCE_TEXT: Record<string, string> = { fresh: '未命中', cache: '命中', 'last-good': '上次成功结果', failed: '失败', unsupported: '不支持' };
 
-function ago(ms: number): string {
-  const d = Date.now() - ms;
-  if (d < 60_000) return '刚刚';
-  if (d < 3_600_000) return `${Math.floor(d / 60_000)} 分钟前`;
-  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)} 小时前`;
-  return formatTime(ms).slice(5);
-}
-
 /** 概览（设计稿「Profile · 概览」）：订阅链接、输出设置、访问日志 */
 export function TabOverview() {
   const { draft, setDraft, allNodeSets } = useProfile();
   const qc = useQueryClient();
-  const tokens = useQuery({ queryKey: ['tokens', draft.id], queryFn: () => api<{ items: TokenItem[] }>('GET', `/profiles/${draft.id}/tokens`).then((r) => r.items) });
-  const log = useQuery({ queryKey: ['access-log', draft.id], queryFn: () => api<{ items: AccessLogRow[] }>('GET', `/profiles/${draft.id}/access-log`).then((r) => r.items) });
+  const tokens = useQuery(tokenOptions(draft.id));
+  const log = useQuery(accessLogOptions(draft.id));
   const refreshTokens = () => qc.invalidateQueries({ queryKey: ['tokens', draft.id] });
   const [label, setLabel] = useState('');
   const [adding, setAdding] = useState(false);
@@ -63,7 +57,7 @@ export function TabOverview() {
                   <li key={t.token} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg border border-line px-3.5 py-3">
                     <div className="flex flex-[1_1_160px] flex-col gap-0.5">
                       <span className="text-[13.5px] font-semibold">{t.label || '未命名设备'}</span>
-                      <span className="text-[12px] text-muted">{seen ? `最近访问 ${ago(seen)}` : '从未访问'}</span>
+                      <span className="text-[12px] text-muted">{seen ? `最近访问 ${formatRelativeTime(seen)}` : '从未访问'}</span>
                     </div>
                     <code className="min-w-0 flex-[999_1_280px] truncate rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px]">{t.url}</code>
                     <div className="flex gap-1.5">
@@ -96,7 +90,7 @@ export function TabOverview() {
             )}</Field>
             <Field label="客户端中的显示名">{(id) => <Input id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
             {lastGood
-              ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{ago(lastGood.at)}（{lastGood.client}）· 校验失败时订阅接口返回这一份，不会下发半成品。</div>
+              ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）· 校验失败时订阅接口返回这一份，不会下发半成品。</div>
               : <Empty title="还没有成功渲染过" description="客户端首次拉取时渲染；校验失败时不会下发半成品。" />}
           </div>
         </Card>

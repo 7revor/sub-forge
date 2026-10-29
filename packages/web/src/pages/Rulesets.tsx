@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 新建与编辑共用同一页面：来源列表在第一块直接编辑；点选来源时下方预览该来源（本地规则可实时编辑），
@@ -6,7 +7,7 @@ import { CodePreview } from '../components/CodePreview.tsx';
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
 import { FileText, Globe, Trash2 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { api, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
@@ -56,13 +57,6 @@ const TARGETS: { key: string; client: Client; platform?: Platform; label: string
   { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
 ];
 
-/** 编辑中的草稿停顿后才请求预览，避免每次按键都打到服务端 */
-function useDebounced<T>(value: T, ms: number): T {
-  const [v, setV] = useState(value);
-  useEffect(() => { const t = setTimeout(() => setV(value), ms); return () => clearTimeout(t); }, [value, ms]);
-  return v;
-}
-
 function rulesetError(d: RuleSetDoc): string | undefined {
   if (!d.name.trim()) return '请填写名称。';
   if (!d.sources.length) return '至少添加一个来源。';
@@ -82,7 +76,7 @@ export function RulesetEdit() {
   const [renaming, setRenaming] = useState(false);
   const [showError, setShowError] = useState(false);
   const t = TARGETS.find((x) => x.key === target)!;
-  const draft = useDebounced(e.draft, 400);
+  const draft = useDebouncedValue(e.draft, 400);
   const preview = useQuery({
     queryKey: ['ruleset-preview', e.isNew ? '' : e.id, selected, target, JSON.stringify(draft)],
     // 新加的来源要等防抖后的草稿里有它再请求，否则服务端找不到该来源

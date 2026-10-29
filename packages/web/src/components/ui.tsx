@@ -213,20 +213,7 @@ export const mono = 'font-mono';
 export const th = 'first:pl-4 last:pr-4 border-b border-line px-3 py-2.5 text-left text-[12px] font-medium whitespace-nowrap text-muted';
 export const td = 'first:pl-4 last:pr-4 border-b border-line-2 px-3 py-2.5 align-middle text-[13px]';
 
-export function formatTime(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function formatBytes(n?: number): string {
-  if (n === undefined) return '—';
-  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
-  return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${u[i]}`;
-}
+export { formatTime, formatBytes } from '../utils/format.ts';
 
 /** 服务端尚未实现的功能：界面已就位，操作会被服务端拒绝（501） */
 export function PendingNotice({ children }: { children: ReactNode }) {

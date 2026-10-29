@@ -1,13 +1,13 @@
+import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展开查看快照历史。
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Collection, OperatorStep } from '@sub-forge/core';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
-import { api, type PipelinePreview } from '../api.ts';
+import { api } from '../api.ts';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
@@ -66,24 +66,6 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
       <ErrorBox error={save.error} />
     </Modal>
   );
-}
-
-/**
- * 处理链草稿变化后延迟预览（SRC-06）。组合同时带上成员草稿（COL-02）：
- * 订阅源同时带上基础设置草稿，切换参数后隐藏旧预览，避免把旧地址的节点当作新结果。
- */
-export function usePipelinePreview(kind: 'sources' | 'collections', id: string | undefined, steps: OperatorStep[] | undefined, members?: Collection['members'], source?: Pick<SourceDoc, 'url' | 'fetch'>) {
-  const draft = useMemo(() => (steps ? { pipeline: steps, ...(members ? { members } : {}), ...(source ? { source } : {}) } : undefined), [steps, members, source]);
-  const [debounced, setDebounced] = useState(draft);
-  useEffect(() => { const t = setTimeout(() => setDebounced(draft), 400); return () => clearTimeout(t); }, [draft]);
-  const query = useQuery({
-    queryKey: ['pipeline-preview', kind, id, debounced],
-    enabled: !!id && id !== 'new' && !!debounced,
-    queryFn: () => api<PipelinePreview>('POST', `/${kind}/${id}/pipeline-preview`, debounced),
-    placeholderData: (prev, previous) => JSON.stringify((previous?.queryKey[3] as typeof draft)?.source) === JSON.stringify(source) ? prev : undefined,
-    retry: false,
-  });
-  return { ...query, data: JSON.stringify(source) === JSON.stringify(debounced?.source) ? query.data : undefined, isFetching: query.isFetching || draft !== debounced };
 }
 
 /** 基础设置与快照历史在详情页直接编辑，和处理链共用页面草稿。 */

@@ -1,3 +1,5 @@
+import { formatRelativeTime } from '../utils/format.ts';
+import { accessLogOptions, snapshotOptions } from '../hooks/documentQueries.ts';
 import { sourceFetchSummary } from '../domain/sourceFetch.ts';
 import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
@@ -8,20 +10,11 @@ import { useQueries } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
-import { api, type AccessLogRow, type SnapshotMeta } from '../api.ts';
 import { Badge, buttonClass, Card, Empty, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useTemplates } from '../hooks.ts';
 import { findOverlayOrphans } from './profile/orphans.ts';
 
 const DAY = 86_400_000;
-
-function ago(ms: number): string {
-  const d = Date.now() - ms;
-  if (d < 60_000) return '刚刚';
-  if (d < 3_600_000) return `${Math.floor(d / 60_000)} 分钟前`;
-  if (d < DAY) return `${Math.floor(d / 3_600_000)} 小时前`;
-  return formatTime(ms).slice(5);
-}
 
 type Todo = { tone: 'err' | 'warn' | 'info'; title: string; body: string; action: string; to: string };
 const DOT = { err: 'bg-err', warn: 'bg-[#c76a12]', info: 'bg-accent' } as const;
@@ -32,10 +25,10 @@ export function Overview() {
   const templates = useTemplates();
   const remote = sources.data ?? [];
   const snaps = useQueries({
-    queries: remote.map((s) => ({ queryKey: ['snapshots', s.id], queryFn: () => api<{ items: SnapshotMeta[] }>('GET', `/sources/${s.id}/snapshots`).then((r) => r.items) })),
+    queries: remote.map((source) => snapshotOptions(source.id)),
   });
   const logs = useQueries({
-    queries: (profiles.data ?? []).map((p) => ({ queryKey: ['access-log', p.id], queryFn: () => api<{ items: AccessLogRow[] }>('GET', `/profiles/${p.id}/access-log`).then((r) => r.items) })),
+    queries: (profiles.data ?? []).map((profile) => accessLogOptions(profile.id)),
   });
   const status = remote.map((source, index) => ({ source, ...sourceFetchSummary(snaps[index]?.data ?? []) }));
   const failing = status.filter((s) => s.failing);
@@ -63,7 +56,7 @@ export function Overview() {
     })),
     ...rows.filter((r) => r.last && r.last.warnings > 0).map((r) => ({
       tone: 'warn' as const, title: `「${r.p.name}」最近一次渲染有 ${r.last!.warnings} 条告警`,
-      body: `${r.last!.client} 于 ${ago(r.last!.at)} 拉取。告警不影响下发，但可能有组为空或引用失效。`, action: '查看预览与渲染报告', to: `/profiles/${r.p.id}/preview`,
+      body: `${r.last!.client} 于 ${formatRelativeTime(r.last!.at)} 拉取。告警不影响下发，但可能有组为空或引用失效。`, action: '查看预览与渲染报告', to: `/profiles/${r.p.id}/preview`,
     })),
     ...rows.filter((r) => r.p.template && !r.p.nodeSets.length).map((r) => ({
       tone: 'info' as const, title: `「${r.p.name}」还没有节点集`, body: '模板组都会按「为空时」的设定输出。', action: '去加入节点集', to: `/profiles/${r.p.id}/nodesets`,
@@ -104,7 +97,7 @@ export function Overview() {
                       <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${p.id}`} className={docNameLinkClass}>{p.name}</Link></td>
                       <td className={cx(td, 'whitespace-nowrap')}>{p.template ? <>{tpl(p.template.id)?.name ?? p.template.id} <span className="text-[12.5px] text-muted">{p.template.follow === 'latest' ? '跟随最新' : `锁定 v${p.template.follow.pinned}`}</span></> : '—'}</td>
                       <td className={cx(td, 'font-mono')}>{p.nodeSets.length}</td>
-                      <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{ago(last.at)}</span><span className="text-[12px] text-muted">{last.client}</span></div> : <span className="text-muted">从未访问</span>}</td>
+                      <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-[12px] text-muted">{last.client}</span></div> : <span className="text-muted">从未访问</span>}</td>
                       <td className={td}>{!last ? <Badge>未访问</Badge> : last.status !== 200 ? <Badge tone="err">渲染失败</Badge> : last.warnings ? <Badge tone="warn">{last.warnings} 条告警</Badge> : <Badge tone="ok">正常</Badge>}</td>
                       <td className={cx(td, 'text-right')}><DocActionLink to={`/profiles/${p.id}`} name={p.name} /></td>
                     </DocTableRow>

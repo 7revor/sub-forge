@@ -1,3 +1,4 @@
+import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { CopyButton } from '../../components/CopyButton.tsx';
 // Profile 详情：头部 + 分区标签（概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览）。
 // 除"概览"中的订阅链接外，各标签编辑同一份草稿，统一用右上角"保存"提交。
@@ -6,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
 import { DeleteAction } from '../../components/DetailActions.tsx';
-import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
 import { Badge, Button, buttonClass, ErrorBox, Modal, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
 import { TemplateCard } from './TemplateCard.tsx';
 import { useDeleteDoc, useDoc, useList, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
@@ -29,8 +29,8 @@ export function ProfileDetail() {
   const dup = useSaveDoc('profiles');
   const del = useDeleteDoc('profiles');
   const presets = useList('presets');
-  const tokens = useQuery({ queryKey: ['tokens', id], enabled: !!id, queryFn: () => api<{ items: TokenItem[] }>('GET', `/profiles/${id}/tokens`).then((r) => r.items) });
-  const log = useQuery({ queryKey: ['access-log', id], enabled: !!id, queryFn: () => api<{ items: AccessLogRow[] }>('GET', `/profiles/${id}/access-log`).then((r) => r.items) });
+  const tokens = useQuery(tokenOptions(id));
+  const log = useQuery(accessLogOptions(id));
   const [draft, setDraft] = useState<ProfileDoc>();
   const [tplOpen, setTplOpen] = useState(false);
   useEffect(() => { if (doc.data) setDraft(doc.data); }, [doc.data]);
