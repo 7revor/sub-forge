@@ -58,6 +58,18 @@ describe('处理链执行', () => {
     expect(r.trace[2]!.nodes!.map((n) => n.name)).toEqual(['🇭🇰 HK-01', '🇯🇵 JP-03']);
   });
 
+  it('逐步预览记录每个节点来自哪个输入节点，排序、移除、兜底去重后仍能对应', () => {
+    const input = nodes(trojan('日本 03', 'c'), trojan('官网 example.com', 'z'), trojan('香港 01', 'a'), trojan('香港 01', 'b'));
+    const r = runPipeline(input, [...HK_PIPELINE, { op: 'rename.affix', suffix: '', enabled: false }], { keepSnapshots: true });
+    expect(r.trace[0]!.origins).toEqual([0, 2, 3]);
+    expect(r.trace[3]!.nodes!.map((n) => n.name)).toEqual(['🇭🇰 HK-01', '🇭🇰 HK-01', '🇯🇵 JP-03']);
+    expect(r.trace[3]!.origins).toEqual([2, 3, 0]);
+    expect(r.trace[4]!.origins).toEqual([2, 3, 0]);
+    const last = r.trace.at(-1)!;
+    expect(last.nodes!.map((n) => n.name)).toEqual(['🇭🇰 HK-01', '🇭🇰 HK-01 2', '🇯🇵 JP-03']);
+    expect(last.origins).toEqual([2, 3, 0]);
+  });
+
   it('禁用的步骤不执行；非法正则的步骤报错并跳过', () => {
     const input = nodes(trojan('A', 'a'), trojan('B', 'b'));
     const r = runPipeline(input, [

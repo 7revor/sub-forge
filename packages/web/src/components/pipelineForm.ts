@@ -25,13 +25,6 @@ function countable(pattern: string, flags = ''): RegExp | undefined {
   return compileUserRegex(pattern, flags);
 }
 
-/** 这一步的输入节点名：输出节点按改名记录还原，再补上被移除的（预览截断时只覆盖已返回的部分） */
-export function stepInputNames(after: string[], renamed: { from: string; to: string }[], removed: string[]): string[] {
-  const back = new Map<string, string[]>();
-  for (const r of renamed) back.set(r.to, [...(back.get(r.to) ?? []), r.from]);
-  return [...after.map((name) => back.get(name)?.shift() ?? name), ...removed];
-}
-
 /** 每条正则命中的节点数；空的或非法的正则为 undefined */
 export function patternHits(patterns: string[], names: string[]): (number | undefined)[] {
   return patterns.map((p) => {

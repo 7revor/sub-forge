@@ -28,6 +28,9 @@ describe('处理链逐步预览', () => {
     expect(res.json.trace[0].removed).toEqual(['剩余流量：10G']);
     expect(res.json.trace[1].renamed).toEqual([{ from: '香港 01 | 0.5x', to: 'HK-01' }]);
     expect(res.json.nodes.map((n: { name: string }) => n.name)).toEqual(['🇭🇰 HK-01', '🇯🇵 日本 03']);
+    // 原始节点与每步的来源序号，供前端逐节点对照
+    expect(res.json.inputNodes.map((n: { name: string }) => n.name)).toEqual(['香港 01 | 0.5x', '剩余流量：10G', '日本 03']);
+    expect(res.json.trace.map((t: { origins: number[] }) => t.origins)).toEqual([[0, 2], [0, 2], [0, 2]]);
   });
 
   it('草稿里的非法正则直接报错；别人的订阅源不能预览', async () => {
