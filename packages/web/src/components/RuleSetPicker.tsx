@@ -13,16 +13,16 @@ const loadAll = loader('all');
 const loadRepository = loader('repository');
 
 /** 模板引用和本地规则集关联共享搜索、匹配、选择；解析成功前不改动原草稿。 */
-export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则集', id, triggerClassName, triggerIcon }: {
+export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则集', ariaLabel = label, id, triggerClassName, triggerIcon }: {
   onSelect: (matcher: RuleSetMatcher) => void; scope?: 'all' | 'repository'; label?: string; id?: string;
-  triggerClassName?: string; triggerIcon?: ReactNode;
+  ariaLabel?: string; triggerClassName?: string; triggerIcon?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
   const currentSelect = useRef(onSelect);
   currentSelect.current = onSelect;
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  return <AsyncSelect id={id} aria-label={label} placeholder={busy ? '正在读取…' : label} disabled={busy}
+  return <AsyncSelect id={id} aria-label={ariaLabel} placeholder={busy ? '正在读取…' : label} disabled={busy}
     searchLabel={scope === 'all' ? '搜索规则集' : '搜索仓库规则'} searchPlaceholder="搜索名称、仓库或路径"
     triggerClassName={triggerClassName} triggerIcon={triggerIcon} loadOptions={scope === 'all' ? loadAll : loadRepository}
     onChange={async key => {

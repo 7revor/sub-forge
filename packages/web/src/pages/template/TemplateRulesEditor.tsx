@@ -1,15 +1,15 @@
 import type { Matcher, ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Button, Card, Empty, Field, Switch, buttonClass, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, Switch, buttonClass, cx } from '../../components/ui.tsx';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[58px_minmax(0,2fr)_minmax(0,1fr)_60px_56px]';
+const columns = 'grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[44px_minmax(0,2fr)_minmax(0,1fr)_116px_48px_48px]';
 
-function RuleFields({ rule, onChange, ctx, value, report }: {
-  rule: RuleEntry; onChange: (rule: RuleEntry) => void; ctx: ConvertCtx; value: TemplateBody; report: ReportItem[];
+function RuleFields({ rule, onChange, ctx, report }: {
+  rule: RuleEntry; onChange: (rule: RuleEntry) => void; ctx: ConvertCtx; report: ReportItem[];
 }) {
   const matcher = rule.matcher;
   const refs = ctx.rulesets;
@@ -24,10 +24,6 @@ function RuleFields({ rule, onChange, ctx, value, report }: {
   return <div className="flex flex-col gap-3 border-t border-line bg-ground p-4">
     <ItemIssues report={report} where={`rule:${rule.id}`} />
     <MatcherEditor fixedKind value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
-    {matcher.kind === 'ruleset' && <>
-      <div className="flex items-center gap-2"><Switch label="no-resolve" checked={rule.options?.noResolve ?? false} onChange={(noResolve) => onChange({ ...rule, options: { ...rule.options, noResolve } })} /><span className="text-[13px]">no-resolve</span></div>
-    </>}
-    <Field label="出口">{() => <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={(target) => onChange({ ...rule, target })} />}</Field>
   </div>;
 }
 
@@ -38,7 +34,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   const add = (matcher: Matcher) => {
     const id = newId('r');
     onChange({ ...value, rules: [...value.rules, { id, matcher, target: { kind: 'builtin', name: 'REJECT' } }] });
-    onSelect(id);
+    onSelect(matcher.kind === 'rule' ? id : undefined);
   };
   return <Card bodyClass="overflow-x-auto px-4 pb-4"
     title={`规则（${value.rules.length} 条）`} subtitle={`出口只能是模板组或内置策略。`}
@@ -48,18 +44,27 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     </div>}>
     {!value.rules.length && <Empty className="mb-4" title="没有规则" />}
     <div className="min-w-0">
-      <div className={`${columns} hidden border-b border-line px-2 py-2 sm:grid text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>启用</span><span>操作</span></div>
+      <div className={`${columns} hidden border-b border-line px-2 py-2 sm:grid text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>no-resolve</span><span>启用</span><span>操作</span></div>
       <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
         const error = report.some((r) => r.level === 'error' && r.where === `rule:${rule.id}`);
         return <div id={`template-rule-${rule.id}`} className={cx('my-1 overflow-hidden rounded-lg border', error ? 'border-err bg-err-soft' : 'border-line bg-panel')}>
-          <div className={`${columns} cursor-pointer p-2 text-[13px]`} onClick={() => onSelect(selected === rule.id ? undefined : rule.id)}>
+          <div className={cx(columns, 'p-2 text-[13px]', rule.matcher.kind === 'rule' && 'cursor-pointer')} onClick={() => { if (rule.matcher.kind === 'rule') onSelect(selected === rule.id ? undefined : rule.id); }}>
             <span className="flex items-center" onClick={(e) => e.stopPropagation()}>{handle}{i + 1}</span>
-            <button type="button" aria-expanded={selected === rule.id} className={cx('cursor-pointer break-all text-left font-mono', error && 'text-err')}>{matcherLabel(rule.matcher, ctx)}</button>
+            {rule.matcher.kind === 'ruleset' ? <div className="min-w-0">
+              <RuleSetPicker label={matcherLabel(rule.matcher, ctx)} ariaLabel={`更换第 ${i + 1} 条规则集`} onSelect={(matcher) => update({ ...rule, matcher })} />
+            </div> : <button type="button" aria-expanded={selected === rule.id} className={cx('min-w-0 cursor-pointer break-all text-left font-mono', error && 'text-err')}>{matcherLabel(rule.matcher, ctx)}</button>}
             <div className="col-start-2 row-start-2 min-w-0 sm:col-auto sm:row-auto" onClick={(e) => e.stopPropagation()}><TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={rule.target} groups={value.groups} onChange={(target) => update({ ...rule, target })} /></div>
+            <div className={cx('col-start-2 row-start-3 sm:col-auto sm:row-auto', rule.matcher.kind !== 'ruleset' && 'hidden sm:block')} onClick={(e) => e.stopPropagation()}>
+              {rule.matcher.kind === 'ruleset' ? <label className="flex cursor-pointer items-center gap-2">
+                <Switch label={`第 ${i + 1} 条规则 no-resolve`} checked={rule.options?.noResolve ?? false} onChange={(noResolve) => update({ ...rule, options: { ...rule.options, noResolve } })} />
+                <span className="text-[12px] sm:hidden">no-resolve</span>
+              </label> : <span className="text-muted">—</span>}
+            </div>
             <div className="col-start-3 row-start-1 sm:col-auto sm:row-auto" onClick={(e) => e.stopPropagation()}><Switch label={`启用第 ${i + 1} 条规则`} checked={rule.enabled !== false} onChange={(enabled) => update({ ...rule, enabled })} /></div>
             <Button size="sm" className="col-start-3 row-start-2 sm:col-auto sm:row-auto" onClick={(e) => { e.stopPropagation(); onChange({ ...value, rules: value.rules.filter((r) => r.id !== rule.id) }); }}>删除</Button>
           </div>
-          {selected === rule.id && <RuleFields rule={rule} onChange={update} ctx={ctx} value={value} report={report} />}
+          {rule.matcher.kind === 'rule' && selected === rule.id && <RuleFields rule={rule} onChange={update} ctx={ctx} report={report} />}
+          {rule.matcher.kind === 'ruleset' && <ItemIssues report={report} where={`rule:${rule.id}`} />}
         </div>;
       }} />
       <div className="mt-3 grid grid-cols-1 items-center gap-3 border-t border-line px-2 py-3 text-[13px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"><span className="font-mono">MATCH（固定）</span><TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={(final) => onChange({ ...value, final })} /></div>

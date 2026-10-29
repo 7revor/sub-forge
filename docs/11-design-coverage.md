@@ -94,3 +94,9 @@ Login 恢复品牌在上、白色卡片横向居中与短屏滚动。Modal 遮�
 TemplateEditor 的「新增规则 → 匹配项类型 → 本地规则集下拉」替换为「添加单条规则 / 引用规则集」。引用弹层复用 RuleSets 的搜索交互，同时返回本地和 GitHub 候选，只有本地加前缀；表内两类规则共用排序/出口/启停。RuleSets 的关联仓库按钮也使用相同组件（仅仓库作用域）。TemplatePublish、TemplateBrowse、Profile 规则摘要显示两类引用的名称。
 
 前端、后端和核心均已实现。外部 Claude Design 画布本轮通过内置浏览器访问仍显示「Sign in to view this page」，未修改外部画板，按待同步流程记录至 docs/13；以本轮实际界面截图为同步依据。
+
+## 2026-10-29：模板编辑背景与规则行
+
+TemplateEditor 策略组编辑区使用与列表一致的白色面板背景。规则集引用的主行直接包含名称选择、出口、no-resolve、启用和删除；移除灰色展开详情及重复名称/出口。单条规则保留展开字段，出口只在主行编辑。窄屏同一卡片内换行，不恢复展开区。服务端与核心沿用现有字段和接口，无待实现项。
+
+本轮通过内置浏览器访问 Claude Design 画布仍显示「Sign in to view this page」，外部画板未更新；已按 docs/13 登记，验收记录见 `research/verification/template-inline-rules-20261029/`。

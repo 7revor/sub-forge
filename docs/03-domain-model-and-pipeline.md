@@ -394,3 +394,5 @@ SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使
 `/rule-options/resolve` 根据仓库索引生成引用，不落本地文档；新引用经索引与 URL 校验，已发布引用仅在映射完全一致时按原映射使用。仓库引用内容不接受客户端改写和自定义拉取参数；需要定制时建立本地规则集。解析层将两类引用统一为 `RuleSetInputs`，之后快照、启用依赖收集、格式处理、托管/透传选择、缓存与旧版本资源保持原链路。
 
 模板编辑 YAML 的 `x-sub-forge-rulesets` 保存别名到完整 Matcher 的映射，避免名称重用与跨来源重名改变引用。该元数据仅用于模板编辑器，不进入最终订阅配置。旧的无映射 YAML 按唯一名称导入；同名本地引用导出为 `local:<id>` 别名。
+
+2026-10-29 模板编辑布局精简：行内规则集选择只替换 `RuleEntry.matcher`；`id`、顺序、`target`、`enabled` 和 `options.noResolve` 沿用现有对象与持久化语义，无领域模型或管线变更。
