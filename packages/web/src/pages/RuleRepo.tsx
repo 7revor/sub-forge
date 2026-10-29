@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
 import { RuleFileTree } from '../components/RuleFileTree.tsx';
+import { CodePreview } from '../components/CodePreview.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleCatalog, type RuleRepo, type RepoFilePreview } from '../api.ts';
@@ -75,7 +76,7 @@ export function RuleRepoPage() {
             <ErrorAlert error={preview.error ?? create.error} />
             {preview.isError && <Button size="sm" onClick={() => void preview.refetch()}>重试读取文件</Button>}
           </div>
-          {preview.isFetching ? <div role="status" className="p-4 text-[13px] text-muted">正在读取文件内容…</div> : file && !preview.isError && <pre aria-label="文件正文" key={`${file.repo}:${file.ref}:${file.path}`} tabIndex={0} className="m-0 min-h-0 flex-1 overflow-auto overscroll-contain p-4 font-mono text-[12px] leading-6 whitespace-pre">{file.content || '（空文件）'}</pre>}
+          {preview.isFetching ? <div role="status" className="p-4 text-[13px] text-muted">正在读取文件内容…</div> : file && !preview.isError && <CodePreview label="文件正文" key={`${file.repo}:${file.ref}:${file.path}`} text={file.content} title={file.content ? '文件正文' : '文件正文（空文件）'} copyable fill className="nav-scroll rounded-none" bodyClassName="overscroll-contain p-4 whitespace-pre" />}
         </>}
       </section>
     </div>
