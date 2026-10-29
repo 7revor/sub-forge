@@ -125,7 +125,7 @@ export function TabGroups() {
                   <button type="button" onClick={() => setSelectedId(x.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-2.5 text-left">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-[13.5px] font-medium">{x.name}</span>
-                      <span className="text-[12px] text-muted">{current.type} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
+                      <span className="text-[12px] text-muted">{current.type.toUpperCase()} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
                     </span>
                     {n === 0 ? <Badge tone="warn">空 · {current.whenEmpty === 'direct' ? '直连' : '拒绝'}</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
                   </button>

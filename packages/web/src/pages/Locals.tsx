@@ -103,7 +103,7 @@ export function LocalEdit() {
               {d.proxies.map((p, i) => (
                 <DocTableRow key={i} to={nodePath(i)}>
                   <td className={cx(td, 'px-3.5 py-3 whitespace-nowrap')}><Link to={nodePath(i)} className={docNameLinkClass}>{p.name}</Link></td>
-                  <td className={cx(td, 'px-3.5 py-3')}><span className="rounded bg-[#ebedf1] px-1.5 py-0.5 font-mono text-[12px]">{p.type}</span></td>
+                  <td className={cx(td, 'px-3.5 py-3')}><span className="rounded bg-[#ebedf1] px-1.5 py-0.5 font-mono text-[12px]">{p.type.toUpperCase()}</span></td>
                   <td className={cx(td, 'px-3.5 py-3 font-mono text-[12.5px] text-ink-2')}>{p.server}:{p.port}</td>
                   <td className={cx(td, 'text-right whitespace-nowrap')}>
                     <Button size="sm" variant="danger" aria-label={`删除 ${p.name}`} className="mr-2" onClick={() => { e.save.reset(); setDeletingNode(i); }}>删除</Button>

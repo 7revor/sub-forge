@@ -118,7 +118,7 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
             {t.groups.map((g) => (
               <tr key={g.id}>
                 <td className={cx(td, 'font-medium whitespace-nowrap')}>{g.name}</td>
-                <td className={cx(td, 'font-mono text-[12.5px]')}>{g.type}</td>
+                <td className={cx(td, 'font-mono text-[12.5px]')}>{g.type.toUpperCase()}</td>
                 <td className={cx(td, 'text-[12.5px] text-ink-2')}>{g.members.map((m) => memberLabel(m, groupName, nsName).text).join(' · ') || '—'}</td>
                 <td className={cx(td, 'text-ink-2 whitespace-nowrap')}>{emptyText(g)}</td>
               </tr>

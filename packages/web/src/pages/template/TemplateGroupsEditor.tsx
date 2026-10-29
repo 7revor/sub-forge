@@ -36,8 +36,12 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             {handle}
             <button type="button" aria-current={g.id === group.id ? 'true' : undefined} onClick={() => onSelect(g.id)} className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1 text-left">
               <span className={cx('w-full truncate text-[13.5px] font-semibold', error && 'text-err')}>{g.name || '未命名组'}</span>
-              <span className="text-[12px] text-muted">{g.type} · {g.members.length} 个成员{error ? ' · 待修复' : ''}</span>
+              <span className="text-[12px] text-muted">{g.type.toUpperCase()} · {g.members.length} 个成员{error ? ' · 待修复' : ''}</span>
             </button>
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              <span className="text-[11px] text-muted">隐藏</span>
+              <Switch label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={(hidden) => onChange({ ...value, groups: value.groups.map((item) => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
+            </div>
           </div>;
         }} />
       </nav>
@@ -49,7 +53,6 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         </div>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
           <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">为空时</span><Segmented label="为空时" value={group.whenEmpty ?? 'reject'} options={[{ value: 'reject', label: '拒绝' }, { value: 'direct', label: '直连' }]} onChange={(whenEmpty) => update({ whenEmpty })} /></div>
-          <div className="flex h-[38px] items-center gap-2"><Switch label="隐藏策略组" checked={group.display?.hidden ?? false} onChange={(hidden) => update({ display: { ...group.display, hidden } })} /><span className="text-[13px]">隐藏策略组</span></div>
         </div>
         <section className="flex min-w-0 flex-col gap-3 border-t border-line pt-4" aria-label="策略组成员">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-muted">{group.members.length} 个</span></h3>

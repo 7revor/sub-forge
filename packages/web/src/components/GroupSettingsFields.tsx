@@ -17,7 +17,7 @@ export function GroupSettingsFields({ value, onChange, defaultStrategy }: {
   const test = value.test ?? {};
   return <>
     <Field label="类型">{(id) => <Select id={id} value={value.type} onChange={(event) => onChange('type', event.target.value as GroupSpec['type'])}>
-      {TYPES.map((type) => <option key={type}>{type}</option>)}
+      {TYPES.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}
     </Select>}</Field>
     {value.type !== 'select' && <>
       {TEST_FIELDS.filter(([key]) => key !== 'tolerance' || value.type === 'url-test').map(([key, label, numeric]) => <Field key={key} label={label}>{(id) => <Input id={id}
