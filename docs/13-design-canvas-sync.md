@@ -142,3 +142,5 @@
 ## 2026-10-29：移除 GitHub Token（待同步）
 
 本轮内置浏览器访问画布仍显示「Sign in to view this page」，未修改外部画板。此前所有 Token 配置设计均撤销：RuleRepo 删除 Token 按钮及弹窗，移除独立设置页；System 卡片标题为「规则仓库」，只保留管理链接。新增/编辑页分支留空识别远程默认分支，许可证可手工填写。界面与错误状态截图见 [16](16-git-only-repositories-verification.md)。
+
+2026-10-29 待同步：模板「添加成员」按钮中的加号、文字与下拉箭头按同一垂直中心排列，标签使用块级 flex，避免 inline-flex 文字基线产生上偏。按钮尺寸与交互保持不变；实际截图见 research/verification/member-button-align-20261029/。

@@ -1,0 +1,66 @@
+{
+  "before": [
+    {
+      "centerOffset": 0,
+      "className": "h-8 w-full rounded-lg border border-[#d5d9e0] bg-panel px-3 text-[12.5px] text-ink inline-flex min-w-0 cursor-pointer items-center gap-2 text-left disabled:cursor-not-allowed disabled:bg-ground disabled:text-faint inline-flex items-center justify-center gap-2 rounded-lg border font-medium whitespace-nowrap no-underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer px-2.5 bg-panel border-[#d5d9e0] text-ink hover:bg-ground self-start",
+      "height": 32,
+      "tag": "BUTTON"
+    },
+    {
+      "centerOffset": 0,
+      "className": "min-w-0 flex-1 truncate",
+      "height": 21.625,
+      "tag": "SPAN"
+    },
+    {
+      "centerOffset": -1.4375,
+      "className": "inline-flex items-center gap-2",
+      "height": 18.75,
+      "tag": "SPAN"
+    },
+    {
+      "centerOffset": -1.4375,
+      "className": "lucide lucide-plus",
+      "height": 14,
+      "tag": "svg"
+    },
+    {
+      "centerOffset": 0,
+      "className": "lucide lucide-chevron-down shrink-0 text-muted transition-transform",
+      "height": 15.32659912109375,
+      "tag": "svg"
+    }
+  ],
+  "after": [
+    {
+      "centerOffset": 0,
+      "className": "h-8 w-full rounded-lg border border-[#d5d9e0] bg-panel px-3 text-[12.5px] text-ink inline-flex min-w-0 cursor-pointer items-center gap-2 text-left disabled:cursor-not-allowed disabled:bg-ground disabled:text-faint inline-flex items-center justify-center gap-2 rounded-lg border font-medium whitespace-nowrap no-underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer px-2.5 bg-panel border-[#d5d9e0] text-ink hover:bg-ground self-start",
+      "height": 32,
+      "tag": "BUTTON"
+    },
+    {
+      "centerOffset": 0,
+      "className": "min-w-0 flex-1 truncate",
+      "height": 18.75,
+      "tag": "SPAN"
+    },
+    {
+      "centerOffset": 0,
+      "className": "flex items-center justify-center gap-2",
+      "height": 18.75,
+      "tag": "SPAN"
+    },
+    {
+      "centerOffset": 0,
+      "className": "lucide lucide-plus shrink-0",
+      "height": 14,
+      "tag": "svg"
+    },
+    {
+      "centerOffset": 0,
+      "className": "lucide lucide-chevron-down shrink-0 text-muted transition-transform",
+      "height": 15,
+      "tag": "svg"
+    }
+  ]
+}

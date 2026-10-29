@@ -20,7 +20,7 @@ export function TemplateTargetSelect({ value, onChange, groups, label, action = 
     if (key.startsWith('group:')) onChange({ kind: 'group', groupId: key.slice(6) });
     else if (key.startsWith('builtin:')) onChange({ kind: 'builtin', name: key.slice(8) as Builtin });
   }}>
-    <option value="" disabled>{action ? <span className="inline-flex items-center gap-2"><Plus size={14} />添加成员</span> : value?.kind === 'node' ? '不支持节点出口，请重新选择' : '请选择'}</option>
+    <option value="" disabled>{action ? <span className="flex items-center justify-center gap-2"><Plus size={14} className="shrink-0" />添加成员</span> : value?.kind === 'node' ? '不支持节点出口，请重新选择' : '请选择'}</option>
     {missing && <option value={key}>已不存在：{value.groupId}</option>}
     <optgroup label="模板组">{groups.map((g) => <option key={g.id} value={`group:${g.id}`}>{g.name || '未命名组'}</option>)}</optgroup>
     <optgroup label="内置策略">{BUILTINS.map((name) => <option key={name} value={`builtin:${name}`}>{name}</option>)}</optgroup>
