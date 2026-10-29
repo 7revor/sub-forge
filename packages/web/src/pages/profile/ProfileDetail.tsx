@@ -1,10 +1,11 @@
+import { acceptProfileSave, modeLabel, syncProfileDraft } from './routing.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { CopyButton } from '../../components/CopyButton.tsx';
 // Profile 详情：头部 + 分区标签（概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览）。
 // 除"概览"中的订阅链接外，各标签编辑同一份草稿，统一用右上角"保存"提交。
 
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
 import { DeleteAction } from '../../components/DetailActions.tsx';
 import { Badge, Button, buttonClass, ErrorAlert, Modal, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
@@ -33,7 +34,14 @@ export function ProfileDetail() {
   const log = useQuery(accessLogOptions(id));
   const [draft, setDraft] = useState<ProfileDoc>();
   const [tplOpen, setTplOpen] = useState(false);
-  useEffect(() => { if (doc.data) setDraft(doc.data); }, [doc.data]);
+  const previous = useRef<ProfileDoc | undefined>(undefined);
+  useEffect(() => {
+    if (!doc.data) return;
+    const before = previous.current;
+    const incoming = doc.data;
+    previous.current = incoming;
+    setDraft(current => syncProfileDraft(current, before, incoming));
+  }, [doc.data]);
 
   const { ctx, template } = useProfileCtx(draft, setDraft);
 
@@ -57,13 +65,13 @@ export function ProfileDetail() {
             <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
             {!dirty && tab !== 'overview' && <CopyButton text={firstUrl ?? ''} disabled={!firstUrl} title={firstUrl ? undefined : '先在「概览」新增订阅链接'}>复制订阅链接</CopyButton>}
             {tab !== 'preview' && !dirty && ['overview', 'groups', 'rules', 'chains'].includes(tab) && <Link to={`/profiles/${id}/preview`} className={buttonClass('primary')}>预览配置</Link>}
-            <Button onClick={() => setTplOpen(true)}>更换模板</Button>
-            {(dirty || !['overview', 'preview'].includes(tab)) && <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>}
+            <Button onClick={() => setTplOpen(true)}>模板与模式</Button>
+            {(dirty || !['overview', 'preview'].includes(tab)) && <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft, { onSuccess: saved => setDraft(current => acceptProfileSave(current, draft, saved)) }); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>}
             <DeleteAction what="配置订阅" name={draft.name} body="它的所有订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
               onReset={del.reset} onDelete={() => del.mutate(draft.id, { onSuccess: () => navigate('/profiles') })} />
           </>}>
           <button type="button" onClick={() => setTplOpen(true)} className="cursor-pointer rounded-full bg-accent-soft px-2.5 py-1 text-[12.5px] text-accent-ink hover:underline">
-            {draft.template ? `模板 ${template.data?.name ?? draft.template.id} v${template.data?.version ?? '?'} · ${draft.template.follow === 'latest' ? '跟随最新' : '锁定版本'}` : '不使用模板'}
+            {modeLabel(draft, template.data?.name)}{template.data && ` v${template.data.version} · 自动更新`}
           </button>
           {preset && <Badge>基础设置 {preset.name}</Badge>}
           {warnings > 0 && <Link to={`/profiles/${id}/preview`} className="rounded-full bg-warn-soft px-2.5 py-1 text-[12.5px] text-[#8f4508] no-underline hover:underline">{warnings} 条告警</Link>}
@@ -78,6 +86,7 @@ export function ProfileDetail() {
         </nav>
       </div>
       <ErrorAlert error={save.error ?? dup.error} />
+      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-accent" href={`/api/profiles/${draft.id}/migration-backup`} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
       <ProfileEditGuard valid={ctx.baseValid} onDiscard={discard} />
       {template.error && <ErrorAlert error={template.error} />}
 
@@ -91,7 +100,7 @@ export function ProfileDetail() {
         {tab === 'preview' && <TabPreview />}
 
       </PageScroll>
-      <Modal title="模板" open={tplOpen} onClose={() => setTplOpen(false)} footer={<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}>
+      <Modal title="模板与模式" open={tplOpen} onClose={() => setTplOpen(false)} footer={<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}>
         <TemplateCard bare />
       </Modal>
     </ProfileContext.Provider>

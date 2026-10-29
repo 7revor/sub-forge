@@ -24,3 +24,5 @@ export * from './proxy/validateLocal.ts';
 export * from './proxy/adapterType.ts';
 
 export * from "./rules/convert.ts";
+
+export * from './template/routing.ts';

@@ -8,7 +8,7 @@
 | `src/pipeline` | 处理链与 P0 处理器，逐步 trace，末尾去重兜底 | SRC-06、SRC-07、SRC-11 |
 | `src/nodeset` | 订阅源 / 组合 / 本地节点组解析，组合环检测 | COL-01–04、LOC-01 |
 | `src/rules` | 规则 IR、规则集解析、按客户端降级与覆盖、多来源规则集合并与自动输出格式（原规则包并入规则集） | RS-01–03、RS-08、原 RB-01–05、CR-01–02 |
-| `src/template` | 模板 ⊕ 覆盖层合并、模板发布前自检 | 03 §5、TPL-07 ①、PRF-04、PRF-09 |
+| `src/template` | 绑定/独立分流解析、旧覆盖层迁移支持、模板发布前自检 | 03 §5、TPL-07 ①、PRF-04、PRF-09 |
 | `src/render` | mihomo 渲染：依赖解析、代理链、引用校验、环检测 | 03 §4、REF-01–12 |
 
 节点 YAML 支持单节点映射、裸节点列表及带 `proxies` 的完整配置，也支持相应行内写法。整体缩进的复制片段可直接解析，嵌套与未知字段保持原样；单个节点缺少必填字段记入 `failures`，语法损坏仍抛出错误，由调用方决定如何展示。
@@ -64,3 +64,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 策略组空组固定拒绝：生成时无成员补 REJECT，所有组自动输出 `empty-fallback: REJECT`；历史 `whenEmpty: direct` 与扩展字段不能覆盖。`exclude-type` 统一解析 ss / Shadowsocks 等协议别名，使内联筛选与 provider 客户端行为一致。
 
 2026-10-29 规则集前端移除整组 no-resolve 配置入口；核心保留 `RuleSet.noResolve` 以兼容历史数据，规则本身和模板引用的选项处理不变。
+
+## 订阅分流模式
+
+`Profile.routing` 包含 `bound`（最新模板 + 按稳定组 ID 追加成员）和 `independent`（完整 groups/rules/final）两类。渲染统一调用 `resolveProfileRouting`；绑定组失效或合并成环为错误，独立配置不依赖模板。`routingConfig` 展开有效配置，`profileEditorOverlay` 仅为现有编辑器提供视图，不能作为第二份配置持久化。历史 `overlay` 入口用于旧数据迁移与兼容测试。

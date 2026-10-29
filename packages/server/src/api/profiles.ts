@@ -1,3 +1,4 @@
+import { profileConversionRoutes } from './profile-conversion.ts';
 // Profile 的附属接口：订阅链接（token）管理、预览与渲染报告、访问日志。
 
 import { Hono } from 'hono';
@@ -11,6 +12,7 @@ const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
 
 export function profileRoutes(store: Store, renderer: RenderService, publicUrl: string) {
   const app = new Hono<ApiEnv>();
+  app.route('/', profileConversionRoutes(store));
   // 静态路径先注册；新建草稿不绑定任何已保存的 Profile。
   app.post('/profiles/preview', requireUser, async (c) => {
     const body = await jsonBody<{ profile?: unknown; platform?: unknown }>(c);

@@ -42,7 +42,7 @@ export type TraceStep = { index: number; op: string; enabled: boolean; before: n
 export type PipelinePreview = { input: number; inputNodes: NodeBrief[]; failures: { line: string; reason: string }[]; report: ReportItem[]; trace: TraceStep[]; nodes: NodeBrief[] };
 export type DependencyEntry = { refKey: string; nodeSet: string; node: string; strategy: 'wrap' | 'copy' | 'inline'; output: string; usedBy: string[] };
 export type ProfilePreview = { ok: boolean; yaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
-export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
+export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; forceable?: boolean; issues: ReportItem[] };
 export type RejectedRuleDetail = { line: number; text: string; reason: string };
 /** 规则集预览中每个来源的拉取 / 解析状态；不支持的行最多返回前 100 条详情 */
 export type RulesetSourceStatus = { format?: string; behavior?: string; conversion?: 'yaml-to-list'; id: string; ok: boolean; error?: string; fetchedAt?: number; stale?: boolean; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRuleDetail[] };

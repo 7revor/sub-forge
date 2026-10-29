@@ -58,6 +58,7 @@ function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => voi
 
 export function TabGroups() {
   const { draft, groups, template, patchOverlay, groupName, nodeSetName, profileNodeSets } = useProfile();
+  const bound = draft.routing?.mode === 'bound';
   const [regionSource, setRegionSource] = useState<NodeSetID>();
   const regionNodeSet = profileNodeSets.find(option => option.ref.type === regionSource?.type && option.ref.id === regionSource.id)
     ?? profileNodeSets.find(option => option.name === 'FlowerCloud') ?? profileNodeSets[0];
@@ -74,7 +75,7 @@ export function TabGroups() {
   const orphans = Object.keys(draft.overlay.groupPatches ?? {}).filter((id) => !template?.groups.some((t) => t.id === id));
 
   const setField = <K extends keyof Editable>(k: K, v: Editable[K] | undefined) => {
-    if (!g) return;
+    if (!g || bound) return;
     if (g.origin === 'template') {
       patchOverlay((o) => {
         const p = o.groupPatches?.[g.id] ?? {};
@@ -134,7 +135,7 @@ export function TabGroups() {
       )}
       <div className="flex flex-wrap items-start gap-5">
         <Card title="策略组" className="min-w-0 flex-[1_1_300px]" bodyClass="px-4 pb-2">
-          {templateIds.length > 0 && <p className="mt-0 text-[12px] text-muted">模板组顺序固定；私有组不能放在第一个模板组之前。</p>}
+          {templateIds.length > 0 && <p className="mt-0 text-[12px] text-muted">模板结构只读，可在组内添加节点或引用。</p>}
           <div className="-mx-4"><SortableList items={groups} getKey={(x) => x.id} isLocked={(x) => x.origin === 'template'}
             canDrop={(_from, to) => !templateIds.length || to > 0}
             onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraGroups: reorderExtraGroups(templateIds, ordered.map((x) => x.id), o.extraGroups ?? []) }))}
@@ -155,11 +156,11 @@ export function TabGroups() {
               );
             }} /></div>
           {!groups.length && <Empty title="没有组" />}
-          <div className="-mx-4 mt-4 flex flex-col gap-2 border-t border-line-2 px-4 pt-2.5">
+          {!bound && <div className="-mx-4 mt-4 flex flex-col gap-2 border-t border-line-2 px-4 pt-2.5">
             <NodeSetSelect label="地区节点来源" value={regionNodeSet?.ref} options={profileNodeSets} onChange={setRegionSource} placeholder="先在「节点集」中加入" />
             <Button onClick={addRegions}><Plus size={15} />添加地区节点</Button>
             <Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button>
-          </div>
+          </div>}
         </Card>
 
         {g && eff && (
@@ -171,12 +172,12 @@ export function TabGroups() {
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
               <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                <GroupSettingsFields value={eff} onChange={setField} defaultStrategy="consistent-hashing" />
+                <fieldset disabled={bound} className="contents"><GroupSettingsFields value={eff} onChange={setField} defaultStrategy="consistent-hashing" /></fieldset>
               </div>
 
               <div className="flex flex-col gap-2.5">
                 <span className="text-[14px] font-semibold">成员</span>
-                {g.origin === 'template' && <Segmented label="追加成员位置" value={patch.memberOrder ?? 'append'}
+                {!bound && g.origin === 'template' && <Segmented label="追加成员位置" value={patch.memberOrder ?? 'append'}
                   options={[{ value: 'prepend', label: '追加成员放在模板成员之前' }, { value: 'append', label: '追加成员放在模板成员之后' }]}
                   onChange={(memberOrder) => patchOverlay((o) => ({ ...o, groupPatches: { ...o.groupPatches, [g.id]: { ...o.groupPatches?.[g.id], memberOrder } } }))} />}
                 <div className="flex flex-col overflow-hidden rounded-lg border border-line">
@@ -194,11 +195,11 @@ export function TabGroups() {
                 <MemberAdder key={g.id} excludeGroupId={g.id} onAdd={(m) => setMembers([...added, m])} />
               </div>
 
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+              <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">
                 <Field label="filter（保留）" hint="仅筛选节点集成员">{(id) => <Input id={id} className="font-mono" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
                 <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={eff.excludeFilter ?? ''} onChange={(e) => setField('excludeFilter', e.target.value)} />}</Field>
                 <Field label="exclude-type（排除协议）">{(id) => <ExcludeTypeSelect id={id} value={eff.excludeType} onChange={(value) => setField('excludeType', value)} />}</Field>
-              </div>
+              </fieldset>
               <div className="flex flex-col gap-2">
                 {previewNodeSets.length > 1 && <Select aria-label="预览节点集" value={previewNodeSet?.[0] ?? ''} onChange={(e) => setPreviewSelection({ groupId: g.id, key: e.target.value })}>
                   {previewNodeSets.map(([key, ref]) => <option key={key} value={key}>{nodeSetName(ref)}</option>)}
@@ -206,14 +207,14 @@ export function TabGroups() {
                 {previewNodeSet ? <><span className="text-[12px] text-muted">节点集：{nodeSetName(previewNodeSet[1])}</span><MatchPreview nodeSet={previewNodeSet[1]} filter={eff.filter} excludeFilter={eff.excludeFilter} excludeType={eff.excludeType} /></> : <span className="text-[12px] text-muted">组里没有节点集成员，filter 不生效</span>}
               </div>
 
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+              <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">
                 <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">hidden（mihomo）{g.origin === 'template' ? ' · 模板设定，只读' : ''}</span>
                   {g.origin === 'template' ? <span className="text-[13px]">{eff.display?.hidden === undefined ? '不设置' : eff.display.hidden ? '开' : '关'}</span> : <OptionalBoolean label="hidden" value={eff.display?.hidden} onChange={(hidden) => setField('display', { ...eff.display, hidden })} />}
                 </div>
                 <Field label="icon" hint="mihomo icon / Surge icon-url">{(id) => <Input id={id} placeholder="图标地址" value={eff.display?.icon ?? ''} onChange={(e) => setField('display', { ...eff.display, icon: e.target.value || undefined })} />}</Field>
-              </div>
+              </fieldset>
               <div className="flex flex-col gap-2">
-                <ExtraFields key={g.id} value={Object.fromEntries(Object.entries(eff.extra ?? {}).filter(([key]) => key !== 'empty-fallback'))} validateName={(name) => name === 'empty-fallback' ? '空组固定使用 REJECT，无需配置此字段' : undefined} onChange={(extra) => setField('extra', extra)} />
+                <fieldset disabled={bound} className="m-0 min-w-0 border-0 p-0"><ExtraFields key={g.id} value={Object.fromEntries(Object.entries(eff.extra ?? {}).filter(([key]) => key !== 'empty-fallback'))} validateName={(name) => name === 'empty-fallback' ? '空组固定使用 REJECT，无需配置此字段' : undefined} onChange={(extra) => setField('extra', extra)} /></fieldset>
               </div>
             </div>
           </Card>
