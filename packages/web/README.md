@@ -4,6 +4,8 @@
 
 ## 开发
 
+本地推荐使用仓库中的 [一键开发脚本](../../scripts/README.md)，同时启动 Vite 热更新与后端源码监听，不需要打包。以下是分别启动两个服务的方式：
+
 ```bash
 # 终端 1：后端（示例数据见 packages/server/README.md）
 SUBFORGE_DB=./data/dev.db PORT=8787 PUBLIC_URL=http://127.0.0.1:5173 pnpm --filter @sub-forge/server start

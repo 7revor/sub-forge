@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本地服务控制；只使用标准库，兼容 macOS / Linux。"""
+"""本地开发服务控制：Vite 热更新与后端源码监听，不执行构建。"""
 
 import argparse
 import datetime
@@ -58,14 +58,22 @@ def process_info(pid):
     return info
 
 
+def group_running(pgid):
+    result = command("ps", "-axo", "pgid=,stat=")
+    return any(parts[0] == str(pgid) and not parts[1].startswith("Z")
+               for line in result.splitlines() if len(parts := line.split()) == 2)
+
+
 class LocalService:
     def __init__(self):
-        # linked worktree 共用 .git，脚本从任何工作树运行都指向仓库主目录。
+        # 启动脚本所在工作树的源码；数据默认仍复用主仓库的本地运行目录。
+        script_dir = Path(__file__).resolve().parent
         common = command("git", "-C", str(Path(__file__).resolve().parent),
                          "rev-parse", "--path-format=absolute", "--git-common-dir")
-        self.root = Path(common).parent
-        legacy = self.root / ".Codex/runtime/m1-stabilization"
-        default = legacy if (legacy / "sub-forge.db").is_file() else self.root / ".Codex/runtime/local-service"
+        self.root = Path(command("git", "-C", str(script_dir), "rev-parse", "--show-toplevel"))
+        main_root = Path(common).parent
+        legacy = main_root / ".Codex/runtime/m1-stabilization"
+        default = legacy if (legacy / "sub-forge.db").is_file() else main_root / ".Codex/runtime/local-service"
         self.runtime = Path(os.environ.get("SUBFORGE_LOCAL_RUNTIME_DIR", str(default))).expanduser().resolve()
         self.state_file = self.runtime / "service.json"
         self.pid_file = self.runtime / "service.pid"
@@ -103,16 +111,16 @@ class LocalService:
             raise RuntimeError(f"PID {state['pid']} 与服务记录不符，未启动新实例，也未停止该进程")
         return info
 
-    def healthy(self, url):
+    def healthy(self, url, path="/healthz", contains=None):
         try:
-            with self.opener.open(url + "/healthz", timeout=1) as response:
-                return response.status == 200
+            with self.opener.open(url + path, timeout=1) as response:
+                return response.status == 200 and (contains is None or contains in response.read())
         except OSError as error:
             self.last_health_error = str(error)
             return False
 
     def mark_stopped(self, state):
-        state.update(previousPid=state.get("pid") or state.get("previousPid"), pid=None,
+        state.update(previousPid=state.get("pid") or state.get("previousPid"), pid=None, pgid=None,
                      status="stopped", stoppedAt=datetime.datetime.now(datetime.timezone.utc).isoformat())
         self.write_state(state)
         self.pid_file.unlink(missing_ok=True)
@@ -121,6 +129,8 @@ class LocalService:
         state = self.read_state()
         info = self.owned_process(state)
         if not info:
+            if state.get("pgid") and group_running(state["pgid"]):
+                raise RuntimeError("管理进程已退出，但进程组仍在运行；请检查日志与进程记录，未盲目发送信号")
             self.mark_stopped(state)
             print("服务已经停止。数据库和密钥保留。")
             return
@@ -134,7 +144,8 @@ class LocalService:
             # 发信号前完整核验身份；退出等待只看进程及启动时间，避免读取正在关闭的目录。
             current = process_status(pid)
             if current is None or current["startTime"] != info["startTime"]:
-                break
+                if not state.get("pgid") or not group_running(state["pgid"]):
+                    break
             if time.monotonic() >= deadline:
                 raise RuntimeError(f"PID {pid} 仍未退出，已保留进程记录，未强制终止。请检查 {state.get('log')}")
             time.sleep(0.2)
@@ -144,51 +155,58 @@ class LocalService:
     def start(self):
         state = self.read_state()
         if self.owned_process(state):
-            if not self.healthy(state["url"]):
+            if state.get("mode") != "dev":
+                raise RuntimeError("旧的静态托管服务仍在运行，请先执行停止脚本，再启动开发服务")
+            if (not self.healthy(state["apiUrl"]) or not self.healthy(state["url"])
+                    or not self.healthy(state["url"], "/", b"/@vite/client")):
                 raise RuntimeError(f"服务进程仍在运行，但健康检查未通过；请先停止再启动。日志：{state.get('log')}")
-            print(f"服务已经运行：{state['url']}（PID {state['pid']}），未重复启动。")
+            print(f"开发服务已经运行：{state['url']}（PID {state['pid']}），未重复启动。")
             return
+        if state.get("pgid") and group_running(state["pgid"]):
+            raise RuntimeError("上次开发服务的进程组仍在运行，请检查日志与进程记录")
         port = int(os.environ.get("SUBFORGE_LOCAL_PORT", "8080"))
-        if not 1 <= port <= 65535:
-            raise RuntimeError("SUBFORGE_LOCAL_PORT 必须是 1–65535 的整数")
-        url = f"http://127.0.0.1:{port}"
-        with socket.socket() as probe:
-            try:
-                probe.bind(("127.0.0.1", port))
-            except OSError as error:
-                raise RuntimeError(f"端口 {port} 已被占用，未停止其他进程：{error}") from error
+        web_port = int(os.environ.get("SUBFORGE_LOCAL_WEB_PORT", "5173"))
+        if not all(1 <= value <= 65535 for value in (port, web_port)) or port == web_port:
+            raise RuntimeError("前后端端口必须是 1–65535 的不同整数")
+        api_url, url = f"http://127.0.0.1:{port}", f"http://127.0.0.1:{web_port}"
+        for value in (port, web_port):
+            with socket.socket() as probe:
+                try:
+                    probe.bind(("127.0.0.1", value))
+                except OSError as error:
+                    raise RuntimeError(f"端口 {value} 已被占用，未停止其他进程：{error}") from error
         database = self.runtime / "sub-forge.db"
         if database.exists() and not (self.runtime / "secret.key").is_file():
             raise RuntimeError("现有数据库旁缺少 secret.key；为避免使用错误密钥，已取消启动")
-        node, pnpm = shutil.which("node"), shutil.which("pnpm")
-        if not node or not pnpm:
-            raise RuntimeError("需要 Node.js 22 或更高版本及 pnpm，请安装后重新运行")
+        node = shutil.which("node")
+        if not node:
+            raise RuntimeError("需要 Node.js 22 或更高版本，请安装后重新运行")
         if int(command(node, "-p", 'process.versions.node.split(".")[0]')) < 22:
             raise RuntimeError("Node.js 版本低于 22，请升级后重新运行")
-        if not (self.root / "packages/server/node_modules/tsx").exists():
+        if not all((self.root / path).exists() for path in (
+                "packages/server/node_modules/tsx", "packages/web/node_modules/vite/bin/vite.js")):
             raise RuntimeError(f"尚未安装依赖，请在 {self.root} 执行 pnpm install --frozen-lockfile")
-        web = self.runtime / "web-local"
-        print("正在构建仓库主目录的前端…", flush=True)
-        subprocess.run([pnpm, "--filter", "@sub-forge/web", "exec", "vite", "build", "--outDir", str(web)],
-                       cwd=self.root, check=True)
-        if not (web / "index.html").is_file():
-            raise RuntimeError("前端构建没有生成 index.html，未启动后台服务")
+        print("正在启动开发服务（前端 Vite 热更新 / 后端源码监听）…", flush=True)
         log_path = self.runtime / "server.log"
         env = os.environ.copy()
         # 本地脚本始终使用数据库旁的密钥，避免终端遗留的密钥覆盖现有文件。
         env.pop("SUBFORGE_SECRET", None)
+        env.pop("WEB_DIR", None)
         env.update(HOST="127.0.0.1", PORT=str(port), PUBLIC_URL=url,
-                   SUBFORGE_DB=str(database), WEB_DIR=str(web))
-        cwd = self.root / "packages/server"
+                   SUBFORGE_DB=str(database), SUBFORGE_API=api_url,
+                   SUBFORGE_LOCAL_WEB_PORT=str(web_port), NODE_ENV="development")
+        cwd = self.root
         with log_path.open("ab") as log:
-            process = subprocess.Popen([node, "--import", "tsx", "src/cli.ts", "serve"], cwd=cwd, env=env,
+            process = subprocess.Popen([node, str(Path(__file__).with_name("dev-service.mjs"))], cwd=cwd, env=env,
                                        stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
         try:
             info = process_info(process.pid)
             if info is None or info["cwd"] != str(cwd):
                 raise RuntimeError("服务启动后退出或工作目录核验失败")
-            state.update(info, pid=process.pid, status="starting", host="127.0.0.1", port=port, url=url,
-                         worktree=str(self.root), database=str(database), log=str(log_path), webDir=str(web),
+            state.pop("webDir", None)
+            state.update(info, pid=process.pid, pgid=process.pid, mode="dev", status="starting",
+                         host="127.0.0.1", port=port, webPort=web_port, url=url, apiUrl=api_url,
+                         worktree=str(self.root), database=str(database), log=str(log_path),
                          branch=command("git", "-C", str(self.root), "branch", "--show-current"),
                          commit=command("git", "-C", str(self.root), "rev-parse", "--short", "HEAD"),
                          startedAt=datetime.datetime.now(datetime.timezone.utc).isoformat())
@@ -198,13 +216,16 @@ class LocalService:
             while time.monotonic() < deadline:
                 if process.poll() is not None:
                     raise RuntimeError(f"服务提前退出（退出码 {process.returncode}）")
-                listener = subprocess.run(["lsof", "-nP", "-a", "-p", str(process.pid),
-                                           f"-iTCP:{port}", "-sTCP:LISTEN", "-Fp"],
+                listener = subprocess.run(["lsof", "-nP", "-a", "-g", str(process.pid),
+                                           f"-iTCP:{port},{web_port}", "-sTCP:LISTEN", "-Fn"],
                                           capture_output=True, text=True, check=False)
-                if f"p{process.pid}" in listener.stdout.splitlines() and self.healthy(url):
+                listens = listener.stdout.splitlines()
+                if (all(f"n127.0.0.1:{value}" in listens for value in (port, web_port))
+                        and self.healthy(api_url) and self.healthy(url)
+                        and self.healthy(url, "/", b"/@vite/client")):
                     state["status"] = "running"
                     self.write_state(state)
-                    print(f"服务已启动：{url}\nPID：{process.pid}\n日志：{log_path}")
+                    print(f"开发服务已启动：{url}\n后端：{api_url}\n源码：{self.root}\nPID：{process.pid}\n日志：{log_path}")
                     return
                 time.sleep(0.2)
             raise RuntimeError(f"服务健康检查超时：{getattr(self, 'last_health_error', '未开始监听')}")
@@ -215,7 +236,7 @@ class LocalService:
                     process.wait(timeout=30)
                 except subprocess.TimeoutExpired:
                     print("本次启动失败的进程未正常退出，正在清理该进程。", file=sys.stderr)
-                    process.kill()
+                    os.killpg(process.pid, signal.SIGKILL)
                     process.wait()
             self.mark_stopped(state)
             print(f"本次启动失败，后台进程已清理。请检查日志：{log_path}", file=sys.stderr)
