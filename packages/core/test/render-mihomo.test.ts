@@ -57,21 +57,15 @@ describe('PRD 场景 3：落地走中转（provider 内节点）', () => {
 });
 
 describe('PRD 场景 4：规则出口为 provider 节点', () => {
-  it('规则包拆为 domain / classical / ipcidr 三个 provider，出口指向包装组', () => {
+  it('合并规则输出一个 classical LIST，出口指向包装组', () => {
     const r = render({
       nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }],
       overlay: { rulePatches: { 'r-fin': { target: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'S' }, match: { exact: '🇺🇸 Home-Broadband' } } } } } },
     });
     const w = r.dependencies[0]!.output;
-    expect((r.config.rules as string[]).slice(0, 4)).toEqual([
-      `RULE-SET,rs_fin_domain,${w}`,
-      `RULE-SET,rs_fin_classical,${w}`,
-      `RULE-SET,rs_fin_ipcidr,${w},no-resolve`,
-      `RULE-SET,rs_fin_broker_mrs,${w},no-resolve`,
-    ]);
-    expect(r.rulesets.rs_fin_domain).toEqual({ behavior: 'domain', text: '+.paypal.com\n' });
-    expect(r.rulesets.rs_fin_classical).toEqual({ behavior: 'classical', text: 'DOMAIN-KEYWORD,paypal\n' });
-    expect((r.config['rule-providers'] as Record<string, unknown>).rs_fin_broker_mrs).toMatchObject({ format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' });
+    expect((r.config.rules as string[])[0]).toBe(`RULE-SET,rs_fin_classical,${w}`);
+    expect(r.rulesets['rs_fin_classical.list']).toEqual({ behavior: 'classical', text: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21,no-resolve\nIP-CIDR,192.0.2.0/24,no-resolve\n' });
+    expect((r.config['rule-providers'] as Record<string, unknown>).rs_fin_classical).toMatchObject({ format: 'text', behavior: 'classical', url: 'https://sub.example.com/r/TOKEN/rs_fin_classical.list' });
   });
 });
 

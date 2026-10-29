@@ -41,7 +41,7 @@ export const RULES: RenderInput['rules'] = {
   rulesets: {
     fin: { id: 'fin', name: '金融服务', noResolve: true, sources: [
       { id: 'paypal', kind: 'local', format: 'auto', content: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21' },
-      { id: 'broker', name: '券商', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' },
+      { id: 'broker', name: '券商', kind: 'local', format: 'auto', content: '192.0.2.0/24' },
     ] },
     ai: { id: 'ai', name: 'AI', sources: [{ id: 's1', kind: 'local', format: 'auto', content: '.openai.com\n.anthropic.com' }] },
   },

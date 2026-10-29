@@ -42,7 +42,7 @@ describe('仅拉取实际启用的规则依赖', () => {
       { id: 'local', kind: 'local', format: 'classical', content: 'DOMAIN,active.example.test' },
     ] });
     const res = await h.renderer.render('p', { client: 'mihomo' });
-    expect(res.ok && res.render.rulesets.rs_b_domain).toBe('active.example.test\n');
+    expect(res.ok && res.render.rulesets['rs_b_classical.list']).toBe('DOMAIN,active.example.test\n');
     expect(h.calls).toEqual([]);
   });
 

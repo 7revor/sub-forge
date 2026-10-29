@@ -187,3 +187,7 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 
 实现依据：[Mihomo 代理延迟 API](https://wiki.metacubex.one/api/#proxiesproxies_namedelay)、[Unix socket 控制器](https://wiki.metacubex.one/config/general/#外部控制-api)。
 
+
+### 自动识别规则格式与下载策略（2026-10-29）
+
+规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（original/managed/unsupported）。单来源兼容时订阅配置引用原始 URL 并填写实际 format/behavior；其余可解析文本输出一个带版本参数的 `/r/:token/rs_…_classical.list`，内容为 classical，IP 选项写在各自规则行内。旧版本资源路由保持可读。旧二进制来源遇到合并、改写或客户端不支持时明确报错，沿用 last-good 回退，不静默丢弃。未增加 MRS/SRS 解码器；当前完整订阅下载仍只有 mihomo，Surge 为规则预览。

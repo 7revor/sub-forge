@@ -23,7 +23,7 @@ describe('远程 YAML 转换为托管 LIST', () => {
       if (!rendered.ok) throw new Error('渲染失败');
       const output = parse(rendered.render.yaml);
       const providers = Object.values(output['rule-providers']) as {format:string;url:string}[];
-      expect(providers).toHaveLength(3);
+      expect(providers).toHaveLength(1);
       expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub.test/r/'))).toBe(true);
       expect(rendered.render.yaml).not.toContain(source.url);
       expect(Object.values(rendered.render.rulesets).every(text=>!String(text).includes('payload:'))).toBe(true);

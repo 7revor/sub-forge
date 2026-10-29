@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api.ts';
-import { Button, ErrorBox, Field, Input, Modal, Select, Textarea } from './ui.tsx';
+import { Button, ErrorBox, Field, Input, Modal, Textarea } from './ui.tsx';
 
 const EMPTY = { name: '', url: '', ref: '', directory: '', include: '**/*.list\n**/*.txt', exclude: '', format: 'auto' };
 const lines = (text: string) => text.split('\n').map(s => s.trim()).filter(Boolean);
@@ -25,9 +25,6 @@ export function CustomRepoDialog({ open, onClose }: { open: boolean; onClose: ()
     </div>
     <Field label="包含文件" hint="相对扫描目录，每行一个模式；* 匹配文件名，** 可跨目录，? 匹配单个字符。仅索引 .list 和 .txt 文件，其他扩展名一律忽略。">{id => <Textarea id={id} rows={4} className="font-mono" spellCheck={false} value={form.include} onChange={e => setForm({ ...form, include: e.target.value })} />}</Field>
     <Field label="排除文件" hint="选填，每行一个模式，如 tests/**">{id => <Textarea id={id} rows={2} className="font-mono" spellCheck={false} value={form.exclude} onChange={e => setForm({ ...form, exclude: e.target.value })} />}</Field>
-    <Field label="规则格式" hint="应用于该仓库全部候选文件；自动识别会在预览或导入时检查内容。">{id => <Select id={id} value={form.format} onChange={e => setForm({ ...form, format: e.target.value })}>
-      <option value="auto">自动识别</option><option value="classical">classical 文本</option><option value="domain-set">纯域名列表</option><option value="ipcidr">纯 CIDR</option>
-    </Select>}</Field>
     <ErrorBox error={add.error} />
   </Modal>;
 }

@@ -80,7 +80,7 @@ describe('用户管理（管理员）', () => {
     store.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'local', id: 's' }, output: 'provider' }], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } } }] }, chains: [], refPolicy: { default: 'wrap' } }, user.id);
     const token = store.createToken('p').token;
     const cfg = parse(await (await app.request(`/sub/${token}`)).text());
-    const paths = [`/sub/${token}`, cfg['proxy-providers'].S.url, cfg['rule-providers'].rs_rs_domain.url].map((url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; });
+    const paths = [`/sub/${token}`, cfg['proxy-providers'].S.url, cfg['rule-providers'].rs_rs_classical.url].map((url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; });
     const admin = client(app); await admin.login('root');
     for (const path of paths) expect((await app.request(path)).status).toBe(200);
     await admin.patch(`/api/users/${user.id}`, { disabled: true });

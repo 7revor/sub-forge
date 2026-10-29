@@ -52,7 +52,7 @@ describe('模板自身的规则可用性检查', () => {
     const first = await h.admin.post('/api/templates/new/publish', h.template);
     expect(first.status).toBe(201);
     const id = first.json.item.id;
-    h.store.put('ruleset', { id: 'r', name: '坏规则', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'invalid' }] });
+    h.store.put('ruleset', { id: 'r', name: '坏规则', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'UNKNOWN,invalid' }] });
     const impact = await h.admin.post(`/api/templates/${id}/impact`, h.template);
     expect(impact.json.report).toContainEqual(expect.objectContaining({ level: 'error' }));
     expect((await h.admin.post(`/api/templates/${id}/publish`, { ...h.template, force: true })).status).toBe(400);
@@ -92,4 +92,12 @@ describe('模板自身的规则可用性检查', () => {
     expect(res.json.report).toContainEqual(expect.objectContaining({ code: 'template.ruleset-passthrough', level: 'info' }));
     expect(h.calls).toEqual([]);
   });
+  it('没有订阅引用时也拒绝需要合并或改写的旧二进制来源', async () => {
+    const h = await setup();
+    h.store.put('ruleset', { id: 'r', name: '旧二进制', noResolve: true, sources: [{ id: 's', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.test/ip.mrs' }] });
+    const validation = await h.admin.post('/api/templates/validate', h.template);
+    expect(validation.json.report).toContainEqual(expect.objectContaining({ level: 'error', code: 'template.ruleset-invalid', message: expect.stringContaining('无法合并或改写') }));
+    expect((await h.admin.post('/api/templates/new/publish', { ...h.template, force: true })).status).toBe(400);
+  });
+
 });

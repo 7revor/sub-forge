@@ -129,6 +129,7 @@ export type RuleSetSource = {
   name?: string;
   url?: string;
   content?: string;
+  /** 自动识别内容；历史值仅兼容域名方言与二进制来源。 */
   format: RuleSetFormat;
   /** 透传的二进制规则集（mrs）必须声明 behavior，其余格式解析后自动拆分 */
   behavior?: 'domain' | 'ipcidr' | 'classical';
@@ -139,7 +140,7 @@ export type RuleSetSource = {
 
 /**
  * 规则集：一个或多个来源（远程 URL / 本地规则）合并成一项，只配一个出口。
- * 输出时按 domain → classical → ipcidr 拆分并去重（原「规则包」并入规则集，2026-10-29）。
+ * 单一兼容远程来源可透传；需要处理时合并去重后输出 classical LIST（原「规则包」并入规则集，2026-10-29）。
  */
 export type RuleSet = {
   id: ID;

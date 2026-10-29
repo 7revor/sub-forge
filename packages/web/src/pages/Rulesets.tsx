@@ -7,7 +7,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { isYamlRuleUrl, type Client, type Platform, type RuleSetFormat } from '@sub-forge/core';
+import type { Client, Platform } from '@sub-forge/core';
 import { FileText, Globe, Link2, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type RepoEntry, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
@@ -16,16 +16,12 @@ import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Switch, Textarea, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
 
-const FORMATS: { value: RuleSetFormat; label: string }[] = [
-  { value: 'auto', label: '自动识别' }, { value: 'classical', label: 'classical 文本' }, { value: 'domain-set', label: 'Surge DOMAIN-SET' },
-  { value: 'ipcidr', label: '纯 CIDR' }, { value: 'yaml', label: 'YAML → LIST（仅托管）' }, { value: 'mrs', label: 'mrs（透传）' },
-];
-const FORMAT_TEXT: Record<string, string> = { auto: '自动识别', classical: 'classical', 'domain-set': 'DOMAIN-SET', domain: 'DOMAIN-SET', ipcidr: 'CIDR', yaml: 'YAML → LIST · 托管', mrs: 'mrs', srs: 'srs' };
+const FORMAT_TEXT: Record<string, string> = { auto: '待识别', classical: 'classical 文本', 'domain-set': '域名文本', domain: '域名文本', ipcidr: 'CIDR 文本', yaml: 'YAML', mrs: 'MRS', srs: 'SRS' };
 const isPassthrough = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
 const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : '本地规则');
 
@@ -66,7 +62,6 @@ function rulesetError(d: RuleSetDoc): string | undefined {
   for (const [i, s] of d.sources.entries()) {
     const at = `来源 ${i + 1}「${sourceLabel(s)}」`;
     if (s.kind === 'remote' && !/^https?:\/\/[^/]+/.test(s.url ?? '')) return `${at}：请填写 http(s) 地址。`;
-    if (s.format === 'mrs' && s.behavior !== 'domain' && s.behavior !== 'ipcidr') return `${at}：mrs 需要选择 behavior。`;
   }
   return overridesError(d.overrides ?? []);
 }
@@ -197,9 +192,10 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
   const on = src.enabled !== false;
   const label = sourceLabel(src);
   const lines = src.kind === 'local' ? (src.content ?? '').split('\n').filter((l) => l.trim() && !l.trim().startsWith('#')).length : undefined;
+  const detected = status?.format ? FORMAT_TEXT[status.format] ?? status.format : '自动识别';
   const sub = src.kind === 'remote'
-    ? [src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${FORMAT_TEXT[src.format] ?? src.format}`].filter(Boolean).join(' · ')
-    : `本地 · ${FORMAT_TEXT[src.format] ?? src.format} · ${lines} 行`;
+    ? [src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${detected}`].filter(Boolean).join(' · ')
+    : `本地 · ${detected} · ${lines} 行`;
   return (
     <div className={cx('my-2 rounded-lg border', active ? 'border-accent bg-[#f8faff]' : 'border-line', !on && 'opacity-60')}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 pr-3 pl-2">
@@ -213,7 +209,6 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
             <span className="truncate text-[12px] text-muted">{sub}</span>
           </span>
         </button>
-        {status?.conversion === 'yaml-to-list' && <Badge tone="accent">YAML → LIST · 托管</Badge>}
         <SourceStatus src={src} status={status} loading={loading} />
         <Switch label={`启用 ${label}`} checked={on} onChange={(v) => onChange({ enabled: v ? undefined : false })} />
         <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${label}`} onClick={onDelete}><Trash2 size={14} /></Button>
@@ -221,15 +216,13 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
       {active && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
           {src.kind === 'remote' && <Field label={src.repository ? '关联地址（只读）' : '地址'} className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} readOnly={!!src.repository} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
-          <Field label="输入格式" hint={src.kind === 'remote' ? '自动识别支持 YAML payload，转换为 LIST 后仅托管输出。' : undefined}>{(id) => <Select id={id} value={src.format} onChange={(x) => onChange({ format: x.target.value as RuleSetFormat })}>{FORMATS.filter(f => f.value !== 'mrs' || !(isYamlRuleUrl(src.url) || src.format === 'yaml' || status?.conversion === 'yaml-to-list')).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
-          {src.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={src.behavior ?? ''} onChange={(x) => onChange({ behavior: (x.target.value || undefined) as 'domain' | 'ipcidr' | undefined })}><option value="">请选择</option><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
           {src.kind === 'remote' && <Field label="缓存（小时）">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
             const h = Number(x.target.value);
             const { ttlSec: _, ...rest } = src.fetch ?? {};
             onChange({ fetch: h > 0 && h !== 24 ? { ...rest, ttlSec: h * 3600 } : Object.keys(rest).length ? rest : undefined });
           }} />}</Field>}
-          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint={src.format === 'yaml' ? '填写包含 payload 列表的 YAML。' : '每行一条，支持 classical 规则、域名或 CIDR。'}>{(id) => (
-            <LocalContentInput format={src.format} id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
+          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="自动识别 classical 规则、域名、CIDR 或 YAML payload。">{(id) => (
+            <LocalContentInput format={status?.format} id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
           )}</Field>}
         </div>
       )}
@@ -261,10 +254,14 @@ function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
   if (preview.error) return <ErrorBox error={preview.error} />;
   const p = preview.data;
   if (!p) return <div className="text-[13px] text-muted">加载中…</div>;
+  if (p.delivery?.mode === 'unsupported') return <ErrorBox error={p.delivery.reason} />;
   if (p.passthrough) return <Empty title="该来源为二进制透传" description="由客户端直接读取，无法在此展示文本规则。" />;
   return (
     <>
-      {p.error && <ErrorBox error={`拉取失败：${p.error}`} />}
+      {p.delivery && <span className="text-[12.5px] text-muted">{p.delivery.mode === 'original'
+        ? `下载时使用原始来源 · ${p.delivery.format} / ${p.delivery.behavior}`
+        : '下载时转换为 .list · classical 文本'}</span>}
+      {p.error && <ErrorBox error={p.error} />}
       {p.lines.length ? <CodePreview text={p.lines.join('\n')} loading={preview.isFetching} bodyClassName="min-h-[120px]" /> : <Empty title="没有可输出的规则" />}
       <span className="text-[12px] text-muted">{p.total ?? p.lines.length} 行{(p.total ?? 0) > p.lines.length ? `（显示前 ${p.lines.length} 行）` : ''} · 降级 {p.notes?.length ?? 0} · 丢弃 {p.dropped.length} · 无法解析 {p.rejected.length}</span>
       {[...(p.notes ?? []).map((n) => ['降级', n]), ...p.dropped.map((x) => ['丢弃', x.reason]), ...p.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].slice(0, 50).map(([k, v], i) => (

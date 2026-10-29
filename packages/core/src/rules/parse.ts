@@ -2,7 +2,7 @@
 // 无法解析或不支持的行记录下来，不中断。
 
 import { parse as parseYaml } from 'yaml';
-import type { RuleIR, RuleSetFormat } from '../types.ts';
+import type { RuleIR, RuleSetFormat, RuleSetSource } from '../types.ts';
 
 export class UnsupportedRuleError extends Error {}
 
@@ -11,7 +11,7 @@ export type RejectedRule = { line: number; text: string; reason: string };
 export type Behavior = 'domain' | 'ipcidr' | 'classical';
 
 export type RuleSetParseResult =
-  | { passthrough: false; format: Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>; rules: ParsedRule[]; rejected: RejectedRule[]; conversion?: 'yaml-to-list' }
+  | { passthrough: false; format: Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>; rules: ParsedRule[]; rejected: RejectedRule[]; behavior: Behavior; conversion?: 'yaml-to-list' }
   | { passthrough: true; format: 'mrs' | 'srs' };
 
 const PROCESS_TYPES: Record<string, { kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex' }> = {
@@ -85,12 +85,14 @@ export function parseRuleLine(text: string): RuleIR {
 }
 
 /** 纯域名行（Surge DOMAIN-SET / mihomo domain behavior） */
-export function parseDomainLine(text: string): RuleIR {
+export function parseDomainLine(text: string, dialect: 'surge' | 'clash' = 'surge'): RuleIR {
   // 域名列表不能把 HTML、JSON 或错误说明当成域名；保留通配符、国际化域名与内网单标签。
   if (!/^(?:\+\.)?\.?[\p{L}\p{N}_*?-]+(?:\.[\p{L}\p{N}_*?-]+)*\.?$/u.test(text)) throw new Error('不是有效的域名规则');
   if (text.startsWith('+.')) return { type: 'DOMAIN-SUFFIX', value: text.slice(2) };
-  // Surge DOMAIN-SET 的 `.x` 含 x 本身；mihomo 的 `.x` 只含子域。统一按后缀处理，偏宽松
-  if (text.startsWith('.')) return { type: 'DOMAIN-SUFFIX', value: text.slice(1) };
+  // Surge 的前导点包含根域；Clash 的前导点只包含子域。
+  if (text.startsWith('.')) return dialect === 'clash'
+    ? { type: 'DOMAIN-WILDCARD', value: `*${text}` }
+    : { type: 'DOMAIN-SUFFIX', value: text.slice(1) };
   if (/[*?]/.test(text)) return { type: 'DOMAIN-WILDCARD', value: text };
   return { type: 'DOMAIN', value: text };
 }
@@ -112,7 +114,7 @@ const hasYamlPayload = (text: string) => /^\s*(?:payload|"payload"|'payload')\s*
 
 function detectFormat(text: string): TextFormat {
   if (hasYamlPayload(text)) return 'yaml';
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#') && !l.startsWith('//'));
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#') && !l.startsWith('//') && !l.startsWith(';'));
   if (lines.length && lines.every((l) => /^[0-9a-f:.]+\/\d+$/i.test(l))) return 'ipcidr';
   if (lines.length && lines.every((l) => !l.includes(','))) return 'domain-set';
   return 'classical';
@@ -135,18 +137,20 @@ export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto'
 
   let entries: { line: number; text: string }[];
   let lineParser: (t: string) => RuleIR;
+  let behavior: Behavior;
   if (fmt === 'yaml') {
     const doc = parseYaml(text) as { payload?: unknown[] } | null;
     if (!doc || !Array.isArray(doc.payload)) throw new Error('规则 YAML 需要 payload 数组');
     if (!doc.payload.every((item) => typeof item === 'string')) throw new Error('规则 YAML 的 payload 条目必须是字符串');
     const payload = doc.payload as string[];
-    const behavior = yamlBehavior ?? behaviorOfYaml(payload);
+    behavior = yamlBehavior ?? behaviorOfYaml(payload);
     entries = payload.map((t, i) => ({ line: i + 1, text: t.trim() }));
-    lineParser = behavior === 'domain' ? parseDomainLine : behavior === 'ipcidr' ? parseCidrLine : parseRuleLine;
+    lineParser = behavior === 'domain' ? t => parseDomainLine(t, 'clash') : behavior === 'ipcidr' ? parseCidrLine : parseRuleLine;
   } else {
     entries = text.split(/\r?\n/).map((t, i) => ({ line: i + 1, text: t.trim() }))
       .filter((e) => e.text && !e.text.startsWith('#') && !e.text.startsWith('//') && !e.text.startsWith(';'));
-    lineParser = fmt === 'domain-set' || fmt === 'domain' ? parseDomainLine : fmt === 'ipcidr' ? parseCidrLine : parseRuleLine;
+    behavior = fmt === 'domain-set' || fmt === 'domain' ? 'domain' : fmt === 'ipcidr' ? 'ipcidr' : 'classical';
+    lineParser = behavior === 'domain' ? t => parseDomainLine(t, fmt === 'domain' ? 'clash' : 'surge') : fmt === 'ipcidr' ? parseCidrLine : parseRuleLine;
   }
 
   for (const e of entries) {
@@ -156,7 +160,7 @@ export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto'
       rejected.push({ ...e, reason: (err as Error).message });
     }
   }
-  return { passthrough: false, format: fmt === 'domain' ? 'domain-set' : fmt, rules, rejected, ...(fmt === 'yaml' ? { conversion: 'yaml-to-list' as const } : {}) };
+  return { passthrough: false, format: fmt === 'domain' ? 'domain-set' : fmt, rules, rejected, behavior, ...(fmt === 'yaml' ? { conversion: 'yaml-to-list' as const } : {}) };
 }
 
 /** 规则在规则包拆分时归入的 behavior（docs/03 §6） */
@@ -174,4 +178,12 @@ export function ruleKey(rule: RuleIR): string {
     case 'RAW': return `RAW|${rule.client}|${rule.text}`;
     default: return `${rule.type}|${rule.value}`;
   }
+}
+
+/** 业务入口始终按内容识别；历史格式只用于区分域名方言和兼容二进制来源。 */
+export function parseRuleSourceContent(text: string, source: Pick<RuleSetSource, 'format' | 'repository'>): RuleSetParseResult {
+  if (source.format === 'mrs' || source.format === 'srs') return parseRuleSetContent(text, source.format);
+  const detected = detectFormat(text);
+  const clashDomain = source.format === 'domain' || source.repository?.path.startsWith('rule/Clash/');
+  return parseRuleSetContent(text, detected === 'domain-set' && clashDomain ? 'domain' : detected);
 }

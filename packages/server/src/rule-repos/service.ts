@@ -1,5 +1,5 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
-import { parseRuleSetContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
+import { parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { randomId } from '../crypto.ts';
 import { isIndexedRuleFile, parseCustomRepo } from './generic.ts';
 import type { Store } from '../store.ts';
@@ -103,7 +103,7 @@ export class RuleRepoService {
     const { file } = find();
     const response = await this.fetcher(file.url, { timeoutMs: 20_000 });
     if (response.status !== 200) throw new Error(`规则文件拉取失败：HTTP ${response.status}`);
-    const parsed = parseRuleSetContent(response.body, file.format, file.behavior);
+    const parsed = parseRuleSourceContent(response.body, { ...file, repository: { repo, entry: path, ref: file.ref, path: file.path } });
     if (parsed.passthrough || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
     const current = find();
     return { name: current.entry.name, sources: [{ kind: 'remote' as const,
@@ -318,7 +318,7 @@ export class RuleRepoService {
         for (const file of variant.files) {
           const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
           if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
-          const parsed = parseRuleSetContent(response.body, file.format, file.behavior);
+          const parsed = parseRuleSourceContent(response.body, { ...file, repository: { repo: id, entry: path, ref: file.ref, path: file.path } });
           if (parsed.passthrough || !parsed.rules.length) throw new Error('文件中没有可解析的规则');
           rejected += parsed.rejected.length;
           rejectedDetails.push(...parsed.rejected.slice(0, Math.max(0, 50 - rejectedDetails.length)).map(r => ({ ...r, text: r.text.slice(0, 500) })));

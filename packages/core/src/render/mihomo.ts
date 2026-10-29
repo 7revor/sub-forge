@@ -1,3 +1,4 @@
+import { ruleSetDelivery } from '../rules/delivery.ts';
 // mihomo 渲染（docs/03 §3 ②–⑥、§4）：模板合并 → 节点集 → 依赖解析 → 规则展开 → 引用校验 → YAML。
 // 纯函数：所有外部数据（快照、模板、规则集）由调用方传入。
 
@@ -332,44 +333,31 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     // 不同规则级选项可能改变 classical 正文或 CIDR 分段，不能共用同名 provider。
     const base = `rs_${safeId(m.id)}${r.options?.noResolve ? '_nr' : ''}${r.options?.src ? '_src' : ''}`;
     const buckets = expandRuleSet(m.id, input.rules, ctx, report);
-    const noResolve = input.rules.rulesets[m.id]?.noResolve || r.options?.noResolve;
-    // domain → classical → ipcidr：IP 类放最后，避免过早触发 DNS 解析（RB-03）
-    for (const behavior of ['domain', 'classical', 'ipcidr'] as const) {
-      const list = buckets[behavior].map(rule => withIpOptions(rule, r.options ?? {}));
-      if (!list.length) continue;
-      // CIDR 文本无法承载行级选项。按连续的选项组合拆段，保留原顺序及解析行为。
-      const segments: { rules: RuleIR[]; noResolve: boolean; src: boolean }[] = [];
-      for (const rule of list) {
-        const flags = { noResolve: behavior === 'ipcidr' && 'noResolve' in rule && !!rule.noResolve, src: behavior === 'ipcidr' && 'src' in rule && !!rule.src };
-        const last = segments.at(-1);
-        if (last && last.noResolve === flags.noResolve && last.src === flags.src) last.rules.push(rule);
-        else segments.push({ rules: [rule], ...flags });
-      }
-      for (const [index, segment] of segments.entries()) {
-        const key = `${base}_${behavior}${segments.length > 1 ? `_part${index + 1}` : ''}`;
-        if (!rulesets[key]) {
-          const list = segment.rules;
-          const lines = behavior === 'domain'
-            ? list.map((x) => (x.type === 'DOMAIN-SUFFIX' ? `+.${(x as { value: string }).value}` : (x as { value: string }).value))
-            : behavior === 'ipcidr'
-              ? list.map((x) => (x as { value: string }).value)
-              : list.map((x) => lowerInline(x, where)).filter((x): x is string => x !== undefined);
-          if (!lines.length) continue;
-          rulesets[key] = { behavior, text: lines.join('\n') + '\n' };
-          ruleProviders[key] = { type: 'http', behavior, format: 'text', url: input.urls.ruleset(key), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
-        }
-        ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: segment.noResolve, src: segment.src }, target));
-      }
+    const rs = input.rules.rulesets[m.id];
+    if (!rs) continue;
+    const delivery = ruleSetDelivery(rs, input.rules, ctx, r.options);
+    if (delivery.mode === 'unsupported') {
+      report.error('ruleset.conversion-unavailable', delivery.reason, where);
+      continue;
     }
-    for (const p of buckets.passthrough) {
-      const key = `${base}_${safeId(p.sourceId)}_${p.format}`;
-      if (p.format !== 'mrs' || !p.url || !p.behavior || p.behavior === 'classical') {
-        report.warn('ruleset.passthrough-unusable', `规则集「${input.rules.rulesets[m.id]?.name ?? m.id}」的来源「${p.name}」（${p.format}）无法用于 mihomo：需要 mrs 格式、URL 与 domain/ipcidr behavior`, where);
-        continue;
-      }
-      ruleProviders[key] ??= { type: 'http', behavior: p.behavior, format: 'mrs', url: p.url, interval: RULESET_INTERVAL };
-      ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: p.behavior === 'ipcidr' && !!noResolve, src: p.behavior === 'ipcidr' && !!r.options?.src }, target));
+    if (delivery.mode === 'original') {
+      const key = `${base}_original`;
+      ruleProviders[key] ??= { type: 'http', behavior: delivery.behavior, format: delivery.format, url: delivery.url, interval: RULESET_INTERVAL };
+      ruleLines.push(`RULE-SET,${key},${target}`);
+      continue;
     }
+    // 所有需要处理的来源统一为一个 classical LIST，IP 选项保留在对应行内。
+    const key = `${base}_classical`;
+    const file = `${key}.list`;
+    if (!rulesets[file]) {
+      const lines = [...buckets.domain, ...buckets.classical, ...buckets.ipcidr]
+        .map(rule => lowerInline(withIpOptions(rule, r.options ?? {}), where))
+        .filter((line): line is string => line !== undefined);
+      if (!lines.length) continue;
+      rulesets[file] = { behavior: 'classical', text: lines.join('\n') + '\n' };
+      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
+    }
+    ruleLines.push(`RULE-SET,${key},${target}`);
   }
   const finalName = resolveTarget(eff.final, 'final') ?? 'DIRECT';
   ruleLines.push(`MATCH,${finalName}`);
