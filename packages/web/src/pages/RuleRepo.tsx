@@ -1,6 +1,7 @@
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
+import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 import { CodePreview } from '../components/CodePreview.tsx';
-// 规则仓库（设计稿「规则仓库」）：搜索内置 GitHub 规则仓库、查看按客户端挑选的变体与内容预览，引用为规则集或作为远程来源加入已有规则集。
+// 规则仓库（设计稿「规则仓库」）：搜索内置及自定义 GitHub 规则仓库、查看按客户端挑选的变体与内容预览，引用为规则集或作为远程来源加入已有规则集。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -9,6 +10,8 @@ import { Select } from '../components/listbox.tsx';
 import { useMe } from '../hooks.ts';
 import { api, type RepoEntry, type RepoEntryDetail, type RuleRepo } from '../api.ts';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
+
+const clientLabel = (client: string) => client === 'any' ? '通用文本' : client;
 
 export function RuleRepoPage() {
   const navigate = useNavigate();
@@ -24,6 +27,10 @@ export function RuleRepoPage() {
   const [variant, setVariant] = useState('');
   const [sel, setSel] = useState<RepoEntry>();
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
+  useEffect(() => {
+    if (repos.data && repo && !repos.data.repos.some(r => r.id === repo && r.enabled)) setRepo(undefined);
+    if (repos.data && sel && !repos.data.repos.some(r => r.id === sel.repo && r.enabled)) setSel(undefined);
+  }, [repos.data, repo, sel]);
   const refresh = useMutation({ mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
   useEffect(() => { setOffset(0); setSel(undefined); setVariant(''); }, [debounced, repo, client]);
   const revision = repos.data?.repos.map(r => `${r.id}:${r.builtAt}:${r.enabled}`).join('|');
@@ -40,6 +47,7 @@ export function RuleRepoPage() {
     mutationFn: () => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: sel!.repo, path: sel!.path, ...(variant ? { variant } : {}), ...(ruleset ? { ruleset } : {}) }),
     onSuccess: async (r) => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${r.item.id}`); },
   });
+  const repoName = (id: string) => repos.data?.repos.find(r => r.id === id)?.name ?? id;
   const items = search.data?.items ?? [];
   const d = detail.data;
 
@@ -48,7 +56,7 @@ export function RuleRepoPage() {
       <PageHeader title="规则仓库" />
       <div className="flex flex-wrap gap-2" aria-label="索引状态">
         {(repos.data?.repos ?? []).map(r => <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-[12px]">
-          <span>{r.id} · {!r.enabled ? '已停用' : r.indexing ? '正在更新索引…' : r.builtAt ? `${r.entries} 个规则` : '等待首次索引'}</span>
+          <span>{r.name} · {!r.enabled ? '已停用' : r.indexing ? '正在更新索引…' : r.builtAt ? `${r.entries} 个规则` : '等待首次索引'}</span>
           {r.error && <span className="text-err">{r.error}{r.builtAt ? '（继续使用上次索引）' : ''}</span>}
           {me.data?.role === 'admin' && r.enabled && <Button size="sm" disabled={r.indexing || refresh.isPending} onClick={() => refresh.mutate(r.id)}>更新索引</Button>}
         </div>)}
@@ -77,7 +85,7 @@ export function RuleRepoPage() {
                 <button key={`${x.repo}:${x.path}`} type="button" aria-current={on || undefined} onClick={() => { setSel(x); setVariant(''); use.reset(); }}
                   className={cx('flex w-full cursor-pointer items-center gap-3 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'hover:bg-ground')}>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{x.name}</span><span className="truncate font-mono text-[12px] text-muted">{x.path}</span></span>
-                  <span className="flex flex-col items-end gap-0.5"><span className="font-mono text-[12.5px]">{x.clients?.join(' / ')}</span><span className="text-[11.5px] text-muted">{x.repo}</span></span>
+                  <span className="flex flex-col items-end gap-0.5"><span className="font-mono text-[12.5px]">{x.clients?.map(clientLabel).join(' / ')}</span><span className="text-[11.5px] text-muted">{repoName(x.repo)}</span></span>
                 </button>
               );
             })}
@@ -95,9 +103,9 @@ export function RuleRepoPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-col gap-1">
                   <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>
-                  <span className="font-mono text-[12px] text-muted">{sel.repo} · {sel.path}</span>
+                  <span className="font-mono text-[12px] text-muted">{repoName(sel.repo)} · {sel.path}</span>
                 </div>
-                <Badge>{d?.count === undefined ? '条数待读取' : `${d.count} 条`}</Badge>
+                {d?.rejected ? <RejectedRulesPopover sourceName={sel.name} status={{ id: sel.path, ok: true, rules: d.count, rejected: d.rejected, rejectedDetails: d.rejectedDetails }} /> : <Badge>{d?.count === undefined ? '条数待读取' : `${d.count} 条`}</Badge>}
               </div>
               <ErrorBox error={detail.error} />
               {d && <>
@@ -108,12 +116,12 @@ export function RuleRepoPage() {
                 <Card title="可用变体" bodyClass="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead><tr><th className={th}>客户端</th><th className={th}>文件</th><th className={th}>方式</th></tr></thead>
-                    <tbody>{d.variants.map((v) => <tr key={v.id}><td className={cx(td, 'font-medium')}>{v.client}</td><td className={cx(td, 'font-mono text-[12px]')}>{v.files.map(f => <a key={`${f.path}:${f.url}`} className="block text-accent" href={f.upstream} target="_blank" rel="noreferrer">{f.path}</a>)}{v.recommended && <span className="text-muted">推荐文本变体</span>}</td><td className={cx(td, 'text-ink-2')}>{v.how}</td></tr>)}</tbody>
+                    <tbody>{d.variants.map((v) => <tr key={v.id}><td className={cx(td, 'font-medium')}>{clientLabel(v.client)}</td><td className={cx(td, 'font-mono text-[12px]')}>{v.files.map(f => <a key={`${f.path}:${f.url}`} className="block text-accent" href={f.upstream} target="_blank" rel="noreferrer">{f.path}</a>)}{v.recommended && <span className="text-muted">推荐文本变体</span>}</td><td className={cx(td, 'text-ink-2')}>{v.how}</td></tr>)}</tbody>
                   </table>
                 </Card>
                 <Select aria-label="导入变体" value={variant} onChange={e => setVariant(e.target.value)}>
                   <option value="">自动选择推荐文本变体</option>
-                  {d.variants.filter(v => v.files.every(f => f.format !== 'mrs')).map(v => <option key={v.id} value={v.id}>{v.client} · {v.label}</option>)}
+                  {d.variants.filter(v => v.files.every(f => f.format !== 'mrs')).map(v => <option key={v.id} value={v.id}>{clientLabel(v.client)} · {v.label}</option>)}
                 </Select>
                 <span className="text-[12px] text-muted">预览为推荐文本变体。导入后保存为远程来源，可在规则集内合并、改写并托管输出。</span>
                 {d.previewError && <div className="text-[13px] text-err">{d.previewError}<Button size="sm" onClick={() => void detail.refetch()}>重试预览</Button></div>}
@@ -122,7 +130,7 @@ export function RuleRepoPage() {
               </>}
               <ErrorBox error={use.error} />
               <div className="flex flex-wrap gap-2">
-                <Button variant="primary" disabled={use.isPending || !d || detail.isFetching} onClick={() => use.mutate()}>{ruleset ? '加入规则集' : '引用为规则集'}</Button>
+                <Button variant="primary" disabled={use.isPending || !d || detail.isFetching || (!!d.previewError && d.variants.some(v => v.client === 'any'))} onClick={() => use.mutate()}>{ruleset ? '加入规则集' : '引用为规则集'}</Button>
                 {!ruleset && <Link to="/rulesets" className={buttonClass()}>加入已有规则集…</Link>}
               </div>
             </>}

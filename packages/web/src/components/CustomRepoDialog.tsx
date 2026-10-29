@@ -1,0 +1,33 @@
+import { useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../api.ts';
+import { Button, ErrorBox, Field, Input, Modal, Select, Textarea } from './ui.tsx';
+
+const EMPTY = { name: '', url: '', ref: '', directory: '', include: '**/*.list\n**/*.txt\n**/*.yaml\n**/*.yml', exclude: '', format: 'auto' };
+const lines = (text: string) => text.split('\n').map(s => s.trim()).filter(Boolean);
+
+export function CustomRepoDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState(EMPTY);
+  const add = useMutation({
+    mutationFn: () => api('POST', '/rule-repos', { ...form, include: lines(form.include), exclude: lines(form.exclude) }),
+    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['rule-repos'] }); onClose(); },
+  });
+  useEffect(() => { if (open) { setForm(EMPTY); add.reset(); } }, [open]);
+  const close = () => { if (!add.isPending) onClose(); };
+  return <Modal title="添加自定义 GitHub 仓库" open={open} onClose={close}
+    footer={<><Button disabled={add.isPending} onClick={close}>取消</Button><Button variant="primary" disabled={!form.url.trim() || !lines(form.include).length || add.isPending} onClick={() => add.mutate()}>{add.isPending ? '检查仓库…' : '添加并建立索引'}</Button></>}>
+    <Field label="GitHub 仓库地址" hint="公开仓库，如 https://github.com/owner/repo">{id => <Input id={id} autoFocus placeholder="https://github.com/owner/repo" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} />}</Field>
+    <Field label="显示名称" hint="留空使用 owner/repo">{id => <Input id={id} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />}</Field>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+      <Field label="分支" hint="留空使用仓库默认分支">{id => <Input id={id} placeholder="默认分支" value={form.ref} onChange={e => setForm({ ...form, ref: e.target.value })} />}</Field>
+      <Field label="扫描目录" hint="相对路径；留空扫描整个仓库">{id => <Input id={id} placeholder="例如 rules" value={form.directory} onChange={e => setForm({ ...form, directory: e.target.value })} />}</Field>
+    </div>
+    <Field label="包含文件" hint="相对扫描目录，每行一个模式；* 匹配文件名，** 可跨目录，? 匹配单个字符。仅支持 list、txt、yaml、yml 文本文件。">{id => <Textarea id={id} rows={4} className="font-mono" spellCheck={false} value={form.include} onChange={e => setForm({ ...form, include: e.target.value })} />}</Field>
+    <Field label="排除文件" hint="选填，每行一个模式，如 tests/**">{id => <Textarea id={id} rows={2} className="font-mono" spellCheck={false} value={form.exclude} onChange={e => setForm({ ...form, exclude: e.target.value })} />}</Field>
+    <Field label="规则格式" hint="应用于该仓库全部候选文件；自动识别会在预览或导入时检查内容。">{id => <Select id={id} value={form.format} onChange={e => setForm({ ...form, format: e.target.value })}>
+      <option value="auto">自动识别</option><option value="classical">classical 文本</option><option value="domain-set">纯域名列表</option><option value="ipcidr">纯 CIDR</option><option value="yaml">mihomo YAML payload</option>
+    </Select>}</Field>
+    <ErrorBox error={add.error} />
+  </Modal>;
+}

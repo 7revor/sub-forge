@@ -52,14 +52,16 @@ describe('规则仓库适配器', () => {
 });
 
 describe('规则仓库索引', () => {
-  it('v9 持久化库升级后保留文档，重启可直接搜索缓存索引', async () => {
+  it.each([9, 10])('v%s 持久化库升级后保留文档，重启可直接搜索缓存索引', async version => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-repo-index-'));
     const path = join(dir, 'test.db');
     const cipher = new Cipher(randomBytes(32));
     let store = new Store(path, { cipher });
     try {
       store.put('ruleset', { id: 'old', name: '原规则', sources: [] }, 'alice');
-      store.db.exec('DROP TABLE rule_repo_entries; DROP TABLE rule_repos; PRAGMA user_version = 9');
+      if (version === 9) store.db.exec('DROP TABLE rule_repo_entries; DROP TABLE rule_repos');
+      else store.db.exec('ALTER TABLE rule_repos DROP COLUMN definition');
+      store.db.pragma(`user_version = ${version}`);
       store.close(); store = new Store(path, { cipher });
       const h = setup();
       const service = new RuleRepoService(store, h.fetcher);

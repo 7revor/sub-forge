@@ -1,12 +1,14 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
 import { parseRuleSetContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
+import { randomId } from '../crypto.ts';
+import { parseCustomRepo } from './generic.ts';
 import type { Store } from '../store.ts';
 import type { UpstreamFetcher } from '../net/upstream.ts';
 import { HttpError, bad, notFound } from '../api/common.ts';
 import { applyReadme, buildEntries, BUILTIN_REPOS, normalizeSearch, rawUrl, upstreamUrl, type IndexedEntry, type RepoDefinition, type RepoFile } from './adapters.ts';
 
 const DAY = 86_400_000;
-type RepoRow = { id: string; enabled: number; built_at: number | null; checked_at: number | null; revisions: string; error: string | null; entries: number };
+type RepoRow = { id: string; enabled: number; built_at: number | null; checked_at: number | null; revisions: string; error: string | null; entries: number; definition: string | null };
 type Tree = { sha: string; truncated: boolean; tree: { path: string; type: string; sha: string; mode?: string }[] };
 
 export class RuleRepoService {
@@ -43,14 +45,20 @@ export class RuleRepoService {
   async linkedSources(repo: string, path: string, variantId?: string) {
     const entry = await this.resolvedEntry(repo, path);
     const variant = this.importVariant(entry, variantId);
+    if (this.definition(repo).adapter === 'generic') {
+      const detail = await this.detail(repo, path);
+      if (detail.previewError) throw new HttpError(400, `规则文件尚不可导入：${detail.previewError}`);
+    }
+    this.assertEntry(repo, path);
     return { name: entry.name, sources: variant.files.map(file => ({
-      kind: 'remote' as const, name: `${repo} · ${file.path}`, url: rawUrl(this.definition(repo), file),
+      kind: 'remote' as const, name: `${this.definition(repo).name} · ${file.path}`, url: rawUrl(this.definition(repo), file),
       format: file.format, behavior: file.behavior,
       repository: { repo, entry: path, ref: file.ref, path: file.path },
     })) };
   }
   definition(id: string): RepoDefinition {
-    const repo = BUILTIN_REPOS.find(r => r.id === id);
+    const row = this.store.db.prepare('SELECT definition FROM rule_repos WHERE id = ?').get(id) as { definition: string | null } | undefined;
+    const repo = row?.definition ? JSON.parse(row.definition) as RepoDefinition : BUILTIN_REPOS.find(r => r.id === id);
     if (!repo) throw notFound('规则仓库');
     return repo;
   }
@@ -60,11 +68,45 @@ export class RuleRepoService {
   list() {
     return this.rows().map(r => {
       const def = this.definition(r.id);
-      return { id: r.id, name: def.name, url: `https://github.com/${def.owner}/${def.repo}`, builtIn: true, enabled: !!r.enabled,
+      return { id: r.id, name: def.name, url: `https://github.com/${def.owner}/${def.repo}`, builtIn: def.adapter !== 'generic', ...(def.adapter === 'generic' ? { ref: def.refs[0], ...def.options } : {}), enabled: !!r.enabled,
         entries: r.entries, builtAt: r.built_at ?? undefined, checkedAt: r.checked_at ?? undefined, error: r.error ?? undefined,
         indexing: this.jobs.has(r.id), revisions: JSON.parse(r.revisions) as Record<string, string> };
     });
   }
+  async addCustom(body: Record<string, unknown>) {
+    const input = parseCustomRepo(body);
+    if (this.stopped) throw new HttpError(409, '索引服务已停止');
+    let metadata: { private: boolean; default_branch: string; license?: { spdx_id?: string } | null };
+    try { metadata = await this.json(`https://api.github.com/repos/${input.owner}/${input.repo}`); }
+    catch (error) { throw new HttpError(502, `无法读取公开 GitHub 仓库：${error instanceof Error ? error.message : String(error)}`); }
+    if (metadata.private !== false || typeof metadata.default_branch !== 'string' || !metadata.default_branch) throw bad('仅支持公开 GitHub 仓库，或上游仓库信息无效');
+    if (this.stopped) throw new HttpError(409, '索引服务已停止');
+    const ref = input.ref ?? metadata.default_branch;
+    const { name, owner, repo, directory, include, exclude, format } = input;
+    const def: RepoDefinition = { id: `custom-${randomId(9)}`, name, owner, repo, refs: [ref], adapter: 'generic',
+      license: metadata.license?.spdx_id && metadata.license.spdx_id !== 'NOASSERTION' ? metadata.license.spdx_id : '见上游仓库许可证',
+      options: { directory, include, exclude, format } };
+    this.store.db.transaction(() => {
+      const duplicate = this.rows().some(row => {
+        const r = this.definition(row.id);
+        return r.owner.toLowerCase() === owner.toLowerCase() && r.repo.toLowerCase() === repo.toLowerCase() && r.refs.includes(ref);
+      });
+      if (duplicate) throw new HttpError(409, '该仓库的此分支已添加');
+      this.store.db.prepare('INSERT INTO rule_repos (id, definition) VALUES (?, ?)').run(def.id, JSON.stringify(def));
+    })();
+    return def.id;
+  }
+  removeCustom(id: string) {
+    if (this.definition(id).adapter !== 'generic') throw bad('内置仓库只能停用，不能删除');
+    if (this.jobs.has(id)) throw new HttpError(409, '索引正在更新，请完成后再删除');
+    this.store.db.transaction(() => {
+      this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run(id);
+      this.store.db.prepare('DELETE FROM rule_repos WHERE id = ?').run(id);
+    })();
+    this.details.clear();
+  }
+  /** 导入前重新确认仓库仍启用、文件仍在索引中。 */
+  assertEntry(id: string, path: string) { this.entry(id, path); }
   setEnabled(id: string, enabled: boolean) {
     this.definition(id);
     this.store.db.prepare('UPDATE rule_repos SET enabled = ? WHERE id = ?').run(Number(enabled), id);
@@ -81,7 +123,7 @@ export class RuleRepoService {
       WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?) AND instr(e.search_name, ?) > 0
       ORDER BY CASE WHEN e.search_name = ? THEN 0 WHEN instr(e.search_name, ?) = 1 THEN 1 ELSE 2 END, e.search_name, e.repo, e.key`)
       .all(repo ?? null, repo ?? null, query, query, query) as { data: string }[];
-    const entries = rows.map(r => JSON.parse(r.data) as IndexedEntry).filter(e => !client || e.variants.some(v => v.client === client));
+    const entries = rows.map(r => JSON.parse(r.data) as IndexedEntry).filter(e => !client || e.variants.some(v => (v.client === client || v.client === 'any')));
     return { items: entries.slice(offset, offset + limit).map(({ variants, ...e }) => ({ ...e, clients: [...new Set(variants.map(v => v.client))] })), total: entries.length, offset, limit };
   }
   private entry(repo: string, path: string): IndexedEntry {
@@ -148,7 +190,7 @@ export class RuleRepoService {
         const trees: Record<string, string[]> = {};
         for (const ref of repo.refs) trees[ref] = await this.files(repo, treeShas[ref]!);
         const entries = buildEntries(repo, trees);
-        if (!entries.length) throw new Error('上游没有可识别的规则文件，保留旧索引');
+        if (!entries.length && repo.adapter !== 'generic') throw new Error('上游没有可识别的规则文件，保留旧索引');
         this.store.db.transaction(() => {
           this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run(id);
           const insert = this.store.db.prepare('INSERT INTO rule_repo_entries (repo, key, search_name, data) VALUES (?, ?, ?, ?)');
@@ -182,9 +224,9 @@ export class RuleRepoService {
     await Promise.all(this.jobs.values());
     await Promise.allSettled(this.details.values());
   }
-  private formatDetail(entry: IndexedEntry, preview: string[], count: number | undefined, previewError?: string) {
+  private formatDetail(entry: IndexedEntry, preview: string[], count: number | undefined, previewError?: string, rejectedDetails: { line: number; text: string; reason: string }[] = [], rejected = 0) {
     const repo = this.definition(entry.repo);
-    return { ...entry, count, license: repo.license, url: `https://github.com/${repo.owner}/${repo.repo}`, preview, previewError,
+    return { ...entry, count, license: repo.license, url: `https://github.com/${repo.owner}/${repo.repo}`, preview, previewError, rejected, rejectedDetails,
       variants: entry.variants.map(v => ({ ...v, file: v.files.map(f => f.path).join(' + '), how: v.files.some(f => f.format === 'mrs') ? '二进制（仅展示）' : '文本托管',
         files: v.files.map(f => ({ ...f, url: rawUrl(repo, f), upstream: upstreamUrl(repo, f) })) })) };
   }
@@ -214,16 +256,20 @@ export class RuleRepoService {
       const repo = this.definition(id);
       const preview: string[] = [];
       const keys = new Set<string>();
+      const rejectedDetails: { line: number; text: string; reason: string }[] = [];
+      let rejected = 0;
       try {
         for (const file of variant.files) {
           const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
           if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
           const parsed = parseRuleSetContent(response.body, file.format, file.behavior);
           if (parsed.passthrough || !parsed.rules.length) throw new Error('文件中没有可解析的规则');
+          rejected += parsed.rejected.length;
+          rejectedDetails.push(...parsed.rejected.slice(0, Math.max(0, 50 - rejectedDetails.length)).map(r => ({ ...r, text: r.text.slice(0, 500) })));
           for (const rule of parsed.rules) keys.add(ruleKey(rule.rule));
           preview.push(`# 来源：${rawUrl(repo, file)}`, ...response.body.split(/\r?\n/).slice(0, 80));
         }
-        return this.formatDetail(entry, preview.slice(0, 160), keys.size);
+        return this.formatDetail(entry, preview.slice(0, 160), keys.size, undefined, rejectedDetails, rejected);
       } catch (error) {
         return this.formatDetail(entry, [], undefined, `内容预览失败：${error instanceof Error ? error.message : String(error)}`);
       }

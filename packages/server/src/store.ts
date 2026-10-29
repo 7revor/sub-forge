@@ -45,14 +45,14 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS rule_repos (
   id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, built_at INTEGER, checked_at INTEGER,
-  revisions TEXT NOT NULL DEFAULT '{}', error TEXT
+  revisions TEXT NOT NULL DEFAULT '{}', error TEXT, definition TEXT
 );
 CREATE TABLE IF NOT EXISTS rule_repo_entries (
   repo TEXT NOT NULL, key TEXT NOT NULL, search_name TEXT NOT NULL, data TEXT NOT NULL,
@@ -150,6 +150,8 @@ export class Store {
         this.db.exec('DROP INDEX IF EXISTS snapshots_owner');
       }
       this.db.exec(SCHEMA);
+      const repoCols = this.db.prepare('PRAGMA table_info(rule_repos)').all() as { name: string }[];
+      if (!repoCols.some(c => c.name === 'definition')) this.db.exec('ALTER TABLE rule_repos ADD COLUMN definition TEXT');
       // v1/v2 允许旧明文文档；本次迁移一并加密，URL 改用 HMAC 查询，错误中也可能包含 URL。
       if (version < 3) {
         for (const r of this.db.prepare('SELECT id, url, body, error FROM snapshots').all() as { id: number; url: string; body: string | null; error: string | null }[]) {

@@ -1,16 +1,18 @@
 // GitHub 文件树转为逻辑规则；只索引已知的规则格式，不把 README 和脚本当成规则。
 import type { RuleSetFormat } from '@sub-forge/core';
+import { matchesGeneric, type GenericOptions } from './generic.ts';
 
 export type RepoDefinition = {
   id: string; name: string; owner: string; repo: string; refs: string[]; license: string;
-  adapter: 'blackmatrix7' | 'zydou';
+  adapter: 'blackmatrix7' | 'zydou' | 'generic';
+  options?: GenericOptions;
 };
 export const BUILTIN_REPOS: RepoDefinition[] = [
   { id: 'blackmatrix7', name: 'blackmatrix7/ios_rule_script', owner: 'blackmatrix7', repo: 'ios_rule_script', refs: ['master'], license: 'GPL-2.0', adapter: 'blackmatrix7' },
   { id: 'zydou', name: 'zydou/domain-list-community-converter', owner: 'zydou', repo: 'domain-list-community-converter', refs: ['clash', 'mrs', 'surge-rule-set', 'surge-domain-set'], license: '见上游仓库许可证', adapter: 'zydou' },
 ];
 export type RepoFile = { path: string; ref: string; format: RuleSetFormat; behavior?: 'classical' | 'domain' | 'ipcidr' };
-export type RepoVariant = { id: string; client: 'mihomo' | 'surge'; label: string; files: RepoFile[]; recommended?: boolean };
+export type RepoVariant = { id: string; client: 'mihomo' | 'surge' | 'any'; label: string; files: RepoFile[]; recommended?: boolean };
 export type IndexedEntry = { repo: string; path: string; name: string; variants: RepoVariant[] };
 export const normalizeSearch = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[-_\s]+/g, '');
 export const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
@@ -29,7 +31,11 @@ export function buildEntries(repo: RepoDefinition, trees: Record<string, string[
   };
   for (const [ref, paths] of Object.entries(trees)) {
     for (const path of paths.sort()) {
-      if (repo.adapter === 'zydou') {
+      if (repo.adapter === 'generic') {
+        if (!repo.options || !matchesGeneric(path, repo.options)) continue;
+        add(path, 'any', '通用文本', { ref, path, format: repo.options.format });
+        entries.get(path)!.name = path.replace(/\.[^.]+$/, '');
+      } else if (repo.adapter === 'zydou') {
         const ext = ref === 'clash' ? '.yml' : ref === 'mrs' ? '.mrs' : '.txt';
         if (path.includes('/') || !path.endsWith(ext)) continue;
         const key = path.slice(0, -ext.length).trimEnd();
@@ -48,7 +54,7 @@ export function buildEntries(repo: RepoDefinition, trees: Record<string, string[
     }
   }
   for (const entry of entries.values()) {
-    for (const client of ['mihomo', 'surge'] as const) {
+    for (const client of ['mihomo', 'surge', 'any'] as const) {
       const choices = entry.variants.filter(v => v.client === client);
       // 文本导入默认优先完整 classical；zydou 用 YAML / RULE-SET，可由现有内核托管合并。
       const score = (v: RepoVariant) => {
