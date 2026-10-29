@@ -13,9 +13,23 @@ const REGIONS: Region[] = [
   { flag: '🇩🇪', pattern: /德国|德國|法兰克福|\bDE\b|Germany|Frankfurt/i },
   { flag: '🇫🇷', pattern: /法国|法國|巴黎|\bFR\b|France|Paris/i },
   { flag: '🇳🇱', pattern: /荷兰|荷蘭|阿姆斯特丹|\bNL\b|Netherlands|Amsterdam/i },
+  { flag: '🇲🇩', pattern: /摩尔多瓦|摩爾多瓦|\bMD\b|Moldova/i },
+  { flag: '🇺🇦', pattern: /乌克兰|烏克蘭|\bUA\b|Ukraine/i },
+  { flag: '🇮🇹', pattern: /意大利|義大利|\bIT\b|Italy/i },
+  { flag: '🇭🇺', pattern: /匈牙利|\bHU\b|Hungary/i },
+  { flag: '🇪🇸', pattern: /西班牙|\bES\b|Spain/i },
   { flag: '🇨🇦', pattern: /加拿大|\bCA\b|Canada/i },
+  { flag: '🇧🇷', pattern: /巴西|\bBR\b|Brazil/i },
+  { flag: '🇨🇱', pattern: /智利|\bCL\b|Chile/i },
   { flag: '🇦🇺', pattern: /澳大利亚|澳洲|悉尼|\bAU\b|Australia|Sydney/i },
+  { flag: '🇳🇿', pattern: /新西兰|紐西蘭|\bNZ\b|New\s?Zealand/i },
+  { flag: '🇮🇩', pattern: /印度尼西亚|印度尼西亞|印尼|\bID\b|Indonesia/i },
   { flag: '🇮🇳', pattern: /印度|孟买|\bIN\b|India|Mumbai/i },
+  { flag: '🇵🇰', pattern: /巴基斯坦|\bPK\b|Pakistan/i },
+  { flag: '🇮🇱', pattern: /以色列|\bIL\b|Israel/i },
+  { flag: '🇦🇪', pattern: /阿联酋|阿聯酋|\bAE\b|\bUAE\b|United\s?Arab\s?Emirates/i },
+  { flag: '🇪🇬', pattern: /埃及|\bEG\b|Egypt/i },
+  { flag: '🇳🇬', pattern: /尼日利亚|奈及利亞|\bNG\b|Nigeria/i },
   { flag: '🇷🇺', pattern: /俄罗斯|俄羅斯|莫斯科|\bRU\b|Russia|Moscow/i },
   { flag: '🇹🇷', pattern: /土耳其|\bTR\b|Turkey|Türkiye/i },
   { flag: '🇦🇷', pattern: /阿根廷|\bAR\b|Argentina/i },
@@ -29,8 +43,11 @@ const REGIONS: Region[] = [
 /** 名称开头的国旗（一对区域指示符） */
 const LEADING_FLAG = /^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u;
 const ANY_FLAG = /[\u{1F1E6}-\u{1F1FF}]{2}/gu;
+// 上游常把流量、到期等说明伪装成代理节点；其中的 GB 是流量单位，不是英国地区代码。
+const INFO_NODE = /^\s*(?:(?:traffic|expire|remaining|upload|download|used|total|reset)\b|(?:剩余流量|已用流量|总流量|流量|到期|过期|有效期|套餐|官网|网址|客服))/i;
 
 export function detectFlag(name: string): string | undefined {
+  if (INFO_NODE.test(name)) return undefined;
   return REGIONS.find((r) => r.pattern.test(name))?.flag;
 }
 
