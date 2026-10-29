@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatExtraValue, parseExtraValue } from './extraFields.ts';
+import { extraNameError, formatExtraValue, parseExtraValue } from './extraFields.ts';
 import { Button, ErrorBox, Input } from './ui.tsx';
 
 function ValueRow({ name, value, onChange, onRename, onRemove }: {
@@ -37,8 +37,9 @@ function ValueRow({ name, value, onChange, onRename, onRemove }: {
   );
 }
 
-export function ExtraFields({ value, onChange }: {
+export function ExtraFields({ value, onChange, validateName }: {
   value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void;
+  validateName?: (name: string) => string | undefined;
 }) {
   const [key, setKey] = useState('');
   const [text, setText] = useState('');
@@ -51,7 +52,8 @@ export function ExtraFields({ value, onChange }: {
           <ValueRow key={name} name={name} value={item}
             onChange={(next) => onChange({ ...value, [name]: next })}
             onRename={(next) => {
-              if (!next || (next !== name && Object.hasOwn(value, next))) return '请填写未使用的字段名称';
+              const error = extraNameError(value, next, name, validateName);
+              if (error) return error;
               onChange(Object.fromEntries(Object.entries(value).map(([key, item]) => [key === name ? next : key, item])));
               return undefined;
             }}
@@ -62,7 +64,8 @@ export function ExtraFields({ value, onChange }: {
           <Input aria-label="新字段值" placeholder="YAML 值" className="font-mono" value={text} onChange={(e) => setText(e.target.value)} />
           <Button size="sm" onClick={() => {
             const name = key.trim();
-            if (!name || Object.hasOwn(value, name)) { setError('请填写未使用的字段名称'); return; }
+            const error = extraNameError(value, name, undefined, validateName);
+            if (error) { setError(error); return; }
             const parsed = parseExtraValue(text);
             if (!parsed.ok) { setError(parsed.error); return; }
             onChange({ ...value, [name]: parsed.value });

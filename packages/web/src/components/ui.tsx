@@ -77,12 +77,12 @@ export function PageScroll({ children, className }: { children: ReactNode; class
   return <div className={cx('page-scroll -m-1 gap-5 p-1', className)}>{children}</div>;
 }
 
-export function Card({ title, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
+export function Card({ title, subtitle, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; subtitle?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
   return (
     <section className={cx('rounded-[10px] border border-line bg-panel', scroll && 'scroll-card', className)}>
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-3.5 pb-4">
-          {typeof title === 'string' ? <h2 className="m-0 text-[15px] font-semibold">{title}</h2> : title}
+          <div className="flex min-w-0 flex-col gap-0.5">{typeof title === 'string' ? <h2 className="m-0 text-[15px] font-semibold">{title}</h2> : title}{subtitle && <span className="text-[12.5px] text-muted">{subtitle}</span>}</div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
       )}
@@ -184,22 +184,28 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
   );
 }
 
-/** 渲染报告条目列表 */
-export function ReportList({ items }: { items: { level: 'error' | 'warn' | 'info'; code: string; message: string; where?: string }[] }) {
+/** 渲染报告条目列表；定位入口保持为可键盘操作的按钮。 */
+export function ReportList({ items, onLocate, canLocate = () => true }: {
+  items: { level: 'error' | 'warn' | 'info'; code: string; message: string; where?: string }[];
+  onLocate?: (where: string) => void; canLocate?: (where: string) => boolean;
+}) {
   if (!items.length) return <div className="text-[13px] text-ok">没有问题</div>;
   const tone = { error: 'err', warn: 'warn', info: 'accent' } as const;
   const text = { error: '错误', warn: '告警', info: '提示' };
-  return (
-    <ul className="m-0 flex list-none flex-col p-0">
-      {items.map((i, k) => (
-        <li key={k} className="flex flex-col gap-1 border-b border-line-2 py-2.5 last:border-0">
-          <span className="flex items-center gap-2"><Badge tone={tone[i.level]}>{text[i.level]}</Badge><span className="font-mono text-[11.5px] text-muted">{i.code}</span></span>
-          <span className="text-[13px] leading-relaxed">{i.message}</span>
-          {i.where && <span className="font-mono text-[11.5px] text-muted">{i.where}</span>}
-        </li>
-      ))}
-    </ul>
-  );
+  return <ul className="m-0 flex list-none flex-col p-0">
+    {items.map((item, index) => {
+      const locate = !!onLocate && !!item.where && canLocate(item.where);
+      const content = <>
+        <span className="flex items-center gap-2"><Badge tone={tone[item.level]}>{text[item.level]}</Badge><span className="font-mono text-[11.5px] text-muted">{item.code}</span></span>
+        <span className="text-[13px] leading-relaxed">{item.message}</span>
+        {item.where && <span className={locate ? 'text-[11.5px] text-accent' : 'font-mono text-[11.5px] text-muted'}>{locate ? `定位：${item.where}` : item.where}</span>}
+      </>;
+      return <li key={index} className="border-b border-line-2 last:border-0">
+        {locate ? <button type="button" className="flex w-full cursor-pointer flex-col gap-1 py-2.5 text-left hover:bg-ground" onClick={() => onLocate!(item.where!)}>{content}</button>
+          : <div className="flex flex-col gap-1 py-2.5">{content}</div>}
+      </li>;
+    })}
+  </ul>;
 }
 
 export const mono = 'font-mono';
@@ -207,20 +213,7 @@ export const mono = 'font-mono';
 export const th = 'first:pl-4 last:pr-4 border-b border-line px-3 py-2.5 text-left text-[12px] font-medium whitespace-nowrap text-muted';
 export const td = 'first:pl-4 last:pr-4 border-b border-line-2 px-3 py-2.5 align-middle text-[13px]';
 
-export function formatTime(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function formatBytes(n?: number): string {
-  if (n === undefined) return '—';
-  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
-  return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${u[i]}`;
-}
+export { formatTime, formatBytes } from '../utils/format.ts';
 
 /** 服务端尚未实现的功能：界面已就位，操作会被服务端拒绝（501） */
 export function PendingNotice({ children }: { children: ReactNode }) {

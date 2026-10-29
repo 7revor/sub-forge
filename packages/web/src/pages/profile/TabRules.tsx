@@ -1,3 +1,5 @@
+import { MatcherEditor } from '../../components/MatcherEditor.tsx';
+import { Notice } from '../../components/Notice.tsx';
 // 模板规则只改启用和出口；私有规则支持拖拽、匹配项及客户端覆盖编辑。
 
 import type { Matcher, RuleEntry, RuleIR, Target } from '@sub-forge/core';
@@ -5,7 +7,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
-import { RuleEditor } from '../../components/RuleEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Modal, Select, Switch, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
@@ -38,22 +39,8 @@ function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (v
   const { groupOptions, profileNodeSets } = useProfile();
   const rulesets = useList('rulesets').data ?? [];
   const matcher = value.matcher;
-  const options = rulesets;
-  const changeRule = (rule: RuleIR) => {
-    if (matcher.kind === 'rule') onChange({ ...value, matcher: { ...matcher, rule } });
-  };
   return <div className="flex flex-col gap-3.5">
-    <Field label="匹配项">{(id) => <Select id={id} value={matcher.kind} onChange={(e) => {
-      const kind = e.target.value as Matcher['kind'];
-      const { rule: _, id: __, overrides: ___, ...rest } = matcher as { rule?: RuleIR; id?: string; overrides?: unknown };
-      onChange({ ...value, matcher: kind === 'rule' ? { ...rest, kind, rule: { type: 'DOMAIN', value: '' } } : { ...rest, kind, id: '' } });
-    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option></Select>}</Field>
-    {matcher.kind === 'rule' ? <RuleEditor value={matcher.rule} onChange={changeRule} onIncomplete={changeRule} /> :
-      <Field label="规则集">{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...value, matcher: { ...matcher, id: e.target.value } })}>
-        <option value="">请选择</option>
-        {matcher.id && !options.some((item) => item.id === matcher.id) && <option value={matcher.id}>{matcher.id}（当前不可用）</option>}
-        {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </Select>}</Field>}
+    <MatcherEditor value={matcher} rulesets={rulesets} onChange={(matcher) => onChange({ ...value, matcher })} />
     <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
     <div className="flex flex-wrap gap-5">
@@ -115,11 +102,8 @@ export function TabRules() {
   }));
 
   return <>
-    {orphans.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-warn-soft px-4 py-3 text-[#6b3406]">
-      <span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span>
-      <Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>
-    </div>}
-    <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（自上而下匹配）</h2><span className="text-[12.5px] text-muted">继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则；点击行展开编辑。</span></div>}
+    {orphans.length > 0 && <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span></Notice>}
+    <Card title={`规则（自上而下匹配）`} subtitle={`继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则；点击行展开编辑。`}
       actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>}>
       {!rows.length ? <Empty title="没有规则" description="所有流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
         onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}

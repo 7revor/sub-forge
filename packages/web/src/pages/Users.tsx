@@ -1,18 +1,12 @@
+import { formatRelativeTime } from '../utils/format.ts';
 // 用户管理（SYS-01，管理员）：创建、禁用、改角色、重置密码、脚本编写权限。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, PendingNotice, Select, Switch, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, PendingNotice, Select, Switch, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
-
-function ago(ms: number): string {
-  const d = Date.now() - ms;
-  if (d < 3_600_000) return `${Math.max(1, Math.floor(d / 60_000))} 分钟前`;
-  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)} 小时前`;
-  return formatTime(ms).slice(5);
-}
 
 /** 用户（设计稿「管理员 · 用户」）：用户表与共享的订阅源 / 组合 */
 export function Users() {
@@ -69,7 +63,7 @@ export function Users() {
                     </td>
                     <td className={cx(td, 'font-mono')}>{s?.profiles ?? '—'}</td>
                     <td className={cx(td, 'font-mono')}>{s?.sources ?? '—'}</td>
-                    <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{s?.lastRequestAt ? ago(s.lastRequestAt) : '—'}</td>
+                    <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</td>
                     <td className={td}>{u.role === 'admin' ? <span className="text-[12.5px] text-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
                     <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
                     <td className={td}>
@@ -86,7 +80,7 @@ export function Users() {
           {stats.data?.pending && <p className="mx-4 my-3 text-[12px] text-muted">配置订阅、订阅源与最近订阅请求的统计还没有接入服务端，暂时显示为「—」。</p>}
         </Card>
 
-        <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">共享的订阅源与组合</h2><span className="text-[12.5px] text-muted">被共享的用户只能引用，看不到原始 URL。</span></div>}
+        <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}
           actions={<Button onClick={() => { setShare({ doc: '', to: [] }); setSharing(true); }}>共享…</Button>}>
           {shares.data?.pending && <div className="mb-3"><PendingNotice>共享模型还没有接入，「共享…」会被拒绝。</PendingNotice></div>}
           <div className="flex flex-col">

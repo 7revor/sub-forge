@@ -1,12 +1,18 @@
+import { formatRelativeTime } from '../../utils/format.ts';
+import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
+import { Notice } from '../../components/Notice.tsx';
+import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
+import { NodeSetCount } from '../../components/NodeSetCount.tsx';
+import { CopyButton } from '../../components/CopyButton.tsx';
 // Profile 标签：概览（订阅链接、输出设置、访问日志）、基础设置、节点集。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
+import { api, type TokenItem } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, Textarea, formatTime, td, th, cx } from '../../components/ui.tsx';
-import { useList, useNodeList, type ProfileDoc } from '../../hooks.ts';
+import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
 import { SchemaForm } from '../../components/SchemaForm.tsx';
@@ -16,25 +22,16 @@ import { useProfile } from './context.ts';
 
 const SOURCE_TEXT: Record<string, string> = { fresh: '未命中', cache: '命中', 'last-good': '上次成功结果', failed: '失败', unsupported: '不支持' };
 
-function ago(ms: number): string {
-  const d = Date.now() - ms;
-  if (d < 60_000) return '刚刚';
-  if (d < 3_600_000) return `${Math.floor(d / 60_000)} 分钟前`;
-  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)} 小时前`;
-  return formatTime(ms).slice(5);
-}
-
 /** 概览（设计稿「Profile · 概览」）：订阅链接、输出设置、访问日志 */
 export function TabOverview() {
   const { draft, setDraft, allNodeSets } = useProfile();
   const qc = useQueryClient();
-  const tokens = useQuery({ queryKey: ['tokens', draft.id], queryFn: () => api<{ items: TokenItem[] }>('GET', `/profiles/${draft.id}/tokens`).then((r) => r.items) });
-  const log = useQuery({ queryKey: ['access-log', draft.id], queryFn: () => api<{ items: AccessLogRow[] }>('GET', `/profiles/${draft.id}/access-log`).then((r) => r.items) });
+  const tokens = useQuery(tokenOptions(draft.id));
+  const log = useQuery(accessLogOptions(draft.id));
   const refreshTokens = () => qc.invalidateQueries({ queryKey: ['tokens', draft.id] });
   const [label, setLabel] = useState('');
   const [adding, setAdding] = useState(false);
   const [resetting, setResetting] = useState<TokenItem>();
-  const [copied, setCopied] = useState<string>();
   const create = useMutation({ mutationFn: () => api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}), onSuccess: () => { setLabel(''); setAdding(false); void refreshTokens(); } });
   const reset = useMutation({ mutationFn: (t: string) => api('POST', `/profiles/${draft.id}/tokens/${t}/reset`), onSuccess: () => { setResetting(undefined); void refreshTokens(); } });
   const remove = useMutation({ mutationFn: (t: string) => api('DELETE', `/profiles/${draft.id}/tokens/${t}`), onSuccess: refreshTokens });
@@ -44,13 +41,12 @@ export function TabOverview() {
   const lastSeen = (token: string) => rows.find((r) => r.token === token)?.at;
   const linkName = (token: string) => tokens.data?.find((t) => t.token === token)?.label ?? '已删除的链接';
   const lastGood = rows.find((r) => r.status === 200 && (r.source === 'fresh' || r.source === 'cache'));
-  const copy = (url: string) => { void navigator.clipboard?.writeText(url); setCopied(url); setTimeout(() => setCopied(undefined), 1500); };
 
   return (
     <>
       <div className="flex flex-wrap items-start gap-5">
         <Card className="min-w-0 flex-[999_1_560px]"
-          title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">订阅链接</h2><span className="text-[12.5px] text-muted">一个设备一个链接，便于单独重置。按 UA 或 ?target= 自动输出 mihomo（Surge 在 M2）。</span></div>}
+          title={`订阅链接`} subtitle={`一个设备一个链接，便于单独重置。按 UA 或 ?target= 自动输出 mihomo（Surge 在 M2）。`}
           actions={<Button onClick={() => setAdding(true)}><Plus size={15} />新增链接</Button>}>
           <ErrorBox error={reset.error ?? remove.error} />
           {!tokens.data?.length ? <Empty title="还没有订阅链接" description="为每台设备新增一个，便于单独重置。" /> : (
@@ -61,11 +57,11 @@ export function TabOverview() {
                   <li key={t.token} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg border border-line px-3.5 py-3">
                     <div className="flex flex-[1_1_160px] flex-col gap-0.5">
                       <span className="text-[13.5px] font-semibold">{t.label || '未命名设备'}</span>
-                      <span className="text-[12px] text-muted">{seen ? `最近访问 ${ago(seen)}` : '从未访问'}</span>
+                      <span className="text-[12px] text-muted">{seen ? `最近访问 ${formatRelativeTime(seen)}` : '从未访问'}</span>
                     </div>
                     <code className="min-w-0 flex-[999_1_280px] truncate rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px]">{t.url}</code>
                     <div className="flex gap-1.5">
-                      <Button className="h-9" onClick={() => copy(t.url)}><Copy size={13} />{copied === t.url ? '已复制' : '复制'}</Button>
+                      <CopyButton className="h-9" text={t.url}><Copy size={13} />复制</CopyButton>
                       <Button className="h-9 text-err" onClick={() => setResetting(t)}><RotateCcw size={13} />重置 token</Button>
                       <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => { if (confirm('删除这个订阅链接？使用它的设备将无法更新。')) remove.mutate(t.token); }}><Trash2 size={14} /></Button>
                     </div>
@@ -94,7 +90,7 @@ export function TabOverview() {
             )}</Field>
             <Field label="客户端中的显示名">{(id) => <Input id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
             {lastGood
-              ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{ago(lastGood.at)}（{lastGood.client}）· 校验失败时订阅接口返回这一份，不会下发半成品。</div>
+              ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）· 校验失败时订阅接口返回这一份，不会下发半成品。</div>
               : <Empty title="还没有成功渲染过" description="客户端首次拉取时渲染；校验失败时不会下发半成品。" />}
           </div>
         </Card>
@@ -170,10 +166,7 @@ export function TabBase() {
       </section>
 
       {hasProcess && processMode !== undefined && processMode !== 'strict' && processMode !== 'always' && mode !== 'none' && (
-        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 rounded-[10px] bg-warn-soft px-4 py-3 text-[#6b3406]">
-          <span className="text-[13px] leading-normal"><b>进程规则不会生效：</b>规则里有进程规则，但 <span className="font-mono">find-process-mode</span> 当前为 <span className="font-mono">{processMode}</span>。</span>
-          <Button className="h-9 border-[#e2b88a] bg-[#fff8f0]" onClick={() => changePatch({ ...patch, 'find-process-mode': 'strict' })}>改为 strict</Button>
-        </div>
+        <Notice tone="warn" actions={<Button className="h-9 border-[#e2b88a] bg-[#fff8f0]" onClick={() => changePatch({ ...patch, 'find-process-mode': 'strict' })}>改为 strict</Button>}><span className="text-[13px] leading-normal"><b>进程规则不会生效：</b>规则里有进程规则，但 <span className="font-mono">find-process-mode</span> 当前为 <span className="font-mono">{processMode}</span>。</span></Notice>
       )}
 
       {mode !== 'none' && (
@@ -206,12 +199,6 @@ export function TabBase() {
   );
 }
 
-const NS_KIND = { source: '订阅源', collection: '组合', local: '本地节点组' } as const;
-
-function NodeSetCount({ refId }: { refId: ProfileDoc['nodeSets'][number]['ref'] }) {
-  const nodes = useNodeList(refId);
-  return <span className="font-mono text-[12.5px]">{nodes.data ? nodes.data.total : '—'}</span>;
-}
 
 /** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
 export function TabNodeSets() {
@@ -221,7 +208,7 @@ export function TabNodeSets() {
 
   return (
     <>
-      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">已加入的节点集</h2><span className="text-[12.5px] text-muted">默认按源输出 provider，面板中可按源查看、分别更新。代理链和被引用的单个节点不用在这里添加，系统会自动解析。</span></div>}
+      <Card title={`已加入的节点集`} subtitle={`默认按源输出 provider，面板中可按源查看、分别更新。代理链和被引用的单个节点不用在这里添加，系统会自动解析。`}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="overflow-x-auto">
         {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" description="点击「添加节点集」选择订阅源、组合或本地节点组。" /></div> : (
           <table className="w-full min-w-[820px] border-collapse">
@@ -230,8 +217,8 @@ export function TabNodeSets() {
               {draft.nodeSets.map((n, i) => (
                 <tr key={`${n.ref.type}:${n.ref.id}`}>
                   <td className={cx(td, 'font-medium')}>{nodeSetName(n.ref)}</td>
-                  <td className={cx(td, 'text-ink-2')}>{NS_KIND[n.ref.type]}</td>
-                  <td className={td}><NodeSetCount refId={n.ref} /></td>
+                  <td className={cx(td, 'text-ink-2')}>{NODE_SET_LABEL[n.ref.type]}</td>
+                  <td className={td}><NodeSetCount nodeSet={n.ref} /></td>
                   <td className={td}><Segmented label="输出方式" size="sm" value={n.output} options={[{ value: 'provider', label: 'provider' }, { value: 'inline', label: 'inline' }]} onChange={(output) => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => (j === i ? { ...x, output } : x)) })} /></td>
                   <td className={cx(td, 'font-mono text-[12px] text-muted')} title="实际地址带内容版本 ?v=，以「预览」中的配置为准">{n.output === 'inline' ? '内联，无单独地址' : `/p/<token>/${n.providerName ?? nodeSetName(n.ref)}`}</td>
                   <td className={cx(td, 'text-[12.5px] text-muted')}>{chained.has(`${n.ref.type}:${n.ref.id}`) ? '有链规则 · Profile 专属 provider' : '—'}</td>

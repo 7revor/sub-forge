@@ -1,3 +1,4 @@
+import { NODE_SET_LABEL, nodeSetKey as key, parseNodeSetKey as parseKey } from '../domain/nodeSet.ts';
 // 选择器：节点集、出口（内置策略 / 组 / 单个节点）、组成员。供 Profile、本地节点、组合等页面共用。
 
 import type { Builtin, GroupMember, NodeSetID, Target } from '@sub-forge/core';
@@ -6,7 +7,6 @@ import { Select } from './ui.tsx';
 import { NodePicker } from './NodePicker.tsx';
 
 export const BUILTINS: Builtin[] = ['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS'];
-const NS_LABEL = { source: '订阅源', collection: '组合', local: '本地节点组' } as const;
 
 /** 当前用户全部节点集（订阅源、组合、本地节点组）的名称表 */
 export function useNodeSetNames() {
@@ -22,8 +22,6 @@ export function useNodeSetNames() {
   return { all, nameOf };
 }
 
-const key = (r: NodeSetID) => `${r.type}:${r.id}`;
-const parseKey = (k: string): NodeSetID => { const [type, ...rest] = k.split(':'); return { type: type as NodeSetID['type'], id: rest.join(':') }; };
 
 export function NodeSetSelect({ value, onChange, options, label, placeholder = '选择节点集' }: {
   value: NodeSetID | undefined; onChange: (r: NodeSetID) => void; options: { ref: NodeSetID; name: string }[]; label: string; placeholder?: string;
@@ -31,7 +29,7 @@ export function NodeSetSelect({ value, onChange, options, label, placeholder = '
   return (
     <Select aria-label={label} value={value ? key(value) : ''} onChange={(e) => e.target.value && onChange(parseKey(e.target.value))}>
       <option value="" disabled>{placeholder}</option>
-      {options.map((o) => <option key={key(o.ref)} value={key(o.ref)}>{NS_LABEL[o.ref.type]} · {o.name}</option>)}
+      {options.map((o) => <option key={key(o.ref)} value={key(o.ref)}>{NODE_SET_LABEL[o.ref.type]} · {o.name}</option>)}
     </Select>
   );
 }

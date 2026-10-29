@@ -1,7 +1,7 @@
 // 详情页的平铺操作按钮与删除确认；删除按钮位于操作区最右侧。
 
 import { useState, type ReactNode } from 'react';
-import { deleteErrorText } from './DocList.tsx';
+import { deleteErrorText } from '../domain/deleteError.ts';
 import { Button, Modal } from './ui.tsx';
 
 export type ActionItem = { label: string; onSelect: () => void };

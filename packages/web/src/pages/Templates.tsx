@@ -1,3 +1,5 @@
+import { Notice } from '../components/Notice.tsx';
+import { VersionHistory } from './template/VersionHistory.tsx';
 // 模板：所有人在列表页浏览（组骨架、规则、版本记录）；管理员在详情页编辑并发布新版本。
 // 表单与 mihomo YAML 共用草稿，修改后即时校验（TPL-11）；发布前分析影响（TPL-07）。
 
@@ -8,7 +10,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
 import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { templateDiff } from '../convert/templateDiff.ts';
@@ -124,16 +126,7 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
           {t.rules.length > RULE_PREVIEW && <div className="border-t border-line-2 px-4 py-2.5"><button type="button" className="cursor-pointer text-[13px] text-accent" onClick={() => setAllRules(!allRules)}>{allRules ? '收起' : `展开全部 ${t.rules.length} 条`}</button></div>}
         </Card>
         <Card title="版本记录" className="min-w-0 flex-[1_1_260px]">
-          {!versions.length && <Empty title="还没有版本记录" />}
-          <ul className="m-0 flex list-none flex-col p-0">
-            {versions.map((v) => (
-              <li key={v.version} className="flex flex-col gap-1 border-t border-line-2 py-2.5 first:border-0 first:pt-0">
-                <span className="flex justify-between text-[13px]"><span className="font-mono font-semibold">v{v.version}</span><span className="text-[12px] text-muted">{formatTime(v.createdAt).slice(5, 10)}</span></span>
-                <span className="text-[12.5px] leading-relaxed text-ink-2">{v.changelog ?? '—'}</span>
-                {v.version > 1 && <button type="button" className="w-fit cursor-pointer text-[12.5px] text-accent" onClick={() => setDiffVersion(v.version)}>与上一版对比</button>}
-              </li>
-            ))}
-          </ul>
+          <VersionHistory versions={versions} onCompare={setDiffVersion} dateOnly />
         </Card>
       </div>
       {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
@@ -326,10 +319,7 @@ function TemplatePage({ id }: { id: string }) {
         <Badge tone="accent">{isNew ? '新模板 · 未发布' : changed ? `草稿 · 基于 v${t!.version} · 未发布` : `已发布 v${t!.version}`}</Badge>
       </PageHeader>
       {(errors.length > 0 || parseErr) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-err-soft px-4 py-3 text-[13px] text-[#8f2a1f]">
-          <span><b>草稿校验：{errors.length || 1} 个错误。</b>{errors[0]?.message ?? parseErr}修复前不能发布。</span>
-          {errors[0]?.where && <Button size="sm" onClick={() => setFocus({ where: errors[0]!.where! })}>定位</Button>}
-        </div>
+        <Notice tone="err" actions={errors[0]?.where && <Button size="sm" onClick={() => setFocus({ where: errors[0]!.where! })}>定位</Button>}><span><b>草稿校验：{errors.length || 1} 个错误。</b>{errors[0]?.message ?? parseErr}修复前不能发布。</span></Notice>
       )}
       <PageScroll>
         <div className="flex flex-wrap items-start gap-5">
@@ -341,15 +331,7 @@ function TemplatePage({ id }: { id: string }) {
           <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
             <Card title="版本">
               {isNew ? <Empty title="还没有发布过" description="发布后将在这里显示版本记录。" /> : (
-                <ul className="m-0 flex list-none flex-col p-0">
-                  {tpl.data!.versions.map((v) => (
-                    <li key={v.version} className="flex flex-col gap-1 border-t border-line-2 py-2.5 first:border-0 first:pt-0">
-                      <span className="flex justify-between text-[13px]"><span className="font-mono font-semibold">v{v.version}</span><span className="text-[12px] text-muted">{formatTime(v.createdAt).slice(5)}</span></span>
-                      <span className="text-[12.5px] text-ink-2">{v.changelog ?? '—'}</span>
-                      {v.version > 1 && <button type="button" className="w-fit cursor-pointer text-[12.5px] text-accent" onClick={() => setDiffVersion(v.version)}>与上一版 diff</button>}
-                    </li>
-                  ))}
-                </ul>
+                <VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} />
               )}
             </Card>
             <Card title="模板自检" actions={<Badge tone={errors.length ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : ready ? '通过' : '待校验'}</Badge>}>

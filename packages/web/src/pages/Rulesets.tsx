@@ -1,15 +1,18 @@
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
+import { CodePreview } from '../components/CodePreview.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 来源配置与本地内容就地编辑，下方始终只读预览最终合并结果。
 
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
 import { FileText, Globe, Trash2 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { api, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
+import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
@@ -36,6 +39,7 @@ export function RulesetList() {
     <DocList kind="rulesets" title="规则集" empty="一组匹配条件，可以由多个远程地址与本地规则合并而成，在配置订阅的规则里配上出口。" intro="一组匹配条件（不含出口），可以引用多个远程地址与本地规则，合并去重后只配一个出口；管理员名下的规则集可被所有人引用。"
       columns={[
         { header: '名称', cell: (r) => r.name },
+        { header: '备注', cell: (r) => <NoteCell note={r.note} /> },
         { header: '来源', cell: (r) => <span className="text-ink-2">{sourceSummary(r)}</span> },
         { header: 'IP 类 no-resolve', cell: (r) => (r.noResolve ? '是' : '否') },
       ]} />
@@ -53,13 +57,6 @@ const TARGETS: { key: string; client: Client; platform?: Platform; label: string
   { key: 'surge-macos', client: 'surge', platform: 'macos', label: 'Surge macOS' },
   { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
 ];
-
-/** 编辑中的草稿停顿后才请求预览，避免每次按键都打到服务端 */
-function useDebounced<T>(value: T, ms: number): T {
-  const [v, setV] = useState(value);
-  useEffect(() => { const t = setTimeout(() => setV(value), ms); return () => clearTimeout(t); }, [value, ms]);
-  return v;
-}
 
 function rulesetError(d: RuleSetDoc): string | undefined {
   if (!d.name.trim()) return '请填写名称。';
@@ -80,7 +77,7 @@ export function RulesetEdit() {
   const [renaming, setRenaming] = useState(false);
   const [showError, setShowError] = useState(false);
   const t = TARGETS.find((x) => x.key === target)!;
-  const draft = useDebounced(e.draft, 400);
+  const draft = useDebouncedValue(e.draft, 400);
   const preview = useQuery({
     queryKey: ['ruleset-preview', e.isNew ? '' : e.id, target, JSON.stringify(draft)],
     enabled: !!draft,
@@ -113,13 +110,16 @@ export function RulesetEdit() {
         {failing > 0 && <Badge tone="err">{failing} 个来源拉取失败</Badge>}
         {failing === 0 && d.sources.some((s) => s.kind === 'remote' && status.get(s.id)?.ok) && <Badge tone="ok">拉取成功</Badge>}
       </>}>
+      <Card title="基本信息">
+        {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
+        <NoteField value={d.note} onChange={(note) => set({ note })} />
+      </Card>
       <Card title="来源" actions={<>
         <Button className="h-9" onClick={() => add(newRemote())}><Globe size={15} />添加远程地址</Button>
         <Button className="h-9" onClick={() => add(newLocal())}><FileText size={15} />添加本地规则</Button>
         {!e.isNew && <Link to={`/rule-repo?ruleset=${encodeURIComponent(d.id)}`} className={buttonClass('default', 'md', 'h-9')}>从规则仓库添加</Link>}
       </>}>
         <div className="flex flex-col gap-4">
-          {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
           <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源展开配置，本地规则在配置块内编辑；下方统一展示合并后的最终只读结果。</p>
           {!d.sources.length ? <Empty title="还没有来源" description="添加远程地址或本地规则。" /> : (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
@@ -226,7 +226,7 @@ function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
   return (
     <>
       {p.error && <ErrorBox error={`拉取失败：${p.error}`} />}
-      {p.lines.length ? <pre className={cx('m-0 max-h-[420px] min-h-[120px] overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7] transition-opacity', preview.isFetching && 'opacity-70')}>{p.lines.join('\n')}</pre> : <Empty title="没有可输出的规则" description="添加或启用来源，或检查规则内容和客户端改写。" />}
+      {p.lines.length ? <CodePreview text={p.lines.join('\n')} loading={preview.isFetching} bodyClassName="min-h-[120px]" /> : <Empty title="没有可输出的规则" description="添加或启用来源，或检查规则内容和客户端改写。" />}
       <span className="text-[12px] text-muted">{p.total ?? p.lines.length} 行{(p.total ?? 0) > p.lines.length ? `（显示前 ${p.lines.length} 行）` : ''} · 降级 {p.notes?.length ?? 0} · 丢弃 {p.dropped.length} · 无法解析 {p.rejected.length}</span>
       {[...(p.notes ?? []).map((n) => ['降级', n]), ...p.dropped.map((x) => ['丢弃', x.reason]), ...p.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].slice(0, 50).map(([k, v], i) => (
         <div key={i} className="flex gap-2 text-[12.5px]"><Badge tone={k === '降级' ? 'accent' : k === '丢弃' ? 'err' : 'warn'}>{k}</Badge><span className="min-w-0 break-all">{v}</span></div>
