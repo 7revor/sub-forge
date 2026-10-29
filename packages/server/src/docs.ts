@@ -19,7 +19,7 @@ export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[
 export type CollectionDoc = Collection;
 export type LocalDoc = LocalProxyGroup;
 
-/** 模板的一个版本；同一模板的多个版本共用 id */
+/** 当前模板；沿用 version 字段作为内部并发标记，不再保存历史。 */
 export type TemplateVersionDoc = Template & { name?: string };
 
 /** 基础设置预设（BS-03），Surge 段仅存储，暂不参与渲染 */

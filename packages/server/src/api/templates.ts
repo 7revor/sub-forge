@@ -1,13 +1,13 @@
 import { normalizeRulePresence } from '../rule-presence.ts';
-// 模板：所有人可读，管理员发布新版本。发布前两步检查（TPL-07）：
-//   ① 模板自身：不通过禁止发布；
-//   ② 对现有 Profile 的影响：逐个用新版本试渲染，会渲染失败的为阻断项（需 force 才能发布），
+// 模板：所有人可读，管理员直接保存。保存时检查模板与绑定订阅：
+//   ① 模板自身：不通过不能保存；
+//   ② 对现有 Profile 的影响：逐个用新版本试渲染，会渲染失败的为阻断项（必须先修复冲突），
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
 import { ruleSetDelivery, parseRuleSourceContent, rejectedRuleReport, validateTemplate, sourceLabel, stableStringify, type ReportItem, type Template } from '@sub-forge/core';
 import { readPagination } from './pagination.ts';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { RuleSetDoc, TemplateVersionDoc } from '../docs.ts';
 import type { RenderService } from '../render.ts';
@@ -49,7 +49,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
   for (const id of ids) {
     const rs = rulesets[id]!;
     const where = `ruleset:${id}`;
-    // 二进制只有无需处理的单来源可以透传；发布前也必须执行相同约束。
+    // 二进制只有无需处理的单来源可以透传；保存前也必须执行相同约束。
     if (rs.sources.some(src => src.enabled !== false && (src.format === 'mrs' || src.format === 'srs'))) {
       for (const entry of t.rules.filter(r => r.enabled !== false && r.matcher.kind === 'ruleset' && r.matcher.id === id)) {
         const delivery = ruleSetDelivery(rs, { rulesets, snapshots: {} }, { client: 'mihomo' }, entry.options);
@@ -91,7 +91,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
 function draftFrom(body: Record<string, unknown>, id: string, version: number): TemplateVersionDoc {
   if (!isStr(body.name)) throw bad('name 不能为空');
   if (!Array.isArray(body.groups) || !Array.isArray(body.rules) || !body.final || typeof body.final !== 'object') throw bad('需要 groups、rules 与 final');
-  return normalizeRulePresence('template', { ...(body as unknown as TemplateVersionDoc), id, version, ...(isStr(body.changelog) ? { changelog: body.changelog } : {}) });
+  return normalizeRulePresence('template', { id, version, name: body.name, groups: body.groups, rules: body.rules, final: body.final, ...(body.ruleProviders !== undefined ? { ruleProviders: body.ruleProviders } : {}) } as TemplateVersionDoc);
 }
 
 export function templateRoutes(store: Store, renderer: RenderService, snapshots: SnapshotService) {
@@ -105,12 +105,6 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
   app.get('/templates/:id', requireUser, (c) => {
     const t = store.getTemplate(c.req.param('id'));
     if (!t) throw notFound('模板');
-    return c.json({ item: t, versions: store.listTemplateVersions(t.id) });
-  });
-
-  app.get('/templates/:id/versions/:version', requireUser, (c) => {
-    const t = store.getTemplate(c.req.param('id'), Number(c.req.param('version')));
-    if (!t) throw notFound('模板版本');
     return c.json({ item: t });
   });
 
@@ -121,32 +115,34 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     return c.json({ report: await selfCheck(store, snapshots, draft, c.get('user')) });
   });
 
-  /** 发布：新模板（:id 为 new）或已有模板的新版本 */
-  app.post('/templates/:id/publish', requireAdmin, async (c) => {
+  /** 保存时统一完成自检、绑定影响检查与并发检查。 */
+  const save = async (c: Context<ApiEnv>, isNew: boolean, checkRevision = true) => {
     const body = await jsonBody(c);
-    const isNew = c.req.param('id') === 'new';
-    const id = isNew ? randomId(9) : c.req.param('id');
+    const id = isNew ? randomId(9) : c.req.param('id')!;
     const current = isNew ? undefined : store.getTemplate(id);
     if (!isNew && !current) throw notFound('模板');
+    if (!isNew && checkRevision && body.version !== current!.version) throw new HttpError(409, '模板已被更新，请重新加载后再保存');
     const draft = draftFrom(body, id, (current?.version ?? 0) + 1);
 
     const boundState = () => stableStringify(store.list('profile').filter(p => p.routing?.mode === 'bound' && p.routing.templateId === id));
     const beforeImpact = boundState();
     const own = await selfCheck(store, snapshots, draft, c.get('user'));
-    if (own.some((i) => i.level === 'error')) throw new HttpError(400, '模板自身校验未通过，禁止发布', { report: own });
+    if (own.some((i) => i.level === 'error')) throw new HttpError(400, '模板自身校验未通过，不能保存', { report: own });
 
     const impact = isNew ? [] : await analyzeImpact(store, renderer, draft);
-    if ((!isNew && store.getTemplate(id)?.version !== current?.version) || boundState() !== beforeImpact) throw new HttpError(409, '检查期间模板或绑定订阅已变化，请重新检查后发布');
+    if ((!isNew && store.getTemplate(id)?.version !== current?.version) || boundState() !== beforeImpact) throw new HttpError(409, '检查期间模板或绑定订阅已变化，请重新检查后保存');
     const blocking = impact.filter((i) => i.level === 'error');
-    if (blocking.some(i => store.get('profile', i.profileId)?.routing?.mode === 'bound')) throw new HttpError(409, '绑定订阅存在冲突，必须先修复成员或引用，不能强制发布', { report: own, impact });
-    if (blocking.length && body.force !== true) {
-      throw new HttpError(409, `${blocking.length} 个配置订阅会渲染失败，确认后可强制发布`, { report: own, impact });
-    }
+    if (blocking.some(i => store.get('profile', i.profileId)?.routing?.mode === 'bound')) throw new HttpError(409, '绑定订阅存在冲突，必须先修复成员或引用，不能强制保存', { report: own, impact });
+    if (blocking.length) throw new HttpError(409, `${blocking.length} 个配置订阅存在冲突，请修复后再保存`, { report: own, impact });
     store.putTemplateVersion(draft);
     return c.json({ item: draft, report: own, impact }, isNew ? 201 : 200);
-  });
+  };
+  app.post('/templates', requireAdmin, c => save(c, true));
+  app.put('/templates/:id', requireAdmin, c => save(c, false));
+  // 兼容旧客户端入口：执行相同的直接保存，不再创建历史版本。
+  app.post('/templates/:id/publish', requireAdmin, c => save(c, c.req.param('id') === 'new', false));
 
-  /** 只做影响分析，不发布（发布页先展示结果） */
+  /** 兼容旧客户端的只读影响检查。新页面直接保存，由服务端完成检查。 */
   app.post('/templates/:id/impact', requireAdmin, async (c) => {
     const id = c.req.param('id');
     const current = store.getTemplate(id);

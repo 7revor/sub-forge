@@ -67,7 +67,7 @@ export function profileConversionRoutes(store: Store) {
     };
     if (profile.routing?.mode === 'bound' && profile.routing.prependRules?.length) changes.push(`保留 ${profile.routing.prependRules.length} 条前置规则，并按策略组映射更新出口`);
     if (profile.routing?.mode === 'independent' && effective.groups.length) changes.push(`替换原策略组：${effective.groups.map(g => g.name).join('、')}；原有 ${effective.rules.length} 条规则改为模板的 ${template.rules.length} 条规则`);
-    changes.unshift(`策略组结构、参数、规则和最终出口改用「${template.name ?? template.id}」v${template.version}`);
+    changes.unshift(`策略组结构、参数、规则和最终出口改用「${template.name ?? template.id}」`);
     validateDoc('profile', next as unknown as Record<string, unknown>, id, c.get('user'), store);
     return c.json({ item: next, changes });
   });

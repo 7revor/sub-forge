@@ -348,8 +348,8 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
       hits.push(store.getWithOwner('profile', p.id)?.owner === ownerId ? `配置订阅「${p.name}」` : '其他用户的配置订阅');
     }
     // 模板由管理员维护，可能引用管理员名下的公共规则集
-    for (const t of store.listAllTemplateVersions()) {
-      if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」v${t.version}`);
+    for (const t of store.listLatestTemplates()) {
+      if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」`);
     }
   }
   if (kind === 'preset') {

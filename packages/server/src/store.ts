@@ -48,7 +48,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 18;
+const SCHEMA_VERSION = 19;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -226,6 +226,7 @@ export class Store {
       }
       // v18 同时清除规则集和规则引用上的独立 no-resolve，保留原始内容中的标记。
       if (version < 18) this.removeRuleSwitches();
+      if (version < 19) this.collapseTemplateHistory();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -406,6 +407,22 @@ export class Store {
     }
   }
 
+  /** v19：先展开旧锁定引用，再移除历史；绑定订阅继续使用当前模板。 */
+  private collapseTemplateHistory(): void {
+    for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
+      const previous = JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc;
+      if (previous.routing) continue;
+      const next = migrateProfile(previous, profileTemplate(previous, (id, version) => this.getTemplate(id, version)));
+      this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
+        .run(row.id, row.data, this.now());
+      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
+        .run(this.cipher.encrypt(JSON.stringify(next)), row.id);
+    }
+    this.db.exec(`DELETE FROM template_versions WHERE (template_id, version) NOT IN (
+      SELECT template_id, MAX(version) FROM template_versions GROUP BY template_id)`);
+    this.db.exec("UPDATE template_versions SET data = json_remove(data, '$.changelog')");
+  }
+
   // ---------- 文档 ----------
 
   /** owner 为 null 表示系统级文档（预设等），只在新建时写入，更新时保持原归属 */
@@ -455,27 +472,23 @@ export class Store {
     return this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
   }
 
-  // ---------- 模板版本 ----------
+  // ---------- 当前模板（沿用旧表名；version 只用于并发检查和渲染缓存） ----------
 
   putTemplateVersion(t: TemplateVersionDoc): void {
-    this.db.prepare('INSERT INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
-      .run(t.id, t.version, JSON.stringify(t), this.now());
+    const { changelog: _changelog, ...current } = t;
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM template_versions WHERE template_id = ?').run(t.id);
+      this.db.prepare('INSERT INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
+        .run(t.id, t.version, JSON.stringify(current), this.now());
+    })();
   }
 
-  /** version 缺省时取最新版本（跟随最新，TPL-06） */
+  /** 正常读取当前模板；version 参数仅供旧数据迁移时解析历史引用。 */
   getTemplate(id: string, version?: number): TemplateVersionDoc | undefined {
     const row = (version === undefined
       ? this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? ORDER BY version DESC LIMIT 1').get(id)
       : this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? AND version = ?').get(id, version)) as { data: string } | undefined;
     return row ? (JSON.parse(row.data) as TemplateVersionDoc) : undefined;
-  }
-
-  listTemplateVersions(id: string): { version: number; changelog?: string; createdAt: number }[] {
-    const rows = this.db.prepare('SELECT version, data, created_at FROM template_versions WHERE template_id = ? ORDER BY version DESC').all(id) as { version: number; data: string; created_at: number }[];
-    return rows.map((r) => {
-      const t = JSON.parse(r.data) as TemplateVersionDoc;
-      return t.changelog ? { version: r.version, changelog: t.changelog, createdAt: r.created_at } : { version: r.version, createdAt: r.created_at };
-    });
   }
 
   /** 每个模板的最新版本 */
@@ -490,12 +503,6 @@ export class Store {
     return this.readPage(`SELECT t.data FROM template_versions t
       JOIN (SELECT template_id, MAX(version) v FROM template_versions GROUP BY template_id) m ON m.template_id = t.template_id AND m.v = t.version
       ORDER BY t.template_id`, [], options, data => JSON.parse(data) as TemplateVersionDoc);
-  }
-
-  /** 历史版本仍可被 Profile 锁定使用，依赖删除检查不能只看最新版本。 */
-  listAllTemplateVersions(): TemplateVersionDoc[] {
-    return (this.db.prepare('SELECT data FROM template_versions ORDER BY template_id, version').all() as { data: string }[])
-      .map((r) => JSON.parse(r.data) as TemplateVersionDoc);
   }
 
   // ---------- 订阅 token ----------
@@ -739,8 +746,9 @@ export class Store {
       for (const d of seed.presets ?? []) this.put('preset', d);
 
       for (const t of seed.templates ?? []) {
-        this.db.prepare('DELETE FROM template_versions WHERE template_id = ? AND version = ?').run(t.id, t.version);
-        this.putTemplateVersion(t);
+        // 旧种子可能包含锁定引用，先载入全部模板，订阅迁移后再只留当前内容。
+        this.db.prepare('INSERT OR REPLACE INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
+          .run(t.id, t.version, JSON.stringify(t), this.now());
       }
       for (const d of seed.profiles ?? []) {
         const next = migrateProfile(d, profileTemplate(d, (id, v) => this.getTemplate(id, v)));
@@ -755,6 +763,7 @@ export class Store {
       this.promoteRuleOverrides();
       this.convertSourceUrls();
       this.removeRuleSwitches();
+      this.collapseTemplateHistory();
     });
     tx();
   }

@@ -38,18 +38,18 @@ describe('规则存在即生效', () => {
         rules: { rulesets: { rs: store.get('ruleset', 'rs')! }, snapshots: {} }, urls: { provider: key => key, ruleset: key => key } }).yaml;
       const before = ['p', 'independent'].map(output);
       store.db.pragma('user_version = 16'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(18);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(19);
       expect(['p', 'independent'].map(output)).toEqual(before);
       expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { revision: 4 } });
       expect(store.getToken('same-token')?.profileId).toBe('p');
-      expect(store.listTemplateVersions('t').map(v => v.version)).toEqual([2, 1]);
+      expect(store.listLatestTemplates().map(v => v.version)).toEqual([2]);
       expect(store.getTemplate('t')!.rules).toEqual([rule('on'), { id: 'set', matcher: { kind: 'ruleset', id: 'rs' }, target: direct }]);
       expect(store.get('profile', 'p')!.routing).toMatchObject({ prependRules: [rule('pre-on')] });
       expect(store.get('ruleset', 'rs')!.sources).toEqual([{ id: 'on', kind: 'local', format: 'auto', content: 'DOMAIN,source-on.test' }]);
       expect(store.get('source', 'nodes')!.pipeline[0]!.enabled).toBe(false);
-      const snapshot = [store.list('profile'), store.list('ruleset'), store.listAllTemplateVersions()];
+      const snapshot = [store.list('profile'), store.list('ruleset'), store.listLatestTemplates()];
       store.close(); store = new Store(file, { cipher });
-      expect([store.list('profile'), store.list('ruleset'), store.listAllTemplateVersions()]).toEqual(snapshot);
+      expect([store.list('profile'), store.list('ruleset'), store.listLatestTemplates()]).toEqual(snapshot);
     } finally { store.close(); rmSync(dir, { recursive: true }); }
   });
 

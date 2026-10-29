@@ -71,7 +71,7 @@ describe('模板自身的规则可用性检查', () => {
     const impact = await h.admin.post(`/api/templates/${id}/impact`, h.template);
     expect(impact.json.report).toContainEqual(expect.objectContaining({ level: 'error' }));
     expect((await h.admin.post(`/api/templates/${id}/publish`, { ...h.template, force: true })).status).toBe(400);
-    expect(h.store.listTemplateVersions(id).map(v => v.version)).toEqual([1]);
+    expect(h.store.listLatestTemplates().filter(t => t.id === id).map(v => v.version)).toEqual([1]);
   });
 
   it('远程暂时失败但有可用快照时允许发布并告警', async () => {

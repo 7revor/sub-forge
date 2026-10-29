@@ -37,11 +37,12 @@ describe('no-resolve 以内容为准', () => {
       store.putRenderGeneration('bound', 'mihomo', 'old-version', historical);
       store.putLastGood('bound', 'mihomo', historical);
       store.db.pragma('user_version = 17'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(18);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(19);
       expect(store.getWithOwner('ruleset', 'rs')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { sources: [source] } });
       expect(store.get('ruleset', 'rs')).not.toHaveProperty('noResolve');
-      expect(store.listTemplateVersions('t').map(t => t.version)).toEqual([2, 1]);
-      for (const version of [1, 2]) expect(store.getTemplate('t', version)!.rules).toEqual(cleaned);
+      expect(store.listLatestTemplates().map(t => t.version)).toEqual([2]);
+      expect(store.getTemplate('t')!.rules).toEqual(cleaned);
+      expect(store.getTemplate('t', 1)).toBeUndefined();
       expect(store.get('profile', 'bound')!.routing).toMatchObject({ prependRules: cleaned });
       expect(store.get('profile', 'independent')!.routing).toMatchObject({ config: { rules: cleaned } });
       expect(store.get('profile', 'legacy')!.routing).toMatchObject({ mode: 'independent', config: { rules: [...cleaned].reverse() } });
@@ -49,9 +50,9 @@ describe('no-resolve 以内容为准', () => {
       expect(store.getToken('same-token')!.profileId).toBe('bound');
       expect(store.getRenderGeneration('bound', 'mihomo', 'old-version')).toEqual(historical);
       expect(store.getLastGood('bound', 'mihomo')).toEqual({ renderedAt: 1234, data: historical });
-      const snapshot = [store.list('profile'), store.list('ruleset'), store.listAllTemplateVersions()];
+      const snapshot = [store.list('profile'), store.list('ruleset'), store.listLatestTemplates()];
       store.close(); store = new Store(file, { cipher });
-      expect([store.list('profile'), store.list('ruleset'), store.listAllTemplateVersions()]).toEqual(snapshot);
+      expect([store.list('profile'), store.list('ruleset'), store.listLatestTemplates()]).toEqual(snapshot);
     } finally { store.close(); rmSync(dir, { recursive: true }); }
   });
 

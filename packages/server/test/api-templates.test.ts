@@ -52,7 +52,7 @@ describe('模板', () => {
       const id = saved.json.item.id;
       expect(saved.json.item.ruleProviders).toEqual(ruleProviders);
       expect((await admin.get(`/api/templates/${id}`)).json.item.ruleProviders).toEqual(ruleProviders);
-      expect((await admin.get(`/api/templates/${id}/versions/1`)).json.item.rules).toEqual(TEMPLATE(rs).rules);
+      expect((await admin.get(`/api/templates/${id}/versions/1`)).status).toBe(404);
       for (const invalid of [[{ name: 'file', url: 'file:///tmp/rules' }], [ruleProviders[0], ruleProviders[0]], {}]) {
         const result = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders: invalid });
         expect(result.status).toBe(400);

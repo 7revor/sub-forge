@@ -54,15 +54,17 @@ describe('文档增删改查', () => {
     }
   });
 
-  it('旧模板版本依赖的规则不可删除，锁定旧版本的 Profile 继续可渲染', async () => {
+  it('旧锁定引用转为独立配置后仍阻止删除所需规则，模板只保留当前内容', async () => {
     const { store, renderer, admin, alice } = await twoUsers();
     const rs = (await admin.post('/api/rulesets', { name: '旧规则', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' })).json.item.id;
     const t = { id: 'legacy', version: 1, name: '历史模板', groups: [], rules: [{ id: 'r', matcher: { kind: 'ruleset' as const, id: rs }, target: { kind: 'builtin' as const, name: 'DIRECT' as const } }], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
-    store.putTemplateVersion(t); store.putTemplateVersion({ ...t, version: 2, rules: [] });
+    store.putTemplateVersion(t);
     const p = (await alice.post('/api/profiles', { name: '锁定旧版', nodeSets: [], template: { id: t.id, follow: { pinned: 1 } } })).json.item.id;
+    store.putTemplateVersion({ ...t, version: 2, rules: [] });
     const res = await admin.del(`/api/rulesets/${rs}`);
     expect(res.status).toBe(409);
-    expect(res.json.details.referrers).toContain('模板「历史模板」v1');
+    expect(res.json.details.referrers).toEqual(['其他用户的配置订阅']);
+    expect(store.getTemplate(t.id, 1)).toBeUndefined();
     expect((await renderer.preview(p, { client: 'mihomo' })).ok).toBe(true);
   });
 
