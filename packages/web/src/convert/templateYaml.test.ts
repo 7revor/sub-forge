@@ -47,6 +47,35 @@ function imported(text: string, current = empty, context = ctx) {
 }
 
 describe('模板与 mihomo YAML 双向转换', () => {
+  it('仓库与重名本地引用可独立导出导入，改出口和选项不丢失文件映射', () => {
+    const repository = { repo: 'github', entry: 'Google', name: '仓库 · Google', sources: [{ id: 's', kind: 'remote' as const, format: 'auto' as const, url: 'https://example.test/Google.list', repository: { repo: 'github', entry: 'Google', ref: 'main', path: 'Google.list' } }] };
+    const context = { rulesets: [{ id: 'one', name: 'Google' }, { id: 'two', name: 'Google' }] };
+    const body: TemplateBody = { ...empty, rules: [
+      { id: 'repo-rule', matcher: { kind: 'ruleset', id: 'repo:fixed', repository }, target: direct, enabled: false },
+      { id: 'local-one', matcher: { kind: 'ruleset', id: 'one' }, target: direct },
+      { id: 'local-two', matcher: { kind: 'ruleset', id: 'two' }, target: direct },
+    ] };
+    const yaml = templateToYaml(body, context);
+    expect(yaml).toContain('RULE-SET,local:one,DIRECT');
+    expect(yaml).toContain('RULE-SET,local:two,DIRECT');
+    const fresh = imported(yaml, empty, context).value;
+    expect(fresh.rules.map(r => r.matcher)).toEqual(body.rules.map(r => r.matcher));
+    expect(fresh.rules[0]!.enabled).toBe(false);
+    const changed = imported(yaml.replace('RULE-SET,repo:fixed,DIRECT', 'RULE-SET,repo:fixed,REJECT,no-resolve'), body, context).value;
+    expect(changed.rules[0]).toMatchObject({ id: 'repo-rule', matcher: body.rules[0]!.matcher, options: { noResolve: true }, target: { kind: 'builtin', name: 'REJECT' } });
+    const tampered = imported(yaml.replace('https://example.test/Google.list', 'https://example.test/changed.list'), body, context).value;
+    expect(tampered.rules[0]!.matcher).toMatchObject({ repository: { sources: [{ url: 'https://example.test/changed.list' }] } });
+    const ambiguous = templateFromYaml('rules: ["RULE-SET,Google,DIRECT"]', empty, context);
+    expect(ambiguous.ok).toBe(false);
+    if (!ambiguous.ok) expect(ambiguous.error).toContain('重名');
+  });
+
+  it('本地规则集改名后按导出的 ID 恢复，不跟随显示名称重新匹配', () => {
+    const body: TemplateBody = { ...empty, rules: [{ id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: direct }] };
+    const yaml = templateToYaml(body, { rulesets: [{ id: 'rs', name: '旧名称' }] });
+    expect(imported(yaml, empty, { rulesets: [{ id: 'rs', name: '新名称' }, { id: 'other', name: '旧名称' }] }).value.rules[0]!.matcher).toEqual({ kind: 'ruleset', id: 'rs' });
+  });
+
   it('恢复正常模板时仍保留稳定 ID、覆盖和禁用状态', () => {
     const body = fixture();
     expect(templateFormFromYaml(templateToYaml(body, ctx), body, ctx)).toEqual({ value: body, notes: [] });
@@ -203,10 +232,10 @@ rules:
     expect(missing.notes.join()).toContain('沿用');
   });
 
-  it('按名称导入规则集，导出找不到名称时使用 ID', () => {
+  it('按名称导入规则集，导出找不到名称时使用带命名空间的 ID', () => {
     const context: ConvertCtx = { rulesets: [{ id: 'rs', name: '同名' }] };
     expect(imported('rules: ["RULE-SET,同名,DIRECT"]', empty, context).value.rules[0]!.matcher).toEqual({ kind: 'ruleset', id: 'rs' });
-    expect(templateToYaml({ ...empty, rules: [{ id: 'r', matcher: { kind: 'ruleset', id: 'missing' }, target: direct }] }, ctx)).toContain('RULE-SET,missing,DIRECT');
+    expect(templateToYaml({ ...empty, rules: [{ id: 'r', matcher: { kind: 'ruleset', id: 'missing' }, target: direct }] }, ctx)).toContain('RULE-SET,local:missing,DIRECT');
   });
 
   it('增删 no-resolve/src 选项保持规则 ID，并移除禁用注释后重新启用', () => {
@@ -255,7 +284,7 @@ rules:
     const result = imported('rules:\n  # 普通说明\n  - DOMAIN,a.example,DIRECT\n  # disabled\n  - DOMAIN,b.example,DIRECT\n  - DOMAIN,c.example,DIRECT # disabled\n');
     expect(result.value.rules.map((r) => r.enabled)).toEqual([undefined, false, false]);
     const plain = parse(templateToYaml(fixture(), ctx));
-    expect(Object.keys(plain)).toEqual(['proxy-groups', 'rules']);
+    expect(Object.keys(plain)).toEqual(['proxy-groups', 'rules', 'x-sub-forge-rulesets']);
     expect(imported(stringify(plain), fixture()).value.rules.every((r) => r.enabled !== false)).toBe(true);
   });
 

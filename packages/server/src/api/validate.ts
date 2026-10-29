@@ -10,6 +10,7 @@ import { normalizeRuleSet, promoteRuleSetOverrides } from '../legacy-rules.ts';
 import { MIN_TTL_SEC } from '../snapshots.ts';
 import { sourceUrl } from '../source-url.ts';
 import { bad, isStr } from './common.ts';
+import { checkRuleSetReference, type RuleSetMatcher } from '../ruleset-reference.ts';
 
 const OPS = new Set(['filter.regex', 'filter.type', 'filter.useless', 'rename.regex', 'rename.delete', 'rename.affix', 'flag', 'sort.name', 'sort.regex', 'dedupe', 'set', 'script']);
 const RULESET_FORMATS = new Set(['auto', 'classical', 'domain', 'ipcidr', 'domain-set', 'yaml', 'mrs', 'srs']);
@@ -281,7 +282,11 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         extraRules.forEach((er: unknown, i) => {
           const m = isObj(er) && isObj(er.rule) && isObj(er.rule.matcher) ? er.rule.matcher : undefined;
           if (!m) throw bad(`私有规则 ${i + 1} 格式错误`);
-          if (m.kind === 'ruleset' && !(isStr(m.id) && refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
+          if (m.kind === 'ruleset') {
+            const prior = store.get('profile', id)?.overlay.extraRules?.find(r => r.rule.id === (er as { rule: { id: string } }).rule.id)?.rule.matcher;
+            checkRuleSetReference(m as RuleSetMatcher, store, prior?.kind === 'ruleset' ? prior : undefined);
+            if (!isStr(m.id) || (!m.repository && !refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
+          }
         });
       }
       (doc.chains as Record<string, unknown>[]).forEach((ch, i) => {

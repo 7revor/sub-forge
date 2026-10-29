@@ -53,7 +53,11 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
     return c.json({ repos: repos.list() });
   });
   app.delete('/rule-repos/:id', requireAdmin, async c => {
-    await repos.removeCustom(c.req.param('id'));
+    const id = c.req.param('id');
+    const referrers = store.listAllTemplateVersions().filter(t => t.rules.some(r => r.matcher.kind === 'ruleset' && r.matcher.repository?.repo === id)).map(t => `模板「${t.name}」v${t.version}`);
+    for (const p of store.list('profile')) if (p.overlay.extraRules?.some(r => r.rule.matcher.kind === 'ruleset' && r.rule.matcher.repository?.repo === id)) referrers.push(`配置订阅「${p.name}」`);
+    if (referrers.length) throw new HttpError(409, `仓库仍被引用，不能删除：${referrers.join('、')}`, { referrers });
+    await repos.removeCustom(id);
     return c.json({ ok: true });
   });
   app.post('/rule-repos/:id/refresh', requireAdmin, c => {

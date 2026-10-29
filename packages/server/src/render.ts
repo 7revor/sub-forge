@@ -10,6 +10,7 @@ import {
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
 import type { SnapshotService } from './snapshots.ts';
 import type { Store, TrafficInfo } from './store.ts';
+import { resolveRuleSetReference } from './ruleset-reference.ts';
 
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
 const GENERATION_PLACEHOLDER = '__SF_GENERATION__';
@@ -286,7 +287,7 @@ export class RenderService {
     const out: RuleSetInputs = { rulesets: {}, snapshots: {} };
     const visit = (m: Matcher) => {
       if (m.kind !== 'ruleset') return;
-      const d = this.store.get('ruleset', m.id);
+      const d = resolveRuleSetReference(m, this.store);
       if (d) out.rulesets[m.id] = d;
     };
     // 与内核渲染使用同一份有效规则：覆盖层可禁用或重新启用模板规则，孤儿锚点也不再参与拉取。

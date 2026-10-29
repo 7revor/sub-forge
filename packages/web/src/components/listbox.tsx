@@ -199,13 +199,14 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
 }
 
 export type AsyncSelectOption = { value: string; label: string; hint?: string };
-export type AsyncSelectPage = { options: AsyncSelectOption[]; nextOffset?: number };
+export type AsyncSelectPage = { options: AsyncSelectOption[]; nextOffset?: number; notices?: string[] };
 
 /** 懒加载单选：打开才请求，搜索防抖并隔离旧响应；分页追加，不允许提交任意文本。 */
-export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', disabled, triggerClassName, triggerIcon, ...rest }: {
+export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', disabled, triggerClassName, triggerIcon, searchLabel = '搜索仓库规则', searchPlaceholder = '搜索规则名或路径', ...rest }: {
   loadOptions: (query: string, offset: number) => Promise<AsyncSelectPage>;
   onChange: (value: string) => void;
-  placeholder?: string; disabled?: boolean; 'aria-label': string;
+  placeholder?: string; disabled?: boolean; 'aria-label': string; id?: string;
+  searchLabel?: string; searchPlaceholder?: string;
   triggerClassName?: string; triggerIcon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -222,7 +223,8 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
   const listId = useId();
   const pos = usePopoverPos(btn, open, 420);
   const close = () => { setOpen(false); btn.current?.focus(); };
-  useOutside([btn, popup], open, () => setOpen(false));
+  // 全局错误对话框盖在选择器上方；确认错误后仍应能在原位置重试。
+  useOutside([btn, popup], open, () => { if (!document.querySelector('[role="alertdialog"]')) setOpen(false); });
   useEffect(() => {
     const version = ++generation.current;
     setPage({ options: [] }); setActive(-1); setError('');
@@ -245,13 +247,13 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
     busy.current = true; setLoading(true); setError('');
     try {
       const next = await loadOptions(query, page.nextOffset);
-      if (generation.current === version) setPage(p => ({ options: [...p.options, ...next.options], nextOffset: next.nextOffset }));
+      if (generation.current === version) setPage(p => ({ ...next, options: [...p.options, ...next.options] }));
     } catch (e) { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } }
     finally { if (generation.current === version) { busy.current = false; setLoading(false); } }
   };
   const pick = (value: string) => { close(); onChange(value); };
   return <>
-    <button ref={btn} type="button" role="combobox" aria-label={rest['aria-label']} aria-haspopup="dialog" aria-expanded={open}
+    <button ref={btn} id={rest.id} type="button" role="combobox" aria-label={rest['aria-label']} aria-haspopup="dialog" aria-expanded={open}
       aria-controls={open ? `${listId}-popup` : undefined} disabled={disabled}
       className={triggerClassName ?? cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
       onClick={() => { setQuery(''); setOpen(!open); }}
@@ -266,16 +268,17 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
         if (e.key === 'Tab') setOpen(false);
       }}>
       <div className="shrink-0 border-b border-line-2 p-3">
-        <input autoFocus role="combobox" aria-label="搜索仓库规则" aria-autocomplete="list" aria-expanded="true" aria-controls={listId}
+        <input autoFocus role="combobox" aria-label={searchLabel} aria-autocomplete="list" aria-expanded="true" aria-controls={listId}
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
-          value={query} placeholder="搜索规则名或路径" className={cx(fieldCls, 'shrink-0')}
+          value={query} placeholder={searchPlaceholder} className={cx(fieldCls, 'shrink-0')}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, Math.min(page.options.length - 1, a + (e.key === 'ArrowDown' ? 1 : -1)))); }
             if (e.key === 'Enter') { e.preventDefault(); if (page.options[active]) pick(page.options[active]!.value); }
           }} />
       </div>
-      <div id={listId} role="listbox" aria-label="仓库规则候选" aria-busy={loading} className="min-h-0 overflow-y-auto overscroll-contain p-1.5 empty:hidden"
+      {!!page.notices?.length && <div role="status" className="shrink-0 border-b border-line-2 px-3 py-2 text-[12px] text-muted">{page.notices.join('；')}</div>}
+      <div id={listId} role="listbox" aria-label={`${searchLabel}候选`} aria-busy={loading} className="min-h-0 overflow-y-auto overscroll-contain p-1.5 empty:hidden"
         onScroll={e => { const el = e.currentTarget; if (!error && el.scrollHeight - el.scrollTop - el.clientHeight < 32) void more(); }}>
         {page.options.map((o, i) => <div key={o.value} id={`${listId}-${i}`} data-option={i} role="option" aria-selected={i === active}
           onMouseDown={e => e.preventDefault()} onMouseEnter={() => setActive(i)} onClick={() => pick(o.value)}
@@ -284,7 +287,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
         </div>)}
       </div>
       {(loading || error || page.nextOffset !== undefined || !page.options.length) && <div role="status" className="flex min-h-12 shrink-0 items-center justify-center gap-2 border-t border-line-2 px-3 py-2 text-center text-[12px] text-muted">
-        {loading ? '加载中…' : error ? <><button type="button" className="shrink-0 rounded-md px-2 py-1 text-accent-ink hover:bg-ground" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full cursor-pointer rounded-md py-1 text-accent-ink hover:bg-ground" onClick={() => void more()}>加载更多</button> : '没有匹配的规则'}
+        {loading ? '加载中…' : error ? <><span>加载失败</span><button type="button" className="shrink-0 rounded-md px-2 py-1 text-accent-ink hover:bg-ground" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full cursor-pointer rounded-md py-1 text-accent-ink hover:bg-ground" onClick={() => void more()}>加载更多</button> : '没有匹配的规则'}
       </div>}
     </div>, document.body)}
   </>;

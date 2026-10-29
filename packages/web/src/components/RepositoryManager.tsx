@@ -25,7 +25,7 @@ export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: 
           {r.error && <span className="break-words text-[12px] text-err">{r.error}{r.builtAt ? '（保留上次索引）' : ''}</span>}
           {admin && <div className="flex flex-wrap gap-2"><Button size="sm" disabled={!r.enabled || r.indexing || refresh.isPending} onClick={() => refresh.mutate(r.id)}>更新索引</Button><Button size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button><Link to={`/rule-repo/${encodeURIComponent(r.id)}/edit${search}`} className={buttonClass('default', 'sm')}>编辑</Link><Button size="sm" variant="ghost" aria-label={`删除 ${r.name}`} disabled={r.indexing || remove.isPending} onClick={() => { remove.reset(); setDeleting(r); }}><Trash2 size={14} />删除</Button></div>}
           {admin && deleting?.id === r.id && <div role="alert" aria-label="删除仓库确认" className="flex flex-col gap-2 border-t border-line-2 pt-2 text-[13px]">
-            <span>删除「{r.name}」及其索引？已创建的规则集会保留。</span>
+            <span>删除「{r.name}」及其索引？已创建的本地规则集会保留；仍被模板或配置订阅直接引用时不能删除。</span>
             <div className="flex gap-2"><Button size="sm" disabled={remove.isPending} onClick={() => setDeleting(undefined)}>取消</Button><Button size="sm" variant="danger" disabled={remove.isPending || r.indexing} onClick={() => remove.mutate(r.id)}>{remove.isPending ? '删除中…' : '确认删除'}</Button></div>
             <ErrorAlert error={remove.error} />
           </div>}

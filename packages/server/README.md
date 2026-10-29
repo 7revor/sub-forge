@@ -207,3 +207,13 @@ Git 同步使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，也
 ### 自动识别规则格式与下载策略（2026-10-29）
 
 规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（original/managed/unsupported）。单来源兼容时订阅配置引用原始 URL 并填写实际 format/behavior；其余可解析文本输出一个带版本参数的 `/r/:token/rs_…_classical.list`，内容为 classical，IP 选项写在各自规则行内。旧版本资源路由保持可读。旧二进制来源遇到合并、改写或客户端不支持时明确报错，沿用 last-good 回退，不静默丢弃。未增加 MRS/SRS 解码器；当前完整订阅下载仍只有 mihomo，Surge 为规则预览。
+
+### 模板规则集统一引用（2026-10-29）
+
+- `GET /api/rule-options/search?q=&offset=0&limit=30&scope=all`：统一搜索可见本地与已启用仓库条目，返回 items/total/notices；scope=repository 用于本地规则集维护。
+- `GET /api/rule-options/locals`：返回可引用本地规则集的 ID/名称（本人及管理员公共规则），不改变仅本人可维护的文档列表。
+- `POST /api/rule-options/resolve`：请求 `{ source: 'local', id }` 或 `{ source: 'repository', repo, entry }`，返回 matcher，不创建本地规则集。
+- 仓库 matcher 保存所选文件映射及稳定身份；新引用检查索引，已发布映射在索引移除或仓库停用后保持可用。删除被模板/配置订阅直接引用的仓库返回 409 和引用方。本地规则集自身被引用时仍禁止删除。
+- 模板自检与渲染统一解析引用，失败诊断可以定位到规则行。前端 YAML 中的引用映射不会出现在最终订阅输出中。
+
+隔离浏览器验收：先构建 web，再运行 `pnpm --filter @sub-forge/server exec tsx test/manual-rule-reference-server.ts`。只监听 127.0.0.1:5186，使用内存库、测试账号和固定上游；退出时关闭监听与数据库，不连接生产数据。验收结束必须停止进程。

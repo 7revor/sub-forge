@@ -156,7 +156,15 @@ export type RuleSet = {
 
 export type Matcher =
   | { kind: 'rule'; rule: RuleIR; overrides?: ClientOverride[] }
-  | { kind: 'ruleset'; id: ID };
+  | { kind: 'ruleset'; id: ID; repository?: RepositoryRuleSetReference };
+
+/** 仓库规则直接引用：保存所选文件映射，内容仍按快照策略刷新，不创建本地规则集。 */
+export type RepositoryRuleSetReference = {
+  repo: string;
+  entry: string;
+  name: string;
+  sources: RuleSetSource[];
+};
 
 // ---------- 分流 ----------
 

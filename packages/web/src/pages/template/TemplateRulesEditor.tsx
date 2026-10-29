@@ -1,7 +1,8 @@
-import type { ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
+import type { Matcher, ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Button, Card, Empty, Field, Switch, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, Field, Switch, buttonClass, cx } from '../../components/ui.tsx';
+import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
 
@@ -22,7 +23,7 @@ function RuleFields({ rule, onChange, ctx, value, report }: {
     ? { ...matcher.rule, noResolve: true } : matcher.kind === 'rule' ? matcher.rule : undefined;
   return <div className="flex flex-col gap-3 border-t border-line p-3">
     <ItemIssues report={report} where={`rule:${rule.id}`} />
-    <MatcherEditor value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
+    <MatcherEditor fixedKind value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
     {matcher.kind === 'ruleset' && <>
       <div className="flex items-center gap-2"><Switch label="no-resolve" checked={rule.options?.noResolve ?? false} onChange={(noResolve) => onChange({ ...rule, options: { ...rule.options, noResolve } })} /><span className="text-[13px]">no-resolve</span></div>
     </>}
@@ -34,13 +35,17 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
 }) {
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map((r) => r.id === rule.id ? rule : r) });
+  const add = (matcher: Matcher) => {
+    const id = newId('r');
+    onChange({ ...value, rules: [...value.rules, { id, matcher, target: { kind: 'builtin', name: 'REJECT' } }] });
+    onSelect(id);
+  };
   return <Card bodyClass="overflow-x-auto px-4 pb-4"
     title={`规则（${value.rules.length} 条）`} subtitle={`出口只能是模板组或内置策略。`}
-    actions={<Button onClick={() => {
-      const id = newId('r');
-      onChange({ ...value, rules: [...value.rules, { id, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'REJECT' } }] });
-      onSelect(id);
-    }}>新增规则</Button>}>
+    actions={<div className="flex flex-wrap gap-2">
+      <Button onClick={() => add({ kind: 'rule', rule: { type: 'DOMAIN', value: '' } })}>添加单条规则</Button>
+      <RuleSetPicker onSelect={add} triggerClassName={buttonClass()} />
+    </div>}>
     {!value.rules.length && <Empty className="mb-4" title="没有规则" />}
     <div className="min-w-[580px]">
       <div className={`${columns} border-b border-line px-2 py-2 text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>启用</span><span>操作</span></div>

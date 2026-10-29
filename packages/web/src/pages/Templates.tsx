@@ -13,7 +13,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, Modal, PageHeader, PageScroll, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
-import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
+import { useList, useMe, useTemplates, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
 import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { templateDiff } from '../convert/templateDiff.ts';
 import { TemplateEditor } from './template/TemplateEditor.tsx';
@@ -73,7 +73,7 @@ const RULE_PREVIEW = 8;
 /** 模板详情：头部卡片、策略组骨架、规则（默认显示前几条）、版本记录与对比 */
 function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; actions?: ReactNode }) {
   const tpl = useQuery({ queryKey: ['template', id], queryFn: () => api<TemplateDetailData>('GET', `/templates/${id}`) });
-  const rulesets = useList('rulesets');
+  const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
   const [allRules, setAllRules] = useState(false);
   const [diffVersion, setDiffVersion] = useState<number>();
@@ -165,7 +165,7 @@ function TemplatePage({ id }: { id: string }) {
   const [focus, setFocus] = useState<{ where: string }>();
   const [diffVersion, setDiffVersion] = useState<number>();
   const [importing, setImporting] = useState<string>();
-  const rulesets = useList('rulesets');
+  const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
   const [changelog, setChangelog] = useState('');
   const [impact, setImpact] = useState<{ report: ReportItem[]; impact: ImpactEntry[] }>();
@@ -196,13 +196,13 @@ function TemplatePage({ id }: { id: string }) {
     if (!isAdmin || !rawValid || !name.trim()) return;
     let active = true;
     const timer = setTimeout(() => {
-      api<{ report: ReportItem[] }>('POST', '/templates/validate', { ...body, name }).then(
+      api<{ report: ReportItem[] }>('POST', '/templates/validate', { ...body, name, ...(isNew ? {} : { id }) }).then(
         (r) => { if (active) setValidation({ body, name, report: r.report }); },
         (e: Error) => { if (active) setValidation({ body, name, report: [], error: e.message }); },
       );
     }, 500);
     return () => { active = false; clearTimeout(timer); };
-  }, [body, name, isAdmin, rawValid]);
+  }, [body, name, isAdmin, rawValid, id, isNew]);
 
   useEffect(() => { setImpact(undefined); setConfirmed(false); }, [body, name]);
 
