@@ -281,6 +281,8 @@ Stash：/sub/:token?target=stash&platform=ios 或 macos 输出完整订阅；UA 
 
 ### 2026-10-29：目录级联索引
 
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
 SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和提交同事务更新。仅记录扫描范围内目录及 list/txt；YAML、二进制、README.md 等不进入该缓存。目录由 Git 普通文件路径提取，符号链接与子模块沿用现有排除规则。原 include/exclude 和格式配置继续控制文件能否关联。缺少新缓存的旧仓库会在同提交下补建；更新失败保留旧目录，接口明确提示目录未完整。
 
 `GET /api/rule-options/catalog?scope=all|repository` 只返回当前用户可见本地规则集、启用仓库的平面节点，由前端组装目录。`POST /api/rule-options/resolve` 新选项携带 `file:{ref,path}`，仅关联该文件；旧无 file 请求保留兼容。目录读取不访问上游正文，创建/引用前重新校验文件成员资格。删除仓库时一并删除目录缓存。
@@ -308,3 +310,21 @@ v19 在事务中先展开仍引用旧模板版本的遗留订阅并保存原始�
 模板保存、订阅保存及绑定模式转换不再比较版本或修订号，也不再检查校验期间的数据变化。旧草稿、无版本请求均按最后一次完成的保存生效。模板 `version`、订阅 `revision` / `templateVersion` 不再产生、传递或持久化；旧请求带这些字段时忽略。
 
 v20 清理旧记录中的并发字段，保留配置内容、绑定关系、归属、更新时间、订阅链接与原始迁移备份。旧种子先按原版本解析锁定引用，再清除编号；旧表的版本列只保留固定存储键，不参与运行时版本管理。页面未保存提醒、字段校验、权限与绑定内容冲突校验继续生效。
+
+### 2026-10-29：目录分页接口（替代全量清单响应）
+
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
+`GET /api/rule-options/catalog?scope=all|repository&q=&offset=0&limit=30` 返回 `{items,total,offset,limit,nextOffset?,notices}`。不传 `repo` 返回本地规则与仓库入口；传 `repo`、可选 `directory`（相对仓库根）仅返回当前层。默认每页 30 项，上限 100。SQL 先在完整索引搜索，按完整原始路径列出当前层，再稳定排序和分页，文件按完整路径与分支区分。缺失目录缓存时回退旧条目且同样分页并提示；不传分页参数也不会返回全量文件。数据模型和示例种子无需迁移。
+
+## 2026-10-29：规则来源平铺分页
+
+当前接口：`GET /api/rule-options/search?scope=all|repository&q=&offset=0&limit=30`，默认 30、上限 100，返回 `{items,total,offset,limit,nextOffset?,notices}`。items 包含 value（JSON 编码的 local 或 repository 单文件选择）、label（文件名）、hint（仓库名 · 原始路径 · 分支）、disabled。本地候选先按权限读取；仓库文件和本地候选统一由 SQLite 筛选、排序、分页。缺失缓存时从已有文件变体在 SQL 中回退，不在应用层读取全部文件。
+
+移除 `/rule-options/catalog` 及目录树查询；新文件缓存不再生成目录节点，兼容旧缓存并在下次更新替换。正文预览只查询所选文件。单文件 resolve、历史引用和种子格式不变。隔离浏览器验收：`pnpm exec tsx test/manual-rule-options-server.ts`，使用内存数据和模拟 Git，结束后停止该进程。
+
+2026-10-29：`/api/rule-options/search` 的仓库文件搜索仅匹配完整 path（包含文件名），仓库名与分支仅展示，不参与匹配。可避免 `ai` 命中仓库名 `domain` 导致整库出现；分页、大小写规范化、权限与文件身份保持不变。
+
+2026-10-29：规则候选 hint 只显示父目录（根目录 `/`）与仓库／分支说明，完整 path 仍保存在 value。新增 `matches:{label:[{start,end}],hint:[{start,end}]}`，为对应显示字符串的 UTF-16 半开区间；只对本页实际搜索字段生成高亮，兼容 NFKC、大小写和跨目录／文件名匹配，不高亮仓库名与分支。
+
+2026-10-29：候选 hint 默认为仓库名和可选父目录，根目录不输出 `/`。SQL 对当前完整匹配集按 repo 统计不同 ref，存在多分支时才显示 `repo name * branch * path`；不同仓库不混算。分页后只格式化当前页说明并更新高亮区间，不改变文件选择值。

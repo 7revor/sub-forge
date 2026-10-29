@@ -1,17 +1,18 @@
-// 目录和名称搜索读取数据库索引，右侧仅预览点击的文件正文。
+// 文件搜索分页读取数据库索引，右侧仅预览点击的文件正文。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
-import { RuleFileTree } from '../components/RuleFileTree.tsx';
+import { PagedOptionList } from '../components/OptionPage.tsx';
 import { CodePreview } from '../components/CodePreview.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
-import { api, type RuleCatalog, type RuleRepo, type RepoFilePreview } from '../api.ts';
-import { buildRuleCatalog, type RuleCatalogSelection } from '../domain/ruleCatalog.ts';
+import { api, type RuleRepo, type RepoFilePreview } from '../api.ts';
+import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
 import { Badge, Button, Empty, ErrorAlert, Input, PageHeader } from '../components/ui.tsx';
 
-type RepositoryFile = Extract<RuleCatalogSelection, { source: 'repository' }>;
+const loadFiles = ruleOptionsLoader('repository');
+type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
 export function RuleRepoPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -22,12 +23,8 @@ export function RuleRepoPage() {
   const query = useDebouncedValue(q.trim(), 250);
   const [selected, setSelected] = useState<RepositoryFile>();
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
-  const revision = repos.data?.repos.map(repo => `${repo.id}:${repo.builtAt}:${repo.enabled}`).join('|');
-  const catalog = useQuery({ queryKey: ['rule-repos', 'catalog', query, revision],
-    queryFn: () => api<RuleCatalog>('GET', `/rule-options/catalog?scope=repository&q=${encodeURIComponent(query)}`),
-  });
+  const revision = repos.data?.repos.map(repo => `${repo.id}:${repo.builtAt}:${repo.enabled}:${repo.configRevision}`).join('|');
   const pending = q.trim() !== query;
-  const tree = useMemo(() => catalog.data ? buildRuleCatalog(catalog.data) : [], [catalog.data]);
   useEffect(() => { setSelected(undefined); }, [query]);
   useEffect(() => {
     if (selected && repos.data && !repos.data.repos.some(repo => repo.id === selected.repo && repo.enabled)) setSelected(undefined);
@@ -40,26 +37,21 @@ export function RuleRepoPage() {
     onSuccess: async result => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${result.item.id}`); },
   });
   const select = (value: string) => {
-    const selection = JSON.parse(value) as RuleCatalogSelection;
+    const selection = JSON.parse(value) as RuleSelection;
     if (selection.source !== 'repository') throw new Error('请选择仓库文件');
     setSelected(selection); create.reset();
   };
   const file = preview.data;
-  const count = catalog.data?.repositories.reduce((total, repo) => total + repo.nodes.filter(node => node.kind === 'file').length, 0) ?? 0;
   return <>
     <PageHeader title="规则仓库" />
     <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} />
     {ruleset && <div className="text-[13px] text-muted">选择文件预览后可加入规则集。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-accent">返回规则集</Link></div>}
-    <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索名称或路径，忽略大小写" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
-    <ErrorAlert error={repos.error ?? catalog.error} />
-    {!!catalog.data?.notices.length && <div role="status" className="text-[12px] text-muted">{catalog.data.notices.join('；')}</div>}
+    <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
+    <ErrorAlert error={repos.error} />
     <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(220px,1fr)_minmax(300px,1.4fr)] gap-5 overflow-y-auto lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-      <section aria-label="目录与文件" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
-        <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{pending || catalog.isFetching ? '搜索中…' : `目录 · ${count} 个文件`}</div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {!pending && !catalog.isPending && <RuleFileTree key={`${query}:${revision}`} options={tree} selected={selected ? JSON.stringify(selected) : undefined} expanded={!!query} onSelect={select} />}
-          {!pending && !catalog.isPending && !catalog.error && !tree.length && <div className="p-4"><Empty title={query ? '没有匹配的目录或文件' : '暂无可用目录索引'} /></div>}
-        </div>
+      <section aria-label="规则文件" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
+        <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : '规则文件'}</div>
+        {!pending && repos.data && <PagedOptionList key={`${query}:${revision}`} allowUnavailable loadOptions={loadFiles} query={query} selected={selected ? JSON.stringify(selected) : undefined} onSelect={select} />}
       </section>
       <section aria-label="文件内容预览" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
         {!selected ? <div className="p-5"><Empty title="选择左侧文件预览内容" /></div> : <>

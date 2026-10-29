@@ -1,10 +1,11 @@
 import { matchesNameSearch, normalizeNameSearch } from '@sub-forge/core';
-import { alertError } from '../feedback.ts';
 import { Empty } from './Empty.tsx';
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
+import { PagedOptionList, type OptionLoader } from './OptionPage.tsx';
 // 下拉选择组件：所有下拉都用这里的 Select / Combobox，不使用浏览器自带的 <select> 弹层与 <datalist>（见仓库 CLAUDE.md）。
 // 弹层渲染到 body，避免被卡片、表格的 overflow 裁掉；层级高于对话框。
 
-import { ChevronDown, ChevronRight, FileText, Folder } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import {
   Children, Fragment, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState,
   type HTMLAttributes, type KeyboardEvent, type ReactElement, type ReactNode, type RefObject,
@@ -243,190 +244,35 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
   </>;
 }
 
-export type AsyncSelectOption = { value: string; label: string; hint?: string };
-export type AsyncSelectPage = { options: AsyncSelectOption[]; nextOffset?: number; notices?: string[] };
-
-/** 懒加载单选：打开才请求，搜索防抖并隔离旧响应；分页追加，不允许提交任意文本。 */
-export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', disabled, triggerClassName, triggerIcon, searchLabel = '搜索仓库规则', searchPlaceholder = '搜索规则名或路径', ...rest }: {
-  loadOptions: (query: string, offset: number) => Promise<AsyncSelectPage>;
-  onChange: (value: string) => void;
-  placeholder?: string; disabled?: boolean; 'aria-label': string; id?: string;
-  searchLabel?: string; searchPlaceholder?: string;
-  triggerClassName?: string; triggerIcon?: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [active, setActive] = useState(-1);
-  const [page, setPage] = useState<AsyncSelectPage>({ options: [] });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [retry, setRetry] = useState(0);
-  const generation = useRef(0);
-  const busy = useRef(false);
-  const btn = useRef<HTMLButtonElement>(null);
-  const popup = useRef<HTMLDivElement>(null);
-  const listId = useId();
-  const pos = usePopoverPos(btn, open, 420);
-  const close = () => { setOpen(false); btn.current?.focus(); };
-  // 全局错误对话框盖在选择器上方；确认错误后仍应能在原位置重试。
-  useOutside([btn, popup], open, () => { if (!document.querySelector('[role="alertdialog"]')) setOpen(false); });
-  useEffect(() => {
-    const version = ++generation.current;
-    setPage({ options: [] }); setActive(-1); setError('');
-    busy.current = true;
-    if (!open) { busy.current = false; setLoading(false); return; }
-    setLoading(true);
-    const timer = setTimeout(() => {
-      busy.current = true;
-      loadOptions(query, 0).then(result => {
-        if (generation.current === version) { setPage(result); setActive(result.options.length ? 0 : -1); }
-      }).catch(e => { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } })
-        .finally(() => { if (generation.current === version) { busy.current = false; setLoading(false); } });
-    }, query ? 300 : 0);
-    return () => { clearTimeout(timer); generation.current++; };
-  }, [open, query, retry, loadOptions]);
-  useEffect(() => { popup.current?.querySelector(`[data-option="${active}"]`)?.scrollIntoView({ block: 'nearest' }); }, [active]);
-  const more = async () => {
-    if (busy.current || page.nextOffset === undefined) return;
-    const version = generation.current;
-    busy.current = true; setLoading(true); setError('');
-    try {
-      const next = await loadOptions(query, page.nextOffset);
-      if (generation.current === version) setPage(p => ({ ...next, options: [...p.options, ...next.options] }));
-    } catch (e) { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } }
-    finally { if (generation.current === version) { busy.current = false; setLoading(false); } }
-  };
-  const pick = (value: string) => { if (busy.current) return; close(); onChange(value); };
-  return <>
-    <button ref={btn} id={rest.id} type="button" role="combobox" aria-label={rest['aria-label']} aria-haspopup="dialog" aria-expanded={open}
-      aria-controls={open ? `${listId}-popup` : undefined} disabled={disabled}
-      className={triggerClassName ?? cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
-      onClick={() => { setQuery(''); setOpen(!open); }}
-      onKeyDown={e => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); setOpen(true); } }}>
-      {triggerIcon}<span className={cx('min-w-0', !triggerClassName && 'flex-1 truncate')}>{placeholder}</span>{!triggerClassName && <ChevronDown size={15} />}
-    </button>
-    {open && pos && createPortal(<div ref={popup} id={`${listId}-popup`} role="dialog" aria-label={rest['aria-label']}
-      style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
-      className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
-      onKeyDown={e => {
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
-        if (e.key === 'Tab') setOpen(false);
-      }}>
-      <div className="shrink-0 border-b border-line-2 p-3">
-        <input autoFocus role="combobox" aria-label={searchLabel} aria-autocomplete="list" aria-expanded="true" aria-controls={listId}
-          aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
-          value={query} placeholder={searchPlaceholder} className={cx(fieldCls, 'shrink-0')}
-          onChange={e => { generation.current++; busy.current = true; setPage({ options: [] }); setActive(-1); setLoading(true); setQuery(e.target.value); }}
-          onKeyDown={e => {
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, Math.min(page.options.length - 1, a + (e.key === 'ArrowDown' ? 1 : -1)))); }
-            if (e.key === 'Enter') { e.preventDefault(); if (page.options[active]) pick(page.options[active]!.value); }
-          }} />
-      </div>
-      {!!page.notices?.length && <div role="status" className="shrink-0 border-b border-line-2 px-3 py-2 text-[12px] text-muted">{page.notices.join('；')}</div>}
-      <div id={listId} role="listbox" aria-label={`${searchLabel}候选`} aria-busy={loading} className="min-h-0 overflow-y-auto overscroll-contain p-1.5 empty:hidden"
-        onScroll={e => { const el = e.currentTarget; if (!error && el.scrollHeight - el.scrollTop - el.clientHeight < 32) void more(); }}>
-        {page.options.map((o, i) => <div key={o.value} id={`${listId}-${i}`} data-option={i} role="option" aria-selected={i === active}
-          onMouseDown={e => e.preventDefault()} onMouseEnter={() => setActive(i)} onClick={() => pick(o.value)}
-          className={cx('flex min-h-12 cursor-pointer flex-col justify-center gap-0.5 rounded-md px-3 py-2 text-[13px]', i === active && 'bg-ground')}>
-          <div className="truncate">{o.label}</div><div className="truncate text-[11.5px] text-muted">{o.hint}</div>
-        </div>)}
-      </div>
-      {(loading || error || page.nextOffset !== undefined || !page.options.length) && <div role="status" className="flex min-h-12 shrink-0 items-center justify-center gap-2 border-t border-line-2 px-3 py-2 text-center text-[12px] text-muted">
-        {loading ? '加载中…' : error ? <><span>加载失败</span><button type="button" className="shrink-0 rounded-md px-2 py-1 text-accent-ink hover:bg-ground" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full cursor-pointer rounded-md py-1 text-accent-ink hover:bg-ground" onClick={() => void more()}>加载更多</button> : <Empty size="compact" title="没有匹配的规则" className="w-full" />}
-      </div>}
-    </div>, document.body)}
-  </>;
-}
-
-export type CascaderOption = { value: string; label: string; hint?: string; disabled?: boolean; children?: CascaderOption[] };
-export type CascaderPage = { options: CascaderOption[]; notices?: string[] };
-
-/** 只允许选择文件叶子的嵌套级联；每次打开重新加载最新目录。 */
-export function Cascader({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon }: {
-  loadOptions: (query: string) => Promise<CascaderPage>; onChange: (value: string) => void;
+/** 打开后按页读取两行候选；搜索防抖期间卸载旧结果，避免误选。 */
+export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon }: {
+  loadOptions: OptionLoader; onChange: (value: string) => void;
   label: string; ariaLabel?: string; disabled?: boolean; id?: string; triggerClassName?: string; triggerIcon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState<CascaderPage>({ options: [] });
-  const [trail, setTrail] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [retry, setRetry] = useState(0);
+  const debounced = useDebouncedValue(query, 250);
   const btn = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
-  const columnsRef = useRef<HTMLDivElement>(null);
   const popupId = useId();
-  const pos = usePopoverPos(btn, open, 760, 420);
+  const pos = usePopoverPos(btn, open, 560, 420);
   const close = () => { setOpen(false); btn.current?.focus(); };
+  const show = () => { setQuery(''); setOpen(true); };
   useOutside([btn, popup], open, () => setOpen(false));
-  useEffect(() => {
-    let current = true;
-    if (!open) return;
-    setTrail([]); setPage({ options: [] }); setLoading(true); setError('');
-    const timer = setTimeout(() => { void loadOptions(query).then(result => { if (current) setPage(result); })
-      .catch(error => { if (current) { setError(error instanceof Error ? error.message : String(error)); alertError(error); } })
-      .finally(() => { if (current) setLoading(false); }); }, query ? 250 : 0);
-    return () => { current = false; clearTimeout(timer); };
-  }, [open, query, loadOptions, retry]);
-  useEffect(() => {
-    const columns = columnsRef.current;
-    if (columns) {
-      columns.scrollLeft = columns.scrollWidth;
-      const lists = columns.querySelectorAll('[role="listbox"]');
-      if (document.activeElement?.tagName !== 'INPUT') lists[lists.length - 1]?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus();
-    }
-  }, [trail, page.options]);
-  const columns = [{ label: '规则来源', options: page.options }];
-  for (const value of trail) {
-    const selected = columns.at(-1)!.options.find(option => option.value === value);
-    if (!selected?.children) break;
-    columns.push({ label: selected.label, options: selected.children });
-  }
-  const pick = (option: CascaderOption, depth: number) => {
-    if (option.disabled) return;
-    if (option.children) setTrail([...trail.slice(0, depth), option.value]);
-    else { close(); onChange(option.value); }
-  };
   return <>
     <button ref={btn} id={id} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? popupId : undefined}
       disabled={disabled} className={triggerClassName ?? cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
-      onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setQuery(''); setOpen(true); } }}>
+      onClick={() => open ? close() : show()} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); show(); } }}>
       {triggerIcon}<span title={label} className={cx('min-w-0 truncate', !triggerClassName && 'flex-1')}>{label}</span>{!triggerClassName && <ChevronDown size={15} />}
     </button>
     {open && pos && createPortal(<div ref={popup} id={popupId} role="dialog" aria-label={ariaLabel}
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
       className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
-      <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="筛选名称" placeholder="输入名称筛选，忽略大小写" value={query}
-        className={fieldCls} onChange={event => { setQuery(event.target.value); setPage({ options: [] }); setLoading(true); }}
+      <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query}
+        className={fieldCls} onChange={event => setQuery(event.target.value)}
         onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); popup.current?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus(); } }} /></div>
-      {!!page.notices?.length && <div role="status" className="shrink-0 border-b border-line-2 px-3 py-2 text-[12px] text-muted">{page.notices.join('；')}</div>}
-      {loading ? <div role="status" className="p-4 text-[13px] text-muted">正在读取目录…</div> : error ? <div role="alert" className="flex items-center gap-3 p-4 text-[13px]"><span>目录读取失败</span><button type="button" className="text-accent" onClick={() => setRetry(x => x + 1)}>重试</button></div> :
-        <div ref={columnsRef} className="flex min-h-0 overflow-x-auto overscroll-contain">
-          {columns.map((column, depth) => <div key={depth} className="flex min-w-[220px] flex-1 flex-col border-r border-line-2 last:border-r-0">
-            <div className="shrink-0 break-all border-b border-line-2 px-3 py-2 text-[12px] font-medium text-muted">{column.label}</div>
-            <div role="listbox" aria-label={column.label} className="min-h-0 overflow-y-auto overscroll-contain p-1.5">
-              {!column.options.length && <Empty size="compact" title="没有可用条目" />}
-              {column.options.map(option => <button key={option.value} type="button" role="option" aria-selected={trail[depth] === option.value} disabled={option.disabled}
-                className={cx('flex w-full cursor-pointer items-start gap-2 rounded-md px-2.5 py-2 text-left text-[13px] hover:bg-ground focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45', trail[depth] === option.value && 'bg-accent-soft text-accent-ink')}
-                onClick={() => pick(option, depth)} onKeyDown={event => {
-                  if (event.key === 'ArrowRight' && option.children) { event.preventDefault(); pick(option, depth); }
-                  if (event.key === 'ArrowLeft' && depth > 0) { event.preventDefault(); setTrail(trail.slice(0, depth - 1)); }
-                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    const siblings = [...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)') ?? [])];
-                    const next = siblings.indexOf(event.currentTarget) + (event.key === 'ArrowDown' ? 1 : -1);
-                    siblings[(next + siblings.length) % siblings.length]?.focus();
-                  }
-                }}>
-                {option.children ? <Folder size={15} className="mt-0.5 shrink-0" /> : <FileText size={15} className="mt-0.5 shrink-0" />}
-                <span className="min-w-0 flex-1"><span className="block break-all">{option.label}</span>{option.hint && <span className="mt-0.5 block break-all text-[11px] leading-4 text-muted">{option.hint}</span>}</span>
-                {option.children && <ChevronRight size={15} className="mt-0.5 shrink-0" />}
-              </button>)}
-            </div>
-          </div>)}
-        </div>}
+      {query !== debounced ? <div role="status" className="p-4 text-[13px] text-muted">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { close(); onChange(value); }} />}
     </div>, document.body)}
   </>;
 }

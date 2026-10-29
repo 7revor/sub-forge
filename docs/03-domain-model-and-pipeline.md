@@ -458,6 +458,8 @@ SQLite v17 在事务中处理规则集、全部模板历史版本、独立订阅
 
 ## 2026-10-29：平面目录清单与级联选择
 
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
 SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`、`ref`、`root`、`path`，可关联文件另含历史索引 `entry`。仅保存目录与 list/txt 文件元数据，不读取规则正文，不在服务端创建嵌套树。它与规则条目、配置快照、提交版本在同一事务中替换，失败保留上次完整结果。旧库缺少目录缓存时标记待更新，同一提交也补建。
 
 `GET /api/rule-options/catalog?scope=all|repository` 返回当前用户可见本地规则集、启用仓库平面节点及索引提示。前端构造级联，叶子携带 `repo + entry + file(ref,path)`，`POST /api/rule-options/resolve` 校验并只返回该文件来源。历史聚合引用与示例种子的映射保留，不重新解释或改写旧模板、订阅；领域模型和渲染器沿用既有单文件来源结构。
@@ -474,3 +476,24 @@ SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`�
 ## 2026-10-29：按物理文件读取正文
 
 `GET /api/rule-repos/file-preview?repo&ref&path` 先检查启用仓库和平面目录成员资格，再按索引固定 commit 读取单个 list/txt 文件。返回原始 content、文件名、路径、分支、许可证与源链接，不解析 README、不合并同目录文件、不创建本地文档。读取结束重验索引快照；索引变化或仓库停用时拒绝返回过期内容。目录与名称查询仍走 SQLite，正文通过现有 Git 对象缓存按需读取。原有来源和规则领域结构不变。
+
+
+## 2026-10-29：规则目录逐层分页
+
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
+`GET /api/rule-options/catalog` 改为有界分页响应 `{items,total,offset,limit,nextOffset?,notices}`，不再返回全部仓库平面节点。`scope=all|repository` 控制本地候选；不传 `repo` 只返回可见本地规则集与仓库入口，传 `repo` 和仓库根相对路径 `directory` 返回当前层。默认 `offset=0&limit=30`，最多 100 项；非法分页/目录返回 400，停用或不存在仓库返回 404。
+
+`q` 在完整 SQLite 目录索引中按既有名称规则筛选，再按完整路径投影当前层、去除相同路径的重复目录、稳定排序并执行 LIMIT/OFFSET。保留原始路径的所有层级，例如 `rule/Clash/China` 与 `rule/Surge/China` 各自展示，不能剥离扫描根后按名称合并；文件保留仓库、完整路径、分支与 entry。正常分页查询不在应用层读取完整目录；缺失目录缓存时回退已有条目，并返回索引待更新提示。读取目录不拉正文，选中叶子后沿用现有单文件解析与授权。持久化领域模型、核心 IR、示例种子无需变更。
+
+## 2026-10-29：规则来源平铺分页
+
+`GET /api/rule-options/search?scope=all|repository&q=&offset=0&limit=30` 返回 `{items,total,offset,limit,nextOffset?,notices}`。每项 `{value,label,hint,disabled}`；value 为 JSON 编码的 `{source:'local',id}` 或 `{source:'repository',repo,entry,file:{ref,path}}`，可解析后传给 resolve。旧 `/rule-options/catalog` 逐层接口已移除。
+
+SQLite 文件索引、本地授权候选在同一查询中筛选、排序和 LIMIT/OFFSET 分页，应用层只接收当前页文件。缓存缺失时通过 SQL 查询已有条目的文件变体，仍有界分页并提示待更新。`rule_repo_catalog` 保留表结构，新缓存仅保存 file/ref/path/entry；读取旧缓存时忽略 directory，刷新时自然替换。预览也按单个文件查询索引，无需枚举全部文件。领域文档、核心 IR、单文件来源映射和示例种子均不变。
+
+2026-10-29 搜索范围修正：仓库候选的 searchable 仅取完整文件 path（含文件名），不拼接仓库名称或 ref；label/hint/value 不变。本地规则集沿用已有名称与备注搜索。核心 IR、领域文档与示例种子无需变更。
+
+2026-10-29 展示协议补充：`/api/rule-options/search` 的 hint 仅包含仓库名、父目录、分支等来源说明，value 中的完整文件路径保持不变。候选新增 `matches:{label:SearchMatch[],hint:SearchMatch[]}`，每个区间为原始显示文本的 UTF-16 半开 `[start,end)`；服务端仅为本页生成区间，跨目录与文件名的命中投影到两行，来源说明不参与高亮。核心新增规范化命中到原文的映射工具，领域 IR 与示例种子不变。
+
+2026-10-29 hint 格式调整：先在 matches 中按 repo 统计 `COUNT(DISTINCT ref)`，再执行当前页 LIMIT/OFFSET；分支数大于 1 才展示 ref。父目录为空时直接省略，不再填充 `/`。分支显示由当前查询全部匹配项决定，跨页稳定；hint 高亮区间按实际前缀长度生成。value、鉴权、文件身份、核心 IR 与示例种子保持不变。

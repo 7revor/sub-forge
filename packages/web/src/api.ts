@@ -1,6 +1,6 @@
 // 管理接口客户端：同源请求，会话靠 cookie。401 时通知外层跳转到登录页。
 
-import type { ReportItem } from '@sub-forge/core';
+import type { ReportItem, SearchMatch } from '@sub-forge/core';
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string, readonly details?: unknown) {
@@ -65,11 +65,8 @@ export type RuleRepo = { id: string; name: string; url: string; refs: string[]; 
 export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
 export type RepoFileEntry = RepoEntry & { filePath: string; ref: string; url: string };
 export type RepoFilePreview = { repo: string; entry?: string; ref: string; path: string; name: string; content: string; url: string; upstream: string; license: string };
-export type RuleCatalog = {
-  repositories: { id: string; name: string; complete: boolean; nodes: { kind: 'file' | 'directory'; ref: string; root: string; path: string; entry?: string }[] }[];
-  locals: { id: string; name: string; hint: string }[];
-  notices: string[];
-};
+export type RuleOption = { value: string; label: string; hint: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
+export type RuleOptions = { items: RuleOption[]; total: number; offset: number; limit: number; nextOffset?: number; notices: string[] };
 export type RepoFileList = RepoEntry & { license?: string; url: string; files: { ref: string; path: string; url: string; upstream: string; format: string }[] };
 export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?: RejectedRuleDetail[]; license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };
 export type SystemInfo = Pending & {

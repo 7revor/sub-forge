@@ -224,3 +224,39 @@
 USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayPal*` 应计为已解析；Surge macOS / iOS 显示有效行，mihomo / Android 显示“当前客户端无法输出：mihomo 不支持 USER-AGENT”的注释。保留现有布局与诊断区域。本轮未修改外部画布。
 
 2026-10-29 Stash 待同步画板：规则集预览增加 Stash macOS / iOS，客户端改写下拉增加 Stash；Profile 预览增加 Stash 与 iOS/macOS 平台、节点快照内联及文件内嵌规则说明；概览增加复制 Stash 链接；预设/基础设置增加 Stash 分区。Stash 使用自身的 YAML 表单和覆盖，不沿用 Mihomo 字段目录。外部画布本轮未修改。
+
+
+### 2026-10-29：规则来源分页文件树（待同步，替代左右级联）
+
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
+本轮访问画布仍显示「Sign in to view this page」，无法编辑。
+
+- TemplateEdit、ProfileRules、RuleSets 的来源弹层改为单列缩进文件树；不再绘制左右分栏级联。
+- 无搜索时仓库和目录初始折叠；有搜索结果时匹配路径默认展开；清空搜索恢复折叠。
+- 每层默认显示 30 项，未完页显示加载数量与「加载更多」；搜索展开不自动读取后续页。失败在相应层显示重试，已有页保留。
+- RuleRepo 左侧同样分页、搜索自动展开，右侧保留选中文件正文。
+
+本轮[验收记录与截图](../research/verification/rule-catalog-pagination-20261029/README.md)可供画布同步。
+
+
+2026-10-29 待同步补充：文件树不得剥离扫描根或合并同名分类；示例应画为 `blackmatrix7/ios_rule_script → rule → Clash → China → China.list` 和独立的 `rule → Surge → China → China.list`。两条路径分别分页和选择，初始折叠、搜索展开行为不变。
+
+原始目录结构的[验收记录与截图](../research/verification/rule-catalog-original-paths-20261029/README.md)。
+
+## 2026-10-29：规则来源平铺分页
+
+待同步：此方案取代前文全部来源级联／文件树画法。本会话已确认外部画布提示「Sign in to view this page」，未修改远程画布。
+
+- TemplateEdit、ProfileRules、RuleSets：单列搜索弹层，无文件夹、树连线、缩进、默认分组和展开控件。
+- 每个文件占两行：`China.list`；`blackmatrix7/ios_rule_script · rule/Clash/China/China.list · 分支：master`。另列 Surge 同名文件，禁止合并；本地候选显示名称与来源说明。
+- 默认只加载 30 项，页脚显示「已加载 30 / 90 项」「加载更多」；搜索结果同样分页。切换关键词显示「搜索中…」，失败可在原处重试。
+- RuleRepo 左侧替换为相同平铺文件列表，右侧保留文件原文预览。
+
+参考 [最新验收截图](../research/verification/rule-options-flat-20261029/README.md)。
+
+2026-10-29 待同步文案修正：TemplateEdit、ProfileRules、RuleSets 与 RuleRepo 的搜索框使用「搜索文件名或路径」。搜索 `ai` 的示例应展示 AI/OpenAI 或实际路径含 ai 的文件，不得因仓库名 v2fly-domain-list 展示 36kr.txt 等无关文件。外部画布受已核实的登录限制，未编辑。
+
+2026-10-29 待同步：三处来源弹层和 RuleRepo 文件列表每项第一行 `OpenAI.txt`，第二行 `v2fly-domain-list · AI/ · 分支：surge-domain-set`；根目录为 `/`，不重复文件名。搜索 ai 时只在第一行的 AI 和目录 AI/ 内高亮 AI，浅黄色底、深色文字，domain 与分支不高亮。长文本仍单行省略，悬停保留完整说明。外部画布仍受已核实的登录限制，未编辑。
+
+2026-10-29 待同步：根目录单分支候选第二行只画 `v2fly-domain-list`；子目录单分支画 `v2fly-domain-list · AI/`。同仓库搜索结果跨多个分支才画 `v2fly-domain-list * master * AI/`，根目录省略末尾目录和分隔符。分支不加“分支：”标签；高亮仍只应用于文件名与实际目录。外部画布登录限制未解除。

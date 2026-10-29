@@ -3,7 +3,8 @@ import { matchesNameSearch, nameLikePattern, normalizeNameSearch, parseRuleSourc
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { GitRepoCache, type RepoCache } from './git-cache.ts';
-import { buildCatalog, type CatalogNode } from './catalog.ts';
+import { buildCatalog } from './catalog.ts';
+import { findRuleFile } from './options.ts';
 import { randomId } from '../crypto.ts';
 import { isIndexedRuleFile, parseCustomRepo, parseScans } from './generic.ts';
 import type { Store } from '../store.ts';
@@ -122,7 +123,8 @@ export class RuleRepoService {
   /** 只预览选中的目录文件，保留注释和空行，不解析 README 或聚合其他来源。 */
   async filePreview(id: string, ref: string, path: string) {
     const version = this.snapshotVersion(id);
-    const node = this.catalog(id).nodes.find(node => node.kind === 'file' && node.ref === ref && node.path === path);
+    this.assertEnabled(id);
+    const node = findRuleFile(this.store.db, id, ref, path);
     if (!node || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中，请刷新后重试');
     const definition = this.definition(id, true);
     const row = this.rows().find(row => row.id === id)!;
@@ -130,7 +132,7 @@ export class RuleRepoService {
     const file: RepoFile = { ref, path, format: 'auto', ...(commit ? { commit } : {}) };
     const content = await this.readFile(definition, file);
     this.assertSnapshot(id, version);
-    return { repo: id, entry: node.entry, ref, path, name: path.split('/').at(-1)!, content,
+    return { repo: id, entry: node.entry ?? undefined, ref, path, name: path.split('/').at(-1)!, content,
       url: rawUrl(definition, file), upstream: upstreamUrl(definition, file), license: definition.license };
   }
   async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
@@ -288,21 +290,6 @@ export class RuleRepoService {
     const rank = (name: string) => normalizeNameSearch(name.replace(/\.[^.]+$/, '')) === query ? 0 : normalizeNameSearch(name).startsWith(query) ? 1 : 2;
     const items = [...files.values()].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.repo.localeCompare(b.repo) || a.filePath.localeCompare(b.filePath) || a.ref.localeCompare(b.ref));
     return { items: items.slice(offset, offset + limit), total: items.length, offset, limit };
-  }
-  catalog(id: string, query = ''): { nodes: CatalogNode[]; complete: boolean } {
-    this.assertEnabled(id);
-    const saved = this.store.db.prepare('SELECT data FROM rule_repo_catalog WHERE repo = ?').get(id) as { data: string } | undefined;
-    if (saved) {
-      const rows = this.store.db.prepare(`SELECT n.value AS data FROM rule_repo_catalog c, json_each(c.data) n
-        WHERE c.repo = ? AND search_fold(json_extract(n.value, '$.path')) LIKE ? ESCAPE '\\'`).all(id, nameLikePattern(query)) as { data: string }[];
-      return { nodes: rows.map(row => JSON.parse(row.data) as CatalogNode), complete: true };
-    }
-    // 更新失败期间仍提供已有规则文件；不把旧缓存当作完整目录索引。
-    const rows = this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ?').all(id) as { data: string }[];
-    const entries = rows.map(row => JSON.parse(row.data) as IndexedEntry);
-    const trees: Record<string, string[]> = {};
-    for (const entry of entries) for (const variant of entry.variants) for (const file of variant.files) (trees[file.ref] ??= []).push(file.path);
-    return { nodes: buildCatalog(this.definition(id, true), trees, entries).filter(node => matchesNameSearch(node.path, query)), complete: false };
   }
   private entry(repo: string, path: string): IndexedEntry {
     this.assertEnabled(repo);
