@@ -111,7 +111,7 @@ export function TabGroups() {
         <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, groupPatches: Object.fromEntries(Object.entries(o.groupPatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除这些组（{orphans.join('、')}），对它们的填充已失效。</span></Notice>
       )}
       <div className="flex flex-wrap items-start gap-5">
-        <Card title="策略组" actions={<span className="text-[12px] text-muted">顺序即面板顺序</span>} className="min-w-0 flex-[1_1_300px]" bodyClass="px-4 pb-2">
+        <Card title="策略组" className="min-w-0 flex-[1_1_300px]" bodyClass="px-4 pb-2">
           {templateIds.length > 0 && <p className="mt-0 text-[12px] text-muted">模板组顺序固定；私有组不能放在第一个模板组之前。</p>}
           <div className="-mx-4"><SortableList items={groups} getKey={(x) => x.id} isLocked={(x) => x.origin === 'template'}
             canDrop={(_from, to) => !templateIds.length || to > 0}
@@ -132,7 +132,7 @@ export function TabGroups() {
                 </div>
               );
             }} /></div>
-          {!groups.length && <Empty title="没有组" description="选择模板或新增私有组。" />}
+          {!groups.length && <Empty title="没有组" />}
           <div className="-mx-4 mt-4 border-t border-line-2 px-4 pt-2.5"><Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button></div>
         </Card>
 
@@ -140,7 +140,7 @@ export function TabGroups() {
           <Card className="min-w-0 flex-[999_1_560px]"
             title={<div className="flex flex-col gap-1">
               <h2 className="m-0 text-lg font-semibold">{g.origin === 'template' ? g.name : <Input aria-label="组名" value={g.name} onChange={(e) => patchOverlay((o) => ({ ...o, extraGroups: (o.extraGroups ?? []).map((x) => (x.group.id === g.id ? { ...x, group: { ...x.group, name: e.target.value } } : x)) }))} />}</h2>
-              <span className="text-[12.5px] text-muted">{g.origin === 'template' ? '模板组 · 可填充成员、调整类型与测速参数；不能删除、改名或隐藏' : '私有组 · 只属于这个配置订阅'}</span>
+              <span className="text-[12.5px] text-muted">{g.origin === 'template' ? '模板组' : '私有组'}</span>
             </div>}
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
@@ -164,13 +164,13 @@ export function TabGroups() {
                     </div>;
                   }} />
                   {patch.memberOrder === 'prepend' && templateMembers}
-                  {!allMembers.length && <div className="p-3.5"><Empty title="没有成员" description="按“为空时”的设定输出。" /></div>}
+                  {!allMembers.length && <div className="p-3.5"><Empty title="没有成员" /></div>}
                 </div>
                 <MemberAdder key={g.id} excludeGroupId={g.id} onAdd={(m) => setMembers([...added, m])} />
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
-                <Field label="filter（保留）" hint="作用于节点集成员；内联节点集由服务端预过滤">{(id) => <Input id={id} className="font-mono" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
+                <Field label="filter（保留）" hint="仅筛选节点集成员">{(id) => <Input id={id} className="font-mono" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
                 <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={eff.excludeFilter ?? ''} onChange={(e) => setField('excludeFilter', e.target.value)} />}</Field>
                 <Field label="exclude-type">{(id) => <Input id={id} className="font-mono" placeholder="如 ss|http" value={eff.excludeType ?? ''} onChange={(e) => setField('excludeType', e.target.value)} />}</Field>
               </div>
@@ -188,7 +188,6 @@ export function TabGroups() {
                 <Field label="icon" hint="mihomo icon / Surge icon-url">{(id) => <Input id={id} placeholder="图标地址" value={eff.display?.icon ?? ''} onChange={(e) => setField('display', { ...eff.display, icon: e.target.value || undefined })} />}</Field>
               </div>
               <div className="flex flex-col gap-2">
-                <span className="text-[12px] text-muted">高级参数原样输出，适用范围见 mihomo 文档</span>
                 <ExtraFields key={g.id} value={eff.extra ?? {}} onChange={(extra) => setField('extra', extra)} />
               </div>
             </div>

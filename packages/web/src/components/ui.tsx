@@ -217,5 +217,5 @@ export { formatTime, formatBytes } from '../utils/format.ts';
 
 /** 服务端尚未实现的功能：界面已就位，操作会被服务端拒绝（501） */
 export function PendingNotice({ children }: { children: ReactNode }) {
-  return <div role="note" className="rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-4 py-3 text-[12.5px] leading-relaxed text-muted"><b className="font-medium text-ink-2">服务端尚未实现：</b>{children}</div>;
+  return <div role="note" className="rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-4 py-3 text-[12.5px] leading-relaxed text-muted">{children}</div>;
 }

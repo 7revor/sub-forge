@@ -23,7 +23,6 @@ import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal,
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
-const INTRO = '自建、中转等手写节点。每个分组就是一个节点集，可单独加入配置订阅。';
 const EMPTY: LocalProxyGroup = { id: '', name: '', proxies: [] };
 const CORE = new Set(['name', 'type', 'server', 'port']);
 const crumbLink = 'text-muted no-underline';
@@ -49,8 +48,7 @@ export function LocalList() {
   const [creating, setCreating] = useState(false);
   return (
     <>
-      <DocList kind="locals" title="本地节点" noun="分组" onCreate={() => setCreating(true)} intro={INTRO} deleteBody={GROUP_DELETE_BODY}
-        empty="自建、中转等手写节点按分组管理，每个分组都能单独加入配置订阅。"
+      <DocList kind="locals" title="本地节点" noun="分组" onCreate={() => setCreating(true)} deleteBody={GROUP_DELETE_BODY}
         columns={[
           { header: '名称', cell: (g) => g.name },
           { header: '备注', cell: (g) => <NoteCell note={g.note} /> },
@@ -95,7 +93,7 @@ export function LocalEdit() {
       <Card scroll bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
         actions={<Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link>}>
-        {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增节点后，可填写表单或在原始配置中粘贴单个节点。" /></div> : (
+        {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" /></div> : (
           <table className="w-full min-w-[620px] border-collapse">
             <thead><tr><th className={cx(th, 'px-3.5')}>名称</th><th className={cx(th, 'px-3.5')}>协议</th><th className={cx(th, 'px-3.5')}>服务器</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>
@@ -119,7 +117,7 @@ export function LocalEdit() {
         footer={<><Button onClick={() => setGroupText(undefined)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {
           if (groupResult?.ok) { setProxies(groupResult.value); setGroupText(undefined); }
         }}>应用到分组</Button></>}>
-        <Field label="整个分组的 proxies 列表" hint="应用后请保存分组。本地节点不设置前置，代理链请在配置订阅中设置。">
+        <Field label="整个分组的 proxies 列表">
           {(id) => <Textarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
         </Field>
         <ErrorBox error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
@@ -194,7 +192,7 @@ export function LocalNodeEdit() {
       <ErrorBox error={save.error} />
 
       <Card scroll title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
-        <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={proxyDraftFromYaml} recoverForm={proxyFormFromYaml} fromPaste={proxyFromPaste} rawLabel="节点 YAML" rawHint="粘贴单个节点的分享链接、YAML、JSON 或 Surge 配置，将自动转为 Mihomo YAML 并同步表单。多个节点请拆分添加。" renderForm={() => <div className="flex flex-col gap-4">
+        <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={proxyDraftFromYaml} recoverForm={proxyFormFromYaml} fromPaste={proxyFromPaste} rawLabel="节点 YAML" rawHint="支持单个节点的分享链接、YAML、JSON 或 Surge 配置。" renderForm={() => <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="名称" className="col-span-2">{(fid) => <Input id={fid} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>
             <Field label="协议">{(fid) => <Select id={fid} value={cur.type} onChange={(x) => changeType(x.target.value)}>

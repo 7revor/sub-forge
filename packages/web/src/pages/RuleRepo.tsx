@@ -45,7 +45,7 @@ export function RuleRepoPage() {
 
   return (
     <>
-      <PageHeader title="规则仓库" subtitle="搜索内置的 GitHub 规则仓库并直接引用。选择文本变体导入规则集，自动合并去重；每日检查上游更新。" />
+      <PageHeader title="规则仓库" />
       <div className="flex flex-wrap gap-2" aria-label="索引状态">
         {(repos.data?.repos ?? []).map(r => <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-[12px]">
           <span>{r.id} · {!r.enabled ? '已停用' : r.indexing ? '正在更新索引…' : r.builtAt ? `${r.entries} 个规则` : '等待首次索引'}</span>
@@ -91,7 +91,7 @@ export function RuleRepoPage() {
           </section>
 
           <section key={sel ? `${sel.repo}:${sel.path}` : 'empty'} aria-label="详情" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain rounded-[10px] border border-line bg-panel px-4.5 py-4 [&>*]:shrink-0">
-            {!sel ? <Empty title="还没有选择规则" description="从左侧选择一个规则查看详情。" /> : <>
+            {!sel ? <Empty title="还没有选择规则" /> : <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-col gap-1">
                   <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>

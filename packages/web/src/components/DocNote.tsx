@@ -1,7 +1,7 @@
 import { Field, Textarea } from './ui.tsx';
 
 export function NoteField({ value, onChange }: { value: string | undefined; onChange: (note: string) => void }) {
-  return <Field label="备注" hint="选填，保存后会展示在列表中。">{(id) =>
+  return <Field label="备注">{(id) =>
     <Textarea id={id} rows={2} placeholder="填写用途或其他说明" value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
   }</Field>;
 }

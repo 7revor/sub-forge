@@ -38,7 +38,7 @@ export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
       <div className="flex flex-col gap-3.5">
         <p className="m-0 text-[13px] text-muted">{ref ? `${template?.name ?? ref.id} · v${template?.version ?? pinned ?? '?'} · ${pinned === undefined ? '跟随最新' : '锁定版本'}` : '不使用模板'}</p>
         <ErrorBox error={templates.error ?? details.error ?? change.error} />
-        <Field label="更换模板" hint="覆盖项会保留；修改后点击右上角保存">{(id) => (
+        <Field label="更换模板" hint="保留现有覆盖项">{(id) => (
           <Select id={id} value={ref?.id ?? ''} disabled={change.isPending || templates.isPending || templates.isError}
             onChange={(e) => change.mutate(e.target.value ? { id: e.target.value, follow: 'latest' } : undefined)}>
             <option value="">不使用模板</option>

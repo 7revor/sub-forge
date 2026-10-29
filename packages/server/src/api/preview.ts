@@ -7,7 +7,7 @@
 
 import {
   composeRule, expandRuleSet, expandSource, lowerRule, NodeSetResolver, parseContent, parseRuleSetContent, Report, runPipeline, sourceKey, withIpOptions,
-  type Client, type ClientCtx, type Collection, type NodeSetID, type OperatorStep, type Platform, type ProxyIR, type RuleIR,
+  type RejectedRule, type Client, type ClientCtx, type Collection, type NodeSetID, type OperatorStep, type Platform, type ProxyIR, type RuleIR,
 } from '@sub-forge/core';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../docs.ts';
 import { Hono, type Context } from 'hono';
@@ -189,7 +189,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const rs: RuleSetDoc = { id: savedId ?? 'draft', name: typeof draft.name === 'string' && draft.name ? draft.name : '未命名', sources: draft.sources, ...(draft.overrides ? { overrides: draft.overrides } : {}), ...(draft.noResolve ? { noResolve: true } : {}) };
 
     const snapshotsIn: Record<string, string> = {};
-    const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number }[] = [];
+    const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRule[] }[] = [];
     for (const src of rs.sources) {
       if (!src || typeof src !== 'object' || typeof src.id !== 'string') throw bad('来源格式错误');
       const passthrough = src.format === 'mrs' || src.format === 'srs';
@@ -214,7 +214,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       status.push({
         id: src.id, ok: !error && (passthrough || content !== undefined),
         ...(error ? { error } : {}), ...(fetchedAt ? { fetchedAt } : {}), ...(passthrough ? { passthrough: true } : {}),
-        ...(parsed && !parsed.passthrough ? { rules: parsed.rules.length, rejected: parsed.rejected.length } : {}),
+        ...(parsed && !parsed.passthrough ? { rules: parsed.rules.length, rejected: parsed.rejected.length, ...(parsed.rejected.length ? { rejectedDetails: parsed.rejected.slice(0, 100) } : {}) } : {}),
       });
     }
     const inputs = { rulesets: { [rs.id]: rs }, snapshots: snapshotsIn };

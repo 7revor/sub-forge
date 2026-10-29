@@ -31,7 +31,7 @@ export function System() {
   return (
     <>
       <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
-      {info.data?.pending && <PendingNotice>SSRF、配置校验、镜像及备份设置仍是占位，保存、导出与恢复会被服务端拒绝。内置规则仓库可独立更新与启停。目前 SSRF 白名单与 mihomo 校验由环境变量 <span className="font-mono">SSRF_ALLOW</span>、<span className="font-mono">MIHOMO_BIN</span> 控制。</PendingNotice>}
+      {info.data?.pending && <PendingNotice>除内置规则仓库外，其余系统设置暂不可用。</PendingNotice>}
       <ErrorBox error={save.error} />
 
       <PageScroll>
@@ -63,7 +63,7 @@ export function System() {
                   <Badge>{verify.version ? `内置 mihomo ${verify.version}` : '未检测到 mihomo'}</Badge>
                   {verify.checks24h !== undefined && <Badge tone={verify.fails24h ? 'warn' : 'neutral'}>近 24 小时校验 {verify.checks24h} 次 · 失败 {verify.fails24h ?? 0} 次</Badge>}
                 </div>
-                <span className="text-[12px] leading-relaxed text-muted">服务端引用校验（dialer-proxy、规则目标、组成员）始终开启，不受此开关影响。</span>
+                <span className="text-[12px] leading-relaxed text-muted">引用校验始终开启。</span>
               </div>
             </Card>
           </div>
@@ -84,13 +84,13 @@ export function System() {
                   {!repos.data?.repos.length && <Empty title="还没有仓库索引" />}
                 </div>
                 <ErrorBox error={repos.error ?? removeRepo.error ?? refreshRepo.error ?? toggleRepo.error} />
-                <Field label="GitHub 镜像地址" hint="镜像设置尚未接入，当前使用 GitHub 官方地址">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
+                <Field label="GitHub 镜像地址" hint="镜像设置暂不生效">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
               </div>
             </Card>
 
             <Card title="备份与恢复">
               <div className="flex flex-col gap-3">
-                <span className="text-[12.5px] leading-relaxed text-ink-2">导出全部配置为 JSON：用户、订阅源、处理链、规则、模板版本、配置订阅覆盖层。快照与渲染缓存不包含在内。敏感字段在导出文件中仍保持加密。</span>
+                <span className="text-[12.5px] leading-relaxed text-ink-2">导出 JSON 配置，不含快照和缓存；敏感字段保持加密。</span>
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => backup.mutate()} disabled={backup.isPending}>{backup.isPending ? '导出中…' : '导出备份'}</Button>
                   <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-[#d5d9e0] bg-panel px-3.5 text-[13.5px] font-medium hover:bg-ground">

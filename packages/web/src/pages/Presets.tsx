@@ -17,7 +17,7 @@ import { baseFormFromYaml, baseFromYaml, baseToYaml } from '../convert/baseYaml.
 import { baseFromForm, baseToForm, mihomoBaseGroups } from '../schemas/mihomoBase.ts';
 import { useList, useSaveDoc, type PresetDoc } from '../hooks.ts';
 
-const INTRO = '预设更新会同步到所有引用它的配置订阅；配置订阅自己覆盖的项保持不变。';
+const INTRO = '保存后同步更新引用此预设的配置订阅。';
 const DELETE_BODY = '引用它的配置订阅需要先改用其他预设或自定义。';
 const DEFAULT_MIHOMO = { 'mixed-port': 7890, mode: 'rule', 'log-level': 'warning' };
 const EMPTY: PresetDoc = { id: '', name: '', version: 1, mihomo: DEFAULT_MIHOMO };
@@ -25,7 +25,7 @@ const EMPTY: PresetDoc = { id: '', name: '', version: 1, mihomo: DEFAULT_MIHOMO 
 function NewPresetModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const save = useSaveDoc('presets');
-  return <NamedCreateDialog open={open} onClose={onClose} title="新建预设" placeholder="例如：fake-ip 推荐" hint="从常用的通用设置开始，创建后再补充 DNS、TUN 等。"
+  return <NamedCreateDialog open={open} onClose={onClose} title="新建预设" placeholder="例如：fake-ip 推荐"
     pending={save.isPending} error={save.error} onReset={save.reset}
     onCreate={(name) => save.mutateAsync({ name, version: 1, mihomo: DEFAULT_MIHOMO }, { onSuccess: (item) => { onClose(); navigate(`/presets/${item.id}`); } })} />;
 }
@@ -38,7 +38,6 @@ export function PresetList() {
     <>
       <ErrorBox error={profiles.error} />
       <DocList kind="presets" title="基础设置预设" noun="预设" intro={INTRO} onCreate={() => setCreating(true)} deleteBody={DELETE_BODY}
-        empty="把 DNS、TUN、嗅探等通用设置做成预设，配置订阅引用后自动同步。"
         columns={[
           { header: '名称', cell: (p) => p.name },
           { header: '已发布版本', cell: (p) => <span className="font-mono text-[13px]">v{p.version}</span> },
@@ -93,7 +92,7 @@ export function PresetEdit() {
                 <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
               </div>
             </div>
-            {client === 'surge' && <Empty title="Surge 预设暂未开放" description="Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。" />}
+            {client === 'surge' && <Empty title="Surge 预设暂未开放" />}
             {client === 'mihomo' && <DualEditor key={`${d.id}-${editorRevision}`} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
               toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} onValidityChange={setRawValid} rawLabel="mihomo · YAML"
               renderForm={() => <SchemaForm groups={mihomoBaseGroups} value={baseToForm(d.mihomo)} extra collapsible

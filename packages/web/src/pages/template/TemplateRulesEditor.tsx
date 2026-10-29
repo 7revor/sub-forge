@@ -41,7 +41,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       onChange({ ...value, rules: [...value.rules, { id, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'REJECT' } }] });
       onSelect(id);
     }}>新增规则</Button>}>
-    {!value.rules.length && <Empty className="mb-4" title="没有规则" description="可新增规则；未匹配的流量走下方 MATCH 出口。" />}
+    {!value.rules.length && <Empty className="mb-4" title="没有规则" />}
     <div className="min-w-[580px]">
       <div className={`${columns} border-b border-line px-2 py-2 text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>启用</span><span>操作</span></div>
       <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {

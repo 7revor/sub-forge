@@ -49,7 +49,7 @@ export function TabChains() {
 
   return (
     <>
-      <Card title={`链规则`} subtitle={`代理链只在这里设置：落地 = 已加入节点集中命中筛选的节点 → 前置 = 策略组或单个节点。本地节点只保存节点信息，订阅源自带的前置会自动识别。`}
+      <Card title={`链规则`}
         actions={<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加链规则</Button>}>
         {!draft.chains.length ? <Empty title={profileNodeSets.length ? '还没有链规则' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
           <div className="flex flex-col gap-3">
@@ -78,7 +78,7 @@ export function TabChains() {
       </Card>
 
       {chainReport.length > 0 && <Card title="代理链告警" bodyClass="px-4 pb-2"><ReportList items={chainReport} /></Card>}
-      <Card title={`依赖节点`} subtitle={`系统自动引入的包装组与复制节点。默认包装组（不打平、不复制），也可以逐项切换。`}
+      <Card title={`依赖节点`}
         actions={<>
           <label className="flex items-center gap-2 text-[12.5px] text-ink-2">Profile 默认
             <Select className="h-9 w-auto" value={draft.refPolicy.default} onChange={(e) => setDraft({ ...draft, refPolicy: { ...draft.refPolicy, default: e.target.value as RefStrategy } })}>
@@ -87,7 +87,7 @@ export function TabChains() {
           <Button onClick={() => preview.mutate(undefined)} disabled={preview.isPending}>{preview.isPending ? '解析中…' : '解析依赖'}</Button>
         </>} bodyClass="overflow-x-auto">
         <ErrorBox error={preview.error} />
-        {!preview.data ? <div className="px-4 pb-4"><Empty title="还没有依赖解析结果" description="点「解析依赖」用当前草稿试渲染，列出被引用的 provider 节点。" /></div> : !preview.data.dependencies?.length ? <div className="px-4 pb-4"><Empty title="没有引用 provider 中的单个节点" /></div> : (
+        {!preview.data ? <div className="px-4 pb-4"><Empty title="还没有依赖解析结果" /></div> : !preview.data.dependencies?.length ? <div className="px-4 pb-4"><Empty title="没有引用 provider 中的单个节点" /></div> : (
           <table className="w-full min-w-[760px] border-collapse">
             <thead><tr><th className={th}>被引用的节点</th><th className={th}>生成项</th><th className={th}>引用来源</th><th className={th}>解析策略</th></tr></thead>
             <tbody>
@@ -103,7 +103,7 @@ export function TabChains() {
             </tbody>
           </table>
         )}
-        {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-muted">包装组一律输出 <code className="font-mono">empty-fallback: REJECT</code>：provider 未加载或节点消失时拒绝连接，不会绕过前置直连。</p>}
+        {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-muted">依赖节点不可用时拒绝连接。</p>}
       </Card>
       <Modal title={editing?.index === -1 ? '添加链规则' : `编辑链规则 #${(editing?.index ?? 0) + 1}`} open={!!editing} onClose={() => setEditing(undefined)}
         footer={<><Button onClick={() => setEditing(undefined)}>取消</Button><Button variant="primary" onClick={commit}>{editing?.index === -1 ? '添加' : '保存链规则'}</Button></>}>
@@ -120,7 +120,6 @@ export function TabChains() {
             <MatchPreview nodeSet={c.landing.nodeSet} filter={c.landing.filter} excludeFilter={c.landing.excludeFilter} />
             <div className="flex flex-col gap-1.5 border-t border-line-2 pt-3"><span className="text-[12.5px] font-medium text-muted">前置</span>
               <TargetPicker label="前置" value={c.via} onChange={(via) => put({ ...c, via })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
-            <span className="text-[12px] text-muted">改动在页面右上角「保存」后生效。</span>
           </>;
         })()}
       </Modal>
@@ -151,12 +150,12 @@ export function TabPreview() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented label="客户端" value="mihomo" options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge', disabled: true, title: 'Surge 在 M2 提供' }]} onChange={() => {}} />
+        <Segmented label="客户端" value="mihomo" options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge', disabled: true, title: 'Surge 暂未开放' }]} onChange={() => {}} />
         <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">平台
           <Select className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
         <Button onClick={() => preview.mutate(platform === 'any' ? undefined : platform)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
         <Button onClick={exportFile} disabled={!preview.data?.yaml}>导出文件</Button>
-        <span className="text-[12.5px] text-muted">用当前草稿（含未保存的修改）渲染，不影响已下发的订阅。Surge 在 M2。</span>
+        <span className="text-[12.5px] text-muted">当前草稿预览</span>
       </div>
       <ErrorBox error={preview.error} />
       {preview.data && (

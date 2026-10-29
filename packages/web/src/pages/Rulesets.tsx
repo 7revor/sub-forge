@@ -1,9 +1,10 @@
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
+import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
-// 来源配置与本地内容就地编辑，下方始终只读预览最终合并结果。
+// 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
-import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
 import { FileText, Globe, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -35,7 +36,7 @@ function sourceSummary(rs: RuleSetDoc): string {
 
 export function RulesetList() {
   return (
-    <DocList kind="rulesets" title="规则集" empty="一组匹配条件，可以由多个远程地址与本地规则合并而成，在配置订阅的规则里配上出口。" intro="一组匹配条件（不含出口），可以引用多个远程地址与本地规则，合并去重后只配一个出口；管理员名下的规则集可被所有人引用。"
+    <DocList kind="rulesets" title="规则集"
       columns={[
         { header: '名称', cell: (r) => r.name },
         { header: '备注', cell: (r) => <NoteCell note={r.note} /> },
@@ -77,16 +78,17 @@ export function RulesetEdit() {
   const t = TARGETS.find((x) => x.key === target)!;
   const draft = useDebouncedValue(e.draft, 400);
   const preview = useQuery({
-    queryKey: ['ruleset-preview', e.isNew ? '' : e.id, target, JSON.stringify(draft)],
-    enabled: !!draft,
-    placeholderData: keepPreviousData,
+    queryKey: ['ruleset-preview', e.isNew ? '' : e.id, target, selected, JSON.stringify(draft)],
+    enabled: !!draft && (!selected || draft.sources.some((s) => s.id === selected)),
     queryFn: () => api<RulesetPreview>('POST', '/rulesets/preview', {
       ...(e.isNew ? {} : { id: e.id }), ruleset: draft,
+      ...(selected ? { source: selected } : {}),
       client: t.client, ...(t.platform ? { platform: t.platform } : {}),
     }),
   });
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
+  const selectedSource = d.sources.find((s) => s.id === selected);
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
   const setSource = (id: string, p: Partial<RuleSetSourceDoc>) => set({ sources: d.sources.map((s) => (s.id === id ? { ...s, ...p } : s)) });
   const add = (src: RuleSetSourceDoc) => { set({ sources: [...d.sources, src] }); setSelected(src.id); };
@@ -117,8 +119,7 @@ export function RulesetEdit() {
         {!e.isNew && <Link to={`/rule-repo?ruleset=${encodeURIComponent(d.id)}`} className={buttonClass('default', 'md', 'h-9')}>从规则仓库添加</Link>}
       </>}>
         <div className="flex flex-col gap-4">
-          <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源展开配置，本地规则在配置块内编辑；下方统一展示合并后的最终只读结果。</p>
-          {!d.sources.length ? <Empty title="还没有来源" description="添加远程地址或本地规则。" /> : (
+          {!d.sources.length ? <Empty title="还没有来源" /> : (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
               <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
                 onSelect={() => setSelected(s.id === selected ? undefined : s.id)}
@@ -134,7 +135,8 @@ export function RulesetEdit() {
         onChange={(overrides) => set({ overrides: overrides.length ? overrides : undefined })}
         onRemoveLegacy={(id) => setSource(id, { overrides: undefined })} />
 
-      <Card className="min-w-0" title="最终结果（只读）">
+      <Card className="min-w-0" title={selectedSource ? `来源预览 · ${sourceLabel(selectedSource)}` : '合并结果（只读）'}
+        actions={selectedSource && <Button onClick={() => setSelected(undefined)}>查看合并结果</Button>}>
         <div className="flex flex-col gap-3">
           <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
             {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
@@ -181,12 +183,12 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
           {src.kind === 'remote' && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
           <Field label="格式">{(id) => <Select id={id} value={src.format} onChange={(x) => onChange({ format: x.target.value as RuleSetFormat })}>{FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
           {src.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={src.behavior ?? ''} onChange={(x) => onChange({ behavior: (x.target.value || undefined) as 'domain' | 'ipcidr' | undefined })}><option value="">请选择</option><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
-          {src.kind === 'remote' && <Field label="缓存（小时）" hint="带失败快照，过期后后台刷新">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
+          {src.kind === 'remote' && <Field label="缓存（小时）">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
             const h = Number(x.target.value);
             const { ttlSec: _, ...rest } = src.fetch ?? {};
             onChange({ fetch: h > 0 && h !== 24 ? { ...rest, ttlSec: h * 3600 } : Object.keys(rest).length ? rest : undefined });
           }} />}</Field>}
-          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="每行一条，如 DOMAIN-SUFFIX,example.com；也可以是纯域名或纯 CIDR。最终结果在下方实时预览。">{(id) => (
+          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="每行一条，支持 classical 规则、域名或 CIDR。">{(id) => (
             <Textarea id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
           )}</Field>}
         </div>
@@ -200,7 +202,8 @@ function SourceStatus({ src, status, loading }: { src: RuleSetSourceDoc; status?
   if (!status) return loading ? <Badge>检查中…</Badge> : null;
   if (status.error) return <span title={status.error}><Badge tone="err">{src.kind === 'remote' ? '拉取失败' : '无法读取'}</Badge></span>;
   if (status.rules === undefined) return null;
-  return <Badge tone={status.rejected ? 'warn' : 'neutral'}>{status.rules} 条{status.rejected ? ` · 不支持 ${status.rejected} 行` : ''}</Badge>;
+  if (status.rejected) return <RejectedRulesPopover sourceName={sourceLabel(src)} status={status} />;
+  return <Badge>{status.rules} 条</Badge>;
 }
 
 function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> }) {
@@ -209,7 +212,7 @@ function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> })
       <div className="grid grid-cols-3 gap-2">
         {(['domain', 'classical', 'ipcidr'] as const).map((b) => <div key={b} className="flex flex-col gap-0.5 rounded-lg bg-ground p-2.5"><span className="font-mono text-[11.5px] text-muted">{b}</span><span className="text-xl font-semibold">{stats[b]}</span></div>)}
       </div>
-      <span className="text-[12.5px] text-ink-2">来源与改写共 {stats.total} 条，去重 {stats.duplicates} 条，输出 {stats.total - stats.duplicates} 条；按 domain → classical → ipcidr 分别输出，IP 类放在最后，避免过早触发 DNS 解析。</span>
+      <span className="text-[12.5px] text-ink-2">来源与改写共 {stats.total} 条，去重 {stats.duplicates} 条，输出 {stats.total - stats.duplicates} 条</span>
     </div>
   );
 }
@@ -218,10 +221,11 @@ function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
   if (preview.error) return <ErrorBox error={preview.error} />;
   const p = preview.data;
   if (!p) return <div className="text-[13px] text-muted">加载中…</div>;
+  if (p.passthrough) return <Empty title="该来源为二进制透传" description="由客户端直接读取，无法在此展示文本规则。" />;
   return (
     <>
       {p.error && <ErrorBox error={`拉取失败：${p.error}`} />}
-      {p.lines.length ? <CodePreview text={p.lines.join('\n')} loading={preview.isFetching} bodyClassName="min-h-[120px]" /> : <Empty title="没有可输出的规则" description="添加或启用来源，或检查规则内容和客户端改写。" />}
+      {p.lines.length ? <CodePreview text={p.lines.join('\n')} loading={preview.isFetching} bodyClassName="min-h-[120px]" /> : <Empty title="没有可输出的规则" />}
       <span className="text-[12px] text-muted">{p.total ?? p.lines.length} 行{(p.total ?? 0) > p.lines.length ? `（显示前 ${p.lines.length} 行）` : ''} · 降级 {p.notes?.length ?? 0} · 丢弃 {p.dropped.length} · 无法解析 {p.rejected.length}</span>
       {[...(p.notes ?? []).map((n) => ['降级', n]), ...p.dropped.map((x) => ['丢弃', x.reason]), ...p.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].slice(0, 50).map(([k, v], i) => (
         <div key={i} className="flex gap-2 text-[12.5px]"><Badge tone={k === '降级' ? 'accent' : k === '丢弃' ? 'err' : 'warn'}>{k}</Badge><span className="min-w-0 break-all">{v}</span></div>
