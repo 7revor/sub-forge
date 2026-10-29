@@ -21,7 +21,7 @@
 | 规则仓库 `RuleRepo` | `/rule-repo` | 占位接口 |
 | 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish` | 草稿在两页之间共用；发布页自动试渲染；仅管理员可进入 |
 | 补充 `TemplateBrowse` | `/templates` | 2026-10-29 统一为唯一模板入口，仅管理员可见，可新建、编辑与发布；旧 `/templates/manage` 重定向到此页。普通用户在配置订阅向导中选择模板 |
-| 基础设置预设 `Presets` | `/presets/:id` | 单页；Surge 段为 M2 占位说明 |
+| 基础设置预设 `Presets` | `/presets`、`/presets/:id` | 列表 → 独立详情：搜索、新建、删除、编辑；详情保留分区配置与引用方，离开前可发布或放弃修改；Surge 段为 M2 占位说明 |
 | 用户 `Users` | `/users` | 统计列与共享走占位接口 |
 | 系统 `System` | `/system` | 占位接口 |
 | 补充 `Dialogs` | 全部详情页 | 头部「更多」菜单与最右侧的独立删除按钮、删除确认、各类对话框、表单 / YAML 双视图、离开前保存（2026-10-29 删除从「更多」菜单移出） |
