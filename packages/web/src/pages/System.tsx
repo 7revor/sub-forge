@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { GithubTokenSettings } from '../components/GithubTokenSettings.tsx';
 import { api, type SystemInfo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
 export function System() {
   const qc = useQueryClient();
@@ -68,7 +68,6 @@ export function System() {
               <div className="flex flex-col gap-3">
                 <GithubTokenSettings />
                 <Link to="/rule-repo" className="text-[13px] text-accent">前往规则仓库管理仓库与索引 →</Link>
-                <Field label="GitHub 镜像地址" hint="镜像设置暂不生效">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
               </div>
             </Card>
 

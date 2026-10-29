@@ -17,8 +17,8 @@ export function pendingRoutes() {
   app.post('/shares', requireAdmin, todo('共享'));
   app.delete('/shares/:id', requireAdmin, todo('共享'));
 
-  // 系统设置：SSRF 白名单、mihomo 校验、仓库镜像、备份与恢复
-  app.get('/system', requireAdmin, (c) => c.json({ pending: true, ssrfAllow: [], verify: null, mirror: '', lastBackup: null }));
+  // 系统设置：SSRF 白名单、mihomo 校验、备份与恢复
+  app.get('/system', requireAdmin, (c) => c.json({ pending: true, ssrfAllow: [], verify: null, lastBackup: null }));
   app.put('/system', requireAdmin, todo('系统设置'));
   app.post('/system/backup', requireAdmin, todo('导出备份'));
   app.post('/system/restore', requireAdmin, todo('从备份恢复'));
