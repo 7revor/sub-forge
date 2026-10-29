@@ -14,7 +14,7 @@ import { NodeSetPickerDialog, RenameDialog } from '../components/dialogs.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { useNodeSetNames } from '../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Select, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useList } from '../hooks.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
@@ -44,7 +44,7 @@ export function CollectionEdit() {
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const preview = usePipelinePreview('collections', e.isNew ? undefined : e.id, e.draft?.pipeline, e.draft?.members);
-  if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const set = (p: Partial<Collection>) => e.setDraft({ ...d, ...p });
   const options = all.filter((n) => !(n.ref.type === 'collection' && n.ref.id === d.id));

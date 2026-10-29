@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { DeleteAction, ActionButtons, type ActionItem } from './DetailActions.tsx';
-import { Badge, Button, ErrorBox, PageHeader, PageScroll } from './ui.tsx';
+import { Badge, Button, ErrorAlert, PageHeader, PageScroll } from './ui.tsx';
 
 export function DetailShell({ listPath, listLabel, isNew, name, dirty, saving, saveDisabled = false, onSave, saveError, onDelete, deleteError, deleting, onDeleteReset, deleteBody, canEdit = true, extraActions, actionItems = [], badges, children }: {
   listPath: string; listLabel: string; isNew: boolean; name: string; dirty: boolean; saving: boolean;
@@ -24,7 +24,7 @@ export function DetailShell({ listPath, listLabel, isNew, name, dirty, saving, s
         {badges}
         {!isNew && dirty && canEdit && <Badge tone="warn">有未保存的修改</Badge>}
       </PageHeader>
-      <ErrorBox error={saveError} />
+      <ErrorAlert error={saveError} />
       <PageScroll>{children}</PageScroll>
     </>
   );

@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useDeleteDoc, useList, type DocMap, type Kind } from '../hooks.ts';
-import { Button, buttonClass, Card, cx, Empty, ErrorBox, Input, PageHeader, PageScroll, td, th } from './ui.tsx';
+import { Button, buttonClass, Card, cx, Empty, ErrorAlert, Input, PageHeader, PageScroll, td, th } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { DeleteDialog } from './DetailActions.tsx';
 
@@ -34,7 +34,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
   return (
     <>
       <PageHeader title={title} subtitle={intro} actions={canCreate && createButton('md', 'primary')} />
-      <ErrorBox error={list.error} />
+      <ErrorAlert error={list.error} />
       {list.isLoading ? <PageScroll><div className="text-muted">加载中…</div></PageScroll> : !list.data?.length ? (
         <PageScroll><Empty title={`还没有${name}`} description={empty} action={canCreate && createButton('sm', 'default')} /></PageScroll>
       ) : (

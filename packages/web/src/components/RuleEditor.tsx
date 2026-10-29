@@ -1,7 +1,8 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { parseRuleLine, type RuleIR } from '@sub-forge/core';
 import { useState } from 'react';
 import { emptyRule, RULE_TYPE_GROUPS, ruleToLine } from './rule.ts';
-import { Button, ErrorBox, Field, Input, Segmented, Select, Switch } from './ui.tsx';
+import { Button, Field, Input, Segmented, Select, Switch } from './ui.tsx';
 
 export function RuleEditor({ value, onChange, onIncomplete }: {
   value: RuleIR | undefined; onChange: (rule: RuleIR) => void;
@@ -10,7 +11,6 @@ export function RuleEditor({ value, onChange, onIncomplete }: {
 }) {
   const [draft, setDraft] = useState<{ source: RuleIR | undefined; rule: RuleIR }>();
   const [line, setLine] = useState('');
-  const [error, setError] = useState('');
   const rule = draft && draft.source === value ? draft.rule : value;
   const edit = (next: RuleIR) => {
     const filled = 'value' in next && next.value.trim() !== '';
@@ -46,14 +46,13 @@ export function RuleEditor({ value, onChange, onIncomplete }: {
       </div>}
     </>}
     <Field label="粘贴整行" hint="classical 规则，不含出口">{(id) => <div className="flex gap-2">
-      <Input id={id} className="font-mono" value={line} onChange={(e) => { setLine(e.target.value); setError(''); }} />
+      <Input id={id} className="font-mono" value={line} onChange={(e) => { setLine(e.target.value); }} />
       <Button onClick={() => {
         try {
           const parsed = parseRuleLine(line);
-          setDraft(undefined); onChange(parsed); setError('');
-        } catch (error) { setError(error instanceof Error ? error.message : String(error)); }
+          setDraft(undefined); onChange(parsed); notifySuccess('规则已解析');
+        } catch (error) { alertError(error); }
       }}>解析</Button>
     </div>}</Field>
-    <ErrorBox error={error} />
   </div>;
 }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api, type RuleRepo } from '../api.ts';
 import { CustomRepoDialog } from './CustomRepoDialog.tsx';
 import { GithubTokenSettings } from './GithubTokenSettings.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Modal, formatTime } from './ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Modal, formatTime } from './ui.tsx';
 
 export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: boolean }) {
   const qc = useQueryClient();
@@ -12,9 +12,9 @@ export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: 
   const [tokenOpen, setTokenOpen] = useState(false);
   const [deleting, setDeleting] = useState<RuleRepo>();
   const invalidate = () => qc.invalidateQueries({ queryKey: ['rule-repos'] });
-  const refresh = useMutation({ mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: invalidate });
-  const toggle = useMutation({ mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: invalidate });
-  const remove = useMutation({ mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => { setDeleting(undefined); return invalidate(); } });
+  const refresh = useMutation({ meta: { successMessage: '已提交索引更新，请查看仓库状态' }, mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: invalidate });
+  const toggle = useMutation({ meta: { successMessage: '仓库状态已更新' }, mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: invalidate });
+  const remove = useMutation({ meta: { successMessage: '仓库已删除' }, mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => { setDeleting(undefined); return invalidate(); } });
   return <>
     <Card title="仓库" subtitle="仅扫描 .list 和 .txt 文件" className="shrink-0" bodyClass="px-4 pb-4" actions={admin && <><Button size="sm" onClick={() => setTokenOpen(true)}>GitHub Token</Button><Button size="sm" onClick={() => setAdding(true)}><Plus size={14} />添加仓库</Button></>}>
       <div aria-label="仓库管理" className="grid max-h-[26vh] min-h-0 grid-cols-1 gap-2 overflow-y-auto overscroll-contain xl:grid-cols-2">
@@ -28,13 +28,13 @@ export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: 
         </div>)}
         {!repos.length && <Empty title="还没有仓库" />}
       </div>
-      <ErrorBox error={refresh.error ?? toggle.error} />
+      <ErrorAlert error={refresh.error ?? toggle.error} />
     </Card>
     <CustomRepoDialog open={adding} onClose={() => setAdding(false)} />
     <Modal title="GitHub 索引认证" open={tokenOpen} onClose={() => setTokenOpen(false)}><GithubTokenSettings /></Modal>
     <Modal title="删除自定义仓库" open={!!deleting} onClose={() => { if (!remove.isPending) setDeleting(undefined); }}
       footer={<><Button disabled={remove.isPending} onClick={() => setDeleting(undefined)}>取消</Button><Button variant="danger" disabled={remove.isPending} onClick={() => deleting && remove.mutate(deleting.id)}>{remove.isPending ? '删除中…' : '删除'}</Button></>}>
-      <p className="m-0 text-[13px]">删除「{deleting?.name}」及其索引？已创建的规则集会保留。</p><ErrorBox error={remove.error} />
+      <p className="m-0 text-[13px]">删除「{deleting?.name}」及其索引？已创建的规则集会保留。</p><ErrorAlert error={remove.error} />
     </Modal>
   </>;
 }

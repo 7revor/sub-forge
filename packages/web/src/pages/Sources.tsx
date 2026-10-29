@@ -1,3 +1,4 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
@@ -12,7 +13,7 @@ import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
-import { Badge, Button, Card, DraftInput, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, DraftInput, Empty, ErrorAlert, Field, Input, Modal, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
 function SourceState({ source }: { source: SourceDoc }) {
@@ -63,7 +64,7 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
       <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
       <NoteField value={note} onChange={setNote} />
-      <ErrorBox error={save.error} />
+      <ErrorAlert error={save.error} />
     </Modal>
   );
 }
@@ -93,7 +94,7 @@ function BasicSettings({ draft, set, state }: {
       <p className="m-0 text-[12px] leading-relaxed text-muted">快照有效期最短 5 分钟。</p>
       <details className="min-w-0 border-t border-line pt-3">
         <summary className="cursor-pointer text-[13px] font-medium">快照历史 · {state.snaps.data?.length ?? 0}</summary>
-        <ErrorBox error={state.snaps.error} />
+        <ErrorAlert error={state.snaps.error} />
         <div className="mt-2 overflow-x-auto">
           <table className="w-full border-collapse">
             <thead><tr><th className={th}>时间</th><th className={th}>地址</th><th className={th}>结果</th></tr></thead>
@@ -130,7 +131,10 @@ export function SourceEdit() {
   const state = useSourceFetchState(doc.data);
   const refresh = useMutation({
     mutationFn: () => api<{ items: { url: string; ok: boolean; error?: string }[] }>('POST', `/sources/${id}/refresh`),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const failures = result.items.filter(item => !item.ok);
+      if (failures.length) alertError(failures.map(item => `${item.url}：${item.error ?? '拉取失败'}`).join('；'));
+      else notifySuccess('订阅源已拉取');
       void qc.invalidateQueries({ queryKey: ['snapshots', id] });
       void qc.invalidateQueries({ queryKey: ['pipeline-preview', 'sources', id] });
       void qc.invalidateQueries({ queryKey: ['nodes', 'source', id] });
@@ -145,7 +149,7 @@ export function SourceEdit() {
   }, [justCreated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (id === 'new') return <Navigate to="/sources" replace state={{ create: true }} />;
-  if (!draft) return doc.error ? <ErrorBox error={doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!draft) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-muted">加载中…</div>;
   const set = (patch: Partial<SourceDoc>) => setDraft({ ...draft, ...patch });
   const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
   const submit = () => {
@@ -175,9 +179,8 @@ export function SourceEdit() {
         {u?.total ? <Badge>{formatBytes((u.upload ?? 0) + (u.download ?? 0))} / {formatBytes(u.total)}{u.expire ? ` · ${formatTime(u.expire * 1000).slice(0, 10)} 到期` : ''}</Badge> : null}
         {dirty && <Badge tone="warn">有未保存的修改</Badge>}
       </PageHeader>
-      <ErrorBox error={save.error} />
-      <ErrorBox error={refresh.error} />
-      {refresh.data?.items.some((i) => !i.ok) && <ErrorBox error={refresh.data.items.filter((i) => !i.ok).map((i) => `${i.url}：${i.error}`).join('；')} />}
+      <ErrorAlert error={save.error} />
+      <ErrorAlert error={refresh.error} />
 
       <PageScroll>
         {preview.data?.report.filter((r) => r.level === 'error' || r.level === 'warn').map((r, i) => (

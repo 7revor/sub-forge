@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Modal, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, FieldError, Field, Modal, Select, Switch, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
@@ -71,7 +71,7 @@ function ExtraRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (ancho
       {(template?.rules ?? []).map((r, i) => <option key={`a${r.id}`} value={`after:${r.id}`}>模板规则 #{i + 1} 之后</option>)}
     </Select>}</Field>
     <PrivateRuleFields value={rule} onChange={setRule} />
-    <ErrorBox error={error} />
+    <FieldError error={error} />
   </Modal>;
 }
 
@@ -80,7 +80,7 @@ function PrivateRuleEdit({ rule, onApply, onClose }: { rule: RuleEntry; onApply:
   const error = privateRuleError(value);
   return <div className="flex flex-col gap-3 border-t border-line-2 bg-ground p-4">
     <PrivateRuleFields value={value} onChange={setValue} />
-    <ErrorBox error={error} />
+    <FieldError error={error} />
     <div className="flex gap-2"><Button variant="primary" disabled={!!error} onClick={() => { onApply(value); onClose(); }}>应用修改</Button><Button onClick={onClose}>取消</Button></div>
   </div>;
 }

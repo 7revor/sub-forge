@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { NodeSetSelect, TargetPicker, targetLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, ReportList, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Modal, ReportList, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 const STRATEGIES: { value: RefStrategy; label: string }[] = [{ value: 'wrap', label: '包装组' }, { value: 'copy', label: '复制到本地' }, { value: 'inline', label: '整体内联' }];
@@ -86,7 +86,7 @@ export function TabChains() {
             </Select></label>
           <Button onClick={() => preview.mutate(undefined)} disabled={preview.isPending}>{preview.isPending ? '解析中…' : '解析依赖'}</Button>
         </>} bodyClass="overflow-x-auto">
-        <ErrorBox error={preview.error} />
+        <ErrorAlert error={preview.error} />
         {!preview.data ? <div className="px-4 pb-4"><Empty title="还没有依赖解析结果" /></div> : !preview.data.dependencies?.length ? <div className="px-4 pb-4"><Empty title="没有引用 provider 中的单个节点" /></div> : (
           <table className="w-full min-w-[760px] border-collapse">
             <thead><tr><th className={th}>被引用的节点</th><th className={th}>生成项</th><th className={th}>引用来源</th><th className={th}>解析策略</th></tr></thead>
@@ -157,7 +157,7 @@ export function TabPreview() {
         <Button onClick={exportFile} disabled={!preview.data?.yaml}>导出文件</Button>
         <span className="text-[12.5px] text-muted">当前草稿预览</span>
       </div>
-      <ErrorBox error={preview.error} />
+      <ErrorAlert error={preview.error} />
       {preview.data && (
         <div className="flex flex-wrap items-start gap-5">
           <CodePreview label="最终配置" className="flex-[999_1_560px] rounded-[10px]" title={`config.yaml · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="max-h-[720px] p-4 text-[12.5px] leading-[1.75]" />

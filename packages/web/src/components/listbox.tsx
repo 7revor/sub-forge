@@ -1,3 +1,4 @@
+import { alertError } from '../feedback.ts';
 import { Empty } from './Empty.tsx';
 // 下拉选择组件：所有下拉都用这里的 Select / Combobox，不使用浏览器自带的 <select> 弹层与 <datalist>（见仓库 CLAUDE.md）。
 // 弹层渲染到 body，避免被卡片、表格的 overflow 裁掉；层级高于对话框。
@@ -229,7 +230,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
       busy.current = true;
       loadOptions(query, 0).then(result => {
         if (generation.current === version) { setPage(result); setActive(result.options.length ? 0 : -1); }
-      }).catch(e => { if (generation.current === version) setError(e instanceof Error ? e.message : String(e)); })
+      }).catch(e => { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } })
         .finally(() => { if (generation.current === version) { busy.current = false; setLoading(false); } });
     }, query ? 300 : 0);
     return () => { clearTimeout(timer); generation.current++; };
@@ -242,7 +243,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
     try {
       const next = await loadOptions(query, page.nextOffset);
       if (generation.current === version) setPage(p => ({ options: [...p.options, ...next.options], nextOffset: next.nextOffset }));
-    } catch (e) { if (generation.current === version) setError(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } }
     finally { if (generation.current === version) { busy.current = false; setLoading(false); } }
   };
   const pick = (value: string) => { close(); onChange(value); };
@@ -278,7 +279,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
         </div>)}
       </div>
       <div role="status" className="shrink-0 text-[12px] text-muted">
-        {loading ? '加载中…' : error ? <><span>{error}</span><button type="button" className="ml-2 text-accent-ink" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full py-2 text-accent-ink" onClick={() => void more()}>加载更多</button> : !page.options.length ? <div className="p-2">没有匹配的规则</div> : null}
+        {loading ? '加载中…' : error ? <><button type="button" className="ml-2 text-accent-ink" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full py-2 text-accent-ink" onClick={() => void more()}>加载更多</button> : !page.options.length ? <div className="p-2">没有匹配的规则</div> : null}
       </div>
     </div>, document.body)}
   </>;

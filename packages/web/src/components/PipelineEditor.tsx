@@ -1,3 +1,4 @@
+import { alertError } from '../feedback.ts';
 import { OptionalBoolean } from './OptionalBoolean.tsx';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
 // 左侧步骤列表（拖拽排序、节点数变化、末尾自动去重兜底、添加处理器菜单）；
@@ -12,7 +13,7 @@ import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetF
 import { mapRows, mapStats, removedAtStep, renamedAtSteps, rowChanged, type MapRow } from './pipelineMap.ts';
 import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview, TraceStep } from '../api.ts';
-import { Badge, Button, DraftInput, DraftTextarea, Empty, Input, Segmented, Select, Switch, cx } from './ui.tsx';
+import { Badge, Button, DraftInput, DraftTextarea, Empty, ErrorAlert, Input, Segmented, Select, Switch, cx } from './ui.tsx';
 
 export const OP_LABEL: Record<OperatorStep['op'], string> = {
   'filter.useless': '无用节点过滤',
@@ -143,7 +144,6 @@ function SetFieldsForm({ fields, onChange }: { fields: Record<string, unknown>; 
 
 function TypeFilterForm({ step, onChange }: { step: Extract<OperatorStep, { op: 'filter.type' }>; onChange: (s: OperatorStep) => void }) {
   const [custom, setCustom] = useState('');
-  const [error, setError] = useState('');
   return <div className="flex flex-col gap-2.5">
     <Segmented label="命中后" value={step.keep ? 'keep' : 'drop'} options={[{ value: 'drop', label: '剔除选中的协议' }, { value: 'keep', label: '只保留选中的协议' }]} onChange={(v) => onChange({ ...step, keep: v === 'keep' })} />
     <fieldset className="m-0 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2 border-0 p-0">
@@ -153,8 +153,8 @@ function TypeFilterForm({ step, onChange }: { step: Extract<OperatorStep, { op: 
         return <label key={type} className={cx('flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 font-mono text-[13px]', on ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel')}>
           <input type="checkbox" checked={on} onChange={(e) => {
             const types = e.target.checked ? [...step.types, type] : step.types.filter((v) => v !== type);
-            if (!types.length) { setError('至少选择一个协议类型'); return; }
-            setError(''); onChange({ ...step, types });
+            if (!types.length) { alertError('至少选择一个协议类型'); return; }
+            onChange({ ...step, types });
           }} />{type}
         </label>;
       })}
@@ -163,11 +163,10 @@ function TypeFilterForm({ step, onChange }: { step: Extract<OperatorStep, { op: 
       <Input aria-label="其他协议" className="h-9 max-w-[280px] font-mono" placeholder="其他协议，如 wireguard" value={custom} onChange={(e) => setCustom(e.target.value)} />
       <Button size="sm" className="h-9" onClick={() => {
         const type = custom.trim().toLowerCase();
-        if (!type) { setError('请输入协议类型'); return; }
-        onChange({ ...step, types: [...new Set([...step.types, type])] }); setCustom(''); setError('');
+        if (!type) { alertError('请输入协议类型'); return; }
+        onChange({ ...step, types: [...new Set([...step.types, type])] }); setCustom('');
       }}>添加</Button>
     </div>
-    {error && <div role="alert" className="text-[12px] text-err">{error}</div>}
   </div>;
 }
 
@@ -506,6 +505,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
   return (
     <div className="flex flex-wrap items-start gap-5">
+      <ErrorAlert error={previewError} />
       <section aria-label={title} className="min-w-0 flex-[1_1_360px] rounded-[10px] border border-line bg-panel pt-4 pb-2">
         <div className="flex items-center justify-between px-4 pb-3">
           <h2 className="m-0 text-[15px] font-semibold">{title}</h2>
@@ -549,7 +549,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
             </div>}
             {loading && <span className="text-[12.5px] text-muted">预览中…</span>}
           </div>
-          {previewError && <div role="alert" className="mx-4 mb-3 rounded-lg bg-err-soft px-3 py-2 text-[13px] text-err">{previewError}</div>}
           {before && after && <MappingView before={before} after={after} inLabel="原始节点" outLabel="最终输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated}
             extraLabel="经过的步骤" extra={(r) => {
               if (r.origin === null) return null;
@@ -592,7 +591,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-2 px-4 pt-3 pb-3">
             <h3 className="m-0 text-[13.5px] font-semibold">这一步的输入 → 输出 <span className="font-normal text-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
           </div>
-          {previewError && <div role="alert" className="mx-4 mb-3 rounded-lg bg-err-soft px-3 py-2 text-[13px] text-err">{previewError}</div>}
           {cur && before && after && <MappingView before={before} after={after} inLabel={selected === 0 ? '输入（原始节点）' : `输入（第 ${selected} 步之后）`} outLabel="输出"
             options={mapOptions} onOptions={setMapOptions} truncated={truncated}
             extraLabel="命中" extra={(r) => (r.in && (!r.out || r.in.name !== r.out.name || r.moved !== 0) ? rowHit(step, r.in.name) : null)} />}
