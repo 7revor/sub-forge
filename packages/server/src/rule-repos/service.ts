@@ -1,40 +1,61 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
 import { parseRuleSetContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
+import { createHash } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { GitRepoCache, type RepoCache } from './git-cache.ts';
 import { randomId } from '../crypto.ts';
-import { isIndexedRuleFile, parseCustomRepo } from './generic.ts';
+import { isIndexedRuleFile, parseCustomRepo, parseScans } from './generic.ts';
 import type { Store } from '../store.ts';
 import type { UpstreamFetcher } from '../net/upstream.ts';
 import { HttpError, bad, notFound } from '../api/common.ts';
 import { applyReadme, buildEntries, BUILTIN_REPOS, normalizeSearch, rawUrl, upstreamUrl, type IndexedEntry, type RepoDefinition, type RepoFile } from './adapters.ts';
 
 const DAY = 86_400_000;
-type RepoRow = { id: string; enabled: number; built_at: number | null; checked_at: number | null; revisions: string; error: string | null; entries: number; definition: string | null };
-type Tree = { sha: string; truncated: boolean; tree: { path: string; type: string; sha: string; mode?: string }[] };
+type RepoRow = { id: string; enabled: number; built_at: number | null; checked_at: number | null; revisions: string; error: string | null; entries: number; definition: string | null; indexed_definition: string | null };
+const configRevision = (value: string) => createHash('sha256').update(value).digest('hex');
 
 export class RuleRepoService {
   private jobs = new Map<string, Promise<void>>();
   private details = new Map<string, Promise<ReturnType<RuleRepoService['formatDetail']>>>();
   private timer?: ReturnType<typeof setInterval>;
   private stopped = false;
-  constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now) {
-    const insert = store.db.prepare('INSERT OR IGNORE INTO rule_repos (id) VALUES (?)');
-    for (const repo of BUILTIN_REPOS) insert.run(repo.id);
+  private editing = new Set<string>();
+  private cache: RepoCache;
+  constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now, cache?: RepoCache) {
+    this.cache = cache ?? new GitRepoCache(join(dirname(store.db.name === ':memory:' ? './data/sub-forge.db' : store.db.name), 'rule-repo-cache'));
+    this.initializeDefinitions();
     this.upgradeTextIndex();
     this.upgradeLegacySources();
+  }
+  private initializeDefinitions() {
+    this.store.db.transaction(() => {
+      if (!this.store.db.prepare("SELECT 1 FROM rule_repo_meta WHERE name = 'initialized'").get()) {
+        for (const repo of BUILTIN_REPOS) this.store.db.prepare('INSERT OR IGNORE INTO rule_repos (id, definition) VALUES (?, ?)').run(repo.id, JSON.stringify(repo));
+        this.store.db.prepare("INSERT INTO rule_repo_meta (name, value) VALUES ('initialized', '1')").run();
+      }
+      for (const row of this.rows()) {
+        const old = row.definition ? JSON.parse(row.definition) : BUILTIN_REPOS.find(r => r.id === row.id);
+        if (!old) throw new Error(`仓库 ${row.id} 缺少配置`);
+        let def: RepoDefinition;
+        if (old.scans) def = old;
+        else if (old.adapter === 'generic') {
+          const options = { ...old.options, format: old.options?.format === 'yaml' ? 'auto' : old.options?.format };
+          def = { id: old.id, name: old.name, owner: old.owner, repo: old.repo, refs: old.refs, license: old.license,
+            scans: old.refs.map((ref: string) => ({ ...options, ref, client: 'any', groupBy: 'path', readme: false, preferred: [] })) };
+        } else {
+          const seed = BUILTIN_REPOS.find(r => r.id === row.id);
+          if (!seed) throw new Error(`仓库 ${row.id} 无法迁移`);
+          def = seed;
+        }
+        const encoded = JSON.stringify(def);
+        this.store.db.prepare('UPDATE rule_repos SET definition = ?, indexed_definition = COALESCE(indexed_definition, ?) WHERE id = ?').run(encoded, row.built_at === null ? null : encoded, row.id);
+      }
+    })();
   }
   /** 只清理索引缓存，不修改已保存来源；上游 commit 不变也会重新建立受影响仓库的索引。 */
   private upgradeTextIndex() {
     this.store.db.transaction(() => {
       const affected = new Set<string>();
-      for (const row of this.rows()) {
-        if (!row.definition) continue;
-        const def = JSON.parse(row.definition) as RepoDefinition;
-        if (def.options?.format === 'yaml') {
-          def.options.format = 'auto';
-          this.store.db.prepare('UPDATE rule_repos SET definition = ? WHERE id = ?').run(JSON.stringify(def), row.id);
-          affected.add(row.id);
-        }
-      }
       for (const row of this.store.db.prepare('SELECT repo, key, data FROM rule_repo_entries').all() as { repo: string; key: string; data: string }[]) {
         const entry = JSON.parse(row.data) as IndexedEntry;
         const variants = entry.variants.filter(v => v.files.length && v.files.every(f => isIndexedRuleFile(f.path) && !['yaml', 'mrs', 'srs'].includes(f.format)));
@@ -51,7 +72,7 @@ export class RuleRepoService {
     const files = new Map<string, NonNullable<RuleSetSource['repository']>>();
     for (const row of this.store.db.prepare('SELECT data FROM rule_repo_entries').all() as { data: string }[]) {
       const entry = JSON.parse(row.data) as IndexedEntry;
-      const repo = this.definition(entry.repo);
+      const repo = this.definition(entry.repo, true);
       for (const file of entry.variants.flatMap(v => v.files)) {
         files.set(`${entry.repo} · ${file.path}\n${rawUrl(repo, file)}`, { repo: entry.repo, entry: entry.path, ref: file.ref, path: file.path });
       }
@@ -68,15 +89,17 @@ export class RuleRepoService {
     }
   }
   async linkedSources(repo: string, path: string, variantId?: string) {
+    const version = this.snapshotVersion(repo);
     const entry = await this.resolvedEntry(repo, path);
     const variant = this.importVariant(entry, variantId);
-    if (this.definition(repo).adapter === 'generic') {
+    if (!entry.variants.some(v => v.readme)) {
       const detail = await this.detail(repo, path);
       if (detail.previewError) throw new HttpError(400, `规则文件尚不可导入：${detail.previewError}`);
     }
     this.assertEntry(repo, path);
+    this.assertSnapshot(repo, version);
     return { name: entry.name, sources: variant.files.map(file => ({
-      kind: 'remote' as const, name: `${this.definition(repo).name} · ${file.path}`, url: rawUrl(this.definition(repo), file),
+      kind: 'remote' as const, name: `${this.definition(repo, true).name} · ${file.path}`, url: rawUrl(this.definition(repo, true), file),
       format: file.format, behavior: file.behavior,
       repository: { repo, entry: path, ref: file.ref, path: file.path },
     })) };
@@ -84,7 +107,7 @@ export class RuleRepoService {
   /** 首页按物理文件展示；不读取 README，不将多个文件组合为一个变体。 */
   fileList(repo: string, path: string) {
     const entry = this.entry(repo, path);
-    const definition = this.definition(repo);
+    const definition = this.definition(repo, true);
     const files = new Map<string, RepoFile>();
     for (const file of entry.variants.flatMap(v => v.files)) {
       if (isIndexedRuleFile(file.path) && !['yaml', 'mrs', 'srs'].includes(file.format)) files.set(JSON.stringify([file.ref, file.path]), file);
@@ -101,21 +124,22 @@ export class RuleRepoService {
       return { entry, file };
     };
     const { file } = find();
-    const response = await this.fetcher(file.url, { timeoutMs: 20_000 });
-    if (response.status !== 200) throw new Error(`规则文件拉取失败：HTTP ${response.status}`);
-    const parsed = parseRuleSetContent(response.body, file.format, file.behavior);
+    const definition = this.definition(repo, true);
+    const body = await this.readFile(definition, file);
+    const parsed = parseRuleSetContent(body, file.format, file.behavior);
     if (parsed.passthrough || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
     const current = find();
+    if (JSON.stringify(current.file) !== JSON.stringify(file) || JSON.stringify(this.definition(repo, true)) !== JSON.stringify(definition)) throw new HttpError(409, '索引已更新，请重新选择文件');
     return { name: current.entry.name, sources: [{ kind: 'remote' as const,
-      name: `${this.definition(repo).name} · ${current.file.path}`, url: current.file.url, format: current.file.format, behavior: current.file.behavior,
+      name: `${this.definition(repo, true).name} · ${current.file.path}`, url: current.file.url, format: current.file.format, behavior: current.file.behavior,
       repository: { repo, entry: path, ref: current.file.ref, path: current.file.path },
     }] };
   }
-  definition(id: string): RepoDefinition {
-    const row = this.store.db.prepare('SELECT definition FROM rule_repos WHERE id = ?').get(id) as { definition: string | null } | undefined;
-    const repo = row?.definition ? JSON.parse(row.definition) as RepoDefinition : BUILTIN_REPOS.find(r => r.id === id);
-    if (!repo) throw notFound('规则仓库');
-    return repo;
+  definition(id: string, indexed = false): RepoDefinition {
+    const row = this.store.db.prepare('SELECT definition, indexed_definition FROM rule_repos WHERE id = ?').get(id) as RepoRow | undefined;
+    const value = indexed ? row?.indexed_definition ?? row?.definition : row?.definition;
+    if (!value) throw notFound('规则仓库');
+    return JSON.parse(value) as RepoDefinition;
   }
   private rows(): RepoRow[] {
     return this.store.db.prepare('SELECT r.*, (SELECT count(*) FROM rule_repo_entries e WHERE e.repo = r.id) AS entries FROM rule_repos r').all() as RepoRow[];
@@ -123,50 +147,87 @@ export class RuleRepoService {
   list() {
     return this.rows().map(r => {
       const def = this.definition(r.id);
-      return { id: r.id, name: def.name, url: `https://github.com/${def.owner}/${def.repo}`, builtIn: def.adapter !== 'generic', ...(def.adapter === 'generic' ? { ref: def.refs[0], ...def.options } : {}), enabled: !!r.enabled,
+      return { id: r.id, name: def.name, url: `https://github.com/${def.owner}/${def.repo}`, refs: def.refs, scans: def.scans, license: def.license,
+        configRevision: configRevision(r.definition!), pending: r.definition !== r.indexed_definition, enabled: !!r.enabled,
         entries: r.entries, builtAt: r.built_at ?? undefined, checkedAt: r.checked_at ?? undefined, error: r.error ?? undefined,
-        indexing: this.jobs.has(r.id), revisions: JSON.parse(r.revisions) as Record<string, string> };
+        indexing: this.jobs.has(r.id) || this.editing.has(r.id), revisions: JSON.parse(r.revisions) as Record<string, string> };
     });
   }
-  async addCustom(body: Record<string, unknown>) {
+  private async parseDefinition(body: Record<string, unknown>, id: string): Promise<RepoDefinition> {
     const input = parseCustomRepo(body);
+    const scans = parseScans(body);
     if (this.stopped) throw new HttpError(409, '索引服务已停止');
-    let metadata: { private: boolean; default_branch: string; license?: { spdx_id?: string } | null };
-    try { metadata = await this.json(`https://api.github.com/repos/${input.owner}/${input.repo}`); }
-    catch (error) { throw new HttpError(502, `无法读取公开 GitHub 仓库：${error instanceof Error ? error.message : String(error)}`); }
-    if (metadata.private !== false || typeof metadata.default_branch !== 'string' || !metadata.default_branch) throw bad('仅支持公开 GitHub 仓库，或上游仓库信息无效');
+    const current = this.rows().some(r => r.id === id) ? this.definition(id) : undefined;
+    let license = current?.license ?? '见上游仓库许可证';
+    if (!current || current.owner !== input.owner || current.repo !== input.repo || scans.some(s => !s.ref)) {
+      let metadata: { private: boolean; default_branch: string; license?: { spdx_id?: string } | null };
+      try { metadata = await this.json(`https://api.github.com/repos/${input.owner}/${input.repo}`); }
+      catch (error) { throw new HttpError(502, `无法读取公开 GitHub 仓库：${error instanceof Error ? error.message : String(error)}`); }
+      if (metadata.private !== false || typeof metadata.default_branch !== 'string' || !metadata.default_branch) throw bad('仅支持公开 GitHub 仓库，或上游仓库信息无效');
+      const defaultRef = parseCustomRepo({ url: body.url, ref: metadata.default_branch }).ref!;
+      for (const scan of scans) if (!scan.ref) scan.ref = defaultRef;
+      license = metadata.license?.spdx_id && metadata.license.spdx_id !== 'NOASSERTION' ? metadata.license.spdx_id : '见上游仓库许可证';
+    }
+    if (body.license !== undefined) {
+      if (typeof body.license !== 'string' || body.license.length > 200 || /[\x00-\x1f]/.test(body.license)) throw bad('许可证需为不超过 200 字的文本');
+      license = body.license;
+    }
+    return { id, name: input.name, owner: input.owner, repo: input.repo, refs: [...new Set(scans.map(s => s.ref))], license, scans };
+  }
+  private assertUnique(def: RepoDefinition) {
+    if (this.rows().some(row => {
+      const other = this.definition(row.id);
+      return other.id !== def.id && other.owner.toLowerCase() === def.owner.toLowerCase() && other.repo.toLowerCase() === def.repo.toLowerCase() && other.refs.some(ref => def.refs.includes(ref));
+    })) throw new HttpError(409, '该仓库的此分支已添加');
+  }
+  async addCustom(body: Record<string, unknown>) {
+    const def = await this.parseDefinition(body, `custom-${randomId(9)}`);
     if (this.stopped) throw new HttpError(409, '索引服务已停止');
-    const ref = input.ref ?? metadata.default_branch;
-    const { name, owner, repo, directory, include, exclude, format } = input;
-    const def: RepoDefinition = { id: `custom-${randomId(9)}`, name, owner, repo, refs: [ref], adapter: 'generic',
-      license: metadata.license?.spdx_id && metadata.license.spdx_id !== 'NOASSERTION' ? metadata.license.spdx_id : '见上游仓库许可证',
-      options: { directory, include, exclude, format } };
-    this.store.db.transaction(() => {
-      const duplicate = this.rows().some(row => {
-        const r = this.definition(row.id);
-        return r.owner.toLowerCase() === owner.toLowerCase() && r.repo.toLowerCase() === repo.toLowerCase() && r.refs.includes(ref);
-      });
-      if (duplicate) throw new HttpError(409, '该仓库的此分支已添加');
-      this.store.db.prepare('INSERT INTO rule_repos (id, definition) VALUES (?, ?)').run(def.id, JSON.stringify(def));
-    })();
+    this.assertUnique(def);
+    this.store.db.prepare('INSERT INTO rule_repos (id, definition) VALUES (?, ?)').run(def.id, JSON.stringify(def));
     return def.id;
   }
-  removeCustom(id: string) {
-    if (this.definition(id).adapter !== 'generic') throw bad('内置仓库只能停用，不能删除');
-    if (this.jobs.has(id)) throw new HttpError(409, '索引正在更新，请完成后再删除');
-    this.store.db.transaction(() => {
-      this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run(id);
-      this.store.db.prepare('DELETE FROM rule_repos WHERE id = ?').run(id);
-    })();
-    this.details.clear();
+  async update(id: string, body: Record<string, unknown>) {
+    this.definition(id);
+    if (this.jobs.has(id) || this.editing.has(id)) throw new HttpError(409, '索引正在更新，请完成后再编辑');
+    if (body.configRevision !== configRevision(JSON.stringify(this.definition(id)))) throw new HttpError(409, '仓库配置已变更，请重新打开编辑');
+    this.editing.add(id);
+    try {
+      const def = await this.parseDefinition(body, id);
+      if (this.stopped) throw new HttpError(409, '索引服务已停止');
+      this.assertUnique(def);
+      this.store.db.prepare('UPDATE rule_repos SET definition = ?, checked_at = NULL, error = NULL WHERE id = ?').run(JSON.stringify(def), id);
+    } finally { this.editing.delete(id); }
+  }
+  async removeCustom(id: string) {
+    this.definition(id);
+    if (this.jobs.has(id) || this.editing.has(id)) throw new HttpError(409, '索引正在更新，请完成后再删除');
+    this.editing.add(id);
+    try {
+      await this.cache.remove(id);
+      this.store.db.transaction(() => {
+        this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run(id);
+        this.store.db.prepare('DELETE FROM rule_repos WHERE id = ?').run(id);
+      })();
+      this.details.clear();
+    } finally { this.editing.delete(id); }
   }
   /** 导入前重新确认仓库仍启用、文件仍在索引中。 */
   assertEntry(id: string, path: string) { this.entry(id, path); }
   setEnabled(id: string, enabled: boolean) {
     this.definition(id);
+    if (this.editing.has(id)) throw new HttpError(409, '仓库配置正在更新');
     this.store.db.prepare('UPDATE rule_repos SET enabled = ? WHERE id = ?').run(Number(enabled), id);
   }
+  private snapshotVersion(id: string) {
+    return JSON.stringify(this.store.db.prepare('SELECT indexed_definition, revisions, built_at FROM rule_repos WHERE id = ?').get(id));
+  }
+  private assertSnapshot(id: string, version: string) {
+    this.assertEnabled(id);
+    if (this.snapshotVersion(id) !== version) throw new HttpError(409, '索引已更新，请重试');
+  }
   private assertEnabled(id: string) {
+    if (this.editing.has(id)) throw new HttpError(409, '仓库配置正在更新');
     const repo = this.definition(id);
     if (!this.rows().find(r => r.id === id)?.enabled) throw notFound('已启用的规则仓库');
     return repo;
@@ -193,35 +254,16 @@ export class RuleRepoService {
     if (response.status !== 200) throw new Error(`GitHub 返回 HTTP ${response.status}`);
     return JSON.parse(response.body) as T;
   }
-  private async files(repo: RepoDefinition, treeSha: string): Promise<string[]> {
-    const base = `https://api.github.com/repos/${repo.owner}/${repo.repo}/git/trees/`;
-    let requests = 0;
-    const read = async (sha: string, recursive: boolean) => {
-      if (++requests > 100 || this.stopped) throw new Error('索引已停止或文件树超过遍历上限');
-      const tree = await this.json<Tree>(`${base}${encodeURIComponent(sha)}${recursive ? '?recursive=1' : ''}`);
-      if (!Array.isArray(tree.tree) || typeof tree.truncated !== 'boolean') throw new Error('GitHub 文件树响应无效');
-      return tree;
-    };
-    const wanted = (path: string) => repo.adapter !== 'blackmatrix7' || ['rule/Clash', 'rule/Surge'].some(prefix => prefix.startsWith(path + '/') || path === prefix || path.startsWith(prefix + '/'));
-    const walk = async (sha: string, prefix: string): Promise<string[]> => {
-      const tree = await read(sha, true);
-      if (!tree.truncated) return tree.tree.filter(f => f.type === 'blob' && f.mode !== '120000').map(f => prefix + f.path).filter(wanted);
-      // GitHub 递归结果被截断时改用完整的非递归树，再逐目录展开。
-      const shallow = await read(sha, false);
-      if (shallow.truncated) throw new Error('GitHub 非递归文件树被截断，保留旧索引');
-      const paths: string[] = [];
-      for (const node of shallow.tree) {
-        const path = prefix + node.path;
-        if (!wanted(path)) continue;
-        if (node.type === 'tree') paths.push(...await walk(node.sha, path + '/'));
-        else if (node.type === 'blob' && node.mode !== '120000') paths.push(path);
-      }
-      return paths;
-    };
-    return walk(treeSha, '');
+  private async readFile(repo: RepoDefinition, file: RepoFile): Promise<string> {
+    if (file.commit) return this.cache.read(repo, file.commit, file.path);
+    // 迁移前的旧索引仍可使用；首次 Git 同步后每个文件均携带固定提交。
+    const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
+    if (response.status !== 200) throw new Error(`规则文件读取失败：HTTP ${response.status}`);
+    return response.body;
   }
   refresh(id: string): Promise<void> {
     this.assertEnabled(id);
+    if (this.editing.has(id)) throw new HttpError(409, '仓库配置正在更新');
     if (this.stopped) throw new HttpError(409, '索引服务已停止');
     const running = this.jobs.get(id);
     if (running) return running;
@@ -233,25 +275,19 @@ export class RuleRepoService {
     const repo = this.definition(id);
     try {
       const previous = this.rows().find(r => r.id === id)!;
-      const revisions: Record<string, string> = {};
-      const treeShas: Record<string, string> = {};
-      for (const ref of repo.refs) {
-        if (this.stopped) throw new Error('索引服务正在关闭');
-        const commit = await this.json<{ sha: string; commit: { tree: { sha: string } } }>(`https://api.github.com/repos/${repo.owner}/${repo.repo}/commits/${encodeURIComponent(ref)}`);
-        if (!/^[a-f0-9]{40}$/.test(commit.sha) || !/^[a-f0-9]{40}$/.test(commit.commit?.tree?.sha)) throw new Error('GitHub commit 响应无效');
-        revisions[ref] = commit.sha;
-        treeShas[ref] = commit.commit.tree.sha;
-      }
-      if (previous.built_at === null || JSON.stringify(revisions) !== previous.revisions) {
+      const revisions = await this.cache.sync(repo);
+      if (this.stopped) throw new Error('索引服务正在关闭');
+      if (previous.built_at === null || JSON.stringify(revisions) !== previous.revisions || previous.indexed_definition !== JSON.stringify(repo)
+          || (this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ? LIMIT 1').get(id) as { data: string } | undefined)?.data.includes('"commit"') === false) {
         const trees: Record<string, string[]> = {};
-        for (const ref of repo.refs) trees[ref] = await this.files(repo, treeShas[ref]!);
-        const entries = buildEntries(repo, trees);
-        if (!entries.length && repo.adapter !== 'generic') throw new Error('上游没有可识别的规则文件，保留旧索引');
+        for (const ref of repo.refs) trees[ref] = await this.cache.files(repo, revisions[ref]!);
+        const entries = buildEntries(repo, trees, revisions);
+        if (this.stopped) throw new Error('索引服务正在关闭');
         this.store.db.transaction(() => {
           this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run(id);
           const insert = this.store.db.prepare('INSERT INTO rule_repo_entries (repo, key, search_name, data) VALUES (?, ?, ?, ?)');
           for (const entry of entries) insert.run(id, entry.path, normalizeSearch(entry.name), JSON.stringify(entry));
-          this.store.db.prepare('UPDATE rule_repos SET built_at = ?, revisions = ? WHERE id = ?').run(this.now(), JSON.stringify(revisions), id);
+          this.store.db.prepare('UPDATE rule_repos SET built_at = ?, revisions = ?, indexed_definition = ? WHERE id = ?').run(this.now(), JSON.stringify(revisions), JSON.stringify(repo), id);
         })();
         this.details.clear();
         this.upgradeLegacySources();
@@ -267,7 +303,7 @@ export class RuleRepoService {
     if (this.timer || this.stopped) return;
     const tick = () => {
       for (const row of this.rows()) {
-        if (row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (row.error ? 15 * 60_000 : DAY))) void this.refresh(row.id);
+        if (!this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (row.error ? 15 * 60_000 : DAY))) void this.refresh(row.id);
       }
     };
     tick();
@@ -277,54 +313,56 @@ export class RuleRepoService {
   async stop() {
     this.stopped = true;
     clearInterval(this.timer);
+    await this.cache.stop();
     await Promise.all(this.jobs.values());
     await Promise.allSettled(this.details.values());
   }
   private formatDetail(entry: IndexedEntry, preview: string[], count: number | undefined, previewError?: string, rejectedDetails: { line: number; text: string; reason: string }[] = [], rejected = 0) {
-    const repo = this.definition(entry.repo);
+    const repo = this.definition(entry.repo, true);
     return { ...entry, count, license: repo.license, url: `https://github.com/${repo.owner}/${repo.repo}`, preview, previewError, rejected, rejectedDetails,
       variants: entry.variants.map(v => ({ ...v, file: v.files.map(f => f.path).join(' + '), how: '文本托管',
         files: v.files.map(f => ({ ...f, url: rawUrl(repo, f), upstream: upstreamUrl(repo, f) })) })) };
   }
   async resolvedEntry(id: string, path: string): Promise<IndexedEntry> {
+    const version = this.snapshotVersion(id);
     const entry = this.entry(id, path);
-    const repo = this.definition(id);
-    if (repo.adapter === 'blackmatrix7') {
-      for (const client of ['mihomo', 'surge'] as const) {
-        const file = entry.variants.find(v => v.client === client)?.files[0];
+    const repo = this.definition(id, true);
+    if (entry.variants.some(v => v.readme)) {
+      for (const client of ['mihomo', 'surge', 'any'] as const) {
+        const file = entry.variants.find(v => v.client === client && v.readme)?.files[0];
         if (!file) continue;
         const readme = { ...file, path: file.path.replace(/[^/]+$/, 'README.md') };
-        const response = await this.fetcher(rawUrl(repo, readme), { timeoutMs: 20_000 });
-        if (response.status !== 200) throw new Error(`使用说明拉取失败：HTTP ${response.status}`);
-        applyReadme(entry, client, response.body);
+        applyReadme(entry, client, await this.readFile(repo, readme));
       }
     }
+    this.assertSnapshot(id, version);
     return entry;
   }
   detail(id: string, path: string) {
     this.entry(id, path);
-    const key = `${id}:${path}`;
+    const version = this.snapshotVersion(id);
+    const key = `${id}:${path}:${version}`;
     const cached = this.details.get(key);
     if (cached) return cached;
     const job = (async () => {
       const entry = await this.resolvedEntry(id, path);
       const variant = this.importVariant(entry);
-      const repo = this.definition(id);
+      const repo = this.definition(id, true);
       const preview: string[] = [];
       const keys = new Set<string>();
       const rejectedDetails: { line: number; text: string; reason: string }[] = [];
       let rejected = 0;
       try {
         for (const file of variant.files) {
-          const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
-          if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
-          const parsed = parseRuleSetContent(response.body, file.format, file.behavior);
+          const body = await this.readFile(repo, file);
+          const parsed = parseRuleSetContent(body, file.format, file.behavior);
           if (parsed.passthrough || !parsed.rules.length) throw new Error('文件中没有可解析的规则');
           rejected += parsed.rejected.length;
           rejectedDetails.push(...parsed.rejected.slice(0, Math.max(0, 50 - rejectedDetails.length)).map(r => ({ ...r, text: r.text.slice(0, 500) })));
           for (const rule of parsed.rules) keys.add(ruleKey(rule.rule));
-          preview.push(`# 来源：${rawUrl(repo, file)}`, ...response.body.split(/\r?\n/).slice(0, 80));
+          preview.push(`# 来源：${rawUrl(repo, file)}`, ...body.split(/\r?\n/).slice(0, 80));
         }
+        this.assertSnapshot(id, version);
         return this.formatDetail(entry, preview.slice(0, 160), keys.size, undefined, rejectedDetails, rejected);
       } catch (error) {
         return this.formatDetail(entry, [], undefined, `内容预览失败：${error instanceof Error ? error.message : String(error)}`);

@@ -32,6 +32,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `SUBFORGE_DB` | `./data/sub-forge.db`（镜像中为 `/data/sub-forge.db`） | SQLite 文件路径 |
+| `SUBFORGE_REPO_CACHE` | 数据库同目录的 `rule-repo-cache` | 公开规则仓库的 Git 缓存，需可写且建议持久化；本地运行需安装 Git，生产镜像已包含 |
 | `SUBFORGE_SECRET` | 数据库旁的 `secret.key` | 32 字节 Base64 主密钥，用于加密敏感数据（SYS-04）；不设置时首次启动自动生成 |
 | `SUBFORGE_ADMIN_USERNAME` / `SUBFORGE_ADMIN_PASSWORD` | 空 | 首次启动时创建管理员；`create-admin` 命令也从 `SUBFORGE_ADMIN_PASSWORD` 取密码 |
 | `HOST` / `PORT` | `127.0.0.1` / `8080`（镜像中 HOST 为 `0.0.0.0`） | 监听地址 |
@@ -187,3 +188,17 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 
 实现依据：[Mihomo 代理延迟 API](https://wiki.metacubex.one/api/#proxiesproxies_namedelay)、[Unix socket 控制器](https://wiki.metacubex.one/config/general/#外部控制-api)。
 
+
+## 规则仓库 Git 缓存与编辑
+
+SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两个默认仓库仅在首次初始化时写入；之后与自定义仓库一样可编辑、停用或删除，重启不会恢复已删除的默认仓库。旧内置配置和自定义单分支配置自动迁移，已导入来源及其分支 URL 保持不变。
+
+每个扫描范围可配置分支、相对目录、包含/排除 glob、格式、客户端、分组、推荐文件模式及 README 使用说明解析。范围重叠时先匹配的配置生效。`PUT /api/rule-repos/:id` 接收完整配置及读取时返回的 `configRevision`；并发旧版本返回 409。停用仓库保存后不自动联网同步，重新启用时更新。
+
+目录同步通过公开 HTTPS Git 执行：使用裸仓库、`fetch --atomic --depth=1 --filter=blob:none --no-tags` 获取所有配置分支，再按固定 commit 执行 `ls-tree -r -z`。浅历史不限制目录层级；不检出工作目录，不递归子模块，不索引符号链接。提交和配置均未变化时跳过目录扫描。发生变化时从本地完整重建文件目录索引，并在一个 SQLite 事务中替换条目、配置快照和分支 SHA。任一步失败都保留上次成功的完整索引；成功扫描无匹配文件则保存空索引。
+
+文件预览和导入前校验通过 `git show <commit>:<path>` 按需获取正文并缓存。导入后的远程来源仍跟踪分支，沿用既有快照刷新机制。迁移前未携带 commit 的旧索引暂时沿用原读取方式，首次 Git 更新后切换。仓库配置修改期间，旧索引使用旧仓库地址与旧配置，不拼接新地址。
+
+默认每 24 小时同步；失败后 15 分钟重试；可手动更新。Git 操作有进程内串行队列、磁盘锁、120 秒超时和 32 MiB 输出上限；退出时取消并等待 Git 进程组。崩溃遗留锁在确认所属进程不存在后自动恢复。单个缓存目录不支持多个主机共享。删除仓库时删除其 Git 缓存，但保留已导入规则集。缓存不是用户配置备份：如需释放累计 Git 对象，可在停止服务后清空专用缓存目录，启动后手动更新仓库重建缓存；重建完成前文件预览可能不可用，SQLite 中的旧目录仍保留。
+
+Git 同步使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，也不继承全局 Git URL 重写及认证配置。Token 只用于添加/修改仓库时的 GitHub 元数据 API。无需 Token 即可同步已配置仓库，但网络仍需能访问 github.com。重命名/迁移的上游地址须编辑为当前地址。

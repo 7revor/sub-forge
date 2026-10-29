@@ -1,5 +1,5 @@
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
-import { BUILTIN_REPOS, rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/adapters.ts';
+import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/adapters.ts';
 // 保存前的校验：结构必填项、正则能否编译、引用是否存在且属于当前用户、组合是否成环。
 // 深层结构（规则、组参数等）由渲染报告兜住，这里只拦截保存后必然无法使用的数据。
 
@@ -157,8 +157,8 @@ export function checkRepositorySource(src: Record<string, unknown>, prior: { rep
     if (src.kind !== 'remote' || !isObj(link) || !['repo', 'entry', 'ref', 'path'].every(k => isStr(link[k]))) throw bad(`${at}：仓库关联标识不合法`);
     // 已保存关联可继续使用，停用仓库或上游删文件不会阻断其他配置的保存。
     if (!prior?.repository) {
-      const config = store.db.prepare('SELECT definition FROM rule_repos WHERE id = ?').get(link.repo) as { definition: string | null } | undefined;
-      const repo = config?.definition ? JSON.parse(config.definition) as RepoDefinition : BUILTIN_REPOS.find(r => r.id === link.repo);
+      const config = store.db.prepare('SELECT COALESCE(indexed_definition, definition) AS definition FROM rule_repos WHERE id = ?').get(link.repo) as { definition: string | null } | undefined;
+      const repo = config?.definition ? JSON.parse(config.definition) as RepoDefinition : undefined;
       const row = store.db.prepare('SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo WHERE e.repo = ? AND e.key = ? AND r.enabled = 1').get(link.repo, link.entry) as { data: string } | undefined;
       const entry = row ? JSON.parse(row.data) as IndexedEntry : undefined;
       const file = entry?.variants.flatMap(v => v.files).find(f => f.path === link.path && f.ref === link.ref);

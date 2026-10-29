@@ -1,74 +1,66 @@
-// GitHub 文件树转为逻辑规则；只索引已知的规则格式，不把 README 和脚本当成规则。
+// 所有仓库使用同一个配置驱动的目录索引器；默认仓库仅提供初始化数据。
 import type { RuleSetFormat } from '@sub-forge/core';
-import { isIndexedRuleFile, matchesGeneric, type GenericOptions } from './generic.ts';
+import { matchesGeneric, pathGlob, type ScanConfig } from './generic.ts';
 
 export type RepoDefinition = {
-  id: string; name: string; owner: string; repo: string; refs: string[]; license: string;
-  adapter: 'blackmatrix7' | 'zydou' | 'generic';
-  options?: GenericOptions;
+  id: string; name: string; owner: string; repo: string; refs: string[]; license: string; scans: ScanConfig[];
 };
+const base = { include: ['**/*.list', '**/*.txt'], exclude: [], preferred: [], readme: false };
 export const BUILTIN_REPOS: RepoDefinition[] = [
-  { id: 'blackmatrix7', name: 'blackmatrix7/ios_rule_script', owner: 'blackmatrix7', repo: 'ios_rule_script', refs: ['master'], license: 'GPL-2.0', adapter: 'blackmatrix7' },
-  { id: 'zydou', name: 'zydou/domain-list-community-converter', owner: 'zydou', repo: 'domain-list-community-converter', refs: ['surge-rule-set', 'surge-domain-set'], license: '见上游仓库许可证', adapter: 'zydou' },
+  { id: 'blackmatrix7', name: 'blackmatrix7/ios_rule_script', owner: 'blackmatrix7', repo: 'ios_rule_script', refs: ['master'], license: 'GPL-2.0',
+    scans: (['mihomo', 'surge'] as const).flatMap(client => {
+      const common = { ...base, ref: 'master', directory: client === 'mihomo' ? 'rule/Clash' : 'rule/Surge', client, groupBy: 'directory' as const, readme: true, preferred: ['*_All.list'] };
+      return [
+        { ...common, include: ['**/*_Domain.list', '**/*_Domain_*.list'], format: client === 'surge' ? 'domain-set' as const : 'domain' as const },
+        { ...common, include: ['**/*_IP.list', '**/*_IP_*.list'], format: 'ipcidr' as const },
+        { ...common, exclude: ['**/*_Domain.list', '**/*_Domain_*.list', '**/*_IP.list', '**/*_IP_*.list'], format: 'classical' as const },
+      ];
+    }) },
+  { id: 'zydou', name: 'zydou/domain-list-community-converter', owner: 'zydou', repo: 'domain-list-community-converter', refs: ['surge-rule-set', 'surge-domain-set'], license: '见上游仓库许可证',
+    scans: [
+      { ...base, ref: 'surge-rule-set', directory: '', include: ['*.txt', '*.list'], exclude: ['*@-*'], client: 'surge', groupBy: 'stem', format: 'classical' },
+      { ...base, ref: 'surge-domain-set', directory: '', include: ['*.txt', '*.list'], exclude: ['*@-*'], client: 'surge', groupBy: 'stem', format: 'domain-set' },
+    ] },
 ];
-export type RepoFile = { path: string; ref: string; format: RuleSetFormat; behavior?: 'classical' | 'domain' | 'ipcidr' };
-export type RepoVariant = { id: string; client: 'mihomo' | 'surge' | 'any'; label: string; files: RepoFile[]; recommended?: boolean };
+export type RepoFile = { path: string; ref: string; commit?: string; format: RuleSetFormat; behavior?: 'classical' | 'domain' | 'ipcidr' };
+export type RepoVariant = { id: string; client: 'mihomo' | 'surge' | 'any'; label: string; files: RepoFile[]; recommended?: boolean; readme?: boolean };
 export type IndexedEntry = { repo: string; path: string; name: string; variants: RepoVariant[] };
 export const normalizeSearch = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[-_\s]+/g, '');
 export const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
+// 导入仍跟踪分支；预览固定到本次索引的提交，避免目录与正文来自不同版本。
 export const rawUrl = (repo: RepoDefinition, file: RepoFile) => `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/${encodeURIComponent(file.ref)}/${encodePath(file.path)}`;
-export const upstreamUrl = (repo: RepoDefinition, file: RepoFile) => `https://github.com/${repo.owner}/${repo.repo}/blob/${encodeURIComponent(file.ref)}/${encodePath(file.path)}`;
+export const upstreamUrl = (repo: RepoDefinition, file: RepoFile) => `https://github.com/${repo.owner}/${repo.repo}/blob/${encodeURIComponent(file.commit ?? file.ref)}/${encodePath(file.path)}`;
 
-export function buildEntries(repo: RepoDefinition, trees: Record<string, string[]>): IndexedEntry[] {
+export function buildEntries(repo: RepoDefinition, trees: Record<string, string[]>, revisions: Record<string, string> = {}): IndexedEntry[] {
   const entries = new Map<string, IndexedEntry>();
-  const add = (key: string, client: RepoVariant['client'], label: string, file: RepoFile, group = file.path) => {
-    let entry = entries.get(key);
-    if (!entry) { entry = { repo: repo.id, path: key, name: key, variants: [] }; entries.set(key, entry); }
-    const id = `${client}:${file.ref}:${group}`;
-    let variant = entry.variants.find(v => v.id === id);
-    if (!variant) { variant = { id, client, label, files: [] }; entry.variants.push(variant); }
-    variant.files.push(file);
-  };
-  for (const [ref, paths] of Object.entries(trees)) {
-    for (const path of paths.sort()) {
-      if (!isIndexedRuleFile(path)) continue;
-      if (repo.adapter === 'generic') {
-        if (!repo.options || !matchesGeneric(path, repo.options)) continue;
-        add(path, 'any', '通用文本', { ref, path, format: repo.options.format });
-        entries.get(path)!.name = path.replace(/\.[^.]+$/, '');
-      } else if (repo.adapter === 'zydou') {
-        if (ref !== 'surge-rule-set' && ref !== 'surge-domain-set') continue;
-        const ext = path.slice(path.lastIndexOf('.'));
-        if (path.includes('/') || !path.endsWith(ext)) continue;
-        const key = path.slice(0, -ext.length).trimEnd();
-        if (!key || /@-/.test(key)) continue;
-        const client = 'surge';
-        const format = ref === 'surge-domain-set' ? 'domain-set' : 'classical';
-        add(key, client, ref, { ref, path, format, behavior: ref === 'surge-rule-set' ? 'classical' : 'domain' }, key);
-      } else {
-        const match = /^rule\/(Clash|Surge)\/(.+)\/([^/]+\.(list|txt))$/.exec(path);
-        if (!match) continue;
-        const [, clientDir, key, filename] = match;
-        const behavior = /_Domain(?:_|\.)/.test(filename!) ? 'domain' : /_IP(?:_|\.)/.test(filename!) ? 'ipcidr' : 'classical';
-        const format = behavior === 'domain' ? (clientDir === 'Surge' ? 'domain-set' : 'domain') : behavior;
-        add(key!, clientDir === 'Clash' ? 'mihomo' : 'surge', filename!, { ref, path, format, behavior });
+  const seen = new Set<string>();
+  const scores = new Map<string, number>();
+  for (const scan of repo.scans) {
+    for (const path of [...(trees[scan.ref] ?? [])].sort()) {
+      if (!matchesGeneric(path, scan) || seen.has(`${scan.ref}:${path}`)) continue;
+      seen.add(`${scan.ref}:${path}`);
+      const relative = scan.directory ? path.slice(scan.directory.length + 1) : path;
+      const stem = relative.replace(/\.[^.]+$/, '').trimEnd();
+      const key = scan.groupBy === 'path' ? path : scan.groupBy === 'stem' ? stem : relative.includes('/') ? relative.slice(0, relative.lastIndexOf('/')) : stem;
+      let entry = entries.get(key);
+      if (!entry) { entry = { repo: repo.id, path: key, name: scan.groupBy === 'path' ? path.replace(/\.[^.]+$/, '') : key, variants: [] }; entries.set(key, entry); }
+      const group = scan.groupBy === 'stem' ? key : path;
+      const id = `${scan.client}:${scan.ref}:${group}`;
+      let variant = entry.variants.find(v => v.id === id);
+      if (!variant) {
+        variant = { id, client: scan.client, label: scan.groupBy === 'stem' ? scan.ref : path.split('/').at(-1)!, files: [], readme: scan.readme };
+        entry.variants.push(variant);
       }
+      const behavior = scan.format === 'classical' || scan.format === 'ipcidr' ? scan.format : scan.format === 'domain' || scan.format === 'domain-set' ? 'domain' : undefined;
+      variant.files.push({ ref: scan.ref, path, format: scan.format, behavior, ...(revisions[scan.ref] ? { commit: revisions[scan.ref] } : {}) });
+      const preferred = scan.preferred.findIndex(p => pathGlob(p).test(path.split('/').at(-1)!));
+      const score = preferred >= 0 ? preferred : scan.preferred.length + (path.split('/').at(-1) === `${key.split('/').at(-1)}.list` ? 0 : 1);
+      scores.set(id, score);
     }
   }
-  for (const entry of entries.values()) {
-    for (const client of ['mihomo', 'surge', 'any'] as const) {
-      const choices = entry.variants.filter(v => v.client === client);
-      // 文本导入默认优先完整 classical；zydou 用 RULE-SET，可由现有内核托管合并。
-      const score = (v: RepoVariant) => {
-        if (repo.adapter === 'zydou') return v.label === 'surge-rule-set' ? 0 : 1;
-        const base = entry.path.split('/').at(-1)!;
-        if (v.label === `${base}_All.list`) return 0;
-        if (v.label === `${base}.list`) return 1;
-        return 2;
-      };
-      choices.sort((a, b) => score(a) - score(b) || a.id.localeCompare(b.id));
-      if (choices[0]) choices[0].recommended = true;
-    }
+  for (const entry of entries.values()) for (const client of ['mihomo', 'surge', 'any'] as const) {
+    const choices = entry.variants.filter(v => v.client === client).sort((a, b) => (scores.get(a.id) ?? 0) - (scores.get(b.id) ?? 0));
+    if (choices[0]) choices[0].recommended = true;
   }
   return [...entries.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
