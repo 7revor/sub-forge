@@ -2,7 +2,7 @@ import type { GroupSpec, ReportItem } from '@sub-forge/core';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Button, Card, Empty, Field, Input, Segmented, Switch, cx } from '../../components/ui.tsx';
+import { Button, Empty, Field, Input, Segmented, Switch, cx } from '../../components/ui.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
@@ -23,16 +23,19 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
     if (!window.confirm(`删除「${groupName(id)}」？\n影响 ${affected.length} 个组${affected.length ? `（${affected.map((g) => g.name).join('、')}）` : ''}、${rules.length} 条规则${final ? '及 MATCH 出口' : ''}。\n确认后移除引用成员，相关规则和 MATCH 出口改为 REJECT。`)) return;
     onChange(removeGroup(value, id));
   };
-  return <Card title={`策略组（${value.groups.length}）`} bodyClass="border-t border-line"
-    actions={<div className="flex flex-wrap gap-2"><Button disabled={REGION_GROUPS.every(region => value.groups.some(group => group.name === region.name))} onClick={() => {
-      const added = createRegionGroups(value.groups);
-      onChange({ ...value, groups: [...value.groups, ...added] });
-      if (added[0]) onSelect(added[0].id);
-    }}>添加地区节点</Button><Button onClick={() => {
-      const id = newId('g');
-      onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [], whenEmpty: 'reject' }] });
-      onSelect(id);
-    }}>新增组</Button></div>}>
+  return <section className="-mx-4 border-t border-line">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5">
+      <h2 className="m-0 text-[15px] font-semibold">策略组（{value.groups.length}）</h2>
+      <div className="flex flex-wrap gap-2"><Button disabled={REGION_GROUPS.every(region => value.groups.some(group => group.name === region.name))} onClick={() => {
+        const added = createRegionGroups(value.groups);
+        onChange({ ...value, groups: [...value.groups, ...added] });
+        if (added[0]) onSelect(added[0].id);
+      }}>添加地区节点</Button><Button onClick={() => {
+        const id = newId('g');
+        onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [], whenEmpty: 'reject' }] });
+        onSelect(id);
+      }}>新增组</Button></div>
+    </div>
     {!group ? <div className="p-4"><Empty title="还没有组" /></div> : <div className="grid min-w-0 md:grid-cols-[240px_minmax(0,1fr)]">
       <nav aria-label="策略组列表" className="min-w-0 border-b border-line p-3 md:border-r md:border-b-0">
         <SortableList items={value.groups} getKey={(g) => g.id} onReorder={(groups) => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
@@ -50,7 +53,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           </div>;
         }} />
       </nav>
-      <div key={group.id} id={`template-group-${group.id}`} className="flex min-w-0 flex-col gap-5 rounded-b-[10px] bg-panel p-4 md:rounded-bl-none md:rounded-br-[10px] md:p-5">
+      <div key={group.id} id={`template-group-${group.id}`} className="flex min-w-0 flex-col gap-5 p-4 md:p-5">
         <ItemIssues report={report} where={`group:${group.id}`} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="组名称">{(id) => <Input id={id} value={group.name} onChange={(e) => update({ name: e.target.value })} />}</Field>
@@ -78,5 +81,5 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <div className="flex justify-end border-t border-line pt-4"><Button variant="danger" size="sm" onClick={() => remove(group.id)}>删除组</Button></div>
       </div>
     </div>}
-  </Card>;
+  </section>;
 }
