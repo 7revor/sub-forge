@@ -121,7 +121,7 @@ type GroupSpec = {
   id: ID; name: string;
   type: 'select' | 'url-test' | 'fallback' | 'load-balance';
   members: GroupMember[];
-  filter?: string; excludeFilter?: string; excludeType?: string;   // 仅 Profile 层可设置，模板中禁止
+  filter?: string; excludeFilter?: string; excludeType?: string;   // 模板可预设，Profile 可覆盖；仅筛选节点集成员
   test?: { url?: string; interval?: number; timeout?: number; tolerance?: number; lazy?: boolean;
            maxFailedTimes?: number; expectedStatus?: string };
   strategy?: 'consistent-hashing' | 'round-robin' | 'sticky-sessions';

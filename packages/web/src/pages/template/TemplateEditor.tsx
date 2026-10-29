@@ -29,6 +29,7 @@ export function TemplateEditor({ value, onChange, ctx, report, focus, onValidity
   }, [focus, group, rule, mode, step]);
   return <DualEditor value={value} onChange={onChange} rawLabel="mihomo YAML" mode={mode} onModeChange={setMode} onValidityChange={onValidityChange}
     toRaw={(body) => templateToYaml(body, ctx)} fromRaw={(text) => templateFromYaml(text, value, ctx)}
+    fromPaste={(text) => /^\s*(?:#[^\n]*\n\s*)*-\s/.test(text) ? templateFromYaml(text, value, ctx) : undefined}
     recoverForm={(text) => templateFormFromYaml(text, value, ctx)} renderForm={() => <>
       {step === 0 && <TemplateGroupsEditor value={value} onChange={onChange} selected={group} onSelect={setGroup} report={report} />}
       {step === 1 && <TemplateRulesEditor value={value} onChange={onChange} selected={rule} onSelect={setRule} ctx={ctx} report={report} />}

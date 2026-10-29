@@ -33,7 +33,6 @@ export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rules
   for (const g of t.groups) {
     const where = `group:${g.id}`;
     g.members.forEach((m) => checkMember(m, where));
-    if (g.filter || g.excludeFilter || g.excludeType) report.error('template.filter-in-template', `模板组「${g.name}」不能预设 filter / exclude-filter / exclude-type`, where);
   }
   for (const c of findGroupCycles(t.groups)) report.error('template.group-cycle', `组之间成环：${c.join(' → ')}`);
 
