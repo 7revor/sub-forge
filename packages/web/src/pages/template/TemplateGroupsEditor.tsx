@@ -53,7 +53,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         }} />
       </>}
     </Card>
-    <Modal title={group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'} open={!!group} onClose={close} placement="right"
+    <Modal title={group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'} open={!!group} onClose={close} wide
       footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={close}>完成</Button></>}>
       {group && <>
         <ItemIssues report={report} where={`group:${group.id}`} />

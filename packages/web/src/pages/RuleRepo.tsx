@@ -32,7 +32,7 @@ export function RuleRepoPage() {
   const preview = useQuery({ queryKey: ['rule-repos', 'file-preview', selected?.repo, selected?.file.ref, selected?.file.path, revision], enabled: !!selected, retry: false,
     queryFn: () => api<{ item: RepoFilePreview }>('GET', `/rule-repos/file-preview?${new URLSearchParams({ repo: selected!.repo, ref: selected!.file.ref, path: selected!.file.path })}`).then(result => result.item),
   });
-  const create = useMutation({ meta: { successMessage: ruleset ? '规则文件已加入规则集' : '规则集已创建' },
+  const create = useMutation({ meta: { successMessage: ruleset ? '规则文件已加入增强集合' : '增强集合已创建' },
     mutationFn: (file: RepoFilePreview) => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: file.repo, path: file.entry, file: { ref: file.ref, path: file.path }, ...(ruleset ? { ruleset } : {}) }),
     onSuccess: async result => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${result.item.id}`); },
   });
@@ -43,9 +43,9 @@ export function RuleRepoPage() {
   };
   const file = preview.data;
   return <>
-    <PageHeader title="规则仓库" />
+    <PageHeader title="规则集合" />
     <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} />
-    {ruleset && <div className="text-[13px] text-muted">选择文件预览后可加入规则集。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-accent">返回规则集</Link></div>}
+    {ruleset && <div className="text-[13px] text-muted">选择文件预览后可加入增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-accent">返回增强集合</Link></div>}
     <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
     <ErrorAlert error={repos.error} />
     <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(220px,1fr)_minmax(300px,1.4fr)] gap-5 overflow-y-auto lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
@@ -63,7 +63,7 @@ export function RuleRepoPage() {
             <span className="break-all font-mono text-[12px] text-muted">{repos.data?.repos.find(repo => repo.id === selected.repo)?.name ?? selected.repo} · {selected.file.path}</span>
             {file && !preview.isFetching && !preview.isError && <div className="flex flex-wrap items-center gap-3 text-[12px]">
               <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-accent">打开原文件</a>
-              <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入规则集' : '新建规则集'}</Button>
+              <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>
             </div>}
             <ErrorAlert error={preview.error ?? create.error} />
             {preview.isError && <Button size="sm" onClick={() => void preview.refetch()}>重试读取文件</Button>}

@@ -166,7 +166,7 @@ export function FieldError({ error }: { error: unknown }) {
   return <div role="alert" className="rounded-lg bg-err-soft px-3 py-2.5 text-[13px] text-[#8f2a1f]">{error instanceof Error ? error.message : String(error)}</div>;
 }
 
-export function Modal({ title, open, onClose, children, footer, wide, placement = 'center' }: { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; placement?: 'center' | 'right' }) {
+export function Modal({ title, open, onClose, children, footer, wide }: { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -197,14 +197,14 @@ export function Modal({ title, open, onClose, children, footer, wide, placement 
   // 挂到 body，避免页面限宽、裁切或定位祖先影响全屏遮罩。
   // 设计稿「对话框与危险操作」：标题 + 关闭、内容、灰底操作栏；宽度 560（表单）/ 720（粘贴、YAML）
   return createPortal(
-    <div className={cx('fixed inset-0 z-50 flex overflow-hidden bg-[rgba(20,23,28,.42)]', placement === 'right' ? 'items-stretch justify-end' : 'items-start justify-center p-4 pt-[10vh]')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={cx('flex max-h-full min-h-0 w-full flex-col bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', placement === 'right' ? 'h-full max-w-[640px]' : cx('rounded-xl', wide ? 'max-w-[720px]' : 'max-w-[560px]'))}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={cx('flex max-h-full min-h-0 w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
         <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-[18px] pb-2">
           <h2 className="m-0 text-base font-semibold">{title}</h2>
           <button type="button" aria-label="关闭" onClick={onClose} className="grid h-8 w-8 cursor-pointer place-items-center rounded-md text-muted hover:bg-ground hover:text-ink"><X size={16} /></button>
         </div>
         <div className="flex min-h-0 flex-col gap-3.5 overflow-auto overscroll-contain px-5 pt-2 pb-[18px]">{children}</div>
-        {footer && <div className={cx('flex shrink-0 flex-wrap justify-end gap-2 border-t border-line-2 bg-[#fafbfc] px-5 py-3.5', placement === 'center' ? 'rounded-b-xl' : 'mt-auto')}>{footer}</div>}
+        {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2 rounded-b-xl border-t border-line-2 bg-[#fafbfc] px-5 py-3.5">{footer}</div>}
       </div>
     </div>, document.body
   );

@@ -1,15 +1,8 @@
-import type { Builtin, Matcher, ReportItem, Target } from '@sub-forge/core';
+import type { Builtin, ReportItem, Target } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
 import { BUILTINS } from '../../components/pickers.tsx';
-import { ruleToLine } from '../../components/rule.ts';
 import { buttonClass, ReportList, Select } from '../../components/ui.tsx';
-import type { ConvertCtx, NamedRef } from '../../convert/templateYaml.ts';
-
-export function matcherLabel(matcher: Matcher, ctx: ConvertCtx): string {
-  if (matcher.kind === 'rule') return ruleToLine(matcher.rule);
-  if (matcher.remote) return `远程 · ${matcher.remote.url}`;
-  return matcher.repository?.name ?? `本地 · ${ctx.rulesets.find((r) => r.id === matcher.id)?.name ?? (matcher.id || '未选择')}`;
-}
+import type { NamedRef } from '../../convert/templateYaml.ts';
 
 export function TemplateTargetSelect({ value, onChange, groups, label, action = false }: {
   value: Target | undefined; onChange: (value: Extract<Target, { kind: 'group' | 'builtin' }>) => void; groups: NamedRef[]; label: string; action?: boolean;

@@ -13,7 +13,7 @@ function RemoteRuleDialog({ value, onSelect, onClose }: { value?: string; onSele
   const [previewUrl, setPreviewUrl] = useState<string>();
   const source = { id: 'remote', kind: 'remote' as const, format: 'auto' as const, url: previewUrl };
   const loaded = useRulesetSources(undefined, previewUrl ? { id: '', name: '', sources: [source] } : undefined);
-  return <Modal title="远程规则 URL" open wide onClose={onClose} footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!matcher} onClick={() => { if (matcher) { onSelect(matcher); onClose(); } }}>使用此地址</Button></>}>
+  return <Modal title="远程链接" open wide onClose={onClose} footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!matcher} onClick={() => { if (matcher) { onSelect(matcher); onClose(); } }}>使用此地址</Button></>}>
     <Field label="规则地址">{id => <Input id={id} type="url" value={url} placeholder="https://example.com/rules.yaml" onChange={e => { setUrl(e.target.value); setPreviewUrl(undefined); }} />}</Field>
     <p className="m-0 text-[13px] text-muted">直接引用自己或第三方维护的规则，自动识别格式并输出 .list。</p>
     {url && error && <FieldError error={error} />}

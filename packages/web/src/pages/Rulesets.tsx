@@ -34,7 +34,7 @@ function sourceSummary(rs: RuleSetDoc): string {
 
 export function RulesetList() {
   return (
-    <DocList kind="rulesets" title="规则集"
+    <DocList kind="rulesets" title="增强集合"
       columns={[
         { header: '名称', cell: (r) => r.name },
         { header: '备注', cell: (r) => <NoteCell note={r.note} /> },
@@ -74,7 +74,7 @@ export function RulesetEdit() {
   const error = rulesetError(d);
 
   return (
-    <DetailShell listPath="/rulesets" listLabel="规则集" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
+    <DetailShell listPath="/rulesets" listLabel="增强集合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
       onSave={() => {
         if (error) { alertError(error); return; }
         if (!error) e.submit((x) => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => (s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' })) }));
@@ -129,11 +129,11 @@ export function RulesetEdit() {
 }
 
 function RepositoryPicker({ onAdd }: { onAdd: (sources: RuleSetSourceDoc[]) => void }) {
-  return <RuleSetPicker scope="repository" label="关联仓库规则" triggerClassName={sourceActionClass}
+  return <RuleSetPicker scope="repository" label="关联规则集合" triggerClassName={sourceActionClass}
     triggerIcon={<Link2 size={15} className="hidden shrink-0 sm:block" />} onSelect={matcher => {
       if (!matcher.repository) return;
       onAdd(matcher.repository.sources.map(source => ({ ...source, id: newId('src') })));
-      notifySuccess('仓库规则已关联，保存后生效');
+      notifySuccess('规则集合已关联，保存后生效');
     }} />;
 }
 
