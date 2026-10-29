@@ -32,7 +32,7 @@ M0 明细（代码在 `packages/core`，本轮合并验证的 Docker 完整环�
 | --- | --- | --- |
 | 节点解析器 | ✅ | URI / Base64 / Clash YAML / Surge `[Proxy]`；ss、vmess、vless(reality)、trojan、hysteria2、tuic、anytls、socks5、http。**未复用 Sub-Store**，自行实现 |
 | 处理链（P0 处理器） | ✅ | 逐步 trace、末尾去重兜底；脚本处理器（SRC-08）未做，需沙箱 |
-| Collection | ✅ | 前后缀、环检测；成员拉取失败策略（COL-05，P1）未做 |
+| Collection | ✅ | 前后缀、环检测；详情页当页编辑处理链，预览带成员草稿（2026-10-29）；成员拉取失败策略（COL-05，P1）未做 |
 | 规则 IR 与解析 | ✅ | classical / DOMAIN-SET / 纯 CIDR / YAML payload，mrs 透传；逻辑规则（RS-04，P1）未做 |
 | 按客户端降级 | ✅ | mihomo 与 Surge 规则写法、进程规则降级、行级覆盖 |
 | 模板 ⊕ 覆盖层、模板校验器 | ✅ | 结构校验在内核；发布前影响分析（TPL-07 ②）已由服务层逐个试渲染，规则可用性检查见 [12](12-backend-regression-fixes.md) |

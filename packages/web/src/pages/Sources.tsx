@@ -2,9 +2,9 @@
 // 拉取参数与快照历史对话框（「订阅源 · 拉取参数与快照」）。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { OperatorStep } from '@sub-forge/core';
+import type { Collection, OperatorStep } from '@sub-forge/core';
 import { Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api, type PipelinePreview } from '../api.ts';
 import { DocList } from '../components/DocList.tsx';
@@ -74,14 +74,18 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
   );
 }
 
-/** 处理链草稿变化后延迟预览（SRC-06） */
-export function usePipelinePreview(kind: 'sources' | 'collections', id: string | undefined, steps: OperatorStep[] | undefined) {
-  const [debounced, setDebounced] = useState(steps);
-  useEffect(() => { const t = setTimeout(() => setDebounced(steps), 400); return () => clearTimeout(t); }, [steps]);
+/**
+ * 处理链草稿变化后延迟预览（SRC-06）。组合同时带上成员草稿（COL-02）：
+ * 预览跟着页面上的成员走，成员增删、改前后缀后不会继续显示旧的合并结果。
+ */
+export function usePipelinePreview(kind: 'sources' | 'collections', id: string | undefined, steps: OperatorStep[] | undefined, members?: Collection['members']) {
+  const draft = useMemo(() => (steps ? { pipeline: steps, ...(members ? { members } : {}) } : undefined), [steps, members]);
+  const [debounced, setDebounced] = useState(draft);
+  useEffect(() => { const t = setTimeout(() => setDebounced(draft), 400); return () => clearTimeout(t); }, [draft]);
   return useQuery({
     queryKey: ['pipeline-preview', kind, id, debounced],
     enabled: !!id && id !== 'new' && !!debounced,
-    queryFn: () => api<PipelinePreview>('POST', `/${kind}/${id}/pipeline-preview`, { pipeline: debounced }),
+    queryFn: () => api<PipelinePreview>('POST', `/${kind}/${id}/pipeline-preview`, debounced),
     placeholderData: (prev) => prev,
     retry: false,
   });
