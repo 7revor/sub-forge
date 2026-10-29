@@ -44,6 +44,16 @@ export type RenderServiceOptions = {
 const SOURCE_TTL_SEC = 86400;
 const RULESET_TTL_SEC = 86400;
 
+/** 流量累加，缺失字段不补零，到期时间取已知的最早值。 */
+function sumTraffic(infos: Iterable<TrafficInfo>): TrafficInfo | undefined {
+  const sum: TrafficInfo = {};
+  for (const u of infos) {
+    for (const k of ['upload', 'download', 'total'] as const) if (u[k] !== undefined) sum[k] = (sum[k] ?? 0) + u[k]!;
+    if (u.expire !== undefined) sum.expire = sum.expire === undefined ? u.expire : Math.min(sum.expire, u.expire);
+  }
+  return Object.keys(sum).length ? sum : undefined;
+}
+
 function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...base };
   for (const [k, v] of Object.entries(patch)) {
@@ -62,7 +72,7 @@ export type PreviewOutcome = { ok: boolean; yaml?: string; dependencies?: Depend
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
 export class RenderService {
-  private readonly cache = new Map<string, StoredRender>();
+  private readonly cache = new Map<string, { render: StoredRender; report: ReportItem[] }>();
 
   constructor(
     private readonly store: Store,
@@ -163,6 +173,7 @@ export class RenderService {
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
     if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
     const base = profile.base ? deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
+    const userinfo = this.userinfo(profile, userinfoBySource);
 
     const key = stableHash(stableStringify({
       profile, template, base, target, snapshotHashes,
@@ -170,10 +181,14 @@ export class RenderService {
       rulesets: rules.rulesets, bundles: rules.bundles,
     }));
     const hit = opts.dry ? undefined : this.cache.get(key);
-    if (hit) {
-      this.cache.delete(key); this.cache.set(key, hit);
-      this.remember(profileId, target, hit);
-      return { from: 'cache', render: hit, report: pre };
+    if (hit && !pre.some(i => i.level === 'error')) {
+      // 配置内容未变时仍使用最新快照的流量和本次拉取告警，不把元信息固化在 YAML 缓存中。
+      const report = [...pre, ...hit.report];
+      const { userinfo: _oldUserinfo, ...content } = hit.render;
+      const render: StoredRender = { ...content, warnings: report.filter(i => i.level === 'warn').length, ...(userinfo ? { userinfo } : {}) };
+      this.cache.delete(key); this.cache.set(key, { render, report: hit.report });
+      this.remember(profileId, target, render);
+      return { from: 'cache', render, report };
     }
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
@@ -213,7 +228,6 @@ export class RenderService {
       }
     }
 
-    const userinfo = this.userinfo(profile, userinfoBySource);
     const render: StoredRender = {
       generation,
       yaml: result.yaml,
@@ -223,7 +237,7 @@ export class RenderService {
       ...(userinfo ? { userinfo } : {}),
     };
     if (opts.dry) return { from: 'fresh', render, report, result };
-    this.cache.set(key, render);
+    this.cache.set(key, { render, report: result.report.items });
     while (this.cache.size > (this.opts.cacheSize ?? 256)) this.cache.delete(this.cache.keys().next().value!);
     this.remember(profileId, target, render);
     return { from: 'fresh', render, report };
@@ -241,12 +255,13 @@ export class RenderService {
     for (const src of sources) {
       const bodies: string[] = [];
       const failures: ReportItem[] = [];
+      const trafficByUrl = new Map<string, TrafficInfo>();
       for (const url of src.urls ?? []) {
         const r = await this.snapshots.get('source', src.id, url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
         if (r.snapshot?.body !== undefined) {
           bodies.push(r.snapshot.body);
           hashes.push(`${src.id}|${url}|${r.snapshot.hash}`);
-          if (r.snapshot.userinfo) userinfo.set(src.id, r.snapshot.userinfo);
+          if (r.snapshot.userinfo) trafficByUrl.set(url, r.snapshot.userinfo);
         }
         if (r.error) failures.push({ level: 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
       }
@@ -256,6 +271,8 @@ export class RenderService {
         for (const failure of failures) failure.level = 'warn';
       }
       report.push(...failures);
+      const traffic = sumTraffic(trafficByUrl.values());
+      if (traffic) userinfo.set(src.id, traffic);
     }
     return { inputs, userinfo, hashes, report };
   }
@@ -301,12 +318,6 @@ export class RenderService {
     const mode = profile.userinfo ?? { mode: 'sum' };
     if (mode.mode === 'none') return undefined;
     if (mode.mode === 'source') return bySource.get(mode.sourceId);
-    if (!bySource.size) return undefined;
-    const sum: TrafficInfo = {};
-    for (const u of bySource.values()) {
-      for (const k of ['upload', 'download', 'total'] as const) if (u[k] !== undefined) sum[k] = (sum[k] ?? 0) + u[k]!;
-      if (u.expire !== undefined) sum.expire = sum.expire === undefined ? u.expire : Math.min(sum.expire, u.expire);
-    }
-    return sum;
+    return sumTraffic(bySource.values());
   }
 }
