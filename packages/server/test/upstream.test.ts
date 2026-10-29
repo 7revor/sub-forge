@@ -81,6 +81,8 @@ describe('上游拉取', () => {
 });
 
 describe('快照服务', () => {
+  // 订阅源快照必须解析得出节点，测试正文用一行节点 URI
+  const node = (name: string) => `trojan://pw@${name}.example.com:443#${name}`;
   const setup = (bodies: (string | Error)[]) => {
     let t = 1_000_000;
     let calls = 0;
@@ -96,37 +98,56 @@ describe('快照服务', () => {
   };
 
   it('首次同步拉取；并发请求只拉一次', async () => {
-    const { svc, calls } = setup(['v1']);
+    const { svc, calls } = setup([node('v1')]);
     const [a, b] = await Promise.all([svc.get('source', 's', 'u', { ttlSec: 60 }), svc.get('source', 's', 'u', { ttlSec: 60 })]);
-    expect(a.snapshot!.body).toBe('v1');
-    expect(b.snapshot!.body).toBe('v1');
+    expect(a.snapshot!.body).toBe(node('v1'));
+    expect(b.snapshot!.body).toBe(node('v1'));
     expect(calls()).toBe(1);
   });
 
   it('过期后先返回旧快照，后台刷新', async () => {
-    const { svc, advance, calls } = setup(['v1', 'v2']);
+    const { svc, advance, calls } = setup([node('v1'), node('v2')]);
     await svc.get('source', 's', 'u', { ttlSec: 60 });
     advance(61_000);
     const r = await svc.get('source', 's', 'u', { ttlSec: 60 });
-    expect(r).toMatchObject({ stale: true, snapshot: { body: 'v1' } });
+    expect(r).toMatchObject({ stale: true, snapshot: { body: node('v1') } });
     await svc.settled();
     expect(calls()).toBe(2);
-    expect((await svc.get('source', 's', 'u', { ttlSec: 60 })).snapshot!.body).toBe('v2');
+    expect((await svc.get('source', 's', 'u', { ttlSec: 60 })).snapshot!.body).toBe(node('v2'));
   });
 
   it('刷新失败时继续使用旧快照，并带上失败原因', async () => {
-    const { svc, advance } = setup(['v1', new Error('connect timeout')]);
+    const { svc, advance } = setup([node('v1'), new Error('connect timeout')]);
     await svc.get('source', 's', 'u', { ttlSec: 60 });
     advance(61_000);
     await svc.get('source', 's', 'u', { ttlSec: 60 });
     await svc.settled();
     const r = await svc.get('source', 's', 'u', { ttlSec: 60 });
-    expect(r.snapshot!.body).toBe('v1');
+    expect(r.snapshot!.body).toBe(node('v1'));
     expect(r.error).toBe('connect timeout');
   });
 
   it('从未成功过时返回错误', async () => {
     const { svc } = setup([new Error('HTTP 500')]);
     expect(await svc.get('source', 's', 'u', { ttlSec: 60 })).toEqual({ stale: false, error: 'HTTP 500' });
+  });
+
+  it('上游 200 但内容为空或没有节点时记为失败，继续使用上一份快照', async () => {
+    const { svc, store, advance } = setup([node('v1'), '', 'not a node list']);
+    await svc.get('source', 's', 'u', { ttlSec: 60 });
+    for (const reason of ['上游返回了空内容', '上游内容中没有可用节点（1 行无法解析）']) {
+      advance(61_000);
+      await svc.get('source', 's', 'u', { ttlSec: 60 });
+      await svc.settled();
+      const r = await svc.get('source', 's', 'u', { ttlSec: 60 });
+      expect(r.snapshot!.body).toBe(node('v1'));
+      expect(r.error).toBe(reason);
+    }
+    expect(store.countSnapshots('source', 's', 'u')).toEqual({ ok: 1, failed: 1 }); // 失败记录只保留最近一条
+  });
+
+  it('规则集只拒绝空内容', async () => {
+    const { svc } = setup(['DOMAIN,a.com']);
+    expect((await svc.get('ruleset', 'r', 'u', { ttlSec: 60 })).snapshot!.body).toBe('DOMAIN,a.com');
   });
 });

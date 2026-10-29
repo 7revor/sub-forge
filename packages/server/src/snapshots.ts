@@ -3,13 +3,24 @@
 // - 有快照但已过期：先用旧快照，后台刷新；
 // - 从未拉取成功：只能同步拉取一次。
 // 同一 URL 的并发拉取合并为一次。拉取失败记入快照表（UI 标红），不抛出。
+// 上游返回 2xx 但内容为空（或订阅源解析不出任何节点）同样记为失败：机场在 token 过期、
+// 限流时常这样返回，若当作成功快照，会顶掉上一份可用内容，订阅变成空的。
 
-import { stableHash } from '@sub-forge/core';
+import { parseContent, stableHash } from '@sub-forge/core';
 import type { FetchOptions } from './docs.ts';
 import type { UpstreamFetcher } from './net/upstream.ts';
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 
 export type SnapshotResult = { snapshot?: SnapshotRow; stale: boolean; error?: string };
+
+/** 内容不可用时返回原因；可用返回 undefined */
+export function unusableBody(kind: SnapshotOwner, id: string, body: string): string | undefined {
+  if (!body.trim()) return '上游返回了空内容';
+  if (kind !== 'source') return undefined;
+  const parsed = parseContent(body, { type: 'source', id });
+  if (parsed.proxies.length) return undefined;
+  return parsed.failures.length ? `上游内容中没有可用节点（${parsed.failures.length} 行无法解析）` : '上游内容中没有可用节点';
+}
 
 export class SnapshotService {
   private readonly inflight = new Map<string, Promise<SnapshotRow>>();
@@ -30,6 +41,8 @@ export class SnapshotService {
       const fetchedAt = this.now();
       try {
         const res = await this.fetcher(url, opts);
+        const unusable = unusableBody(kind, id, res.body);
+        if (unusable) throw new Error(unusable);
         const row = { ownerKind: kind, ownerId: id, url, fetchedAt, ok: true, status: res.status, body: res.body, hash: stableHash(res.body), ...(res.userinfo ? { userinfo: res.userinfo } : {}) };
         this.store.addSnapshot(row);
         return this.store.latestSnapshot(kind, id, url)!;
