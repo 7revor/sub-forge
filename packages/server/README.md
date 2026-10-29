@@ -75,7 +75,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
 | `GET /api/profiles/:id/access-log` | 访问日志（保留 30 天） |
 | `POST /api/sources/:id/refresh`、`GET /api/sources/:id/snapshots` | 立即拉取、快照历史 |
-| `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；组合还可带未保存的 `members`（按保存规则校验引用与成环） |
+| `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；订阅源还可带 `source: { urls, fetch }`，组合还可带 `members`（按保存规则校验引用与成环） |
 | `GET /api/nodesets/:type/:id/nodes` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
 | `POST /api/rulesets/:id/preview` | 规则集按 `client` + `platform` 的最终输出 |
 
@@ -91,6 +91,8 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `GET/PUT /api/system`、`POST /api/system/backup`、`POST /api/system/restore` | 系统：SSRF 白名单、mihomo 校验开关、GitHub 镜像、备份恢复 |
 
 保存前校验：必填项、正则能否编译、远程地址协议、脚本编写权限、引用是否存在且属于当前用户（规则集还可以是管理员名下的公共规则集）、组合是否成环、规则包层数。深层结构问题由预览与渲染报告给出。
+
+订阅源拉取参数草稿与正式配置不同的时候，按草稿地址、User-Agent 和超时拉取并预览；结果只保留最多 16 组、60 秒的内存缓存，不写文档或正式快照。相同参数下调整处理链复用拉取结果；未修改参数时继续使用正式快照。草稿的部分地址失败会返回告警与成功部分，全部失败返回空节点和错误报告。
 
 处理链的创建、更新和草稿预览统一检查每个处理器的数组、对象、标量类型、枚举及正则 flags。非法参数返回带步骤位置的 400，禁用步骤也须满足结构要求；空数组与空正则占位仍允许，脚本编写权限不变。
 

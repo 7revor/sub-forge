@@ -1,7 +1,7 @@
 // 编辑器用的预览接口：
 //   POST /api/sources/:id/refresh            立即拉取（SRC-03 快照）
 //   GET  /api/sources/:id/snapshots          快照历史（不含正文）
-//   POST /api/{sources,collections}/:id/pipeline-preview   处理链逐步预览（SRC-06），可带未保存的处理链（组合还可带未保存的成员）
+//   POST /api/{sources,collections}/:id/pipeline-preview   处理链逐步预览（SRC-06），支持拉取参数与成员草稿
 //   GET  /api/nodesets/:type/:id/nodes      已保存处理链之后的节点列表
 //   POST /api/rulesets/:id/preview           规则集按客户端 + 平台的最终输出（CR-05）
 
@@ -11,6 +11,7 @@ import {
 } from '@sub-forge/core';
 import { Hono, type Context } from 'hono';
 import type { RenderService } from '../render.ts';
+import type { SourceDoc } from '../docs.ts';
 import type { SnapshotService } from '../snapshots.ts';
 import type { Store } from '../store.ts';
 import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
@@ -71,21 +72,29 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
   /**
    * 处理链逐步预览：输入为订阅源解析结果（或组合合并后的结果），逐步执行请求体里的处理链草稿
    * （缺省用已保存的处理链），返回每一步之后的节点与改名 / 移除差异。
-   * 组合还可带成员草稿（缺省用已保存的成员），让详情页在保存前就能看到合并结果。
+   * 组合可带成员草稿；订阅源可带拉取参数草稿，只读取临时预览，不改正式快照。
    */
   const pipelinePreview = (kind: 'source' | 'collection') => async (c: Context<ApiEnv>) => {
     const user = c.get('user');
     let doc = own(kind, c.req.param('id') ?? '', user.id);
-    const body = await jsonBody<{ pipeline?: unknown; members?: unknown }>(c);
-    if (body.pipeline !== undefined || (kind === 'collection' && body.members !== undefined)) {
+    const saved = doc;
+    const body = await jsonBody<{ pipeline?: unknown; members?: unknown; source?: { urls?: unknown; fetch?: unknown } }>(c);
+    if (kind === 'source' && body.source !== undefined && (!body.source || typeof body.source !== 'object' || Array.isArray(body.source))) throw bad('订阅源草稿必须是对象');
+    if (body.pipeline !== undefined || (kind === 'collection' && body.members !== undefined) || (kind === 'source' && body.source !== undefined)) {
       // 借用保存前校验检查草稿（正则、脚本权限、成员引用与成环）
-      const patch = { pipeline: body.pipeline ?? doc.pipeline, ...(kind === 'collection' && body.members !== undefined ? { members: body.members } : {}) };
+      const patch = {
+        pipeline: body.pipeline ?? doc.pipeline,
+        ...(kind === 'collection' && body.members !== undefined ? { members: body.members } : {}),
+        ...(kind === 'source' && body.source !== undefined ? { urls: body.source.urls, fetch: body.source.fetch } : {}),
+      };
       doc = validateDoc(kind, { ...(doc as unknown as Record<string, unknown>), ...patch }, doc.id, user, store);
     }
     const steps: OperatorStep[] = doc.pipeline;
 
     const ref: NodeSetID = { type: kind, id: doc.id };
-    const loaded = kind === 'collection'
+    const sourceChanged = kind === 'source' && JSON.stringify([(doc as SourceDoc).urls, (doc as SourceDoc).fetch ?? {}]) !== JSON.stringify([(saved as SourceDoc).urls, (saved as SourceDoc).fetch ?? {}]);
+    const loaded = sourceChanged ? await renderer.loadNodeSets([])
+      : kind === 'collection'
       ? await renderer.loadNodeSets((doc as Collection).members.map((m) => m.ref))
       : await renderer.loadNodeSets([ref]);
     const report = new Report();
@@ -93,7 +102,16 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     let failures: { line: string; reason: string }[] = [];
     if (kind === 'source') {
       input = [];
-      for (const b of loaded.inputs.snapshots[doc.id] ?? []) {
+      const bodies: string[] = [];
+      if (sourceChanged) {
+        const src = doc as SourceDoc;
+        const results = await Promise.all(src.urls.map((url) => snapshots.previewSource(src.id, url, src.fetch)));
+        for (const result of results) if (result.body !== undefined) bodies.push(result.body);
+        for (const [index, result] of results.entries()) if (result.error) {
+          report[bodies.length ? 'warn' : 'error']('source.fetch-failed', `地址 ${index + 1} 预览拉取失败：${result.error}`, `source:${src.id}`);
+        }
+      } else bodies.push(...(loaded.inputs.snapshots[doc.id] ?? []));
+      for (const b of bodies) {
         const r = parseContent(b, ref);
         input.push(...r.proxies);
         failures = failures.concat(r.failures);

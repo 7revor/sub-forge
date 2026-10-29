@@ -22,7 +22,9 @@ function checkRegex(pattern: unknown, where: string, flags = ''): void {
 function checkFetch(fetch: unknown): void {
   if (fetch === undefined) return;
   if (!isObj(fetch)) throw bad('拉取参数格式错误');
-  if (fetch.ttlSec !== undefined && !(typeof fetch.ttlSec === 'number' && fetch.ttlSec >= MIN_TTL_SEC)) throw bad(`快照有效期不能短于 ${MIN_TTL_SEC / 60} 分钟`);
+  if (fetch.ua !== undefined && typeof fetch.ua !== 'string') throw bad('User-Agent 必须是字符串');
+  if (fetch.timeoutMs !== undefined && !(typeof fetch.timeoutMs === 'number' && Number.isSafeInteger(fetch.timeoutMs) && fetch.timeoutMs > 0 && fetch.timeoutMs <= 4294967295)) throw bad('超时必须是正整数毫秒，且不超过 4294967295');
+  if (fetch.ttlSec !== undefined && !(typeof fetch.ttlSec === 'number' && Number.isFinite(fetch.ttlSec) && fetch.ttlSec >= MIN_TTL_SEC)) throw bad(`快照有效期不能短于 ${MIN_TTL_SEC / 60} 分钟`);
 }
 
 function checkPipeline(steps: unknown, where: string, user: User): void {
