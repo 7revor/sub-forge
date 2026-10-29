@@ -10,11 +10,14 @@ function tryRaw<T>(toRaw: (value: T) => string, value: T): { text: string } | { 
   try { return { text: toRaw(value) }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 }
 
-export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, recoverForm, rawLabel = '原始配置', mode, onModeChange, onValidityChange }: {
+export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, recoverForm, fromPaste, rawHint, rawLabel = '原始配置', mode, onModeChange, onValidityChange }: {
   value: T; onChange: (value: T) => void; renderForm: () => ReactNode;
   toRaw: (value: T) => string; fromRaw: (text: string) => RawResult<T>;
   /** 返回表单时过滤错误字段，不以保存校验阻止切换。 */
   recoverForm: (text: string) => FormRecovery<T>;
+  /** 完整配置粘贴时转换；返回 undefined 时保留普通文本粘贴。失败不覆盖当前草稿。 */
+  fromPaste?: (text: string) => RawResult<T> | undefined;
+  rawHint?: string;
   rawLabel?: string; mode?: EditorMode; onModeChange?: (mode: EditorMode) => void;
   /** 让外层保存按钮同步阻止提交尚未解析成功的原始配置。 */
   onValidityChange?: (valid: boolean) => void;
@@ -83,9 +86,21 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
             catch (error) { setCopyMessage(`复制失败：${error instanceof Error ? error.message : String(error)}`); }
           }}>复制</Button>
         </div>
-        <Textarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onChange={(event) => {
+        {rawHint && <span className="text-[12px] leading-relaxed text-muted">{rawHint}</span>}
+        <Textarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
+          const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
+          if (!imported) return;
+          event.preventDefault();
+          if (!imported.ok) { setRawError(`未导入：${imported.error}`); return; }
+          const canonical = tryRaw(toRaw, imported.value);
+          if ('error' in canonical) { setRawError(`未导入：${canonical.error}`); return; }
+          setText(canonical.text); setResult(imported); setRawError(''); setCopyMessage('');
+          emitted.current = { value: imported.value, canonical: canonical.text };
+          onValidityChange?.(true);
+          onChange(imported.value);
+        }} onChange={(event) => {
           const raw = event.target.value;
-          setText(raw); setCopyMessage('');
+          setText(raw); setCopyMessage(''); setRawError('');
           const parsed = fromRaw(raw);
           setResult(parsed);
           onValidityChange?.(parsed.ok);

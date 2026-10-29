@@ -1,0 +1,15 @@
+Browser tab: 4, Title: "Sub Forge", URL: "http://127.0.0.1:18871/locals/LDi2JjRWq5OR/nodes/0".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++			40 text 未导入：包含多个节点或多行无效内容，只允许单节点，请拆分后逐个添加
+The focused UI element is 39 text entry area (settable) Description: 节点 YAML, Value: name: URL Reality
+type: vless
+server: us.example.com
+port: 443
+uuid: 00000000-0000-4000-8000-000000000001
+tls: true
+servername: www.example.com
+client-fingerprint: chrome
+reality-opts:
+  public-key: test-public-key
+  short-id: "00123456"
+flow: xtls-rprx-vision

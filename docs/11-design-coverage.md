@@ -32,8 +32,7 @@
 
 - 2026-10-29 订阅源：原「拉取参数」改为顶部「基础设置」，单 URL、Field / Input 对齐；下方处理链与总览保持左右结构。`Source` / `SourceFetch` / `Pipeline` / `Lists` 按 [待同步要求](13-design-canvas-sync.md) 更新；本轮按用户要求只记录待同步，不修改外部画布。
 - 2026-10-29 规则集组级客户端改写：`RuleSets` / `RuleSetNew` 改写区块始终独立显示；只保留「规则内容精确匹配」，移除行号与来源绑定。前后端和文档已同步；Claude Design 画布打开后显示「Sign in to view this page」，外部画板未更新。实际界面见 [独立区块截图](../research/verification/ruleset-group-overrides-20261029/independent-block.png)。
-
-- 2026-10-29 本地节点粘贴导入：前端补充提示「YAML 支持单个节点、节点列表或带 proxies 的完整配置。」，内核已补齐相应解析。外部 Claude Design 画布打开后要求登录，本轮未能更新 `LocalNodes` / `Dialogs` 画板；前端实际效果见 [验收截图](../research/verification/local-node-yaml-import-20261029/single-node-import.png)。
+- 2026-10-29 本地节点：分组列表移除「粘贴导入」按钮与弹窗；单节点「原始配置」增加自动识别、Mihomo YAML 格式化及表单同步。多节点提示拆分并保留当前草稿，保存操作不变。外部画布要求登录，`LocalNodes` / `LocalNodeEdit` / `Dialogs` 待同步；具体要求见 [13](13-design-canvas-sync.md)，实际效果见 [验收记录](../research/verification/raw-node-import-20261029/README.md)。
 - 模板入口与空状态：管理员只显示一个「模板」入口，普通用户不显示独立模板页；各页面的空状态统一白底虚线框。画布仍待同步，要求与参考截图见 [13 · 画布待同步](13-design-canvas-sync.md)。
 - 2026-10-29 地区旗帜：`PipelineForms` 的「添加旗帜」提示已补充流量、到期说明节点不加旗帜。Claude Design 画布仍要求登录，未能同步该画板文案；前端与内核、服务端预览已同步。
 - 全局 blank 二次排查（2026-10-29）：独立公共 `Empty` 补齐 Surge、模板、空预览与下拉候选；卡片标题/说明与空框、空框与后续操作区统一 16 px 留白。代码已调整，**设计稿待同步**，详见 [空状态规范](14-empty-state-guidelines.md) 与 [待同步清单](13-design-canvas-sync.md)。

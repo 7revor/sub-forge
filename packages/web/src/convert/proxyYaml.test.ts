@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import snapshots from '../../../core/test/__snapshots__/proxy-parse.test.ts.snap?raw';
 import { getPath, otherFields, setPath } from '../components/schema.ts';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, parseProxyImport, proxyDraftFromYaml, proxyFormFromYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
+import { groupFromYaml, groupToYaml, proxyFromPaste, proxyDraftFromYaml, proxyFormFromYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
 
 const node: LocalProxy = {
   name: '测试节点', type: 'vless', server: 'example.com', port: 443, uuid: 'uuid', tls: true,
@@ -13,30 +13,61 @@ const node: LocalProxy = {
   future: { list: [1, false, '值'], nested: { enabled: true } },
 };
 
-describe('列表粘贴导入', () => {
-  it('与单节点原始配置识别相同字段', () => {
-    const text = proxyToYaml(node);
-    const imported = parseProxyImport(text);
-    const raw = proxyFromYaml(text);
-    expect(raw.ok).toBe(true);
-    expect(imported.failures).toEqual([]);
-    expect(imported.proxies).toHaveLength(1);
-    const { _source, _origName, _key, ...fields } = imported.proxies[0]!;
-    if (raw.ok) expect(fields).toEqual(raw.value);
+describe('原始配置粘贴导入', () => {
+  it.each([
+    ['单节点 YAML', proxyToYaml(node)],
+    ['缩进 YAML', proxyToYaml(node).split('\n').map((line) => `    ${line}`).join('\n')],
+    ['单节点 JSON', JSON.stringify(node)],
+    ['单项列表', JSON.stringify([node])],
+    ['proxies 配置', groupToYaml([node])],
+  ])('%s 与表单字段一致', (_name, text) => {
+    expect(proxyFromPaste(text)).toMatchObject({ ok: true, value: node });
   });
 
   it.each([
-    'name: [未闭合\ntype: vless',
-    '- name: [未闭合\n  type: vless',
-    'proxies:\n  - name: [未闭合',
-    'name: 重复\nname: 键\ntype: vless',
-    'proxies: 不是列表',
-  ])('显示无效 YAML 的诊断，禁止导入：%s', (text) => {
-    const result = parseProxyImport(text);
-    expect(result.format).toBe('clash');
-    expect(result.proxies).toEqual([]);
-    expect(result.failures).toHaveLength(1);
-    expect(result.failures[0]!.reason).not.toBe('不是 URI');
+    ['分享链接', 'trojan://password@example.com:443#测试'],
+    ['Surge 节点行', '测试 = trojan, example.com, 443, password=password'],
+    ['Surge 段', '[Proxy]\n测试 = trojan, example.com, 443, password=password'],
+    ['Base64', 'dHJvamFuOi8vcGFzc3dvcmRAZXhhbXBsZS5jb206NDQzI+a1i+ivlQ=='],
+  ])('将%s 转换为 Mihomo 字段', (_name, text) => {
+    expect(proxyFromPaste(text)).toMatchObject({ ok: true, value: { name: '测试', type: 'trojan', server: 'example.com', port: 443, password: 'password' } });
+  });
+
+  it.each([
+    groupToYaml([node, { ...node, name: '第二个' }]),
+    JSON.stringify([node, { name: '坏节点' }]),
+    'trojan://a@a.example.com:443#A\ntrojan://b@b.example.com:443#B',
+    '[Proxy]\nA = trojan, a.example.com, 443, password=a\nB = trojan, b.example.com, 443, password=b',
+  ])('多个节点明确要求拆分，不取第一项', (text) => {
+    expect(proxyFromPaste(text)).toMatchObject({ ok: false, error: expect.stringContaining('拆分') });
+  });
+
+  it.each(['name: [未闭合\ntype: vless', 'proxies:\n  - name: [未闭合', 'name: 重复\nname: 键\ntype: vless', 'proxies: 不是列表', 'ssr://unsupported', 'proxies: []'])('无效或不支持的配置显示错误', (text) => {
+    expect(proxyFromPaste(text)).toMatchObject({ ok: false });
+  });
+
+  it.each(['example.com', 'server: new.example.com', 'tls: true\nservername: example.com', '[h2, http/1.1]', '[]', '443', ''])('普通字段片段按文本粘贴', (text) => {
+    expect(proxyFromPaste(text)).toBeUndefined();
+  });
+
+  it('节点自带前置会明确提示且不写入本地表单', () => {
+    const result = proxyFromPaste(proxyToYaml(node) + 'dialer-proxy: 中转\n');
+    expect(result).toMatchObject({ ok: true, value: node, notes: expect.arrayContaining([expect.stringContaining('代理链')]) });
+  });
+
+  it('不把远程订阅地址误当成 HTTP 代理，也不发起请求', () => {
+    expect(proxyFromPaste('https://example.com:443/sub?token=fake')).toMatchObject({ ok: false, error: expect.stringContaining('订阅源') });
+    expect(proxyFromPaste('http://user:password@example.com:80#HTTP')).toMatchObject({ ok: true, value: { type: 'http', port: 80 } });
+  });
+
+  it.each([
+    { type: 'vless', tag: 'JSON 节点', server: 'example.com', server_port: 443, uuid: 'test-uuid' },
+    { protocol: 'vless', tag: 'JSON 节点', settings: { address: 'example.com', port: 443, id: 'test-uuid', encryption: 'none' } },
+  ])('识别客户端单节点对象和单项 outbounds 配置', (value) => {
+    for (const text of [JSON.stringify(value), JSON.stringify({ outbounds: [value] })]) {
+      expect(proxyFromPaste(text)).toMatchObject({ ok: true, value: { name: 'JSON 节点', type: 'vless', server: 'example.com', port: 443, uuid: 'test-uuid' } });
+    }
+    expect(proxyFromPaste(JSON.stringify({ outbounds: [value, value] }))).toMatchObject({ ok: false, error: expect.stringContaining('拆分') });
   });
 });
 
