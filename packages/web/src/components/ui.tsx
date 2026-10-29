@@ -132,14 +132,17 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
-export function PageHeader({ title, crumbs, actions, children }: { title: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
+export function PageHeader({ title, subtitle, crumbs, actions, children }: { title: ReactNode; subtitle?: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
   return (
     <div className="flex flex-col gap-2.5">
       {crumbs && <div className="text-[12.5px] text-muted">{crumbs}</div>}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="m-0 text-2xl font-semibold tracking-tight">{title}</h1>
-          {children}
+      <div className={cx('flex flex-wrap justify-between gap-3', subtitle ? 'items-end' : 'items-center')}>
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="m-0 text-2xl font-semibold tracking-tight">{title}</h1>
+            {children}
+          </div>
+          {subtitle && <p className="m-0 text-[13.5px] text-muted">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>

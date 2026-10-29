@@ -74,6 +74,10 @@ export function SourceEdit() {
           {!isNew && draft.kind === 'remote' && <Button onClick={() => refresh.mutate()} disabled={refresh.isPending}><RefreshCw size={15} />{refresh.isPending ? '拉取中…' : '立即拉取'}</Button>}
           <Button variant="primary" onClick={submit} disabled={save.isPending || !dirty}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
         </>}>
+        {!isNew && <Badge>{doc.data?.kind === 'remote' ? `远程 · ${doc.data.urls?.length ?? 0} 个地址` : '本地内容'}</Badge>}
+        {!isNew && draft.kind === 'remote' && snaps.data && (lastOk
+          ? <Badge tone={snaps.data[0]?.ok ? 'ok' : 'err'}>{snaps.data[0]?.ok ? `${formatTime(lastOk.fetchedAt).slice(11)} 拉取成功` : '最近一次拉取失败 · 使用快照'} · 快照 {snaps.data.filter((x) => x.ok).length} 份</Badge>
+          : <Badge tone={snaps.data.length ? 'err' : 'neutral'}>{snaps.data.length ? '拉取失败 · 没有可用快照' : '还没有拉取过'}</Badge>)}
         {!isNew && u?.total ? <Badge>{formatBytes((u.upload ?? 0) + (u.download ?? 0))} / {formatBytes(u.total)}{u.expire ? ` · ${formatTime(u.expire * 1000).slice(0, 10)} 到期` : ''}</Badge> : null}
       </PageHeader>
       <ErrorBox error={save.error} />
