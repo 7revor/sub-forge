@@ -2,7 +2,8 @@ import type { GroupSpec, ReportItem } from '@sub-forge/core';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Button, Card, Empty, Field, Input, Segmented, Switch, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, Field, Input, Switch, cx } from '../../components/ui.tsx';
+import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
@@ -30,7 +31,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
       if (added[0]) onSelect(added[0].id);
     }}>添加地区节点</Button><Button onClick={() => {
       const id = newId('g');
-      onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [], whenEmpty: 'reject' }] });
+      onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [] }] });
       onSelect(id);
     }}>新增组</Button></div>}>
     {!group ? <div className="p-4"><Empty title="还没有组" /></div> : <div className="grid min-w-0 md:grid-cols-[240px_minmax(0,1fr)]">
@@ -56,13 +57,10 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           <Field label="组名称">{(id) => <Input id={id} value={group.name} onChange={(e) => update({ name: e.target.value })} />}</Field>
           <GroupSettingsFields value={group} onChange={(key, next) => update({ [key]: next })} />
         </div>
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-          <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">为空时</span><Segmented label="为空时" value={group.whenEmpty ?? 'reject'} options={[{ value: 'reject', label: '拒绝' }, { value: 'direct', label: '直连' }]} onChange={(whenEmpty) => update({ whenEmpty })} /></div>
-        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="filter（保留）" hint="订阅填入节点集后生效">{(id) => <Input id={id} className="font-mono" value={group.filter ?? ''} onChange={(event) => update({ filter: event.target.value || undefined })} />}</Field>
           <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={group.excludeFilter ?? ''} onChange={(event) => update({ excludeFilter: event.target.value || undefined })} />}</Field>
-          <Field label="exclude-type">{(id) => <Input id={id} className="font-mono" value={group.excludeType ?? ''} onChange={(event) => update({ excludeType: event.target.value || undefined })} />}</Field>
+          <Field label="exclude-type（排除协议）">{(id) => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={(excludeType) => update({ excludeType })} />}</Field>
         </div>
         <section className="flex min-w-0 flex-col gap-3 border-t border-line pt-4" aria-label="策略组成员">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-muted">{group.members.length} 个</span></h3>

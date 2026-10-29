@@ -1,4 +1,5 @@
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
+import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { Notice } from '../../components/Notice.tsx';
 import { OptionalBoolean } from '../../components/OptionalBoolean.tsx';
 // 策略组：填充模板组（只能加成员、调整类型与测速参数，不能删除、改名或隐藏，PRF-09），管理私有组。
@@ -16,7 +17,7 @@ import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
-type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'whenEmpty' | 'display' | 'extra'>;
+type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'display' | 'extra'>;
 
 function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => void; excludeGroupId: string }) {
   const { profileNodeSets, groupOptions } = useProfile();
@@ -78,7 +79,9 @@ export function TabGroups() {
       patchOverlay((o) => {
         const p = o.groupPatches?.[g.id] ?? {};
         const set = { ...(p.set ?? {}) } as Record<string, unknown>;
-        if (v === undefined || v === '') delete set[k]; else set[k] = v;
+        // 清空协议多选意味着覆盖为“不排除”，不能删除覆盖项后又继承模板的排除协议。
+        if (k === 'excludeType') set[k] = v ?? '';
+        else if (v === undefined || v === '') delete set[k]; else set[k] = v;
         return { ...o, groupPatches: { ...o.groupPatches, [g.id]: { ...p, set } } };
       });
     } else {
@@ -146,7 +149,7 @@ export function TabGroups() {
                       <span className="text-[13.5px] font-medium">{x.name}</span>
                       <span className="text-[12px] text-muted">{current.type.toUpperCase()} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
                     </span>
-                    {n === 0 ? <Badge tone="warn">空 · {current.whenEmpty === 'direct' ? '直连' : '拒绝'}</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
+                    {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
                   </button>
                 </div>
               );
@@ -169,7 +172,6 @@ export function TabGroups() {
             <div className="flex flex-col gap-5">
               <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                 <GroupSettingsFields value={eff} onChange={setField} defaultStrategy="consistent-hashing" />
-                <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">为空时{g.origin === 'template' ? '（模板设定）' : ''}</span>{g.origin === 'template' ? <span className="flex h-[38px] items-center text-[13px]">{eff.whenEmpty === 'direct' ? '直连 · 输出 COMPATIBLE' : '拒绝 · 输出 REJECT'}</span> : <Segmented label="私有组为空时" value={eff.whenEmpty ?? 'reject'} options={[{ value: 'reject', label: '拒绝' }, { value: 'direct', label: '直连' }]} onChange={(value) => setField('whenEmpty', value)} />}</div>
               </div>
 
               <div className="flex flex-col gap-2.5">
@@ -195,7 +197,7 @@ export function TabGroups() {
               <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
                 <Field label="filter（保留）" hint="仅筛选节点集成员">{(id) => <Input id={id} className="font-mono" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
                 <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={eff.excludeFilter ?? ''} onChange={(e) => setField('excludeFilter', e.target.value)} />}</Field>
-                <Field label="exclude-type">{(id) => <Input id={id} className="font-mono" placeholder="如 ss|http" value={eff.excludeType ?? ''} onChange={(e) => setField('excludeType', e.target.value)} />}</Field>
+                <Field label="exclude-type（排除协议）">{(id) => <ExcludeTypeSelect id={id} value={eff.excludeType} onChange={(value) => setField('excludeType', value)} />}</Field>
               </div>
               <div className="flex flex-col gap-2">
                 {previewNodeSets.length > 1 && <Select aria-label="预览节点集" value={previewNodeSet?.[0] ?? ''} onChange={(e) => setPreviewSelection({ groupId: g.id, key: e.target.value })}>
@@ -211,7 +213,7 @@ export function TabGroups() {
                 <Field label="icon" hint="mihomo icon / Surge icon-url">{(id) => <Input id={id} placeholder="图标地址" value={eff.display?.icon ?? ''} onChange={(e) => setField('display', { ...eff.display, icon: e.target.value || undefined })} />}</Field>
               </div>
               <div className="flex flex-col gap-2">
-                <ExtraFields key={g.id} value={eff.extra ?? {}} onChange={(extra) => setField('extra', extra)} />
+                <ExtraFields key={g.id} value={Object.fromEntries(Object.entries(eff.extra ?? {}).filter(([key]) => key !== 'empty-fallback'))} validateName={(name) => name === 'empty-fallback' ? '空组固定使用 REJECT，无需配置此字段' : undefined} onChange={(extra) => setField('extra', extra)} />
               </div>
             </div>
           </Card>

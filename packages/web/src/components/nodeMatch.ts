@@ -1,12 +1,12 @@
-import { compileUserRegex, type NodeRef } from '@sub-forge/core';
+import { compileUserRegex, excludedAdapterTypes, isExcludedAdapter, type NodeRef } from '@sub-forge/core';
 import type { NodeBrief } from '../api.ts';
 
 export function filterNodes(nodes: NodeBrief[], filters: { filter?: string; excludeFilter?: string; excludeType?: string }): { nodes: NodeBrief[]; error?: string } {
   try {
     const inc = filters.filter ? compileUserRegex(filters.filter) : undefined;
     const exc = filters.excludeFilter ? compileUserRegex(filters.excludeFilter) : undefined;
-    const types = filters.excludeType ? new Set(filters.excludeType.split('|').map((t) => t.trim().toLowerCase())) : undefined;
-    return { nodes: nodes.filter((n) => (!inc || inc.test(n.name)) && (!exc || !exc.test(n.name)) && (!types || !types.has(n.type.toLowerCase()))) };
+    const types = excludedAdapterTypes(filters.excludeType);
+    return { nodes: nodes.filter((n) => (!inc || inc.test(n.name)) && (!exc || !exc.test(n.name)) && !isExcludedAdapter(n.type, types)) };
   } catch (error) {
     return { nodes: [], error: error instanceof Error ? error.message : String(error) };
   }

@@ -14,7 +14,7 @@ const testFields = {
   lazy: 'lazy', 'max-failed-times': 'maxFailedTimes', 'expected-status': 'expectedStatus',
 } as const;
 const filterFields = { filter: 'filter', 'exclude-filter': 'excludeFilter', 'exclude-type': 'excludeType' } as const;
-const knownFields = new Set(['name', 'type', 'proxies', 'strategy', 'hidden', 'icon', ...Object.keys(testFields), ...Object.keys(filterFields)]);
+const knownFields = new Set(['name', 'type', 'proxies', 'strategy', 'hidden', 'icon', 'empty-fallback', ...Object.keys(testFields), ...Object.keys(filterFields)]);
 const nodeField = (key: string) => key === 'use' || key.startsWith('include-all');
 const referenceField = 'x-sub-forge-rulesets';
 
@@ -60,7 +60,8 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     for (const [yamlKey, key] of Object.entries(filterFields)) if (g[key] !== undefined) out[yamlKey] = g[key];
     if (g.display?.hidden !== undefined) out.hidden = g.display.hidden;
     if (g.display?.icon !== undefined) out.icon = g.display.icon;
-    return { ...out, ...g.extra };
+    const { 'empty-fallback': _emptyFallback, ...extra } = g.extra ?? {};
+    return { ...out, ...extra };
   });
   const lines = t.rules.map((r) => {
     const m = r.matcher;
