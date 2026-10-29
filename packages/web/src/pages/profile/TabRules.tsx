@@ -22,7 +22,7 @@ export function ruleText(r: RuleIR): string {
 function useMatcherLabel() {
   const rulesets = useRuleSetRefs().data ?? [];
   return (m: Matcher): { kind: string; text: string } => {
-    if (m.kind === 'rule') return { kind: '单条规则', text: ruleText(m.rule) };
+    if (m.kind === 'rule') return { kind: '静态规则', text: ruleText(m.rule) };
     if (m.remote) return { kind: '远程 URL', text: m.remote.url };
     return { kind: '系统规则集', text: m.repository?.name ?? `本地 · ${rulesets.find((r) => r.id === m.id)?.name ?? m.id}` };
   };

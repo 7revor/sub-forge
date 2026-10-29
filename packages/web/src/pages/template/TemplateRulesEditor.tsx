@@ -75,7 +75,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   };
   return <>
     <Card title="规则" subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={<>
-      <Button size="sm" aria-label="添加单条规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />单条规则</Button>
+      <Button size="sm" aria-label="添加静态规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />静态规则</Button>
       <RemoteRulePicker label="远程链接" ariaLabel="引用远程链接" triggerClassName={buttonClass('default', 'sm')} onSelect={add} />
       <Button size="sm" onClick={() => setAdding(true)}>引用规则</Button>
     </>}>
