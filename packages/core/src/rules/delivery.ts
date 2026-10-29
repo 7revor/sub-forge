@@ -3,7 +3,7 @@ import type { RuleDocument } from './convert.ts';
 import type { RuleSet, RuleEntry } from '../types.ts';
 import { composeRule, lowerRule, type ClientCtx } from './client.ts';
 import { sourceKey, type RuleSetInputs } from './expand.ts';
-import { parseRuleSourceContent, type Behavior } from './parse.ts';
+import { parseRuleSourceContent, ruleKey, type Behavior } from './parse.ts';
 
 export type RuleSetDelivery =
   | { mode: 'original'; format: 'text' | 'yaml' | 'mrs'; behavior: Behavior; url: string }
@@ -35,6 +35,16 @@ export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientC
     rules: document.rows.flatMap(row => row.parsed ? [row.parsed] : []), rejected: document.diagnostics,
   } : parseRuleSourceContent(body, src);
   if (parsed.passthrough || !parsed.rules.length || parsed.rejected.length) return managed;
+  // 大小写等价的 wildcard 必须经托管去重，不能直接引用原始远程文件。
+  if (ctx.client === 'mihomo') {
+    const seen = new Set<string>();
+    for (const { rule } of parsed.rules) {
+      if (rule.type !== 'DOMAIN-WILDCARD' && !(rule.type === 'PROCESS' && rule.mode === 'wildcard')) continue;
+      const key = ruleKey(rule, ctx.client);
+      if (seen.has(key)) return managed;
+      seen.add(key);
+    }
+  }
   if (parsed.format === 'yaml' && ctx.client !== 'mihomo') return managed;
   if (parsed.behavior === 'ipcidr' && ctx.client !== 'mihomo') return managed;
   // DOMAIN-SET 的前导点在 Clash 中语义不同；纯域名可以直接引用，其余必须转换。

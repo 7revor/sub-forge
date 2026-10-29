@@ -5,6 +5,39 @@ import { addUser, client, setupApp } from './helpers.ts';
 const yaml = 'payload: ["DOMAIN,example.test", "IP-CIDR,192.0.2.0/24,no-resolve"]';
 
 describe('自动格式贯通预览、保存与下载', () => {
+  it.each(['text', 'yaml'])('%s 远程 wildcard 大小写去重贯通合并预览与实际下载', async format => {
+    const rows = [
+      'PROCESS-NAME-WILDCARD,Example*', 'PROCESS-NAME-WILDCARD,example*',
+      'PROCESS-PATH-WILDCARD,/Apps/*', 'PROCESS-PATH-WILDCARD,/apps/*',
+      'DOMAIN-WILDCARD,*.Example.test', 'DOMAIN-WILDCARD,*.example.test',
+    ];
+    const body = format === 'yaml' ? `payload: ${JSON.stringify(rows)}` : rows.join('\n');
+    const h = setupApp({ fetcher: async () => ({ status: 200, body }) });
+    try {
+      const user = await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
+      const draft = { name: 'wildcard 去重', sources: [{ id: 's', kind: 'remote', url: 'https://example.test/wildcard' }] };
+      const preview = await c.post('/api/rulesets/preview', { ruleset: draft, client: 'mihomo' });
+      expect(preview.status).toBe(200);
+      expect(preview.json.delivery.mode).toBe('managed');
+      expect(preview.json.lines.filter((line: string) => line && !line.startsWith('#'))).toEqual([rows[0], rows[2], rows[4]]);
+      const surge = await c.post('/api/rulesets/preview', { ruleset: draft, client: 'surge', platform: 'macos' });
+      expect(surge.json.lines.filter((line: string) => line && !line.startsWith('#'))).toHaveLength(6);
+      const saved = await c.post('/api/rulesets', draft);
+      expect(saved.status).toBe(201);
+      h.store.put('profile', { id: 'p', name: '下载', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: saved.json.item.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } }, user.id);
+      h.store.putToken({ token: 'test', profileId: 'p' });
+      const config = parse(await (await h.app.request('/sub/test')).text());
+      const provider = (Object.values(config['rule-providers']) as { url: string; format: string }[])[0]!;
+      expect(provider.format).toBe('text');
+      const url = new URL(provider.url);
+      expect(url.pathname).toMatch(/\.list$/);
+      const download = await h.app.request(url.pathname + url.search);
+      expect(download.status).toBe(200);
+      expect((await download.text()).trim().split('\n')).toEqual(preview.json.lines);
+      expect((await c.get(`/api/rulesets/${saved.json.item.id}`)).json.item.sources[0].url).toBe(draft.sources[0]!.url);
+    } finally { await h.snapshots.settled(); h.store.close(); }
+  });
+
   it('省略格式也能保存，TXT 地址按实际 YAML 内容识别；预览转换且下载原格式透传', async () => {
     const h = setupApp({ fetcher: async () => ({ status: 200, body: yaml }) });
     try {

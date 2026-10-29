@@ -409,3 +409,6 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 迁移删除 `server_secrets` 中的 `github-index-token`，表为空时删除表，存在未知其他服务凭据时保留。新数据库不建此表。订阅令牌、文档、索引与归属保持不变。仓库元信息通过 Git 获取，不新增领域字段，种子无此全局凭据，因此无需修改示例种子。
 
 2026-10-29 规则集页面移除整组 no-resolve 开关及列表列。`RuleSet.noResolve` 作为旧数据兼容字段保留，编辑其他字段时继续原样保存并参与预览与渲染；新建规则集不设置该字段。规则级选项与管线不变，无需数据迁移。
+
+
+2026-10-29：ruleKey 增加可选目标客户端；仅 mihomo 的进程 wildcard 与 DOMAIN-WILDCARD 对值执行 toLowerCase 后生成去重键，不改写 RuleIR 或来源内容。convertRuleDocuments 与 expandRuleSet 共用该键，替换及追加也参与；重复项保留来源行位并写为注释。单来源原文预览继续保留重复行。ruleSetDelivery 检测远程 wildcard 重复并强制托管（含 YAML），让实际下载与合并预览一致。客户端未指定时维持原有大小写敏感键，仓库索引计数不变。
