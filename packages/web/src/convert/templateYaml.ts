@@ -1,4 +1,4 @@
-import { composeRule, lowerRule, parseRuleLine, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
+import { composeRule, lowerRule, parseRuleLine, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
 import { Document, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
 import { recoverYaml } from './recoverYaml.ts';
 
@@ -14,6 +14,13 @@ const testFields = {
 } as const;
 const knownFields = new Set(['name', 'type', 'proxies', 'strategy', 'hidden', 'icon', ...Object.keys(testFields)]);
 const nodeField = (key: string) => ['use', 'filter', 'exclude-filter', 'exclude-type'].includes(key) || key.startsWith('include-all');
+const referenceField = 'x-sub-forge-rulesets';
+
+function rulesetAlias(m: Extract<Matcher, { kind: 'ruleset' }>, ctx: ConvertCtx): string {
+  if (m.repository) return m.id;
+  const name = ctx.rulesets.find(r => r.id === m.id)?.name;
+  return name && !name.includes(',') && !name.startsWith('repo:') && !name.startsWith('local:') && ctx.rulesets.filter(r => r.name === name).length === 1 ? name : `local:${encodeURIComponent(m.id)}`;
+}
 
 export function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0')}`;
@@ -55,12 +62,13 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
   const lines = t.rules.map((r) => {
     const m = r.matcher;
     const lowered = m.kind === 'rule' ? lowerMatcher(m) : {
-      text: `RULE-SET,${ctx.rulesets.find((ref) => ref.id === m.id)?.name ?? m.id}`,
+      text: `RULE-SET,${rulesetAlias(m, ctx)}`,
     };
     return composeRule({ ...lowered, noResolve: ('noResolve' in lowered && lowered.noResolve) || r.options?.noResolve, src: ('src' in lowered && lowered.src) || r.options?.src }, targetName(r.target, t.groups));
   });
   lines.push(`MATCH,${targetName(t.final, t.groups)}`);
-  const doc = new Document({ 'proxy-groups': groups, rules: lines });
+  const references = Object.fromEntries(t.rules.flatMap(r => r.matcher.kind === 'ruleset' ? [[rulesetAlias(r.matcher, ctx), r.matcher]] : []));
+  const doc = new Document({ 'proxy-groups': groups, rules: lines, ...(Object.keys(references).length ? { [referenceField]: references } : {}) });
   const groupNodes = doc.get('proxy-groups', true);
   if (isSeq(groupNodes)) t.groups.forEach((g, i) => {
     const item = groupNodes.items[i];
@@ -76,7 +84,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
 
 // no-resolve 和 src 属于选项；修改选项或出口不应使覆盖层失去规则 ID。
 function matcherKey(m: Matcher): string {
-  if (m.kind !== 'rule') return `${m.kind}:${m.id}`;
+  if (m.kind !== 'rule') return `${m.kind}:${m.id}${m.repository ? `:${stableStringify(m.repository)}` : ''}`;
   const lowered = lowerRule(m.rule, { client: 'mihomo' });
   return `rule:${lowered.kind === 'ok' ? lowered.text : JSON.stringify(m.rule)}`;
 }
@@ -151,7 +159,16 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
     };
     locate(doc.contents);
     if (!isMap(doc.contents)) throw new Error('YAML 顶层必须是对象');
-    const ignored = doc.contents.items.map((p) => String(p.key)).filter((key) => !['proxy-groups', 'rules'].includes(key));
+    const referenceNode = doc.get(referenceField, true);
+    if (referenceNode !== undefined && !isMap(referenceNode)) throw new Error('规则集引用映射必须是对象');
+    const referenceMap = new Map<string, Extract<Matcher, { kind: 'ruleset' }>>();
+    if (isMap(referenceNode)) for (const [alias, matcher] of Object.entries(referenceNode.toJSON() as Record<string, unknown>)) {
+      if (!matcher || typeof matcher !== 'object' || Array.isArray(matcher) || !('kind' in matcher) || matcher.kind !== 'ruleset' || !('id' in matcher) || typeof matcher.id !== 'string' || !matcher.id.trim()) throw new Error(`规则集「${alias}」引用格式错误`);
+      const m = matcher as Extract<Matcher, { kind: 'ruleset' }>;
+      if (m.repository && (typeof m.repository.name !== 'string' || typeof m.repository.repo !== 'string' || typeof m.repository.entry !== 'string' || !Array.isArray(m.repository.sources))) throw new Error(`规则集「${alias}」仓库映射格式错误`);
+      referenceMap.set(alias, m);
+    }
+    const ignored = doc.contents.items.map((p) => String(p.key)).filter((key) => !['proxy-groups', 'rules', referenceField].includes(key));
     if (ignored.length) notes.push(`已忽略：${ignored.join('、')}（仅导入 proxy-groups 和 rules）`);
     const groupNodes = doc.get('proxy-groups', true);
     locate(groupNodes);
@@ -304,8 +321,12 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         let matcher: Matcher;
         if (type === 'RULE-SET') {
           const name = parts[1]!;
-          const ruleset = ctx.rulesets.find((ref) => ref.name === name);
-          if (ruleset) matcher = { kind: 'ruleset', id: ruleset.id };
+          const reference = referenceMap.get(name);
+          const matches = ctx.rulesets.filter(ref => ref.name === name);
+          const ruleset = matches[0];
+          if (reference) matcher = reference;
+          else if (matches.length > 1) throw new Error(`规则集「${name}」重名，请在表单中选择或保留引用映射`);
+          else if (ruleset) matcher = { kind: 'ruleset', id: ruleset.id };
           else throw new Error(`规则集「${name}」不存在`);
         } else {
           matcher = { kind: 'rule', rule: parseRuleLine(matchingParts.join(',')) };

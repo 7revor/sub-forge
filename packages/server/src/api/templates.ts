@@ -4,29 +4,49 @@
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { ruleSetDelivery, parseRuleSourceContent, validateTemplate, sourceLabel, type ReportItem, type RuleSet, type Template } from '@sub-forge/core';
+import { ruleSetDelivery, parseRuleSourceContent, validateTemplate, sourceLabel, type ReportItem, type Template } from '@sub-forge/core';
 import { readPagination } from './pagination.ts';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
-import type { TemplateVersionDoc } from '../docs.ts';
+import type { RuleSetDoc, TemplateVersionDoc } from '../docs.ts';
 import type { RenderService } from '../render.ts';
 import { unusableBody, type SnapshotService } from '../snapshots.ts';
-import type { Store } from '../store.ts';
+import type { Store, User } from '../store.ts';
 import { bad, HttpError, isStr, jsonBody, notFound, requireAdmin, requireUser, type ApiEnv } from './common.ts';
+import { checkRuleSetReference, resolveRuleSetReference } from '../ruleset-reference.ts';
+import { RefChecker } from './validate.ts';
 
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
 
 /** 只关心新版本带来的问题：渲染错误、孤儿覆盖项、空组 */
 const IMPACT_CODES = new Set(['overlay.orphan', 'overlay.orphan-anchor', 'group.empty']);
 
-async function selfCheck(store: Store, snapshots: SnapshotService, t: Template): Promise<ReportItem[]> {
-  const rulesets: Record<string, RuleSet> = Object.fromEntries(store.list('ruleset').map((r) => [r.id, r]));
+async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, user: User): Promise<ReportItem[]> {
+  const rulesets: Record<string, RuleSetDoc> = Object.fromEntries(store.list('ruleset').map((r) => [r.id, r]));
+  const referenceIssues: ReportItem[] = [];
+  const prior = store.getTemplate(t.id);
+  for (const rule of t.rules) {
+    if (rule.matcher.kind !== 'ruleset') continue;
+    const matcher = rule.matcher;
+    try {
+      const old = prior?.rules.find(r => r.matcher.kind === 'ruleset' && r.matcher.id === matcher.id)?.matcher;
+      checkRuleSetReference(rule.matcher, store, old?.kind === 'ruleset' ? old : undefined);
+      // 无归属种子保持兼容；有归属的本地规则必须符合公共/本人可见性。
+      if (!matcher.repository && store.getWithOwner('ruleset', matcher.id)?.owner && !new RefChecker(store, user).ruleVisible(matcher.id)) throw bad('本地规则集不可用');
+      const rs = resolveRuleSetReference(rule.matcher, store);
+      if (rs) rulesets[rs.id] = rs;
+    } catch (error) {
+      if (!(error instanceof HttpError)) throw error;
+      referenceIssues.push({ level: 'error', code: 'template.ruleset-reference', message: error.message, where: `rule:${rule.id}` });
+    }
+  }
+  if (referenceIssues.length) return referenceIssues;
   const report = validateTemplate(t, { rulesets }).items;
   if (report.some(i => i.level === 'error')) return report;
   const ids = new Set<string>();
   for (const r of t.rules) if (r.enabled !== false && r.matcher.kind === 'ruleset') ids.add(r.matcher.id);
   for (const id of ids) {
-    const rs = store.get('ruleset', id)!;
+    const rs = rulesets[id]!;
     const where = `ruleset:${id}`;
     // 二进制只有无需处理的单来源可以透传；发布前也必须执行相同约束。
     if (rs.sources.some(src => src.enabled !== false && (src.format === 'mrs' || src.format === 'srs'))) {
@@ -61,7 +81,10 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template):
       if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', message: `${label}有 ${parsed.rejected.length} 行无法解析或不支持`, where });
     }
   }
-  return report;
+  // 保留资源诊断，同时提供可直接展开定位的规则行错误。
+  return report.flatMap(issue => issue.where?.startsWith('ruleset:')
+    ? [issue, ...t.rules.filter(r => r.enabled !== false && r.matcher.kind === 'ruleset' && `ruleset:${r.matcher.id}` === issue.where).map(r => ({ ...issue, where: `rule:${r.id}` }))]
+    : [issue]);
 }
 
 function draftFrom(body: Record<string, unknown>, id: string, version: number): TemplateVersionDoc {
@@ -94,7 +117,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
   app.post('/templates/validate', requireAdmin, async (c) => {
     const body = await jsonBody(c);
     const draft = draftFrom(body, isStr(body.id) ? body.id : 'draft', 0);
-    return c.json({ report: await selfCheck(store, snapshots, draft) });
+    return c.json({ report: await selfCheck(store, snapshots, draft, c.get('user')) });
   });
 
   /** 发布：新模板（:id 为 new）或已有模板的新版本 */
@@ -106,7 +129,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     if (!isNew && !current) throw notFound('模板');
     const draft = draftFrom(body, id, (current?.version ?? 0) + 1);
 
-    const own = await selfCheck(store, snapshots, draft);
+    const own = await selfCheck(store, snapshots, draft, c.get('user'));
     if (own.some((i) => i.level === 'error')) throw new HttpError(400, '模板自身校验未通过，禁止发布', { report: own });
 
     const impact = isNew ? [] : await analyzeImpact(store, renderer, draft);
@@ -124,7 +147,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     const current = store.getTemplate(id);
     if (!current) throw notFound('模板');
     const draft = draftFrom(await jsonBody(c), id, current.version + 1);
-    const report = await selfCheck(store, snapshots, draft);
+    const report = await selfCheck(store, snapshots, draft, c.get('user'));
     return c.json({ report, impact: report.some(i => i.level === 'error') ? [] : await analyzeImpact(store, renderer, draft) });
   });
 

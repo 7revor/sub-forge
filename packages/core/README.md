@@ -56,3 +56,5 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 规则来源可带 `repository: { repo, entry, ref, path }` 表示仓库文件关联；仍为远程来源，URL 约束由服务端负责，内核解析、合并、去重不变。
 
 文本来源统一通过 `parseRuleSourceContent` 按内容识别，旧 format 不再强制指定解析器（仅保留域名方言与二进制兼容）。预览始终解析为规则 IR；`ruleSetDelivery` 判断原格式透传或托管转换。单一启用远程来源、无覆写、IP 选项处理或自定义 UA，且目标客户端支持原内容时直接引用上游，并设置实际 format 和 behavior；否则生成一个 `.list`（text/classical）。拒绝行、方言转换也触发托管。旧 MRS/SRS 无解码能力，无法转换时明确失败。`conversion: yaml-to-list` 仅作为旧版预览解析诊断兼容，是否托管以 delivery 为准。仓库仍只索引 list/txt。
+
+模板的 `ruleset` 匹配项支持可选 `repository` 文件映射。调用方在渲染前将本地与仓库引用统一为 `RuleSetInputs`；内核继续按同一规则管线处理，不负责访问 GitHub。没有 repository 的旧 ID 引用保持兼容。

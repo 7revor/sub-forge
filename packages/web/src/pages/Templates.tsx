@@ -15,7 +15,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, Modal, PageHeader, PageScroll, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
-import { useList, useMe, type TemplateDoc } from '../hooks.ts';
+import { useList, useMe, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
 import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { templateDiff } from '../convert/templateDiff.ts';
 import { TemplateEditor } from './template/TemplateEditor.tsx';
@@ -78,7 +78,7 @@ const RULE_PREVIEW = 8;
 /** 模板详情：头部卡片、策略组骨架、规则（默认显示前几条）、版本记录与对比 */
 function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; actions?: ReactNode }) {
   const tpl = useQuery({ queryKey: ['template', id], queryFn: () => api<TemplateDetailData>('GET', `/templates/${id}`) });
-  const rulesets = useList('rulesets');
+  const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
   const [allRules, setAllRules] = useState(false);
   const [diffVersion, setDiffVersion] = useState<number>();
@@ -100,7 +100,7 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
       </section>
       <Card title="策略组骨架" bodyClass="overflow-x-auto">
         {!t.groups.length ? <div className="px-4 pb-4"><Empty title="还没有组" /></div> : <table className="w-full border-collapse">
-          <thead><tr><th className={th}>组</th><th className={th}>类型</th><th className={th}>成员（组 / 内置）</th><th className={th}>为空时</th><th className={th}>填充提示</th></tr></thead>
+          <thead><tr><th className={th}>组</th><th className={th}>类型</th><th className={th}>成员（组 / 内置）</th><th className={th}>为空时</th></tr></thead>
           <tbody>
             {t.groups.map((g) => (
               <tr key={g.id}>
@@ -108,7 +108,6 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
                 <td className={cx(td, 'font-mono text-[12.5px]')}>{g.type}</td>
                 <td className={cx(td, 'text-[12.5px] text-ink-2')}>{g.members.map((m) => memberLabel(m, groupName, nsName).text).join(' · ') || '—'}</td>
                 <td className={cx(td, 'text-ink-2 whitespace-nowrap')}>{emptyText(g)}</td>
-                <td className={cx(td, 'text-muted')}>{g.hint ?? '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -144,7 +143,7 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
 function skeleton(): TemplateBody {
   const id = newId('g');
   return {
-    groups: [{ id, name: '🚀 节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }], hint: '建议放所有节点', whenEmpty: 'reject' }],
+    groups: [{ id, name: '节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }], whenEmpty: 'reject' }],
     rules: [], final: { kind: 'group', groupId: id },
   };
 }
@@ -166,11 +165,12 @@ function TemplatePage({ id }: { id: string }) {
   const [name, setName] = useState('');
   const [body, setBody] = useState<TemplateBody>(skeleton);
   const [rawValid, setRawValid] = useState(true);
+  const [step, setStep] = useState(0);
   const [validation, setValidation] = useState<{ body: TemplateBody; name: string; report: ReportItem[]; error?: string }>();
   const [focus, setFocus] = useState<{ where: string }>();
   const [diffVersion, setDiffVersion] = useState<number>();
   const [importing, setImporting] = useState<string>();
-  const rulesets = useList('rulesets');
+  const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
   const [changelog, setChangelog] = useState('');
   const [impact, setImpact] = useState<{ report: ReportItem[]; impact: ImpactEntry[] }>();
@@ -201,13 +201,13 @@ function TemplatePage({ id }: { id: string }) {
     if (!isAdmin || !rawValid || !name.trim()) return;
     let active = true;
     const timer = setTimeout(() => {
-      api<{ report: ReportItem[] }>('POST', '/templates/validate', { ...body, name }).then(
+      api<{ report: ReportItem[] }>('POST', '/templates/validate', { ...body, name, ...(isNew ? {} : { id }) }).then(
         (r) => { if (active) setValidation({ body, name, report: r.report }); },
         (e: Error) => { if (active) setValidation({ body, name, report: [], error: e.message }); },
       );
     }, 500);
     return () => { active = false; clearTimeout(timer); };
-  }, [body, name, isAdmin, rawValid]);
+  }, [body, name, isAdmin, rawValid, id, isNew]);
 
   useEffect(() => { setImpact(undefined); setConfirmed(false); }, [body, name]);
 
@@ -321,34 +321,44 @@ function TemplatePage({ id }: { id: string }) {
       <PageHeader crumbs={crumbs} title={isNew ? '新建模板' : name || t?.name || id}
         actions={<>
           <Button disabled={!rawValid} onClick={() => setImporting(templateToYaml(body, ctx))}>从 YAML 导入</Button>
-          <Link to={isNew ? '/templates/new/publish' : `/templates/${id}/publish`} className={buttonClass('primary')}>发布前校验</Link>
         </>}>
         <Badge tone="accent">{isNew ? '新模板 · 未发布' : changed ? `草稿 · 基于 v${t!.version} · 未发布` : `已发布 v${t!.version}`}</Badge>
       </PageHeader>
       {(errors.length > 0 || parseErr) && (
         <Notice tone="err" actions={errors[0]?.where && <Button size="sm" onClick={() => setFocus({ where: errors[0]!.where! })}>定位</Button>}><span><b>草稿校验：{errors.length || 1} 个错误。</b>{errors[0]?.message ?? parseErr}修复前不能发布。</span></Notice>
       )}
-      <PageScroll>
-        <div className="flex flex-wrap items-start gap-5">
-          <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-5">
-            <Card title="名称"><Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field></Card>
-            <ErrorAlert error={rulesets.error} />
-            <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} />
-          </div>
-          <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
-            <Card title="版本">
-              {isNew ? <Empty title="还没有发布过" /> : (
-                <VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} />
-              )}
-            </Card>
-            <Card title="模板自检" actions={<Badge tone={errors.length ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : ready ? '通过' : '待校验'}</Badge>}>
-              {(ready || report.length > 0) && <TemplateReport items={report} onLocate={(where) => { if (rawValid) setFocus({ where }); }} />}
-              {!ready && !parseErr && rawValid && <span className="text-[13px] text-muted">{name.trim() ? '修改后自动校验…' : '请填写模板名称'}</span>}
-            </Card>
-          </aside>
+      <ol aria-label="模板设置步骤" className="m-0 flex shrink-0 list-none gap-2 p-0">
+        {['策略组', '规则'].map((label, index) => <li key={label} className="min-w-0 flex-1">
+          <button type="button" aria-current={step === index ? 'step' : undefined} disabled={!rawValid} onClick={() => setStep(index)}
+            className={cx('flex min-h-14 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60', step === index ? 'border-accent bg-[#f5f8ff]' : 'border-line bg-panel hover:bg-ground')}>
+            <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px]', step === index ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}>{index + 1}</span>
+            <span className="text-[13.5px] font-semibold">{label}</span>
+          </button>
+        </li>)}
+      </ol>
+      <div className="page-scroll !mb-0"><div className="page-scroll-content flex flex-col gap-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <Card bodyClass="p-4"><Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field></Card>
+          <Card title="模板自检" actions={<Badge tone={errors.length ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : ready ? '通过' : '待校验'}</Badge>}>
+            {(ready || report.length > 0) && <TemplateReport items={report} onLocate={(where) => { if (rawValid) setFocus({ where }); }} />}
+            {!ready && !parseErr && rawValid && <span className="text-[13px] text-muted">{name.trim() ? '修改后自动校验…' : '请填写模板名称'}</span>}
+          </Card>
         </div>
-
-      </PageScroll>
+        <ErrorAlert error={rulesets.error} />
+        <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} />
+        {!isNew && <details className="rounded-[10px] border border-line bg-panel p-4">
+          <summary className="cursor-pointer text-[13px] font-medium">版本记录</summary>
+          <div className="pt-3"><VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} /></div>
+        </details>}
+      </div></div>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <span className="text-[13px] text-muted">第 {step + 1} 步，共 2 步</span>
+        <div className="flex gap-2">
+          <Button disabled={step === 0 || !rawValid} onClick={() => setStep(0)}>上一步</Button>
+          {step === 0 ? <Button variant="primary" disabled={!rawValid} onClick={() => setStep(1)}>下一步：规则</Button>
+            : <Button variant="primary" disabled={!rawValid || !name.trim()} onClick={() => navigate(isNew ? '/templates/new/publish' : `/templates/${id}/publish`)}>发布前校验</Button>}
+        </div>
+      </div>
       {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
       <Modal title="从 YAML 导入" open={importing !== undefined} onClose={() => setImporting(undefined)} wide
         footer={<><Button onClick={() => setImporting(undefined)}>取消</Button><Button variant="primary" onClick={() => {

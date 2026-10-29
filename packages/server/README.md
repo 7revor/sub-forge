@@ -213,3 +213,13 @@ Git 同步使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，也
 `GET /api/{sources,profiles,collections,locals,rulesets,presets,templates}` 支持 `page`、`pageSize`、`q`。传任一参数即启用分页，默认第 1 页、每页 20 条，`pageSize` 范围 1–100；非法页码或条数返回 400。返回 `{ items, total, page, pageSize, totalPages }`，计数仅包含当前用户可见且名称匹配的结果（模板、预设沿用共享读取权限）。模板仅计最新版本；名称搜索忽略首尾空白和大小写，无名称的历史模板按 ID 搜索。顺序保持 ID 升序，越界页回退至最后一页，空结果为第 1 / 1 页。
 
 不传参数仍返回全量 `{ items }`，兼容关联选择器及旧客户端。无搜索时通过 SQLite `LIMIT/OFFSET` 分页；文档正文保持加密，名称搜索在服务端解密后筛选，不新增明文名称索引。
+
+### 模板规则集统一引用（2026-10-29）
+
+- `GET /api/rule-options/search?q=&offset=0&limit=30&scope=all`：统一搜索可见本地与已启用仓库条目，返回 items/total/notices；scope=repository 用于本地规则集维护。
+- `GET /api/rule-options/locals`：返回可引用本地规则集的 ID/名称（本人及管理员公共规则），不改变仅本人可维护的文档列表。
+- `POST /api/rule-options/resolve`：请求 `{ source: 'local', id }` 或 `{ source: 'repository', repo, entry }`，返回 matcher，不创建本地规则集。
+- 仓库 matcher 保存所选文件映射及稳定身份；新引用检查索引，已发布映射在索引移除或仓库停用后保持可用。删除被模板/配置订阅直接引用的仓库返回 409 和引用方。本地规则集自身被引用时仍禁止删除。
+- 模板自检与渲染统一解析引用，失败诊断可以定位到规则行。前端 YAML 中的引用映射不会出现在最终订阅输出中。
+
+隔离浏览器验收：先构建 web，再运行 `pnpm --filter @sub-forge/server exec tsx test/manual-rule-reference-server.ts`。只监听 127.0.0.1:5186，使用内存库、测试账号和固定上游；退出时关闭监听与数据库，不连接生产数据。验收结束必须停止进程。

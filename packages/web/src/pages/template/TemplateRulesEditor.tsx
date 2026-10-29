@@ -1,11 +1,12 @@
-import type { ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
+import type { Matcher, ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Button, Card, Empty, Field, Switch, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, Field, Switch, buttonClass, cx } from '../../components/ui.tsx';
+import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[58px_minmax(130px,2fr)_minmax(130px,1fr)_60px_56px] items-center gap-2';
+const columns = 'grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[58px_minmax(0,2fr)_minmax(0,1fr)_60px_56px]';
 
 function RuleFields({ rule, onChange, ctx, value, report }: {
   rule: RuleEntry; onChange: (rule: RuleEntry) => void; ctx: ConvertCtx; value: TemplateBody; report: ReportItem[];
@@ -20,9 +21,9 @@ function RuleFields({ rule, onChange, ctx, value, report }: {
   // 历史数据可能把 IP 规则的 no-resolve 放在 options 中，统一交给 RuleEditor 编辑。
   const ir = matcher.kind === 'rule' && rule.options?.noResolve && ['IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'SRC-IP-CIDR'].includes(matcher.rule.type)
     ? { ...matcher.rule, noResolve: true } : matcher.kind === 'rule' ? matcher.rule : undefined;
-  return <div className="flex flex-col gap-3 border-t border-line p-3">
+  return <div className="flex flex-col gap-3 border-t border-line bg-ground p-4">
     <ItemIssues report={report} where={`rule:${rule.id}`} />
-    <MatcherEditor value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
+    <MatcherEditor fixedKind value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
     {matcher.kind === 'ruleset' && <>
       <div className="flex items-center gap-2"><Switch label="no-resolve" checked={rule.options?.noResolve ?? false} onChange={(noResolve) => onChange({ ...rule, options: { ...rule.options, noResolve } })} /><span className="text-[13px]">no-resolve</span></div>
     </>}
@@ -34,30 +35,34 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
 }) {
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map((r) => r.id === rule.id ? rule : r) });
+  const add = (matcher: Matcher) => {
+    const id = newId('r');
+    onChange({ ...value, rules: [...value.rules, { id, matcher, target: { kind: 'builtin', name: 'REJECT' } }] });
+    onSelect(id);
+  };
   return <Card bodyClass="overflow-x-auto px-4 pb-4"
     title={`规则（${value.rules.length} 条）`} subtitle={`出口只能是模板组或内置策略。`}
-    actions={<Button onClick={() => {
-      const id = newId('r');
-      onChange({ ...value, rules: [...value.rules, { id, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'REJECT' } }] });
-      onSelect(id);
-    }}>新增规则</Button>}>
+    actions={<div className="flex flex-wrap gap-2">
+      <Button onClick={() => add({ kind: 'rule', rule: { type: 'DOMAIN', value: '' } })}>添加单条规则</Button>
+      <RuleSetPicker onSelect={add} triggerClassName={buttonClass()} />
+    </div>}>
     {!value.rules.length && <Empty className="mb-4" title="没有规则" />}
-    <div className="min-w-[580px]">
-      <div className={`${columns} border-b border-line px-2 py-2 text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>启用</span><span>操作</span></div>
+    <div className="min-w-0">
+      <div className={`${columns} hidden border-b border-line px-2 py-2 sm:grid text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>启用</span><span>操作</span></div>
       <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
         const error = report.some((r) => r.level === 'error' && r.where === `rule:${rule.id}`);
-        return <div id={`template-rule-${rule.id}`} className={cx('my-1 rounded-lg border', error ? 'border-err bg-err-soft' : 'border-line')}>
+        return <div id={`template-rule-${rule.id}`} className={cx('my-1 overflow-hidden rounded-lg border', error ? 'border-err bg-err-soft' : 'border-line bg-panel')}>
           <div className={`${columns} cursor-pointer p-2 text-[13px]`} onClick={() => onSelect(selected === rule.id ? undefined : rule.id)}>
             <span className="flex items-center" onClick={(e) => e.stopPropagation()}>{handle}{i + 1}</span>
             <button type="button" aria-expanded={selected === rule.id} className={cx('cursor-pointer break-all text-left font-mono', error && 'text-err')}>{matcherLabel(rule.matcher, ctx)}</button>
-            <div onClick={(e) => e.stopPropagation()}><TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={rule.target} groups={value.groups} onChange={(target) => update({ ...rule, target })} /></div>
-            <div onClick={(e) => e.stopPropagation()}><Switch label={`启用第 ${i + 1} 条规则`} checked={rule.enabled !== false} onChange={(enabled) => update({ ...rule, enabled })} /></div>
-            <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange({ ...value, rules: value.rules.filter((r) => r.id !== rule.id) }); }}>删除</Button>
+            <div className="col-start-2 row-start-2 min-w-0 sm:col-auto sm:row-auto" onClick={(e) => e.stopPropagation()}><TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={rule.target} groups={value.groups} onChange={(target) => update({ ...rule, target })} /></div>
+            <div className="col-start-3 row-start-1 sm:col-auto sm:row-auto" onClick={(e) => e.stopPropagation()}><Switch label={`启用第 ${i + 1} 条规则`} checked={rule.enabled !== false} onChange={(enabled) => update({ ...rule, enabled })} /></div>
+            <Button size="sm" className="col-start-3 row-start-2 sm:col-auto sm:row-auto" onClick={(e) => { e.stopPropagation(); onChange({ ...value, rules: value.rules.filter((r) => r.id !== rule.id) }); }}>删除</Button>
           </div>
           {selected === rule.id && <RuleFields rule={rule} onChange={update} ctx={ctx} value={value} report={report} />}
         </div>;
       }} />
-      <div className={`${columns} border-t border-line px-2 py-3 text-[13px]`}><span>—</span><span className="font-mono">MATCH（固定）</span><TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={(final) => onChange({ ...value, final })} /><span /><span /></div>
+      <div className="mt-3 grid grid-cols-1 items-center gap-3 border-t border-line px-2 py-3 text-[13px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"><span className="font-mono">MATCH（固定）</span><TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={(final) => onChange({ ...value, final })} /></div>
       <ItemIssues report={report} where="final" />
     </div>
   </Card>;

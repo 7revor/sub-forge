@@ -92,3 +92,9 @@ Login 恢复品牌在上、白色卡片横向居中与短屏滚动。Modal 遮�
 ## 2026-10-29：列表分页与剩余高度
 
 `Lists`、配置订阅、组合、本地节点、规则集及模板画板对应页面已实现服务端分页、搜索、条数选择及固定分页器；模板列表、详情分别滚动。基础设置预设随通用组件同步。前后端已完成，[验收记录](15-list-pagination-verification.md) 包含截图。外部 Claude Design 画布本次仍显示「Sign in to view this page」，尚未同步；细节列入 [13](13-design-canvas-sync.md)。
+
+## 2026-10-29：模板规则来源平级
+
+TemplateEditor 的「新增规则 → 匹配项类型 → 本地规则集下拉」替换为「添加单条规则 / 引用规则集」。引用弹层复用 RuleSets 的搜索交互，同时返回本地和 GitHub 候选，只有本地加前缀；表内两类规则共用排序/出口/启停。RuleSets 的关联仓库按钮也使用相同组件（仅仓库作用域）。TemplatePublish、TemplateBrowse、Profile 规则摘要显示两类引用的名称。
+
+前端、后端和核心均已实现。外部 Claude Design 画布本轮通过内置浏览器访问仍显示「Sign in to view this page」，未修改外部画板，按待同步流程记录至 docs/13；以本轮实际界面截图为同步依据。

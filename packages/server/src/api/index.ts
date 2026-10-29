@@ -11,6 +11,7 @@ import { RuleRepoService } from '../rule-repos/service.ts';
 import { parseAllowList } from '../net/ssrf.ts';
 import { createUpstreamFetcher } from '../net/upstream.ts';
 import { ruleRepoRoutes } from './rule-repos.ts';
+import { ruleOptionRoutes } from './rule-options.ts';
 import { authRoutes } from './auth.ts';
 import { pendingRoutes } from './pending.ts';
 import { docRoutes } from './docs.ts';
@@ -44,7 +45,9 @@ export function createApi(deps: ApiDeps) {
   api.use('*', csrfGuard(() => deps.allowedOrigins));
   api.use('*', sessionLoader(deps.store));
   // 占位接口先于 /users/:id 等通配路由注册
-  api.route('/', ruleRepoRoutes(deps.store, deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now)));
+  const repos = deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now);
+  api.route('/', ruleRepoRoutes(deps.store, repos));
+  api.route('/', ruleOptionRoutes(deps.store, repos));
   api.route('/', pendingRoutes());
   api.route('/', nodeProbeRoutes(deps.nodeProbe));
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));

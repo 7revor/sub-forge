@@ -9,7 +9,7 @@ import { ClientOverrides, clientOverridesError, ruleInputError } from '../../com
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Badge, Button, Card, Empty, FieldError, Field, Modal, Select, Switch, cx } from '../../components/ui.tsx';
-import { useList } from '../../hooks.ts';
+import { useRuleSetRefs } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
 
@@ -23,10 +23,10 @@ export function ruleText(r: RuleIR): string {
 }
 
 function useMatcherLabel() {
-  const rulesets = useList('rulesets').data ?? [];
+  const rulesets = useRuleSetRefs().data ?? [];
   return (m: Matcher): { kind: string; text: string } => {
     if (m.kind === 'rule') return { kind: '单条规则', text: ruleText(m.rule) };
-    return { kind: '规则集', text: rulesets.find((r) => r.id === m.id)?.name ?? m.id };
+    return { kind: '规则集', text: m.repository?.name ?? `本地 · ${rulesets.find((r) => r.id === m.id)?.name ?? m.id}` };
   };
 }
 
@@ -37,7 +37,7 @@ function privateRuleError(rule: RuleEntry): string | undefined {
 
 function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (value: RuleEntry) => void }) {
   const { groupOptions, profileNodeSets } = useProfile();
-  const rulesets = useList('rulesets').data ?? [];
+  const rulesets = useRuleSetRefs().data ?? [];
   const matcher = value.matcher;
   return <div className="flex flex-col gap-3.5">
     <MatcherEditor value={matcher} rulesets={rulesets} onChange={(matcher) => onChange({ ...value, matcher })} />

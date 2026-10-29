@@ -42,22 +42,22 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, noResolve, 
   const stats = result?.stats;
   const previousLabel = TARGETS.find(x => x.key === last.current?.target)?.label;
   const diagnostic = result?.diagnostics.filter(d => ['client', 'degraded', 'override'].includes(d.kind)) ?? [];
+  const status = sourceError && !sourceReading ? result ? '来源读取失败，暂显示上次结果。' : '来源读取失败，尚无可用预览。'
+    : pending ? result ? `正在更新，暂显示上次${previousLabel ? ` ${previousLabel}` : ''}结果…` : '正在加载规则…'
+    : preview.error ? `更新失败，暂显示上次${previousLabel ? ` ${previousLabel} ` : ''}结果。`
+    : result?.delivery.mode === 'unsupported' ? result.delivery.reason
+    : result?.passthrough ? '二进制来源由客户端读取，无法展示文本。' : null;
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
     <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
       {TARGETS.map(x => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
-        className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
+        className={cx('h-[34px] shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
     </div>
-    <div className="flex min-h-8 flex-wrap items-center gap-2 text-[12.5px] text-muted" role="status">
-      {sourceError && !sourceReading ? result ? '来源读取失败，暂显示上次结果。' : '来源读取失败，尚无可用预览。'
-        : pending ? result ? `正在更新，暂显示上次${previousLabel ? ` ${previousLabel}` : ''}结果…` : '正在加载规则…'
-        : preview.error ? `更新失败，暂显示上次${previousLabel ? ` ${previousLabel} ` : ''}结果。`
-        : result?.delivery.mode === 'unsupported' ? result.delivery.reason
-        : result?.passthrough ? '二进制来源由客户端读取，无法展示文本。'
-        : result?.delivery.mode === 'original' ? `下载时使用原始来源 · ${result.delivery.format} / ${result.delivery.behavior}` : '下载时输出 .list；未生效规则保留为注释。'}
+    {(status || preview.error || sourceError) ? <div className="flex min-h-8 flex-wrap items-center gap-2 text-[12.5px] text-muted" role="status">
+      {status}
       {(preview.error || sourceError) ? <FieldError error={preview.error || sourceError} /> : null}
-      <Button size="sm" onClick={() => void onRefreshSources()} disabled={sourceReading}>{sourceError ? '重新读取来源' : '刷新来源'}</Button>
+      {sourceError ? <Button size="sm" onClick={() => void onRefreshSources()} disabled={sourceReading}>重新读取来源</Button> : null}
       {preview.error && <Button size="sm" onClick={() => void preview.refetch()} disabled={!ready || !settled || preview.isFetching}>重新转换</Button>}
-    </div>
+    </div> : null}
     <div className="grid grid-cols-3 gap-2">
       {(['domain', 'classical', 'ipcidr'] as const).map(b => <div key={b} className="flex flex-col gap-0.5 rounded-lg bg-ground p-2.5"><span className="font-mono text-[11.5px] text-muted">{b}</span><span className="text-xl font-semibold">{stats?.[b] ?? '—'}</span></div>)}
     </div>

@@ -1,6 +1,6 @@
 import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
-import { AsyncSelect, type AsyncSelectPage } from '../components/listbox.tsx';
+import { RuleSetPicker } from '../components/RuleSetPicker.tsx';
 import { useRulesetSources } from '../hooks/useRulesetSources.ts';
 import { RulesetPreview } from '../components/RulesetPreview.tsx';
 import { CopyButton } from '../components/CopyButton.tsx';
@@ -9,8 +9,8 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
 import { FileText, Globe, Link2, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, type RepoEntry, type RulesetSourceStatus } from '../api.ts';
+import { useState, type ReactNode } from 'react';
+import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
@@ -130,31 +130,13 @@ export function RulesetEdit() {
   );
 }
 
-async function loadRepositoryOptions(query: string, offset: number): Promise<AsyncSelectPage> {
-  const result = await api<{ items: RepoEntry[]; total: number }>('GET', `/rule-repos/search?q=${encodeURIComponent(query)}&offset=${offset}&limit=30`);
-  return {
-    options: result.items.map(item => ({ value: JSON.stringify([item.repo, item.path]), label: item.name, hint: `${item.repo} · ${item.path}` })),
-    nextOffset: offset + result.items.length < result.total ? offset + result.items.length : undefined,
-  };
-}
-
 function RepositoryPicker({ onAdd }: { onAdd: (sources: RuleSetSourceDoc[]) => void }) {
-  const [busy, setBusy] = useState(false);
-  const alive = useRef(true);
-  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  return <>
-    <AsyncSelect aria-label="关联仓库规则" placeholder={busy ? '正在关联…' : '关联仓库规则'} disabled={busy} loadOptions={loadRepositoryOptions}
-      triggerClassName={sourceActionClass} triggerIcon={<Link2 size={15} className="hidden shrink-0 sm:block" />}
-      onChange={async value => {
-        setBusy(true);
-        try {
-          const [repo, path] = JSON.parse(value) as [string, string];
-          const result = await api<{ sources: RuleSetSourceDoc[] }>('POST', '/rule-repos/resolve', { repo, path });
-          if (alive.current) { onAdd(result.sources); notifySuccess('仓库规则已关联，保存后生效'); }
-        } catch (e) { if (alive.current) alertError(e); }
-        finally { if (alive.current) setBusy(false); }
-      }} />
-  </>;
+  return <RuleSetPicker scope="repository" label="关联仓库规则" triggerClassName={sourceActionClass}
+    triggerIcon={<Link2 size={15} className="hidden shrink-0 sm:block" />} onSelect={matcher => {
+      if (!matcher.repository) return;
+      onAdd(matcher.repository.sources.map(source => ({ ...source, id: newId('src') })));
+      notifySuccess('仓库规则已关联，保存后生效');
+    }} />;
 }
 
 function SourceRow({ src, handle, active, status, loading, onSelect, onChange, onDelete }: {
