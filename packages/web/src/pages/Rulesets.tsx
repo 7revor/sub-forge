@@ -3,6 +3,7 @@ import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { AsyncSelect, type AsyncSelectPage } from '../components/listbox.tsx';
 import { useRulesetSources } from '../hooks/useRulesetSources.ts';
 import { RulesetPreview } from '../components/RulesetPreview.tsx';
+import { CopyButton } from '../components/CopyButton.tsx';
 import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
@@ -162,10 +163,12 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
 }) {
   const on = src.enabled !== false;
   const label = sourceLabel(src);
+  const editingUrl = active && src.kind === 'remote' && !src.repository;
+  const title = editingUrl ? src.name?.trim() || '远程地址' : label;
   const lines = src.kind === 'local' ? (src.content ?? '').split('\n').filter((l) => l.trim() && !l.trim().startsWith('#')).length : undefined;
   const detected = status?.format ? FORMAT_TEXT[status.format] ?? status.format : '自动识别';
   const sub = src.kind === 'remote'
-    ? [src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${detected}`].filter(Boolean).join(' · ')
+    ? [!editingUrl && src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${detected}`].filter(Boolean).join(' · ')
     : `本地 · ${detected} · ${lines} 行`;
   return (
     <div className={cx('my-2 rounded-lg border', active ? 'border-accent bg-[#f8faff]' : 'border-line', !on && 'opacity-60')}>
@@ -176,17 +179,18 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
             {src.repository ? <Link2 size={15} /> : src.kind === 'remote' ? <Globe size={15} /> : <FileText size={15} />}
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className={cx('truncate text-[13.5px] font-medium', src.kind === 'remote' && !src.name?.trim() && 'font-mono text-[12.5px]')}>{label}</span>
-            <span className="truncate text-[12px] text-muted">{sub}</span>
+            <span title={title} className={cx('truncate text-[13.5px] font-medium', src.kind === 'remote' && !src.name?.trim() && !editingUrl && 'font-mono text-[12.5px]')}>{title}</span>
+            <span title={sub} className="truncate text-[12px] text-muted">{sub}</span>
           </span>
         </button>
+        {src.kind === 'remote' && src.repository && src.url && <CopyButton text={src.url} size="sm" variant="ghost" aria-label={`复制关联地址 ${label}`}>复制地址</CopyButton>}
         <SourceStatus src={src} status={status} loading={loading} />
         <Switch label={`启用 ${label}`} checked={on} onChange={(v) => onChange({ enabled: v ? undefined : false })} />
         <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${label}`} onClick={onDelete}><Trash2 size={14} /></Button>
       </div>
       {active && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
-          {src.kind === 'remote' && <Field label={src.repository ? '关联地址（只读）' : '地址'} className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} readOnly={!!src.repository} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
+          {src.kind === 'remote' && !src.repository && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
           {src.kind === 'remote' && <Field label="缓存（小时）">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
             const h = Number(x.target.value);
             const { ttlSec: _, ...rest } = src.fetch ?? {};

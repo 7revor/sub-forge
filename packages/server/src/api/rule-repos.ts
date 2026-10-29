@@ -46,8 +46,14 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
     void repos.refresh(id);
     return c.json({ id, repos: repos.list() }, 201);
   });
-  app.delete('/rule-repos/:id', requireAdmin, c => {
-    repos.removeCustom(c.req.param('id'));
+  app.put('/rule-repos/:id', requireAdmin, async c => {
+    const id = c.req.param('id');
+    await repos.update(id, await jsonBody(c));
+    if (repos.list().find(r => r.id === id)?.enabled) void repos.refresh(id);
+    return c.json({ repos: repos.list() });
+  });
+  app.delete('/rule-repos/:id', requireAdmin, async c => {
+    await repos.removeCustom(c.req.param('id'));
     return c.json({ ok: true });
   });
   app.post('/rule-repos/:id/refresh', requireAdmin, c => {

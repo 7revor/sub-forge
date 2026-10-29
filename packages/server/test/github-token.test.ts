@@ -51,7 +51,7 @@ describe('GitHub 索引凭据', () => {
       expect(store.getGithubToken()).toBeUndefined();
       store.setGithubToken('test_persisted_token');
       store.close(); store = new Store(path, { cipher });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(12);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(13);
       expect(store.getGithubToken()).toBe('test_persisted_token');
       expect((store.db.prepare('SELECT value FROM server_secrets').get() as { value: string }).value).not.toContain('test_persisted_token');
     } finally {
@@ -61,25 +61,16 @@ describe('GitHub 索引凭据', () => {
     }
   });
 
-  it('Token 变更即时作用于索引 API，不传给 README 和规则文件', async () => {
+  it('Token 变更即时作用于仓库元数据 API', async () => {
     const store = new Store(':memory:');
-    const fetcher = vi.fn<UpstreamFetcher>(async url => {
-      if (url.includes('/commits/')) return { status: 200, body: JSON.stringify({ sha: 'a'.repeat(40), commit: { tree: { sha: 'b'.repeat(40) } } }) };
-      if (url.includes('/git/trees/')) return { status: 200, body: JSON.stringify({ truncated: false, tree: [{ path: 'rule/Surge/Test/Test.list', type: 'blob' }] }) };
-      return { status: 200, body: url.endsWith('README.md') ? '' : 'DOMAIN,example.com' };
-    });
+    const fetcher = vi.fn<UpstreamFetcher>(async () => ({ status: 200, body: JSON.stringify({ private: false, default_branch: 'main' }) }));
     const repos = new RuleRepoService(store, fetcher);
     try {
-      store.setGithubToken('test_first');
-      await repos.refresh('blackmatrix7');
-      await repos.detail('blackmatrix7', 'Test');
-      const calls = fetcher.mock.calls;
-      expect(calls.filter(([url]) => url.startsWith('https://api.github.com/')).length).toBeGreaterThan(1);
-      expect(calls.filter(([url]) => url.startsWith('https://raw.githubusercontent.com/')).length).toBeGreaterThan(0);
-      for (const [url, options] of calls) expect(options?.githubToken).toBe(url.startsWith('https://api.github.com/') ? 'test_first' : undefined);
-      for (const token of ['test_second', undefined]) {
-        store.setGithubToken(token); fetcher.mockClear(); await repos.refresh('blackmatrix7');
+      for (const [index, token] of ['test_first', 'test_second', undefined].entries()) {
+        store.setGithubToken(token); fetcher.mockClear();
+        await repos.addCustom({ url: `https://github.com/example/test-${index}` });
         expect(fetcher.mock.calls[0]?.[1]?.githubToken).toBe(token);
+        expect(fetcher.mock.calls[0]?.[0]).toContain('https://api.github.com/');
       }
     } finally { await repos.stop(); store.close(); }
   });

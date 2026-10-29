@@ -38,6 +38,9 @@ COPY packages/core/src packages/core/src
 COPY packages/server/src packages/server/src
 
 FROM node:22-bookworm-slim@sha256:3ed748ce9dea62d2f0f0205cdbb6823106d9f973a6f555c402fe2575f8d6e1ae
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git ca-certificates \
+ && apt-get clean
 ENV NODE_ENV=production \
     SUBFORGE_DB=/data/sub-forge.db \
     HOST=0.0.0.0 \

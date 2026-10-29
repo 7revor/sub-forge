@@ -18,6 +18,8 @@ import { ProfileList, ProfileNew } from './pages/profile/ProfileList.tsx';
 import { RulesetEdit, RulesetList } from './pages/Rulesets.tsx';
 import { SourceEdit, SourceList } from './pages/Sources.tsx';
 import { TemplateEdit, TemplateList } from './pages/Templates.tsx';
+import { RuleRepoEditorPage } from './pages/RuleRepoEdit.tsx';
+import { RuleRepoSettingsPage } from './pages/RuleRepoSettings.tsx';
 import { RuleRepoPage } from './pages/RuleRepo.tsx';
 import { System } from './pages/System.tsx';
 import { Users } from './pages/Users.tsx';
@@ -60,6 +62,9 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="templates/manage" element={<RequireAdmin><Navigate to="/templates" replace /></RequireAdmin>} />
       <Route path="templates/:id/:tab?" element={<RequireAdmin><TemplateEdit /></RequireAdmin>} />
       <Route path="rule-repo" element={<RuleRepoPage />} />
+      <Route path="rule-repo/new" element={<RequireAdmin><RuleRepoEditorPage /></RequireAdmin>} />
+      <Route path="rule-repo/:id/edit" element={<RequireAdmin><RuleRepoEditorPage /></RequireAdmin>} />
+      <Route path="rule-repo/settings" element={<RequireAdmin><RuleRepoSettingsPage /></RequireAdmin>} />
       <Route path="system" element={<RequireAdmin><System /></RequireAdmin>} />
       <Route path="presets" element={<RequireAdmin><PresetList /></RequireAdmin>} />
       <Route path="presets/:id" element={<RequireAdmin><PresetEdit /></RequireAdmin>} />

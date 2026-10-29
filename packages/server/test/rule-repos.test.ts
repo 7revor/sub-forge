@@ -1,3 +1,4 @@
+import { fixtureCache } from './repo-cache-fixture.ts';
 import { mkdtempSync, readdirSync, unlinkSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,7 +30,7 @@ function setup() {
     return { status: 200, body: (url.includes('_Domain') || url.includes('/surge-domain-set/')) ? '.example.com\n' : 'DOMAIN,chatgpt.com\n' };
   });
   const env = setupApp({ fetcher });
-  const service = new RuleRepoService(env.store, fetcher, () => 1_700_000_000_000);
+  const service = new RuleRepoService(env.store, fetcher, () => 1_700_000_000_000, fixtureCache(fetcher));
   const app = createApp({ ...env, ruleRepos: service });
   envs.push({ service, store: env.store });
   return { ...env, app, service, fetcher, change: () => { commit = 'c'.repeat(40); }, fail: (part: string) => { failRef = part; }, setPaths: (next: string[]) => { paths = next; } };
@@ -42,6 +43,16 @@ describe('规则仓库适配器', () => {
     const china = entries[0]!;
     applyReadme(china, 'surge', readme);
     expect(china.variants.find(v => v.recommended)?.files.map(f => f.behavior)).toEqual(['classical', 'domain']);
+  });
+  it('README 建议限定同分支和目录，不混用其他扫描范围的文件', () => {
+    const base = BUILTIN_REPOS[0]!;
+    const repo = { ...base, id: '任意仓库', refs: ['one', 'two'], scans: ['one', 'two'].map(ref => ({ ...base.scans[5]!, ref, directory: 'custom', include: ['**/*.list'], exclude: [], format: 'auto' as const })) };
+    const paths = ['custom/China/China.list', 'custom/China/China_Domain.list'];
+    const entry = buildEntries(repo, { one: paths, two: paths })[0]!;
+    applyReadme(entry, 'surge', readme, { ref: 'two', directory: 'custom/China/' });
+    const combination = entry.variants.find(v => v.files.length === 2)!;
+    expect(combination.files.every(f => f.ref === 'two')).toBe(true);
+    expect(entry.variants.filter(v => v.files[0]?.ref === 'one').every(v => v.files.every(f => f.format === 'auto'))).toBe(true);
   });
   it('所有适配器仅接受 list/txt，Clash YAML 与二进制不进入索引', () => {
     const black = buildEntries(BUILTIN_REPOS[0]!, { master: ['rule/Clash/OnlyYaml/OnlyYaml.yaml', 'rule/Clash/OnlyYml/OnlyYml.yml', 'rule/Surge/OpenAI/OpenAI.list', 'rule/Clash/Text/Text.txt', 'rule/Surge/Binary/Binary.mrs'] });
@@ -71,10 +82,10 @@ describe('规则仓库索引', () => {
       store.db.pragma(`user_version = ${version}`);
       store.close(); store = new Store(path, { cipher });
       const h = setup();
-      const service = new RuleRepoService(store, h.fetcher);
+      const service = new RuleRepoService(store, h.fetcher, Date.now, fixtureCache(h.fetcher));
       await service.refresh('blackmatrix7');
       await service.stop(); store.close(); store = new Store(path, { cipher });
-      const restarted = new RuleRepoService(store, h.fetcher);
+      const restarted = new RuleRepoService(store, h.fetcher, Date.now, fixtureCache(h.fetcher));
       expect(store.getWithOwner('ruleset', 'old')?.owner).toBe('alice');
       expect(restarted.search('openai', undefined, undefined, 0, 50).total).toBe(1);
       await restarted.stop();
@@ -93,7 +104,7 @@ describe('规则仓库索引', () => {
     h.store.db.prepare('UPDATE rule_repo_entries SET data=? WHERE repo=? AND key=?').run(JSON.stringify(mixed),'blackmatrix7','OpenAI');
     const doc = { id: 'legacy-yaml', name: '已保存 YAML', sources: [{ id: 'yaml', kind: 'remote' as const, format: 'yaml' as const, url: 'https://example.com/rules.yaml', repository: { repo: 'blackmatrix7', entry: 'Legacy', ref: 'master', path: 'rule/Clash/Legacy/Legacy.yaml' } }] };
     h.store.put('ruleset', doc, 'alice'); h.fetcher.mockClear();
-    const restart = new RuleRepoService(h.store, h.fetcher);
+    const restart = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
     expect(restart.search('Legacy',undefined,undefined,0,50).total).toBe(0);
     expect((await restart.resolvedEntry('blackmatrix7','OpenAI')).variants.every(v=>v.files.every(f=>/\.(list|txt)$/.test(f.path)))).toBe(true);
     expect(h.store.get('ruleset','legacy-yaml')).toEqual(doc);
@@ -105,7 +116,7 @@ describe('规则仓库索引', () => {
   it('启动自动索引，每日检查，停止后不再运行定时任务', async () => {
     vi.useFakeTimers();
     const h = setup();
-    const service = new RuleRepoService(h.store, h.fetcher, Date.now);
+    const service = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
     try {
       service.start(); await service.refresh('blackmatrix7'); await service.refresh('zydou');
       const calls = h.fetcher.mock.calls.length;
@@ -128,7 +139,7 @@ describe('规则仓库索引', () => {
     expect(h.service.search('open ai', 'blackmatrix7', 'surge', 0, 50).items).toEqual([expect.objectContaining({ path: 'OpenAI' })]);
     expect(h.service.search('', undefined, undefined, 1, 1).items).toHaveLength(1);
     expect(h.service.search('%', undefined, undefined, 0, 50).total).toBe(0);
-    const another = new RuleRepoService(h.store, h.fetcher);
+    const another = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
     expect(another.search('openai', undefined, undefined, 0, 50).total).toBe(3);
     await another.stop();
   });
@@ -154,26 +165,14 @@ describe('规则仓库索引', () => {
     h.fail(''); await h.service.refresh('zydou');
     expect(h.service.list().find(r => r.id === 'zydou')?.error).toBeUndefined();
   });
-  it('空树保留最后成功的索引，停用后禁止搜索与详情', async () => {
+  it('成功空树清空索引，停用后禁止搜索与详情', async () => {
     const h = setup(); await h.service.refresh('blackmatrix7'); h.change(); h.setPaths([]);
     await h.service.refresh('blackmatrix7');
-    expect(h.service.search('openai', undefined, undefined, 0, 50).total).toBe(1);
-    expect(h.service.list()[0]!.error).toContain('没有可识别');
+    expect(h.service.search('openai', undefined, undefined, 0, 50).total).toBe(0);
+    expect(h.service.list()[0]!.error).toBeUndefined();
     h.service.setEnabled('blackmatrix7', false);
     expect(h.service.search('', undefined, undefined, 0, 50).total).toBe(0);
     expect(() => h.service.detail('blackmatrix7', 'OpenAI')).toThrow('已启用');
-  });
-  it('被截断的递归树改用分目录结果，忽略符号链接', async () => {
-    const h = setup();
-    h.fetcher.mockImplementation(async url => {
-      if (url.includes('/commits/')) return { status: 200, body: JSON.stringify({ sha, commit: { tree: { sha: treeSha } } }) };
-      const recursive = url.endsWith('?recursive=1');
-      const root = url.includes(treeSha);
-      return { status: 200, body: JSON.stringify({ sha: treeSha, truncated: root && recursive, tree: root ? [{ type: 'tree', path: 'rule', sha: 'sub' }] : [{ type: 'blob', path: 'Surge/OpenAI/OpenAI.list' }, { type: 'blob', mode: '120000', path: 'Surge/Link/Link.list' }] }) };
-    });
-    await h.service.refresh('blackmatrix7');
-    expect(h.service.search('', undefined, undefined, 0, 50).items.map(e => e.path)).toEqual(['OpenAI']);
-    expect(h.fetcher.mock.calls.some(c => c[0].endsWith(treeSha))).toBe(true);
   });
   it('详情预览只取文本；失败可重试，成功统计去重条数', async () => {
     const h = setup(); await h.service.refresh('blackmatrix7');
@@ -276,7 +275,7 @@ describe('规则仓库接口', () => {
     await h.service.refresh('zydou');
     const old = { id: 'old', kind: 'remote' as const, name: 'zydou · openai.txt', url: 'https://raw.githubusercontent.com/zydou/domain-list-community-converter/surge-domain-set/openai.txt', format: 'domain-set' as const };
     h.store.put('ruleset', { id: 'legacy', name: '旧导入', sources: [old, { ...old, id: 'manual', name: '自定义' }, { ...old, id: 'changed', url: 'https://example.com/file' }] }, user.id);
-    const restart = new RuleRepoService(h.store, h.fetcher);
+    const restart = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
     const migrated = h.store.getWithOwner('ruleset', 'legacy')!;
     expect(migrated.owner).toBe(user.id);
     expect(migrated.doc.sources[0]!.repository).toEqual({ repo: 'zydou', entry: 'openai', ref: 'surge-domain-set', path: 'openai.txt' });

@@ -5,7 +5,6 @@
 // 配置全部来自环境变量，见 packages/server/README.md。
 
 import { mkdirSync, readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.ts';
 import { Cipher, hashPassword, loadMasterKey } from './crypto.ts';
@@ -14,6 +13,8 @@ import { parseAllowList } from './net/ssrf.ts';
 import { createUpstreamFetcher } from './net/upstream.ts';
 import { RenderService } from './render.ts';
 import { SnapshotService } from './snapshots.ts';
+import { GitRepoCache } from './rule-repos/git-cache.ts';
+import { join, dirname } from 'node:path';
 import { RuleRepoService } from './rule-repos/service.ts';
 import { Store } from './store.ts';
 import { createNodeProbe } from './node-probe.ts';
@@ -79,7 +80,7 @@ async function start(): Promise<void> {
     publicUrl,
     ...(env.MIHOMO_BIN ? { verify: mihomoVerifier(env.MIHOMO_BIN, env.MIHOMO_DIR) } : {}),
   });
-  const ruleRepos = new RuleRepoService(store, fetcher);
+  const ruleRepos = new RuleRepoService(store, fetcher, Date.now, new GitRepoCache(env.SUBFORGE_REPO_CACHE ?? join(dirname(dbPath), 'rule-repo-cache')));
   const nodeProbe = env.MIHOMO_BIN ? createNodeProbe(env.MIHOMO_BIN, { allow: parseAllowList((env.SSRF_ALLOW ?? '').split(',')) }) : undefined;
   const app = createApp({
     store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe,

@@ -3,7 +3,7 @@ import { bad } from '../api/common.ts';
 
 export type GenericOptions = { directory: string; include: string[]; exclude: string[]; format: RuleSetFormat };
 export type CustomRepoInput = GenericOptions & { name: string; owner: string; repo: string; ref?: string };
-const FORMATS = new Set(['auto', 'classical', 'domain-set', 'ipcidr']);
+const FORMATS = new Set(['auto', 'classical', 'domain', 'domain-set', 'ipcidr']);
 const DEFAULT_INCLUDE = ['**/*.list', '**/*.txt'];
 
 /** 仅支持路径通配符 *、**、?；不执行仓库脚本或用户正则。 */
@@ -50,7 +50,7 @@ export function parseCustomRepo(body: Record<string, unknown>): CustomRepoInput 
   };
   const name = string('name', '', 120) || `${owner}/${repo}`;
   const ref = string('ref', '', 200);
-  if (ref && (/\s|\.\.|@\{|[~^:?*\[\\]/.test(ref) || ref.startsWith('/') || ref.endsWith('/') || ref.includes('//') || ref.endsWith('.lock'))) throw bad('分支名称不合法');
+  if (ref && (/\s|\.\.|@\{|[~^:?*\[\\]/.test(ref) || ref.startsWith('-') || ref.startsWith('.') || ref.endsWith('.') || ref.split('/').some(p => p.endsWith('.lock') || p.startsWith('.')) || ref.startsWith('/') || ref.endsWith('/') || ref.includes('//') || ref.endsWith('.lock'))) throw bad('分支名称不合法');
   const rawDirectory = string('directory', '', 300);
   if (rawDirectory.startsWith('/')) throw bad('扫描目录必须是仓库内的相对路径');
   const directory = rawDirectory.replace(/\/$/, '');
@@ -67,4 +67,28 @@ export function parseCustomRepo(body: Record<string, unknown>): CustomRepoInput 
   const format = body.format ?? 'auto';
   if (typeof format !== 'string' || !FORMATS.has(format)) throw bad('请选择自动识别、classical、域名列表或 CIDR 格式');
   return { name, owner, repo, ...(ref ? { ref } : {}), directory, include: patterns('include', DEFAULT_INCLUDE), exclude: patterns('exclude', []), format: format as RuleSetFormat };
+}
+
+export type ScanConfig = GenericOptions & {
+  ref: string; client: 'any' | 'mihomo' | 'surge'; groupBy: 'path' | 'directory' | 'stem';
+  readme: boolean; preferred: string[];
+};
+
+export function parseScans(body: Record<string, unknown>): ScanConfig[] {
+  const values = body.scans ?? [body];
+  if (!Array.isArray(values) || !values.length || values.length > 20) throw bad('需配置 1 至 20 个扫描范围');
+  return values.map(value => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw bad('扫描范围格式不合法');
+    const item = value as Record<string, unknown>;
+    const parsed = parseCustomRepo({ ...item, url: body.url });
+    const client = item.client ?? 'any';
+    const groupBy = item.groupBy ?? 'path';
+    if (!['any', 'mihomo', 'surge'].includes(String(client))) throw bad('客户端类型不合法');
+    if (!['path', 'directory', 'stem'].includes(String(groupBy))) throw bad('文件分组方式不合法');
+    if (item.readme !== undefined && typeof item.readme !== 'boolean') throw bad('README 配置必须是布尔值');
+    const preferred = item.preferred ?? [];
+    if (!Array.isArray(preferred) || preferred.length > 20 || preferred.some(p => typeof p !== 'string' || p.length > 200 || /[\x00-\x1f]/.test(p))) throw bad('推荐文件模式不合法');
+    return { ref: parsed.ref ?? '', directory: parsed.directory, include: parsed.include, exclude: parsed.exclude, format: parsed.format,
+      client: client as ScanConfig['client'], groupBy: groupBy as ScanConfig['groupBy'], readme: item.readme === true, preferred };
+  });
 }

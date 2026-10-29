@@ -17,7 +17,7 @@ ARG GEOIP_TAG=202610230445
 ARG GEOIP_SHA256=85ef4144851be2860952e7a15df08efbf266d536e5fb05d77afb6e714e9d9a9d
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl python3 make g++ \
+ && apt-get install -y --no-install-recommends git ca-certificates curl python3 make g++ \
  && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
