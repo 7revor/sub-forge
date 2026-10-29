@@ -101,6 +101,7 @@ export function createNodeProbe(bin: string, options: { allow?: AllowList; targe
       while (true) {
         abort.signal.throwIfAborted();
         if (didExit || processError) return result('failed', 'Mihomo 无法加载此节点，请检查协议配置');
+        if (Date.now() >= readyUntil) return result('unavailable', '测试内核未能及时启动');
         try {
           if ((await controller(socketPath, '/version', abort.signal)).status === 200) break;
         } catch (error) {
@@ -140,6 +141,12 @@ export function createNodeProbe(bin: string, options: { allow?: AllowList; targe
       active.set(abort, task);
       return task;
     },
-    async close() { closing = true; for (const abort of active.keys()) abort.abort(); await Promise.all(active.values()); },
+    async close() {
+      closing = true;
+      for (const abort of active.keys()) abort.abort();
+      const results = await Promise.allSettled(active.values());
+      const errors = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (errors.length) throw new AggregateError(errors.map(result => result.reason), '测试进程清理失败');
+    },
   };
 }

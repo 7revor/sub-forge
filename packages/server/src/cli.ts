@@ -95,19 +95,25 @@ async function start(): Promise<void> {
   const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
     console.log(`Sub Forge 已启动：http://${info.address}:${info.port}（对外地址 ${publicUrl}，数据库 ${dbPath}）`);
   });
-  const shutdown = () => {
+  let shuttingDown = false;
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     clearInterval(prune);
-    void nodeProbe?.close();
-    server.close(async () => {
-      await nodeProbe?.close();
-      await ruleRepos.stop();
-      await snapshots.settled();
-      store.close();
-      process.exit(0);
-    });
+    // 立即停止接收请求并取消探测；同时等待所有清理，避免先前未等待的 close 拒绝。
+    const closed = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop()]);
+    await snapshots.settled();
+    store.close();
+    const errors = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (errors.length) throw new AggregateError(errors.map(result => result.reason), '关闭服务时清理失败');
+    process.exit(0);
   };
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
+  const onSignal = () => {
+    void shutdown().catch(error => { console.error('关闭服务失败', error); process.exit(1); });
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
 }
 
 main().catch((e: Error) => {

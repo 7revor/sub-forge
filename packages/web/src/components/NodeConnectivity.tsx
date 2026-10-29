@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { LocalProxy } from '@sub-forge/core';
 import { api } from '../api.ts';
+import { createProbeRequestId } from '../domain/probeRequestId.ts';
 import { Badge, Button } from './ui.tsx';
 
 type Result = { ok: boolean; status: 'success' | 'failed' | 'unavailable' | 'cancelled'; message: string; delay?: number; testedAt: number; target: string };
@@ -24,10 +25,11 @@ export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: stri
   }, [text]); // 输入变化或离开页面时取消测试；旧响应由请求标识与文本双重隔离。
   const run = async () => {
     if (!node || active.current) return;
-    const requestId = crypto.randomUUID();
-    active.current = requestId;
+    let requestId: string | undefined;
     setRunning(true); setCancelError('');
     try {
+      requestId = createProbeRequestId();
+      active.current = requestId;
       const data = await api<Result>('POST', '/node-probe', { node, requestId });
       if (active.current === requestId && currentText.current === text) setResult({ text, data });
     } catch (error) {

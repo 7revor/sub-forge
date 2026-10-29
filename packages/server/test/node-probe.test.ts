@@ -63,6 +63,10 @@ describe('节点探测进程生命周期', () => {
     await probe.close();
     expect(await b).toMatchObject({ status: 'cancelled' });
   });
+  it('控制器持续返回非成功状态时按启动期限结束并清理', async () => {
+    const { probe } = await setup();
+    expect(await probe.run({ ...node, server: 'notready.example' }, new AbortController().signal)).toMatchObject({ status: 'unavailable', message: '测试内核未能及时启动' });
+  }, 9000);
   it('预先取消不启动进程', async () => {
     const { probe } = await setup();
     const abort = new AbortController(); abort.abort();

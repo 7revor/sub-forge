@@ -10,6 +10,7 @@ if (config.includes('exit.example')) process.exit(1);
 process.on('SIGTERM', () => {});
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
+  if (req.url === '/version' && config.includes('notready.example')) { res.statusCode = 503; return res.end('{}'); }
   if (req.url === '/version') return res.end('{"version":"test"}');
   if (config.includes('hang.example')) return;
   if (config.includes('fail.example')) { res.statusCode = 504; return res.end('{"message":"authentication failed secret-password"}'); }
