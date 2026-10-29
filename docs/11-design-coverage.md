@@ -32,6 +32,7 @@
 
 - 2026-10-29 本地节点粘贴导入：前端补充提示「YAML 支持单个节点、节点列表或带 proxies 的完整配置。」，内核已补齐相应解析。外部 Claude Design 画布打开后要求登录，本轮未能更新 `LocalNodes` / `Dialogs` 画板；前端实际效果见 [验收截图](../research/verification/local-node-yaml-import-20261029/single-node-import.png)。
 - 模板入口与空状态：管理员只显示一个「模板」入口，普通用户不显示独立模板页；各页面的空状态统一白底虚线框。画布仍待同步，要求与参考截图见 [13 · 画布待同步](13-design-canvas-sync.md)。
+- 2026-10-29 地区旗帜：`PipelineForms` 的「添加旗帜」提示已补充流量、到期说明节点不加旗帜。Claude Design 画布仍要求登录，未能同步该画板文案；前端与内核、服务端预览已同步。
 
 ## 下拉组件
 

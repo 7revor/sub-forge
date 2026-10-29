@@ -11,7 +11,7 @@
 
 import { parseContent, parseRuleSetContent, stableHash, type RuleSetFormat } from '@sub-forge/core';
 import type { FetchOptions } from './docs.ts';
-import type { UpstreamFetcher } from './net/upstream.ts';
+import { DEFAULT_TIMEOUT_MS, DEFAULT_UA, type UpstreamFetcher } from './net/upstream.ts';
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 
 export const MIN_TTL_SEC = 300;
@@ -40,12 +40,36 @@ export function unusableBody(kind: SnapshotOwner, id: string, body: string, form
 export class SnapshotService {
   private readonly inflight = new Map<string, Promise<SnapshotRow>>();
   private readonly background = new Set<Promise<unknown>>();
+  private readonly previews = new Map<string, { at: number; result: Promise<{ body?: string; error?: string }> }>();
 
   constructor(
     private readonly store: Store,
     private readonly fetcher: UpstreamFetcher,
     private readonly now: () => number = Date.now,
   ) {}
+
+  /** 草稿拉取只保留短期内存缓存，不改正式快照；处理链编辑复用相同参数的内容。 */
+  previewSource(id: string, url: string, opts: FetchOptions = {}): Promise<{ body?: string; error?: string }> {
+    const key = JSON.stringify([id, url, opts.ua ?? DEFAULT_UA, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS]);
+    for (const [entry, value] of this.previews) if (this.now() - value.at >= 60_000) this.previews.delete(entry);
+    const cached = this.previews.get(key);
+    if (cached && this.now() - cached.at < 60_000) return cached.result;
+    const result = (async () => {
+      try {
+        const response = await this.fetcher(url, opts);
+        const error = unusableBody('source', id, response.body);
+        return error ? { error } : { body: response.body };
+      } catch (e) {
+        return { error: (e as Error).message };
+      }
+    })();
+    this.previews.delete(key);
+    this.previews.set(key, { at: this.now(), result });
+    while (this.previews.size > 16) this.previews.delete(this.previews.keys().next().value!);
+    this.background.add(result);
+    void result.finally(() => this.background.delete(result));
+    return result;
+  }
 
   /** 拉取一次并写入快照表；失败时写入失败记录并返回它。规则集来源带上 format 以检查内容是否可用 */
   refresh(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): Promise<SnapshotRow> {

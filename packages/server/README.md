@@ -75,7 +75,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
 | `GET /api/profiles/:id/access-log` | 访问日志（保留 30 天） |
 | `POST /api/sources/:id/refresh`、`GET /api/sources/:id/snapshots` | 立即拉取、快照历史 |
-| `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；组合还可带未保存的 `members`（按保存规则校验引用与成环） |
+| `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；订阅源还可带 `source: { urls, fetch }`，组合还可带 `members`（按保存规则校验引用与成环） |
 | `GET /api/nodesets/:type/:id/nodes` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
 | `POST /api/rulesets/preview` | 规则集草稿按 `client` + `platform` 的输出，请求体 `{ ruleset, id?, source?, client, platform? }`：给出 `source` 时为该来源（含无法解析的行），否则为全部启用来源合并去重后的结果与 domain / classical / ipcidr 统计；每个来源的拉取 / 解析状态一并返回。`id` 为已保存的规则集时，已保存的远程地址读写它名下的快照；新建草稿与编辑中新填的地址只拉取、不写快照（同一地址 5 分钟内复用） |
 
@@ -92,7 +92,11 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 保存前校验：必填项、正则能否编译、远程地址协议、脚本编写权限、引用是否存在且属于当前用户（规则集还可以是管理员名下的公共规则集）、组合是否成环、规则集来源（id 唯一、远程地址协议、mrs 的 behavior）。深层结构问题由预览与渲染报告给出。
 
+订阅源拉取参数草稿与正式配置不同的时候，按草稿地址、User-Agent 和超时拉取并预览；结果只保留最多 16 组、60 秒的内存缓存，不写文档或正式快照。相同参数下调整处理链复用拉取结果；未修改参数时继续使用正式快照。草稿的部分地址失败会返回告警与成功部分，全部失败返回空节点和错误报告。
+
 处理链的创建、更新和草稿预览统一检查每个处理器的数组、对象、标量类型、枚举及正则 flags。非法参数返回带步骤位置的 400，禁用步骤也须满足结构要求；空数组与空正则占位仍允许，脚本编写权限不变。
+
+「添加旗帜」的草稿预览与最终渲染共用内核地区识别：流量、到期等说明节点不添加旗帜；如需从输出中删除说明节点，可在前一步添加 `filter.useless`。
 
 模板的即时校验、影响分析与发布都会检查启用规则集中每个启用的文本来源能否取得并解析，不依赖已有 Profile。无可用内容时禁止发布，`force` 不能绕过自身错误；有可用旧快照时允许发布并告警。二进制透传仅标注由客户端检查，不宣称服务端已验证内容或可达性。
 

@@ -1,0 +1,125 @@
+Browser tab: 2, Title: "Sub Forge", URL: "http://localhost:18877/sources/inline-demo".
+1 AXWebArea Sub Forge, URL: localhost:18877/sources/inline-demo
+	2 container root
+		3 container 主导航
+			4 text Sub Forge
+			5 link Description: 总览, Value: localhost:18877/
+			6 link Description: 配置订阅, Value: localhost:18877/profiles
+			7 text 节点
+			8 link Description: 订阅源, Value: localhost:18877/sources
+			9 link Description: 组合, Value: localhost:18877/collections
+			10 link Description: 本地节点, Value: localhost:18877/locals
+			11 text 规则
+			12 link Description: 规则集, Value: localhost:18877/rulesets
+			13 link Description: 规则仓库, Value: localhost:18877/rule-repo
+			14 link Description: 模板, Value: localhost:18877/templates
+			15 text 管理员
+			16 link Description: 基础设置预设, Value: localhost:18877/presets
+			17 link Description: 用户, Value: localhost:18877/users
+			18 link Description: 系统, Value: localhost:18877/system
+			19 link Description: preview-user · 管理员, Value: localhost:18877/account
+			20 button 退出登录
+		21 container
+			22 link Description: 订阅源, Value: localhost:18877/sources
+			23 text  /  订阅源示例
+			24 heading 订阅源示例, Value: 1
+				25 text 订阅源示例
+			26 text 1  个地址 12:01 拉取成功  · 快照  2  份
+			27 button 立即拉取
+			28 button (disabled) 已保存
+			29 button 删除
+			30 heading 拉取参数, Value: 2
+				31 text 拉取参数
+			32 text 修改后自动预览，点击「保存修改」生效。
+			33 container
+				34 text 名称
+				35 text field (settable) 名称, Value: 订阅源示例
+			36 text 订阅地址（多个地址按顺序合并） 1
+			37 text field (settable) Description: 订阅地址 1, Value: https://example.test/second
+			38 button (disabled) 删除地址 1
+			39 button 添加地址
+			40 container
+				41 text User-Agent
+				42 text field (settable) User-Agent, Value: preview-agent
+			43 container
+				44 text 快照有效期（小时）
+				45 text field (settable) 快照有效期（小时）
+			46 container
+				47 text 超时（秒）
+				48 text field (settable) 超时（秒）
+			49 text 留空使用占位符里的默认值。快照过期后在后台刷新；刷新失败时继续使用上一份快照，订阅请求不会等待上游。
+			50 button (collapsed) 快照历史 · 2, Secondary Actions: Expand
+				51 text 快照历史 ·
+				52 text 2
+			53 container 处理链
+				54 heading 处理链, Value: 2
+					55 text 处理链
+				56 text 拖动排序 ·  输入 2 个节点
+				57 button 总览 · 原始 → 最终 原始节点与处理链跑完后的结果逐个对照 2 → 2
+					58 text 总览 · 原始 → 最终
+					59 text 原始节点与处理链跑完后的结果逐个对照
+					75 text 2
+					76 text  →
+					77 text 2
+				60 content list
+					61 container
+						62 sortable 拖动第 1 项
+						63 button 1 前缀 / 后缀 示例·… 2 ~2
+							64 text 1
+							65 text 前缀 / 后缀
+							66 text 示例·…
+							78 text 2
+							79 text  ~
+							80 text 2
+				67 button (disabled) 去重 · 加序号 自动兜底，不可移除 同名节点追加 2、3… 2
+					68 text 去重 · 加序号  自动兜底，不可移除 同名节点追加 2、3… 2
+				69 button (collapsed) 添加处理器, Secondary Actions: Expand
+				70 text 新步骤追加到末尾，并自动选中
+			71 container 编辑与预览
+				72 heading 总览 · 原始 → 最终, Value: 2
+					73 text 总览 · 原始 → 最终
+				74 text 左边是解析出的原始节点，右边是所有步骤和自动去重跑完后的输出。点「经过的步骤」里的序号跳到那一步调试。 原始  2 最终  2 改名  2
+				81 container 排列方式
+					82 checkbox 按输出顺序, Value: 1
+					83 checkbox 按输入顺序, Value: 0
+				84 checkbox (settable, integer) Description: 只看有变化的, Value: 0
+				85 table
+					86 row
+						87 cell
+							88 text #
+						89 cell
+							90 text 原始节点 2
+						91 cell
+							92 text #
+						93 cell
+							94 text 最终输出 2
+						95 cell
+							96 text 位置
+						97 cell
+							98 text 经过的步骤
+					99 row
+						100 cell
+							101 text 1
+						102 cell
+							103 text 新 UA·新加坡 03
+						104 cell
+							105 text 1
+						106 cell
+							107 text 示例·新 UA·新加坡 03
+						108 cell
+							109 button 1, Help: 查看第 1 步
+					110 row
+						111 cell
+							112 text 2
+						113 cell
+							114 text 新 UA·德国 04
+						115 cell
+							116 text 2
+						117 cell
+							118 text 示例·新 UA·德国 04
+						119 cell
+							120 button 1, Help: 查看第 1 步
+				121 container
+					122 text 显示  2  /  2  行 · 「位置」是在保留下来的节点中名次的变化
+
+The focused UI element is 1 AXWebArea Sub Forge, URL: localhost:18877/sources/inline-demo

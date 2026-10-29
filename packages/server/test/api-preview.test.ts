@@ -18,6 +18,21 @@ async function scenario(fetcher?: UpstreamFetcher) {
 }
 
 describe('处理链逐步预览', () => {
+  it('花云格式的地区和流量说明节点在单独添加旗帜时正确预览', async () => {
+    const body = [
+      'Traffic: 13.24 GB | 150 GB', 'Expire: 2027-05-19',
+      '摩尔多瓦标准 IEPL 专线 1', '印尼标准 IEPL 专线 1',
+    ].map((name, i) => `trojan://pw@node${i}.example.com:443#${encodeURIComponent(name)}`).join('\n');
+    const { alice } = await scenario(async () => ({ status: 200, body }));
+    const id = (await alice.post('/api/sources', { ...remote('花云测试'), pipeline: [] })).json.item.id;
+    const res = await alice.post(`/api/sources/${id}/pipeline-preview`, { pipeline: [{ op: 'flag', mode: 'add' }] });
+    expect(res.status).toBe(200);
+    expect(res.json.nodes.map((n: { name: string }) => n.name)).toEqual([
+      'Traffic: 13.24 GB | 150 GB', 'Expire: 2027-05-19',
+      '🇲🇩 摩尔多瓦标准 IEPL 专线 1', '🇮🇩 印尼标准 IEPL 专线 1',
+    ]);
+  });
+
   it('订阅源：按草稿处理链逐步执行，返回每步节点与差异', async () => {
     const { alice } = await scenario(UPSTREAM);
     const id = (await alice.post('/api/sources', { ...remote('A'), pipeline: [] })).json.item.id;

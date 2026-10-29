@@ -272,7 +272,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'flag':
       return <div className="flex flex-col gap-2">
         <Segmented label="旗帜" value={step.mode} options={[{ value: 'add', label: '添加旗帜' }, { value: 'remove', label: '移除旗帜' }]} onChange={(mode) => onChange({ ...step, mode })} />
-        <span className={hint}>按名称中的地区名或代码识别（香港 / HK / Hong Kong…），已有旗帜的节点不重复添加。</span>
+        <span className={hint}>按名称中的地区名或代码识别（香港 / HK / Hong Kong…）；流量、到期等说明节点不添加旗帜，已有旗帜的节点不重复添加。</span>
       </div>;
     case 'sort.name':
       return <div className="flex flex-col gap-2">
@@ -466,13 +466,15 @@ function StepChip({ index, tone, onClick, children }: { index: number; tone?: 'e
     className={cx('cursor-pointer rounded px-1.5 py-px font-mono text-[11.5px] hover:underline', tone === 'err' ? 'bg-err-soft text-err' : 'bg-accent-soft text-accent-ink')}>{children ?? index + 1}</button>;
 }
 
-export function PipelineEditor({ steps, onChange, preview, previewError, loading, inputLabel, title = '处理链' }: {
+export function PipelineEditor({ steps, onChange, preview, previewError, loading, inputLabel, layout = 'columns', title = '处理链' }: {
   steps: OperatorStep[];
   onChange: (s: OperatorStep[]) => void;
   preview?: PipelinePreview;
   previewError?: string;
   loading?: boolean;
   inputLabel?: string;
+  /** 订阅源详情按上下顺序编辑与预览。 */
+  layout?: 'columns' | 'stacked';
   /** 左栏标题，组合页用「组合自身的处理链」 */
   title?: string;
 }) {
@@ -532,8 +534,8 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   );
 
   return (
-    <div className="flex flex-wrap items-start gap-5">
-      <section aria-label={title} className="min-w-0 flex-[1_1_360px] rounded-[10px] border border-line bg-panel pt-4 pb-2">
+    <div className={cx('flex gap-5', layout === 'stacked' ? 'flex-col' : 'flex-wrap items-start')}>
+      <section aria-label={title} className={cx('min-w-0 rounded-[10px] border border-line bg-panel pt-4 pb-2', layout === 'columns' && 'flex-[1_1_360px]')}>
         <div className="flex items-center justify-between px-4 pb-3">
           <h2 className="m-0 text-[15px] font-semibold">{title}</h2>
           <span className="text-[12.5px] text-muted">拖动排序 · {inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
@@ -560,12 +562,12 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
         <AddMenu onAdd={add} />
       </section>
 
-      <section aria-label="编辑与预览" className="min-w-0 flex-[999_1_540px] rounded-[10px] border border-line bg-panel">
+      <section aria-label="编辑与预览" className={cx('min-w-0 rounded-[10px] border border-line bg-panel', layout === 'columns' && 'flex-[999_1_540px]')}>
         {mode === 'overview' && <>
           <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">
               <h2 className="m-0 text-[15px] font-semibold">总览 · 原始 → 最终</h2>
-              <span className="text-[12.5px] text-muted">{steps.length ? '左边是解析出的原始节点，右边是所有步骤和自动去重跑完后的输出。点「经过的步骤」里的序号跳到那一步调试。' : '还没有处理步骤，节点会原样输出。从左侧「添加处理器」开始，每加一步都能看到它的效果。'}</span>
+              <span className="text-[12.5px] text-muted">{steps.length ? '左边是解析出的原始节点，右边是所有步骤和自动去重跑完后的输出。点「经过的步骤」里的序号跳到那一步调试。' : '还没有处理步骤，节点会原样输出。从「添加处理器」开始，每加一步都能看到它的效果。'}</span>
             </div>
             {preview && overviewStats && <div className="flex flex-wrap gap-1.5">
               <Badge>原始 {preview.input}</Badge>
