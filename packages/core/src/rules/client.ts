@@ -102,7 +102,7 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
       if (rule.src) {
         if (rule.type === 'IP-CIDR' || rule.type === 'IP-CIDR6') return { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'src 转换为 Surge 的 SRC-IP' };
-        return { kind: 'drop', reason: `Surge 无法表达 ${rule.type} 的 src 选项，请设置客户端覆盖` };
+        return { kind: 'drop', reason: `Surge 不支持 ${rule.type} 的 src 选项` };
       }
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
     case 'SRC-IP-CIDR':
@@ -136,17 +136,17 @@ function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
       if (rule.src) return rule.type === 'IP-CIDR' || rule.type === 'IP-CIDR6'
         ? { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'src 转换为 Stash 的 SRC-IP（需 iOS 3.7 / macOS 4.4 或更新版本）' }
-        : { kind: 'drop', reason: `Stash 无法表达 ${rule.type} 的 src 选项，请设置客户端覆盖` };
+        : { kind: 'drop', reason: `Stash 不支持 ${rule.type} 的 src 选项` };
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
     case 'SRC-IP-CIDR':
       return { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'Stash SRC-IP 需要 iOS 3.7 / macOS 4.4 或更新版本' };
     case 'SRC-PORT':
       return { kind: 'ok', text: `SRC-PORT,${rule.value}`, note: 'Stash SRC-PORT 需要 iOS 3.7 / macOS 4.4 或更新版本' };
     case 'PROCESS': {
-      if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Stash 进程规则仅支持 macOS，请明确选择 macOS 平台' };
+      if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Stash 进程规则仅支持 macOS' };
       if (rule.kind === 'path') return rule.mode === 'exact'
         ? { kind: 'ok', text: `PROCESS-PATH,${rule.value}` }
-        : { kind: 'drop', reason: 'Stash 未提供进程路径通配或正则规则，请设置客户端覆盖' };
+        : { kind: 'drop', reason: 'Stash 不支持进程路径通配或正则' };
       if (rule.mode !== 'regex') return { kind: 'ok', text: `PROCESS-NAME,${rule.value}` };
       const wildcard = regexToWildcard(rule.value);
       return wildcard === undefined

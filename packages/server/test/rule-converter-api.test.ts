@@ -23,7 +23,7 @@ describe('来源获取与服务端转换分离', () => {
         const result = await alice.post('/api/rules/convert', { inputs: [{ source: remote, content: loaded.json.content }], client: target, platform });
         expect(result.status).toBe(200);
         expect(result.json.stats).toMatchObject({ parsed: 1, rejected: 0, output: target === 'surge' ? 1 : 0, unsupported: target === 'surge' ? 0 : 1 });
-        expect(result.json.lines).toEqual(target === 'surge' ? ['USER-AGENT,PayPal*'] : ['# [当前客户端无法输出：mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*']);
+        expect(result.json.lines).toEqual(target === 'surge' ? ['USER-AGENT,PayPal*'] : ['# [mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*']);
         const downloaded = await alice.get(`/api/rules/convert?url=${encodeURIComponent(remote.url)}&target=${target}${platform ? `&platform=${platform}` : ''}`);
         expect(downloaded.status).toBe(target === 'surge' ? 200 : 400);
         if (target === 'surge') {
@@ -49,7 +49,7 @@ describe('来源获取与服务端转换分离', () => {
     const ios = await alice.post('/api/rules/convert', { ...body, client: 'surge', platform: 'ios' });
     expect(mihomo.status).toBe(200); expect(ios.status).toBe(200);
     expect(mihomo.json.lines).toHaveLength(ios.json.lines.length);
-    expect(ios.json.lines[3]).toContain('当前客户端无法输出');
+    expect(ios.json.lines[3]).toContain('Surge iOS 不支持进程规则');
     expect(ios.json.stats).toMatchObject({ rejected: 1, unsupported: 1, output: 2 });
     expect(calls).toHaveLength(1);
     await alice.post('/api/rulesets/source', { source: { ...remote, name: '重命名' } });
