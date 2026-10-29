@@ -123,6 +123,8 @@ export type RuleSetSource = {
   /** 规则集内唯一；远程快照以 (规则集 id, URL) 定位，与来源 id 无关 */
   id: ID;
   kind: 'remote' | 'local';
+  /** 仓库关联：地址由索引中的文件定位决定，不允许改为自定义地址。 */
+  repository?: { repo: string; entry: string; ref: string; path: string };
   /** 显示名，缺省用 URL 或「本地规则」 */
   name?: string;
   url?: string;

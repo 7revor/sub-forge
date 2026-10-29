@@ -96,6 +96,11 @@ describe('自定义仓库管理及导入 API', () => {
     const imported = await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' });
     expect(imported.status).toBe(201);
     expect(imported.json.item.sources[0]).toMatchObject({ kind: 'remote', format: 'auto', url: 'https://raw.githubusercontent.com/7revor/proxy-rules/main/ai.list' });
+    expect(imported.json.item.sources[0].repository).toMatchObject({ repo: id, entry: 'ai.list', ref: 'main', path: 'ai.list' });
+    const resolved = await user.post('/api/rule-repos/resolve', { repo: id, path: 'ai.list' });
+    expect(resolved.status).toBe(200);
+    expect((await user.post('/api/rulesets', { name: '自定义仓库关联', sources: resolved.json.sources })).status).toBe(201);
+    expect((await user.post('/api/rulesets', { name: '伪造关联', sources: [{ ...resolved.json.sources[0], url: 'https://example.com/fake' }] })).status).toBe(400);
     const target = imported.json.item.id;
     expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list', ruleset: target })).json.item.sources).toHaveLength(1);
     expect((await admin.post('/api/rule-repos/import', { repo: id, path: 'ai.list', ruleset: target })).status).toBe(404);
@@ -103,6 +108,7 @@ describe('自定义仓库管理及导入 API', () => {
     expect((await user.del(`/api/rule-repos/${id}`)).status).toBe(403);
     expect((await admin.del(`/api/rule-repos/${id}`)).status).toBe(200);
     expect(h.store.get('ruleset', target)?.sources).toHaveLength(1);
+    expect((await user.put(`/api/rulesets/${target}`, { ...imported.json.item, note: '仓库删除后仍可编辑' })).status).toBe(200);
     expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(404);
   });
   it.each(['', '<html>错误页面</html>', 'payload: invalid', 'AND,((DOMAIN,a))'])('无可解析内容不能导入：%s', async body => {
@@ -110,6 +116,7 @@ describe('自定义仓库管理及导入 API', () => {
     const id = await h.service.addCustom({ url }); await h.service.refresh(id);
     await addUser(h.store, 'alice'); const user = client(h.app); await user.login('alice');
     expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(400);
+    expect((await user.post('/api/rule-repos/resolve', { repo: id, path: 'ai.list' })).status).toBe(400);
     h.body('DOMAIN,example.com');
     expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(201);
   });

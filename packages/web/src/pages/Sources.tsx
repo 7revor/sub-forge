@@ -35,10 +35,9 @@ export function SourceList() {
       <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={() => setCreating(true)} deleteBody={SOURCE_DELETE_BODY}
         columns={[
           { header: '名称', cell: (s) => s.name },
-          { header: '备注', cell: (s) => <NoteCell note={s.note} /> },
+          { header: '备注', cell: (s) => s.note?.trim() ? <NoteCell note={s.note} /> : null },
           { header: '地址', cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[12px] text-ink-2">{s.url}</span> },
           { header: '节点', cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
-          { header: '处理链', cell: (s) => <span className="font-mono text-[13px]">{s.pipeline.length} 步</span> },
           { header: '上次拉取', cell: (s) => <SourceLast source={s} /> },
           { header: '状态', cell: (s) => <SourceState source={s} /> },
         ]} />

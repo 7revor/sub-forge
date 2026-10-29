@@ -18,7 +18,6 @@ import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
 import { groupFromYaml, groupToYaml, proxyFromPaste, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, DeleteDialog, ActionButtons } from '../components/DetailActions.tsx';
-import { RenameDialog } from '../components/dialogs.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
@@ -63,13 +62,13 @@ export function LocalList() {
 /** /locals/:id：分组详情，节点表的「编辑」「新增节点」进入节点子页 */
 export function LocalEdit() {
   const e = useDocEditor('locals', EMPTY);
-  const [renaming, setRenaming] = useState(false);
   const [groupText, setGroupText] = useState<string>();
   const [deletingNode, setDeletingNode] = useState<number>();
   const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew);
   if (e.isNew) return <Navigate to="/locals" replace />;
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
+  const validName = !!d.name.trim();
   const setProxies = (proxies: LocalProxy[]) => e.setDraft({ ...d, proxies });
   const groupResult = groupText === undefined ? undefined : groupFromYaml(groupText);
   const nodePath = (i: number | 'new') => `/locals/${d.id}/nodes/${i}`;
@@ -79,8 +78,8 @@ export function LocalEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / {e.doc.data?.name}</>}
         title={d.name || '未命名'}
         actions={<>
-          <ActionButtons items={[{ label: '重命名分组', onSelect: () => setRenaming(true) }, { label: '分组 YAML', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
-          <Button variant="primary" onClick={() => e.submit()} disabled={e.save.isPending || !e.dirty}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
+          <ActionButtons items={[{ label: '分组 YAML', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
+          <Button variant="primary" onClick={() => e.submit((draft) => ({ ...draft, name: draft.name.trim() }))} disabled={e.save.isPending || !e.dirty || !validName}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
           <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
             onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })} />
         </>}>
@@ -88,7 +87,11 @@ export function LocalEdit() {
         {e.dirty && <Badge tone="warn">有未保存的修改</Badge>}
       </PageHeader>
       <ErrorBox error={e.save.error} />
-      <Card bodyClass="p-4"><NoteField value={d.note} onChange={(note) => e.setDraft({ ...d, note })} /></Card>
+      <Card title="基本信息" bodyClass="flex flex-col gap-4 px-4 pb-4">
+        <Field label="名称">{(id) => <Input id={id} value={d.name} placeholder="例如：自建、家宽" aria-invalid={!validName} onChange={(event) => e.setDraft({ ...d, name: event.target.value })} />}</Field>
+        {!validName && <span className="text-[12px] text-err">请填写分组名称</span>}
+        <NoteField value={d.note} onChange={(note) => e.setDraft({ ...d, note })} />
+      </Card>
 
       <Card scroll bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
@@ -127,9 +130,8 @@ export function LocalEdit() {
         onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>
         节点会从分组「{d.name}」中移除并立即保存{e.dirty ? '；分组里其他未保存的修改也会一起保存' : ''}。
       </DeleteDialog>
-      <RenameDialog open={renaming} title="重命名分组" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
-      <LeaveDialog blocker={blocker} what={`分组「${d.name}」`} canSave pending={e.save.isPending} error={e.save.error}
-        onSave={(done) => e.save.mutate(d, { onSuccess: done })} />
+      <LeaveDialog blocker={blocker} what={`分组「${d.name}」`} canSave={validName} pending={e.save.isPending} error={e.save.error}
+        onSave={(done) => e.save.mutate({ ...d, name: d.name.trim() }, { onSuccess: done })} />
     </>
   );
 }

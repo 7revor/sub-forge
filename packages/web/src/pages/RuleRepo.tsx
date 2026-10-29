@@ -9,7 +9,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Select } from '../components/listbox.tsx';
 import { useMe } from '../hooks.ts';
 import { api, type RepoEntry, type RepoEntryDetail, type RuleRepo } from '../api.ts';
-import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Input, PageHeader, PageScroll, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
 
 const clientLabel = (client: string) => client === 'any' ? '通用文本' : client;
 
@@ -75,10 +75,10 @@ export function RuleRepoPage() {
       </div>
       <ErrorBox error={repos.error ?? search.error} />
 
-      <PageScroll>
-        <div className="flex flex-wrap items-start gap-5">
-          <section aria-label="搜索结果" className="min-w-0 flex-[1_1_360px] overflow-hidden rounded-[10px] border border-line bg-panel">
-            <div className="border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{search.isFetching ? '搜索中…' : `${search.data?.total ?? 0} 个结果`}</div>
+      <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(240px,1fr)_minmax(320px,1.5fr)] gap-5 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+          <section aria-label="搜索结果" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
+            <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{search.isFetching ? '搜索中…' : `${search.data?.total ?? 0} 个结果`}</div>
+            <div key={`${debounced}:${repo ?? ''}:${client}:${offset}`} aria-label="规则列表" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {items.map((x) => {
               const on = sel?.repo === x.repo && sel.path === x.path;
               return (
@@ -90,14 +90,15 @@ export function RuleRepoPage() {
               );
             })}
             {!items.length && !search.isFetching && <div className="px-4 py-4"><Empty title={debounced ? `没有找到「${debounced}」` : '暂无可用索引，请等待首次更新或联系管理员'} /></div>}
-            {(search.data?.total ?? 0) > 50 && <div className="flex items-center justify-between gap-2 p-3">
+            </div>
+            {(search.data?.total ?? 0) > 50 && <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line-2 p-3">
               <Button size="sm" disabled={offset === 0 || search.isFetching} onClick={() => setOffset(Math.max(0, offset - 50))}>上一页</Button>
               <span className="text-[12px] text-muted">第 {Math.floor(offset / 50) + 1} 页</span>
               <Button size="sm" disabled={offset + 50 >= (search.data?.total ?? 0) || search.isFetching} onClick={() => setOffset(offset + 50)}>下一页</Button>
             </div>}
           </section>
 
-          <section aria-label="详情" className="flex min-w-0 flex-[999_1_520px] flex-col gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
+          <section key={sel ? `${sel.repo}:${sel.path}` : 'empty'} aria-label="详情" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain rounded-[10px] border border-line bg-panel px-4.5 py-4 [&>*]:shrink-0">
             {!sel ? <Empty title="还没有选择规则" /> : <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-col gap-1">
@@ -134,8 +135,7 @@ export function RuleRepoPage() {
               </div>
             </>}
           </section>
-        </div>
-      </PageScroll>
+      </div>
     </>
   );
 }

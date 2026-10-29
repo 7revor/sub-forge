@@ -155,3 +155,8 @@ GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树
 管理员 `POST /api/rule-repos`：`{url,name?,ref?,directory?,include?,exclude?,format?}`，成功 201 返回 id 并异步索引。`ref` 留空取默认分支；include/exclude 为相对扫描目录的 glob 数组，format 默认 auto，仅支持文本格式。`DELETE /api/rule-repos/:id` 删除自定义配置与索引（索引中返回 409），已导入远程来源保留。普通用户可搜索、预览和导入，不能管理仓库。
 
 SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档与内置状态保留。generic 适配器以完整文件路径为 key，每个文件一个条目，详情返回 rejected/rejectedDetails（最多 50 条，每条正文最多 500 字符）。导入前复用核心解析器校验，无有效规则返回 400。无需改变领域规则结构或离线种子；示例种子不包含全局仓库管理元数据。
+
+
+### 仓库关联来源
+
+`POST /api/rule-repos/resolve` 接收 `{ repo, path, variant? }`，返回 `{ name, sources }`（含来源 ID、repository 标识与规范 URL），仅解析、不保存规则集。导入接口同样保留关联标识；新建/保存和草稿预览均拒绝伪造或修改关联地址、移除既有关联标识。旧导入按名称与完整 URL 精确命中索引后补齐标识。示例种子附带默认停用且不被配置引用的关联示例，不触发额外远程拉取。

@@ -348,4 +348,10 @@ expand(ruleset):
 
 ## 2026-10-29：自定义仓库索引配置
 
-SQLite v11 的 `rule_repos.definition` 为可空 JSON：`id/name/owner/repo/refs/license/adapter=generic/options`，options 包含 directory、include、exclude、format；内置仓库保留空 definition。索引使用完整文件路径（含扩展名）作为 key，一个文件一个通用文本变体。添加先验证公开仓库与默认分支，再异步读取 commit/tree。详情按需解析并报告拒绝行，导入前校验有效内容及仓库启用状态。规则领域模型不变，导入仍写 remote，后续交给既有快照→解析→合并→改写→输出链；不表示持久 repo 关联。
+SQLite v11 的 `rule_repos.definition` 为可空 JSON：`id/name/owner/repo/refs/license/adapter=generic/options`，options 包含 directory、include、exclude、format；内置仓库保留空 definition。索引使用完整文件路径（含扩展名）作为 key，一个文件一个通用文本变体。添加先验证公开仓库与默认分支，再异步读取 commit/tree。详情按需解析并报告拒绝行，导入前校验有效内容及仓库启用状态。规则领域模型不变，导入仍写 remote，后续交给既有快照→解析→合并→改写→输出链；保留主分支新增的 repository 文件标识，但不动态切换变体。
+
+### 2026-10-29：保留来源关联身份
+
+`RuleSetSource` 新增可选 `repository: { repo, entry, ref, path }`，内部仍为 `kind: remote`，继续走既有快照与解析合并。URL 从索引文件推导，不按客户端动态切换变体；格式与缓存仍可配置。新增关联校验启用仓库和索引文件，既有来源禁止修改 URL、移除或替换标识；允许删除来源后重新关联。仓库停用或上游删文件后，既有来源仍可保存其他设置。
+
+服务初始化及索引更新后，旧来源仅在名称严格为 `仓库 ID · 文件路径` 且完整 URL 命中索引时补齐标识并持久化，保留归属。旧数据未记录导入来源，完全仿照旧命名的自定义来源无法区分；已改地址或不同名称的自定义来源保持原样。无须新增数据库表或版本。

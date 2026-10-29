@@ -194,3 +194,92 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
     {open && pos && <OptionList id={listId} opts={opts} active={active} selected={value} pos={pos} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} empty={empty} />}
   </>;
 }
+
+export type AsyncSelectOption = { value: string; label: string; hint?: string };
+export type AsyncSelectPage = { options: AsyncSelectOption[]; nextOffset?: number };
+
+/** 懒加载单选：打开才请求，搜索防抖并隔离旧响应；分页追加，不允许提交任意文本。 */
+export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', disabled, ...rest }: {
+  loadOptions: (query: string, offset: number) => Promise<AsyncSelectPage>;
+  onChange: (value: string) => void;
+  placeholder?: string; disabled?: boolean; 'aria-label': string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(-1);
+  const [page, setPage] = useState<AsyncSelectPage>({ options: [] });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const generation = useRef(0);
+  const busy = useRef(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const pos = usePopoverPos(btn, open);
+  const close = () => { setOpen(false); btn.current?.focus(); };
+  useOutside([btn, popup], open, () => setOpen(false));
+  useEffect(() => {
+    const version = ++generation.current;
+    setPage({ options: [] }); setActive(-1); setError('');
+    busy.current = false;
+    if (!open) { setLoading(false); return; }
+    setLoading(true);
+    const timer = setTimeout(() => {
+      busy.current = true;
+      loadOptions(query, 0).then(result => {
+        if (generation.current === version) { setPage(result); setActive(result.options.length ? 0 : -1); }
+      }).catch(e => { if (generation.current === version) setError(e instanceof Error ? e.message : String(e)); })
+        .finally(() => { if (generation.current === version) { busy.current = false; setLoading(false); } });
+    }, query ? 300 : 0);
+    return () => { clearTimeout(timer); generation.current++; };
+  }, [open, query, retry, loadOptions]);
+  useEffect(() => { popup.current?.querySelector(`[data-option="${active}"]`)?.scrollIntoView({ block: 'nearest' }); }, [active]);
+  const more = async () => {
+    if (busy.current || page.nextOffset === undefined) return;
+    const version = generation.current;
+    busy.current = true; setLoading(true); setError('');
+    try {
+      const next = await loadOptions(query, page.nextOffset);
+      if (generation.current === version) setPage(p => ({ options: [...p.options, ...next.options], nextOffset: next.nextOffset }));
+    } catch (e) { if (generation.current === version) setError(e instanceof Error ? e.message : String(e)); }
+    finally { if (generation.current === version) { busy.current = false; setLoading(false); } }
+  };
+  const pick = (value: string) => { close(); onChange(value); };
+  return <>
+    <button ref={btn} type="button" role="combobox" aria-label={rest['aria-label']} aria-haspopup="dialog" aria-expanded={open}
+      aria-controls={open ? `${listId}-popup` : undefined} disabled={disabled}
+      className={cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
+      onClick={() => { setQuery(''); setOpen(!open); }}
+      onKeyDown={e => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); setOpen(true); } }}>
+      <span className="min-w-0 flex-1 truncate">{placeholder}</span><ChevronDown size={15} />
+    </button>
+    {open && pos && createPortal(<div ref={popup} id={`${listId}-popup`} role="dialog" aria-label={rest['aria-label']}
+      style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
+      className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel p-1.5 shadow-lg"
+      onKeyDown={e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+        if (e.key === 'Tab') setOpen(false);
+      }}>
+      <input autoFocus role="combobox" aria-label="搜索仓库规则" aria-autocomplete="list" aria-expanded="true" aria-controls={listId}
+        aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
+        value={query} placeholder="搜索规则名或路径" className={cx(fieldCls, 'shrink-0')}
+        onChange={e => setQuery(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, Math.min(page.options.length - 1, a + (e.key === 'ArrowDown' ? 1 : -1)))); }
+          if (e.key === 'Enter') { e.preventDefault(); if (page.options[active]) pick(page.options[active]!.value); }
+        }} />
+      <div id={listId} role="listbox" aria-label="仓库规则候选" aria-busy={loading} className="min-h-0 overflow-y-auto overscroll-contain"
+        onScroll={e => { const el = e.currentTarget; if (!error && el.scrollHeight - el.scrollTop - el.clientHeight < 32) void more(); }}>
+        {page.options.map((o, i) => <div key={o.value} id={`${listId}-${i}`} data-option={i} role="option" aria-selected={i === active}
+          onMouseDown={e => e.preventDefault()} onMouseEnter={() => setActive(i)} onClick={() => pick(o.value)}
+          className={cx('cursor-pointer rounded-md px-2.5 py-2 text-[13px]', i === active && 'bg-ground')}>
+          <div className="truncate">{o.label}</div><div className="truncate text-[11.5px] text-muted">{o.hint}</div>
+        </div>)}
+      </div>
+      <div role="status" className="shrink-0 text-[12px] text-muted">
+        {loading ? '加载中…' : error ? <><span>{error}</span><button type="button" className="ml-2 text-accent-ink" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full py-2 text-accent-ink" onClick={() => void more()}>加载更多</button> : !page.options.length ? <div className="p-2">没有匹配的规则</div> : null}
+      </div>
+    </div>, document.body)}
+  </>;
+}
