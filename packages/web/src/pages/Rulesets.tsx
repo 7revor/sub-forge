@@ -15,7 +15,6 @@ import { DetailShell } from '../components/DetailShell.tsx';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
-import { RenameDialog } from '../components/dialogs.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
@@ -74,7 +73,6 @@ export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
   const [selected, setSelected] = useState<string | undefined>(() => (e.isNew ? FIRST_SOURCE : undefined));
-  const [renaming, setRenaming] = useState(false);
   const [showError, setShowError] = useState(false);
   const t = TARGETS.find((x) => x.key === target)!;
   const draft = useDebouncedValue(e.draft, 400);
@@ -104,14 +102,13 @@ export function RulesetEdit() {
       }}
       saveError={(showError && error) || e.save.error}
       onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
-      actionItems={[{ label: '重命名', onSelect: () => setRenaming(true) }]}
       badges={!e.isNew && <>
         <Badge>{sourceSummary(d)}</Badge>
         {failing > 0 && <Badge tone="err">{failing} 个来源拉取失败</Badge>}
         {failing === 0 && d.sources.some((s) => s.kind === 'remote' && status.get(s.id)?.ok) && <Badge tone="ok">拉取成功</Badge>}
       </>}>
-      <Card title="基本信息">
-        {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
+      <Card title="基本信息" bodyClass="flex flex-col gap-4 px-4 pb-4">
+        <Field label="名称">{(id) => <Input id={id} autoFocus={e.isNew} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
         <NoteField value={d.note} onChange={(note) => set({ note })} />
       </Card>
       <Card title="来源" actions={<>
@@ -148,7 +145,6 @@ export function RulesetEdit() {
           {!!preview.data?.passthroughSources?.length && <span className="text-[12.5px] text-muted">另有 {preview.data.passthroughSources.map((p) => `「${p.name}」`).join('')}以透传方式单独输出。</span>}
         </div>
       </Card>
-      <RenameDialog open={renaming} title="重命名规则集" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => set({ name })} />
     </DetailShell>
   );
 }
@@ -183,7 +179,6 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
       {active && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
           {src.kind === 'remote' && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
-          <Field label="名称" hint="可选，缺省显示地址或「本地规则」">{(id) => <Input id={id} value={src.name ?? ''} onChange={(x) => onChange({ name: x.target.value || undefined })} />}</Field>
           <Field label="格式">{(id) => <Select id={id} value={src.format} onChange={(x) => onChange({ format: x.target.value as RuleSetFormat })}>{FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
           {src.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={src.behavior ?? ''} onChange={(x) => onChange({ behavior: (x.target.value || undefined) as 'domain' | 'ipcidr' | undefined })}><option value="">请选择</option><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
           {src.kind === 'remote' && <Field label="缓存（小时）" hint="带失败快照，过期后后台刷新">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
