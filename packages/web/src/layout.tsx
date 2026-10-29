@@ -60,7 +60,7 @@ export function AppLayout() {
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
-        <div className={cx('min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain', menuOpen ? 'flex' : 'hidden md:flex')}>
+        <div className={cx('nav-scroll min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain', menuOpen ? 'flex' : 'hidden md:flex')}>
         {NAV.map((g, i) => {
           const items = g.items.filter((it) => !it.admin || isAdmin);
           if (!items.length) return null;

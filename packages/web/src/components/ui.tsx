@@ -7,11 +7,12 @@ export { cx } from './cx.ts';
 export { Select, Combobox, type SelectProps, type ComboOption } from './listbox.tsx';
 import { cx } from './cx.ts';
 
-type BtnVariant = 'primary' | 'default' | 'danger' | 'ghost';
+type BtnVariant = 'primary' | 'default' | 'danger' | 'danger-solid' | 'ghost';
 const BTN: Record<BtnVariant, string> = {
   primary: 'bg-accent border-accent text-white hover:bg-accent-strong',
   default: 'bg-panel border-[#d5d9e0] text-ink hover:bg-ground',
   danger: 'bg-panel border-[#f0b5ae] text-err hover:bg-err-soft',
+  'danger-solid': 'bg-err border-err text-white hover:bg-[#912018]',
   ghost: 'bg-transparent border-transparent text-ink-2 hover:bg-ground',
 };
 
@@ -210,8 +211,9 @@ export function ReportList({ items }: { items: { level: 'error' | 'warn' | 'info
 }
 
 export const mono = 'font-mono';
-export const th = 'border-b border-line px-3 py-2.5 text-left text-[12px] font-medium whitespace-nowrap text-muted';
-export const td = 'border-b border-line-2 px-3 py-2.5 align-middle text-[13px]';
+/** 表格首尾与卡片标题栏保持相同的 16px 内边距。 */
+export const th = 'first:pl-4 last:pr-4 border-b border-line px-3 py-2.5 text-left text-[12px] font-medium whitespace-nowrap text-muted';
+export const td = 'first:pl-4 last:pr-4 border-b border-line-2 px-3 py-2.5 align-middle text-[13px]';
 
 export function formatTime(ms: number): string {
   const d = new Date(ms);

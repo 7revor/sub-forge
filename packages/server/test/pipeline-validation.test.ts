@@ -4,7 +4,7 @@ import { addUser, client, serve, setupApp } from './helpers.ts';
 const url = 'https://sub.example.test/pipeline';
 const h = setupApp({ fetcher: serve({ [url]: 'trojan://test@node.example.test:443#节点' }) });
 const admin = client(h.app);
-const source = { name: '原始订阅', urls: [url], pipeline: [] };
+const source = { name: '原始订阅', url: url, pipeline: [] };
 let id: string;
 let collectionId: string;
 beforeAll(async () => {

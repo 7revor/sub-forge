@@ -4,7 +4,7 @@ import type { NodeSetInputs } from '../../src/nodeset/resolve.ts';
 import type { Profile, Source, Template } from '../../src/types.ts';
 
 export const trojan = (name: string, host: string) => `trojan://pw@${host}:443#${encodeURIComponent(name)}`;
-export const src = (id: string, name: string): Source => ({ id, name, urls: [`https://${id.toLowerCase()}.example.com/sub`], pipeline: [] });
+export const src = (id: string, name: string): Source => ({ id, name, url: `https://${id.toLowerCase()}.example.com/sub`, pipeline: [] });
 
 export const NODESETS: NodeSetInputs = {
   sources: { L: src('L', '落地'), T: src('T', '中转'), S: src('S', '家宽'), A: src('A', '机场 A') },

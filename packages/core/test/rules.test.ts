@@ -135,3 +135,36 @@ describe('规则集多来源', () => {
     expect(formatRuleLine({ type: 'RAW', client: 'surge', text: 'USER-AGENT,x*' })).toBe('USER-AGENT,x*');
   });
 });
+
+describe('规则集组级内容改写', () => {
+  const make = (): RuleSetInputs => ({ rulesets: { r: {
+    id: 'r', name: '整组', noResolve: true,
+    sources: [
+      { id: 'a', kind: 'local', format: 'classical', content: '# 注释\nDOMAIN,same.test\nDOMAIN,keep.test' },
+      { id: 'b', kind: 'remote', format: 'classical', url: 'https://example.test/list' },
+      { id: 'off', kind: 'local', format: 'classical', content: 'DOMAIN,off.test', enabled: false },
+      { id: 'binary', kind: 'remote', format: 'mrs', behavior: 'domain', url: 'https://example.test/binary' },
+    ],
+    overrides: [
+      { match: 'DOMAIN,same.test', override: { when: { client: 'mihomo', platform: 'android' }, action: { replace: [{ type: 'IP-CIDR', value: '192.0.2.0/24' }] } } },
+      { match: 'DOMAIN,same.test', override: { when: { client: 'mihomo' }, action: { drop: true } } },
+    ],
+  } }, snapshots: { 'r/b': 'DOMAIN,same.test\nDOMAIN,remote.test' } });
+
+  it('所有来源按内容匹配，平台优先级、替换后去重、no-resolve 与二进制透传保持一致', () => {
+    const b = expandRuleSet('r', make(), { client: 'mihomo', platform: 'android' }, new Report());
+    expect(b.domain.map((r) => 'value' in r && r.value)).toEqual(['keep.test', 'remote.test']);
+    expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24', noResolve: true }]);
+    expect(b).toMatchObject({ total: 4, duplicates: 1, passthrough: [{ sourceId: 'binary' }] });
+  });
+
+  it('丢弃整组所有匹配项，其他客户端与不匹配内容保持原样', () => {
+    const inputs = make();
+    expect(expandRuleSet('r', inputs, { client: 'mihomo' }, new Report()).domain).toEqual([
+      { type: 'DOMAIN', value: 'keep.test' }, { type: 'DOMAIN', value: 'remote.test' },
+    ]);
+    expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report()).domain).toHaveLength(3);
+    inputs.rulesets.r!.sources.reverse();
+    expect(expandRuleSet('r', inputs, { client: 'mihomo', platform: 'android' }, new Report()).ipcidr).toHaveLength(1);
+  });
+});

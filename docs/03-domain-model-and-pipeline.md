@@ -11,11 +11,13 @@
 
 ## 2. 领域模型
 
+订阅源从 2026-10-29 起只保存单个 `url`。接口和种子兼容旧版只含一个元素的 `urls`，统一转换为 `url`；多地址、空地址或同时提供两种字段均拒绝。数据库 v9 在事务内转换旧单地址文档，保留 ID、归属、更新时间、引用与快照；遇到意外多地址会回滚，不能自动截断。
+
 ```ts
 // ---------- 节点侧 ----------
 type Source = {
   id: ID; owner: UserID; name: string;
-  urls: string[];                // 可多个，按序合并；手写或粘贴的节点放在 LocalProxyGroup
+  url: string;                   // 一个 HTTP(S) URL；多个来源用 Collection，粘贴节点用 LocalProxyGroup
   fetch?: { ua?: string; timeoutMs?: number; ttlSec?: number; viaProxy?: string };
   pipeline: OperatorRef[];       // 处理链
 };
@@ -90,7 +92,7 @@ type RuleSetSource = {
   name?: string;                 // 缺省显示 URL 或「本地规则」
   url?: string; content?: string; format: 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
   behavior?: 'domain' | 'ipcidr' | 'classical';   // mrs 透传必须声明
-  overrides?: { line?: number; match?: string; override: ClientOverride }[];  // 行号按该来源解析后的行
+  overrides?: { line?: number; match?: string; override: ClientOverride }[];  // 仅用于尚无法转换的旧配置兼容，不用于新建改写
   enabled?: boolean;
   fetch?: FetchOptions;          // 服务层：远程来源的拉取参数
 };
@@ -98,6 +100,7 @@ type RuleSetSource = {
 type RuleSet = {
   id: ID; name: string;
   sources: RuleSetSource[];      // 按序合并、去重
+  overrides?: { match: string; override: ClientOverride }[]; // 整组按规则原文精确匹配，第一条客户端/平台匹配项生效
   noResolve?: boolean;           // IP 类规则统一加 no-resolve
   script?: string;               // (rule, ctx) => rule | rule[] | null（P1）
 };
@@ -299,7 +302,7 @@ effective.final = overlay.final ?? template.final
 
 ```
 expand(ruleset):
-  rules = concat(sources.filter(enabled).map(s => applyOverrides(parse(s.kind == 'local' ? s.content : snapshot(ruleset.id, s.url)), s.overrides)))
+  rules = concat(sources.filter(enabled).map(s => applyOverrides(parse(s.kind == 'local' ? s.content : snapshot(ruleset.id, s.url)), ruleset.overrides)))
   mrs / srs 来源不解析，单独透传为一个 rule-provider（mihomo 需要 URL 与 domain/ipcidr behavior）
   去重（按 type+value）
   按 behavior 分桶：
@@ -309,6 +312,8 @@ expand(ruleset):
   输出顺序：domain → classical(非 IP 类) → ipcidr（IP 类统一 no-resolve 可选）
 ```
 
+改写对各来源解析后的规则原文精确匹配（不含出口），在合并去重之前应用；单来源预览与合并、订阅输出共用同一逻辑。v8 迁移将启用来源的旧原文匹配直接提升，旧行号按本地内容或已有成功快照转成内容匹配；停用来源及无法定位的旧项保留，并在独立改写区块提示，补充内容并保存时重试转换。组级匹配优先于兼容旧项。
+
 同一出口的规则在规则集内部的相对顺序不影响命中结果，唯一需要关心的是 IP 类规则会触发 DNS 解析，因此放在最后。
 
 ## 7. 缓存与刷新
@@ -317,7 +322,7 @@ expand(ruleset):
 | --- | --- | --- |
 | 原始快照 | sourceId + url | TTL 到期 / 手动刷新；拉取失败保留旧快照，失败后退避（见下） |
 | NodeSet 结果 | nodeSetId + pipelineHash + 成员快照哈希 | 任一变化 |
-| 规则集展开 | rulesetId + 各远程来源的 snapshotHash + 来源定义（含 overrides）+ client/platform | 任一变化 |
+| 规则集展开 | rulesetId + 各远程来源的 snapshotHash + 来源定义 + 组级 overrides+ client/platform | 任一变化 |
 | 渲染结果 | profileId + templateVersion + presetVersion + 上述哈希 + client/platform | 任一变化 |
 
 客户端每次拉取订阅时：快照未过期则直接用缓存渲染；过期则后台刷新、本次先返回旧结果（stale-while-revalidate），避免订阅请求超时。

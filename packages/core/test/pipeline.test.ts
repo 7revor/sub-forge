@@ -20,7 +20,7 @@ const HK_PIPELINE: OperatorStep[] = [
 
 describe('PRD 场景 2：改名确定性', () => {
   const src = (body: string): NodeSetInputs => ({
-    sources: { x: { id: 'x', name: 'X', urls: ['u'], pipeline: HK_PIPELINE } },
+    sources: { x: { id: 'x', name: 'X', url: 'u', pipeline: HK_PIPELINE } },
     collections: {},
     locals: {},
     snapshots: { x: [body] },
@@ -126,7 +126,7 @@ describe('处理链执行', () => {
 });
 
 describe('组合', () => {
-  const srcOf = (id: string): Source => ({ id, name: id, urls: ['u'], pipeline: [] });
+  const srcOf = (id: string): Source => ({ id, name: id, url: 'u', pipeline: [] });
 
   it('按成员顺序合并，成员前缀生效，再跑组合自身处理链', () => {
     const inputs: NodeSetInputs = {
@@ -154,7 +154,7 @@ describe('组合', () => {
   });
 
   it('订阅源没有快照时报错', () => {
-    const res = new NodeSetResolver({ sources: { r: { id: 'r', name: 'R', urls: ['u'], pipeline: [] } }, collections: {}, locals: {}, snapshots: {} });
+    const res = new NodeSetResolver({ sources: { r: { id: 'r', name: 'R', url: 'u', pipeline: [] } }, collections: {}, locals: {}, snapshots: {} });
     expect(res.resolve({ type: 'source', id: 'r' })).toEqual([]);
     expect(res.report.byCode('source.no-snapshot')).toHaveLength(1);
   });

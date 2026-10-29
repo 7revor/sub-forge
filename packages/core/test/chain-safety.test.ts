@@ -9,7 +9,7 @@ const base = (group: GroupSpec, output: 'provider' | 'inline' = 'provider'): Ren
     chains: [{ id: 'c', landing: { nodeSet: { type: 'source', id: 's' }, filter: '^落地$' }, via: { kind: 'group', groupId: 'g' } }],
     refPolicy: { default: 'wrap' },
   },
-  nodeSets: { sources: { s: { id: 's', name: '源', urls: ['https://s.test/sub'], pipeline: [] } }, collections: {}, locals: {}, snapshots: { s: ['proxies:\n  - { name: 落地, type: socks5, server: landing.test, port: 1080 }\n  - { name: 前置, type: http, server: relay.test, port: 8080 }\n'] } },
+  nodeSets: { sources: { s: { id: 's', name: '源', url: 'https://s.test/sub', pipeline: [] } }, collections: {}, locals: {}, snapshots: { s: ['proxies:\n  - { name: 落地, type: socks5, server: landing.test, port: 1080 }\n  - { name: 前置, type: http, server: relay.test, port: 8080 }\n'] } },
   rules: { rulesets: {}, snapshots: {} },
   urls: { provider: (key, v) => `https://test/p/${key}?v=${v}`, ruleset: key => `https://test/r/${key}` },
 });

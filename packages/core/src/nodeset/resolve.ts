@@ -10,7 +10,7 @@ export type NodeSetInputs = {
   sources: Record<ID, Source>;
   collections: Record<ID, Collection>;
   locals: Record<ID, LocalProxyGroup>;
-  /** 订阅源的原始快照：按 Source.urls 顺序给出正文；缺失表示从未拉取成功 */
+  /** 订阅源单个 URL 的原始快照正文；数组容器供解析器使用，缺失表示从未拉取成功 */
   snapshots: Record<ID, string[]>;
 };
 

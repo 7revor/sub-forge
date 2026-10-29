@@ -1,4 +1,4 @@
-// 规则集展开（docs/03 §3 ④、§6）：逐个来源解析并应用行级覆盖，再按 behavior 拆分、去重。
+// 规则集展开（docs/03 §3 ④、§6）：逐个来源解析并应用组级内容改写，再按 behavior 拆分、去重。
 
 import type { Report } from '../report.ts';
 import type { ID, RuleIR, RuleSet, RuleSetSource } from '../types.ts';
@@ -21,7 +21,7 @@ export type ExpandedSource =
   | { passthrough: false; rules: RuleIR[] }
   | { passthrough: true; format: 'mrs' | 'srs'; url?: string };
 
-/** 展开单个来源：解析 + 行级客户端覆盖。结果按 ctx 区分 */
+/** 展开单个来源：解析 + 组级内容改写（兼容旧来源覆盖）。结果按 ctx 区分 */
 export function expandSource(rs: RuleSet, src: RuleSetSource, inputs: RuleSetInputs, ctx: ClientCtx, report: Report): ExpandedSource {
   const where = `ruleset:${rs.id}`;
   const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
@@ -45,8 +45,9 @@ export function expandSource(rs: RuleSet, src: RuleSetSource, inputs: RuleSetInp
   }
   const rules: RuleIR[] = [];
   for (const p of parsed.rules) {
+    const group = rs.overrides?.filter((o) => o.match === p.text).map((o) => o.override) ?? [];
     const ov = src.overrides?.filter((o) => (o.line !== undefined && o.line === p.line) || (o.match !== undefined && o.match === p.text)).map((o) => o.override);
-    rules.push(...applyOverrides(p.rule, ov, ctx));
+    rules.push(...applyOverrides(p.rule, [...group, ...(ov ?? [])], ctx));
   }
   return { passthrough: false, rules };
 }
