@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { RuleEditor } from './RuleEditor.tsx';
 import { emptyRule } from './rule.ts';
 import { SortableList } from './SortableList.tsx';
-import { Button, FieldError, Field, Segmented, Select } from './ui.tsx';
+import { Button, FieldError, Field, Select, cx } from './ui.tsx';
 
 export function ruleInputError(rule: RuleIR | undefined): string | undefined {
   if (!rule) return '请选择规则类型并填写规则值。';
@@ -36,39 +36,40 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
     const ruleLabel = action === 'append' ? '追加' : '替换';
     const setRules = (rules: RuleIR[]) => update(index, { ...override, action: action === 'append' ? { append: rules } : { replace: rules } });
     return <div className="flex min-w-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-end gap-3">
-        {leading && <div className="flex h-[38px] items-center">{leading}</div>}
-        <Segmented label="改写方式" value={action} options={[{ value: 'replace', label: '替换' }, { value: 'drop', label: '丢弃' }, ...(allowAppend ? [{ value: 'append', label: '追加' }] : [])]}
-          onChange={(next) => {
-            if (next === action) return;
-            update(index, { ...override, action: next === 'drop' ? { drop: true } : next === 'append' ? { append: replacements ?? [emptyRule('DOMAIN')] } : { replace: replacements ?? [emptyRule('DOMAIN')] } });
-          }} />
-
-        <Field label="客户端" className="w-[112px]">{(id) => <Select id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
-          <option value="mihomo">mihomo</option><option value="surge">Surge</option>
-        </Select>}</Field>
-        <Field label="平台" className="w-[112px]">{(id) => <Select id={id} value={override.when.platform ?? ''} onChange={(e) => {
-          const { platform: _, ...when } = override.when;
-          update(index, { ...override, when: e.target.value ? { ...when, platform: e.target.value as Platform } : when });
-        }}><option value="">不限</option>{(['android', 'macos', 'windows', 'ios', 'linux'] as const).map((platform) => <option key={platform} value={platform}>{platform}</option>)}</Select>}</Field>
-        {!single && <Button size="sm" variant="ghost" aria-label={`删除客户端覆盖 ${index + 1}`} onClick={() => onChange(value.filter((_, i) => i !== index))}><Trash2 size={14} /></Button>}
-        {trailing && <div className="ml-auto flex h-[38px] items-center">{trailing}</div>}
+      <div className="flex items-start gap-2">
+        {leading && <div className="flex h-[62px] shrink-0 items-end pb-[3px]">{leading}</div>}
+        <div className={cx('grid min-w-0 flex-1 grid-cols-2 items-start gap-3 sm:grid-cols-3', matchInput ? 'lg:grid-cols-[100px_112px_112px_minmax(0,1fr)]' : 'sm:max-w-[348px]')}>
+          <Field label="改写类型" className="col-span-full sm:col-span-1">{(id) => <Select id={id} value={action} onChange={(event) => {
+              const next = event.target.value;
+              if (next === action) return;
+              update(index, { ...override, action: next === 'drop' ? { drop: true } : next === 'append' ? { append: replacements ?? [emptyRule('DOMAIN')] } : { replace: replacements ?? [emptyRule('DOMAIN')] } });
+            }}><option value="replace">替换</option><option value="drop">丢弃</option>{allowAppend && <option value="append">追加</option>}</Select>}</Field>
+          <Field label="客户端">{(id) => <Select id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
+            <option value="mihomo">mihomo</option><option value="surge">Surge</option>
+          </Select>}</Field>
+          <Field label="平台">{(id) => <Select id={id} value={override.when.platform ?? ''} onChange={(e) => {
+            const { platform: _, ...when } = override.when;
+            update(index, { ...override, when: e.target.value ? { ...when, platform: e.target.value as Platform } : when });
+          }}><option value="">不限</option>{(['android', 'macos', 'windows', 'ios', 'linux'] as const).map((platform) => <option key={platform} value={platform}>{platform}</option>)}</Select>}</Field>
+          {matchInput && <div className="col-span-full min-w-0 lg:col-span-1">{matchInput}</div>}
+        </div>
+        {!single && <Button size="sm" variant="ghost" className="mt-6" aria-label={`删除客户端覆盖 ${index + 1}`} onClick={() => onChange(value.filter((_, i) => i !== index))}><Trash2 size={14} /></Button>}
+        {trailing && <div className="ml-auto flex h-[62px] shrink-0 items-end pb-[3px]">{trailing}</div>}
       </div>
-      {matchInput}
-      {replacements && <>
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      {replacements && <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 pl-8">
           <span className="text-[12.5px] font-medium text-muted">{action === 'append' ? '追加规则' : '替换为'}</span>
           <Button size="sm" variant="ghost" onClick={() => setRules([...replacements, emptyRule('DOMAIN')])}><Plus size={14} />添加{ruleLabel}规则</Button>
         </div>
         <SortableList items={replacements} onReorder={setRules}
-          renderItem={(rule, i, handle) => <div className="flex items-start gap-2 py-2">
+          renderItem={(rule, i, handle) => <div className={cx('flex items-start gap-2', i > 0 && 'pt-3')}>
             <div className="pt-6">{handle}</div><div className="min-w-0 flex-1"><RuleEditor compact value={rule}
               onChange={(next) => setRules(replacements.map((item, j) => j === i ? next : item))}
               onIncomplete={(next) => setRules(replacements.map((item, j) => j === i ? next : item))} /></div>
             <Button size="sm" variant="ghost" className="mt-6" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
               onClick={() => setRules(replacements.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
           </div>} />
-      </>}
+      </div>}
     </div>;
   };
   return <div className="flex flex-col gap-3">
