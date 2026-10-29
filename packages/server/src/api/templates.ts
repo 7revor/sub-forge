@@ -5,7 +5,7 @@ import { normalizeRulePresence } from '../rule-presence.ts';
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { ruleSetDelivery, parseRuleSourceContent, rejectedRuleReport, validateTemplate, sourceLabel, stableStringify, type ReportItem, type Template } from '@sub-forge/core';
+import { ruleSetDelivery, parseRuleSourceContent, rejectedRuleReport, validateTemplate, sourceLabel, type ReportItem, type Template } from '@sub-forge/core';
 import { readPagination } from './pagination.ts';
 import { Hono, type Context } from 'hono';
 import { randomId } from '../crypto.ts';
@@ -88,10 +88,10 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
     : [issue]);
 }
 
-function draftFrom(body: Record<string, unknown>, id: string, version: number): TemplateVersionDoc {
+function draftFrom(body: Record<string, unknown>, id: string): TemplateVersionDoc {
   if (!isStr(body.name)) throw bad('name 不能为空');
   if (!Array.isArray(body.groups) || !Array.isArray(body.rules) || !body.final || typeof body.final !== 'object') throw bad('需要 groups、rules 与 final');
-  return normalizeRulePresence('template', { id, version, name: body.name, groups: body.groups, rules: body.rules, final: body.final, ...(body.ruleProviders !== undefined ? { ruleProviders: body.ruleProviders } : {}) } as TemplateVersionDoc);
+  return normalizeRulePresence('template', { id, name: body.name, groups: body.groups, rules: body.rules, final: body.final, ...(body.ruleProviders !== undefined ? { ruleProviders: body.ruleProviders } : {}) } as TemplateVersionDoc);
 }
 
 export function templateRoutes(store: Store, renderer: RenderService, snapshots: SnapshotService) {
@@ -111,26 +111,21 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
   /** 编辑器即时校验（TPL-11）：只做模板自身检查 */
   app.post('/templates/validate', requireAdmin, async (c) => {
     const body = await jsonBody(c);
-    const draft = draftFrom(body, isStr(body.id) ? body.id : 'draft', 0);
+    const draft = draftFrom(body, isStr(body.id) ? body.id : 'draft');
     return c.json({ report: await selfCheck(store, snapshots, draft, c.get('user')) });
   });
 
-  /** 保存时统一完成自检、绑定影响检查与并发检查。 */
-  const save = async (c: Context<ApiEnv>, isNew: boolean, checkRevision = true) => {
+  /** 保存时完成自检与绑定影响检查，后保存的内容覆盖当前模板。 */
+  const save = async (c: Context<ApiEnv>, isNew: boolean) => {
     const body = await jsonBody(c);
     const id = isNew ? randomId(9) : c.req.param('id')!;
     const current = isNew ? undefined : store.getTemplate(id);
     if (!isNew && !current) throw notFound('模板');
-    if (!isNew && checkRevision && body.version !== current!.version) throw new HttpError(409, '模板已被更新，请重新加载后再保存');
-    const draft = draftFrom(body, id, (current?.version ?? 0) + 1);
-
-    const boundState = () => stableStringify(store.list('profile').filter(p => p.routing?.mode === 'bound' && p.routing.templateId === id));
-    const beforeImpact = boundState();
+    const draft = draftFrom(body, id);
     const own = await selfCheck(store, snapshots, draft, c.get('user'));
     if (own.some((i) => i.level === 'error')) throw new HttpError(400, '模板自身校验未通过，不能保存', { report: own });
 
     const impact = isNew ? [] : await analyzeImpact(store, renderer, draft);
-    if ((!isNew && store.getTemplate(id)?.version !== current?.version) || boundState() !== beforeImpact) throw new HttpError(409, '检查期间模板或绑定订阅已变化，请重新检查后保存');
     const blocking = impact.filter((i) => i.level === 'error');
     if (blocking.some(i => store.get('profile', i.profileId)?.routing?.mode === 'bound')) throw new HttpError(409, '绑定订阅存在冲突，必须先修复成员或引用，不能强制保存', { report: own, impact });
     if (blocking.length) throw new HttpError(409, `${blocking.length} 个配置订阅存在冲突，请修复后再保存`, { report: own, impact });
@@ -140,14 +135,14 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
   app.post('/templates', requireAdmin, c => save(c, true));
   app.put('/templates/:id', requireAdmin, c => save(c, false));
   // 兼容旧客户端入口：执行相同的直接保存，不再创建历史版本。
-  app.post('/templates/:id/publish', requireAdmin, c => save(c, c.req.param('id') === 'new', false));
+  app.post('/templates/:id/publish', requireAdmin, c => save(c, c.req.param('id') === 'new'));
 
   /** 兼容旧客户端的只读影响检查。新页面直接保存，由服务端完成检查。 */
   app.post('/templates/:id/impact', requireAdmin, async (c) => {
     const id = c.req.param('id');
     const current = store.getTemplate(id);
     if (!current) throw notFound('模板');
-    const draft = draftFrom(await jsonBody(c), id, current.version + 1);
+    const draft = draftFrom(await jsonBody(c), id);
     const report = await selfCheck(store, snapshots, draft, c.get('user'));
     return c.json({ report, impact: report.some(i => i.level === 'error') ? [] : await analyzeImpact(store, renderer, draft) });
   });

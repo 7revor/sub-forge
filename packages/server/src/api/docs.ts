@@ -47,8 +47,7 @@ export function docRoutes(store: Store) {
 
     app.get(`/${seg}/:id`, (c) => {
       const row = load(c.req.param('id'), c.get('user').id);
-      const item = row.doc as ProfileDoc;
-      return c.json({ item: kind === 'profile' && item.routing?.mode === 'bound' ? { ...item, templateVersion: store.getTemplate(item.routing.templateId)?.version } : row.doc, updatedAt: row.updatedAt });
+      return c.json({ item: row.doc, updatedAt: row.updatedAt });
     });
 
     app.post(`/${seg}`, async (c) => {
@@ -56,7 +55,7 @@ export function docRoutes(store: Store) {
       assertWritable(user.role);
       const body = await jsonBody(c);
       let doc = validateDoc(kind, body, randomId(9), user, store);
-      if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), revision: 1, migration: undefined };
+      if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), migration: undefined };
       doc = normalizeRulePresence(kind, doc);
       store.put(kind, doc, shared ? null : user.id);
       return c.json({ item: doc }, 201);
@@ -70,9 +69,8 @@ export function docRoutes(store: Store) {
       const current = load(id, user.id);
       if (body.id !== undefined && body.id !== id) throw new HttpError(400, 'id 与路径不一致');
       if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.routing === undefined) throw new HttpError(400, '不能移除分流模式，请使用模式转换');
-      if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.revision !== (current.doc as ProfileDoc).revision) throw new HttpError(409, '订阅已被其他编辑更新，请重新加载后保存');
       let doc = validateDoc(kind, body, id, user, store);
-      if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), revision: ((current.doc as ProfileDoc).revision ?? 0) + 1, migration: (current.doc as ProfileDoc).migration };
+      if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), migration: (current.doc as ProfileDoc).migration };
       doc = normalizeRulePresence(kind, doc);
       store.put(kind, doc, shared ? null : user.id);
       return c.json({ item: doc });

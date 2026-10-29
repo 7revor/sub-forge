@@ -25,8 +25,8 @@ export function syncProfileDraft(current: ProfileDoc | undefined, previous: Prof
   return !current || current.id !== incoming.id || JSON.stringify(current) === JSON.stringify(previous) ? incoming : current;
 }
 
-/** 保存期间继续输入时保留后续修改，仅接受已成功保存的 revision。 */
+/** 保存期间继续输入时保留后续修改。 */
 export function acceptProfileSave(current: ProfileDoc | undefined, submitted: ProfileDoc, saved: ProfileDoc): ProfileDoc | undefined {
   if (!current || current.id !== saved.id) return current;
-  return JSON.stringify(current) === JSON.stringify(submitted) ? saved : { ...current, revision: saved.revision };
+  return JSON.stringify(current) === JSON.stringify(submitted) ? saved : current;
 }

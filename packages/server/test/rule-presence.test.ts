@@ -13,11 +13,11 @@ import { addUser, client, setupApp } from './helpers.ts';
 const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
 const rule = (id: string, enabled?: boolean) => ({ id, matcher: { kind: 'rule' as const, rule: { type: 'DOMAIN' as const, value: `${id}.test` } }, target: direct, ...(enabled !== undefined ? { enabled } : {}) });
 const template: TemplateVersionDoc = { id: 't', name: '模板', version: 1, groups: [], rules: [rule('on', true), rule('off', false)], final: direct };
-const base: ProfileDoc = { id: 'p', name: '订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, revision: 4, templateVersion: 1,
+const base: ProfileDoc = { id: 'p', name: '订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' },
   routing: { mode: 'bound', templateId: 't', groupAdditions: {}, prependRules: [rule('pre-on', true), rule('pre-off', false)] } };
 
 describe('规则存在即生效', () => {
-  it('v16 升级移除停用项，渲染、归属、时间、链接、模板版本和历史资源保持一致，重启幂等', () => {
+  it('v16 升级移除停用项，渲染、归属、时间、链接、模板内容和历史资源保持一致，重启幂等', () => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-rule-presence-'));
     const cipher = new Cipher(randomBytes(32));
     const file = join(dir, 'state.sqlite');
@@ -38,11 +38,12 @@ describe('规则存在即生效', () => {
         rules: { rulesets: { rs: store.get('ruleset', 'rs')! }, snapshots: {} }, urls: { provider: key => key, ruleset: key => key } }).yaml;
       const before = ['p', 'independent'].map(output);
       store.db.pragma('user_version = 16'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(19);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(20);
       expect(['p', 'independent'].map(output)).toEqual(before);
-      expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { revision: 4 } });
+      expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
       expect(store.getToken('same-token')?.profileId).toBe('p');
-      expect(store.listLatestTemplates().map(v => v.version)).toEqual([2]);
+      expect(store.listLatestTemplates()).toHaveLength(1);
+      expect(store.getTemplate('t')).not.toHaveProperty('version');
       expect(store.getTemplate('t')!.rules).toEqual([rule('on'), { id: 'set', matcher: { kind: 'ruleset', id: 'rs' }, target: direct }]);
       expect(store.get('profile', 'p')!.routing).toMatchObject({ prependRules: [rule('pre-on')] });
       expect(store.get('ruleset', 'rs')!.sources).toEqual([{ id: 'on', kind: 'local', format: 'auto', content: 'DOMAIN,source-on.test' }]);

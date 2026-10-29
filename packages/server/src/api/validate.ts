@@ -281,6 +281,8 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       break;
     }
     case 'profile': {
+      delete doc.revision;
+      delete doc.templateVersion;
       if (!Array.isArray(doc.nodeSets)) throw bad('nodeSets 必须是数组');
       (doc.nodeSets as unknown[]).forEach((n, i) => {
         if (!isObj(n) || (n.output !== 'provider' && n.output !== 'inline')) throw bad(`节点集 ${i + 1} 的输出方式只能是 provider 或 inline`);

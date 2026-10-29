@@ -3,7 +3,7 @@ import { persistedProfile, updateEditorOverlay } from './routing.ts';
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
 
 import type { GroupSpec, NodeSetID, Overlay } from '@sub-forge/core';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api.ts';
 import { useNodeSetNames, type GroupOption } from '../../components/pickers.tsx';
@@ -52,17 +52,13 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
   const [baseValid, setBaseValid] = useState(true);
   const [baseEditorKey, setBaseEditorKey] = useState(0);
   const resetBaseEditor = useCallback(() => { setBaseValid(true); setBaseEditorKey(key => key + 1); }, []);
-  const tplRef = draft?.routing?.mode === 'bound' ? { id: draft.routing.templateId, follow: 'latest' as const } : draft?.routing ? undefined : draft?.template;
+  const templateId = draft?.routing?.mode === 'bound' ? draft.routing.templateId : draft?.routing ? undefined : draft?.template?.id;
   const template = useQuery({
-    queryKey: ['template', tplRef?.id, tplRef?.follow],
-    enabled: !!tplRef,
-    queryFn: () => tplRef!.follow === 'latest'
-      ? api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}`).then((r) => r.item)
-      : api<{ item: TemplateDoc }>('GET', `/templates/${tplRef!.id}/versions/${tplRef!.follow.pinned}`).then((r) => r.item),
+    queryKey: ['template', templateId],
+    enabled: !!templateId,
+    queryFn: () => api<{ item: TemplateDoc }>('GET', `/templates/${templateId}`),
+    select: result => result.item,
   });
-  useEffect(() => {
-    if (draft?.routing?.mode === 'bound' && draft.templateVersion === undefined && template.data?.id === draft.routing.templateId) setDraft({ ...draft, templateVersion: template.data.version });
-  }, [draft, template.data, setDraft]);
   const { all, nameOf } = useNodeSetNames();
 
   const ctx = useMemo<ProfileCtx | undefined>(() => {

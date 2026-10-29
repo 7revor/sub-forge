@@ -64,7 +64,7 @@ describe('模板', () => {
   it('管理员发布新模板，所有人可读；普通用户不能发布', async () => {
     const { alice, published, tplId, rs } = await scenario();
     expect(published.status).toBe(201);
-    expect(published.json.item.version).toBe(1);
+    expect(published.json.item).not.toHaveProperty('version');
     expect((await alice.get('/api/templates')).json.items.map((t: { id: string }) => t.id)).toEqual([tplId]);
     expect((await alice.post(`/api/templates/${tplId}/publish`, TEMPLATE(rs))).status).toBe(403);
   });
@@ -85,7 +85,7 @@ describe('模板', () => {
     expect((await admin.post(`/api/templates/${tplId}/impact`, withoutHk)).json.impact).toEqual([]);
     expect((await admin.post(`/api/templates/${tplId}/publish`, withoutHk)).status).toBe(200);
     expect((await alice.post(`/api/profiles/${profile}/preview`)).json.ok).toBe(true);
-    expect((await admin.get(`/api/templates/${tplId}`)).json.item.version).toBe(2);
+    expect((await admin.get(`/api/templates/${tplId}`)).json.item.groups).toEqual(withoutHk.groups);
   });
 });
 

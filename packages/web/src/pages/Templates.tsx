@@ -65,16 +65,16 @@ export function TemplateList() {
 }
 
 
-type TemplateDraft = { name: string; body: TemplateBody; version: number };
+type TemplateDraft = { name: string; body: TemplateBody };
 type TemplateResponse = { item: TemplateDoc; report?: ReportItem[]; impact?: ImpactEntry[] };
 
 function draftFromTemplate(t: TemplateDoc): TemplateDraft {
-  return { name: t.name ?? '', version: t.version, body: { groups: t.groups, rules: t.rules, final: t.final, ...(t.ruleProviders ? { ruleProviders: t.ruleProviders } : {}) } };
+  return { name: t.name ?? '', body: { groups: t.groups, rules: t.rules, final: t.final, ...(t.ruleProviders ? { ruleProviders: t.ruleProviders } : {}) } };
 }
 
 function emptyTemplate(): TemplateDraft {
   const id = newId('g');
-  return { name: '', version: 0, body: { groups: [{ id, name: '节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [], final: { kind: 'group', groupId: id } } };
+  return { name: '', body: { groups: [{ id, name: '节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [], final: { kind: 'group', groupId: id } } };
 }
 
 /** 旧详情、编辑和发布书签统一落到同一个页面。 */
@@ -133,7 +133,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
 
   const save = useMutation({
     meta: { successMessage: '模板已保存' },
-    mutationFn: (value: TemplateDraft) => api<TemplateResponse>(isNew ? 'POST' : 'PUT', isNew ? '/templates' : `/templates/${encodeURIComponent(id)}`, { ...value.body, name: value.name.trim(), version: value.version }),
+    mutationFn: (value: TemplateDraft) => api<TemplateResponse>(isNew ? 'POST' : 'PUT', isNew ? '/templates' : `/templates/${encodeURIComponent(id)}`, { ...value.body, name: value.name.trim() }),
     onSuccess: result => {
       const next = draftFromTemplate(result.item);
       setBase(next); setDraft(next);

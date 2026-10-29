@@ -1,5 +1,5 @@
 import { normalizeRulePresence } from './rule-presence.ts';
-import { migrateProfile, profileTemplate } from './profile-routing.ts';
+import { migrateProfile, profileTemplate, stripProfileRevisions } from './profile-routing.ts';
 // SQLite 存储。保存文档、快照与最近成功的配置版本；旧客户端按版本取兼容资源。
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
@@ -48,7 +48,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 19;
+const SCHEMA_VERSION = 20;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -227,6 +227,7 @@ export class Store {
       // v18 同时清除规则集和规则引用上的独立 no-resolve，保留原始内容中的标记。
       if (version < 18) this.removeRuleSwitches();
       if (version < 19) this.collapseTemplateHistory();
+      if (version < 20) this.removeConcurrencyMarkers();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -423,10 +424,21 @@ export class Store {
     this.db.exec("UPDATE template_versions SET data = json_remove(data, '$.changelog')");
   }
 
+  /** v20：清除模板和订阅的并发标记，保留归属与更新时间。 */
+  private removeConcurrencyMarkers(): void {
+    this.db.exec("UPDATE template_versions SET version = 1, data = json_remove(data, '$.version')");
+    for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
+      const profile = JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc;
+      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
+        .run(this.cipher.encrypt(JSON.stringify(stripProfileRevisions(profile))), row.id);
+    }
+  }
+
   // ---------- 文档 ----------
 
   /** owner 为 null 表示系统级文档（预设等），只在新建时写入，更新时保持原归属 */
   put<K extends DocKind>(kind: K, doc: DocTypes[K], owner: string | null = null): void {
+    if (kind === 'profile') doc = stripProfileRevisions(doc as ProfileDoc) as DocTypes[K];
     if (kind === 'source') doc = normalizeSourceFetch(doc as SourceDoc) as DocTypes[K];
     this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
       .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
@@ -472,14 +484,14 @@ export class Store {
     return this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
   }
 
-  // ---------- 当前模板（沿用旧表名；version 只用于并发检查和渲染缓存） ----------
+  // ---------- 当前模板（沿用旧表结构；版本列仅兼容旧数据迁移，新写入固定为 1） ----------
 
   putTemplateVersion(t: TemplateVersionDoc): void {
-    const { changelog: _changelog, ...current } = t;
+    const { changelog: _changelog, version: _version, ...current } = t;
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM template_versions WHERE template_id = ?').run(t.id);
       this.db.prepare('INSERT INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
-        .run(t.id, t.version, JSON.stringify(current), this.now());
+        .run(t.id, 1, JSON.stringify(current), this.now());
     })();
   }
 
@@ -488,7 +500,9 @@ export class Store {
     const row = (version === undefined
       ? this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? ORDER BY version DESC LIMIT 1').get(id)
       : this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? AND version = ?').get(id, version)) as { data: string } | undefined;
-    return row ? (JSON.parse(row.data) as TemplateVersionDoc) : undefined;
+    const template = row ? JSON.parse(row.data) as TemplateVersionDoc : undefined;
+    // 只有尚未迁移的旧记录含有版本号，固定存储键不代表可读取的历史版本。
+    return version === undefined || template?.version === version ? template : undefined;
   }
 
   /** 每个模板的最新版本 */
@@ -748,7 +762,7 @@ export class Store {
       for (const t of seed.templates ?? []) {
         // 旧种子可能包含锁定引用，先载入全部模板，订阅迁移后再只留当前内容。
         this.db.prepare('INSERT OR REPLACE INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
-          .run(t.id, t.version, JSON.stringify(t), this.now());
+          .run(t.id, t.version ?? 1, JSON.stringify(t), this.now());
       }
       for (const d of seed.profiles ?? []) {
         const next = migrateProfile(d, profileTemplate(d, (id, v) => this.getTemplate(id, v)));
@@ -764,6 +778,7 @@ export class Store {
       this.convertSourceUrls();
       this.removeRuleSwitches();
       this.collapseTemplateHistory();
+      this.removeConcurrencyMarkers();
     });
     tx();
   }

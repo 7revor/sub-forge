@@ -19,16 +19,13 @@ export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[
 export type CollectionDoc = Collection;
 export type LocalDoc = LocalProxyGroup;
 
-/** 当前模板；沿用 version 字段作为内部并发标记，不再保存历史。 */
+/** 当前模板；旧 version 字段仅供导入历史数据，不参与保存和渲染。 */
 export type TemplateVersionDoc = Template & { name?: string };
 
 /** 基础设置预设（BS-03），Surge 段仅存储，暂不参与渲染 */
 export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; stash?: Record<string, unknown>; surge?: { general?: Record<string, unknown>; host?: Record<string, string> } };
 
 export type ProfileDoc = Profile & {
-  revision?: number;
-  /** 编辑时看到的模板版本，只做并发检查，不锁定渲染版本。 */
-  templateVersion?: number;
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
   template?: { id: string; follow: 'latest' | { pinned: number } };
   /** 不设置表示不输出基础设置（使用客户端默认） */

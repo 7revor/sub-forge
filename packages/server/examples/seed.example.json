@@ -48,7 +48,6 @@
   "templates": [
     {
       "id": "std",
-      "version": 1,
       "name": "标准分流",
       "groups": [
         { "id": "sel", "name": "🚀 节点选择", "type": "select", "members": [{ "kind": "group", "groupId": "hk" }, { "kind": "builtin", "name": "DIRECT" }] },
@@ -83,7 +82,6 @@
       "refPolicy": {
         "default": "wrap"
       },
-      "revision": 1,
       "routing": {
         "mode": "independent",
         "config": {
@@ -163,7 +161,6 @@
         },
         "initializedFrom": {
           "templateId": "std",
-          "version": 1,
           "name": "标准分流"
         }
       }
@@ -188,7 +185,6 @@
       "refPolicy": {
         "default": "wrap"
       },
-      "revision": 1,
       "routing": {
         "mode": "bound",
         "templateId": "std",
@@ -204,8 +200,7 @@
             }
           ]
         }
-      },
-      "templateVersion": 1
+      }
     }
   ],
   "tokens": [{"token": "demo-token", "profileId": "demo", "label": "演示"}, {"token": "demo-bound-token", "profileId": "demo-bound", "label": "绑定模板演示"}]

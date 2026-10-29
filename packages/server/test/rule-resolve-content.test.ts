@@ -20,7 +20,7 @@ const cleaned = rules.map(rule => ({ ...rule, options: rule.id === 'plain' ? { s
 const config = { groups: [], rules, final: direct };
 
 describe('no-resolve 以内容为准', () => {
-  it('v17 升级清理独立选项，保留内容、归属、修订、模板历史和已发出的资源，重启幂等', () => {
+  it('v17 升级清理独立选项，保留内容、归属和已发出的资源，重启幂等', () => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-rule-resolve-'));
     const file = join(dir, 'state.sqlite'); const cipher = new Cipher(randomBytes(32));
     let store = new Store(file, { cipher, now: () => 1234 });
@@ -28,8 +28,8 @@ describe('no-resolve 以内容为准', () => {
       store.put('ruleset', { id: 'rs', name: '规则增强', noResolve: true, sources: [source] }, 'owner');
       store.putTemplateVersion({ id: 't', name: '模板', version: 1, ...config });
       store.putTemplateVersion({ id: 't', name: '模板', version: 2, ...config });
-      const base = { name: '订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' as const }, revision: 7 };
-      store.put('profile', { ...base, id: 'bound', templateVersion: 1, routing: { mode: 'bound', templateId: 't', groupAdditions: {}, prependRules: rules } }, 'owner');
+      const base = { name: '订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' as const } };
+      store.put('profile', { ...base, id: 'bound', routing: { mode: 'bound', templateId: 't', groupAdditions: {}, prependRules: rules } }, 'owner');
       store.put('profile', { ...base, id: 'independent', routing: { mode: 'independent', config } }, 'owner');
       store.put('profile', { ...base, id: 'legacy', overlay: { extraRules: rules.map(rule => ({ anchor: 'top' as const, rule })) } }, 'owner');
       store.putToken({ token: 'same-token', profileId: 'bound' });
@@ -37,16 +37,16 @@ describe('no-resolve 以内容为准', () => {
       store.putRenderGeneration('bound', 'mihomo', 'old-version', historical);
       store.putLastGood('bound', 'mihomo', historical);
       store.db.pragma('user_version = 17'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(19);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(20);
       expect(store.getWithOwner('ruleset', 'rs')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { sources: [source] } });
       expect(store.get('ruleset', 'rs')).not.toHaveProperty('noResolve');
-      expect(store.listLatestTemplates().map(t => t.version)).toEqual([2]);
+      expect(store.listLatestTemplates()).toHaveLength(1);
+      expect(store.getTemplate('t')).not.toHaveProperty('version');
       expect(store.getTemplate('t')!.rules).toEqual(cleaned);
-      expect(store.getTemplate('t', 1)).toBeUndefined();
       expect(store.get('profile', 'bound')!.routing).toMatchObject({ prependRules: cleaned });
       expect(store.get('profile', 'independent')!.routing).toMatchObject({ config: { rules: cleaned } });
       expect(store.get('profile', 'legacy')!.routing).toMatchObject({ mode: 'independent', config: { rules: [...cleaned].reverse() } });
-      expect(store.getWithOwner('profile', 'bound')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { revision: 7, templateVersion: 1 } });
+      expect(store.getWithOwner('profile', 'bound')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
       expect(store.getToken('same-token')!.profileId).toBe('bound');
       expect(store.getRenderGeneration('bound', 'mihomo', 'old-version')).toEqual(historical);
       expect(store.getLastGood('bound', 'mihomo')).toEqual({ renderedAt: 1234, data: historical });

@@ -20,17 +20,17 @@ export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
   const change = useMutation({
     mutationFn: async (action: 'bound' | 'copy' | 'detach') => {
       const profile = persistedProfile(draft);
-      if (action === 'detach') return api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'independent', currentTemplateVersion: template?.version });
+      if (action === 'detach') return api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'independent' });
       if (!target) throw new Error('请先选择模板');
       const effectiveMapping = Object.fromEntries(groups.flatMap(g => {
         const value = mapping[g.id] ?? (selected === currentId && target.groups.some(t => t.id === g.id) ? g.id : '');
         return value ? [[g.id, value === '__drop' ? null : value]] : [];
       }));
       const bound = await api<Conversion>('POST', '/profiles/routing/convert', {
-        profile, mode: 'bound', templateId: target.id, templateVersion: target.version, currentTemplateVersion: template?.version, mapping: effectiveMapping,
+        profile, mode: 'bound', templateId: target.id, mapping: effectiveMapping,
       });
       if (action === 'bound') return bound;
-      const independent = await api<Conversion>('POST', '/profiles/routing/convert', { profile: bound.item, mode: 'independent', currentTemplateVersion: target.version });
+      const independent = await api<Conversion>('POST', '/profiles/routing/convert', { profile: bound.item, mode: 'independent' });
       return { ...independent, changes: [...bound.changes, ...independent.changes] };
     },
     onSuccess: setStaged,

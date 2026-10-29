@@ -18,9 +18,9 @@ store.importSeed({ templates: [{ id: 'template', name: '存在即生效模板', 
     { id: 'on', name: '本地规则', kind: 'local', format: 'auto', content: 'DOMAIN,local.example.test', enabled: true },
     { id: 'off', name: '旧停用来源', kind: 'remote', format: 'auto', url: 'https://unused.example.test/rules', enabled: false },
   ] }], profiles: [
-    { id: 'bound', name: '绑定订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, revision: 1, templateVersion: 1,
+    { id: 'bound', name: '绑定订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' },
       routing: { mode: 'bound', templateId: 'template', groupAdditions: {}, prependRules: rules.map(r => ({ ...r, id: `pre-${r.id}` })) } },
-    { id: 'independent', name: '独立订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, revision: 1,
+    { id: 'independent', name: '独立订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' },
       routing: { mode: 'independent', config: { groups: [], rules, final: direct } } },
   ],
 }, user.id);

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { Cipher } from '../src/crypto.ts';
 import { Store } from '../src/store.ts';
 
-const T = (version: number) => ({ id: 'std', version, groups: [], rules: [], final: { kind: 'builtin' as const, name: 'DIRECT' as const } });
+const T = (version: number) => ({ id: 'std', name: `模板${version}`, version, groups: [], rules: [], final: { kind: 'builtin' as const, name: 'DIRECT' as const } });
 
 describe('Store', () => {
   it('文档读写与覆盖', () => {
@@ -22,10 +22,14 @@ describe('Store', () => {
   it('旧种子只保留当前模板，历史版本不再可读', () => {
     const s = new Store(':memory:');
     s.importSeed({ templates: [T(1), T(3), T(2)] });
-    expect(s.getTemplate('std')!.version).toBe(3);
+    expect(s.getTemplate('std')!.name).toBe('模板3');
+    expect(s.getTemplate('std')).not.toHaveProperty('version');
     expect(s.getTemplate('std', 2)).toBeUndefined();
     expect(s.db.prepare('SELECT COUNT(*) n FROM template_versions').get()).toEqual({ n: 1 });
     expect(s.getTemplate('std', 9)).toBeUndefined();
+    s.importSeed({ templates: [{ id: 'std', name: '无版本的新内容', groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } }] });
+    expect(s.getTemplate('std')!.name).toBe('无版本的新内容');
+    expect(s.getTemplate('std')).not.toHaveProperty('version');
   });
 
   it.each(['source', 'ruleset'] as const)('%s 快照：订阅源只留一次成功，规则集保留 5 份，失败只留最新一条', (kind) => {
@@ -188,7 +192,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(19);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(20);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
@@ -221,7 +225,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(19);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(20);
     expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } }] });
     expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [{ match: 'DOMAIN,a.test', override: overrides[0]!.override }] });
     expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', sources: [
@@ -241,7 +245,7 @@ describe('加密与迁移', () => {
     const migratedRulesets = s.list('ruleset');
     s.close();
     const reopened = new Store(file, { cipher });
-    expect(reopened.db.pragma('user_version', { simple: true })).toBe(19);
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(20);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
     expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });

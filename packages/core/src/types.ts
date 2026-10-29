@@ -223,7 +223,8 @@ export type RuleEntry = {
 
 export type Template = {
   id: ID;
-  version: number;
+  /** 仅兼容旧数据导入；当前模板不维护版本号。 */
+  version?: number;
   changelog?: string;
   groups: GroupSpec[];
   rules: RuleEntry[];
@@ -263,7 +264,7 @@ export type ProfileRouting =
     /** 按显示顺序优先于全部模板规则，仅允许单条匹配。 */
     prependRules?: RuleEntry[];
   }
-  | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version: number; name?: string } };
+  | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version?: number; name?: string } };
 
 export type Profile = {
   /** 旧文档兼容读取；新订阅以 routing 为唯一分流配置来源。 */

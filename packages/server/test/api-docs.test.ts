@@ -58,9 +58,10 @@ describe('文档增删改查', () => {
     const { store, renderer, admin, alice } = await twoUsers();
     const rs = (await admin.post('/api/rulesets', { name: '旧规则', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' })).json.item.id;
     const t = { id: 'legacy', version: 1, name: '历史模板', groups: [], rules: [{ id: 'r', matcher: { kind: 'ruleset' as const, id: rs }, target: { kind: 'builtin' as const, name: 'DIRECT' as const } }], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
-    store.putTemplateVersion(t);
-    const p = (await alice.post('/api/profiles', { name: '锁定旧版', nodeSets: [], template: { id: t.id, follow: { pinned: 1 } } })).json.item.id;
-    store.putTemplateVersion({ ...t, version: 2, rules: [] });
+    const owner = (await alice.get('/api/me')).json.user.id;
+    const p = 'legacy-pinned';
+    store.importSeed({ templates: [t, { ...t, version: 2, rules: [] }], profiles: [{ id: p, name: '锁定旧版', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, template: { id: t.id, follow: { pinned: 1 } } }] }, owner);
+    expect((await alice.get(`/api/profiles/${p}`)).json.item.routing.mode).toBe('independent');
     const res = await admin.del(`/api/rulesets/${rs}`);
     expect(res.status).toBe(409);
     expect(res.json.details.referrers).toEqual(['其他用户的配置订阅']);
