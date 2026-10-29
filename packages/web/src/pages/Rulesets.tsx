@@ -4,15 +4,15 @@
 
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
-import { FileText, Globe, Plus, Trash2 } from 'lucide-react';
+import { FileText, Globe, Trash2 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { api, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
-import { ClientOverrides, clientOverridesError, newClientOverride } from '../components/ClientOverrides.tsx';
+import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Segmented, Select, Switch, Textarea, cx } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
@@ -69,13 +69,11 @@ function rulesetError(d: RuleSetDoc): string | undefined {
     const at = `来源 ${i + 1}「${sourceLabel(s)}」`;
     if (s.kind === 'remote' && !/^https?:\/\/[^/]+/.test(s.url ?? '')) return `${at}：请填写 http(s) 地址。`;
     if (s.format === 'mrs' && s.behavior !== 'domain' && s.behavior !== 'ipcidr') return `${at}：mrs 需要选择 behavior。`;
-    const error = overridesError(s.overrides ?? []);
-    if (error) return `${at}：${error}`;
   }
-  return undefined;
+  return overridesError(d.overrides ?? []);
 }
 
-/** 规则集（设计稿「规则集」）：来源 → 客户端改写（选中来源时）→ 输出预览，每块独占一行 */
+/** 规则集（设计稿「规则集」）：来源 → 客户端改写（整个规则集）→ 输出预览，每块独占一行 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
@@ -138,7 +136,9 @@ export function RulesetEdit() {
         </div>
       </Card>
 
-      {current && !isPassthrough(current) && <SourceOverrides src={current} onChange={(overrides) => setSource(current.id, { overrides: overrides.length ? overrides : undefined })} />}
+      <RulesetOverrides value={d.overrides ?? []} legacySources={d.sources}
+        onChange={(overrides) => set({ overrides: overrides.length ? overrides : undefined })}
+        onRemoveLegacy={(id) => setSource(id, { overrides: undefined })} />
 
       <Card className="min-w-0" title={<h2 className="m-0 min-w-0 truncate text-[15px] font-semibold">{current ? `输出预览 · ${sourceLabel(current)}` : '输出预览 · 合并结果'}</h2>}
         actions={current && <Button size="sm" onClick={() => setSelected(undefined)}>查看合并结果</Button>}>
@@ -248,50 +248,4 @@ function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
       ))}
     </>
   );
-}
-
-type LineOverride = NonNullable<RuleSetSourceDoc['overrides']>[number];
-
-function overridesError(value: LineOverride[]): string | undefined {
-  for (const [i, item] of value.entries()) {
-    if (item.line !== undefined ? !Number.isSafeInteger(item.line) || item.line < 1 : !item.match?.trim()) {
-      return `行级覆盖第 ${i + 1} 条：请填写从 1 开始的整数行号或原文。`;
-    }
-    const error = clientOverridesError([item.override]);
-    if (error) return `行级覆盖第 ${i + 1} 条：${error}`;
-  }
-  return undefined;
-}
-
-/** 客户端改写：作用于选中的来源，按该来源解析后的行号或原文定位 */
-function SourceOverrides({ src, onChange }: { src: RuleSetSourceDoc; onChange: (value: LineOverride[]) => void }) {
-  const value = src.overrides ?? [];
-  const update = (index: number, item: LineOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
-  return <Card title={<h2 className="m-0 min-w-0 truncate text-[15px] font-semibold">客户端改写 · {sourceLabel(src)}</h2>} actions={<Button onClick={() => onChange([...value, { line: 1, override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
-    <p className="mt-0 text-[12.5px] text-muted">按这个来源解析后的行号（从 1 开始）或原文精确匹配定位。同一行命中第一条客户端与平台匹配的覆盖，可拖拽调整优先级。</p>
-    {!value.length ? <Empty title="没有行级覆盖" /> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => {
-      const mode = item.match !== undefined && item.line === undefined ? 'match' : 'line';
-      return <div className="my-3 flex items-start gap-2 rounded-lg border border-line p-3">
-        {handle}<div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Segmented label={`第 ${i + 1} 条定位方式`} value={mode} options={[{ value: 'line', label: '按行号' }, { value: 'match', label: '按原文精确匹配' }]} onChange={(next) => {
-              if (next === mode) return;
-              const { line: _, match: __, ...rest } = item;
-              update(i, next === 'line' ? { ...rest, line: 1 } : { ...rest, match: '' });
-            }} />
-            <Button size="sm" variant="ghost" aria-label={`删除行级覆盖 ${i + 1}`} onClick={() => onChange(value.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
-          </div>
-          {mode === 'line' ? <Field label="行号" hint="从 1 开始，以该来源解析后的行号为准">{(id) => <Input id={id} type="number" min={1} step={1} value={item.line ?? ''} onChange={(e) => {
-            const { match: _, ...rest } = item;
-            update(i, { ...rest, line: e.target.value === '' ? undefined : Number(e.target.value) });
-          }} />}</Field> : <Field label="原文精确匹配" hint="保持规则原文，不含出口">{(id) => <Input id={id} className="font-mono" value={item.match ?? ''} onChange={(e) => {
-            const { line: _, ...rest } = item;
-            update(i, { ...rest, match: e.target.value });
-          }} />}</Field>}
-          <ClientOverrides single value={[item.override]} onChange={(overrides) => update(i, { ...item, override: overrides[0]! })} />
-        </div>
-      </div>;
-    }} />}
-    <ErrorBox error={overridesError(value)} />
-  </Card>;
 }

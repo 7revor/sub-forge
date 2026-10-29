@@ -137,7 +137,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(8);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
@@ -170,9 +170,9 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(8);
     expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } }] });
-    expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test', overrides }] });
+    expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [{ match: 'DOMAIN,a.test', override: overrides[0]!.override }] });
     expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', noResolve: true, sources: [
       { id: 'tg', name: 'Telegram', kind: 'remote', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } },
       { id: 'own', name: '自定', kind: 'local', content: 'DOMAIN,a.test', overrides, enabled: false },
@@ -192,7 +192,7 @@ describe('加密与迁移', () => {
     const migratedRulesets = s.list('ruleset');
     s.close();
     const reopened = new Store(file, { cipher });
-    expect(reopened.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(8);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
     expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });
@@ -227,4 +227,33 @@ describe('加密与迁移', () => {
       expect(readFileSync(file).includes(Buffer.from('MIGRATION_SECRET'))).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+});
+
+it('v7 升级到 v8：按成功快照与本地内容迁移旧行号，无内容或停用来源保留并可重试', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sf-group-mig-'));
+  const file = join(dir, 'v7.db');
+  const cipher = new Cipher(randomBytes(32));
+  const old = new Store(file, { cipher });
+  const override = { when: { client: 'mihomo' as const }, action: { drop: true as const } };
+  old.put('ruleset', { id: 'r', name: '迁移', sources: [
+    { id: 'a', kind: 'local', format: 'auto', content: '# 注释\nDOMAIN,a.test', overrides: [{ line: 2, override }] },
+    { id: 'b', kind: 'remote', format: 'auto', url: 'https://example.test/list', overrides: [{ line: 1, override }] },
+    { id: 'c', kind: 'remote', format: 'auto', url: 'https://example.test/missing', overrides: [{ line: 99, override }] },
+    { id: 'off', kind: 'local', format: 'auto', content: 'DOMAIN,off.test', enabled: false, overrides: [{ match: 'DOMAIN,off.test', override }] },
+  ] }, 'owner');
+  old.addSnapshot({ ownerKind: 'ruleset', ownerId: 'r', url: 'https://example.test/list', fetchedAt: 1, ok: true, body: 'DOMAIN,b.test' });
+  old.db.pragma('user_version = 7');
+  old.close();
+  const migrated = new Store(file, { cipher });
+  const rs = migrated.get('ruleset', 'r')!;
+  expect(migrated.getWithOwner('ruleset', 'r')!.owner).toBe('owner');
+  expect(rs.overrides).toEqual([{ match: 'DOMAIN,a.test', override }, { match: 'DOMAIN,b.test', override }]);
+  expect(rs.sources.slice(0, 2).every((s) => !s.overrides)).toBe(true);
+  expect(rs.sources[2]!.overrides).toEqual([{ line: 99, override }]);
+  expect(rs.sources[3]!.overrides).toHaveLength(1);
+  migrated.close();
+  const reopened = new Store(file, { cipher });
+  expect(reopened.get('ruleset', 'r')).toEqual(rs);
+  reopened.close();
+  rmSync(dir, { recursive: true, force: true });
 });

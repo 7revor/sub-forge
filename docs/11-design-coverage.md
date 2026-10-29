@@ -16,7 +16,7 @@
 | 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由，同日去掉前置卡片与「前置」列，代理链只在 Profile「代理链」中设置 |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集「下发地址」显示路径模式 |
-| 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：来源（多个远程地址 / 本地规则，可排序、启停，选中后展开地址、格式、缓存等字段）、客户端改写（作用于选中的来源）、输出预览（选中来源时为该来源，本地规则在预览里实时编辑；不选时为合并结果与 domain / classical / ipcidr 统计），每块独占一行。2026-10-29 取消「编辑来源」对话框与「解析结果」表，规则包并入规则集 |
+| 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：来源（多个远程地址 / 本地规则，可排序、启停，选中后展开地址、格式、缓存等字段）、独立的客户端改写区块（作用于整个规则集，只按规则内容精确匹配）、输出预览（选中来源时为该来源，本地规则在预览里实时编辑；不选时为合并结果与 domain / classical / ipcidr 统计），每块独占一行。2026-10-29 取消「编辑来源」对话框与「解析结果」表，规则包并入规则集 |
 | 规则集 `RuleSetNew` | `/rulesets`、`/rulesets/new` | 列表（名称、来源概况、no-resolve）；新建直接打开与编辑页同一个页面，默认带一个选中的本地来源，不再有单独的新建表单或对话框（2026-10-29 取代原 `RuleBundle` 画板） |
 | 规则仓库 `RuleRepo` | `/rule-repo` | 占位接口 |
 | 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish` | 草稿在两页之间共用；发布页自动试渲染；仅管理员可进入 |
@@ -29,6 +29,8 @@
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
 
 ## 设计稿待同步
+
+- 2026-10-29 规则集组级客户端改写：`RuleSets` / `RuleSetNew` 改写区块始终独立显示；只保留「规则内容精确匹配」，移除行号与来源绑定。前后端和文档已同步；Claude Design 画布打开后显示「Sign in to view this page」，外部画板未更新。实际界面见 [独立区块截图](../research/verification/ruleset-group-overrides-20261029/independent-block.png)。
 
 - 2026-10-29 本地节点粘贴导入：前端补充提示「YAML 支持单个节点、节点列表或带 proxies 的完整配置。」，内核已补齐相应解析。外部 Claude Design 画布打开后要求登录，本轮未能更新 `LocalNodes` / `Dialogs` 画板；前端实际效果见 [验收截图](../research/verification/local-node-yaml-import-20261029/single-node-import.png)。
 - 模板入口与空状态：管理员只显示一个「模板」入口，普通用户不显示独立模板页；各页面的空状态统一白底虚线框。画布仍待同步，要求与参考截图见 [13 · 画布待同步](13-design-canvas-sync.md)。

@@ -16,7 +16,7 @@ import type { SourceDoc } from '../docs.ts';
 import type { SnapshotService } from '../snapshots.ts';
 import type { Store } from '../store.ts';
 import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
-import { validateDoc } from './validate.ts';
+import { checkRuleSetOverrides, validateDoc } from './validate.ts';
 
 const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
 /** 逐步预览每步最多返回的节点数，避免大订阅撑爆响应 */
@@ -186,7 +186,8 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const savedUrls = new Set((saved?.sources ?? []).flatMap((x) => (x.kind === 'remote' && x.url ? [x.url] : [])));
     const draft = body.ruleset as Partial<RuleSetDoc> | undefined;
     if (!draft || typeof draft !== 'object' || !Array.isArray(draft.sources)) throw bad('ruleset.sources 必须是数组');
-    const rs: RuleSetDoc = { id: savedId ?? 'draft', name: typeof draft.name === 'string' && draft.name ? draft.name : '未命名', sources: draft.sources, ...(draft.noResolve ? { noResolve: true } : {}) };
+    checkRuleSetOverrides(draft.overrides);
+    const rs: RuleSetDoc = { id: savedId ?? 'draft', name: typeof draft.name === 'string' && draft.name ? draft.name : '未命名', sources: draft.sources, ...(draft.overrides ? { overrides: draft.overrides } : {}), ...(draft.noResolve ? { noResolve: true } : {}) };
 
     const snapshotsIn: Record<string, string> = {};
     const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number }[] = [];

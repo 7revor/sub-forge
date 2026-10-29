@@ -249,3 +249,51 @@ describe('节点集最终节点列表', () => {
     expect(calls).toBe(3);
   });
 });
+
+describe('规则集组级改写保存与预览', () => {
+  it('保存、重新读取、各来源预览、合并预览和实际渲染都应用同一组级改写', async () => {
+    const { alice, renderer } = await scenario(serve({ 'https://example.test/rules': 'DOMAIN,same.test\nDOMAIN,remote.test' }));
+    const overrides = [{ match: 'DOMAIN,same.test', override: { when: { client: 'mihomo' }, action: { replace: [{ type: 'DOMAIN', value: 'changed.test' }] } } }];
+    const created = await alice.post('/api/rulesets', { name: '整组', sources: [
+      { id: 'a', kind: 'local', format: 'auto', content: 'DOMAIN,same.test' },
+      { id: 'b', kind: 'remote', format: 'auto', url: 'https://example.test/rules' },
+    ], overrides });
+    expect(created.status).toBe(201);
+    const rs = (await alice.get(`/api/rulesets/${created.json.item.id}`)).json.item;
+    expect(rs.overrides).toEqual(overrides);
+    expect(rs.sources.every((s: object) => !('overrides' in s))).toBe(true);
+    for (const source of ['a', 'b', undefined]) {
+      const preview = await alice.post('/api/rulesets/preview', { id: rs.id, ruleset: rs, source, client: 'mihomo' });
+      expect(preview.status).toBe(200);
+      expect(preview.json.lines).toContain('DOMAIN,changed.test');
+      expect(preview.json.lines).not.toContain('DOMAIN,same.test');
+    }
+    const surge = await alice.post('/api/rulesets/preview', { ruleset: rs, client: 'surge' });
+    expect(surge.json.lines).toContain('DOMAIN,same.test');
+    const profile = await alice.post('/api/profiles', { name: '改写输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
+    const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
+    expect(rendered.ok).toBe(true);
+    expect(rendered.ok && Object.values(rendered.render.rulesets).join('')).toContain('changed.test');
+    expect(rendered.ok && Object.values(rendered.render.rulesets).join('')).not.toContain('same.test');
+    const removed = await alice.put(`/api/rulesets/${rs.id}`, { ...rs, overrides: [] });
+    const restored = await alice.post('/api/rulesets/preview', { ruleset: removed.json.item, client: 'mihomo' });
+    expect(restored.json.lines).toContain('DOMAIN,same.test');
+    const rerendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
+    expect(rerendered.ok && Object.values(rerendered.render.rulesets).join('')).toContain('same.test');
+    expect(rerendered.ok && Object.values(rerendered.render.rulesets).join('')).not.toContain('changed.test');
+  });
+
+  it('保存与草稿预览拒绝行号、空内容和无效动作，避免保存后丢失改写或渲染崩溃', async () => {
+    const { alice } = await scenario();
+    const override = { when: { client: 'mihomo' }, action: { drop: true } };
+    for (const item of [
+      { line: 1, override }, { match: ' ', override }, { match: 'DOMAIN,a.test', line: 1, override },
+      { match: 'DOMAIN,a.test', override: { ...override, action: { replace: [] } } },
+      { match: 'DOMAIN,a.test', override: { ...override, action: { replace: [{ type: 'UNKNOWN', value: 'x' }] } } },
+    ]) {
+      const ruleset = { name: '非法', sources: [{ id: 'a', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [item] };
+      expect((await alice.post('/api/rulesets', ruleset)).status).toBe(400);
+      expect((await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' })).status).toBe(400);
+    }
+  });
+});
