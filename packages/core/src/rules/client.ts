@@ -17,15 +17,15 @@ export function composeRule(l: { text: string; noResolve?: boolean; src?: boolea
   return `${l.text}${target === undefined ? '' : `,${target}`}${l.noResolve ? ',no-resolve' : ''}${l.src ? ',src' : ''}`;
 }
 
-/** 结构化选项仅作用于目标 IP；RAW 合并原文选项，由目标客户端解释。 */
+/** 仅叠加 src；no-resolve 始终来自规则原文，忽略历史独立开关。 */
 export function withIpOptions(rule: RuleIR, options: { noResolve?: boolean; src?: boolean }): RuleIR {
-  if (rule.type === 'RAW' && (options.noResolve || options.src)) {
+  if (rule.type === 'RAW' && options.src) {
     if (rawRuleError(rule.text)) return rule;
     const parts = rawRuleParts(rule.text);
-    return { ...rule, text: composeRule({ ...parts, ...(options.noResolve ? { noResolve: true } : {}), ...(options.src ? { src: true } : {}) }) };
+    return { ...rule, text: composeRule({ ...parts, src: true }) };
   }
   if (rule.type !== 'IP-CIDR' && rule.type !== 'IP-CIDR6' && rule.type !== 'IP-ASN' && rule.type !== 'GEOIP') return rule;
-  return { ...rule, ...(options.noResolve ? { noResolve: true } : {}), ...(options.src ? { src: true } : {}) };
+  return { ...rule, ...(options.src ? { src: true } : {}) };
 }
 
 /** 声明式客户端覆盖：命中第一条匹配的覆盖，返回替换结果、保留原规则并追加，或丢弃（空数组） */

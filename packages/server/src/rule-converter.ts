@@ -23,7 +23,7 @@ export class RuleConverter {
     return document;
   }
   convert(inputs: ConversionInput[], options: Pick<RuleSet, 'overrides' | 'noResolve'>, ctx: ClientCtx, sourceId?: string): ConversionResult {
-    const rs: RuleSet = { id: 'conversion', name: '', sources: inputs.map(i => i.source), ...options };
+    const rs: RuleSet = { id: 'conversion', name: '', sources: inputs.map(i => i.source), overrides: options.overrides };
     const documents = new Map(inputs.filter(i => i.content !== undefined || ['mrs', 'srs'].includes(i.source.format)).map(i => [i.source.id, this.prepare(i.content ?? '', i.source)]));
     const snapshots = Object.fromEntries(inputs.filter(i => i.content !== undefined).map(i => [sourceKey(rs.id, i.source.id), i.content!]));
     const scope = sourceId ? { ...rs, sources: rs.sources.filter(s => s.id === sourceId).map(s => ({ ...s, enabled: true })) } : rs;

@@ -31,10 +31,10 @@ function fixture(): TemplateBody {
       { id: 'r_disabled_first', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'disabled.example' } }, target: direct },
       { id: 'r_domain', matcher: { kind: 'rule', rule: { type: 'DOMAIN-SUFFIX', value: 'example.com' }, overrides: [{ when: { client: 'surge' }, action: { drop: true } }] }, target: proxy },
       { id: 'r_ir', matcher: { kind: 'rule', rule: { type: 'IP-CIDR', value: '10.0.0.0/8', noResolve: true } }, target: direct },
-      { id: 'r_options', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN' } }, target: direct, options: { noResolve: true, src: true } },
+      { id: 'r_options', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN', noResolve: true } }, target: direct, options: { src: true } },
       { id: 'r_process', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'path', mode: 'wildcard', value: '/Applications/*' } }, target: proxy },
       { id: 'r_ruleset', matcher: { kind: 'ruleset', id: 'rs_ads' }, target: { kind: 'builtin', name: 'REJECT' } },
-      { id: 'r_bundle', matcher: { kind: 'ruleset', id: 'b_media' }, target: proxy, options: { noResolve: true } },
+      { id: 'r_bundle', matcher: { kind: 'ruleset', id: 'b_media' }, target: proxy },
     ],
     final: proxy,
   };
@@ -92,7 +92,8 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(fresh.rules.map(r => r.matcher)).toEqual(body.rules.map(r => r.matcher));
     expect(fresh.rules[0]!.enabled).toBeUndefined();
     const changed = imported(yaml.replace('RULE-SET,repo:fixed,DIRECT', 'RULE-SET,repo:fixed,REJECT,no-resolve'), body, context).value;
-    expect(changed.rules[0]).toMatchObject({ id: 'repo-rule', matcher: body.rules[0]!.matcher, options: { noResolve: true }, target: { kind: 'builtin', name: 'REJECT' } });
+    expect(changed.rules[0]!.options?.noResolve).toBeUndefined();
+    expect(changed.rules[0]).toMatchObject({ id: 'repo-rule', matcher: body.rules[0]!.matcher, target: { kind: 'builtin', name: 'REJECT' } });
     const tampered = imported(yaml.replace('https://example.test/Google.list', 'https://example.test/changed.list'), body, context).value;
     expect(tampered.rules[0]!.matcher).toMatchObject({ repository: { sources: [{ url: 'https://example.test/changed.list' }] } });
     const ambiguous = templateFromYaml('rules: ["RULE-SET,Google,DIRECT"]', empty, context);
@@ -150,7 +151,8 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(yaml).toContain('PROCESS-PATH-WILDCARD,/Applications/*,代理选择');
     expect(yaml).toContain('GEOIP,CN,DIRECT,no-resolve,src');
     expect(yaml).toContain('RULE-SET,广告规则,REJECT');
-    expect(yaml).toContain('RULE-SET,媒体规则包,代理选择,no-resolve');
+    expect(yaml).toContain('RULE-SET,媒体规则包,代理选择');
+    expect(yaml).not.toContain('RULE-SET,媒体规则包,代理选择,no-resolve');
     expect(yaml).not.toContain('# disabled');
     expect(yaml).not.toMatch(/whenEmpty|hint/);
     const result = imported(yaml, t);
@@ -272,9 +274,9 @@ rules:
   it('增删 no-resolve/src 选项保持规则 ID，不再保存启用字段', () => {
     const t: TemplateBody = { ...empty, rules: [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'IP-CIDR', value: '10.0.0.0/8' } }, target: direct, options: { noResolve: false, src: false } }] };
     const enabled = imported('rules: ["IP-CIDR,10.0.0.0/8,DIRECT,no-resolve,src"]', t).value;
-    expect(enabled.rules[0]).toStrictEqual({ ...t.rules[0], options: { noResolve: true, src: true } });
+    expect(enabled.rules[0]).toStrictEqual({ ...t.rules[0], matcher: { kind: 'rule', rule: { type: 'IP-CIDR', value: '10.0.0.0/8', noResolve: true } }, options: { src: true } });
     const removed = imported('rules: ["IP-CIDR,10.0.0.0/8,DIRECT"]', enabled).value;
-    expect(removed.rules[0]).toStrictEqual({ ...t.rules[0] });
+    expect(removed.rules[0]).toStrictEqual({ ...t.rules[0], options: { src: false } });
   });
 
   it('出口前后的 no-resolve/src 选项都保留，数字状态码映射为字符串', () => {
@@ -286,7 +288,7 @@ rules:
     });
   });
 
-  it('IR 和 options 中的 no-resolve 不重复输出，false 与空对象也能往返', () => {
+  it('原文标记保留，旧独立选项清理，false 与空对象仍能往返', () => {
     const t: TemplateBody = {
       groups: [{ id: 'g', name: '空组', type: 'select', members: [], test: {}, display: {}, extra: {} }], final: direct,
       rules: [
@@ -297,7 +299,7 @@ rules:
     };
     const yaml = templateToYaml(t, ctx);
     expect(yaml.match(/no-resolve/g)).toHaveLength(2);
-    expect(imported(yaml, t).value).toStrictEqual(t);
+    expect(imported(yaml, t).value).toStrictEqual({ ...t, rules: t.rules.map(rule => { const { noResolve: _, ...options } = rule.options ?? {}; return { ...rule, options }; }) });
   });
 
   it('core 暂不支持的逻辑规则导出明确报错，不静默丢弃', () => {
@@ -355,7 +357,7 @@ describe('模板导入远程 URL', () => {
     const body = imported(text, empty, { rulesets: [{id:'local-lan',name:'lan'}] }).value;
     expect(body.rules[0]!.matcher).toMatchObject({ kind:'ruleset', remote: {url} });
     expect(Object.keys(body.rules[0]!.matcher)).toEqual(['kind','id','remote']);
-    expect(body.rules[0]!.options?.noResolve).toBe(true);
+    expect(body.rules[0]!.options?.noResolve).toBeUndefined();
     expect(imported(templateToYaml(body,ctx),body).value).toEqual(body);
   });
   it('仅提供 rule-providers 时补入现有模板，保留组、规则和最终出口，重复 URL 不新增', () => {

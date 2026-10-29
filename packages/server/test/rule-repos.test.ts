@@ -332,7 +332,7 @@ describe('规则仓库接口', () => {
     const appended = await c.post('/api/rule-repos/import', { repo: 'blackmatrix7', path: 'China', ruleset: id });
     expect(appended.status).toBe(200);
     expect(appended.json.item.sources).toHaveLength(2);
-    expect(appended.json.item.noResolve).toBe(true);
+    expect(appended.json.item.noResolve).toBeUndefined();
     h.store.put('ruleset', { id: 'private', name: '私有', sources: [] }, bob.id);
     expect((await c.post('/api/rule-repos/import', { repo: 'blackmatrix7', path: 'China', ruleset: 'private' })).status).toBe(404);
     expect(h.store.getWithOwner('ruleset', id)?.owner).toBe(alice.id);

@@ -11,7 +11,7 @@ function setup(format: RuleSetFormat, initial: string) {
   let body = initial;
   const env = setupApp({ fetcher: async () => ({ status: 200, body }) });
   envs.push(env);
-  env.store.put('ruleset', { id: 'r', name: '远程规则', noResolve: true, sources: [{ id: 's1', kind: 'remote', format, url: 'https://rules.example.test/list' }] });
+  env.store.put('ruleset', { id: 'r', name: '远程规则', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's1', kind: 'remote', format, url: 'https://rules.example.test/list' }] });
   env.store.put('profile', {
     id: 'p', name: '测试订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' },
     overlay: { extraRules: [{ anchor: 'top', rule: { id: 'rule', matcher: { kind: 'ruleset', id: 'r' }, target: { kind: 'builtin', name: 'REJECT' } } }] },

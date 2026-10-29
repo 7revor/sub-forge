@@ -32,16 +32,16 @@ export const TEMPLATE: Template = {
     { id: 'r-fin', matcher: { kind: 'ruleset', id: 'fin' }, target: { kind: 'group', groupId: 'sel' } },
     { id: 'r-ai', matcher: { kind: 'ruleset', id: 'ai' }, target: { kind: 'group', groupId: 'ai' } },
     { id: 'r-wx', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'path', mode: 'wildcard', value: '/Applications/*/WeChat.app/*' } }, target: { kind: 'builtin', name: 'DIRECT' } },
-    { id: 'r-cn', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN' } }, target: { kind: 'builtin', name: 'DIRECT' }, options: { noResolve: true } },
+    { id: 'r-cn', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN', noResolve: true } }, target: { kind: 'builtin', name: 'DIRECT' } },
   ],
   final: { kind: 'group', groupId: 'sel' },
 };
 
 export const RULES: RenderInput['rules'] = {
   rulesets: {
-    fin: { id: 'fin', name: '金融服务', noResolve: true, sources: [
-      { id: 'paypal', kind: 'local', format: 'auto', content: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21' },
-      { id: 'broker', name: '券商', kind: 'local', format: 'auto', content: '192.0.2.0/24' },
+    fin: { id: 'fin', name: '金融服务', sources: [
+      { id: 'paypal', kind: 'local', format: 'auto', content: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21,no-resolve' },
+      { id: 'broker', name: '券商', kind: 'local', format: 'auto', content: 'IP-CIDR,192.0.2.0/24,no-resolve' },
     ] },
     ai: { id: 'ai', name: 'AI', sources: [{ id: 's1', kind: 'local', format: 'auto', content: '.openai.com\n.anthropic.com' }] },
   },

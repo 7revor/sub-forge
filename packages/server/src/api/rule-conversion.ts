@@ -79,7 +79,7 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
     }
     if (body.source !== undefined && !sources.some(s => s.id === body.source)) throw bad('来源不存在');
     const result = converter.convert(sources.map((src, i) => ({ source: src, content: loaded[i]!.content })),
-      { overrides: body.ruleset.overrides, noResolve: body.ruleset.noResolve },
+      { overrides: body.ruleset.overrides },
       { client: body.client === 'surge' ? 'surge' : 'mihomo', platform: body.platform } as ClientCtx, body.source);
     const stats = result.stats;
     return c.json({ ...result, sources: loaded.map(x => x.status), total: result.lines.length,
@@ -146,7 +146,7 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
     });
     if (body.sourceId !== undefined && !ids.has(body.sourceId)) throw bad('预览来源不存在');
     if (inputs.some(i => (body.sourceId ? i.source.id === body.sourceId : i.source.enabled !== false) && !['mrs', 'srs'].includes(i.source.format) && i.content === undefined)) throw bad('来源正文尚未读取成功，请先重新读取来源');
-    return c.json(converter.convert(inputs, { overrides: body.overrides, noResolve: body.noResolve }, { client: body.client, platform: body.platform } as ClientCtx, body.sourceId));
+    return c.json(converter.convert(inputs, { overrides: body.overrides }, { client: body.client, platform: body.platform } as ClientCtx, body.sourceId));
   });
   return app;
 }

@@ -28,7 +28,7 @@ function harness(store = new Store(':memory:')) {
 }
 function seed(store: Store) {
   store.put('source', { id: 's', name: 'S', url: 'https://example.test/source', pipeline: [] });
-  store.put('ruleset', { id: 'rs', name: 'R', noResolve: true, sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://example.test/rules' }] });
+  store.put('ruleset', { id: 'rs', name: 'R', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://example.test/rules' }] });
   store.putTemplateVersion(template());
   store.put('profile', structuredClone(profile));
   store.putToken({ token: 'token', profileId: 'p' });

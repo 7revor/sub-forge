@@ -41,11 +41,16 @@ describe('按内容识别与自动输出格式', () => {
   });
 
   it.each([
-    { noResolve: true },
     { overrides: [{ match: 'DOMAIN,example.com', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }] },
   ])('额外配置触发托管：%j', patch => {
     const f = fixture('DOMAIN,example.com', patch);
     expect(f.decide().mode).toBe('managed');
+  });
+
+  it('旧独立 no-resolve 不改变原格式透传决策', () => {
+    const f = fixture('IP-CIDR,192.0.2.0/24', { noResolve: true });
+    expect(f.decide().mode).toBe('original');
+    expect(ruleSetDelivery(f.rs, f.inputs, { client: 'mihomo' }, { noResolve: true }).mode).toBe('original');
   });
 
   it('合并本地与远程只输出一个 classical LIST，去重并保留行级 IP 选项', () => {
@@ -83,6 +88,8 @@ describe('按内容识别与自动输出格式', () => {
     expect(f.decide()).toMatchObject({ mode: 'original', format: 'mrs' });
     delete f.inputs.snapshots['r/s'];
     f.rs.noResolve = true;
+    expect(f.decide().mode).toBe('original');
+    f.rs.overrides = [{ match: 'DOMAIN,example.test', override: { when: { client: 'mihomo' }, action: { drop: true } } }];
     expect(f.decide().mode).toBe('unsupported');
     expect(rendered(f.inputs).report.byCode('ruleset.conversion-unavailable')).toHaveLength(1);
   });

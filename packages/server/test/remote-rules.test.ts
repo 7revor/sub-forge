@@ -9,7 +9,7 @@ const draft = (matcher = remoteRuleMatcher(url)) => ({ name: '远程模板', gro
 describe('外部 URL 与系统 ID 分开引用', () => {
   it.each(['legacy', 'bound'])('%s 模式发布、订阅输出嵌套 GET、快照缓存、版本保留和撤销 token 闭环', async mode => {
     const calls: string[] = [];
-    const h = setupApp({ fetcher: async value => { calls.push(value); return { status: 200, body: 'payload:\n  - DOMAIN,example.test\n  - IP-CIDR,10.0.0.0/8' }; } });
+    const h = setupApp({ fetcher: async value => { calls.push(value); return { status: 200, body: 'payload:\n  - DOMAIN,example.test\n  - IP-CIDR,10.0.0.0/8\n  - IP-CIDR,192.0.2.0/24,no-resolve' }; } });
     try {
       const user = await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
       const published = await c.post('/api/templates/new/publish', draft());
@@ -33,7 +33,10 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(download.status).toBe(200);
       const output = await download.text();
       expect(output).toContain('DOMAIN,example.test');
-      expect(output).toContain('IP-CIDR,10.0.0.0/8,no-resolve');
+      expect(output).toContain('IP-CIDR,10.0.0.0/8\n');
+      expect(output).not.toContain('IP-CIDR,10.0.0.0/8,no-resolve');
+      expect(output).toContain('IP-CIDR,192.0.2.0/24,no-resolve');
+      expect(published.json.item.rules[0].options?.noResolve).toBeUndefined();
       expect(download.headers.get('content-type')).toContain('text/plain');
       expect(calls).toEqual([url]);
       const edited = new URL(provider.url); edited.searchParams.set('url', 'https://unrelated.test/list');

@@ -223,7 +223,7 @@ describe('加密与迁移', () => {
     expect(s.db.pragma('user_version', { simple: true })).toBe(18);
     expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } }] });
     expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [{ match: 'DOMAIN,a.test', override: overrides[0]!.override }] });
-    expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', noResolve: true, sources: [
+    expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', sources: [
       { id: 'tg', name: 'Telegram', kind: 'remote', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } },
       { id: 'rules', name: '单条规则', kind: 'local', format: 'classical', content: 'IP-CIDR,10.0.0.0/8' },
     ] } });

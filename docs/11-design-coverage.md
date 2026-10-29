@@ -157,3 +157,6 @@ RuleSets 来源行、TemplateEditor 规则行、ProfileDetail 独立规则与绑
 实现范围：规则仓库页、模板系统规则集、订阅系统规则集、规则集来源关联。统一采用自绘级联 select；仓库页取消列表和右侧详情。后端只索引目录/list/txt，前端按扫描根相对路径组装层级，叶子绑定单文件和分支。服务端、前端及文档已实现；旧示例种子继续使用原映射，无数据迁移要求。
 
 设计画布同步未完成：使用 Codex 内置浏览器访问 CLAUDE.md 指定的 [Sub-Forge 设计画布](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，页面显示“Sign in to view this page”，当前无可编辑会话。没有绕过登录；该项仅登记为设计同步阻塞，不能宣称已修改画布。实际交互截图见 `research/verification/rule-cascader-20261029/`。
+
+
+2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
