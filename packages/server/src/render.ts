@@ -4,7 +4,7 @@
 
 import { createHash } from 'node:crypto';
 import {
-  renderMihomo, stableHash, stableStringify,
+  mergeTemplate, Report, renderMihomo, stableHash, stableStringify,
   type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -280,11 +280,14 @@ export class RenderService {
         const b = this.store.get('bundle', m.id);
         if (!b) return;
         out.bundles[b.id] = b;
-        for (const i of b.items) if (i.kind === 'ruleset') addRuleset(i.id);
+        for (const i of b.items) if (i.kind === 'ruleset' && i.enabled !== false) addRuleset(i.id);
       }
     };
-    template?.rules.forEach((r) => visit(r.matcher));
-    profile.overlay.extraRules?.forEach((r) => visit(r.rule.matcher));
+    // 与内核渲染使用同一份有效规则：覆盖层可禁用或重新启用模板规则，孤儿锚点也不再参与拉取。
+    // 合并报告由 renderMihomo 统一返回，避免重复记录。
+    for (const r of mergeTemplate(template, profile.overlay, new Report()).rules) {
+      if (r.enabled !== false) visit(r.matcher);
+    }
     return out;
   }
 
