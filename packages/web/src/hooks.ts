@@ -11,7 +11,8 @@ export type PresetDoc = { id: string; name: string; version: number; mihomo: Rec
 export type TemplateDoc = Template & { name?: string };
 export type ProfileDoc = import('@sub-forge/core').Profile & {
   template?: { id: string; follow: 'latest' | { pinned: number } };
-  base?: { presetId?: string; patch?: Record<string, unknown> };
+  /** raw：原样片段（追加到末尾；服务端尚未输出，见 docs/11） */
+  base?: { presetId?: string; patch?: Record<string, unknown>; raw?: string };
   updateIntervalSec?: number;
   userinfo?: { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
 };
