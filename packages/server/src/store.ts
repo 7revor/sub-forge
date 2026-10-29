@@ -1,3 +1,4 @@
+import { normalizeRulePresence } from './rule-presence.ts';
 import { migrateProfile, profileTemplate } from './profile-routing.ts';
 // SQLite 存储。保存文档、快照与最近成功的配置版本；旧客户端按版本取兼容资源。
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
@@ -47,7 +48,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -219,6 +220,7 @@ export class Store {
           this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(JSON.stringify(migrated)), row.id);
         }
       }
+      if (version < 17) this.removeRuleSwitches();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -377,6 +379,26 @@ export class Store {
   getProfileMigrationBackup(id: string): ProfileDoc | undefined {
     const row = this.db.prepare('SELECT data FROM profile_migration_backups WHERE profile_id = ?').get(id) as { data: string } | undefined;
     return row ? JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc : undefined;
+  }
+
+  /** 在原事务内移除停用项，保留归属、更新时间、版本、令牌与历史渲染资源。 */
+  private removeRuleSwitches(): void {
+    for (const row of this.db.prepare("SELECT rowid, kind, data FROM docs WHERE kind IN ('ruleset', 'profile')").all() as { rowid: number; kind: string; data: string }[]) {
+      const original = this.cipher.decrypt(row.data);
+      let document = JSON.parse(original);
+      if (row.kind === 'profile' && !document.routing) {
+        const previous = document as ProfileDoc;
+        document = migrateProfile(previous, profileTemplate(previous, (id, version) => this.getTemplate(id, version)));
+        this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
+          .run(previous.id, this.cipher.encrypt(original), this.now());
+      }
+      const normalized = JSON.stringify(normalizeRulePresence(row.kind, document));
+      if (normalized !== original) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(normalized), row.rowid);
+    }
+    for (const row of this.db.prepare('SELECT rowid, data FROM template_versions').all() as { rowid: number; data: string }[]) {
+      const normalized = JSON.stringify(normalizeRulePresence('template', JSON.parse(row.data)));
+      if (normalized !== row.data) this.db.prepare('UPDATE template_versions SET data = ? WHERE rowid = ?').run(normalized, row.rowid);
+    }
   }
 
   // ---------- 文档 ----------
@@ -727,6 +749,7 @@ export class Store {
       this.convertRuleBundles();
       this.promoteRuleOverrides();
       this.convertSourceUrls();
+      this.removeRuleSwitches();
     });
     tx();
   }

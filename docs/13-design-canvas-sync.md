@@ -188,3 +188,10 @@
 - [ ] 模板规则与 MATCH 只读展示；前置区始终位于模板区之前。
 
 本轮在内置浏览器访问外部画布仍显示登录页，无法编辑。同步参考 `research/verification/template-prepend-rules-20261029/rules.png` 和 `preview.png`。
+
+
+### 规则存在即生效（2026-10-29，待同步）
+
+此项取代此前规则启停设计：RuleSets 来源行删除启用开关；TemplateEditor 删除启用列并回收列宽；ProfileDetail 的独立规则和绑定前置规则删除启用开关、停用样式和停用标签。保留排序、出口、删除及 no-resolve/src 选项。界面存在的每一项都会生效。旧停用项按用户确认移除。
+
+外部画布本会话已核实要求登录，未更新。同步参考 `research/verification/rule-presence-20261029/` 中规则集、模板、绑定及独立订阅截图。

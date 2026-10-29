@@ -134,3 +134,8 @@ ProfileNew、Profile 详情与 Lists/Main 显示「绑定模板 / 独立配置�
 ### 2026-10-29：绑定订阅前置规则
 
 配置订阅规则页上方新增可编辑「前置规则」，下方保留只读模板规则及 MATCH。添加固定单条匹配，不提供位置或规则集类型切换；复用全局规则和出口组件。后端 bound.prependRules、依赖解析、转换与模板发布检查已接通。外部 Claude Design 画布本轮实测仍显示「Sign in to view this page」，按 docs/13 登记待同步；实际截图与验收见 `research/verification/template-prepend-rules-20261029/`。
+
+
+### 2026-10-29：规则取消启用开关
+
+RuleSets 来源行、TemplateEditor 规则行、ProfileDetail 独立规则与绑定前置规则不再展示启用 Switch、启用列或停用样式。存在即参与输出，删除即移除；no-resolve、src 等规则选项仍可编辑。后端保存规范化与 v17 迁移已接通，无待实现接口。外部画布沿用本会话已核实的登录限制，待同步项见 docs/13；浏览器截图见 `research/verification/rule-presence-20261029/`。

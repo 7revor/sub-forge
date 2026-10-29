@@ -8,14 +8,14 @@ const result = (data?: RuleSourceContent) => ({ data, error: null, isPending: !d
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('来源失败状态与显式重试', () => {
-  it('业务错误、HTTP 错误、缺失正文和刷新中均阻止转换；禁用或其他预览范围不阻塞', () => {
+  it('业务错误、HTTP 错误、缺失正文和刷新中均阻止转换；其他预览范围不阻塞，存在的来源都参与检查', () => {
     const failed = result({ status: { id: 's', ok: false, error: '上游失败' } });
     expect(rulesetSourceState([source], [failed])).toMatchObject({ ready: false, reading: false, error: '上游失败' });
     expect(rulesetSourceState([source], [{ ...result(success), error: new Error('HTTP 503') }]).ready).toBe(false);
     expect(rulesetSourceState([source], [result({ status: { id: 's', ok: true } })]).ready).toBe(false);
     expect(rulesetSourceState([source], [{ ...result(success), isFetching: true }]).ready).toBe(false);
-    expect(rulesetSourceState([{ ...source, enabled: false }], [failed]).ready).toBe(true);
-    expect(rulesetSourceState([{ ...source, enabled: false }], [failed], 's').ready).toBe(false);
+    expect(rulesetSourceState([source], [failed]).ready).toBe(false);
+    expect(rulesetSourceState([source], [failed], 's').ready).toBe(false);
     expect(rulesetSourceState([source, { ...source, id: 'good' }], [failed, result(success)], 'good').ready).toBe(true);
     expect(rulesetSourceState([source], [result({ status: { id: 's', ok: true, passthrough: true } })]).ready).toBe(true);
   });

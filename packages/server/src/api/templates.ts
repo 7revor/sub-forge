@@ -1,3 +1,4 @@
+import { normalizeRulePresence } from '../rule-presence.ts';
 // 模板：所有人可读，管理员发布新版本。发布前两步检查（TPL-07）：
 //   ① 模板自身：不通过禁止发布；
 //   ② 对现有 Profile 的影响：逐个用新版本试渲染，会渲染失败的为阻断项（需 force 才能发布），
@@ -90,7 +91,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
 function draftFrom(body: Record<string, unknown>, id: string, version: number): TemplateVersionDoc {
   if (!isStr(body.name)) throw bad('name 不能为空');
   if (!Array.isArray(body.groups) || !Array.isArray(body.rules) || !body.final || typeof body.final !== 'object') throw bad('需要 groups、rules 与 final');
-  return { ...(body as unknown as TemplateVersionDoc), id, version, ...(isStr(body.changelog) ? { changelog: body.changelog } : {}) };
+  return normalizeRulePresence('template', { ...(body as unknown as TemplateVersionDoc), id, version, ...(isStr(body.changelog) ? { changelog: body.changelog } : {}) });
 }
 
 export function templateRoutes(store: Store, renderer: RenderService, snapshots: SnapshotService) {

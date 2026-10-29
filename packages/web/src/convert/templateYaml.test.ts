@@ -28,12 +28,12 @@ function fixture(): TemplateBody {
       { id: 'g_balance', name: '负载均衡', type: 'load-balance', members: [], strategy: 'consistent-hashing', test: { url: 'https://example.com', timeout: 2000 } },
     ],
     rules: [
-      { id: 'r_disabled_first', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'disabled.example' } }, target: direct, enabled: false },
-      { id: 'r_domain', matcher: { kind: 'rule', rule: { type: 'DOMAIN-SUFFIX', value: 'example.com' }, overrides: [{ when: { client: 'surge' }, action: { drop: true } }] }, target: proxy, enabled: true },
+      { id: 'r_disabled_first', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'disabled.example' } }, target: direct },
+      { id: 'r_domain', matcher: { kind: 'rule', rule: { type: 'DOMAIN-SUFFIX', value: 'example.com' }, overrides: [{ when: { client: 'surge' }, action: { drop: true } }] }, target: proxy },
       { id: 'r_ir', matcher: { kind: 'rule', rule: { type: 'IP-CIDR', value: '10.0.0.0/8', noResolve: true } }, target: direct },
       { id: 'r_options', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN' } }, target: direct, options: { noResolve: true, src: true } },
       { id: 'r_process', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'path', mode: 'wildcard', value: '/Applications/*' } }, target: proxy },
-      { id: 'r_ruleset', matcher: { kind: 'ruleset', id: 'rs_ads' }, target: { kind: 'builtin', name: 'REJECT' }, enabled: false },
+      { id: 'r_ruleset', matcher: { kind: 'ruleset', id: 'rs_ads' }, target: { kind: 'builtin', name: 'REJECT' } },
       { id: 'r_bundle', matcher: { kind: 'ruleset', id: 'b_media' }, target: proxy, options: { noResolve: true } },
     ],
     final: proxy,
@@ -59,7 +59,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     const repository = { repo: 'github', entry: 'Google', name: '仓库 · Google', sources: [{ id: 's', kind: 'remote' as const, format: 'auto' as const, url: 'https://example.test/Google.list', repository: { repo: 'github', entry: 'Google', ref: 'main', path: 'Google.list' } }] };
     const context = { rulesets: [{ id: 'one', name: 'Google' }, { id: 'two', name: 'Google' }] };
     const body: TemplateBody = { ...empty, rules: [
-      { id: 'repo-rule', matcher: { kind: 'ruleset', id: 'repo:fixed', repository }, target: direct, enabled: false },
+      { id: 'repo-rule', matcher: { kind: 'ruleset', id: 'repo:fixed', repository }, target: direct },
       { id: 'local-one', matcher: { kind: 'ruleset', id: 'one' }, target: direct },
       { id: 'local-two', matcher: { kind: 'ruleset', id: 'two' }, target: direct },
     ] };
@@ -68,7 +68,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(yaml).toContain('RULE-SET,local:two,DIRECT');
     const fresh = imported(yaml, empty, context).value;
     expect(fresh.rules.map(r => r.matcher)).toEqual(body.rules.map(r => r.matcher));
-    expect(fresh.rules[0]!.enabled).toBe(false);
+    expect(fresh.rules[0]!.enabled).toBeUndefined();
     const changed = imported(yaml.replace('RULE-SET,repo:fixed,DIRECT', 'RULE-SET,repo:fixed,REJECT,no-resolve'), body, context).value;
     expect(changed.rules[0]).toMatchObject({ id: 'repo-rule', matcher: body.rules[0]!.matcher, options: { noResolve: true }, target: { kind: 'builtin', name: 'REJECT' } });
     const tampered = imported(yaml.replace('https://example.test/Google.list', 'https://example.test/changed.list'), body, context).value;
@@ -84,7 +84,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(imported(yaml, empty, { rulesets: [{ id: 'rs', name: '新名称' }, { id: 'other', name: '旧名称' }] }).value.rules[0]!.matcher).toEqual({ kind: 'ruleset', id: 'rs' });
   });
 
-  it('恢复正常模板时仍保留稳定 ID、覆盖和禁用状态', () => {
+  it('恢复正常模板时仍保留稳定 ID 和覆盖', () => {
     const body = fixture();
     expect(templateFormFromYaml(templateToYaml(body, ctx), body, ctx)).toEqual({ value: body, notes: [] });
   });
@@ -99,7 +99,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(result.value.groups[1]!.test).not.toHaveProperty('interval');
     expect(result.value.groups[1]!.display).not.toHaveProperty('hidden');
     expect(result.value.rules.map((rule) => rule.id)).toEqual(body.rules.slice(1).map((rule) => rule.id));
-    expect(result.value.rules[0]!.enabled).toBe(true);
+    expect(result.value.rules[0]!.enabled).toBeUndefined();
     for (const key of ['interval', 'hidden', 'UNKNOWN']) expect(result.notes.join()).toContain(key);
   });
 
@@ -120,7 +120,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(result.value.final).toEqual({ kind: 'builtin', name: 'REJECT' });
     expect(result.notes.join()).toContain('原出口组已不存在');
   });
-  it('完整模板往返后深度相等，保留 ID、非 YAML 字段及禁用状态', () => {
+  it('完整模板往返后深度相等，保留 ID 和非 YAML 字段', () => {
     const t = fixture();
     const snapshot = structuredClone(t);
     const yaml = templateToYaml(t, ctx);
@@ -129,7 +129,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(yaml).toContain('GEOIP,CN,DIRECT,no-resolve,src');
     expect(yaml).toContain('RULE-SET,广告规则,REJECT');
     expect(yaml).toContain('RULE-SET,媒体规则包,代理选择,no-resolve');
-    expect(yaml.match(/# disabled/g)).toHaveLength(2);
+    expect(yaml).not.toContain('# disabled');
     expect(yaml).not.toMatch(/whenEmpty|hint/);
     const result = imported(yaml, t);
     expect(result.value).toStrictEqual(t);
@@ -247,12 +247,12 @@ rules:
     expect(templateToYaml({ ...empty, rules: [{ id: 'r', matcher: { kind: 'ruleset', id: 'missing' }, target: direct }] }, ctx)).toContain('RULE-SET,local:missing,DIRECT');
   });
 
-  it('增删 no-resolve/src 选项保持规则 ID，并移除禁用注释后重新启用', () => {
-    const t: TemplateBody = { ...empty, rules: [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'IP-CIDR', value: '10.0.0.0/8' } }, target: direct, options: { noResolve: false, src: false }, enabled: false }] };
+  it('增删 no-resolve/src 选项保持规则 ID，不再保存启用字段', () => {
+    const t: TemplateBody = { ...empty, rules: [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'IP-CIDR', value: '10.0.0.0/8' } }, target: direct, options: { noResolve: false, src: false } }] };
     const enabled = imported('rules: ["IP-CIDR,10.0.0.0/8,DIRECT,no-resolve,src"]', t).value;
-    expect(enabled.rules[0]).toStrictEqual({ ...t.rules[0], enabled: true, options: { noResolve: true, src: true } });
+    expect(enabled.rules[0]).toStrictEqual({ ...t.rules[0], options: { noResolve: true, src: true } });
     const removed = imported('rules: ["IP-CIDR,10.0.0.0/8,DIRECT"]', enabled).value;
-    expect(removed.rules[0]).toStrictEqual({ ...t.rules[0], enabled: true });
+    expect(removed.rules[0]).toStrictEqual({ ...t.rules[0] });
   });
 
   it('出口前后的 no-resolve/src 选项都保留，数字状态码映射为字符串', () => {
@@ -289,9 +289,11 @@ rules:
     }
   });
 
-  it('原始规则字符串和 YAML 注释可独立读取，不把普通注释视为禁用', () => {
+  it('旧 YAML 的停用注释移除对应规则，普通注释仍保留规则', () => {
     const result = imported('rules:\n  # 普通说明\n  - DOMAIN,a.example,DIRECT\n  # disabled\n  - DOMAIN,b.example,DIRECT\n  - DOMAIN,c.example,DIRECT # disabled\n');
-    expect(result.value.rules.map((r) => r.enabled)).toEqual([undefined, false, false]);
+    expect(result.value.rules).toHaveLength(1);
+    expect(result.value.rules[0]!.matcher).toEqual({ kind: 'rule', rule: { type: 'DOMAIN', value: 'a.example' } });
+    expect(result.value.rules[0]).not.toHaveProperty('enabled');
     const plain = parse(templateToYaml(fixture(), ctx));
     expect(Object.keys(plain)).toEqual(['proxy-groups', 'rules', 'x-sub-forge-rulesets']);
     expect(imported(stringify(plain), fixture()).value.rules.every((r) => r.enabled !== false)).toBe(true);
@@ -309,4 +311,17 @@ rules:
       random.mockRestore();
     }
   });
+});
+
+it('旧模板导出时移除停用规则且清除启用字段，不改变原对象', () => {
+  const value: TemplateBody = { groups: [], final: direct, rules: [
+    { id: 'off', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'off.test' } }, target: direct, enabled: false },
+    { id: 'on', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'on.test' } }, target: direct, enabled: true },
+  ] };
+  const yaml = templateToYaml(value, ctx);
+  expect(yaml).not.toContain('off.test');
+  expect(yaml).not.toContain('disabled');
+  const next = templateFromYaml(yaml, value, ctx);
+  expect(next.ok && next.value.rules).toEqual([{ id: 'on', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'on.test' } }, target: direct }]);
+  expect(value.rules[0]!.enabled).toBe(false);
 });

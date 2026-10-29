@@ -135,6 +135,7 @@ export type RuleSetSource = {
   behavior?: 'domain' | 'ipcidr' | 'classical';
   /** 仅兼容旧数据；新改写统一存放在 RuleSet.overrides，按规则内容定位 */
   overrides?: { line?: number; match?: string; override: ClientOverride }[];
+  /** @deprecated 仅兼容旧输入；保存或迁移时移除停用来源并清除此字段。 */
   enabled?: boolean;
 };
 
@@ -207,6 +208,7 @@ export type RuleEntry = {
   matcher: Matcher;
   target: Target;
   options?: { noResolve?: boolean; src?: boolean };
+  /** @deprecated 仅兼容旧输入；规则以存在与否决定生效。 */
   enabled?: boolean;
 };
 

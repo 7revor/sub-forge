@@ -1,3 +1,4 @@
+import { normalizeRulePresence } from '../rule-presence.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
 import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/adapters.ts';
@@ -174,7 +175,7 @@ export function checkRepositorySource(src: Record<string, unknown>, prior: { rep
 export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unknown>, id: string, user: User, store: Store): DocTypes[K] {
   if (!isStr(body.name)) throw bad('name 不能为空');
   if (['source', 'collection', 'local', 'ruleset'].includes(kind) && body.note !== undefined && typeof body.note !== 'string') throw bad('备注必须是字符串');
-  const doc = { ...body, id } as Record<string, unknown>;
+  const doc = normalizeRulePresence(kind, { ...body, id }) as Record<string, unknown>;
   const refs = new RefChecker(store, user);
 
   switch (kind) {

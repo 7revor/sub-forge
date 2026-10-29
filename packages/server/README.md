@@ -260,3 +260,8 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 
 
 绑定订阅的 `routing.prependRules` 可选，保存与草稿预览只接受单条规则，检查规则内容、出口归属与节点集成员。模板发布检查前置引用，引用组删除或规则 ID 冲突不允许 force；转换为独立配置保留前置规则，重新绑定显式映射组出口。现有绑定订阅无新增迁移。内置浏览器隔离验收入口：`pnpm exec tsx test/manual-prepend-rules-server.ts`，结束后用 SIGINT/SIGTERM 关闭。
+
+
+### 规则存在即生效（SQLite v17）
+
+保存、自检、预览及发布共用规则清理：旧 enabled:false 条目移除，其余清除标记。v17 在事务中处理规则集、模板全部版本、独立订阅与绑定前置规则，保持有效输出、归属、更新时间、链接和历史资源。旧种子导入执行同一清理，旧备份不修改。示例移除默认停用的 YAML/仓库来源。隔离浏览器入口为 `pnpm exec tsx test/manual-rule-presence-server.ts`，完成后关闭服务。

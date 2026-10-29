@@ -6,7 +6,7 @@ import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[44px_minmax(0,2fr)_minmax(0,1fr)_116px_48px_48px]';
+const columns = 'grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[44px_minmax(0,2fr)_minmax(0,1fr)_116px_48px]';
 
 function RuleFields({ rule, onChange, ctx, report }: {
   rule: RuleEntry; onChange: (rule: RuleEntry) => void; ctx: ConvertCtx; report: ReportItem[];
@@ -50,7 +50,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     <div className="overflow-x-auto px-4 pb-4">
       {!value.rules.length && <Empty className="mb-4" title="没有规则" />}
       <div className="min-w-0">
-        <div className={`${columns} hidden border-b border-line px-2 py-2 sm:grid text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>no-resolve</span><span>启用</span><span>操作</span></div>
+        <div className={`${columns} hidden border-b border-line px-2 py-2 sm:grid text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>no-resolve</span><span>操作</span></div>
         <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
           const error = report.some((r) => r.level === 'error' && r.where === `rule:${rule.id}`);
           return <div id={`template-rule-${rule.id}`} className={cx('my-1 overflow-hidden rounded-lg border', error ? 'border-err bg-err-soft' : 'border-line bg-panel')}>
@@ -66,8 +66,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
                   <span className="text-[12px] sm:hidden">no-resolve</span>
                 </label> : <span className="text-muted">—</span>}
               </div>
-              <div className="col-start-3 row-start-1 sm:col-auto sm:row-auto" onClick={(e) => e.stopPropagation()}><Switch label={`启用第 ${i + 1} 条规则`} checked={rule.enabled !== false} onChange={(enabled) => update({ ...rule, enabled })} /></div>
-              <Button size="sm" className="col-start-3 row-start-2 sm:col-auto sm:row-auto" onClick={(e) => { e.stopPropagation(); onChange({ ...value, rules: value.rules.filter((r) => r.id !== rule.id) }); }}>删除</Button>
+              <Button size="sm" className="col-start-3 row-start-1 sm:col-auto sm:row-auto" onClick={(e) => { e.stopPropagation(); onChange({ ...value, rules: value.rules.filter((r) => r.id !== rule.id) }); }}>删除</Button>
             </div>
             {rule.matcher.kind === 'rule' && selected === rule.id && <RuleFields rule={rule} onChange={update} ctx={ctx} report={report} />}
             {rule.matcher.kind === 'ruleset' && <ItemIssues report={report} where={`rule:${rule.id}`} />}

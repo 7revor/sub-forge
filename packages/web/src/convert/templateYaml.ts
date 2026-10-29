@@ -45,6 +45,7 @@ function targetName(target: Target, groups: GroupSpec[]): string {
 }
 
 export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
+  t = { ...t, rules: t.rules.filter(rule => rule.enabled !== false).map(({ enabled: _, ...rule }) => rule) };
   const groups = t.groups.map((g) => {
     const out: Record<string, unknown> = {
       name: g.name, type: g.type,
@@ -81,7 +82,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
   const rules = doc.get('rules', true);
   if (isSeq(rules)) t.rules.forEach((r, i) => {
     const item = rules.items[i];
-    if (isNode(item)) item.commentBefore = ` sub-forge-rule: ${encodeURIComponent(r.id)}${r.enabled === false ? '\n disabled' : ''}`;
+    if (isNode(item)) item.commentBefore = ` sub-forge-rule: ${encodeURIComponent(r.id)}`;
   });
   return doc.toString({ lineWidth: 0 });
 }
@@ -336,6 +337,9 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         attempt(() => { throw new Error(`第 ${index + 1} 条规则必须是字符串`); });
         continue;
       }
+      // 第一项的前置注释可能归在 YAMLSeq 上，而非 Scalar 上。
+      const comments = [node.commentBefore, node.comment, index === 0 && isSeq(ruleNodes) ? ruleNodes.commentBefore : undefined];
+      if (comments.some((comment) => typeof comment === 'string' && comment.split('\n').some((s) => s.trim() === 'disabled'))) continue;
       const original = node.value;
       try {
         const parts = original.split(',').map((part) => part.trim());
@@ -379,10 +383,6 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         const old = (byId && !used.has(byId.id) ? byId : undefined) ?? current.rules.find((r) => !used.has(r.id) && matcherKey(r.matcher) === key);
         if (old) used.add(old.id);
         const r: RuleEntry = { id: old?.id ?? newId('r'), ...restoreRule(matcher, old, flags.includes('no-resolve'), flags.includes('src')), target };
-        // 第一项的前置注释可能归在 YAMLSeq 上，而非 Scalar 上。
-        const comments = [node.commentBefore, node.comment, index === 0 && isSeq(ruleNodes) ? ruleNodes.commentBefore : undefined];
-        if (comments.some((comment) => typeof comment === 'string' && comment.split('\n').some((s) => s.trim() === 'disabled'))) r.enabled = false;
-        else if (old?.enabled !== undefined) r.enabled = true;
         rules.push(r);
       } catch (err) {
         const message = `第 ${index + 1} 条规则「${original}」：${err instanceof Error ? err.message : String(err)}`;

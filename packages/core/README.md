@@ -71,3 +71,6 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 
 绑定订阅可选 `routing.prependRules` 保存有序单条规则，渲染先于全部模板规则，MATCH 沿用模板；缺省空数组。节点出口复用代理链的 wrap/copy/inline 依赖解析。模板更新检查前置规则 ID 与引用组，模式转换通过 resolveProfileRouting 保留完整顺序。
+
+
+2026-10-29：规则及规则来源改为存在即生效。enabled 字段只供旧输入兼容，由服务端保存和 v17 迁移移除停用项并清除标记。处理链与仓库启停保持原语义。

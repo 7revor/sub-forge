@@ -38,9 +38,8 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
       if (!Array.isArray(r.prependRules)) throw bad('前置规则必须是数组');
       for (const rule of r.prependRules) {
         if (!obj(rule) || !isStr(rule.id) || !obj(rule.matcher) || rule.matcher.kind !== 'rule') throw bad('前置规则只能使用单条规则');
-        if (Object.keys(rule).some(key => !['id', 'matcher', 'target', 'options', 'enabled'].includes(key))) throw bad('前置规则不能指定插入位置或覆盖模板规则');
+        if (Object.keys(rule).some(key => !['id', 'matcher', 'target', 'options'].includes(key))) throw bad('前置规则不能指定插入位置或覆盖模板规则');
         if (!obj(rule.target) || rule.target.kind === 'node' && !obj(rule.target.ref)) throw bad('前置规则出口格式错误');
-        if (rule.enabled !== undefined && typeof rule.enabled !== 'boolean') throw bad('前置规则启用状态必须是布尔值');
         checkPrependRule(rule.matcher.rule);
         if (rule.matcher.overrides !== undefined) {
           if (!Array.isArray(rule.matcher.overrides)) throw bad('客户端覆盖必须是数组');
