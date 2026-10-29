@@ -4,7 +4,7 @@ import { useQueries } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { api, type SnapshotMeta } from '../api.ts';
-import { Badge, Card, Empty, PageHeader, formatBytes, formatTime, td, th } from '../components/ui.tsx';
+import { Badge, Card, Empty, PageHeader, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useTemplates } from '../hooks.ts';
 
 export function Overview() {
@@ -69,8 +69,8 @@ export function Overview() {
                 <tr key={p.id}>
                   <td className={td}><Link to={`/profiles/${p.id}`} className="font-medium text-ink no-underline hover:text-accent">{p.name}</Link></td>
                   <td className={td}>{p.template ? <>{tplName(p.template.id)} <span className="text-[12px] text-muted">{p.template.follow === 'latest' ? '跟随最新' : `锁定 v${p.template.follow.pinned}`}</span></> : '—'}</td>
-                  <td className={`${td} font-mono`}>{p.nodeSets.length}</td>
-                  <td className={`${td} font-mono`}>{p.chains.length}</td>
+                  <td className={cx(td, 'font-mono')}>{p.nodeSets.length}</td>
+                  <td className={cx(td, 'font-mono')}>{p.chains.length}</td>
                 </tr>
               ))}
             </tbody>
@@ -91,7 +91,7 @@ export function Overview() {
                     <td className={td}><Link to={`/sources/${source.id}`} className="font-medium text-ink no-underline hover:text-accent">{source.name}</Link></td>
                     <td className={td}>{lastOk ? formatTime(lastOk.fetchedAt) : '—'}</td>
                     <td className={td}>{u?.total ? `${formatBytes(used)} / ${formatBytes(u.total)}` : '无流量信息'}</td>
-                    <td className={`${td} text-muted`}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
+                    <td className={cx(td, 'text-muted')}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
                     <td className={td}>{f ? <Badge tone="err">{lastOk ? '拉取失败 · 使用快照' : '拉取失败'}</Badge> : lastOk ? <Badge tone="ok">正常</Badge> : <Badge>未拉取</Badge>}</td>
                   </tr>
                 );

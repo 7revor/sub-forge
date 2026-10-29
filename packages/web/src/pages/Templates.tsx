@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
 import { newId, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { TemplateEditor } from './template/TemplateEditor.tsx';
@@ -32,9 +32,9 @@ export function TemplateList() {
               {list.data.map((t) => (
                 <tr key={t.id} className="hover:bg-ground">
                   <td className={td}><Link to={`/templates/${t.id}`} className="font-medium text-ink no-underline hover:text-accent">{t.name ?? t.id}</Link></td>
-                  <td className={`${td} font-mono`}>v{t.version}</td>
-                  <td className={`${td} font-mono`}>{t.groups.length}</td>
-                  <td className={`${td} font-mono`}>{t.rules.length}</td>
+                  <td className={cx(td, 'font-mono')}>v{t.version}</td>
+                  <td className={cx(td, 'font-mono')}>{t.groups.length}</td>
+                  <td className={cx(td, 'font-mono')}>{t.rules.length}</td>
                 </tr>
               ))}
             </tbody>
@@ -65,8 +65,8 @@ function TemplateView({ t, ctx }: { t: TemplateDoc; ctx: ConvertCtx }) {
             {t.groups.map((g) => (
               <tr key={g.id}>
                 <td className={td}><div className="flex flex-col gap-0.5"><span className="font-medium">{g.name}</span>{g.hint && <span className="text-[12px] text-muted">{g.hint}</span>}</div></td>
-                <td className={`${td} font-mono text-[12.5px]`}>{g.type}</td>
-                <td className={`${td} text-[12.5px] text-ink-2`}>{g.members.map((m) => memberLabel(m, groupName, nsName).text).join(' · ') || '—'}</td>
+                <td className={cx(td, 'font-mono text-[12.5px]')}>{g.type}</td>
+                <td className={cx(td, 'text-[12.5px] text-ink-2')}>{g.members.map((m) => memberLabel(m, groupName, nsName).text).join(' · ') || '—'}</td>
                 <td className={td}><Badge tone={g.whenEmpty === 'direct' ? 'accent' : 'err'}>{g.whenEmpty === 'direct' ? '直连' : '拒绝'}</Badge></td>
               </tr>
             ))}
@@ -79,12 +79,12 @@ function TemplateView({ t, ctx }: { t: TemplateDoc; ctx: ConvertCtx }) {
           <tbody>
             {t.rules.map((r, i) => (
               <tr key={r.id}>
-                <td className={`${td} font-mono text-muted`}>{i + 1}</td>
-                <td className={`${td} font-mono text-[12.5px]`}>{matcherLabel(r.matcher, ctx)}</td>
+                <td className={cx(td, 'font-mono text-muted')}>{i + 1}</td>
+                <td className={cx(td, 'font-mono text-[12.5px]')}>{matcherLabel(r.matcher, ctx)}</td>
                 <td className={td}>{targetLabel(r.target, groupName, nsName)}</td>
               </tr>
             ))}
-            <tr><td className={`${td} font-mono text-muted`}>—</td><td className={`${td} font-mono`}>MATCH</td><td className={td}>{targetLabel(t.final, groupName, nsName)}</td></tr>
+            <tr><td className={cx(td, 'font-mono text-muted')}>—</td><td className={cx(td, 'font-mono')}>MATCH</td><td className={td}>{targetLabel(t.final, groupName, nsName)}</td></tr>
           </tbody>
         </table>
       </Card>
