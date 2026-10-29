@@ -1,7 +1,7 @@
 import type { Builtin, Matcher, ReportItem, Target } from '@sub-forge/core';
 import { BUILTINS } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
-import { Badge, ReportList, Select } from '../../components/ui.tsx';
+import { ReportList, Select } from '../../components/ui.tsx';
 import type { ConvertCtx, NamedRef } from '../../convert/templateYaml.ts';
 
 export function matcherLabel(matcher: Matcher, ctx: ConvertCtx): string {
@@ -32,13 +32,5 @@ export function ItemIssues({ report, where }: { report: ReportItem[]; where: str
 }
 
 export function TemplateReport({ items, onLocate }: { items: ReportItem[]; onLocate: (where: string) => void }) {
-  if (!items.length) return <ReportList items={items} />;
-  const tones = { error: 'err', warn: 'warn', info: 'accent' } as const;
-  const levels = { error: '错误', warn: '告警', info: '提示' };
-  return <div>{items.map((item, i) => item.where && /^(group|rule):/.test(item.where)
-    ? <button key={i} type="button" className="flex w-full cursor-pointer flex-col gap-1 border-b border-line-2 py-2.5 text-left hover:bg-ground" onClick={() => onLocate(item.where!)}>
-      <span className="flex items-center gap-2"><Badge tone={tones[item.level]}>{levels[item.level]}</Badge><span className="font-mono text-[11.5px] text-muted">{item.code}</span></span>
-      <span className="text-[13px] leading-relaxed">{item.message}</span>
-      <span className="text-[11.5px] text-accent">定位：{item.where}</span>
-    </button> : <ReportList key={i} items={[item]} />)}</div>;
+  return <ReportList items={items} onLocate={onLocate} canLocate={(where) => /^(group|rule):/.test(where)} />;
 }

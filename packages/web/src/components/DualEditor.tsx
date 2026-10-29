@@ -1,5 +1,6 @@
+import { CopyButton } from './CopyButton.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, ErrorBox, Segmented, Textarea } from './ui.tsx';
+import { ErrorBox, Segmented, Textarea } from './ui.tsx';
 
 export type EditorMode = 'form' | 'raw';
 export type RawResult<T> = { ok: true; value: T; notes?: string[] } | { ok: false; error: string; line?: number };
@@ -27,7 +28,6 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
   const [text, setText] = useState(() => { const r = current === 'raw' ? tryRaw(toRaw, value) : undefined; return r && 'text' in r ? r.text : ''; });
   const [result, setResult] = useState<RawResult<T>>(() => { const r = current === 'raw' ? tryRaw(toRaw, value) : undefined; return r && 'text' in r ? fromRaw(r.text) : { ok: true, value }; });
   const [rawError, setRawError] = useState('');
-  const [copyMessage, setCopyMessage] = useState('');
   const previous = useRef({ value, mode: current });
   const emitted = useRef<{ value: T; canonical: string } | undefined>(undefined);
 
@@ -42,7 +42,6 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           setText(raw.text);
           setResult(fromRaw(raw.text));
         }
-        setCopyMessage('');
       }
       emitted.current = undefined;
     }
@@ -81,10 +80,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
       {current === 'form' ? renderForm() : <>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[13px] text-muted">{rawLabel}</span>
-          <Button size="sm" onClick={async () => {
-            try { await navigator.clipboard.writeText(text); setCopyMessage('已复制'); }
-            catch (error) { setCopyMessage(`复制失败：${error instanceof Error ? error.message : String(error)}`); }
-          }}>复制</Button>
+          <CopyButton size="sm" text={text} />
         </div>
         {rawHint && <span className="text-[12px] leading-relaxed text-muted">{rawHint}</span>}
         <Textarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
@@ -94,13 +90,13 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           if (!imported.ok) { setRawError(`未导入：${imported.error}`); return; }
           const canonical = tryRaw(toRaw, imported.value);
           if ('error' in canonical) { setRawError(`未导入：${canonical.error}`); return; }
-          setText(canonical.text); setResult(imported); setRawError(''); setCopyMessage('');
+          setText(canonical.text); setResult(imported); setRawError('');
           emitted.current = { value: imported.value, canonical: canonical.text };
           onValidityChange?.(true);
           onChange(imported.value);
         }} onChange={(event) => {
           const raw = event.target.value;
-          setText(raw); setCopyMessage(''); setRawError('');
+          setText(raw); setRawError('');
           const parsed = fromRaw(raw);
           setResult(parsed);
           onValidityChange?.(parsed.ok);
@@ -117,7 +113,6 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
         }} />
         <ErrorBox error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
         {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[13px] text-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
-        {copyMessage && <span role="status" className="text-[12px] text-muted">{copyMessage}</span>}
       </>}
     </div>
   </div>;

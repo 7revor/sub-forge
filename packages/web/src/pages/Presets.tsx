@@ -1,12 +1,15 @@
+import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
+import { LeaveDialog } from '../components/LeaveDialog.tsx';
+import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 // 基础设置预设（BS-03，设计稿「管理员 · 基础设置预设」）：一页完成——左侧预设列表、中间编辑（分区跳转 + 表单 / YAML）、右侧引用方。
 // 保存即发布新版本，引用它的配置订阅随之更新，它们自己覆盖的项保持不变。
 
 import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { DeleteAction, ActionButtons } from '../components/DetailActions.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Button, Card, Empty, ErrorBox, Input, Modal, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
+import { Button, Card, Empty, ErrorBox, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { DualEditor, type EditorMode } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
@@ -21,18 +24,9 @@ const EMPTY: PresetDoc = { id: '', name: '', version: 1, mihomo: DEFAULT_MIHOMO 
 function NewPresetModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const save = useSaveDoc('presets');
-  const [name, setName] = useState('');
-  useEffect(() => { if (open) setName(''); }, [open]);
-  const create = () => save.mutate({ name: name.trim(), version: 1, mihomo: DEFAULT_MIHOMO }, { onSuccess: (item) => { onClose(); navigate(`/presets/${item.id}`); } });
-  return (
-    <Modal title="新建预设" open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!name.trim() || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建'}</Button></>}>
-      <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">名称</span>
-        <Input autoFocus placeholder="例如：fake-ip 推荐" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) create(); }} /></label>
-      <span className="text-[12px] text-muted">从常用的通用设置开始，创建后再补充 DNS、TUN 等。</span>
-      <ErrorBox error={save.error} />
-    </Modal>
-  );
+  return <NamedCreateDialog open={open} onClose={onClose} title="新建预设" placeholder="例如：fake-ip 推荐" hint="从常用的通用设置开始，创建后再补充 DNS、TUN 等。"
+    pending={save.isPending} error={save.error} onReset={save.reset}
+    onCreate={(name) => save.mutateAsync({ name, version: 1, mihomo: DEFAULT_MIHOMO }, { onSuccess: (item) => { onClose(); navigate(`/presets/${item.id}`); } })} />;
 }
 
 /** /presets：有预设时跳到第一个，否则显示空状态 */
@@ -64,20 +58,22 @@ export function PresetEdit() {
   const [client, setClient] = useState<'mihomo' | 'surge'>('mihomo');
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
+  const dirty = e.dirty || !rawValid;
+  const { blocker, leave } = useLeaveGuard(!!e.draft && !e.isNew && dirty);
   if (e.isNew) return <Navigate to="/presets" replace />;
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const refs = (profiles.data ?? []).filter((p) => p.base?.presetId === d.id);
-  const dirty = e.dirty || !rawValid;
   const publish = () => { if (rawValid) e.submit((x) => ({ ...x, version: x.version + 1 })); };
-  const discard = () => e.setDraft(e.doc.data);
+  const discard = () => { e.setDraft(e.doc.data); setRawValid(true); setEditorKey((key) => key + 1); };
   const jump = (title: string) => document.querySelector(`[data-section="${title}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const refCount = (id: string) => (profiles.data ?? []).filter((p) => p.base?.presetId === id).length;
 
   return (
     <>
       <PageHeader title="基础设置预设" subtitle={INTRO} actions={<>
-        <Button disabled={!e.dirty} onClick={discard}>放弃</Button>
+        <Button disabled={!dirty} onClick={discard}>放弃</Button>
         <Button variant="primary" disabled={!dirty || !rawValid || e.save.isPending} onClick={publish}>{e.save.isPending ? '发布中…' : `发布 v${d.version + 1}`}</Button>
         <Button onClick={() => setCreating(true)}>新建预设</Button>
       </>}>
@@ -90,7 +86,7 @@ export function PresetEdit() {
             {(presets.data ?? []).map((p) => {
               const on = p.id === d.id;
               return (
-                <button key={p.id} type="button" aria-current={on || undefined} onClick={() => { if (!on && (!dirty || confirm(`「${d.name}」有未保存的修改，离开后会丢失。继续？`))) navigate(`/presets/${p.id}`); }}
+                <button key={p.id} type="button" aria-current={on || undefined} onClick={() => { if (!on) navigate(`/presets/${p.id}`); }}
                   className={cx('flex w-full cursor-pointer flex-col gap-0.5 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'bg-panel hover:bg-ground')}>
                   <span className="text-[13.5px] font-semibold">{on ? d.name : p.name}</span>
                   <span className="text-[12px] text-muted">v{p.version} · {refCount(p.id)} 个配置订阅引用</span>
@@ -105,7 +101,7 @@ export function PresetEdit() {
               <div className="flex flex-wrap items-center gap-2">
                 <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
                 <ActionButtons items={[{ label: '重命名', onSelect: () => setRenaming(true) }]} />
-                <DeleteAction what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove} />
+                <DeleteAction what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/presets') })} />
               </div>
             </div>
             {client === 'surge' && <Empty title="Surge 预设暂未开放" description="Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。" />}
@@ -113,7 +109,7 @@ export function PresetEdit() {
               {mihomoBaseGroups.map((g) => <button key={g.title} type="button" onClick={() => jump(g.title)}
                 className="cursor-pointer rounded-full border border-line bg-ground px-2.5 py-1 text-[12.5px] text-ink-2 hover:border-[#c5cad3]">{g.title}</button>)}
             </div>}
-            {client === 'mihomo' && <DualEditor key={d.id} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
+            {client === 'mihomo' && <DualEditor key={`${d.id}:${editorKey}`} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
               toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} onValidityChange={setRawValid} rawLabel="mihomo · YAML"
               renderForm={() => <SchemaForm groups={mihomoBaseGroups} value={baseToForm(d.mihomo)} extra
                 onChange={(value) => e.setDraft({ ...d, mihomo: baseFromForm(value, d.mihomo) })} />} />}
@@ -134,6 +130,8 @@ export function PresetEdit() {
         </div>
       </PageScroll>
       <NewPresetModal open={creating} onClose={() => setCreating(false)} />
+      <LeaveDialog blocker={blocker} what={`预设「${d.name}」`} canSave={rawValid} pending={e.save.isPending} error={e.save.error} onDiscard={discard} saveLabel="发布并离开"
+        onSave={(done) => e.save.mutate({ ...d, version: d.version + 1 }, { onSuccess: done })} />
       <RenameDialog open={renaming} title="重命名预设" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
     </>
   );

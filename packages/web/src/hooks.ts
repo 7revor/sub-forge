@@ -1,3 +1,5 @@
+import { snapshotOptions } from './hooks/documentQueries.ts';
+import { sourceFetchSummary } from './domain/sourceFetch.ts';
 // 数据读写的 React Query 封装。文档种类与后端 /api/{kind} 一一对应。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -72,13 +74,6 @@ export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined
 
 /** 订阅源的拉取状态：最近一次成功的快照、最近一次是否失败（与总览共用缓存） */
 export function useSourceFetchState(source: SourceDoc | undefined) {
-  const snaps = useQuery({
-    queryKey: ['snapshots', source?.id],
-    enabled: !!source?.id,
-    queryFn: () => api<{ items: import('./api.ts').SnapshotMeta[] }>('GET', `/sources/${source!.id}/snapshots`).then((r) => r.items),
-  });
-  const items = snaps.data ?? [];
-  const lastOk = items.find((x) => x.ok);
-  const lastFail = items.find((x) => !x.ok);
-  return { snaps, lastOk, failing: !!lastFail && (!lastOk || lastFail.fetchedAt > lastOk.fetchedAt), okCount: items.filter((x) => x.ok).length };
+  const snaps = useQuery(snapshotOptions(source?.id));
+  return { snaps, ...sourceFetchSummary(snaps.data ?? []) };
 }

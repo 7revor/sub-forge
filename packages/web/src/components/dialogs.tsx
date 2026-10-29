@@ -1,3 +1,4 @@
+import { NODE_SET_LABEL, sameNodeSet as same, nodeSetKey } from '../domain/nodeSet.ts';
 // 通用对话框（设计稿「对话框与危险操作」）：重命名、添加节点集。
 
 import type { NodeSetID } from '@sub-forge/core';
@@ -18,8 +19,6 @@ export function RenameDialog({ open, title, name, onClose, onRename }: { open: b
   );
 }
 
-const NS_LABEL = { source: '订阅源', collection: '组合', local: '本地节点组' } as const;
-const same = (a: NodeSetID, b: NodeSetID) => a.type === b.type && a.id === b.id;
 
 /** 搜索 + 多选；已加入的置灰，不能自选（如组合不能加入自己） */
 export function NodeSetPickerDialog({ open, title = '添加节点集', options, added, onClose, onAdd, hint }: {
@@ -39,10 +38,10 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
           const isAdded = added.some((a) => same(a, o.ref));
           const on = picked.some((p) => same(p, o.ref));
           return (
-            <label key={`${o.ref.type}:${o.ref.id}`} className={`flex items-center gap-2.5 border-b border-line-2 px-3 py-2.5 last:border-0 ${isAdded ? 'text-faint' : 'cursor-pointer hover:bg-ground'}`}>
+            <label key={nodeSetKey(o.ref)} className={`flex items-center gap-2.5 border-b border-line-2 px-3 py-2.5 last:border-0 ${isAdded ? 'text-faint' : 'cursor-pointer hover:bg-ground'}`}>
               <input type="checkbox" disabled={isAdded} checked={on || isAdded} onChange={(e) => setPicked(e.target.checked ? [...picked, o.ref] : picked.filter((p) => !same(p, o.ref)))} />
               <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{o.name}</span>
-              <span className="text-[12px] text-muted">{isAdded ? '已加入' : NS_LABEL[o.ref.type]}</span>
+              <span className="text-[12px] text-muted">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>
             </label>
           );
         })}

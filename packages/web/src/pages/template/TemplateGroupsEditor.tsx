@@ -1,8 +1,9 @@
+import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import type { GroupSpec, ReportItem } from '@sub-forge/core';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, Field, Input, Segmented, Switch, cx } from '../../components/ui.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
@@ -25,7 +26,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
   // 设计稿「管理员 · 模板编辑器」：骨架表格（组 / 类型 / 成员 / 为空时 / 填充提示），点击行在下方展开编辑
   const grid = 'grid grid-cols-[24px_minmax(0,1.1fr)_minmax(0,0.6fr)_minmax(0,1.4fr)_88px_minmax(0,1fr)] items-center gap-3';
   return <Card bodyClass="overflow-x-auto pb-2"
-    title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">策略组骨架</h2><span className="text-[12.5px] text-muted">只含其他模板组和内置策略，不含节点，也不预设 filter。</span></div>}
+    title={`策略组骨架`} subtitle={`只含其他模板组和内置策略，不含节点，也不预设 filter。`}
     actions={<Button onClick={() => {
       const id = newId('g');
       onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [], whenEmpty: 'reject' }] });
@@ -49,22 +50,9 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           {open && group && <div key={group.id} id={`template-group-${group.id}`} className="flex min-w-0 flex-col gap-3 border-t border-line-2 bg-ground px-4 py-4">
         <ItemIssues report={report} where={`group:${group.id}`} />
         <Field label="组名称">{(id) => <Input id={id} value={group.name} onChange={(e) => update({ name: e.target.value })} />}</Field>
-        <Field label="类型">{(id) => <Select id={id} value={group.type} onChange={(e) => update({ type: e.target.value as GroupSpec['type'] })}>
-          {['select', 'url-test', 'fallback', 'load-balance'].map((type) => <option key={type}>{type}</option>)}
-        </Select>}</Field>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><GroupSettingsFields value={group} onChange={(key, next) => update({ [key]: next })} /></div>
         <div className="flex flex-wrap items-center gap-2"><span className="text-[13px] text-muted">为空时</span><Segmented label="为空时" value={group.whenEmpty ?? 'reject'} options={[{ value: 'reject', label: '拒绝' }, { value: 'direct', label: '直连' }]} onChange={(whenEmpty) => update({ whenEmpty })} /></div>
         <Field label="填充提示">{(id) => <Input id={id} value={group.hint ?? ''} onChange={(e) => update({ hint: e.target.value })} />}</Field>
-        {group.type !== 'select' && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {(['url', 'interval', 'timeout', 'maxFailedTimes', 'expectedStatus', ...(group.type === 'url-test' ? ['tolerance'] as const : [])] as const).map((key) => {
-            const numeric = !['url', 'expectedStatus'].includes(key);
-            const label = key === 'maxFailedTimes' ? 'max-failed-times' : key === 'expectedStatus' ? 'expected-status' : key;
-            return <Field key={key} label={label}>{(id) => <Input id={id} type={numeric ? 'number' : 'text'} min={numeric ? 0 : undefined} value={group.test?.[key] ?? ''} onChange={(e) => update({ test: { ...group.test, [key]: e.target.value === '' ? undefined : numeric ? Number(e.target.value) : e.target.value } })} />}</Field>;
-          })}
-          <div className="flex items-center gap-2"><Switch label="lazy" checked={group.test?.lazy ?? false} onChange={(lazy) => update({ test: { ...group.test, lazy } })} /><span className="text-[13px]">lazy</span></div>
-          {group.type === 'load-balance' && <Field label="strategy">{(id) => <Select id={id} value={group.strategy ?? ''} onChange={(e) => update({ strategy: (e.target.value || undefined) as GroupSpec['strategy'] })}>
-            <option value="">默认</option>{['consistent-hashing', 'round-robin', 'sticky-sessions'].map((s) => <option key={s}>{s}</option>)}
-          </Select>}</Field>}
-        </div>}
         <div className="flex items-center gap-2"><Switch label="hidden" checked={group.display?.hidden ?? false} onChange={(hidden) => update({ display: { ...group.display, hidden } })} /><span className="text-[13px]">hidden（隐藏）</span></div>
         <Field label="icon（图标）">{(id) => <Input id={id} value={group.display?.icon ?? ''} onChange={(e) => update({ display: { ...group.display, icon: e.target.value } })} />}</Field>
         <ExtraFields value={group.extra ?? {}} onChange={(extra) => update({ extra })} />
