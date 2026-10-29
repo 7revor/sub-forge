@@ -23,9 +23,9 @@ export function TemplateTargetSelect({ value, onChange, groups, label, action = 
 
 export function ItemIssues({ report, where }: { report: ReportItem[]; where: string }) {
   const issues = report.filter((r) => r.where === where);
-  return issues.length > 0 ? <div className="rounded-lg border border-line px-3"><ReportList items={issues} /></div> : null;
+  return issues.length > 0 ? <div className="rounded-lg border border-line px-3"><ReportList items={issues} showWhere={false} /></div> : null;
 }
 
 export function TemplateReport({ items, onLocate }: { items: ReportItem[]; onLocate: (where: string) => void }) {
-  return <ReportList items={items} onLocate={onLocate} canLocate={(where) => /^(group|rule):/.test(where)} />;
+  return <ReportList items={items} showWhere={false} onLocate={onLocate} canLocate={(where) => /^(group|rule):/.test(where)} />;
 }

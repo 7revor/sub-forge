@@ -10,10 +10,11 @@ import { ruleToLine } from '../../components/rule.ts';
 import { Button, Card, Empty, ErrorAlert, Field, FieldError, Input, Modal, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
+import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)_64px]';
+const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(120px,14vw,200px)_64px]';
 
 function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCtx; repos: NamedRef[] }) {
   if (matcher.kind === 'rule') {
@@ -45,18 +46,25 @@ function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCt
   return <span className={lineClass}><span className={sourceClass}>增强集合 ·</span><span className="truncate" title={name}>{name}</span></span>;
 }
 
-export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report }: {
+export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady }: {
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
+  onRuleValidationReady: (id: string, ready: boolean) => void;
 }) {
   const [urlError, setUrlError] = useState<string>();
   const [adding, setAdding] = useState(false);
   const repositories = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: value.rules.some(r => r.matcher.kind === 'ruleset' && !!r.matcher.repository) });
   const repos = repositories.data?.repos ?? [];
+  const [preview, setPreview] = useState<Matcher>();
   const rule = value.rules.find(r => r.id === selected);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
+  const close = () => {
+    if (rule) onRuleValidationReady(rule.id, true);
+    onSelect(undefined);
+  };
   const add = (matcher: Matcher) => {
     const id = newId('r');
+    if (matcher.kind === 'rule') onRuleValidationReady(id, false);
     onChange({ ...value, rules: [...value.rules, { id, matcher, target: value.final }] });
     if (matcher.kind === 'rule') onSelect(id);
   };
@@ -75,28 +83,28 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       {!value.rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
       <SortableList items={value.rules} getKey={r => r.id} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
         const error = report.some(item => item.level === 'error' && item.where === `rule:${r.id}`);
-        return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-1 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
+        return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
           <span className="flex items-center text-[12px] text-muted">{handle}{i + 1}</span>
-          <button type="button" aria-label={`编辑第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)} className="min-w-0 cursor-pointer text-left hover:text-accent"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
+          <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer text-left hover:text-accent"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-          <button type="button" aria-label={`修改第 ${i + 1} 条规则出口`} onClick={() => onSelect(r.id)} className="col-start-2 row-start-2 min-w-0 cursor-pointer truncate text-left text-ink-2 hover:text-accent sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</button>
+          <span title={targetLabel(r.target, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-left text-ink-2 sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</span>
           <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
             <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
             <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
           </div>
         </div>;
       }} />
-      <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-3 text-[13px]')}>
+      <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
         <span className="pl-6 text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-        <button type="button" aria-label="修改 MATCH 出口" onClick={() => onSelect('final')} className="col-start-2 row-start-2 cursor-pointer truncate text-left hover:text-accent sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</button>
+        <span title={targetLabel(value.final, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-left sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</span>
         <Button size="sm" variant="ghost" className="col-start-3 row-start-1 justify-self-start px-1.5 sm:col-start-5" aria-label="编辑 MATCH" onClick={() => onSelect('final')}><Pencil size={14} /></Button>
       </div>
     </Card>
     <Modal title="引用规则" open={adding} onClose={() => setAdding(false)} wide footer={<Button onClick={() => setAdding(false)}>取消</Button>}>
       <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" onSelect={matcher => { add(matcher); setAdding(false); }} />}</Field>
     </Modal>
-    <Modal title={rule ? `编辑第 ${value.rules.indexOf(rule) + 1} 条规则` : 'MATCH 出口'} open={!!rule || selected === 'final'} onClose={() => onSelect(undefined)} wide
-      footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={() => onSelect(undefined)}>完成</Button></>}>
+    <Modal title={rule ? `编辑第 ${value.rules.indexOf(rule) + 1} 条规则` : 'MATCH 出口'} open={!!rule || selected === 'final'} onClose={close} wide
+      footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={close}>完成</Button></>}>
       {rule ? <>
         <ItemIssues report={report} where={`rule:${rule.id}`} />
         {rule.matcher.kind === 'ruleset' && rule.matcher.remote ? <Field label="远程链接">{id => <Input id={id} type="url" value={rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : ''} onChange={e => {
@@ -111,7 +119,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         }} />}</Field> : rule.matcher.kind === 'ruleset' ? <Field label="规则来源">{id => <>
           <RuleMatcher matcher={rule.matcher} ctx={ctx} repos={repos} />
           <RuleSetPicker id={id} label="更换规则来源" onSelect={matcher => update({ ...rule, matcher })} />
-        </>}</Field> : <MatcherEditor fixedKind value={rule.matcher} rulesets={ctx.rulesets} ruleValue={withIpOptions(rule.matcher.rule, rule.options ?? {})} onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} />}
+        </>}</Field> : <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}><MatcherEditor fixedKind value={rule.matcher} rulesets={ctx.rulesets} ruleValue={withIpOptions(rule.matcher.rule, rule.options ?? {})} onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} /></div>}
         {rule.matcher.kind === 'ruleset' && rule.matcher.remote && !rule.matcher.id && urlError && <FieldError error={urlError} />}
         <Field label="出口">{() => <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={target => update({ ...rule, target })} />}</Field>
       </> : <>
@@ -120,5 +128,6 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         <ItemIssues report={report} where="final" />
       </>}
     </Modal>
+    {preview && <RuleSourcePreview matcher={preview} onClose={() => setPreview(undefined)} />}
   </>;
 }

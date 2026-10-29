@@ -43,9 +43,9 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <SortableList items={value.groups} getKey={g => g.id} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = g.members.map(m => memberLabel(m, groupName, ref => ref.id).text).join(' · ') || '—';
-          return <div className={cx(columns, 'items-center border-t border-line-2 px-4 py-1 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
+          return <div className={cx(columns, 'items-center border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
             {handle}
-            <button type="button" onClick={() => onSelect(g.id)} className={cx('min-w-0 cursor-pointer truncate text-left font-medium hover:text-accent', error && 'text-err')}>{g.name || '未命名组'}{g.display?.hidden && <span className="ml-2 text-[11px] font-normal text-muted">已隐藏</span>}</button>
+            <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left font-medium', error && 'text-err')}>{g.name || '未命名组'}{g.display?.hidden && <span className="ml-2 text-[11px] font-normal text-muted">已隐藏</span>}</span>
             <span className="font-mono text-[12px]">{g.type.toUpperCase()}</span>
             <span className="col-span-3 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-auto sm:row-start-auto" title={members}>{members}</span>
             <Button size="sm" variant="ghost" className="col-start-4 row-start-1 px-2 sm:col-start-5" aria-label={`编辑策略组「${g.name}」`} onClick={() => onSelect(g.id)}><Pencil size={14} /></Button>

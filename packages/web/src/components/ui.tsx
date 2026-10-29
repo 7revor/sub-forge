@@ -211,9 +211,10 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
 }
 
 /** 渲染报告条目列表；定位入口保持为可键盘操作的按钮。 */
-export function ReportList({ items, onLocate, canLocate = () => true }: {
+export function ReportList({ items, onLocate, canLocate = () => true, showWhere = true }: {
   items: ReportItem[];
   onLocate?: (where: string) => void; canLocate?: (where: string) => boolean;
+  showWhere?: boolean;
 }) {
   if (!items.length) return <div className="text-[13px] text-ok">没有问题</div>;
   const tone = { error: 'err', warn: 'warn', info: 'accent' } as const;
@@ -242,7 +243,7 @@ export function ReportList({ items, onLocate, canLocate = () => true }: {
       const content = <>
         <span className="flex items-center gap-2"><Badge tone={tone[item.level]}>{text[item.level]}</Badge><span className="font-mono text-[11.5px] text-muted">{item.code}</span></span>
         <span className="text-[13px] leading-relaxed">{item.message}</span>
-        {item.where && <span className={locate ? 'text-[11.5px] text-accent' : 'font-mono text-[11.5px] text-muted'}>{locate ? `定位：${item.where}` : item.where}</span>}
+        {item.where && (showWhere || locate) && <span className={locate ? 'text-[11.5px] text-accent' : 'font-mono text-[11.5px] text-muted'}>{locate ? (showWhere ? `定位：${item.where}` : '定位') : item.where}</span>}
       </>;
       return <li key={index} className="border-b border-line-2 last:border-0">
         {locate ? <button type="button" className="flex w-full cursor-pointer flex-col gap-1 py-2.5 text-left hover:bg-ground" onClick={() => onLocate!(item.where!)}>{content}</button>

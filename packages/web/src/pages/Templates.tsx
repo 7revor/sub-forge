@@ -97,6 +97,13 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const [draft, setDraft] = useState(base);
   const [group, setGroup] = useState<string>();
   const [rule, setRule] = useState<string>();
+  const [pendingRules, setPendingRules] = useState<Set<string>>(() => new Set());
+  const onRuleValidationReady = (id: string, ready: boolean) => setPendingRules(current => {
+    const next = new Set(current);
+    if (ready) next.delete(id);
+    else next.add(id);
+    return next;
+  });
   const [yaml, setYaml] = useState<{ mode: 'edit' | 'import'; text: string; original: string }>();
   const [discardYaml, setDiscardYaml] = useState(false);
   const [validation, setValidation] = useState<{ draft: TemplateDraft; report: ReportItem[]; error?: string }>();
@@ -109,7 +116,10 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const currentValidation = validation?.draft === draft ? validation : undefined;
   const report = [...draftIssues(body), ...(currentValidation?.report ?? [])];
   const errors = report.filter(r => r.level === 'error');
-  const firstLocation = errors.find(r => r.where && /^(group:|rule:|final$)/.test(r.where))?.where;
+  // 首次失焦前隐藏新增规则的问题；保存仍使用完整报告，不能绕过校验。
+  const visibleReport = report.filter(r => !r.where?.startsWith('rule:') || !pendingRules.has(r.where.slice(5)));
+  const visibleErrors = visibleReport.filter(r => r.level === 'error');
+  const firstLocation = visibleErrors.find(r => r.where && /^(group:|rule:|final$)/.test(r.where))?.where;
   const inUse = (profiles.data ?? []).filter(p => boundTemplateId(p) === id).length;
   const updateBody = (body: TemplateBody) => setDraft(current => ({ ...current, body }));
   const locate = (where: string) => {
@@ -136,7 +146,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
     mutationFn: (value: TemplateDraft) => api<TemplateResponse>(isNew ? 'POST' : 'PUT', isNew ? '/templates' : `/templates/${encodeURIComponent(id)}`, { ...value.body, name: value.name.trim() }),
     onSuccess: result => {
       const next = draftFromTemplate(result.item);
-      setBase(next); setDraft(next);
+      setBase(next); setDraft(next); setPendingRules(new Set());
       setSavedWarnings([...(result.report ?? []).filter(r => r.level === 'warn'), ...(result.impact ?? []).flatMap(i => i.issues.filter(r => r.level === 'warn'))]);
       qc.setQueryData(['template', result.item.id], { item: result.item });
       void qc.invalidateQueries({ queryKey: ['templates'] });
@@ -164,8 +174,8 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
     <PageScroll>
       <ErrorAlert error={save.error ?? rulesets.error} />
       {currentValidation?.error && <FieldError error={currentValidation.error} />}
-      {errors.length > 0 && <Notice tone="err" actions={firstLocation && <Button size="sm" onClick={() => locate(firstLocation)}>定位</Button>}>
-        <span>{errors[0]!.message}{errors.length > 1 ? `（共 ${errors.length} 项待修复）` : ''}</span>
+      {visibleErrors.length > 0 && <Notice tone="err" actions={firstLocation && <Button size="sm" onClick={() => locate(firstLocation)}>定位</Button>}>
+        <span>{visibleErrors[0]!.message}{visibleErrors.length > 1 ? `（共 ${visibleErrors.length} 项待修复）` : ''}</span>
       </Notice>}
       {failure?.report?.length ? <Card title="保存检查"><TemplateReport items={failure.report} onLocate={locate} /></Card> : null}
       {!!failure?.impact?.length && <Card title="请先修复绑定订阅冲突">
@@ -188,7 +198,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
           </div>
         </section>
         <TemplateGroupsEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : group} onSelect={setGroup} report={report} />
-        <TemplateRulesEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : rule} onSelect={setRule} ctx={ctx} report={report} />
+        <TemplateRulesEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : rule} onSelect={setRule} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
     </PageScroll>
     <Modal title={yaml?.mode === 'import' ? '从 YAML 导入' : '编辑 YAML'} open={!!yaml && !showingLeave} onClose={closeYaml} wide footer={discardYaml ? <>
@@ -199,6 +209,6 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       {yamlResult?.ok && yamlResult.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-muted">{yamlResult.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
     </Modal>
     <LeaveDialog blocker={blocker} what="模板" canSave={canSave} pending={save.isPending} error={save.error}
-      onSave={done => save.mutate(draft, { onSuccess: done })} onDiscard={() => { setDraft(base); setYaml(undefined); setGroup(undefined); setRule(undefined); }} />
+      onSave={done => save.mutate(draft, { onSuccess: done })} onDiscard={() => { setDraft(base); setYaml(undefined); setGroup(undefined); setRule(undefined); setPendingRules(new Set()); }} />
   </>;
 }
