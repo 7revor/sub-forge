@@ -5,7 +5,7 @@
 
 import { DEFAULT_USELESS_PATTERNS, type OperatorStep } from '@sub-forge/core';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ExtraFields } from './ExtraFields.tsx';
 import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetField } from './pipelineForm.ts';
 import { mapRows, mapStats, removedAtStep, renamedAtSteps, rowChanged, type MapRow } from './pipelineMap.ts';
@@ -372,8 +372,39 @@ const OVERVIEW = -1;
 type Side = { names: string[]; origins: (number | null)[] };
 type MapOptions = { order: 'out' | 'in'; changedOnly: boolean };
 
-const th = 'border-b border-line px-3 py-2 text-left text-[12px] font-medium text-muted whitespace-nowrap';
+const th = 'sticky top-0 z-[1] border-b border-line bg-panel px-3 py-2 text-left text-[12px] font-medium text-muted whitespace-nowrap';
 const td = 'border-b border-line-2 px-3 py-[7px]';
+
+/** main 的下内边距（py-7）+ 卡片下边框 */
+const PAGE_BOTTOM = 29;
+/** 视口太矮时对照表至少保留的高度，此时退回整页滚动 */
+const MIN_SCROLL_HEIGHT = 320;
+
+/**
+ * 宽屏下让对照表填满视口剩余高度并在内部滚动，节点再多页面本身也不滚动，左侧导航与处理链保持不动；
+ * 窄屏（处理链与预览上下堆叠）不限高。
+ */
+function useFillViewport(scroll: RefObject<HTMLElement | null>, footer: RefObject<HTMLElement | null>) {
+  const [maxHeight, setMaxHeight] = useState<number>();
+  useLayoutEffect(() => {
+    const wide = window.matchMedia('(min-width: 768px)');
+    const measure = () => {
+      const el = scroll.current;
+      if (!el || !wide.matches) { setMaxHeight(undefined); return; }
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const below = footer.current?.offsetHeight ?? 0;
+      setMaxHeight(Math.max(MIN_SCROLL_HEIGHT, Math.floor(window.innerHeight - top - below - PAGE_BOTTOM)));
+    };
+    measure();
+    // 页头徽章异步加载、参数表单增减行都会改变表格位置；只依赖位置计算，不会因自身限高反复触发
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    window.addEventListener('resize', measure);
+    wide.addEventListener('change', measure);
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure); wide.removeEventListener('change', measure); };
+  }, [scroll, footer]);
+  return maxHeight;
+}
 
 /** 输入 → 输出对照表：一行一个节点，左边是它进入时的样子，右边是出来时的样子 */
 function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, options, onOptions, truncated }: {
@@ -383,6 +414,9 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
 }) {
   const rows = useMemo(() => mapRows(before, after, options.order), [before, after, options.order]);
   const shown = options.changedOnly ? rows.filter(rowChanged) : rows;
+  const scroll = useRef<HTMLDivElement>(null);
+  const footer = useRef<HTMLDivElement>(null);
+  const maxHeight = useFillViewport(scroll, footer);
   return <>
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3">
       <Segmented label="排列方式" size="sm" value={options.order} options={[{ value: 'out', label: '按输出顺序' }, { value: 'in', label: '按输入顺序' }]} onChange={(order) => onOptions({ ...options, order })} />
@@ -390,7 +424,7 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
         <input type="checkbox" checked={options.changedOnly} onChange={(e) => onOptions({ ...options, changedOnly: e.target.checked })} />只看有变化的
       </label>
     </div>
-    {shown.length ? <div className="overflow-x-auto">
+    {shown.length ? <div ref={scroll} className="overflow-auto overscroll-contain" style={maxHeight ? { maxHeight } : undefined}>
       <table className="w-full border-collapse text-[13px]">
         <thead><tr>
           <th className={cx(th, 'w-10 pl-4 text-right')}>#</th>
@@ -421,7 +455,7 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
         </tbody>
       </table>
     </div> : <div className="px-4 pb-4 text-[13px] text-muted">{rows.length ? '没有任何节点发生变化。' : '没有节点。'}</div>}
-    <div className="px-4 pt-3 pb-4 text-[12.5px] text-muted">
+    <div ref={footer} className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-muted">
       显示 {shown.length} / {rows.length} 行 · 「位置」是在保留下来的节点中名次的变化{truncated && ' · 节点较多，预览只包含前 500 个'}
     </div>
   </>;
