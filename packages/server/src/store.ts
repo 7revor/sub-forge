@@ -2,6 +2,7 @@
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
 import Database from 'better-sqlite3';
+import { pageMeta, type PageOptions, type PageResult } from './pagination.ts';
 import { exactNameRegex, NodeSetResolver, type ChainRule, type LocalProxy, type Profile, type Target } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
@@ -377,6 +378,25 @@ export class Store {
     return rows.map((r) => JSON.parse(this.cipher.decrypt(r.data)) as DocTypes[K]);
   }
 
+  /** 无搜索时在数据库分页；名称在加密正文内，搜索必须先解密再筛选。 */
+  private readPage<T extends { id: string; name?: string }>(sql: string, params: string[], options: PageOptions, decode: (data: string) => T): PageResult<T> {
+    if (options.q) {
+      const matches = (this.db.prepare(sql).all(...params) as { data: string }[])
+        .map(row => decode(row.data)).filter(doc => (doc.name ?? doc.id).toLowerCase().includes(options.q));
+      const meta = pageMeta(matches.length, options);
+      return { ...meta, items: matches.slice((meta.page - 1) * meta.pageSize, meta.page * meta.pageSize) };
+    }
+    const { total } = this.db.prepare(`SELECT COUNT(*) AS total FROM (${sql})`).get(...params) as { total: number };
+    const meta = pageMeta(total, options);
+    const rows = this.db.prepare(`${sql} LIMIT ? OFFSET ?`).all(...params, meta.pageSize, (meta.page - 1) * meta.pageSize) as { data: string }[];
+    return { ...meta, items: rows.map(row => decode(row.data)) };
+  }
+
+  listPage<K extends DocKind>(kind: K, options: PageOptions, owner?: string): PageResult<DocTypes[K]> {
+    return this.readPage(`SELECT data FROM docs WHERE kind = ?${owner === undefined ? '' : ' AND owner = ?'} ORDER BY id`,
+      owner === undefined ? [kind] : [kind, owner], options, data => JSON.parse(this.cipher.decrypt(data)) as DocTypes[K]);
+  }
+
   delete(kind: DocKind, id: string): boolean {
     return this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
   }
@@ -410,6 +430,12 @@ export class Store {
       JOIN (SELECT template_id, MAX(version) v FROM template_versions GROUP BY template_id) m ON m.template_id = t.template_id AND m.v = t.version
       ORDER BY t.template_id`).all() as { data: string }[];
     return rows.map((r) => JSON.parse(r.data) as TemplateVersionDoc);
+  }
+
+  listLatestTemplatesPage(options: PageOptions): PageResult<TemplateVersionDoc> {
+    return this.readPage(`SELECT t.data FROM template_versions t
+      JOIN (SELECT template_id, MAX(version) v FROM template_versions GROUP BY template_id) m ON m.template_id = t.template_id AND m.v = t.version
+      ORDER BY t.template_id`, [], options, data => JSON.parse(data) as TemplateVersionDoc);
   }
 
   /** 历史版本仍可被 Profile 锁定使用，依赖删除检查不能只看最新版本。 */

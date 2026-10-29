@@ -46,7 +46,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           </div>;
         }} />
       </nav>
-      <div key={group.id} id={`template-group-${group.id}`} className="flex min-w-0 flex-col gap-5 rounded-b-[10px] bg-ground p-4 md:rounded-bl-none md:rounded-br-[10px] md:p-5">
+      <div key={group.id} id={`template-group-${group.id}`} className="flex min-w-0 flex-col gap-5 rounded-b-[10px] bg-panel p-4 md:rounded-bl-none md:rounded-br-[10px] md:p-5">
         <ItemIssues report={report} where={`group:${group.id}`} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="组名称">{(id) => <Input id={id} value={group.name} onChange={(e) => update({ name: e.target.value })} />}</Field>
