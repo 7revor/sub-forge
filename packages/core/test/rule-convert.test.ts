@@ -50,13 +50,23 @@ describe('保留行位的通用规则转换', () => {
       expect(result.origins).toEqual(results[0]!.origins);
       if (i < 2) {
         expect(active(result)).toEqual([]);
-        expect(result.lines.join('\n')).toContain('# [当前客户端无法输出：mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*');
+        expect(result.lines.join('\n')).toContain('# [mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*');
         expect(result.diagnostics).toMatchObject([{ kind: 'client', line: 1 }]);
       } else {
         expect(active(result)).toEqual(['USER-AGENT,PayPal*']);
         expect(result.diagnostics).toEqual([]);
       }
     }
+  });
+
+  it.each([undefined, 'ios'] as const)('Stash %s 的进程诊断保留原文，原因和注释简洁且不改变行位', platform => {
+    const text = 'PROCESS-NAME,Example';
+    const rs: RuleSet = { id: 'r', name: '', sources: [source(`# 进程\n${text}\nDOMAIN,last.test`)] };
+    const result = convert(rs, { client: 'stash', platform });
+    expect(result.diagnostics).toEqual([{ sourceId: 'a', line: 2, text, kind: 'client', reason: 'Stash 进程规则仅支持 macOS' }]);
+    expect(result.lines).toEqual(['# 进程', `# [Stash 进程规则仅支持 macOS] ${text}`, 'DOMAIN,last.test']);
+    expect(result.origins).toEqual([1, 2, 3].map(line => ({ sourceId: 'a', line })));
+    expect(active(convert(rs, { client: 'stash', platform: 'macos' }))).toEqual([text, 'DOMAIN,last.test']);
   });
 
   it('四个客户端保留原注释、空行、未解析、重复和不兼容规则的位置', () => {
@@ -73,7 +83,7 @@ describe('保留行位的通用规则转换', () => {
     }
     expect(results[0]!.stats).toMatchObject({ parsed: 4, rejected: 2, output: 3, duplicates: 1, unsupported: 0 });
     expect(results[3]!.stats).toMatchObject({ output: 2, unsupported: 1 });
-    expect(results[3]!.lines[5]).toContain('当前客户端无法输出');
+    expect(results[3]!.lines[5]).toContain('Surge iOS 不支持进程规则');
   });
 
   it('多条替换、移除和组级追加为所有客户端预留稳定行位，保持首条匹配语义', () => {
