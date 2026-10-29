@@ -164,6 +164,8 @@ type ChainRule = {
 };
 ```
 
+`{ op: 'flag', mode: 'add' }` 根据节点名称中的地区名或代码添加旗帜；已带旗帜的名称保持不变。以 Traffic、Expire、Remaining 等或流量、到期等开头的说明节点跳过识别，避免把流量单位 GB 当作英国代码。需要移除这类伪节点时，另用 `filter.useless`。
+
 ## 3. 渲染流水线
 
 ```

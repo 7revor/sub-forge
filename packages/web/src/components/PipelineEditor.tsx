@@ -272,7 +272,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'flag':
       return <div className="flex flex-col gap-2">
         <Segmented label="旗帜" value={step.mode} options={[{ value: 'add', label: '添加旗帜' }, { value: 'remove', label: '移除旗帜' }]} onChange={(mode) => onChange({ ...step, mode })} />
-        <span className={hint}>按名称中的地区名或代码识别（香港 / HK / Hong Kong…），已有旗帜的节点不重复添加。</span>
+        <span className={hint}>按名称中的地区名或代码识别（香港 / HK / Hong Kong…）；流量、到期等说明节点不添加旗帜，已有旗帜的节点不重复添加。</span>
       </div>;
     case 'sort.name':
       return <div className="flex flex-col gap-2">

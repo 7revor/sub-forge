@@ -44,6 +44,14 @@ describe('PRD 场景 2：改名确定性', () => {
 });
 
 describe('处理链执行', () => {
+  it('单独添加旗帜时，花云地区节点匹配，流量和到期说明节点保持原名', () => {
+    const names = ['Traffic: 13.24 GB | 150 GB', 'Expire: 2027-05-19', '摩尔多瓦标准 IEPL 专线 1', '印尼标准 IEPL 专线 1'];
+    const result = runPipeline(nodes(...names.map((name, i) => trojan(name, `node${i}`))), [{ op: 'flag', mode: 'add' }]);
+    expect(result.nodes.map((n) => n.name)).toEqual([
+      names[0], names[1], '🇲🇩 摩尔多瓦标准 IEPL 专线 1', '🇮🇩 印尼标准 IEPL 专线 1',
+    ]);
+  });
+
   it('逐步预览记录每步的改名与移除', () => {
     const input = nodes(trojan('香港 01 | 0.5x', 'a'), trojan('官网 example.com', 'z'), trojan('日本 03', 'c'));
     const r = runPipeline(input, HK_PIPELINE, { keepSnapshots: true });
