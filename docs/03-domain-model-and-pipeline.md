@@ -387,6 +387,10 @@ SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使
 
 格式支持依据：[mihomo rule-providers](https://wiki.metacubex.one/en/config/rule-providers/)、[文件内容格式](https://wiki.metacubex.one/en/config/rule-providers/content/)。当前完整订阅下载实现为 mihomo；Surge 继续用于规则预览。
 
+## 管理列表查询模型（2026-10-29）
+
+列表分页不改变领域文档、种子格式或数据库结构。查询参数为 `page`、`pageSize`、`q`，返回 `items` 及 `total/page/pageSize/totalPages`；`total` 为用户可见且名称匹配的文档数，模板仅统计最新版本。未传参数仍返回全量 `items`，用于关联选择与旧客户端。无搜索时数据库分页；加密文档名称在服务端解密后筛选，不新增明文索引。
+
 ## 2026-10-29：直接仓库规则引用
 
 `Matcher` 仍分 `rule` / `ruleset`。旧 `{ kind: 'ruleset', id }` 表示本地规则集，不迁移已有数据。仓库引用为 `{ kind: 'ruleset', id, repository: { repo, entry, name, sources } }`，其中 sources 固定本次选定的分支、路径、URL 与文本格式；id 为 `repo:` 加映射的 SHA-256 摘要前 32 位，不依赖显示名称。
