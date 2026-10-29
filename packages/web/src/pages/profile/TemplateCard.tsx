@@ -37,14 +37,14 @@ export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
   });
   const initialized = draft.routing?.mode === 'independent' ? draft.routing.initializedFrom : undefined;
   const body = <div className="flex flex-col gap-3.5">
-    <p className="m-0 text-[13px] font-medium">{modeLabel(draft, template?.name)}{template && ` v${template.version}`}</p>
-    <p className="m-0 text-[13px] text-muted">{currentId ? '模板维护分流结构，订阅只补充成员；模板发布后，下次刷新主订阅时更新。' : '策略组和规则由本订阅维护。节点源和远程规则内容仍可更新。'}</p>
-    {initialized && <p className="m-0 text-[12px] text-muted">初始化自 {initialized.name ?? initialized.templateId} v{initialized.version}</p>}
+    <p className="m-0 text-[13px] font-medium">{modeLabel(draft, template?.name)}</p>
+    <p className="m-0 text-[13px] text-muted">{currentId ? '模板维护分流结构，订阅只补充成员；模板保存后，下次刷新主订阅时更新。' : '策略组和规则由本订阅维护。节点源和远程规则内容仍可更新。'}</p>
+    {initialized && <p className="m-0 text-[12px] text-muted">初始化自 {initialized.name ?? initialized.templateId}</p>}
     <ErrorAlert error={templates.error ?? change.error} />
     {currentId && <Button disabled={change.isPending || !template} onClick={() => change.mutate('detach')}>转为独立配置</Button>}
     <Field label="选择模板">{id => <Select id={id} value={selected} disabled={change.isPending} onChange={e => { setSelected(e.target.value); setMapping({}); setStaged(undefined); change.reset(); }}>
       <option value="">选择模板</option>
-      {(templates.data ?? []).map(t => <option key={t.id} value={t.id}>{t.name ?? t.id} v{t.version}</option>)}
+      {(templates.data ?? []).map(t => <option key={t.id} value={t.id}>{t.name ?? t.id}</option>)}
     </Select>}</Field>
     {target && <>
       {groups.length > 0 && <div className="flex flex-col gap-2">

@@ -68,10 +68,10 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
 | `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限 |
 | `GET/POST /api/{kind}`、`GET/PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles` `presets`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；按用户隔离（别人的文档一律 404）；预设由管理员维护、所有人可读；被引用的文档不能删除（409 返回引用方） |
-| `GET /api/templates`、`GET /api/templates/:id`、`GET /api/templates/:id/versions/:v` | 所有人可读 |
+| `GET /api/templates`、`GET /api/templates/:id` | 所有人可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
-| `POST /api/templates/:id/publish` | 管理员：`:id` 为 `new` 时新建。自身校验不通过 400；绑定订阅渲染失败或检查期间发生并发修改时 409，绑定冲突不允许 `force` 跳过（TPL-07、PRF-12） |
+| `POST /api/templates`、`PUT /api/templates/:id` | 管理员新建或直接保存；更新须带读取时的 `version` 并发标记。自身校验不通过 400；绑定冲突或并发修改返回 409，不允许 `force` 跳过。旧 `POST /api/templates/:id/publish` 兼容同一保存逻辑，不再创建历史 |
 | `GET/POST /api/profiles/:id/tokens`、`POST .../tokens/:token/reset`、`DELETE .../tokens/:token` | 订阅链接；重置后旧链接立即失效 |
 | `POST /api/profiles/:id/preview` | 预览配置、依赖节点与渲染报告；请求体可带未保存的 `profile` 草稿 |
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
@@ -103,7 +103,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 「添加旗帜」的草稿预览与最终渲染共用内核地区识别：流量、到期等说明节点不添加旗帜；如需从输出中删除说明节点，可在前一步添加 `filter.useless`。
 
-模板的即时校验、影响分析与发布都会检查启用规则集中每个启用的文本来源能否取得并解析，不依赖已有 Profile。无可用内容时禁止发布，`force` 不能绕过自身错误；有可用旧快照时允许发布并告警。二进制透传仅标注由客户端检查，不宣称服务端已验证内容或可达性。
+模板的即时校验、影响分析与保存都会检查启用规则集中每个启用的文本来源能否取得并解析，不依赖已有 Profile。无可用内容时禁止保存，`force` 不能绕过自身错误；有可用旧快照时允许保存并告警。二进制透传仅标注由客户端检查，不宣称服务端已验证内容或可达性。
 
 ## 上游拉取
 
@@ -127,13 +127,13 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 ## 种子文件
 
-结构见 `src/docs.ts` 的 `Seed`，示例见 `examples/seed.example.json`（演示订阅只用本地节点组，不需要联网；远程订阅源使用单个 `url`，旧版单元素 `urls` 导入时转换，多地址会导致整批导入回滚；旧种子里 `kind: "local"` 的订阅源导入时自动转为本地节点组；单一来源写法的旧规则集转为一个来源，旧的 `bundles` 转为同 id 的多来源规则集；本地节点不设置前置，旧种子里节点上的前置导入时转为直接使用该分组的配置订阅中的链规则）。`seed <文件> <用户名>` 把有归属的文档写到该用户名下；不指定用户时文档无归属，登录后看不到，只能通过订阅接口使用。同一模板的多个版本作为多条记录写入 `templates`。
+结构见 `src/docs.ts` 的 `Seed`，示例见 `examples/seed.example.json`（演示订阅只用本地节点组，不需要联网；远程订阅源使用单个 `url`，旧版单元素 `urls` 导入时转换，多地址会导致整批导入回滚；旧种子里 `kind: "local"` 的订阅源导入时自动转为本地节点组；单一来源写法的旧规则集转为一个来源，旧的 `bundles` 转为同 id 的多来源规则集；本地节点不设置前置，旧种子里节点上的前置导入时转为直接使用该分组的配置订阅中的链规则）。`seed <文件> <用户名>` 把有归属的文档写到该用户名下；不指定用户时文档无归属，登录后看不到，只能通过订阅接口使用。旧种子可携带同一模板的多个版本；导入先解析旧订阅引用，再只保留当前模板。
 
 ## 与设计文档的差异
 
 - 存储用 better-sqlite3 直接读写 JSON 文档，没有用 05 建议的 Drizzle ORM：文档结构仍在频繁变化，暂不需要关系模型。
-- 模板草稿只保存在前端，服务端只保存已发布的版本；编辑时用 `validate` 接口即时校验。
-- 2026-10-29 前端只向管理员展示一个模板入口；普通用户仍需通过现有只读模板接口在配置订阅向导中选择已发布版本。服务端的模板读写权限与种子格式未变。
+- 模板草稿只保存在前端，服务端只保存当前内容；编辑时用 `validate` 接口即时校验。
+- 2026-10-29 前端只向管理员展示一个模板入口；普通用户仍需通过现有只读模板接口在配置订阅向导中选择当前模板。服务端的模板读写权限未变，旧种子仍兼容。
 - 管理员共享订阅源 / 组合给指定用户（SYS-06）、模板可见性（TPL-08）尚未实现：目前模板对所有人可见，管理员名下的规则集可被所有人引用。
 - 订阅源只拉取一个 URL；拉取失败时使用该地址上一份成功快照并告警，没有可用成功快照时整个 Profile 渲染失败并尝试 last-good 回退。流量读取该源的快照；跨源汇总按源 ID 去重。组合成员整体不可用时仍失败，成员级失败策略 COL-05 尚未实现：前端可设置组合成员的 `onFail` 并随文档保存，渲染尚未读取。
 - 配置订阅基础设置的原样片段（`base.raw`，BS-04）随文档保存，渲染尚未输出。
@@ -292,3 +292,12 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 ### 2026-10-29：仓库单文件正文预览
 
 `GET /api/rule-repos/file-preview?repo&ref&path` 只读取所选 list/txt 原文，按目录索引校验成员资格并使用索引 commit；响应含 content、name、entry（可关联时）、ref、path、url、upstream、license。仅登录用户可用；目录或伪造文件返回 400，停用仓库返回 404，上游读取异常返回 502，可重试。空文件、纯注释与无有效规则文本仍能预览；创建操作另行执行既有解析校验。预览不组合文件，不请求 README，也不写本地规则集。
+
+
+### 模板直接保存（数据库 v19）
+
+模板不再有发布流程和历史记录。创建使用 `POST /api/templates`，更新使用 `PUT /api/templates/:id`；保存完成模板自检、绑定订阅影响检查与并发检查后立即生效。绑定订阅仍跟随模板，独立配置不受影响。内部 `version` / `templateVersion` 仅用于并发保护与渲染缓存，不提供历史查看、对比或回滚；订阅产物历史资源及 last-good 回退不受影响。
+
+v19 在事务中先展开仍引用旧模板版本的遗留订阅并保存原始备份，再为每个模板保留当前内容、移除旧记录和 changelog。已采用 bound 模式的订阅保持绑定；更新保留订阅归属、更新时间和链接。旧种子导入执行相同顺序，缺失所引用历史时整批失败。升级前沿用上文完整数据库及密钥备份要求。
+
+`GET /api/templates/:id` 只返回 `item`，历史版本读取接口已移除。旧 publish / impact 路径仅兼容旧调用，前端不再使用。

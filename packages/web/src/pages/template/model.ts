@@ -14,7 +14,7 @@ export function draftIssues(body: TemplateBody): ReportItem[] {
       level: 'error', code: 'template.empty-name', message: '请填写策略组名称', where: `group:${g.id}`,
     })),
     ...body.rules.filter((r) => r.matcher.kind === 'rule' ? incompleteRule(r.matcher.rule) : !r.matcher.id).map((r): ReportItem => ({
-      level: 'error', code: 'template.empty-matcher', message: '请补全规则匹配项后再发布', where: `rule:${r.id}`,
+      level: 'error', code: 'template.empty-matcher', message: '请补全规则匹配项后再保存', where: `rule:${r.id}`,
     })),
   ];
 }
