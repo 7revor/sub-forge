@@ -164,3 +164,7 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 ### 2026-10-29：仅文本索引
 
 所有仓库只索引 `.list` / `.txt`，任意 include 也不能放开 YAML、MRS、SRS 等后缀。zydou 只检查两个 Surge 文本分支。启动即清理旧缓存中的不支持变体，并使相关仓库同 commit 也重建；既有规则来源保留。自定义仓库旧 YAML 格式配置降为 auto，不改 include/exclude。手动远程 YAML 不受索引限制，预览报告 `conversion: yaml-to-list`，实际 provider 使用本服务文本 URL；已知 YAML 输入不得标为二进制透传。
+
+### GitHub 索引 Token
+
+管理员通过 `GET/PUT/DELETE /api/rule-repos/github-token` 读取状态、保存或清除 Token；PUT body 为 `{ "token": "你的 Token" }`，响应只有 `configured`。SQLite v12 加密保存该服务凭据，不写入示例种子；下一次索引 API 请求立即生效。只向 HTTPS GitHub API 携带认证，跨源重定向永久移除。不会用于 raw 文件、一般订阅源或客户端输出；公开仓库限制不变。

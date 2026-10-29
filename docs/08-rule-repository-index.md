@@ -200,3 +200,11 @@ type VariantPolicy = { prefer?: 'smallest' | 'no-resolve' | 'classical'; perClie
 文件扩展名是统一硬性白名单，包含内置与自定义适配器；yaml/yml/mrs/srs/json 等不会出现在搜索、详情、导入或关联选项。旧索引启动时原子清理，影响仓库重新拉取树，即使上游 commit 未变。历史调研中列出的 Clash/YAML/MRS 文件仅作背景资料，不再属于目标索引范围。
 
 用户手动添加远程规则可使用 YAML payload，自动解析后经已有 IR 管线输出 LIST 文本，转换结果只能托管。输入格式与输出格式分别处理，不改原地址和快照，以便持续更新；服务返回转换诊断，不支持的条目明确报告。已保存的 YAML 来源与关联信息保留，不因清理公共索引丢失用户配置。
+
+## GitHub Token 配置（2026-10-29）
+
+在「系统 → 规则仓库 → GitHub Token」输入 personal access token 并点击「保存 Token」，随后点击仓库的「更新索引」。可在同一区域替换或清除，保存后无需重启。已配置仅表示服务保存了凭据，是否有效由后续索引请求验证；当前仍只支持公开仓库。细粒度 Token 可选择 Public repositories，无需授予写权限。
+
+Token 只发送到 `https://api.github.com`，不会发送到 raw 文件地址、镜像、其他域名或 HTTP 降级地址。数据库加密保存，读取接口只返回配置状态，示例种子不保存 Token。
+
+GitHub 官方说明匿名请求通常每小时 60 次，个人认证请求通常每小时 5000 次；其他限制仍可能生效：[REST API 限额](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)。

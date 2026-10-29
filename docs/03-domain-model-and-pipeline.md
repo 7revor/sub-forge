@@ -361,3 +361,7 @@ SQLite v11 的 `rule_repos.definition` 为可空 JSON：`id/name/owner/repo/refs
 仓库候选扩展名固定为 list/txt，自定义路径通配符不能扩大范围。zydou 仅读取 surge-rule-set 与 surge-domain-set；blackmatrix7 不再索引 YAML。服务初始化过滤旧缓存中的不支持变体（多文件变体整体过滤），删除空条目，清空受影响仓库的 revisions 与 checked_at，从而在 commit 不变时也重新构建；既有 RuleSetSource 文档不改动。旧自定义仓库 `format: yaml` 改为 auto，保留用户路径筛选。
 
 RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML 解析结果增加可选 `conversion: yaml-to-list`，预览来源状态透出同名字段，前端展示转换托管标记。输入先解析为 IR，应用改写，再分桶输出 LIST 文本；不是把 YAML URL 直接下发。保存/预览拒绝把 YAML 地址或同 URL 的既有 yaml 输入标记为 mrs/srs；内核也阻止已知 YAML 地址被透传。原生二进制透传不承担转换功能。
+
+## 2026-10-29 追加：索引凭据
+
+SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使用现有 Cipher 加密保存，与规则集、索引文件及用户订阅 Token 分离。管理员接口 `GET/PUT/DELETE /api/rule-repos/github-token` 仅返回 `{ configured: boolean }`，PUT 接受 `{ token: string }`。每次 GitHub API 请求读取最新凭据，不向 raw 文件请求或转换输出传播，跨源（包括 HTTP 降级）重定向后永久剥离认证头。种子导入不携带该服务凭据，示例种子保持不变。

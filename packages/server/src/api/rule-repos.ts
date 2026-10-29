@@ -9,6 +9,17 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
   const app = new Hono<ApiEnv>();
   app.use('/rule-repos/*', requireUser);
   app.get('/rule-repos', requireUser, c => c.json({ repos: repos.list() }));
+  app.get('/rule-repos/github-token', requireAdmin, c => c.json({ configured: !!store.getGithubToken() }));
+  app.put('/rule-repos/github-token', requireAdmin, async c => {
+    const body = await jsonBody(c);
+    if (typeof body.token !== 'string' || !/^[A-Za-z0-9_]{1,512}$/.test(body.token.trim())) throw bad('请填写有效的 GitHub Token，不要包含 Bearer 前缀或空格');
+    store.setGithubToken(body.token.trim());
+    return c.json({ configured: true });
+  });
+  app.delete('/rule-repos/github-token', requireAdmin, c => {
+    store.setGithubToken(undefined);
+    return c.json({ configured: false });
+  });
   app.get('/rule-repos/search', c => {
     const { q = '', repo, client, offset = '0', limit = '50' } = c.req.query();
     if (q.length > 200) throw bad('关键词最多 200 个字符');

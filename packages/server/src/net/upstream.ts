@@ -7,7 +7,7 @@ import { assertUrlAllowed, SsrfError, type AllowList } from './ssrf.ts';
 export class UpstreamError extends Error {}
 
 export type UpstreamResponse = { status: number; body: string; userinfo?: TrafficInfo };
-export type UpstreamOptions = { ua?: string; timeoutMs?: number };
+export type UpstreamOptions = { ua?: string; timeoutMs?: number; githubToken?: string };
 export type UpstreamFetcher = (url: string, opts?: UpstreamOptions) => Promise<UpstreamResponse>;
 
 /** 只用到 fetch 响应的这几个成员，便于测试替换 */
@@ -55,8 +55,10 @@ export function createUpstreamFetcher(opts: { allow: AllowList; fetchImpl?: Fetc
 
   return async (rawUrl, o = {}) => {
     const signal = AbortSignal.timeout(o.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    const headers = { 'user-agent': o.ua ?? DEFAULT_UA };
+    const headers: Record<string, string> = { 'user-agent': o.ua ?? DEFAULT_UA };
     let url = new URL(rawUrl);
+    // 凭据只允许发送给 GitHub API；一旦离开该源，后续跳转也不重新携带。
+    if (o.githubToken && url.origin === 'https://api.github.com') headers.authorization = `Bearer ${o.githubToken}`;
     for (let hop = 0; ; hop++) {
       assertUrlAllowed(url, opts.allow);
       let res: Awaited<ReturnType<FetchLike>>;
@@ -70,6 +72,7 @@ export function createUpstreamFetcher(opts: { allow: AllowList; fetchImpl?: Fetc
         if (!loc) throw new UpstreamError(`HTTP ${res.status} 缺少 Location`);
         if (hop >= MAX_REDIRECTS) throw new UpstreamError('重定向次数过多');
         url = new URL(loc, url);
+        if (url.origin !== 'https://api.github.com') delete headers.authorization;
         continue;
       }
       if (res.status < 200 || res.status >= 300) throw new UpstreamError(`HTTP ${res.status}`);

@@ -158,7 +158,8 @@ export class RuleRepoService {
     return JSON.parse(row.data) as IndexedEntry;
   }
   private async json<T>(url: string): Promise<T> {
-    const response = await this.fetcher(url, { ua: 'Sub-Forge-rule-index', timeoutMs: 20_000 });
+    const token = this.store.getGithubToken();
+    const response = await this.fetcher(url, { ua: 'Sub-Forge-rule-index', timeoutMs: 20_000, ...(token ? { githubToken: token } : {}) });
     if (response.status !== 200) throw new Error(`GitHub 返回 HTTP ${response.status}`);
     return JSON.parse(response.body) as T;
   }

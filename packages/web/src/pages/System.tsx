@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CustomRepoDialog } from '../components/CustomRepoDialog.tsx';
+import { GithubTokenSettings } from '../components/GithubTokenSettings.tsx';
 import { api, type RuleRepo, type SystemInfo } from '../api.ts';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
@@ -71,6 +72,7 @@ export function System() {
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
             <Card title="规则仓库" actions={<Button onClick={() => setAddingRepo(true)}><Plus size={15} />添加自定义仓库</Button>}>
               <div className="flex flex-col gap-3">
+                <GithubTokenSettings />
                 <div className="flex flex-col">
                   {(repos.data?.repos ?? []).map((r) => (
                     <div key={r.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">

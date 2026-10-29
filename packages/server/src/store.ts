@@ -45,11 +45,14 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS server_secrets (
+  name TEXT PRIMARY KEY, value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS rule_repos (
   id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, built_at INTEGER, checked_at INTEGER,
   revisions TEXT NOT NULL DEFAULT '{}', error TEXT, definition TEXT
@@ -132,6 +135,16 @@ export class Store {
   }
 
   close(): void { this.db.close(); }
+
+  getGithubToken(): string | undefined {
+    const row = this.db.prepare("SELECT value FROM server_secrets WHERE name = 'github-index-token'").get() as { value: string } | undefined;
+    return row ? this.cipher.decrypt(row.value) : undefined;
+  }
+
+  setGithubToken(token: string | undefined): void {
+    if (token === undefined) this.db.prepare("DELETE FROM server_secrets WHERE name = 'github-index-token'").run();
+    else this.db.prepare("INSERT OR REPLACE INTO server_secrets (name, value) VALUES ('github-index-token', ?)").run(this.cipher.encrypt(token));
+  }
 
   /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包；v7：客户端改写绑定来源；v8 及以前：订阅地址可能保存在 urls 数组） */
   private migrate(): void {
