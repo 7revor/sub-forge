@@ -1,9 +1,10 @@
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
+import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
-// 来源配置与本地内容就地编辑，下方始终只读预览最终合并结果。
+// 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
-import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
 import { FileText, Globe, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -77,16 +78,17 @@ export function RulesetEdit() {
   const t = TARGETS.find((x) => x.key === target)!;
   const draft = useDebouncedValue(e.draft, 400);
   const preview = useQuery({
-    queryKey: ['ruleset-preview', e.isNew ? '' : e.id, target, JSON.stringify(draft)],
-    enabled: !!draft,
-    placeholderData: keepPreviousData,
+    queryKey: ['ruleset-preview', e.isNew ? '' : e.id, target, selected, JSON.stringify(draft)],
+    enabled: !!draft && (!selected || draft.sources.some((s) => s.id === selected)),
     queryFn: () => api<RulesetPreview>('POST', '/rulesets/preview', {
       ...(e.isNew ? {} : { id: e.id }), ruleset: draft,
+      ...(selected ? { source: selected } : {}),
       client: t.client, ...(t.platform ? { platform: t.platform } : {}),
     }),
   });
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
+  const selectedSource = d.sources.find((s) => s.id === selected);
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
   const setSource = (id: string, p: Partial<RuleSetSourceDoc>) => set({ sources: d.sources.map((s) => (s.id === id ? { ...s, ...p } : s)) });
   const add = (src: RuleSetSourceDoc) => { set({ sources: [...d.sources, src] }); setSelected(src.id); };
@@ -117,7 +119,7 @@ export function RulesetEdit() {
         {!e.isNew && <Link to={`/rule-repo?ruleset=${encodeURIComponent(d.id)}`} className={buttonClass('default', 'md', 'h-9')}>从规则仓库添加</Link>}
       </>}>
         <div className="flex flex-col gap-4">
-          <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源展开配置，本地规则在配置块内编辑；下方统一展示合并后的最终只读结果。</p>
+          <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源展开配置，本地规则在配置块内编辑；下方预览随选中来源切换，再次点击来源或点击「查看合并结果」可查看全部启用来源的合并结果。</p>
           {!d.sources.length ? <Empty title="还没有来源" description="添加远程地址或本地规则。" /> : (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
               <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
@@ -134,7 +136,8 @@ export function RulesetEdit() {
         onChange={(overrides) => set({ overrides: overrides.length ? overrides : undefined })}
         onRemoveLegacy={(id) => setSource(id, { overrides: undefined })} />
 
-      <Card className="min-w-0" title="最终结果（只读）">
+      <Card className="min-w-0" title={selectedSource ? `来源预览 · ${sourceLabel(selectedSource)}` : '合并结果（只读）'}
+        actions={selectedSource && <Button onClick={() => setSelected(undefined)}>查看合并结果</Button>}>
         <div className="flex flex-col gap-3">
           <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
             {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
@@ -200,7 +203,8 @@ function SourceStatus({ src, status, loading }: { src: RuleSetSourceDoc; status?
   if (!status) return loading ? <Badge>检查中…</Badge> : null;
   if (status.error) return <span title={status.error}><Badge tone="err">{src.kind === 'remote' ? '拉取失败' : '无法读取'}</Badge></span>;
   if (status.rules === undefined) return null;
-  return <Badge tone={status.rejected ? 'warn' : 'neutral'}>{status.rules} 条{status.rejected ? ` · 不支持 ${status.rejected} 行` : ''}</Badge>;
+  if (status.rejected) return <RejectedRulesPopover sourceName={sourceLabel(src)} status={status} />;
+  return <Badge>{status.rules} 条</Badge>;
 }
 
 function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> }) {
@@ -218,6 +222,7 @@ function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
   if (preview.error) return <ErrorBox error={preview.error} />;
   const p = preview.data;
   if (!p) return <div className="text-[13px] text-muted">加载中…</div>;
+  if (p.passthrough) return <Empty title="该来源为二进制透传" description="由客户端直接读取，无法在此展示文本规则。" />;
   return (
     <>
       {p.error && <ErrorBox error={`拉取失败：${p.error}`} />}

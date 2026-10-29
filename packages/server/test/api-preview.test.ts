@@ -111,13 +111,43 @@ describe('规则集预览（CR-05）', () => {
     const mihomo = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'mihomo' });
     expect(mihomo.json.lines).toEqual(['DOMAIN-SUFFIX,notion.so', 'PROCESS-NAME-REGEX,^steam.*', 'PROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(mihomo.json.rejected.map((r: { reason: string }) => r.reason)).toEqual(['不支持的规则类型 USER-AGENT']);
-    expect(mihomo.json.sources).toEqual([{ id: 'a', ok: true, rules: 4, rejected: 1 }]);
+    expect(mihomo.json.sources).toEqual([{ id: 'a', ok: true, rules: 4, rejected: 1, rejectedDetails: [{ line: 5, text: 'USER-AGENT,x*', reason: '不支持的规则类型 USER-AGENT' }] }]);
     const mac = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'macos' });
     expect(mac.json.lines).toContain('PROCESS-NAME,steam*');
     expect(mac.json.notes).toHaveLength(1);
     const ios = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'ios' });
     expect(ios.json.lines).toEqual(['DOMAIN-SUFFIX,notion.so', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(ios.json.dropped).toHaveLength(2);
+  });
+
+  it('切换来源只返回对应内容，合并时也提供各来源不支持行的详情', async () => {
+    const { alice } = await scenario();
+    const ruleset = { name: '多来源', sources: [
+      local('a', '# 注释\nDOMAIN,a.test\nUSER-AGENT,a*'),
+      local('b', 'DOMAIN,b.test\nUSER-AGENT,b*'),
+      { ...local('off', 'DOMAIN,off.test'), enabled: false },
+    ] };
+    for (const source of ['a', 'b', 'off']) {
+      const res = await alice.post('/api/rulesets/preview', { ruleset, source, client: 'mihomo' });
+      expect(res.status).toBe(200);
+      expect(res.json.lines).toEqual([`DOMAIN,${source}.test`]);
+      expect(res.json.stats).toBeUndefined();
+      expect(res.json.rejected).toHaveLength(source === 'off' ? 0 : 1);
+    }
+    const merged = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
+    expect(merged.json.lines).toEqual(['DOMAIN,a.test', 'DOMAIN,b.test']);
+    expect(merged.json.sources[0].rejectedDetails).toEqual([{ line: 3, text: 'USER-AGENT,a*', reason: '不支持的规则类型 USER-AGENT' }]);
+    expect(merged.json.sources[1].rejectedDetails).toEqual([{ line: 2, text: 'USER-AGENT,b*', reason: '不支持的规则类型 USER-AGENT' }]);
+  });
+
+  it('来源诊断保留完整计数，详情最多返回 100 行', async () => {
+    const { alice } = await scenario();
+    const ruleset = { name: '大量不支持行', sources: [local('a', Array.from({ length: 105 }, (_, i) => `USER-AGENT,x${i}`).join('\n'))] };
+    const res = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
+    expect(res.status).toBe(200);
+    expect(res.json.sources[0].rejected).toBe(105);
+    expect(res.json.sources[0].rejectedDetails).toHaveLength(100);
+    expect(res.json.sources[0].rejectedDetails[99].line).toBe(100);
   });
 
   it('不指定来源时返回合并结果：去重、domain → classical → ipcidr、跳过停用来源、统一 no-resolve', async () => {
