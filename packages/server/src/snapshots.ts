@@ -18,6 +18,7 @@ export const MIN_TTL_SEC = 300;
 const FAILURE_RETRY_SEC = 300;
 
 export type SnapshotResult = { snapshot?: SnapshotRow; stale: boolean; error?: string };
+export type SnapshotFetchOptions = FetchOptions & { format?: RuleSetFormat };
 
 /** 内容不可用时返回原因；可用返回 undefined */
 export function unusableBody(kind: SnapshotOwner, id: string, body: string, format: RuleSetFormat = 'auto'): string | undefined {
@@ -46,16 +47,17 @@ export class SnapshotService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  /** 拉取一次并写入快照表；失败时写入失败记录并返回它 */
-  refresh(kind: SnapshotOwner, id: string, url: string, opts: FetchOptions = {}): Promise<SnapshotRow> {
+  /** 拉取一次并写入快照表；失败时写入失败记录并返回它。规则集来源带上 format 以检查内容是否可用 */
+  refresh(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): Promise<SnapshotRow> {
     const key = `${kind}\u0000${id}\u0000${url}`;
     const running = this.inflight.get(key);
     if (running) return running;
     const p = (async () => {
       const fetchedAt = this.now();
       try {
-        const res = await this.fetcher(url, opts);
-        const unusable = unusableBody(kind, id, res.body, kind === 'ruleset' ? this.store.get('ruleset', id)?.format : undefined);
+        const { format, ...fetchOpts } = opts;
+        const res = await this.fetcher(url, fetchOpts);
+        const unusable = unusableBody(kind, id, res.body, format);
         if (unusable) throw new Error(unusable);
         const hash = stableHash(res.body);
         const prev = this.store.latestSnapshot(kind, id, url);
@@ -73,7 +75,7 @@ export class SnapshotService {
     return p;
   }
 
-  async get(kind: SnapshotOwner, id: string, url: string, opts: FetchOptions & { ttlSec: number }): Promise<SnapshotResult> {
+  async get(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions & { ttlSec: number }): Promise<SnapshotResult> {
     const latest = this.store.latestSnapshot(kind, id, url);
     const lastFailure = this.store.latestSnapshot(kind, id, url, false);
     const failure = lastFailure && !lastFailure.ok && (!latest || lastFailure.fetchedAt >= latest.fetchedAt) ? lastFailure : undefined;
@@ -91,6 +93,21 @@ export class SnapshotService {
       void p.finally(() => this.background.delete(p));
     }
     return { snapshot: latest, stale, ...(failure?.error ? { error: failure.error } : {}) };
+  }
+
+  /**
+   * 只拉取、不写快照表：用于尚未保存的规则集草稿预览（还没有 id，快照无处归属）。
+   * 内容不可用时与快照拉取一样返回原因。
+   */
+  async peek(url: string, opts: SnapshotFetchOptions = {}): Promise<{ body?: string; error?: string }> {
+    const { format, ...fetchOpts } = opts;
+    try {
+      const res = await this.fetcher(url, fetchOpts);
+      const unusable = unusableBody('ruleset', '', res.body, format);
+      return unusable ? { error: unusable } : { body: res.body };
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
   }
 
   /** 等待后台刷新全部结束（测试与优雅退出用） */

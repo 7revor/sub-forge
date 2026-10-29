@@ -115,30 +115,38 @@ export type ClientOverride = {
 
 export type RuleSetFormat = 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
 
-export type RuleSet = {
+/** 规则集的一个来源：远程地址或本地手写规则。行级覆盖按该来源解析后的行号或原文定位 */
+export type RuleSetSource = {
+  /** 规则集内唯一；远程快照以 (规则集 id, URL) 定位，与来源 id 无关 */
   id: ID;
-  name: string;
   kind: 'remote' | 'local';
+  /** 显示名，缺省用 URL 或「本地规则」 */
+  name?: string;
   url?: string;
   content?: string;
   format: RuleSetFormat;
   /** 透传的二进制规则集（mrs）必须声明 behavior，其余格式解析后自动拆分 */
   behavior?: 'domain' | 'ipcidr' | 'classical';
-  /** 行级客户端覆盖：按解析后的行号（从 1 开始）或原文精确匹配定位 */
+  /** 行级客户端覆盖：按该来源解析后的行号（从 1 开始）或原文精确匹配定位 */
   overrides?: { line?: number; match?: string; override: ClientOverride }[];
+  enabled?: boolean;
 };
 
-export type RuleBundle = {
+/**
+ * 规则集：一个或多个来源（远程 URL / 本地规则）合并成一项，只配一个出口。
+ * 输出时按 domain → classical → ipcidr 拆分并去重（原「规则包」并入规则集，2026-10-29）。
+ */
+export type RuleSet = {
   id: ID;
   name: string;
-  items: ({ kind: 'ruleset'; id: ID; enabled?: boolean } | { kind: 'rule'; rule: RuleIR; enabled?: boolean })[];
+  sources: RuleSetSource[];
+  /** IP 类规则统一加 no-resolve */
   noResolve?: boolean;
 };
 
 export type Matcher =
   | { kind: 'rule'; rule: RuleIR; overrides?: ClientOverride[] }
-  | { kind: 'ruleset'; id: ID }
-  | { kind: 'bundle'; id: ID };
+  | { kind: 'ruleset'; id: ID };
 
 // ---------- 分流 ----------
 

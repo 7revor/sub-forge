@@ -87,19 +87,66 @@ describe('立即拉取与快照', () => {
 });
 
 describe('规则集预览（CR-05）', () => {
-  it('按客户端与平台输出，列出降级、丢弃与无法解析的行', async () => {
+  const RULES = 'DOMAIN-SUFFIX,notion.so\nPROCESS-NAME-REGEX,^steam.*\nPROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*\nIP-CIDR,1.1.1.0/24,no-resolve\nUSER-AGENT,x*';
+  const local = (id: string, content: string) => ({ id, kind: 'local', format: 'auto', content });
+
+  it('单个来源按客户端与平台输出，列出降级、丢弃与无法解析的行；草稿不必保存', async () => {
     const { alice } = await scenario();
-    const content = 'DOMAIN-SUFFIX,notion.so\nPROCESS-NAME-REGEX,^steam.*\nPROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*\nIP-CIDR,1.1.1.0/24,no-resolve\nUSER-AGENT,x*';
-    const id = (await alice.post('/api/rulesets', { name: 'R', kind: 'local', format: 'auto', content })).json.item.id;
-    const mihomo = await alice.post(`/api/rulesets/${id}/preview`, { client: 'mihomo' });
+    const ruleset = { name: '', sources: [local('a', RULES)] };
+    const mihomo = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'mihomo' });
     expect(mihomo.json.lines).toEqual(['DOMAIN-SUFFIX,notion.so', 'PROCESS-NAME-REGEX,^steam.*', 'PROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(mihomo.json.rejected.map((r: { reason: string }) => r.reason)).toEqual(['不支持的规则类型 USER-AGENT']);
-    const mac = await alice.post(`/api/rulesets/${id}/preview`, { client: 'surge', platform: 'macos' });
+    expect(mihomo.json.sources).toEqual([{ id: 'a', ok: true, rules: 4, rejected: 1 }]);
+    const mac = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'macos' });
     expect(mac.json.lines).toContain('PROCESS-NAME,steam*');
     expect(mac.json.notes).toHaveLength(1);
-    const ios = await alice.post(`/api/rulesets/${id}/preview`, { client: 'surge', platform: 'ios' });
+    const ios = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'ios' });
     expect(ios.json.lines).toEqual(['DOMAIN-SUFFIX,notion.so', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(ios.json.dropped).toHaveLength(2);
+  });
+
+  it('不指定来源时返回合并结果：去重、domain → classical → ipcidr、跳过停用来源、统一 no-resolve', async () => {
+    const { alice } = await scenario();
+    const ruleset = { name: 'M', noResolve: true, sources: [
+      local('a', 'IP-CIDR,10.0.0.0/8\nDOMAIN-KEYWORD,x\nDOMAIN,a.test'),
+      local('b', 'DOMAIN,a.test\nDOMAIN-SUFFIX,b.test'),
+      { ...local('off', 'DOMAIN,off.test'), enabled: false },
+    ] };
+    const res = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
+    expect(res.json.lines).toEqual(['DOMAIN,a.test', 'DOMAIN-SUFFIX,b.test', 'DOMAIN-KEYWORD,x', 'IP-CIDR,10.0.0.0/8,no-resolve']);
+    expect(res.json.stats).toEqual({ domain: 2, classical: 1, ipcidr: 1, total: 5, duplicates: 1 });
+  });
+
+  it('远程来源：已保存的规则集写入快照，新建草稿只拉取不落快照；拉取失败不阻断合并结果', async () => {
+    const fetched: string[] = [];
+    const { alice, store } = await scenario(async (url) => {
+      fetched.push(url);
+      if (url.endsWith('/bad')) throw new Error('上游 500');
+      return { status: 200, body: 'DOMAIN,remote.test' };
+    });
+    const sources = [{ id: 'r', kind: 'remote', format: 'classical', url: 'https://rules.example.test/ok' }, { id: 'x', kind: 'remote', format: 'classical', url: 'https://rules.example.test/bad' }, local('l', 'DOMAIN,local.test')];
+    const draft = await alice.post('/api/rulesets/preview', { ruleset: { name: 'N', sources }, client: 'mihomo' });
+    expect(draft.json.lines).toEqual(['DOMAIN,remote.test', 'DOMAIN,local.test']);
+    expect(draft.json.sources).toEqual([
+      { id: 'r', ok: true, rules: 1, rejected: 0 },
+      { id: 'x', ok: false, error: '上游 500' },
+      { id: 'l', ok: true, rules: 1, rejected: 0 },
+    ]);
+    expect(store.snapshotHistory('ruleset', 'draft')).toEqual([]);
+    // 同一地址短时间内复用，不重复拉取
+    await alice.post('/api/rulesets/preview', { ruleset: { name: 'N', sources }, source: 'r', client: 'mihomo' });
+    expect(fetched.filter((u) => u.endsWith('/ok'))).toHaveLength(1);
+
+    const id = (await alice.post('/api/rulesets', { name: 'N', sources: sources.slice(0, 1) })).json.item.id;
+    const saved = await alice.post('/api/rulesets/preview', { id, ruleset: { name: 'N', sources: sources.slice(0, 1) }, source: 'r', client: 'mihomo' });
+    expect(saved.json.lines).toEqual(['DOMAIN,remote.test']);
+    expect(store.snapshotHistory('ruleset', id)).toHaveLength(1);
+  });
+
+  it('别人的规则集不能借 id 读快照', async () => {
+    const { alice, bob } = await scenario();
+    const id = (await alice.post('/api/rulesets', { name: 'A', sources: [local('a', 'DOMAIN,a.test')] })).json.item.id;
+    expect((await bob.post('/api/rulesets/preview', { id, ruleset: { name: 'A', sources: [] }, client: 'mihomo' })).status).toBe(404);
   });
 });
 

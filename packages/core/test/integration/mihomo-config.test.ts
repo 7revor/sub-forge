@@ -29,7 +29,7 @@ const isolated: Partial<RenderInput> = {
     provider: (key, v) => `${UNREACHABLE}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
     ruleset: (key) => `${UNREACHABLE}/r/TOKEN/${key}`,
   },
-  rules: { ...RULES, rulesets: { ...RULES.rulesets, broker: { ...RULES.rulesets.broker!, url: `${UNREACHABLE}/broker.mrs` } } },
+  rules: { ...RULES, rulesets: { ...RULES.rulesets, fin: { ...RULES.rulesets.fin!, sources: RULES.rulesets.fin!.sources.map((s) => (s.id === 'broker' ? { ...s, url: `${UNREACHABLE}/broker.mrs` } : s)) } } },
   base: {
     'mixed-port': 0,
     'log-level': 'warning',

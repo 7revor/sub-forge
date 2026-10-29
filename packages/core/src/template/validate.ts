@@ -5,7 +5,7 @@ import type { RuleSetInputs } from '../rules/expand.ts';
 import type { GroupMember, Target, Template } from '../types.ts';
 import { findGroupCycles } from './merge.ts';
 
-export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rulesets' | 'bundles'>): Report {
+export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rulesets'>): Report {
   const report = new Report();
   const ids = new Map<string, number>();
   const names = new Map<string, number>();
@@ -45,12 +45,6 @@ export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rules
     checkTarget(r.target, where);
     if (!rules) continue;
     if (r.matcher.kind === 'ruleset' && !rules.rulesets[r.matcher.id]) report.error('template.dangling-ruleset', `规则集 ${r.matcher.id} 不存在`, where);
-    if (r.matcher.kind === 'bundle') {
-      const b = rules.bundles[r.matcher.id];
-      if (!b) report.error('template.dangling-bundle', `规则包 ${r.matcher.id} 不存在`, where);
-      else if (b.items.some((i) => (i as { kind: string }).kind === 'bundle')) report.error('bundle.nested', `规则包「${b.name}」超过两层`, where);
-      else for (const i of b.items) if (i.kind === 'ruleset' && !rules.rulesets[i.id]) report.error('template.dangling-ruleset', `规则包「${b.name}」引用的规则集 ${i.id} 不存在`, where);
-    }
   }
 
   if (!t.final) report.error('template.no-final', '未设置 MATCH / FINAL 出口');

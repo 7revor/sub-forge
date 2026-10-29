@@ -8,7 +8,7 @@ const to = { kind: 'builtin' as const, name: 'DIRECT' as const };
 const render = (content: string, entries: RuleEntry[] = [{ id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: to }]) => renderMihomo({
   profile: { id: 'p', name: 'P', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: { extraRules: entries.map(rule => ({ anchor: 'bottom', rule })) } },
   nodeSets: { sources: {}, collections: {}, locals: {}, snapshots: {} },
-  rules: { rulesets: { rs: { id: 'rs', name: 'R', kind: 'local', format: 'classical', content } }, bundles: {}, snapshots: {} },
+  rules: { rulesets: { rs: { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content }] } }, snapshots: {} },
   urls: { provider: k => `https://test/p/${k}`, ruleset: k => `https://test/r/${k}` },
 });
 

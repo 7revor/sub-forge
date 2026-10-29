@@ -5,7 +5,7 @@ import { stringify } from 'yaml';
 import { NodeSetResolver, nodeSetKey, type NodeSetInputs } from '../nodeset/resolve.ts';
 import { Report } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
-import { expandBundle, type RuleSetInputs } from '../rules/expand.ts';
+import { expandRuleSet, type RuleSetInputs } from '../rules/expand.ts';
 import type { Behavior } from '../rules/parse.ts';
 import { mergeTemplate, type EffectiveGroup } from '../template/merge.ts';
 import type { GroupMember, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template } from '../types.ts';
@@ -334,10 +334,9 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
       continue;
     }
     // 不同规则级选项可能改变 classical 正文或 CIDR 分段，不能共用同名 provider。
-    const base = `${m.kind === 'bundle' ? 'b' : 'rs'}_${safeId(m.id)}${r.options?.noResolve ? '_nr' : ''}${r.options?.src ? '_src' : ''}`;
-    const bundleInputs = m.kind === 'bundle' ? input.rules : { ...input.rules, bundles: { ...input.rules.bundles, [base]: { id: base, name: m.id, items: [{ kind: 'ruleset' as const, id: m.id }] } } };
-    const buckets = expandBundle(m.kind === 'bundle' ? m.id : base, bundleInputs, ctx, report);
-    const noResolve = (m.kind === 'bundle' && input.rules.bundles[m.id]?.noResolve) || r.options?.noResolve;
+    const base = `rs_${safeId(m.id)}${r.options?.noResolve ? '_nr' : ''}${r.options?.src ? '_src' : ''}`;
+    const buckets = expandRuleSet(m.id, input.rules, ctx, report);
+    const noResolve = input.rules.rulesets[m.id]?.noResolve || r.options?.noResolve;
     // domain → classical → ipcidr：IP 类放最后，避免过早触发 DNS 解析（RB-03）
     for (const behavior of ['domain', 'classical', 'ipcidr'] as const) {
       const list = buckets[behavior].map(rule => withIpOptions(rule, r.options ?? {}));
@@ -367,14 +366,13 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
       }
     }
     for (const p of buckets.passthrough) {
-      const rs = input.rules.rulesets[p.id];
-      const key = `${base}_${safeId(p.id)}_${p.format}`;
-      if (p.format !== 'mrs' || !p.url || !rs?.behavior || rs.behavior === 'classical') {
-        report.warn('ruleset.passthrough-unusable', `规则集「${rs?.name ?? p.id}」（${p.format}）无法用于 mihomo：需要 mrs 格式、URL 与 domain/ipcidr behavior`, where);
+      const key = `${base}_${safeId(p.sourceId)}_${p.format}`;
+      if (p.format !== 'mrs' || !p.url || !p.behavior || p.behavior === 'classical') {
+        report.warn('ruleset.passthrough-unusable', `规则集「${input.rules.rulesets[m.id]?.name ?? m.id}」的来源「${p.name}」（${p.format}）无法用于 mihomo：需要 mrs 格式、URL 与 domain/ipcidr behavior`, where);
         continue;
       }
-      ruleProviders[key] ??= { type: 'http', behavior: rs.behavior, format: 'mrs', url: p.url, interval: RULESET_INTERVAL };
-      ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: rs.behavior === 'ipcidr' && !!noResolve, src: rs.behavior === 'ipcidr' && !!r.options?.src }, target));
+      ruleProviders[key] ??= { type: 'http', behavior: p.behavior, format: 'mrs', url: p.url, interval: RULESET_INTERVAL };
+      ruleLines.push(composeRule({ text: `RULE-SET,${key}`, noResolve: p.behavior === 'ipcidr' && !!noResolve, src: p.behavior === 'ipcidr' && !!r.options?.src }, target));
     }
   }
   const finalName = resolveTarget(eff.final, 'final') ?? 'DIRECT';

@@ -82,7 +82,11 @@ describe('文档增删改查', () => {
     expect(badRegex.json.error).toMatch(/第 1 步.*非法正则/);
     expect((await alice.post('/api/sources', { ...remoteSource(), pipeline: [{ op: 'script', code: 'x' }] })).json.error).toMatch(/脚本/);
     expect((await alice.post('/api/rulesets', { name: 'M', kind: 'remote', format: 'mrs', url: 'https://a.example.com/x.mrs' })).json.error).toMatch(/behavior/);
-    expect((await alice.post('/api/bundles', { name: 'B', items: [{ kind: 'bundle', id: 'x' }] })).json.error).toMatch(/两层/);
+    expect((await alice.post('/api/rulesets', { name: 'D', sources: [{ id: 'a', kind: 'local', format: 'auto', content: '' }, { id: 'a', kind: 'local', format: 'auto', content: '' }] })).json.error).toMatch(/重复/);
+    expect((await alice.post('/api/rulesets', { name: 'U', sources: [{ id: 'a', kind: 'remote', format: 'auto', url: 'ftp://x' }] })).json.error).toMatch(/来源 1.*http/);
+    // 旧客户端的单一来源写法转成一个来源
+    expect((await alice.post('/api/rulesets', { name: 'L', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' })).json.item).toEqual(expect.objectContaining({ sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }] }));
+    expect((await alice.get('/api/bundles')).status).toBe(404);
   });
 
   it('组合成环时拒绝保存', async () => {

@@ -5,7 +5,8 @@ import Database from 'better-sqlite3';
 import { NodeSetResolver, type LocalProxy } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
-import type { DocKind, DocTypes, LocalDoc, Seed, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import type { DocKind, DocTypes, LocalDoc, RuleSetDoc, Seed, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import { convertBundles, normalizeRuleSet, retargetBundleRefs } from './legacy-rules.ts';
 
 export type SnapshotOwner = 'source' | 'ruleset';
 
@@ -43,7 +44,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -102,7 +103,7 @@ type RawUser = { id: string; username: string; password_hash: string; role: Role
 const toUser = (r: RawUser): User => ({ id: r.id, username: r.username, role: r.role, disabled: r.disabled === 1, scriptAllowed: r.script_allowed === 1, createdAt: r.created_at });
 
 /** 有归属的文档种类；模板与预设由管理员维护，所有人可读 */
-export const OWNED_KINDS = ['source', 'collection', 'local', 'ruleset', 'bundle', 'profile'] as const;
+export const OWNED_KINDS = ['source', 'collection', 'local', 'ruleset', 'profile'] as const;
 
 export type StoreOptions = { now?: () => number; cipher?: Cipher };
 
@@ -123,7 +124,7 @@ export class Store {
 
   close(): void { this.db.close(); }
 
-  /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容） */
+  /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：规则集单一来源、另有规则包） */
   private migrate(): void {
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version >= SCHEMA_VERSION) return;
@@ -165,6 +166,7 @@ export class Store {
         this.db.exec('DROP TABLE tokens');
       }
       if (hasDocs && version < 5) this.convertLocalSources();
+      if (hasDocs && version < 6) this.convertRuleBundles();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -217,6 +219,45 @@ export class Store {
       const before = this.cipher.decrypt(r.data);
       const after = JSON.stringify(retarget(JSON.parse(before)));
       if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(after), r.rowid);
+    }
+  }
+
+  /**
+   * 规则包并入规则集：旧规则集转成多来源结构；规则包转成同归属的规则集（id 冲突时换新 id），
+   * 远程来源的快照复制到新规则集名下，模板与 Profile 中的规则包引用改指向新规则集。
+   */
+  private convertRuleBundles(): void {
+    const rulesets = new Map<string, RuleSetDoc>();
+    for (const r of this.db.prepare("SELECT rowid, id, data FROM docs WHERE kind = 'ruleset'").all() as { rowid: number; id: string; data: string }[]) {
+      const raw = JSON.parse(this.cipher.decrypt(r.data)) as Record<string, unknown>;
+      const next = normalizeRuleSet(raw);
+      if (next) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify(next)), r.rowid);
+      rulesets.set(r.id, next ?? (raw as unknown as RuleSetDoc));
+    }
+    const rows = this.db.prepare("SELECT id, owner, data FROM docs WHERE kind = 'bundle'").all() as { id: string; owner: string | null; data: string }[];
+    if (!rows.length) return;
+    const owners = new Map(rows.map((r) => [r.id, r.owner]));
+    const converted = convertBundles(rows.map((r) => JSON.parse(this.cipher.decrypt(r.data))), rulesets, new Set(rulesets.keys()), () => randomId(9),
+      (message) => console.warn(`[迁移] ${message}`));
+    for (const rs of converted.rulesets) {
+      const bundleId = [...converted.idMap].find(([, to]) => to === rs.id)![0];
+      this.db.prepare("INSERT INTO docs (kind, id, owner, data, updated_at) VALUES ('ruleset', ?, ?, ?, ?)")
+        .run(rs.id, owners.get(bundleId) ?? null, this.cipher.encrypt(JSON.stringify(rs)), this.now());
+    }
+    for (const c of converted.snapshotCopies) {
+      this.db.prepare(`INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error)
+        SELECT owner_kind, ?, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error FROM snapshots WHERE owner_kind = 'ruleset' AND owner_id = ? AND url_hash = ?`)
+        .run(c.to, c.from, this.cipher.hmac(c.url));
+    }
+    this.db.prepare("DELETE FROM docs WHERE kind = 'bundle'").run();
+    for (const r of this.db.prepare("SELECT rowid, data FROM docs WHERE kind = 'profile'").all() as { rowid: number; data: string }[]) {
+      const before = this.cipher.decrypt(r.data);
+      const after = JSON.stringify(retargetBundleRefs(JSON.parse(before), converted.idMap));
+      if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(after), r.rowid);
+    }
+    for (const r of this.db.prepare('SELECT rowid, data FROM template_versions').all() as { rowid: number; data: string }[]) {
+      const after = JSON.stringify(retargetBundleRefs(JSON.parse(r.data), converted.idMap));
+      if (after !== r.data) this.db.prepare('UPDATE template_versions SET data = ? WHERE rowid = ?').run(after, r.rowid);
     }
   }
 
@@ -509,7 +550,11 @@ export class Store {
       for (const d of seed.collections ?? []) this.put('collection', d, owner);
       for (const d of seed.locals ?? []) this.put('local', d, owner);
       for (const d of seed.rulesets ?? []) this.put('ruleset', d, owner);
-      for (const d of seed.bundles ?? []) this.put('bundle', d, owner);
+      // 旧种子里的规则包先按原样写入，下面统一转成规则集
+      for (const d of seed.bundles ?? []) {
+        this.db.prepare("INSERT OR REPLACE INTO docs (kind, id, owner, data, updated_at) VALUES ('bundle', ?, ?, ?, ?)")
+          .run((d as { id: string }).id, owner, this.cipher.encrypt(JSON.stringify(d)), this.now());
+      }
       for (const d of seed.presets ?? []) this.put('preset', d);
       for (const d of seed.profiles ?? []) this.put('profile', d, owner);
       for (const t of seed.templates ?? []) {
@@ -517,8 +562,9 @@ export class Store {
         this.putTemplateVersion(t);
       }
       for (const t of seed.tokens ?? []) this.putToken(t);
-      // 旧种子里的本地内容订阅源同样转成本地节点组
+      // 旧种子里的本地内容订阅源同样转成本地节点组；旧格式规则集与规则包转成多来源规则集
       this.convertLocalSources();
+      this.convertRuleBundles();
     });
     tx();
   }

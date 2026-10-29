@@ -51,28 +51,28 @@ proxy-groups:
     hidden: true
     empty-fallback: REJECT
 rule-providers:
-  b_fin_domain:
+  rs_fin_domain:
     type: http
     behavior: domain
     format: text
-    url: https://sub.example.com/r/TOKEN/b_fin_domain
+    url: https://sub.example.com/r/TOKEN/rs_fin_domain
     interval: 86400
     proxy: DIRECT
-  b_fin_classical:
+  rs_fin_classical:
     type: http
     behavior: classical
     format: text
-    url: https://sub.example.com/r/TOKEN/b_fin_classical
+    url: https://sub.example.com/r/TOKEN/rs_fin_classical
     interval: 86400
     proxy: DIRECT
-  b_fin_ipcidr:
+  rs_fin_ipcidr:
     type: http
     behavior: ipcidr
     format: text
-    url: https://sub.example.com/r/TOKEN/b_fin_ipcidr
+    url: https://sub.example.com/r/TOKEN/rs_fin_ipcidr
     interval: 86400
     proxy: DIRECT
-  b_fin_broker_mrs:
+  rs_fin_broker_mrs:
     type: http
     behavior: ipcidr
     format: mrs
@@ -86,10 +86,10 @@ rule-providers:
     interval: 86400
     proxy: DIRECT
 rules:
-  - RULE-SET,b_fin_domain,🚀 节点选择
-  - RULE-SET,b_fin_classical,🚀 节点选择
-  - RULE-SET,b_fin_ipcidr,🚀 节点选择,no-resolve
-  - RULE-SET,b_fin_broker_mrs,🚀 节点选择,no-resolve
+  - RULE-SET,rs_fin_domain,🚀 节点选择
+  - RULE-SET,rs_fin_classical,🚀 节点选择
+  - RULE-SET,rs_fin_ipcidr,🚀 节点选择,no-resolve
+  - RULE-SET,rs_fin_broker_mrs,🚀 节点选择,no-resolve
   - RULE-SET,rs_ai_domain,🤖 AI 服务
   - PROCESS-PATH-WILDCARD,/Applications/*/WeChat.app/*,DIRECT
   - GEOIP,CN,DIRECT,no-resolve

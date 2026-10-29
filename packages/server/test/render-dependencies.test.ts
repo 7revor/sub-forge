@@ -13,7 +13,7 @@ function setup(overlay: Overlay, tpl?: Template) {
   const calls: string[] = [];
   const h = setupApp({ fetcher: async url => { calls.push(url); throw new Error('模拟远程规则不可用'); } });
   envs.push(h);
-  h.store.put('ruleset', { id: 'bad', name: '不可用规则', kind: 'remote', format: 'classical', url: 'https://rules.example.test/bad' });
+  h.store.put('ruleset', { id: 'bad', name: '不可用规则', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://rules.example.test/bad' }] });
   if (tpl) h.store.putTemplateVersion(tpl);
   h.store.put('profile', { id: 'p', name: '测试', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay, ...(tpl ? { template: { id: tpl.id, follow: 'latest' as const } } : {}) });
   h.store.putToken({ token: 'token', profileId: 'p' });
@@ -35,14 +35,14 @@ describe('仅拉取实际启用的规则依赖', () => {
     expect(h.store.snapshotHistory('ruleset', 'bad')).toEqual([]);
   });
 
-  it('规则包只拉取启用子项，保留其他单条规则', async () => {
-    const h = setup({ extraRules: [{ anchor: 'top', rule: { ...rule, matcher: { kind: 'bundle', id: 'b' } } }] });
-    h.store.put('bundle', { id: 'b', name: '混合规则包', items: [
-      { kind: 'ruleset', id: 'bad', enabled: false },
-      { kind: 'rule', rule: { type: 'DOMAIN', value: 'active.example.test' } },
+  it('规则集只拉取启用的来源，保留其他本地来源', async () => {
+    const h = setup({ extraRules: [{ anchor: 'top', rule: { ...rule, matcher: { kind: 'ruleset', id: 'b' } } }] });
+    h.store.put('ruleset', { id: 'b', name: '混合规则集', sources: [
+      { id: 'bad', kind: 'remote', format: 'classical', url: 'https://rules.example.test/bad', enabled: false },
+      { id: 'local', kind: 'local', format: 'classical', content: 'DOMAIN,active.example.test' },
     ] });
     const res = await h.renderer.render('p', { client: 'mihomo' });
-    expect(res.ok && res.render.rulesets.b_b_domain).toBe('active.example.test\n');
+    expect(res.ok && res.render.rulesets.rs_b_domain).toBe('active.example.test\n');
     expect(h.calls).toEqual([]);
   });
 

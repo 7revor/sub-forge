@@ -4,7 +4,7 @@
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { parseRuleSetContent, validateTemplate, type ReportItem, type RuleBundle, type RuleSet, type Template } from '@sub-forge/core';
+import { parseRuleSetContent, validateTemplate, sourceLabel, type ReportItem, type RuleSet, type Template } from '@sub-forge/core';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { TemplateVersionDoc } from '../docs.ts';
@@ -20,41 +20,38 @@ const IMPACT_CODES = new Set(['overlay.orphan', 'overlay.orphan-anchor', 'group.
 
 async function selfCheck(store: Store, snapshots: SnapshotService, t: Template): Promise<ReportItem[]> {
   const rulesets: Record<string, RuleSet> = Object.fromEntries(store.list('ruleset').map((r) => [r.id, r]));
-  const bundles: Record<string, RuleBundle> = Object.fromEntries(store.list('bundle').map((b) => [b.id, b]));
-  const report = validateTemplate(t, { rulesets, bundles }).items;
+  const report = validateTemplate(t, { rulesets }).items;
   if (report.some(i => i.level === 'error')) return report;
   const ids = new Set<string>();
-  for (const r of t.rules) {
-    if (r.enabled === false) continue;
-    if (r.matcher.kind === 'ruleset') ids.add(r.matcher.id);
-    if (r.matcher.kind === 'bundle') {
-      for (const item of bundles[r.matcher.id]!.items) if (item.kind === 'ruleset' && item.enabled !== false) ids.add(item.id);
-    }
-  }
+  for (const r of t.rules) if (r.enabled !== false && r.matcher.kind === 'ruleset') ids.add(r.matcher.id);
   for (const id of ids) {
     const rs = store.get('ruleset', id)!;
     const where = `ruleset:${id}`;
-    if (rs.format === 'mrs' || rs.format === 'srs') {
-      report.push({ level: 'info', code: 'template.ruleset-passthrough', message: `规则集「${rs.name}」为二进制透传，内容与可达性由客户端检查`, where });
-      continue;
-    }
-    let content = rs.content ?? '';
-    if (rs.kind === 'remote') {
-      const result = await snapshots.get('ruleset', id, rs.url!, { ttlSec: rs.fetch?.ttlSec ?? 86400, ...rs.fetch });
-      if (!result.snapshot) {
-        report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `规则集「${rs.name}」没有可用快照：${result.error ?? '无法拉取'}`, where });
+    for (const src of rs.sources) {
+      if (src.enabled === false) continue;
+      const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
+      if (src.format === 'mrs' || src.format === 'srs') {
+        report.push({ level: 'info', code: 'template.ruleset-passthrough', message: `${label}为二进制透传，内容与可达性由客户端检查`, where });
         continue;
       }
-      content = result.snapshot.body ?? '';
-      if (result.error || result.stale) report.push({ level: 'warn', code: 'template.ruleset-snapshot', message: `规则集「${rs.name}」使用可用快照${result.error ? `：${result.error}` : '，后台刷新中'}`, where });
+      let content = src.content ?? '';
+      if (src.kind === 'remote') {
+        const result = await snapshots.get('ruleset', id, src.url!, { ttlSec: src.fetch?.ttlSec ?? 86400, ...src.fetch, format: src.format });
+        if (!result.snapshot) {
+          report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `${label}没有可用快照：${result.error ?? '无法拉取'}`, where });
+          continue;
+        }
+        content = result.snapshot.body ?? '';
+        if (result.error || result.stale) report.push({ level: 'warn', code: 'template.ruleset-snapshot', message: `${label}使用可用快照${result.error ? `：${result.error}` : '，后台刷新中'}`, where });
+      }
+      const reason = unusableBody('ruleset', id, content, src.format);
+      if (reason) {
+        report.push({ level: 'error', code: 'template.ruleset-invalid', message: `${label}不可用：${reason}`, where });
+        continue;
+      }
+      const parsed = parseRuleSetContent(content, src.format, src.behavior);
+      if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', message: `${label}有 ${parsed.rejected.length} 行无法解析或不支持`, where });
     }
-    const reason = unusableBody('ruleset', id, content, rs.format);
-    if (reason) {
-      report.push({ level: 'error', code: 'template.ruleset-invalid', message: `规则集「${rs.name}」不可用：${reason}`, where });
-      continue;
-    }
-    const parsed = parseRuleSetContent(content, rs.format);
-    if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', message: `规则集「${rs.name}」有 ${parsed.rejected.length} 行无法解析或不支持`, where });
   }
   return report;
 }

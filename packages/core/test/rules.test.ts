@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyOverrides, lowerRule, regexToWildcard } from '../src/rules/client.ts';
-import { expandBundle, type RuleSetInputs } from '../src/rules/expand.ts';
+import { expandRuleSet, formatRuleLine, sourceKey, type RuleSetInputs } from '../src/rules/expand.ts';
 import { parseRuleLine, parseRuleSetContent } from '../src/rules/parse.ts';
 import { Report } from '../src/report.ts';
 import type { RuleIR } from '../src/types.ts';
@@ -90,33 +90,48 @@ describe('客户端降级与覆盖', () => {
   });
 });
 
-describe('规则包', () => {
+describe('规则集多来源', () => {
   const inputs: RuleSetInputs = {
     rulesets: {
-      paypal: { id: 'paypal', name: 'PayPal', kind: 'local', format: 'auto', content: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21' },
-      stripe: { id: 'stripe', name: 'Stripe', kind: 'local', format: 'auto', content: '.stripe.com\npaypal.com' },
-      broker: { id: 'broker', name: '券商', kind: 'remote', format: 'mrs', url: 'https://example.com/broker.mrs' },
-      off: { id: 'off', name: '停用', kind: 'local', format: 'auto', content: 'DOMAIN,off.example.com' },
-    },
-    bundles: {
-      fin: { id: 'fin', name: '金融服务', noResolve: true, items: [
-        { kind: 'ruleset', id: 'paypal' },
-        { kind: 'ruleset', id: 'stripe' },
-        { kind: 'ruleset', id: 'broker' },
-        { kind: 'ruleset', id: 'off', enabled: false },
-        { kind: 'rule', rule: { type: 'DOMAIN-SUFFIX', value: 'paypal.com' } },
+      fin: { id: 'fin', name: '金融服务', noResolve: true, sources: [
+        { id: 'paypal', kind: 'local', format: 'auto', content: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21' },
+        { id: 'stripe', kind: 'local', format: 'auto', content: '.stripe.com\npaypal.com' },
+        { id: 'broker', name: '券商', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' },
+        { id: 'off', kind: 'local', format: 'auto', content: 'DOMAIN,off.example.com', enabled: false },
+        { id: 'single', kind: 'local', format: 'classical', content: 'DOMAIN-SUFFIX,paypal.com',
+          overrides: [{ line: 1, override: { when: { client: 'surge' }, action: { drop: true } } }] },
+        { id: 'remote', kind: 'remote', format: 'auto', url: 'https://example.com/r.list' },
       ] },
     },
-    snapshots: {},
+    snapshots: { [sourceKey('fin', 'remote')]: 'DOMAIN,remote.example.com' },
   };
 
-  it('按 behavior 拆分、去重、IP 类统一 no-resolve、mrs 透传', () => {
+  it('按 behavior 拆分、去重、IP 类统一 no-resolve、mrs 透传、读远程快照', () => {
     const report = new Report();
-    const b = expandBundle('fin', inputs, { client: 'mihomo' }, report);
-    expect(b.domain).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'paypal.com' }, { type: 'DOMAIN-SUFFIX', value: 'stripe.com' }, { type: 'DOMAIN', value: 'paypal.com' }]);
+    const b = expandRuleSet('fin', inputs, { client: 'mihomo' }, report);
+    expect(b.domain).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'paypal.com' }, { type: 'DOMAIN-SUFFIX', value: 'stripe.com' }, { type: 'DOMAIN', value: 'paypal.com' }, { type: 'DOMAIN', value: 'remote.example.com' }]);
     expect(b.classical).toEqual([{ type: 'DOMAIN-KEYWORD', value: 'paypal' }]);
     expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '64.4.240.0/21', noResolve: true }]);
-    expect(b.passthrough).toEqual([{ id: 'broker', format: 'mrs', url: 'https://example.com/broker.mrs' }]);
+    expect(b.passthrough).toEqual([{ sourceId: 'broker', name: '券商', format: 'mrs', url: 'https://example.com/broker.mrs', behavior: 'ipcidr' }]);
+    expect(b).toMatchObject({ total: 7, duplicates: 1 });
     expect(report.items).toEqual([]);
+  });
+
+  it('行级覆盖只作用于所在来源', () => {
+    const b = expandRuleSet('fin', inputs, { client: 'surge' }, new Report());
+    expect(b.total).toBe(6);
+    expect(b.duplicates).toBe(0);
+  });
+
+  it('远程来源没有快照时报错并指明来源', () => {
+    const report = new Report();
+    expandRuleSet('fin', { ...inputs, snapshots: {} }, { client: 'mihomo' }, report);
+    expect(report.items).toMatchObject([{ code: 'ruleset.no-snapshot', message: '规则集「金融服务」的来源「https://example.com/r.list」没有可用快照' }]);
+  });
+
+  it('单条规则写回 classical 文本', () => {
+    expect(formatRuleLine({ type: 'IP-CIDR', value: '10.0.0.0/8', noResolve: true })).toBe('IP-CIDR,10.0.0.0/8,no-resolve');
+    expect(formatRuleLine({ type: 'PROCESS', kind: 'name', mode: 'regex', value: '^code$' })).toBe('PROCESS-NAME-REGEX,^code$');
+    expect(formatRuleLine({ type: 'RAW', client: 'surge', text: 'USER-AGENT,x*' })).toBe('USER-AGENT,x*');
   });
 });
