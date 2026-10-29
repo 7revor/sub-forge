@@ -1,7 +1,7 @@
 # 07 · 待核对清单（本地采集用）
 
 > **状态：第一轮采集完成（2026-10-28），剩余项需要 GUI 或真机配合。**
-> 已完成：Surge 手册全部相关页面、`surge-cli --check` 离线校验（Surge Mac 6.9.1）、mihomo v1.19.33 代理链实测、mihomo 源码版本追溯、规则仓库 F1–F4。
+> 已完成：Surge 手册全部相关页面、`surge-cli --check` 离线校验（Surge Mac 6.9.1）、mihomo v1.19.33 代理链实测、mihomo 源码版本追溯、规则仓库 F1–F3（F4 国内直连可达性待验证）。
 > 未完成的项在各表中标为 **⏳**，汇总见 [§7.1](#71-剩余采集项)。全部采集完成前，依赖这些结论的设计（标注 ⚠ 的位置）保持草案状态，不进入实现。
 > 实测用例可复现：[research/verification/](../research/verification/README.md)。
 
@@ -196,7 +196,7 @@
 | F1 | blackmatrix7 README "使用说明 / 配置建议"有哪些措辞模板（"单独使用"、"共同使用"之外还有吗） | 抽查 Clash / Surge 目录下 20 个 README，尤其是有 `_Classical`、`_Domain`、`_IP` 变体的 | 适配器解析规则 | 抽查 20 个规则（Google、YouTube、Netflix、Apple、Microsoft、Telegram、OpenAI、China、ChinaMax、Global、Lan、Advertising、Twitter、Spotify、Steam、Bilibili、GitHub、Amazon、Disney、TikTok）× Clash / Surge，共 40 个 README。列表项句式（`X` 为文件名）：<br>· `X 单独使用。` / `X、Y 共同使用。` / `X、Y、Z 共同使用。`<br>· `X 纯IPv4网络，单独使用。` / `X、Y 纯IPv4网络，共同使用。`<br>· `X.yaml，请使用 behavior: "classical"` / `"domain"` / `"ipcidr"`<br>· `X.list，请使用RULE-SET。` / `X.list，请使用DOMAIN-SET。`<br>· `X与Y的区别仅在于后者IP-CIDR(6)类型带no-resolve。`<br>· `X与Y的区别在于后者不带IPv6规则，适用纯IPv4网络。`（及"不带IPv6类型的规则，且不带no-resolve"的变体）<br>· 版本分段：`Surge 5.21.0(2952)以上版本使用以下配置：` / `…以下版本使用以下配置：`，`X与Y为 Surge 5.21.0(2952) 以上版本使用`（见 Apple、Advertising、China、ChinaMax、Global 的 Surge README）<br>· 提示类：`URL-REGEX类型的规则，在HTTPS协议中，需要配合MITM使用。规则生成器已尝试推导MITM的配置X_MITM.sgmodule，仅供参考。`、`可能存在部分误拦截，建议搭配放行规则进行修正。`<br>README 中还有大量上游来源 URL 列表（LM-Firefly、ACL4SSR、Loyalsoldier 等），不是使用说明，解析时需跳过 |
 | F2 | zydou 的 `@attr` 命名含义：`cn@!cn`、`cn@-!cn` 分别对应 v2fly 的什么 | 对照 v2fly/domain-list-community 的属性说明与转换脚本 | 搜索结果中属性的展示文案 | · `@!cn`：v2fly 中带 `!cn` 属性的条目。v2fly README："Rules with `@!cn` attribute have been cast out from cn lists"；`@cn` 的含义是 "Domains and services that originate from outside China mainland but have access point in China mainland"。<br>· `@-!cn`：**构建 bug，不是属性**。v2fly 的 `include:list2 @attr1 @-attr2` 是"选择性包含"语法（只包含带 attr1 且不带 attr2 的条目，"It's filtering, not flagging"）。zydou `convert.py` 把 `include:` 行上的 `@-!cn` 当作属性记录，生成的文件内容是无效行，如 `category-games-cn@-!cn.txt` 内容为 `.include:kurogames`、`.include:xd`（clash 分支为 `'+.include:kurogames'`）。<br>→ 属性名以 `-` 开头的文件应丢弃 |
 | F3 | 带尾部空格的文件名（`openai@ads .txt`）是否为上游构建 bug，内容与无空格版是否相同 | 对比两个文件 | 索引时去重还是丢弃 | **是构建 bug，内容不同，两者是同一属性的两个互补子集。** 原因：`convert.py` 中 `for attr in line.split("@")[1:]` 没有 strip，一行带多个属性时（如 `domain @ads @cn`），除最后一个外的属性名都带尾部空格（`ads `）。所以 `openai@ads .txt` = 带 `@ads` 且后面还有其他属性的条目，`openai@ads.txt` = `@ads` 是最后一个属性的条目，**并集才是完整的 `@ads`**。<br>实测：`openai@ads` 空格版 3 行、无空格版 1 行；`alphabet@cn` 3 行 vs 121 行；`category-ads@cn` 3 行 vs 684 行。surge-domain-set 分支共 2109 个文件，带空格的 97 个，其中 74 个有无空格同名文件（其余 23 个只有空格版）。<br>另：`convert.py` 跳过 `regexp:` 规则 |
-| F4 | jsDelivr 访问这两个仓库是否可用、缓存延迟多久；国内网络下 raw.githubusercontent.com 的可达性 | 实测 | REPO-07 默认 `urlTemplate` | · jsDelivr 按文件访问两个仓库都可用（200）：`cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/OpenAI/OpenAI.yaml`、`.../gh/zydou/domain-list-community-converter@clash/openai.yml`、`@mrs/openai.mrs`；`fastly.jsdelivr.net` 同样可用。但 `.../ios_rule_script@master/README.md`（仓库根）返回 **403**。<br>· 缓存头：jsDelivr `cache-control: public, max-age=604800, s-maxage=43200`（CDN 侧 12 小时、浏览器侧 7 天），响应头 `x-jsd-version` 为分支名；raw.githubusercontent.com `max-age=300`。<br>· 国内网络可达性 ⏳：本机经 Surge 系统代理出网，无法代表国内直连 |
+| F4 | 国内网络下 raw.githubusercontent.com 的可达性 | 实测 | 上游文件直连 | 国内网络可达性 ⏳：本机经 Surge 系统代理出网，无法代表国内直连 |
 
 ---
 
@@ -257,7 +257,7 @@
 | Q8 | **脚本处理器先仅限管理员，管理员可按用户授权**；普通用户可以引用管理员共享的脚本 | 沙箱（SYS-03）稳定前降低风险 |
 | Q9 | **Surge 外部节点集只用 `policy-path`**，不做内联回退。外部节点上的代理链用组级 `underlying-proxy`（S3）；低于 iOS 5.22.0 / Mac 6.9.0 时代理链不可用，在渲染报告中提示 | S1、S3 |
 | Q10 | 项目名定为 **sub-forge** | — |
-| R1 | 规则仓库**默认直连**（配置中直接写上游地址，可切换 jsDelivr 等镜像）；需要改写或合并时自动转为托管 | F4；zydou 带空格文件的合并（F3）只能在托管模式下完成 |
+| R1 | 规则仓库**默认直连**（配置中直接写上游地址）；需要改写或合并时自动转为托管 | F4；zydou 带空格文件的合并（F3）只能在托管模式下完成 |
 | R2 | 托管输出**保留原文件头注释，并附来源 URL 与许可证名称**。非正式法律意见 | 规则是数据，不与代码链接 |
 | R3 | mihomo **默认 mrs**，托管时输出 yaml | M10：mrs 自 v1.18.7 起支持，低于 D3 的最低版本 |
 | R4 | **自定义规则仓库仅限管理员**；普通用户仍可使用远程 URL 规则集（RS-01） | — |

@@ -2,7 +2,7 @@
 
 > 状态：2026-10-29 已接通首期索引与搜索，当前索引政策为仅接受 `.list` / `.txt`；下文历史调研不代表当前支持范围。
 > 已实现：两个内置仓库、SQLite v11 持久化、启动/每日 commit 检查、管理员手动更新与启停、失败保留旧索引、名称归一化搜索（忽略大小写、连字符、下划线与空格）、仓库/客户端筛选、分页、按需文本预览、变体选择、导入新规则集或追加为已有规则集的远程来源。
-> 首期导入沿用 `remote` 来源与文本托管流程，默认选择推荐文本变体，不在渲染时动态切换仓库变体；YAML、MRS、SRS 等文件不进入索引。镜像、规则类型/内容搜索、来源注释随托管输出、动态 `repo` 引用、commit 锁定与上游消失检测仍未实现。下文默认 mrs/直连、YAML 专用索引决策已于 2026-10-29 撤销；替代为文本索引与托管转换。
+> 首期导入沿用 `remote` 来源与文本托管流程，默认选择推荐文本变体，不在渲染时动态切换仓库变体；YAML、MRS、SRS 等文件不进入索引。规则类型/内容搜索、来源注释随托管输出、动态 `repo` 引用、commit 锁定与上游消失检测仍未实现。下文默认 mrs/直连、YAML 专用索引决策已于 2026-10-29 撤销；替代为文本索引与托管转换。
 
 ### 自定义 GitHub 仓库（2026-10-29 已实现）
 
@@ -13,7 +13,7 @@
 - 格式可选自动识别、classical、域名列表、CIDR，应用于该仓库所有候选文件；在详情或导入时使用现有核心解析器读取内容。部分不支持行提供条数、行号与原因弹层；完全无法解析时禁止导入，失败可重试。
 - 通用文本条目可出现在 mihomo / Surge 两种筛选中，最终兼容性由已有规则集渲染流程处理。导入保存普通 `remote` URL，不建立动态 repo 引用，不锁定 commit。与主分支关联功能整合后，导入和 resolve 均保留 repository 标识；保存与预览校验自定义仓库的规范 URL。
 - 复用启动/每日检查、手动更新、失败保留旧索引与重启恢复。成功扫描无匹配文件时保存空索引；网络失败保留旧结果。索引进行中不可删除；删除自定义仓库会删除配置和索引，已导入来源保留；内置仓库仅可停用。
-- `rule_repos.definition` 保存自定义配置；内置行为不变。配置编辑、私有仓库、鉴权令牌、镜像、路径模板、多文件变体聚合与逐用户可见范围留待后续。
+- `rule_repos.definition` 保存自定义配置；内置行为不变。配置编辑、私有仓库、鉴权令牌、路径模板、多文件变体聚合与逐用户可见范围留待后续。
 
 ### 首期实现说明
 
@@ -97,7 +97,6 @@ type RuleRepo = {
   git: { owner: string; repo: string; refs: string[] };   // blackmatrix7: [master]; zydou: [clash, mrs, surge-rule-set, surge-domain-set]
   adapter: 'blackmatrix7' | 'zydou' | 'generic';
   adapterOptions?: GenericAdapterOptions;
-  urlTemplate: string;            // 默认 https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}；可改为 jsDelivr 或自建镜像
   pin?: { ref: string; commit: string };   // 可选：锁定 commit
   indexedAt?: Time; indexedCommit?: Record<string, string>;
   license?: string;
@@ -143,7 +142,7 @@ type VariantPolicy = { prefer?: 'smallest' | 'no-resolve' | 'classical'; perClie
 
 | 模式 | 输出 | 优点 | 限制 |
 | --- | --- | --- | --- |
-| **直连**（passthrough，默认） | 配置中直接写上游 URL（按 `urlTemplate` 生成）和变体的 behavior / format | 不经过本服务；可以用 mrs 等二进制格式 | 不能改写；该客户端必须有现成变体 |
+| **直连**（passthrough，默认） | 配置中直接写上游 URL（按仓库、分支与文件路径生成 raw.githubusercontent.com 地址）和变体的 behavior / format | 不经过本服务；可以用 mrs 等二进制格式 | 不能改写；该客户端必须有现成变体 |
 | **托管**（hosted） | 本服务拉取、解析成 IR，按我们的地址下发（PRD RS-05） | 可以做客户端改写（CR-01~03）、作为来源与其他来源合并、去重 | 二进制格式（mrs）无法托管，只能改用文本变体 |
 
 自动切换：引用被作为来源加进**多来源规则集**，或挂了**改写 / 脚本**时，自动切换为托管并在 UI 中说明原因。
@@ -158,7 +157,6 @@ type VariantPolicy = { prefer?: 'smallest' | 'no-resolve' | 'classical'; perClie
 | REPO-04 | 详情页：变体列表、文件组合、规则预览（按需拉取前 N 行）、上游链接 | P0 |
 | REPO-05 | **一键引用**：在规则列表、规则集来源、模板编辑器里都可以"从仓库添加"，生成 `{ kind: 'repo' }` 规则集；在规则集里可以多选批量加入为多个来源 | P0 |
 | REPO-06 | 渲染时按客户端挑选变体：取 `variantPolicy.perClient`，没有就取适配器推荐；该客户端没有可用变体时，改为托管（从其他客户端的文本变体转换），仍不行就丢弃并告警 | P0 |
-| REPO-07 | 镜像：每个仓库可设置 `urlTemplate`（raw.githubusercontent.com / jsDelivr / 自定义加速前缀），也可按 Profile 覆盖，照顾访问不了 raw.githubusercontent.com 的用户 | P1 |
 | REPO-08 | 上游消失检测：重建索引后，被引用的 key 不存在了 → 标红、通知引用者；已托管的继续使用最后快照 | P1 |
 | REPO-09 | 锁定 commit：引用可固定在某个 commit（URL 中用 commit SHA），默认跟随分支 | P2 |
 | REPO-10 | 管理员添加自定义仓库（generic 适配器），可配置可见用户 | P1 |
@@ -205,7 +203,7 @@ type VariantPolicy = { prefer?: 'smallest' | 'no-resolve' | 'classical'; perClie
 
 在「系统 → 规则仓库 → GitHub Token」输入 personal access token 并点击「保存 Token」，随后点击仓库的「更新索引」。可在同一区域替换或清除，保存后无需重启。已配置仅表示服务保存了凭据，是否有效由后续索引请求验证；当前仍只支持公开仓库。细粒度 Token 可选择 Public repositories，无需授予写权限。
 
-Token 只发送到 `https://api.github.com`，不会发送到 raw 文件地址、镜像、其他域名或 HTTP 降级地址。数据库加密保存，读取接口只返回配置状态，示例种子不保存 Token。
+Token 只发送到 `https://api.github.com`，不会发送到 raw 文件地址、其他域名或 HTTP 降级地址。数据库加密保存，读取接口只返回配置状态，示例种子不保存 Token。
 
 GitHub 官方说明匿名请求通常每小时 60 次，个人认证请求通常每小时 5000 次；其他限制仍可能生效：[REST API 限额](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)。
 

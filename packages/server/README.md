@@ -148,7 +148,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - `POST /api/rule-repos/:id/refresh`：管理员触发，202 返回后通过列表轮询状态；同仓库并发任务合并。
 - `PATCH /api/rule-repos/:id`：管理员设置 `{ enabled: boolean }`，停用不删除索引或已导入的规则集。
 
-GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。仅索引 list/txt，默认导入文本后走已有托管流程。镜像、动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
+GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。仅索引 list/txt，默认导入文本后走已有托管流程。动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
 
 ### 自定义 GitHub 仓库
 
