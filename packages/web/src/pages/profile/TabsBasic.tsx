@@ -45,8 +45,8 @@ export function TabOverview() {
 
   return (
     <>
-      <div className="flex flex-wrap items-start gap-5">
-        <Card className="min-w-0 flex-[999_1_560px]"
+      <div className="grid grid-cols-1 gap-5">
+        <Card className="min-w-0"
           title={`订阅链接`}
           actions={<Button onClick={() => setAdding(true)}><Plus size={15} />新增链接</Button>}>
           <ErrorAlert error={reset.error ?? remove.error} />
@@ -72,7 +72,7 @@ export function TabOverview() {
             </ul>
           )}
         </Card>
-        <Card title="输出设置" className="min-w-0 flex-[1_1_340px]">
+        <Card title="输出设置" className="min-w-0">
           <div className="flex flex-col gap-3.5">
             <Field label="更新间隔">{(id) => (
               <Select id={id} value={String(draft.updateIntervalSec ?? 86400)} onChange={(e) => setDraft({ ...draft, updateIntervalSec: Number(e.target.value) })}>
