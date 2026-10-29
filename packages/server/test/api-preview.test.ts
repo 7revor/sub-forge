@@ -289,10 +289,34 @@ describe('规则集组级改写保存与预览', () => {
     expect(rerendered.ok && Object.values(rerendered.render.rulesets).join('')).not.toContain('changed.test');
   });
 
+  it('追加不需要内容匹配，保存重读、合并预览与实际渲染一致', async () => {
+    const { alice, renderer } = await scenario();
+    const overrides = [{ override: { when: { client: 'mihomo' }, action: { append: [{ type: 'DOMAIN', value: 'added.test' }] } } }];
+    const created = await alice.post('/api/rulesets', { name: '追加', sources: [
+      { id: 'a', kind: 'local', format: 'auto', content: 'DOMAIN,keep.test' },
+    ], overrides });
+    expect(created.status).toBe(201);
+    const rs = (await alice.get(`/api/rulesets/${created.json.item.id}`)).json.item;
+    expect(rs.overrides).toEqual(overrides);
+    const preview = await alice.post('/api/rulesets/preview', { id: rs.id, ruleset: rs, client: 'mihomo' });
+    expect(preview.status).toBe(200);
+    expect(preview.json.lines).toEqual(['DOMAIN,keep.test', 'DOMAIN,added.test']);
+    const surge = await alice.post('/api/rulesets/preview', { ruleset: rs, client: 'surge' });
+    expect(surge.json.lines).toEqual(['DOMAIN,keep.test']);
+    const profile = await alice.post('/api/profiles', { name: '追加输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
+    const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
+    expect(rendered.ok).toBe(true);
+    expect(rendered.ok && Object.values(rendered.render.rulesets).join('')).toContain('added.test');
+  });
+
   it('保存与草稿预览拒绝行号、空内容和无效动作，避免保存后丢失改写或渲染崩溃', async () => {
     const { alice } = await scenario();
     const override = { when: { client: 'mihomo' }, action: { drop: true } };
     for (const item of [
+      { override: { ...override, action: { append: [] } } },
+      { override: { ...override, action: { append: [{ type: 'DOMAIN', value: ' ' }] } } },
+      { override: { ...override, action: { append: [{ type: 'DOMAIN', value: 'a.test' }], drop: true } } },
+      { match: 'DOMAIN,a.test', override: { ...override, action: { append: [{ type: 'DOMAIN', value: 'b.test' }] } } },
       { line: 1, override }, { match: ' ', override }, { match: 'DOMAIN,a.test', line: 1, override },
       { match: 'DOMAIN,a.test', override: { ...override, action: { replace: [] } } },
       { match: 'DOMAIN,a.test', override: { ...override, action: { replace: [{ type: 'UNKNOWN', value: 'x' }] } } },
