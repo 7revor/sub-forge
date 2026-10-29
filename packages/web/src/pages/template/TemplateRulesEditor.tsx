@@ -55,7 +55,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         <div className={`${columns} hidden border-b border-line px-2 py-2 sm:grid text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>no-resolve</span><span>启用</span><span>操作</span></div>
         <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
           const error = report.some((r) => r.level === 'error' && r.where === `rule:${rule.id}`);
-          return <div id={`template-rule-${rule.id}`} className={cx('my-1 overflow-hidden rounded-lg border', error ? 'border-err bg-err-soft' : 'border-line bg-panel')}>
+          return <div id={`template-rule-${rule.id}`} className={cx('my-1 overflow-hidden rounded-lg', error && 'bg-err-soft')}>
             <div className={cx(columns, 'p-2 text-[13px]', rule.matcher.kind === 'rule' && 'cursor-pointer')} onClick={() => { if (rule.matcher.kind === 'rule') onSelect(selected === rule.id ? undefined : rule.id); }}>
               <span className="flex items-center" onClick={(e) => e.stopPropagation()}>{handle}{i + 1}</span>
               {rule.matcher.kind === 'ruleset' ? <div className="min-w-0">
