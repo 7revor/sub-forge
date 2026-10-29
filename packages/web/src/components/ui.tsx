@@ -146,8 +146,16 @@ export function PageHeader({ title, subtitle, crumbs, actions, children }: { tit
   );
 }
 
-export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-[13px] text-muted">{children}</div>;
+/** 页面与卡片共用的空状态：白底虚线框、居中标题和说明。 */
+export function Empty({ title, description, action, children, className }: {
+  title?: ReactNode; description?: ReactNode; action?: ReactNode; children?: ReactNode; className?: string;
+}) {
+  return <div className={cx('flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-7 py-7 text-center', className)}>
+    {title && <span className="text-[14px] font-semibold text-ink">{title}</span>}
+    {description && <span className="max-w-[420px] text-[12.5px] leading-relaxed text-muted">{description}</span>}
+    {children && <span className="text-[12.5px] leading-relaxed text-muted">{children}</span>}
+    {action}
+  </div>;
 }
 
 export function ErrorBox({ error }: { error: unknown }) {

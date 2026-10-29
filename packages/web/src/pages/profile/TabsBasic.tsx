@@ -53,7 +53,7 @@ export function TabOverview() {
           title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">订阅链接</h2><span className="text-[12.5px] text-muted">一个设备一个链接，便于单独重置。按 UA 或 ?target= 自动输出 mihomo（Surge 在 M2）。</span></div>}
           actions={<Button onClick={() => setAdding(true)}><Plus size={15} />新增链接</Button>}>
           <ErrorBox error={reset.error ?? remove.error} />
-          {!tokens.data?.length ? <div className="text-[13px] text-muted">还没有订阅链接。为每台设备新增一个，便于单独重置。</div> : (
+          {!tokens.data?.length ? <Empty title="还没有订阅链接" description="为每台设备新增一个，便于单独重置。" /> : (
             <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
               {tokens.data.map((t) => {
                 const seen = lastSeen(t.token);
@@ -95,7 +95,7 @@ export function TabOverview() {
             <Field label="客户端中的显示名">{(id) => <Input id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
             {lastGood
               ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{ago(lastGood.at)}（{lastGood.client}）· 校验失败时订阅接口返回这一份，不会下发半成品。</div>
-              : <div className="rounded-lg bg-ground px-3 py-2.5 text-[12.5px] leading-relaxed text-muted">还没有成功渲染过。客户端首次拉取时渲染；校验失败时不会下发半成品。</div>}
+              : <Empty title="还没有成功渲染过" description="客户端首次拉取时渲染；校验失败时不会下发半成品。" />}
           </div>
         </Card>
       </div>
@@ -114,7 +114,7 @@ export function TabOverview() {
                 <td className={td}><Badge tone={r.warnings ? 'warn' : 'neutral'}>{r.warnings}</Badge></td>
               </tr>
             ))}
-            {!rows.length && <tr><td className={cx(td, 'text-muted')} colSpan={7}>还没有访问记录</td></tr>}
+            {!rows.length && <tr><td className={td} colSpan={7}><Empty title="还没有访问记录" /></td></tr>}
           </tbody>
         </table>
       </Card>
@@ -223,7 +223,7 @@ export function TabNodeSets() {
     <>
       <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">已加入的节点集</h2><span className="text-[12.5px] text-muted">默认按源输出 provider，面板中可按源查看、分别更新。代理链和被引用的单个节点不用在这里添加，系统会自动解析。</span></div>}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="overflow-x-auto">
-        {!draft.nodeSets.length ? <div className="px-4 pb-4 text-[13px] text-muted">还没有节点集。点击「添加节点集」选择订阅源、组合或本地节点组。</div> : (
+        {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" description="点击「添加节点集」选择订阅源、组合或本地节点组。" /></div> : (
           <table className="w-full min-w-[820px] border-collapse">
             <thead><tr><th className={th}>节点集</th><th className={th}>类型</th><th className={th}>节点</th><th className={th}>输出方式</th><th className={th}>下发地址</th><th className={th}>备注</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
             <tbody>

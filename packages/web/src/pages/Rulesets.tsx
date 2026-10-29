@@ -126,7 +126,7 @@ export function RulesetEdit() {
         <div className="flex flex-col gap-3">
           {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
           <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源在下方预览它的输出，本地规则可在预览里直接编辑；不选中时预览合并后的最终规则。</p>
-          {!d.sources.length ? <Empty>还没有来源。添加远程地址或本地规则。</Empty> : (
+          {!d.sources.length ? <Empty title="还没有来源" description="添加远程地址或本地规则。" /> : (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
               <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
                 onSelect={() => setSelected(s.id === selected ? undefined : s.id)}
@@ -269,7 +269,7 @@ function SourceOverrides({ src, onChange }: { src: RuleSetSourceDoc; onChange: (
   const update = (index: number, item: LineOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
   return <Card title={<h2 className="m-0 min-w-0 truncate text-[15px] font-semibold">客户端改写 · {sourceLabel(src)}</h2>} actions={<Button onClick={() => onChange([...value, { line: 1, override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
     <p className="mt-0 text-[12.5px] text-muted">按这个来源解析后的行号（从 1 开始）或原文精确匹配定位。同一行命中第一条客户端与平台匹配的覆盖，可拖拽调整优先级。</p>
-    {!value.length ? <Empty>没有行级覆盖。</Empty> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => {
+    {!value.length ? <Empty title="没有行级覆盖" /> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => {
       const mode = item.match !== undefined && item.line === undefined ? 'match' : 'line';
       return <div className="my-3 flex items-start gap-2 rounded-lg border border-line p-3">
         {handle}<div className="flex min-w-0 flex-1 flex-col gap-3">

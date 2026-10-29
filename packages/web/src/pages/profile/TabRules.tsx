@@ -121,7 +121,7 @@ export function TabRules() {
     </div>}
     <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（自上而下匹配）</h2><span className="text-[12.5px] text-muted">继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则；点击行展开编辑。</span></div>}
       actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>}>
-      {!rows.length ? <Empty>没有规则，所有流量走 MATCH。</Empty> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
+      {!rows.length ? <Empty title="没有规则" description="所有流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
         onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}
         renderItem={(r, i, handle) => {
           const l = label(r.matcher);
