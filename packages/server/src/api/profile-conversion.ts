@@ -3,10 +3,10 @@ import { Report, resolveProfileRouting, type GroupMember, type Target } from '@s
 import { independentProfile, profileTemplate } from '../profile-routing.ts';
 import type { ProfileDoc } from '../docs.ts';
 import type { Store } from '../store.ts';
-import { bad, HttpError, isStr, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
+import { bad, isStr, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
 import { validateDoc } from './validate.ts';
 
-/** 转换仅生成可预览的草稿，最终通过带 revision 的保存原子提交。 */
+/** 转换仅生成可预览的草稿，最终通过保存接口提交。 */
 export function profileConversionRoutes(store: Store) {
   const app = new Hono<ApiEnv>();
   app.post('/profiles/routing/convert', requireUser, async c => {
@@ -17,11 +17,9 @@ export function profileConversionRoutes(store: Store) {
     if (id) {
       const saved = store.getWithOwner('profile', id);
       if (!saved || saved.owner !== c.get('user').id) throw notFound('配置订阅');
-      if (saved.doc.routing && raw.revision !== saved.doc.revision) throw new HttpError(409, '订阅已更新，请重新加载');
     }
     const profile = validateDoc('profile', raw, id, c.get('user'), store);
     const currentTemplate = profileTemplate(profile, (key, version) => store.getTemplate(key, version));
-    if (currentTemplate && body.currentTemplateVersion !== currentTemplate.version) throw new HttpError(409, '模板已更新，请重新加载后转换');
     if (body.mode === 'independent') {
       const next = independentProfile(profile, currentTemplate);
       return c.json({ item: next, changes: ['已将当前策略组、成员和规则完整复制到订阅，之后独立维护'] });
@@ -29,7 +27,6 @@ export function profileConversionRoutes(store: Store) {
     if (body.mode !== 'bound' || !isStr(body.templateId)) throw bad('请选择分流模式和模板');
     const template = store.getTemplate(body.templateId);
     if (!template) throw notFound('模板');
-    if (body.templateVersion !== template.version) throw new HttpError(409, '目标模板已更新，请重新选择');
     const mapping = body.mapping;
     if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) throw bad('请指定策略组成员映射');
     const map = mapping as Record<string, unknown>;
@@ -62,12 +59,12 @@ export function profileConversionRoutes(store: Store) {
       changes.push(`「${group.name}」的 ${members.length} 个成员迁移到「${template.groups.find(g => g.id === target)!.name}」`);
     }
     const { template: _old, ...rest } = profile;
-    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) }, templateVersion: template.version,
+    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
       chains: profile.chains.map(chain => ({ ...chain, via: remapTarget(chain.via) })),
     };
     if (profile.routing?.mode === 'bound' && profile.routing.prependRules?.length) changes.push(`保留 ${profile.routing.prependRules.length} 条前置规则，并按策略组映射更新出口`);
     if (profile.routing?.mode === 'independent' && effective.groups.length) changes.push(`替换原策略组：${effective.groups.map(g => g.name).join('、')}；原有 ${effective.rules.length} 条规则改为模板的 ${template.rules.length} 条规则`);
-    changes.unshift(`策略组结构、参数、规则和最终出口改用「${template.name ?? template.id}」v${template.version}`);
+    changes.unshift(`策略组结构、参数、规则和最终出口改用「${template.name ?? template.id}」`);
     validateDoc('profile', next as unknown as Record<string, unknown>, id, c.get('user'), store);
     return c.json({ item: next, changes });
   });

@@ -69,7 +69,7 @@ describe('绑定模板订阅的前置规则接口', () => {
       expect(response.status).toBe(409);
       expect(response.json.details.impact[0].forceable).toBe(false);
     }
-    expect((await admin.get(`/api/templates/${t.id}`)).json.item.version).toBe(1);
+    expect((await admin.get(`/api/templates/${t.id}`)).json.item).toEqual(t);
   });
 
   it('拒绝前置规则集、非法规则、插入位置及模板覆盖，保存失败不落库', async () => {

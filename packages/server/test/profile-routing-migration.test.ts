@@ -27,8 +27,8 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
   const cipher = new Cipher(randomBytes(32));
   let store = new Store(file, { cipher, now: () => 1234 });
   try {
-    store.putTemplateVersion(template);
-    store.putTemplateVersion({ ...template, version: 2, groups: template.groups.map(g => ({ ...g, name: `${g.name} v2` })) });
+    const historical = [template, { ...template, version: 2, groups: template.groups.map(g => ({ ...g, name: `${g.name} v2` })) }];
+    for (const t of historical) store.db.prepare('INSERT INTO template_versions VALUES (?, ?, ?, ?)').run(t.id, t.version, JSON.stringify(t), 1234);
     store.put('local', { id: 'local', name: '节点', proxies: [{ name: '香港节点', type: 'socks5', server: 'node.test', port: 1080 }] }, 'owner');
     const profiles = [
       base('bound', { groupPatches: { g: { addMembers: [node] } } }),
@@ -48,7 +48,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(18);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(20);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();
@@ -63,7 +63,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       expect(row.doc.template).toBeUndefined();
       expect(store.getProfileMigrationBackup(old.id)).toEqual(JSON.parse(JSON.stringify(old)));
       expect(store.getToken(`${old.id}-secret-token`)?.profileId).toBe(old.id);
-      const original = routingConfig(mergeTemplate(profileTemplate(old, (id, v) => store.getTemplate(id, v)), old.overlay, new Report()));
+      const original = routingConfig(mergeTemplate(profileTemplate(old, (id, v) => historical.find(t => t.id === id && t.version === (v ?? 2))), old.overlay, new Report()));
       original.rules = original.rules.filter(rule => rule.enabled !== false).map(({ enabled: _, ...rule }) => rule);
       expect(routingConfig(resolveProfileRouting(row.doc, profileTemplate(row.doc, (id, v) => store.getTemplate(id, v)), new Report()))).toEqual(original);
       const rendered = await nextRenderer.render(old.id, { client: 'mihomo' });

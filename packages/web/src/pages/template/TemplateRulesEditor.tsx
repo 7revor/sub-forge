@@ -1,129 +1,96 @@
-import { withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
-import { Plus, Trash2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { remoteRuleMatcher, withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Button, Empty, buttonClass, cx } from '../../components/ui.tsx';
+import { targetLabel } from '../../components/pickers.tsx';
+import { Button, Card, Empty, Field, FieldError, Input, Modal, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[36px_minmax(0,1fr)] gap-x-3 sm:grid-cols-[44px_minmax(0,1fr)_172px_32px] sm:gap-x-5';
-const editClass = 'inline-flex min-h-8 shrink-0 cursor-pointer items-center rounded px-1 text-[12px] font-medium text-accent-ink hover:bg-accent-soft';
+const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)_64px]';
 
-function summary(matcher: Matcher, ctx: ConvertCtx) {
-  if (matcher.kind === 'rule') return { title: matcherLabel(matcher, ctx), kind: '单条规则', detail: undefined };
-  if (matcher.remote) {
-    const url = matcher.remote.url;
-    const path = URL.canParse(url) ? new URL(url).pathname : '';
-    return { title: path.split('/').filter(Boolean).at(-1) || '远程规则', kind: '远程 URL', detail: url || '尚未填写地址' };
-  }
-  return { title: matcher.repository?.name ?? ctx.rulesets.find(r => r.id === matcher.id)?.name ?? '规则集不可用',
-    kind: matcher.repository ? '规则仓库' : '规则增强', detail: undefined };
-}
-
-function RuleFields({ rule, onChange, ctx, report, onBlur }: {
-  rule: RuleEntry; onChange: (rule: RuleEntry) => void; ctx: ConvertCtx; report: ReportItem[];
-  onBlur: () => void;
-}) {
-  const matcher = rule.matcher;
-  const refs = ctx.rulesets;
-  const changeRule = (next: RuleIR) => {
-    if (matcher.kind !== 'rule') return;
-    const { noResolve: _noResolve, src: _src, ...options } = rule.options ?? {};
-    onChange({ ...rule, matcher: { ...matcher, rule: next }, ...(rule.options ? { options } : {}) });
-  };
-  // 旧选项合并到 RAW 回显，编辑后从独立 options 移除，避免删除文本选项后又被补回。
-  const ir = matcher.kind === 'rule' ? withIpOptions(matcher.rule, rule.options ?? {}) : undefined;
-  return <div className="flex flex-col gap-3" onBlur={onBlur}>
-    <ItemIssues report={report} where={`rule:${rule.id}`} />
-    <MatcherEditor fixedKind value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
-  </div>;
+function RuleMatcher({ matcher, ctx }: { matcher: Matcher; ctx: ConvertCtx }) {
+  if (matcher.kind === 'ruleset' && matcher.remote) return <span className="flex min-w-0 items-center gap-2 font-mono text-[12.5px]">
+    <span className="shrink-0">远程 ·</span>
+    <span dir="rtl" title={matcher.remote.url} className="truncate text-left"><bdi dir="ltr">{matcher.remote.url}</bdi></span>
+  </span>;
+  const label = matcherLabel(matcher, ctx);
+  return <span className="block truncate font-mono text-[12.5px]" title={label}>{label || '填写规则内容'}</span>;
 }
 
 export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady }: {
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
 }) {
-  useEffect(() => {
-    if (!selected) return;
-    const frame = requestAnimationFrame(() => document.getElementById(`template-rule-${selected}`)?.scrollIntoView({ block: 'nearest' }));
-    return () => cancelAnimationFrame(frame);
-  }, [selected]);
-  const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map((r) => r.id === rule.id ? rule : r) });
-  const select = (id: string | undefined) => {
-    if (selected && selected !== id) onRuleValidationReady(selected, true);
-    onSelect(id);
+  const [urlError, setUrlError] = useState<string>();
+  const rule = value.rules.find(r => r.id === selected);
+  const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
+  const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
+  const close = () => {
+    if (rule) onRuleValidationReady(rule.id, true);
+    onSelect(undefined);
   };
   const add = (matcher: Matcher) => {
     const id = newId('r');
     if (matcher.kind === 'rule') onRuleValidationReady(id, false);
-    onChange({ ...value, rules: [...value.rules, { id, matcher, target: { kind: 'builtin', name: 'REJECT' } }] });
-    select(matcher.kind === 'rule' ? id : undefined);
+    onChange({ ...value, rules: [...value.rules, { id, matcher, target: value.final }] });
+    if (matcher.kind === 'rule') onSelect(id);
   };
-  return <section className="pt-3 pb-5" aria-label="分流规则">
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h2 className="m-0 flex items-baseline gap-2 text-[15px] font-semibold">规则<span className="text-[12px] font-normal text-muted">{value.rules.length} 条</span></h2>
-        <span className="text-[12px] text-muted">自上而下匹配，拖动调整顺序。</span>
+  const changeRule = (next: RuleIR) => {
+    if (rule?.matcher.kind !== 'rule') return;
+    const { noResolve: _noResolve, src: _src, ...options } = rule.options ?? {};
+    update({ ...rule, matcher: { ...rule.matcher, rule: next }, ...(rule.options ? { options } : {}) });
+  };
+  return <>
+    <Card title="规则" subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={<>
+      <Button size="sm" aria-label="添加单条规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />单条规则</Button>
+      <RemoteRulePicker label="远程 URL" ariaLabel="引用远程 URL" triggerClassName={buttonClass('default', 'sm')} onSelect={add} />
+      <RuleSetPicker label="系统规则集" ariaLabel="引用系统规则集" onSelect={add} triggerClassName={buttonClass('default', 'sm')} />
+    </>}>
+      {!value.rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
+      <SortableList items={value.rules} getKey={r => r.id} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
+        const error = report.some(item => item.level === 'error' && item.where === `rule:${r.id}`);
+        return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-1 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
+          <span className="flex items-center text-[12px] text-muted">{handle}{i + 1}</span>
+          <button type="button" aria-label={`编辑第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)} className="min-w-0 cursor-pointer text-left hover:text-accent"><RuleMatcher matcher={r.matcher} ctx={ctx} /></button>
+          <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
+          <button type="button" aria-label={`修改第 ${i + 1} 条规则出口`} onClick={() => onSelect(r.id)} className="col-start-2 row-start-2 min-w-0 cursor-pointer truncate text-left text-ink-2 hover:text-accent sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</button>
+          <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
+            <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
+            <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
+          </div>
+        </div>;
+      }} />
+      <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-3 text-[13px]')}>
+        <span className="pl-6 text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
+        <button type="button" aria-label="修改 MATCH 出口" onClick={() => onSelect('final')} className="col-start-2 row-start-2 cursor-pointer truncate text-left hover:text-accent sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</button>
+        <Button size="sm" variant="ghost" className="col-start-3 row-start-1 justify-self-start px-1.5 sm:col-start-5" aria-label="编辑 MATCH" onClick={() => onSelect('final')}><Pencil size={14} /></Button>
       </div>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="添加规则">
-        <Button size="sm" aria-label="添加单条规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} aria-hidden />单条规则</Button>
-        <RemoteRulePicker label="远程 URL" ariaLabel="引用远程 URL" triggerClassName={buttonClass('default', 'sm')} onSelect={add} />
-        <RuleSetPicker label="系统规则集" ariaLabel="引用系统规则集" onSelect={add} triggerClassName={buttonClass('default', 'sm')} />
-      </div>
-    </div>
-    <div className="min-w-0">
-      {!value.rules.length && <Empty className="py-6" title="没有规则" />}
-      {!!value.rules.length && <div className={`${columns} hidden border-b border-line pb-2 sm:grid text-[12px] text-muted`}><span>顺序</span><span>匹配规则</span><span>出口</span><span>操作</span></div>}
-        <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
-          const error = report.some((r) => r.level === 'error' && r.where === `rule:${rule.id}`);
-          const text = summary(rule.matcher, ctx);
-          const expanded = rule.matcher.kind === 'rule' && selected === rule.id;
-          return <div id={`template-rule-${rule.id}`} className={cx('py-4', i > 0 && 'border-t border-line-2', error ? 'bg-err-soft' : 'bg-panel')}>
-            <div className={cx(columns, 'items-start gap-y-3 text-[13px]')}>
-              <span className="flex h-9 items-center text-[12px] tabular-nums text-muted">{handle}{i + 1}</span>
-              <div className="min-w-0">
-                <div className="flex min-h-9 items-center gap-2">
-                  {rule.matcher.kind === 'rule' ? <button type="button" aria-expanded={expanded} onClick={() => select(expanded ? undefined : rule.id)}
-                    className={cx('min-w-0 cursor-pointer rounded text-left font-medium break-all text-ink hover:text-accent-ink', error && 'text-err')}>{text.title || '填写规则内容'}</button>
-                    : <span className="min-w-0 truncate font-medium text-ink" title={text.title}>{text.title}</span>}
-                  {rule.matcher.kind === 'ruleset' ? rule.matcher.remote
-                    ? <RemoteRulePicker value={rule.matcher.remote.url} label="编辑" ariaLabel={`编辑第 ${i + 1} 条远程规则`} triggerClassName={editClass} onSelect={matcher => update({ ...rule, matcher })} />
-                    : <RuleSetPicker label="更换" ariaLabel={`更换第 ${i + 1} 条规则集`} triggerClassName={editClass} onSelect={matcher => update({ ...rule, matcher })} />
-                    : <button type="button" className={editClass} aria-label={`${expanded ? '收起' : '编辑'}第 ${i + 1} 条规则`} aria-expanded={expanded} onClick={() => select(expanded ? undefined : rule.id)}>{expanded ? '收起' : '编辑'}</button>}
-                </div>
-                <div className="flex min-w-0 items-center gap-2 text-[12px] leading-5 text-muted">
-                  <span className="shrink-0">{text.kind}</span>
-                  {text.detail && <span className="truncate" title={text.detail}>{text.detail}</span>}
-                </div>
-              </div>
-              <div className="col-start-2 flex min-w-0 items-start gap-4 sm:col-auto sm:contents">
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <span className="text-[12px] text-muted sm:hidden">出口</span>
-                  <TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={rule.target} groups={value.groups} onChange={(target) => update({ ...rule, target })} />
-                </div>
-                <div className="flex shrink-0 flex-col gap-1.5">
-                  <span className="text-[12px] text-muted sm:hidden">操作</span>
-                  <div className="flex h-[38px] items-center gap-3">
-                    <button type="button" title={`删除第 ${i + 1} 条规则`} aria-label={`删除第 ${i + 1} 条规则`} className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted hover:bg-err-soft hover:text-err" onClick={() => { onChange({ ...value, rules: value.rules.filter((r) => r.id !== rule.id) }); if (selected === rule.id) onSelect(undefined); }}><Trash2 size={16} aria-hidden /></button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {expanded && <div className="mt-3 rounded-lg bg-ground p-4 sm:ml-16">
-              <div className="mb-3 flex items-center justify-between gap-3"><span className="text-[12px] font-medium text-muted">编辑第 {i + 1} 条规则</span><button type="button" className={editClass} onClick={() => select(undefined)}>完成</button></div>
-              <RuleFields rule={rule} onChange={update} ctx={ctx} report={report} onBlur={() => onRuleValidationReady(rule.id, true)} />
-            </div>}
-            {!expanded && <ItemIssues report={report} where={`rule:${rule.id}`} />}
-          </div>;
-        }} />
-        <div className={cx(columns, 'mt-3 items-center gap-y-3 rounded-lg bg-ground px-3 py-4 sm:px-0')}>
-          <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1 sm:col-start-2"><span className="text-[13px] font-medium">兜底出口 <span className="ml-2 font-mono text-[12px] font-normal text-muted">MATCH</span></span><span className="text-[12px] text-muted">以上规则均未匹配时使用</span></div>
-          <div className="col-span-2 min-w-0 sm:col-span-1"><TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={(final) => onChange({ ...value, final })} /></div>
-        </div>
+    </Card>
+    <Modal title={rule ? `编辑第 ${value.rules.indexOf(rule) + 1} 条规则` : 'MATCH 出口'} open={!!rule || selected === 'final'} onClose={close} wide
+      footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={close}>完成</Button></>}>
+      {rule ? <>
+        <ItemIssues report={report} where={`rule:${rule.id}`} />
+        {rule.matcher.kind === 'ruleset' && rule.matcher.remote ? <Field label="远程规则地址">{id => <Input id={id} type="url" value={rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : ''} onChange={e => {
+          const url = e.target.value;
+          let matcher: Matcher;
+          try { matcher = remoteRuleMatcher(url); setUrlError(undefined); }
+          catch (error) {
+            matcher = { kind: 'ruleset', id: '', remote: { url } };
+            setUrlError(error instanceof Error ? error.message : String(error));
+          }
+          update({ ...rule, matcher });
+        }} />}</Field> : <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}><MatcherEditor fixedKind value={rule.matcher} rulesets={ctx.rulesets} ruleValue={rule.matcher.kind === 'rule' ? withIpOptions(rule.matcher.rule, rule.options ?? {}) : undefined} onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} /></div>}
+        {rule.matcher.kind === 'ruleset' && rule.matcher.remote && !rule.matcher.id && urlError && <FieldError error={urlError} />}
+        <Field label="出口">{() => <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={target => update({ ...rule, target })} />}</Field>
+      </> : <>
+        <span className="text-[13px] text-muted">以上规则均未匹配时使用。</span>
+        <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />
         <ItemIssues report={report} where="final" />
-    </div>
-  </section>;
+      </>}
+    </Modal>
+  </>;
 }

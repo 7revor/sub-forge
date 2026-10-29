@@ -8,7 +8,7 @@
 | `src/pipeline` | 处理链与 P0 处理器，逐步 trace，末尾去重兜底 | SRC-06、SRC-07、SRC-11 |
 | `src/nodeset` | 订阅源 / 组合 / 本地节点组解析，组合环检测 | COL-01–04、LOC-01 |
 | `src/rules` | 规则 IR、规则集解析、按客户端降级与覆盖、多来源规则集合并与自动输出格式（原规则包并入规则集） | RS-01–03、RS-08、原 RB-01–05、CR-01–02 |
-| `src/template` | 绑定/独立分流解析、旧覆盖层迁移支持、模板发布前自检 | 03 §5、TPL-07 ①、PRF-04、PRF-09 |
+| `src/template` | 绑定/独立分流解析、旧覆盖层迁移支持、模板保存前自检 | 03 §5、TPL-07 ①、PRF-04、PRF-09 |
 | `src/render` | mihomo 渲染：依赖解析、代理链、引用校验、环检测 | 03 §4、REF-01–12 |
 
 节点 YAML 支持单节点映射、裸节点列表及带 `proxies` 的完整配置，也支持相应行内写法。整体缩进的复制片段可直接解析，嵌套与未知字段保持原样；单个节点缺少必填字段记入 `failures`，语法损坏仍抛出错误，由调用方决定如何展示。
@@ -37,7 +37,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 规则参数运行时测试（`test/integration/mihomo-rule-options.test.ts`）使用同样的开关，启动容器内回环 DNS 与 HTTP 服务，实测 `no-resolve` 的查询行为和 `src` 的来源 IP 匹配；测试结束自动关闭服务与内核进程。
 
-模板发布前的影响分析（TPL-07 ②）已在服务层完成：逐个试渲染现有 Profile。模板规则内容的可用性检查也由服务层负责，详见 [后端修复记录](../../docs/12-backend-regression-fixes.md)。内核负责结构校验，以及阻止无效远程规则快照被渲染为成功的空分流配置。
+模板保存前的影响分析（TPL-07 ②）已在服务层完成：逐个试渲染现有 Profile。模板规则内容的可用性检查也由服务层负责，详见 [后端修复记录](../../docs/12-backend-regression-fixes.md)。内核负责结构校验，以及阻止无效远程规则快照被渲染为成功的空分流配置。
 
 ## 尚未实现
 

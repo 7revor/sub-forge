@@ -71,7 +71,7 @@ export function ProfileDetail() {
               onReset={del.reset} onDelete={() => del.mutate(draft.id, { onSuccess: () => navigate('/profiles') })} />
           </>}>
           <button type="button" onClick={() => setTplOpen(true)} className="cursor-pointer rounded-full bg-accent-soft px-2.5 py-1 text-[12.5px] text-accent-ink hover:underline">
-            {modeLabel(draft, template.data?.name)}{template.data && ` v${template.data.version} · 自动更新`}
+            {modeLabel(draft, template.data?.name)}{template.data && ' · 自动更新'}
           </button>
           {preset && <Badge>基础设置 {preset.name}</Badge>}
           {warnings > 0 && <Link to={`/profiles/${id}/preview`} className="rounded-full bg-warn-soft px-2.5 py-1 text-[12.5px] text-[#8f4508] no-underline hover:underline">{warnings} 条告警</Link>}

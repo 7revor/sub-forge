@@ -67,7 +67,7 @@ describe('列表分页', () => {
     } finally { store.close(); }
   });
 
-  it('模板只分页最新版本，搜索不匹配旧版本名称，无名模板可按 ID 搜索', async () => {
+  it('模板只分页当前内容，搜索不匹配旧名称，无名模板可按 ID 搜索', async () => {
     const { store, admin, other } = await setup();
     try {
       const base = { version: 1, groups: [], rules: [], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
@@ -76,10 +76,10 @@ describe('列表分页', () => {
       store.putTemplateVersion({ ...base, id: 'b', name: 'Beta' });
       store.putTemplateVersion({ ...base, id: 'legacy-id' });
       const first = (await other.get('/api/templates?pageSize=1')).json;
-      expect(first).toMatchObject({ total: 3, page: 1, pageSize: 1, totalPages: 3, items: [{ id: 'a', version: 2 }] });
+      expect(first).toMatchObject({ total: 3, page: 1, pageSize: 1, totalPages: 3, items: [{ id: 'a', name: '最新 Alpha' }] });
       expect((await admin.get('/api/templates?page=2&pageSize=1')).json.items[0].id).toBe('b');
       expect((await admin.get('/api/templates?q=旧名称')).json.total).toBe(0);
-      expect((await admin.get('/api/templates?q=ALPHA')).json.items[0].version).toBe(2);
+      expect((await admin.get('/api/templates?q=ALPHA')).json.items[0]).not.toHaveProperty('version');
       expect((await admin.get('/api/templates?q=legacy')).json.items[0].id).toBe('legacy-id');
       expect((await admin.get('/api/templates')).json.items).toHaveLength(3);
     } finally { store.close(); }

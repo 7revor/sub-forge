@@ -281,6 +281,8 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       break;
     }
     case 'profile': {
+      delete doc.revision;
+      delete doc.templateVersion;
       if (!Array.isArray(doc.nodeSets)) throw bad('nodeSets 必须是数组');
       (doc.nodeSets as unknown[]).forEach((n, i) => {
         if (!isObj(n) || (n.output !== 'provider' && n.output !== 'inline')) throw bad(`节点集 ${i + 1} 的输出方式只能是 provider 或 inline`);
@@ -348,8 +350,8 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
       hits.push(store.getWithOwner('profile', p.id)?.owner === ownerId ? `配置订阅「${p.name}」` : '其他用户的配置订阅');
     }
     // 模板由管理员维护，可能引用管理员名下的公共规则集
-    for (const t of store.listAllTemplateVersions()) {
-      if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」v${t.version}`);
+    for (const t of store.listLatestTemplates()) {
+      if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」`);
     }
   }
   if (kind === 'preset') {

@@ -3,7 +3,7 @@ import type { ProfileDoc } from '../docs.ts';
 import type { Store } from '../store.ts';
 import { profileTemplate } from '../profile-routing.ts';
 import { checkRuleSetReference } from '../ruleset-reference.ts';
-import { bad, HttpError, isStr } from './common.ts';
+import { bad, isStr } from './common.ts';
 import type { RefChecker } from './validate.ts';
 
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -34,7 +34,6 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
   if (r.mode === 'bound') {
     if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions', 'prependRules'].includes(k))) throw bad('绑定模式只能保存模板引用、追加成员和前置单条规则');
     if (!isStr(r.templateId) || !(template = store.getTemplate(r.templateId))) throw bad('模板不存在');
-    if (doc.templateVersion !== template.version) throw new HttpError(409, '模板已更新，请重新加载后检查并保存');
     if (!obj(r.groupAdditions)) throw bad('追加成员必须按策略组 ID 保存');
     for (const [id, members] of Object.entries(r.groupAdditions)) {
       if (!template.groups.some(g => g.id === id)) throw bad(`追加成员指向不存在的策略组 ${id}`);
@@ -65,7 +64,6 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
         if (rule.options !== undefined && (!obj(rule.options) || Object.entries(rule.options).some(([key, value]) => !['noResolve', 'src'].includes(key) || typeof value !== 'boolean'))) throw bad('前置规则选项不合法');
       }
     }
-    doc.templateVersion = template.version;
   } else {
     if (Object.keys(r).some(k => !['mode', 'config', 'initializedFrom'].includes(k))) throw bad('独立模式字段不合法');
     if (!obj(r.config) || !Array.isArray(r.config.groups) || !Array.isArray(r.config.rules) || !obj(r.config.final)) throw bad('独立配置需要完整的策略组、规则和最终出口');

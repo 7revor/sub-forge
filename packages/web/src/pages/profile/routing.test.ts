@@ -26,16 +26,16 @@ describe('订阅编辑器分流适配', () => {
   });
 });
 
-it('后台刷新不覆盖转换草稿，保存期间的新输入保留并使用新 revision', () => {
-  const initial = { ...profile, revision: 1 };
+it('后台刷新不覆盖转换草稿，保存期间的新输入保留', () => {
+  const initial = { ...profile };
   const converted: ProfileDoc = { ...initial, routing: { mode: 'bound', templateId: 't', groupAdditions: {} } };
-  const remote = { ...initial, revision: 2, name: '另一处编辑' };
+  const remote = { ...initial, name: '另一处编辑' };
   expect(syncProfileDraft(initial, initial, remote)).toBe(remote);
   expect(syncProfileDraft(converted, initial, remote)).toBe(converted);
-  const saved = { ...converted, revision: 3 };
+  const saved = { ...converted };
   expect(acceptProfileSave(converted, converted, saved)).toBe(saved);
   const typing = { ...converted, name: '保存期间继续编辑' };
-  expect(acceptProfileSave(typing, converted, saved)).toEqual({ ...typing, revision: 3 });
+  expect(acceptProfileSave(typing, converted, saved)).toBe(typing);
   expect(syncProfileDraft(converted, remote, { ...remote, id: 'other' }).id).toBe('other');
 });
 

@@ -9,6 +9,7 @@ export function profileTemplate(profile: ProfileDoc, get: (id: string, version?:
 
 /** 不访问上游；只展开已保存的领域配置，节点与规则集仍保留引用。 */
 export function migrateProfile(profile: ProfileDoc, template: TemplateVersionDoc | undefined): ProfileDoc {
+  profile = stripProfileRevisions(profile);
   if (profile.routing) return profile;
   if (profile.template && !template) throw new Error(`订阅「${profile.name}」引用的模板版本缺失，迁移已中止，原配置保持不变`);
   profile = { ...profile, overlay: profile.overlay ?? {}, nodeSets: profile.nodeSets ?? [], chains: profile.chains ?? [], refPolicy: profile.refPolicy ?? { default: 'wrap' } };
@@ -23,13 +24,12 @@ export function migrateProfile(profile: ProfileDoc, template: TemplateVersionDoc
   const canBind = !!template && profile.template?.follow === 'latest' && onlyMembers && !report.items.length;
   const { template: _template, ...rest } = profile;
   const reason = canBind ? '仅有追加成员，继续跟随模板' : profile.template?.follow !== 'latest' && profile.template ? '锁定版本已展开为独立配置' : profile.template ? '保留原有组参数、规则或私有配置，转为独立维护' : '空白订阅转为独立配置';
-  const next: ProfileDoc = { ...rest, overlay: {}, revision: profile.revision ?? 1,
+  const next: ProfileDoc = { ...rest, overlay: {},
     routing: canBind ? { mode: 'bound', templateId: template.id, groupAdditions: additions } : {
       mode: 'independent', config: routingConfig(effective),
-      ...(template ? { initializedFrom: { templateId: template.id, version: template.version, name: template.name } } : {}),
+      ...(template ? { initializedFrom: { templateId: template.id, name: template.name } } : {}),
     },
     migration: { reason, issues: report.items },
-    ...(canBind ? { templateVersion: template.version } : {}),
   };
   if (stableStringify(routingConfig(resolveProfileRouting(next, template, new Report()))) !== stableStringify(routingConfig(effective))) throw new Error(`订阅「${profile.name}」迁移前后配置不一致，迁移已中止`);
   return next;
@@ -39,8 +39,14 @@ export function independentProfile(profile: ProfileDoc, template?: Template): Pr
   const report = new Report();
   const config = routingConfig(resolveProfileRouting(profile, template, report));
   if (report.items.some(i => i.level === 'error')) throw new Error(report.items.map(i => i.message).join('；'));
-  const { template: _template, templateVersion: _version, ...rest } = profile;
+  const { template: _template, ...rest } = stripProfileRevisions(profile);
   return { ...rest, overlay: {}, routing: { mode: 'independent', config,
-    ...(template ? { initializedFrom: { templateId: template.id, version: template.version, ...('name' in template && typeof template.name === 'string' ? { name: template.name } : {}) } } : {}),
+    ...(template ? { initializedFrom: { templateId: template.id, ...('name' in template && typeof template.name === 'string' ? { name: template.name } : {}) } } : {}),
   } };
+}
+
+/** 丢弃旧保存协议携带的并发标记。 */
+export function stripProfileRevisions(profile: ProfileDoc): ProfileDoc {
+  const { revision: _revision, templateVersion: _templateVersion, ...current } = profile as ProfileDoc & { revision?: unknown; templateVersion?: unknown };
+  return current;
 }
