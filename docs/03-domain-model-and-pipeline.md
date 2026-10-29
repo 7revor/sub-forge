@@ -18,7 +18,7 @@
 type Source = {
   id: ID; owner: UserID; name: string;
   url: string;                   // 一个 HTTP(S) URL；多个来源用 Collection，粘贴节点用 LocalProxyGroup
-  fetch?: { ua?: string; timeoutMs?: number; ttlSec?: number; viaProxy?: string };
+  fetch?: { ttlSec?: number }; // 自动更新间隔；UA 固定 clash.meta，超时固定 10 秒
   pipeline: OperatorRef[];       // 处理链
 };
 
@@ -329,13 +329,15 @@ expand(ruleset):
 | 规则集展开 | rulesetId + 各远程来源的 snapshotHash + 来源定义 + 组级 overrides+ client/platform | 任一变化 |
 | 渲染结果 | profileId + templateVersion + presetVersion + 上述哈希 + client/platform | 任一变化 |
 
+节点订阅仅支持内联或本服务托管 provider，不透传上游节点订阅地址。以下自动更新间隔控制服务端缓存，规则集原地址透传沿用规则集输出策略。
+
 客户端每次拉取订阅时：快照未过期则直接用缓存渲染；过期则后台刷新、本次先返回旧结果（stale-while-revalidate），避免订阅请求超时。
 
 原始快照的刷新结果分三种：
 
 | 拉取结果 | 快照 | 订阅请求看到的 |
 | --- | --- | --- |
-| 成功，内容有变化 | 新增一份；成功快照保留最近 5 份 | 下一次请求按新快照重新渲染（快照哈希进入渲染缓存键） |
+| 成功，内容有变化 | 替换订阅源上一次成功内容；规则集每个 URL 保留最近 5 份 | 下一次请求按新快照重新渲染（快照哈希进入渲染缓存键） |
 | 成功，内容无变化（哈希相同） | 不新增，只更新最近一份的拉取时间、状态码与流量信息，重新计算有效期 | 渲染缓存继续命中；此前的失败提示消失 |
 | 失败（非 2xx、超时、过大，或 2xx 但正文为空 / 订阅源解析不出节点） | 记一条失败记录（只保留最新一条），成功快照不动 | 有快照：继续用旧快照，渲染报告 warn「拉取失败，正在使用快照」；从未成功：该源无节点，报告 error |
 

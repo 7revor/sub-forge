@@ -20,7 +20,7 @@ describe('移除 GitHub 凭据', () => {
     } finally { store.close(); }
   });
 
-  it.each([11, 12, 13])('从 v%s 升级清理旧凭据，保留业务文档和订阅令牌，重启幂等', version => {
+  it.each([11, 12, 13, 14])('从 v%s 升级清理旧凭据，保留业务文档和订阅令牌，重启幂等', version => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-token-removal-'));
     const path = join(dir, 'test.db'), cipher = new Cipher(randomBytes(32));
     let store = new Store(path, { cipher });
@@ -34,7 +34,7 @@ describe('移除 GitHub 凭据', () => {
       store.db.pragma(`user_version = ${version}`);
       store.close(); store = new Store(path, { cipher });
       for (let i = 0; i < 2; i++) {
-        expect(store.db.pragma('user_version', { simple: true })).toBe(14);
+        expect(store.db.pragma('user_version', { simple: true })).toBe(15);
         expect(store.db.prepare("SELECT name FROM sqlite_master WHERE name = 'server_secrets'").get()).toBeUndefined();
         expect(store.getWithOwner('source', 's1')).toMatchObject({ owner: 'alice', doc: { name: '保留的来源' } });
         expect(store.listTokens('profile-1')[0]?.token).toBe('subscription-token');

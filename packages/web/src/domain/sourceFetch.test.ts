@@ -11,3 +11,10 @@ it('区分未拉取、没有快照的失败及失败后使用快照', () => {
 it('后续拉取成功会清除失败状态', () => {
   expect(sourceFetchSummary([snap(true, 3), snap(false, 2), snap(true, 1)])).toMatchObject({ failing: false, lastOk: { fetchedAt: 3 }, okCount: 2 });
 });
+
+it('更换地址后不把旧地址的成功内容和流量显示成当前地址状态', () => {
+  const old = snap(true, 1);
+  const failed = { ...snap(false, 2), url: 'https://example.test/new' };
+  expect(sourceFetchSummary([old], failed.url)).toMatchObject({ lastOk: undefined, failing: false });
+  expect(sourceFetchSummary([failed, old], failed.url)).toMatchObject({ lastOk: undefined, failing: true });
+});

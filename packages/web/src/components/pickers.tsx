@@ -42,7 +42,7 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
 }) {
   const kind = value.kind;
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-start gap-2">
       <Select aria-label={`${label}类型`} className="w-auto" value={kind} onChange={(e) => {
         const k = e.target.value as Target['kind'];
         if (k === 'builtin') onChange({ kind: 'builtin', name: 'DIRECT' });

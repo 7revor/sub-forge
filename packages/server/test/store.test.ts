@@ -27,14 +27,29 @@ describe('Store', () => {
     expect(s.getTemplate('std', 9)).toBeUndefined();
   });
 
-  it('快照：成功的保留最近 5 份，失败的只留最新一条', () => {
+  it.each(['source', 'ruleset'] as const)('%s 快照：订阅源只留一次成功，规则集保留 5 份，失败只留最新一条', (kind) => {
     let t = 0;
     const s = new Store(':memory:', { now: () => t });
-    for (let i = 0; i < 8; i++) s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'u', fetchedAt: ++t, ok: true, body: `b${i}`, hash: `h${i}` });
-    for (let i = 0; i < 3; i++) s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'u', fetchedAt: ++t, ok: false, error: `e${i}` });
-    expect(s.countSnapshots('source', 'a', 'u')).toEqual({ ok: 5, failed: 1 });
-    expect(s.latestSnapshot('source', 'a', 'u')!.body).toBe('b7');
-    expect(s.latestSnapshot('source', 'a', 'u', false)!.error).toBe('e2');
+    try {
+      for (let i = 0; i < 8; i++) s.addSnapshot({ ownerKind: kind, ownerId: 'a', url: 'u', fetchedAt: ++t, ok: true, body: `b${i}`, hash: `h${i}` });
+      for (let i = 0; i < 3; i++) s.addSnapshot({ ownerKind: kind, ownerId: 'a', url: 'u', fetchedAt: ++t, ok: false, error: `e${i}` });
+      expect(s.countSnapshots(kind, 'a', 'u')).toEqual({ ok: kind === 'source' ? 1 : 5, failed: 1 });
+      expect(s.latestSnapshot(kind, 'a', 'u')!.body).toBe('b7');
+      expect(s.latestSnapshot(kind, 'a', 'u', false)!.error).toBe('e2');
+    } finally { s.close(); }
+  });
+
+  it('订阅源换地址后不累积成功历史，不把旧地址内容用作新地址的快照', () => {
+    const s = new Store(':memory:');
+    try {
+      s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'old', fetchedAt: 1, ok: true, body: '旧内容' });
+      s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'new', fetchedAt: 2, ok: false, error: '失败' });
+      expect(s.latestSnapshot('source', 'a', 'new')).toBeUndefined();
+      expect(s.latestSnapshot('source', 'a', 'old')?.body).toBe('旧内容');
+      s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url: 'new', fetchedAt: 3, ok: true, body: '新内容' });
+      expect(s.latestSnapshot('source', 'a', 'old')).toBeUndefined();
+      expect(s.snapshotHistory('source', 'a').filter(row => row.ok)).toHaveLength(1);
+    } finally { s.close(); }
   });
 
   it('token、最近一次成功渲染、访问日志', () => {
@@ -49,6 +64,41 @@ describe('Store', () => {
 });
 
 describe('加密与迁移', () => {
+  it.each([13, 14])('v%i 升级清理订阅源旧拉取选项和成功历史，保持归属、更新时间、规则集和重复启动一致', (version) => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-source-policy-'));
+    const file = join(dir, 'v13.db');
+    const cipher = new Cipher(randomBytes(32));
+    let store = new Store(file, { cipher, now: () => 42 });
+    try {
+      const legacy = { id: 's', name: '旧订阅源', url: 'https://a.test/sub', pipeline: [], fetch: { ua: '旧 UA', timeoutMs: 1500, ttlSec: 7200 } };
+      store.db.prepare("INSERT INTO docs (kind, id, owner, data, updated_at) VALUES ('source', 's', 'u1', ?, 42)").run(cipher.encrypt(JSON.stringify(legacy)));
+      store.put('ruleset', { id: 'r', name: '规则集', sources: [{ id: 'remote', kind: 'remote', format: 'auto', url: 'https://r.test/list', fetch: { ua: '规则 UA', timeoutMs: 2000 } }] }, 'u1');
+      const insert = store.db.prepare('INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, body, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+      for (const kind of ['source', 'ruleset']) {
+        const id = kind === 'source' ? 's' : 'r';
+        for (let i = 0; i < 5; i++) insert.run(kind, id, cipher.encrypt(legacy.url), cipher.hmac(legacy.url), i === 4 ? 3 : i, 1, cipher.encrypt(`内容${i}`), null);
+        for (let i = 0; i < 2; i++) insert.run(kind, id, cipher.encrypt(legacy.url), cipher.hmac(legacy.url), 10 + i, 0, null, cipher.encrypt(`失败${i}`));
+      }
+      store.db.pragma(`user_version = ${version}`);
+      store.close();
+      store = new Store(file, { cipher });
+      expect(store.getWithOwner('source', 's')).toMatchObject({ owner: 'u1', updatedAt: 42, doc: { fetch: { ttlSec: 7200 } } });
+      expect(store.get('source', 's')?.fetch).toEqual({ ttlSec: 7200 });
+      expect(store.snapshotHistory('source', 's')).toHaveLength(2);
+      expect(store.latestSnapshot('source', 's', legacy.url)?.body).toBe('内容4');
+      expect(store.latestSnapshot('source', 's', legacy.url, false)?.error).toBe('失败1');
+      expect(store.snapshotHistory('ruleset', 'r')).toHaveLength(7);
+      expect(store.get('ruleset', 'r')?.sources[0]?.fetch).toEqual({ ua: '规则 UA', timeoutMs: 2000 });
+      const before = store.snapshotHistory('source', 's');
+      store.close();
+      store = new Store(file, { cipher });
+      expect(store.snapshotHistory('source', 's')).toEqual(before);
+      // 旧种子导入也不能恢复自定义拉取选项。
+      store.importSeed({ sources: [legacy] });
+      expect(store.get('source', 's')?.fetch).toEqual({ ttlSec: 7200 });
+    } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('文档、快照正文、token 落盘时加密；token 按 HMAC 查找', () => {
     const s = new Store(':memory:');
     s.put('source', { id: 'a', name: 'A', url: 'https://secret.example.com/sub?token=xyz', pipeline: [] }, 'u1');
@@ -137,7 +187,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(14);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(15);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
@@ -170,7 +220,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(14);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(15);
     expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } }] });
     expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [{ match: 'DOMAIN,a.test', override: overrides[0]!.override }] });
     expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', noResolve: true, sources: [
@@ -192,7 +242,7 @@ describe('加密与迁移', () => {
     const migratedRulesets = s.list('ruleset');
     s.close();
     const reopened = new Store(file, { cipher });
-    expect(reopened.db.pragma('user_version', { simple: true })).toBe(14);
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(15);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
     expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });

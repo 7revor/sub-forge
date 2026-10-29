@@ -89,7 +89,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const steps: OperatorStep[] = doc.pipeline;
 
     const ref: NodeSetID = { type: kind, id: doc.id };
-    const sourceChanged = kind === 'source' && JSON.stringify([(doc as SourceDoc).url, (doc as SourceDoc).fetch ?? {}]) !== JSON.stringify([(saved as SourceDoc).url, (saved as SourceDoc).fetch ?? {}]);
+    const sourceChanged = kind === 'source' && (doc as SourceDoc).url !== (saved as SourceDoc).url;
     const loaded = sourceChanged ? await renderer.loadNodeSets([])
       : kind === 'collection'
       ? await renderer.loadNodeSets((doc as Collection).members.map((m) => m.ref))
@@ -102,7 +102,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       const bodies: string[] = [];
       if (sourceChanged) {
         const src = doc as SourceDoc;
-        const result = await snapshots.previewSource(src.id, src.url, src.fetch);
+        const result = await snapshots.previewSource(src.id, src.url);
         if (result.body !== undefined) bodies.push(result.body);
         if (result.error) report.error('source.fetch-failed', `预览拉取失败：${result.error}`, `source:${src.id}`);
       } else bodies.push(...(loaded.inputs.snapshots[doc.id] ?? []));

@@ -56,9 +56,10 @@ describe('订阅源单 URL 契约', () => {
     old.addSnapshot({ ownerKind: 'source', ownerId: 's', url, fetchedAt: 100, ok: true, body: '旧快照' });
     old.db.pragma(`user_version = ${version}`); old.close();
     const s = new Store(file, { cipher }); stores.push(s);
-    expect(s.db.pragma('user_version', { simple: true })).toBe(14);
-    expect(s.getWithOwner('source', 's')).toMatchObject({ owner: 'alice', doc: { id: 's', url, fetch: legacy.fetch } });
+    expect(s.db.pragma('user_version', { simple: true })).toBe(15);
+    expect(s.getWithOwner('source', 's')).toMatchObject({ owner: 'alice', doc: { id: 's', url } });
     expect(s.get('source', 's')).not.toHaveProperty('urls');
+    expect(s.get('source', 's')).not.toHaveProperty('fetch');
     expect(s.getWithOwner('ruleset', 'r')).toMatchObject({ owner: 'alice', doc: { overrides: [groupOverride] } });
     expect(s.get('ruleset', 'r')!.sources[0]).not.toHaveProperty('overrides');
     expect(s.db.prepare("SELECT updated_at FROM docs WHERE kind = 'source'").get()).toEqual({ updated_at: 123 });
@@ -91,6 +92,7 @@ describe('订阅源单 URL 契约', () => {
     s.importSeed({ sources: [legacy as never] }, 'alice');
     expect(s.get('source', 's')?.url).toBe(url);
     expect(s.get('source', 's')).not.toHaveProperty('urls');
+    expect(s.get('source', 's')).not.toHaveProperty('fetch');
     const before = s.list('source');
     expect(() => s.importSeed({ sources: [
       { id: 'new', name: '新源', url, pipeline: [] },

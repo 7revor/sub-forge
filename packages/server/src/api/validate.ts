@@ -8,7 +8,7 @@ import type { DocKind, DocTypes, RuleSetDoc } from '../docs.ts';
 import type { Store, User } from '../store.ts';
 import { normalizeRuleSet, promoteRuleSetOverrides } from '../legacy-rules.ts';
 import { MIN_TTL_SEC } from '../snapshots.ts';
-import { sourceUrl } from '../source-url.ts';
+import { normalizeSourceFetch, sourceUrl } from '../source-url.ts';
 import { bad, isStr } from './common.ts';
 import { checkRuleSetReference, type RuleSetMatcher } from '../ruleset-reference.ts';
 
@@ -53,12 +53,12 @@ function checkRegex(pattern: unknown, where: string, flags = ''): void {
   try { compileUserRegex(pattern, flags); } catch (e) { throw bad(`${where}：${(e as Error).message}`); }
 }
 
-export function checkFetch(fetch: unknown): void {
+export function checkFetch(fetch: unknown, source = false): void {
   if (fetch === undefined) return;
   if (!isObj(fetch)) throw bad('拉取参数格式错误');
-  if (fetch.ua !== undefined && typeof fetch.ua !== 'string') throw bad('User-Agent 必须是字符串');
-  if (fetch.timeoutMs !== undefined && !(typeof fetch.timeoutMs === 'number' && Number.isSafeInteger(fetch.timeoutMs) && fetch.timeoutMs > 0 && fetch.timeoutMs <= 4294967295)) throw bad('超时必须是正整数毫秒，且不超过 4294967295');
-  if (fetch.ttlSec !== undefined && !(typeof fetch.ttlSec === 'number' && Number.isFinite(fetch.ttlSec) && fetch.ttlSec >= MIN_TTL_SEC)) throw bad(`快照有效期不能短于 ${MIN_TTL_SEC / 60} 分钟`);
+  if (!source && fetch.ua !== undefined && typeof fetch.ua !== 'string') throw bad('User-Agent 必须是字符串');
+  if (!source && fetch.timeoutMs !== undefined && !(typeof fetch.timeoutMs === 'number' && Number.isSafeInteger(fetch.timeoutMs) && fetch.timeoutMs > 0 && fetch.timeoutMs <= 4294967295)) throw bad('超时必须是正整数毫秒，且不超过 4294967295');
+  if (fetch.ttlSec !== undefined && !(typeof fetch.ttlSec === 'number' && Number.isFinite(fetch.ttlSec) && fetch.ttlSec >= MIN_TTL_SEC)) throw bad(`${source ? '自动更新时间' : '快照有效期'}不能短于 ${MIN_TTL_SEC / 60} 分钟`);
 }
 
 function checkPipeline(steps: unknown, where: string, user: User): void {
@@ -184,7 +184,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (doc.content !== undefined) throw bad('订阅源不再支持 content，粘贴的节点请放到本地节点组');
       try { doc.url = sourceUrl(doc); } catch (e) { throw bad((e as Error).message); }
       delete doc.urls;
-      checkFetch(doc.fetch);
+      checkFetch(doc.fetch, true);
+      const normalized = normalizeSourceFetch(doc as { fetch?: { ttlSec?: number } });
+      delete doc.fetch;
+      if (normalized.fetch) doc.fetch = normalized.fetch;
       if (doc.pipeline === undefined) doc.pipeline = [];
       checkPipeline(doc.pipeline, '处理链', user);
       break;
