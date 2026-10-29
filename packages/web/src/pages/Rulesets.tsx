@@ -59,7 +59,7 @@ function SourceFields({ d, set, autoFocusName }: { d: RuleSetDoc; set: (p: Parti
 
 const FORMAT_TEXT: Record<string, string> = { auto: '自动识别', classical: 'classical', 'domain-set': 'DOMAIN-SET', domain: 'DOMAIN-SET', ipcidr: 'CIDR', yaml: 'YAML payload', mrs: 'mrs', srs: 'srs' };
 
-/** 规则集（设计稿「规则集」）：解析结果表 + 输出预览，来源在「编辑来源」对话框里改，行级改写在下方 */
+/** 规则集（设计稿「规则集」）：自上而下为客户端改写、解析结果、输出预览，每块独占一行；来源在「编辑来源」对话框里改 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
@@ -97,13 +97,14 @@ export function RulesetEdit() {
         {parsed && !parsed.passthrough && <Badge tone={parsed.rejected.length ? 'warn' : 'neutral'}>解析 {parsed.rules.length} 行{parsed.rejected.length ? ` · 不支持 ${parsed.rejected.length} 行` : ''}</Badge>}
       </>}>
       {e.isNew ? <Card title="来源"><SourceFields d={d} set={set} autoFocusName /></Card> : (
-        <div className="flex flex-wrap items-start gap-5">
-          <Card className="min-w-0 flex-[999_1_520px]" bodyClass="overflow-x-auto"
+        <>
+          <RulesetOverrides value={d.overrides ?? []} onChange={(overrides) => set({ overrides })} />
+          <Card className="min-w-0" bodyClass="overflow-x-auto"
             title={<h2 className="m-0 text-[15px] font-semibold">解析结果</h2>}
             actions={d.kind === 'local' && !parsed?.passthrough && <Input aria-label="搜索规则" placeholder="搜索" className="h-9 w-[200px]" value={q} onChange={(x) => setQ(x.target.value)} />}>
             {d.kind === 'remote' || parsed?.passthrough ? (
               <div className="px-4 pb-4 text-[13px] leading-relaxed text-muted">
-                {parsed?.passthrough || d.format === 'mrs' || d.format === 'srs' ? 'mrs / srs 二进制规则集只做透传，不解析。' : `远程内容在拉取后解析，最终输出见右侧「输出预览」${rejectedCount ? `；有 ${rejectedCount} 行不支持` : ''}。`}
+                {parsed?.passthrough || d.format === 'mrs' || d.format === 'srs' ? 'mrs / srs 二进制规则集只做透传，不解析。' : `远程内容在拉取后解析，最终输出见下方「输出预览」${rejectedCount ? `；有 ${rejectedCount} 行不支持` : ''}。`}
               </div>
             ) : (
               <table className="w-full min-w-[560px] border-collapse">
@@ -123,7 +124,7 @@ export function RulesetEdit() {
             )}
             {shown.length > 300 && <div className="px-4 py-2.5 text-[12.5px] text-muted">显示前 300 行，共 {shown.length} 行</div>}
           </Card>
-          <Card title="输出预览" className="min-w-0 flex-[1_1_360px]">
+          <Card title="输出预览" className="min-w-0">
             <div className="flex flex-col gap-3">
               <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
                 {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
@@ -143,15 +144,8 @@ export function RulesetEdit() {
               )}
             </div>
           </Card>
-        </div>
+        </>
       )}
-      {!e.isNew && <RulesetOverrides value={d.overrides ?? []} onChange={(overrides) => set({ overrides })} />}
-      {!e.isNew && <Card title="下载地址">
-        <div className="flex flex-col gap-2">
-          {[`/r/<token>/${d.name}?target=mihomo&behavior=${d.behavior ?? 'classical'}`, `/r/<token>/${d.name}?target=surge`].map((u) => <code key={u} className="truncate rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px]">{u}</code>)}
-          <span className="text-[12px] leading-relaxed text-muted">规则集随引用它的配置订阅下发，<span className="font-mono">&lt;token&gt;</span> 是该订阅链接的 token，实际地址以配置订阅「预览」为准。无改写且格式兼容时直接引用上游 URL（P1）；Surge 在 M2。</span>
-        </div>
-      </Card>}
       <Modal title="编辑来源" open={editing} onClose={() => setEditing(false)} wide footer={<Button variant="primary" onClick={() => setEditing(false)}>完成</Button>}>
         <SourceFields d={d} set={set} />
         <span className="text-[12px] text-muted">改动在页面右上角「保存」后生效。</span>
