@@ -257,3 +257,6 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 订阅 ID、归属、链接、基础设置、节点源、代理链及 last-good/版本资源保留；迁移前后有效分流配置必须一致。历史孤儿项原本不生效，留在备份与诊断中。缺失模板版本或旧合并错误会中止整批迁移，不能靠丢弃配置继续启动；修复旧库后再试。回退旧程序应恢复升级前整库及对应密钥，单份 Profile 备份不等于数据库降级工具。
 
 示例种子保留原 `demo` 的筛选配置及 `demo-token`，将其完整展开为独立模式；另有 `demo-bound` / `demo-bound-token` 演示纯成员绑定。
+
+
+绑定订阅的 `routing.prependRules` 可选，保存与草稿预览只接受单条规则，检查规则内容、出口归属与节点集成员。模板发布检查前置引用，引用组删除或规则 ID 冲突不允许 force；转换为独立配置保留前置规则，重新绑定显式映射组出口。现有绑定订阅无新增迁移。内置浏览器隔离验收入口：`pnpm exec tsx test/manual-prepend-rules-server.ts`，结束后用 SIGINT/SIGTERM 关闭。

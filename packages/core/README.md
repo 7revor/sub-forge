@@ -68,3 +68,6 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 ## 订阅分流模式
 
 `Profile.routing` 包含 `bound`（最新模板 + 按稳定组 ID 追加成员）和 `independent`（完整 groups/rules/final）两类。渲染统一调用 `resolveProfileRouting`；绑定组失效或合并成环为错误，独立配置不依赖模板。`routingConfig` 展开有效配置，`profileEditorOverlay` 仅为现有编辑器提供视图，不能作为第二份配置持久化。历史 `overlay` 入口用于旧数据迁移与兼容测试。
+
+
+绑定订阅可选 `routing.prependRules` 保存有序单条规则，渲染先于全部模板规则，MATCH 沿用模板；缺省空数组。节点出口复用代理链的 wrap/copy/inline 依赖解析。模板更新检查前置规则 ID 与引用组，模式转换通过 resolveProfileRouting 保留完整顺序。

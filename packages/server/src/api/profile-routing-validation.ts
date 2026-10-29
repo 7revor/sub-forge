@@ -9,19 +9,56 @@ import type { RefChecker } from './validate.ts';
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const builtins = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']);
 
+/** 与全局单条编辑器保持一致，拒绝空值、伪造类型及通过原样文本注入额外规则。 */
+function checkPrependRule(value: unknown): void {
+  if (!obj(value) || !isStr(value.type)) throw bad('前置规则格式错误');
+  if (value.type === 'RAW' || ['AND', 'OR', 'NOT'].includes(value.type)) throw bad('前置规则暂不支持原样或逻辑规则');
+  const types = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'GEOSITE', 'SRC-IP-CIDR', 'DST-PORT', 'SRC-PORT', 'NETWORK', 'PROCESS'];
+  if (!types.includes(value.type) || !isStr(value.value) || /[\r\n]/.test(value.value)) throw bad('前置规则类型或规则值不合法');
+  if (value.type === 'NETWORK' && !['tcp', 'udp'].includes(value.value)) throw bad('NETWORK 只能是 tcp 或 udp');
+  if (value.type === 'PROCESS' && (!['name', 'path'].includes(String(value.kind)) || !['exact', 'wildcard', 'regex'].includes(String(value.mode)))) throw bad('进程规则匹配方式不合法');
+  for (const key of ['noResolve', 'src']) if (value[key] !== undefined && typeof value[key] !== 'boolean') throw bad('规则选项必须是布尔值');
+}
+
 export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefChecker): void {
   const r = doc.routing;
   if (!obj(r) || !['bound', 'independent'].includes(r.mode)) throw bad('分流模式只能是 bound 或 independent');
   if (doc.template !== undefined || Object.keys(doc.overlay).length) throw bad('新分流模式不能同时保存旧模板引用或覆盖层');
   let template;
   if (r.mode === 'bound') {
-    if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions'].includes(k))) throw bad('绑定模式只能保存模板引用和追加成员');
+    if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions', 'prependRules'].includes(k))) throw bad('绑定模式只能保存模板引用、追加成员和前置单条规则');
     if (!isStr(r.templateId) || !(template = store.getTemplate(r.templateId))) throw bad('模板不存在');
     if (doc.templateVersion !== template.version) throw new HttpError(409, '模板已更新，请重新加载后检查并保存');
     if (!obj(r.groupAdditions)) throw bad('追加成员必须按策略组 ID 保存');
     for (const [id, members] of Object.entries(r.groupAdditions)) {
       if (!template.groups.some(g => g.id === id)) throw bad(`追加成员指向不存在的策略组 ${id}`);
       if (!Array.isArray(members)) throw bad(`策略组 ${id} 的追加成员必须是数组`);
+    }
+    if (r.prependRules !== undefined) {
+      if (!Array.isArray(r.prependRules)) throw bad('前置规则必须是数组');
+      for (const rule of r.prependRules) {
+        if (!obj(rule) || !isStr(rule.id) || !obj(rule.matcher) || rule.matcher.kind !== 'rule') throw bad('前置规则只能使用单条规则');
+        if (Object.keys(rule).some(key => !['id', 'matcher', 'target', 'options', 'enabled'].includes(key))) throw bad('前置规则不能指定插入位置或覆盖模板规则');
+        if (!obj(rule.target) || rule.target.kind === 'node' && !obj(rule.target.ref)) throw bad('前置规则出口格式错误');
+        if (rule.enabled !== undefined && typeof rule.enabled !== 'boolean') throw bad('前置规则启用状态必须是布尔值');
+        checkPrependRule(rule.matcher.rule);
+        if (rule.matcher.overrides !== undefined) {
+          if (!Array.isArray(rule.matcher.overrides)) throw bad('客户端覆盖必须是数组');
+          for (const override of rule.matcher.overrides) {
+            if (!obj(override) || !obj(override.when) || !['mihomo', 'surge'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
+            if (override.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(String(override.when.platform))) throw bad('客户端覆盖平台不合法');
+            const action = override.action;
+            if (Object.keys(action).length !== 1) throw bad('客户端覆盖只能指定一个动作');
+            if ('drop' in action) { if (action.drop !== true) throw bad('客户端覆盖丢弃动作不合法'); }
+            else {
+              const rules = 'replace' in action ? action.replace : 'append' in action ? action.append : undefined;
+              if (!Array.isArray(rules) || !rules.length) throw bad('客户端覆盖规则不能为空');
+              rules.forEach(checkPrependRule);
+            }
+          }
+        }
+        if (rule.options !== undefined && (!obj(rule.options) || Object.entries(rule.options).some(([key, value]) => !['noResolve', 'src'].includes(key) || typeof value !== 'boolean'))) throw bad('前置规则选项不合法');
+      }
     }
     doc.templateVersion = template.version;
   } else {

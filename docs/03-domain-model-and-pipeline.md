@@ -429,3 +429,12 @@ type ProfileRouting =
 `POST /api/profiles/routing/convert` 接受订阅草稿、目标 mode、模板版本与组映射，返回草稿和变更清单，不写库。绑定转独立保留完整有效配置；重新绑定替换模板负责的结构、规则和最终出口，仅迁移显式映射的成员与代理链/节点回退引用。不迁移使用 null 明确表达，仍被引用的组不能丢弃。最终 PUT 使用 revision 原子保存，模板版本过期拒绝。发布前试渲染所有绑定订阅，检查过程中的并发改动拒绝发布。
 
 `profile-migration-plan` 通过 SQLite backup 在临时一致性副本上迁移，源库只读；输出订阅名称、目标模式、原因及诊断，不包含完整配置或令牌。操作步骤见 server README。
+
+
+### 2026-10-29：绑定模式前置规则扩展
+
+`ProfileRouting` 的 `bound` 分支增加可选 `prependRules: RuleEntry[]`，按显示顺序保存，只允许 `matcher.kind: rule`，不携带锚点，不修改模板。缺省等同空数组，已有绑定订阅无需数据库迁移。有效规则为 `prependRules + template.rules`；禁用项保留顺序但不输出，最终出口仍为 `template.final`。编辑器通过倒序 top 锚点兼容旧覆盖层视图，保存仅写 routing。
+
+前置节点出口共用 `resolveTarget / nameForNode`：默认 wrap 生成精确过滤的隐藏组，copy 复制到顶层，inline 内联节点集；与代理链重复引用时复用依赖。保存及草稿预览检查出口归属、节点集已加入订阅、匹配项和规则 ID；规则 ID 不得与模板或其他前置规则冲突。模板发布检查全部前置出口（含禁用项、节点兜底组），删除所引用组或引入冲突 ID 时不可强制发布。绑定转独立会将前置规则完整固化，绑定间转换映射前置出口及兜底组。
+
+规则出口也会生成包装组与本地副本，因此代理链的成环与跳数检查在全部规则出口解析完成后执行，确保 `include-all-proxies` 等动态成员纳入新增副本。

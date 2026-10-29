@@ -11,7 +11,7 @@ export function updateEditorOverlay(p: ProfileDoc, change: (o: Overlay) => Overl
   const overlay = change(profileEditorOverlay(p));
   if (!p.routing) return { ...p, overlay };
   return { ...p, overlay: {}, routing: p.routing.mode === 'bound'
-    ? { ...p.routing, groupAdditions: additionsFromOverlay(overlay) }
+    ? { ...p.routing, groupAdditions: additionsFromOverlay(overlay), ...((overlay.extraRules?.length || p.routing.prependRules) ? { prependRules: [...(overlay.extraRules ?? [])].reverse().map(extra => extra.rule) } : {}) }
     : { ...p.routing, config: routingConfig(mergeTemplate(undefined, overlay, new Report())) } };
 }
 export function modeLabel(p: ProfileDoc, name?: string): string {

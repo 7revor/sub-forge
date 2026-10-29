@@ -129,3 +129,8 @@ TemplateEditor 策略组编辑区使用与列表一致的白色面板背景。�
 ProfileNew、Profile 详情与 Lists/Main 显示「绑定模板 / 独立配置」；「模板与模式」提供绑定、复制初始化、解除绑定、成员映射及转换预览。绑定策略组仅追加成员可编辑，规则和最终出口只读；独立模式完整编辑。详情显示迁移记录和备份下载。TemplateBrowse 使用数量按绑定关系统计，TemplatePublish 对绑定冲突展示禁止强制发布说明并禁用发布。
 
 核心、后端、前端及种子已同步，无新增后端待实现项。内置浏览器本轮访问外部画布仍显示「Sign in to view this page」，未修改外部画板；按 docs/13 登记待同步，证据及实际页面见 [本轮验收](../research/verification/profile-template-modes-20261029/README.md)。
+
+
+### 2026-10-29：绑定订阅前置规则
+
+配置订阅规则页上方新增可编辑「前置规则」，下方保留只读模板规则及 MATCH。添加固定单条匹配，不提供位置或规则集类型切换；复用全局规则和出口组件。后端 bound.prependRules、依赖解析、转换与模板发布检查已接通。外部 Claude Design 画布本轮实测仍显示「Sign in to view this page」，按 docs/13 登记待同步；实际截图与验收见 `research/verification/template-prepend-rules-20261029/`。

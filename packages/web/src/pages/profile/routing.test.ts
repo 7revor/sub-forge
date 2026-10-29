@@ -38,3 +38,17 @@ it('后台刷新不覆盖转换草稿，保存期间的新输入保留并使用�
   expect(acceptProfileSave(typing, converted, saved)).toEqual({ ...typing, revision: 3 });
   expect(syncProfileDraft(converted, remote, { ...remote, id: 'other' }).id).toBe('other');
 });
+
+it('绑定前置规则的增删、排序、编辑与再次保存保留显示顺序和成员', () => {
+  const rules = profile.routing?.mode === 'independent' ? profile.routing.config.rules : [];
+  const bound: ProfileDoc = { ...profile, routing: { mode: 'bound', templateId: 't', groupAdditions: { a: [{ kind: 'builtin', name: 'DIRECT' }] }, prependRules: [rules[0]!, { ...rules[0]!, id: 'second' }] } };
+  const overlay = profileEditorOverlay(bound);
+  const edited = updateEditorOverlay(bound, o => ({ ...o, extraRules: o.extraRules!.map(e => ({ ...e, rule: { ...e.rule, target: { kind: 'builtin', name: 'REJECT' } } })) }));
+  expect(edited.routing).toMatchObject({ groupAdditions: bound.routing?.mode === 'bound' ? bound.routing.groupAdditions : {}, prependRules: [{ id: 'r', target: { name: 'REJECT' } }, { id: 'second', target: { name: 'REJECT' } }] });
+  expect(updateEditorOverlay(edited, o => o)).toEqual(edited);
+  const reordered = updateEditorOverlay(bound, o => ({ ...o, extraRules: [...overlay.extraRules!].reverse() }));
+  expect(reordered.routing?.mode === 'bound' && reordered.routing.prependRules?.map(r => r.id)).toEqual(['second', 'r']);
+  const removed = updateEditorOverlay(bound, o => ({ ...o, extraRules: [] }));
+  expect(removed.routing?.mode === 'bound' && removed.routing.prependRules).toEqual([]);
+  expect(persistedProfile({ ...edited, overlay }).overlay).toEqual({});
+});
