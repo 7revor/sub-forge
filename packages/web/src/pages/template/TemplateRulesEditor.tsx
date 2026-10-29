@@ -11,7 +11,7 @@ function RuleFields({ rule, onChange, ctx, value, report }: {
   rule: RuleEntry; onChange: (rule: RuleEntry) => void; ctx: ConvertCtx; value: TemplateBody; report: ReportItem[];
 }) {
   const matcher = rule.matcher;
-  const refs = matcher.kind === 'ruleset' ? ctx.rulesets : ctx.bundles;
+  const refs = ctx.rulesets;
   const changeRule = (next: RuleIR) => {
     if (matcher.kind !== 'rule') return;
     const ip = 'noResolve' in next || ['IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'SRC-IP-CIDR'].includes(next.type);
@@ -25,9 +25,9 @@ function RuleFields({ rule, onChange, ctx, value, report }: {
     <Field label="匹配项类型">{(id) => <Select id={id} value={matcher.kind} onChange={(e) => {
       const kind = e.target.value as Matcher['kind'];
       onChange({ ...rule, matcher: kind === 'rule' ? { kind, rule: { type: 'DOMAIN', value: '' } } : { kind, id: '' } });
-    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option><option value="bundle">规则包</option></Select>}</Field>
+    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option></Select>}</Field>
     {matcher.kind === 'rule' ? <RuleEditor value={ir} onChange={changeRule} onIncomplete={changeRule} /> : <>
-      <Field label={matcher.kind === 'ruleset' ? '规则集' : '规则包'}>{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...rule, matcher: { ...matcher, id: e.target.value } })}>
+      <Field label="规则集">{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...rule, matcher: { ...matcher, id: e.target.value } })}>
         <option value="">请选择</option>
         {matcher.id && !refs.some((ref) => ref.id === matcher.id) && <option value={matcher.id}>已不存在：{matcher.id}</option>}
         {refs.map((ref) => <option key={ref.id} value={ref.id}>{ref.name}</option>)}

@@ -6,7 +6,7 @@ import type { ConvertCtx, NamedRef } from '../../convert/templateYaml.ts';
 
 export function matcherLabel(matcher: Matcher, ctx: ConvertCtx): string {
   if (matcher.kind === 'rule') return ruleToLine(matcher.rule);
-  return `${matcher.kind === 'ruleset' ? '规则集' : '规则包'} · ${(matcher.kind === 'ruleset' ? ctx.rulesets : ctx.bundles).find((r) => r.id === matcher.id)?.name ?? (matcher.id || '未选择')}`;
+  return `规则集 · ${ctx.rulesets.find((r) => r.id === matcher.id)?.name ?? (matcher.id || '未选择')}`;
 }
 
 export function TemplateTargetSelect({ value, onChange, groups, label }: {

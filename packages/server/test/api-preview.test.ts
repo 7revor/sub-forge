@@ -138,9 +138,11 @@ describe('规则集预览（CR-05）', () => {
     expect(fetched.filter((u) => u.endsWith('/ok'))).toHaveLength(1);
 
     const id = (await alice.post('/api/rulesets', { name: 'N', sources: sources.slice(0, 1) })).json.item.id;
+    // 已保存规则集里新填、尚未保存的地址同样不落快照
+    await alice.post('/api/rulesets/preview', { id, ruleset: { name: 'N', sources }, client: 'mihomo' });
+    expect(store.snapshotHistory('ruleset', id)).toHaveLength(1);
     const saved = await alice.post('/api/rulesets/preview', { id, ruleset: { name: 'N', sources: sources.slice(0, 1) }, source: 'r', client: 'mihomo' });
     expect(saved.json.lines).toEqual(['DOMAIN,remote.test']);
-    expect(store.snapshotHistory('ruleset', id)).toHaveLength(1);
   });
 
   it('别人的规则集不能借 id 读快照', async () => {

@@ -1,12 +1,13 @@
 // 数据读写的 React Query 封装。文档种类与后端 /api/{kind} 一一对应。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Collection, LocalProxyGroup, RuleBundle, RuleSet, Source, Template } from '@sub-forge/core';
+import type { Collection, LocalProxyGroup, RuleSet, RuleSetSource, Source, Template } from '@sub-forge/core';
 import { api, type User } from './api.ts';
 
 export type FetchOptions = { ua?: string; timeoutMs?: number; ttlSec?: number };
 export type SourceDoc = Source & { fetch?: FetchOptions };
-export type RuleSetDoc = RuleSet & { fetch?: FetchOptions };
+export type RuleSetSourceDoc = RuleSetSource & { fetch?: FetchOptions };
+export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[] };
 export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown> };
 export type TemplateDoc = Template & { name?: string };
 export type ProfileDoc = import('@sub-forge/core').Profile & {
@@ -22,7 +23,6 @@ export type DocMap = {
   collections: Collection;
   locals: LocalProxyGroup;
   rulesets: RuleSetDoc;
-  bundles: RuleBundle;
   profiles: ProfileDoc;
   presets: PresetDoc;
 };

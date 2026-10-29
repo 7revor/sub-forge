@@ -152,7 +152,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
 
   /**
    * 规则集预览：请求体带编辑中的草稿（可未保存），不写入任何文档。
-   * - id：已保存的规则集，远程来源读写它名下的快照；新建时缺省，远程来源只拉取不落快照；
+   * - id：已保存的规则集，已保存的远程地址读写它名下的快照；其余地址（新建草稿、编辑中新填的）只拉取不落快照；
    * - source：来源 id，给出时返回该来源的输出与无法解析的行，否则返回全部启用来源合并（去重、按 behavior 排序）后的结果；
    * - 每个来源的拉取状态一并返回，界面在来源列表上标出。
    */
@@ -162,7 +162,10 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const client: Client = body.client === 'surge' ? 'surge' : 'mihomo';
     const platform = PLATFORMS.find((p) => p === body.platform);
     const ctx: ClientCtx = platform ? { client, platform } : { client };
-    const savedId = typeof body.id === 'string' && body.id ? own('ruleset', body.id, user.id).id : undefined;
+    const saved = typeof body.id === 'string' && body.id ? own('ruleset', body.id, user.id) : undefined;
+    const savedId = saved?.id;
+    // 只有已保存的地址读写快照；编辑中尚未保存的地址（含输入到一半的）只拉取，不在快照表里留下记录
+    const savedUrls = new Set((saved?.sources ?? []).flatMap((x) => (x.kind === 'remote' && x.url ? [x.url] : [])));
     const draft = body.ruleset as Partial<RuleSetDoc> | undefined;
     if (!draft || typeof draft !== 'object' || !Array.isArray(draft.sources)) throw bad('ruleset.sources 必须是数组');
     const rs: RuleSetDoc = { id: savedId ?? 'draft', name: typeof draft.name === 'string' && draft.name ? draft.name : '未命名', sources: draft.sources, ...(draft.noResolve ? { noResolve: true } : {}) };
@@ -177,7 +180,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       let fetchedAt: number | undefined;
       if (src.kind === 'remote' && !passthrough && (body.source === undefined || body.source === src.id || src.enabled !== false)) {
         if (!src.url || !/^https?:\/\/[^/]+/.test(src.url)) error = '请填写 http(s) 地址';
-        else if (savedId) {
+        else if (savedId && savedUrls.has(src.url)) {
           const r = await snapshots.get('ruleset', savedId, src.url, { ttlSec: src.fetch?.ttlSec ?? 86400, ...src.fetch, format: src.format });
           content = r.snapshot?.body;
           fetchedAt = r.snapshot?.fetchedAt;

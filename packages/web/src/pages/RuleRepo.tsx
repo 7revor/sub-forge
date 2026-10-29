@@ -1,4 +1,4 @@
-// 规则仓库（设计稿「规则仓库」）：搜索内置 GitHub 规则仓库、查看按客户端挑选的变体与内容预览，引用为规则集或加入规则包。
+// 规则仓库（设计稿「规则仓库」）：搜索内置 GitHub 规则仓库、查看按客户端挑选的变体与内容预览，引用为规则集或作为远程来源加入已有规则集。
 // 服务端索引尚未实现：搜索返回空结果并带 pending，引用返回 501。
 
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import { Badge, Button, buttonClass, Card, ErrorBox, Input, PageHeader, PendingN
 export function RuleRepoPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const bundle = params.get('bundle');
+  const ruleset = params.get('ruleset');
   const [q, setQ] = useState(params.get('q') ?? '');
   const [debounced, setDebounced] = useState(q);
   const [repo, setRepo] = useState<string>();
@@ -27,8 +27,8 @@ export function RuleRepoPage() {
     queryFn: () => api<{ item: RepoEntryDetail }>('GET', `/rule-repos/entry?repo=${encodeURIComponent(sel!.repo)}&path=${encodeURIComponent(sel!.path)}`).then((r) => r.item),
   });
   const use = useMutation({
-    mutationFn: () => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: sel!.repo, path: sel!.path, ...(bundle ? { bundle } : {}) }),
-    onSuccess: (r) => navigate(bundle ? `/bundles/${bundle}` : `/rulesets/${r.item.id}`),
+    mutationFn: () => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: sel!.repo, path: sel!.path, ...(ruleset ? { ruleset } : {}) }),
+    onSuccess: (r) => navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${r.item.id}`),
   });
   const items = search.data?.items ?? [];
   const pending = repos.data?.pending || search.data?.pending;
@@ -38,7 +38,7 @@ export function RuleRepoPage() {
     <>
       <PageHeader title="规则仓库" subtitle="搜索内置的 GitHub 规则仓库并直接引用。按客户端自动挑选变体；索引每日重建。" />
       {pending && <PendingNotice>规则仓库的索引与搜索还没有接入，搜索暂时没有结果，「引用为规则集」会被拒绝。可以先在规则集里填写远程地址。</PendingNotice>}
-      {bundle && <div className="rounded-lg bg-accent-soft px-3 py-2.5 text-[13px] text-accent-ink">选中的规则会加入规则包。<Link to={`/bundles/${bundle}`} className="ml-1 text-accent">返回规则包</Link></div>}
+      {ruleset && <div className="rounded-lg bg-accent-soft px-3 py-2.5 text-[13px] text-accent-ink">选中的规则会作为远程来源加入规则集。<Link to={`/rulesets/${ruleset}`} className="ml-1 text-accent">返回规则集</Link></div>}
       <div className="flex flex-wrap items-center gap-3">
         <Input aria-label="搜索规则" placeholder="搜索规则名或路径，如 telegram" className="h-10 max-w-[360px]" value={q} onChange={(e) => setQ(e.target.value)} />
         <div role="group" aria-label="仓库" className="flex flex-wrap gap-1.5">
@@ -92,8 +92,8 @@ export function RuleRepoPage() {
             </>}
             <ErrorBox error={use.error} />
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" disabled={use.isPending} onClick={() => use.mutate()}>{bundle ? '加入规则包' : '引用为规则集'}</Button>
-              {!bundle && <Link to="/bundles" className={buttonClass()}>加入规则包…</Link>}
+              <Button variant="primary" disabled={use.isPending} onClick={() => use.mutate()}>{ruleset ? '加入规则集' : '引用为规则集'}</Button>
+              {!ruleset && <Link to="/rulesets" className={buttonClass()}>加入已有规则集…</Link>}
             </div>
           </>}
         </section>

@@ -23,25 +23,22 @@ export function ruleText(r: RuleIR): string {
 
 function useMatcherLabel() {
   const rulesets = useList('rulesets').data ?? [];
-  const bundles = useList('bundles').data ?? [];
   return (m: Matcher): { kind: string; text: string } => {
     if (m.kind === 'rule') return { kind: '单条规则', text: ruleText(m.rule) };
-    if (m.kind === 'ruleset') return { kind: '规则集', text: rulesets.find((r) => r.id === m.id)?.name ?? m.id };
-    return { kind: '规则包', text: bundles.find((b) => b.id === m.id)?.name ?? m.id };
+    return { kind: '规则集', text: rulesets.find((r) => r.id === m.id)?.name ?? m.id };
   };
 }
 
 function privateRuleError(rule: RuleEntry): string | undefined {
   const matcher = rule.matcher;
-  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : '请选择规则集或规则包。';
+  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : '请选择规则集。';
 }
 
 function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (value: RuleEntry) => void }) {
   const { groupOptions, profileNodeSets } = useProfile();
   const rulesets = useList('rulesets').data ?? [];
-  const bundles = useList('bundles').data ?? [];
   const matcher = value.matcher;
-  const options = matcher.kind === 'ruleset' ? rulesets : bundles;
+  const options = rulesets;
   const changeRule = (rule: RuleIR) => {
     if (matcher.kind === 'rule') onChange({ ...value, matcher: { ...matcher, rule } });
   };
@@ -50,9 +47,9 @@ function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (v
       const kind = e.target.value as Matcher['kind'];
       const { rule: _, id: __, overrides: ___, ...rest } = matcher as { rule?: RuleIR; id?: string; overrides?: unknown };
       onChange({ ...value, matcher: kind === 'rule' ? { ...rest, kind, rule: { type: 'DOMAIN', value: '' } } : { ...rest, kind, id: '' } });
-    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option><option value="bundle">规则包</option></Select>}</Field>
+    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option></Select>}</Field>
     {matcher.kind === 'rule' ? <RuleEditor value={matcher.rule} onChange={changeRule} onIncomplete={changeRule} /> :
-      <Field label={matcher.kind === 'ruleset' ? '规则集' : '规则包'}>{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...value, matcher: { ...matcher, id: e.target.value } })}>
+      <Field label="规则集">{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...value, matcher: { ...matcher, id: e.target.value } })}>
         <option value="">请选择</option>
         {matcher.id && !options.some((item) => item.id === matcher.id) && <option value={matcher.id}>{matcher.id}（当前不可用）</option>}
         {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
