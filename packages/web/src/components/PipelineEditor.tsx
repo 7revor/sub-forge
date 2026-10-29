@@ -29,21 +29,6 @@ export const OP_LABEL: Record<OperatorStep['op'], string> = {
   script: '脚本',
 };
 
-const OP_DESC: Record<OperatorStep['op'], string> = {
-  'filter.useless': '去掉剩余流量、到期、官网等公告节点',
-  'filter.regex': '按名称剔除或只保留',
-  'filter.type': '按协议剔除或只保留',
-  'rename.regex': '匹配 → 替换，支持 $1',
-  'rename.delete': '删掉名称中命中的部分',
-  'rename.affix': '给所有节点加前后缀',
-  flag: '按地区添加或移除旗帜',
-  'sort.name': '自然排序，升序或降序',
-  'sort.regex': '先命中的排前面',
-  dedupe: '按名称或节点身份去重',
-  set: '批量设置 udp、tfo 等字段',
-  script: '自定义 (nodes, ctx) => nodes',
-};
-
 const OP_GROUPS: { title: string; ops: OperatorStep['op'][] }[] = [
   { title: '过滤', ops: ['filter.useless', 'filter.regex', 'filter.type'] },
   { title: '改名', ops: ['rename.regex', 'rename.delete', 'rename.affix', 'flag'] },
@@ -210,11 +195,10 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'rename.delete':
       return <div className="flex flex-col gap-2">
         <PatternRows label="要删除的部分（正则）" patterns={step.patterns} hits={hits(step.patterns)} flags="g" onChange={(patterns) => onChange({ ...step, patterns })} />
-        <span className={hint}>多条依次执行。命中 0 个的规则不会报错，但值得检查是否写错。</span>
       </div>;
     case 'sort.regex':
       return <div className="flex flex-col gap-2">
-        <span className={lbl}>优先级（先命中的排前面，拖动调整；未命中的保持原顺序排在最后）</span>
+        <span className={lbl}>优先级（从上到下）</span>
         <SortableList items={step.patterns} onReorder={(patterns) => onChange({ ...step, patterns })} renderItem={(p, i, handle) => (
           <div className="grid grid-cols-[24px_22px_minmax(0,1fr)_44px_32px] items-center gap-2 py-1">
             {handle}
@@ -250,7 +234,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
         })}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
           <Button size="sm" onClick={() => onChange({ ...step, rules: [...step.rules, { pattern: '', replace: '' }] })}><Plus size={14} />添加规则</Button>
-          <span className={hint}>按顺序执行，上一条的结果交给下一条 · 替换支持 $1、$2 · (?i) 前缀忽略大小写</span>
+          <span className={hint}>替换支持 $1、$2；(?i) 忽略大小写</span>
         </div>
       </div>;
     }
@@ -265,7 +249,6 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'flag':
       return <div className="flex flex-col gap-2">
         <Segmented label="旗帜" value={step.mode} options={[{ value: 'add', label: '添加旗帜' }, { value: 'remove', label: '移除旗帜' }]} onChange={(mode) => onChange({ ...step, mode })} />
-        <span className={hint}>按名称中的地区名或代码识别（香港 / HK / Hong Kong…）；流量、到期等说明节点不添加旗帜，已有旗帜的节点不重复添加。</span>
       </div>;
     case 'sort.name':
       return <div className="flex flex-col gap-2">
@@ -284,7 +267,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
       return <div className="flex flex-col gap-2">
         <label htmlFor="script-code" className={lbl}>{'(nodes, ctx) => nodes'}</label>
         <DraftTextarea id="script-code" rows={7} className="bg-panel font-mono text-[12.5px]" value={step.code} onCommit={(code) => onChange({ ...step, code })} />
-        <span className={hint}>需要管理员授予脚本权限。在服务端沙箱中执行；出错时这一步被跳过，预览标为失败。</span>
+        <span className={hint}>需要脚本权限；执行失败时跳过。</span>
       </div>;
   }
 }
@@ -310,12 +293,10 @@ function AddMenu({ onAdd }: { onAdd: (op: OperatorStep['op']) => void }) {
             {g.ops.map((op) => <button key={op} type="button" role="menuitem" onClick={() => { onAdd(op); setOpen(false); }}
               className="flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 text-left hover:bg-ground">
               <span className="text-[13.5px] font-medium">{OP_LABEL[op]}</span>
-              <span className="text-[12px] text-muted">{OP_DESC[op]}</span>
             </button>)}
           </div>)}
         </div>
       )}
-      <span className="text-center text-[12px] text-muted">新步骤追加到末尾，并自动选中</span>
     </div>
   );
 }
@@ -518,7 +499,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
       <span aria-hidden="true" className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md', mode === 'overview' ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}><ArrowLeftRight size={13} /></span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[13.5px] font-medium">总览 · 原始 → 最终</span>
-        <span className="truncate text-[12px] text-muted">原始节点与处理链跑完后的结果逐个对照</span>
       </span>
       {preview && <span className="shrink-0 font-mono text-[12.5px] text-ink-2">{preview.input} → {last ? last.after : preview.input}</span>}
     </button>
@@ -529,7 +509,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
       <section aria-label={title} className="min-w-0 flex-[1_1_360px] rounded-[10px] border border-line bg-panel pt-4 pb-2">
         <div className="flex items-center justify-between px-4 pb-3">
           <h2 className="m-0 text-[15px] font-semibold">{title}</h2>
-          <span className="text-[12.5px] text-muted">拖动排序 · {inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
+          <span className="text-[12.5px] text-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
         {overviewRow}
         <SortableList items={steps.map((s, i) => ({ step: s, id: keys[i]! }))} getKey={(item) => item.id}
@@ -545,7 +525,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           className={cx('flex w-full items-center gap-3 border-t border-line-2 px-4 py-3 text-left', mode === 'auto' ? 'bg-accent-soft' : 'bg-[#fafbfc]', autoDedupe && 'cursor-pointer')}>
           <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md bg-[#ebedf1] font-mono text-[12px] text-faint">✓</span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[13.5px] font-medium text-ink-2">去重 · 加序号 <span className="text-[12px] font-normal text-muted">自动兜底，不可移除</span></span>
+            <span className="text-[13.5px] font-medium text-ink-2">去重 · 加序号 <span className="text-[12px] font-normal text-muted">自动</span></span>
             <span className="font-mono text-[12px] text-muted">{autoDedupe?.renamed.length ? `${autoDedupe.renamed.length} 个重名节点追加了序号` : '同名节点追加 2、3…'}</span>
           </span>
           {last && <span className="font-mono text-[12.5px] text-ink-2">{last.after}{autoDedupe && <span className="text-ok"> ~{autoDedupe.renamed.length}</span>}</span>}
@@ -558,7 +538,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">
               <h2 className="m-0 text-[15px] font-semibold">总览 · 原始 → 最终</h2>
-              <span className="text-[12.5px] text-muted">{steps.length ? '左边是解析出的原始节点，右边是所有步骤和自动去重跑完后的输出。点「经过的步骤」里的序号跳到那一步调试。' : '还没有处理步骤，节点会原样输出。从「添加处理器」开始，每加一步都能看到它的效果。'}</span>
             </div>
             {preview && overviewStats && <div className="flex flex-wrap gap-1.5">
               <Badge>原始 {preview.input}</Badge>
@@ -587,7 +566,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
         {mode === 'auto' && autoDedupe && <>
           <div className="flex flex-col gap-0.5 px-4 pt-4 pb-3">
             <h2 className="m-0 text-[15px] font-semibold">去重 · 加序号（自动兜底）</h2>
-            <span className="text-[12.5px] text-muted">所有步骤跑完后，同名节点从第二个起追加 2、3…，保证名称唯一。这一步不可移除。</span>
           </div>
           <div className="border-t border-line-2 px-4 pt-3 pb-3"><h3 className="m-0 text-[13.5px] font-semibold">输入 → 输出 <span className="font-normal text-muted">· {resultText(autoDedupe)}</span></h3></div>
           {before && after && <MappingView before={before} after={after} inLabel="输入" outLabel="输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated} />}
@@ -597,7 +575,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">
               <h2 className="m-0 text-[15px] font-semibold">第 {selected + 1} 步 · {OP_LABEL[step.op]}</h2>
-              <span className="text-[12.5px] text-muted">{OP_DESC[step.op]}</span>
             </div>
             <div className="flex items-center gap-2.5">
               <span className="flex items-center gap-2 text-[13px] text-ink-2">

@@ -37,8 +37,8 @@ export function RuleRepoPage() {
 
   return (
     <>
-      <PageHeader title="规则仓库" subtitle="搜索内置的 GitHub 规则仓库并直接引用。按客户端自动挑选变体；索引每日重建。" />
-      {pending && <PendingNotice>规则仓库的索引与搜索还没有接入，搜索暂时没有结果，「引用为规则集」会被拒绝。可以先在规则集里填写远程地址。</PendingNotice>}
+      <PageHeader title="规则仓库" />
+      {pending && <PendingNotice>搜索与引用暂不可用。</PendingNotice>}
       {ruleset && <div className="rounded-lg bg-accent-soft px-3 py-2.5 text-[13px] text-accent-ink">选中的规则会作为远程来源加入规则集。<Link to={`/rulesets/${ruleset}`} className="ml-1 text-accent">返回规则集</Link></div>}
       <div className="flex flex-wrap items-center gap-3">
         <Input aria-label="搜索规则" placeholder="搜索规则名或路径，如 telegram" className="h-10 max-w-[360px]" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -69,7 +69,7 @@ export function RuleRepoPage() {
           </section>
 
           <section aria-label="详情" className="flex min-w-0 flex-[999_1_520px] flex-col gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-            {!sel ? <Empty title="还没有选择规则" description="从左侧选择一个规则查看详情。" /> : <>
+            {!sel ? <Empty title="还没有选择规则" /> : <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-col gap-1">
                   <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>

@@ -14,7 +14,6 @@ export function RenameDialog({ open, title, name, onClose, onRename }: { open: b
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ok} onClick={() => { onRename(value.trim()); onClose(); }}>确定</Button></>}>
       <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">名称</span>
         <Input autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && ok) { onRename(value.trim()); onClose(); } }} /></label>
-      <span className="text-[12px] text-muted">改名后点击页面右上角「保存」生效。</span>
     </Modal>
   );
 }

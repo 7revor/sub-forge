@@ -33,8 +33,6 @@ export function SourceList() {
   return (
     <>
       <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={() => setCreating(true)} deleteBody={SOURCE_DELETE_BODY}
-        intro="节点来源：机场的订阅地址。改名、过滤、排序都写在处理链里；自己整理的节点放在「本地节点」。"
-        empty="添加机场的订阅地址，之后在处理链里改名、过滤、排序。自己整理的节点请放到「本地节点」。"
         columns={[
           { header: '名称', cell: (s) => s.name },
           { header: '备注', cell: (s) => <NoteCell note={s.note} /> },
@@ -66,7 +64,6 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
       <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
       <NoteField value={note} onChange={setNote} />
-      <span className="text-[12px] leading-relaxed text-muted">每个订阅源只使用一个 URL；多个来源请通过「组合」合并。User-Agent、快照有效期在详情页的「基础设置」里设置。创建后立即拉取一次，并打开编辑与预览。自己整理的节点请到 <Link to="/locals" onClick={onClose}>本地节点</Link>，在新增节点的原始配置中粘贴。</span>
       <ErrorBox error={save.error} />
     </Modal>
   );
@@ -83,9 +80,9 @@ function BasicSettings({ draft, set, state }: {
   };
   const num = (v: string, scale: number) => (v.trim() && Number.isFinite(Number(v)) ? Math.round(Number(v) * scale) : undefined);
   return (
-    <Card title="基础设置" actions={<span className="text-[12px] text-muted">修改后自动预览 · 保存后生效</span>} bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
+    <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] items-start gap-3">
-        <Field label="订阅地址" className="col-span-full min-w-0" hint="每个订阅源使用一个 URL，多个来源请通过「组合」合并。">{(id) =>
+        <Field label="订阅地址" className="col-span-full min-w-0">{(id) =>
           <Input id={id} type="url" className="font-mono" placeholder="https://" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
         <Field label="名称" className="min-w-0">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
@@ -94,7 +91,7 @@ function BasicSettings({ draft, set, state }: {
         <Field label="超时（秒）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min="0.001" step="any" className="font-mono" inputMode="decimal" placeholder="10" value={draft.fetch?.timeoutMs === undefined ? '' : String(draft.fetch.timeoutMs / 1000)} onCommit={(value) => setFetch({ timeoutMs: num(value, 1000) })} />}</Field>
       </div>
       <NoteField value={draft.note} onChange={(note) => set({ note })} />
-      <p className="m-0 text-[12px] leading-relaxed text-muted">拉取选项留空使用默认值，快照有效期最短 5 分钟。快照过期后在后台刷新，失败时继续使用上一份成功快照。</p>
+      <p className="m-0 text-[12px] leading-relaxed text-muted">快照有效期最短 5 分钟。</p>
       <details className="min-w-0 border-t border-line pt-3">
         <summary className="cursor-pointer text-[13px] font-medium">快照历史 · {state.snaps.data?.length ?? 0}</summary>
         <ErrorBox error={state.snaps.error} />
@@ -112,7 +109,6 @@ function BasicSettings({ draft, set, state }: {
               {!state.snaps.data?.length && !state.snaps.error && <tr><td className={td} colSpan={3}>{state.snaps.isLoading ? <span className="text-muted">加载中…</span> : <Empty title="还没有拉取过" />}</td></tr>}
             </tbody>
           </table>
-          <p className="mx-3 mt-2.5 mb-0 text-[12px] text-muted">订阅请求总是使用最新一份成功快照。</p>
         </div>
       </details>
     </Card>

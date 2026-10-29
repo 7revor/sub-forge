@@ -21,7 +21,7 @@ import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 
 export function CollectionList() {
   return (
-    <DocList kind="collections" title="组合" empty="把多个订阅源、本地节点组合并成一个节点集，成员可以加前后缀区分来源。" intro="把多个订阅源、组合或本地节点组按顺序合并成一个节点集，可整体加入配置订阅。"
+    <DocList kind="collections" title="组合"
       columns={[
         { header: '名称', cell: (c) => c.name },
         { header: '备注', cell: (c) => <NoteCell note={c.note} /> },
@@ -66,10 +66,10 @@ export function CollectionEdit() {
         <NoteField value={d.note} onChange={(note) => set({ note })} />
       </Card>
 
-      <Card title={`成员`} subtitle={`按顺序合并。每个成员先跑自己的处理链，前后缀等价于自动追加一个改名处理器。组合之间不能成环。`}
+      <Card title={`成员`}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加成员</Button>}
         bodyClass="overflow-x-auto pb-1">
-        {!d.members.length ? <div className="px-4 pb-4"><Empty title="还没有成员" description="点击「添加成员」选择订阅源、组合或本地节点组。" /></div> : (
+        {!d.members.length ? <div className="px-4 pb-4"><Empty title="还没有成员" /></div> : (
           <div className="min-w-[900px]">
             <div className={cx(GRID, 'border-y border-line py-2 text-[12px] font-medium text-muted')}><span /><span>成员</span><span>类型</span><span>节点</span><span>前缀</span><span>后缀</span><span>拉取失败时</span><span /></div>
             <SortableList items={d.members} onReorder={(members) => set({ members })} renderItem={(m, i, handle) => (
@@ -89,7 +89,7 @@ export function CollectionEdit() {
             )} />
           </div>
         )}
-        {d.members.length > 0 && <p className="mx-4 mt-2 mb-3 text-[12px] text-muted">「拉取失败时」会随组合保存；服务端渲染尚未读取这一项，目前成员拉取失败时一律使用快照。</p>}
+        {d.members.length > 0 && <p className="mx-4 mt-2 mb-3 text-[12px] text-muted">失败策略暂不生效，拉取失败时使用快照。</p>}
       </Card>
 
       {!e.isNew && (
@@ -99,7 +99,7 @@ export function CollectionEdit() {
       )}
 
       <NodeSetPickerDialog open={adding} title="添加成员" options={options} added={d.members.map((m) => m.ref)} onClose={() => setAdding(false)}
-        onAdd={(refs) => set({ members: [...d.members, ...refs.map((ref) => ({ ref }))] })} hint="不能加入会形成环的组合；保存时会再次检查。" />
+        onAdd={(refs) => set({ members: [...d.members, ...refs.map((ref) => ({ ref }))] })} hint="组合不能循环引用。" />
       <RenameDialog open={renaming} title="重命名组合" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => set({ name })} />
     </DetailShell>
   );

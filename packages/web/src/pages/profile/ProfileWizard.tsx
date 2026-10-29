@@ -12,7 +12,7 @@ import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
 import { ProfileEditGuard } from './ProfileEditGuard.tsx';
 
-const STEPS = [['名称与基础设置', '预设 / 自定义 / 不输出'], ['节点集', '选择节点集'], ['模板', '分流骨架'], ['填充策略组', '给模板组加成员'], ['规则', '继承与覆盖'], ['代理链', '链规则与依赖'], ['预览', '按客户端查看']] as const;
+const STEPS = ['名称与基础设置', '节点集', '模板', '填充策略组', '规则', '代理链', '预览'] as const;
 
 export function ProfileWizard() {
   const navigate = useNavigate();
@@ -53,14 +53,14 @@ export function ProfileWizard() {
       </PageHeader>
       <ProfileEditGuard valid={ctx!.baseValid} onDiscard={ctx!.resetBaseEditor} />
       <ol aria-label="新建 Profile 步骤" className="m-0 flex shrink-0 list-none gap-2 overflow-x-auto p-0">
-        {STEPS.map(([label, sub], index) => {
+        {STEPS.map((label, index) => {
           const now = step === index, done = index < reached && !now;
           return (
             <li key={label} className="min-w-[140px] flex-1">
               <button type="button" aria-current={now ? 'step' : undefined} disabled={index > reached || !ctx!.baseValid || save.isPending || (index > 0 && !nameValid)} onClick={() => setStep(index)}
                 className={cx('flex min-h-14 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60', now ? 'border-accent bg-[#f5f8ff]' : 'border-line bg-panel hover:bg-ground')}>
                 <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[12px]', now || done ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}>{done ? <Check size={13} /> : index + 1}</span>
-                <span className="flex flex-col gap-px"><span className="text-[13.5px] font-semibold">{label}</span><span className="text-[11.5px] text-muted">{sub}</span></span>
+                <span className="text-[13.5px] font-semibold">{label}</span>
               </button>
             </li>
           );
@@ -69,7 +69,7 @@ export function ProfileWizard() {
       <fieldset disabled={save.isPending} className="page-scroll -m-1 gap-5 border-0 p-1">
         {step === 0 && <>
           <Card title="名称与基础设置">
-            <Field label="名称" hint="必填，客户端里显示的订阅名">{(id) => <Input id={id} required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
+            <Field label="名称">{(id) => <Input id={id} required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
           </Card>
           <TabBase />
         </>}
@@ -86,7 +86,7 @@ export function ProfileWizard() {
               </button>
             ))}
           </div>
-          {draft.template && <p className="mt-3 mb-0 text-[12.5px] text-muted">跟随最新版本：模板发布后立即生效。可以在详情页改为锁定某个版本。</p>}
+          {draft.template && <p className="mt-3 mb-0 text-[12.5px] text-muted">自动跟随模板最新版本。</p>}
         </Card>}
         <ErrorBox error={template.error} />
         {step >= 3 && !templateReady && <div className="text-muted">{template.isError ? '模板加载失败，请返回模板步骤重新选择，或重试。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
