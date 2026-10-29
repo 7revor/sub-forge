@@ -38,7 +38,7 @@ describe('物理文件平铺搜索与分页', () => {
     const searched = (await h.admin.get('/api/rule-options/search?scope=repository&q=file-34')).json;
     expect(searched.items).toHaveLength(2);
     expect(searched.items.map((item: { value: string }) => JSON.parse(item.value).file.path)).toEqual(['rule/Clash/China/file-34.list', 'rule/Surge/China/file-34.list']);
-    expect(searched.items[0]).toMatchObject({ label: 'file-34.list', hint: 'blackmatrix7/ios_rule_script · rule/Clash/China/ · 分支：master' });
+    expect(searched.items[0]).toMatchObject({ label: 'file-34.list', hint: 'blackmatrix7/ios_rule_script · rule/Clash/China/' });
     expect((await h.admin.get('/api/rule-options/search?offset=999')).json).toMatchObject({ items: [], total: 71 });
     expect(full).not.toHaveBeenCalled();
     expect(h.reads).toEqual([]);
@@ -83,7 +83,7 @@ describe('物理文件平铺搜索与分页', () => {
     }
     expect((await search('v2fly')).total).toBe(0);
     expect((await search('surge-domain-set')).total).toBe(0);
-    expect((await search('36kr')).items).toMatchObject([{ label: '36kr.txt', hint: 'v2fly-domain-list · / · 分支：surge-domain-set' }]);
+    expect((await search('36kr')).items).toMatchObject([{ label: '36kr.txt', hint: 'v2fly-domain-list' }]);
     expect((await search('')).total).toBe(39);
   });
 
@@ -98,11 +98,11 @@ describe('物理文件平铺搜索与分页', () => {
     const page = await search('ai');
     expect(page.total).toBe(2);
     const nested = page.items.find((item: { label: string }) => item.label === 'OpenＡＩ.txt');
-    expect(nested.hint).toBe('v2fly-domain-list · AI/ · 分支：surge-domain-set');
+    expect(nested.hint).toBe('v2fly-domain-list · AI/');
     expect(marked(nested, 'label')).toEqual(['ＡＩ']);
     expect(marked(nested, 'hint')).toEqual(['AI']);
     const root = page.items.find((item: { label: string }) => item.label === 'OpenAI.txt');
-    expect(root.hint).toBe('v2fly-domain-list · / · 分支：surge-domain-set');
+    expect(root.hint).toBe('v2fly-domain-list');
     expect(marked(root, 'label')).toEqual(['AI']);
     expect(marked(root, 'hint')).toEqual([]);
     expect(JSON.parse(nested.value).file.path).toBe('AI/OpenＡＩ.txt');
@@ -112,6 +112,39 @@ describe('物理文件平铺搜索与分页', () => {
     const local = (await search('google')).items[0];
     expect(marked(local, 'label')).toEqual(['Google']);
     expect((await search('')).items.every((item: typeof nested) => !item.matches.label.length && !item.matches.hint.length)).toBe(true);
+  });
+
+  it('同仓库跨页出现多个分支时才显示分支，搜索缩小到单分支后隐藏', async () => {
+    const h = await setup();
+    const nodes = [
+      ...Array.from({ length: 35 }, (_, index) => ({ kind: 'file', ref: 'main', path: `AI/a-${String(index).padStart(2, '0')}.txt`, entry: 'AI' })),
+      { kind: 'file', ref: 'alternate', path: 'z-ai.txt', entry: 'AI' },
+    ];
+    h.store.db.prepare('UPDATE rule_repo_catalog SET data = ? WHERE repo = ?').run(JSON.stringify(nodes), 'blackmatrix7');
+    const search = async (q: string, offset = 0) => (await h.admin.get(`/api/rule-options/search?scope=repository&q=${encodeURIComponent(q)}&offset=${offset}`)).json;
+    const first = await search('ai');
+    const second = await search('ai', 30);
+    expect(first).toMatchObject({ total: 36, nextOffset: 30 });
+    expect(first.items.every((item: { hint: string; value: string }) => item.hint === 'blackmatrix7/ios_rule_script * main * AI/' && JSON.parse(item.value).file.ref === 'main')).toBe(true);
+    expect(second.items.at(-1)).toMatchObject({ label: 'z-ai.txt', hint: 'blackmatrix7/ios_rule_script * alternate' });
+    const highlighted = first.items[0];
+    expect(highlighted.matches.hint.map((range: { start: number; end: number }) => highlighted.hint.slice(range.start, range.end))).toEqual(['AI']);
+    expect((await search('AI/a-')).items.every((item: { hint: string }) => item.hint === 'blackmatrix7/ios_rule_script · AI/')).toBe(true);
+    expect((await search('z-ai')).items).toMatchObject([{ label: 'z-ai.txt', hint: 'blackmatrix7/ios_rule_script' }]);
+    expect((await search('google')).total).toBe(0);
+  });
+
+  it('不同仓库的不同分支不触发分支展示，同名文件仍保留独立选择值', async () => {
+    const h = await setup();
+    h.repos.setEnabled('zydou', true);
+    const save = h.store.db.prepare('INSERT OR REPLACE INTO rule_repo_catalog (repo, data) VALUES (?, ?)');
+    save.run('blackmatrix7', JSON.stringify([{ kind: 'file', ref: 'master', path: 'same.txt', entry: 'same' }]));
+    save.run('zydou', JSON.stringify([{ kind: 'file', ref: 'surge-domain-set', path: 'same.txt', entry: 'same' }]));
+    const page = (await h.admin.get('/api/rule-options/search?scope=repository&q=same')).json;
+    expect(page.items).toHaveLength(2);
+    const names = new Map(h.repos.list().map(repo => [repo.id, repo.name]));
+    for (const item of page.items) expect(item.hint).toBe(names.get(JSON.parse(item.value).repo));
+    expect(new Set(page.items.map((item: { value: string }) => item.value)).size).toBe(2);
   });
 
   it('本地候选共用分页，鉴权、私有隔离与分页上限保持有效', async () => {

@@ -495,3 +495,5 @@ SQLite 文件索引、本地授权候选在同一查询中筛选、排序和 LIM
 2026-10-29 搜索范围修正：仓库候选的 searchable 仅取完整文件 path（含文件名），不拼接仓库名称或 ref；label/hint/value 不变。本地规则集沿用已有名称与备注搜索。核心 IR、领域文档与示例种子无需变更。
 
 2026-10-29 展示协议补充：`/api/rule-options/search` 的 hint 仅包含仓库名、父目录、分支等来源说明，value 中的完整文件路径保持不变。候选新增 `matches:{label:SearchMatch[],hint:SearchMatch[]}`，每个区间为原始显示文本的 UTF-16 半开 `[start,end)`；服务端仅为本页生成区间，跨目录与文件名的命中投影到两行，来源说明不参与高亮。核心新增规范化命中到原文的映射工具，领域 IR 与示例种子不变。
+
+2026-10-29 hint 格式调整：先在 matches 中按 repo 统计 `COUNT(DISTINCT ref)`，再执行当前页 LIMIT/OFFSET；分支数大于 1 才展示 ref。父目录为空时直接省略，不再填充 `/`。分支显示由当前查询全部匹配项决定，跨页稳定；hint 高亮区间按实际前缀长度生成。value、鉴权、文件身份、核心 IR 与示例种子保持不变。

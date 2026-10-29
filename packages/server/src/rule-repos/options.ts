@@ -34,30 +34,39 @@ export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query:
   ), options AS (
     SELECT json_object('source', 'repository', 'repo', repo, 'entry', coalesce(entry, ''),
       'file', json_object('ref', ref, 'path', path)) AS value, label,
-      repoName || ' · ' || CASE WHEN path = label THEN '/' ELSE substr(path, 1, length(path) - length(label)) END || ' · 分支：' || ref || CASE WHEN entry IS NULL THEN ' · 不可关联' ELSE '' END AS hint,
+      '' AS hint,
       substr(label, 1, length(label) - CASE WHEN lower(label) LIKE '%.list' THEN 5 ELSE 4 END) AS name,
-      path AS searchable, entry IS NULL AS disabled, path AS filePath, repoName
+      path AS searchable, entry IS NULL AS disabled, path AS filePath, repoName, repo, ref
     FROM named
     UNION ALL
     SELECT json_object('source', 'local', 'id', json_extract(value, '$.id')),
       '本地 · ' || json_extract(value, '$.name'), json_extract(value, '$.hint'), json_extract(value, '$.name'),
-      json_extract(value, '$.name') || ' ' || json_extract(value, '$.hint'), 0, NULL, NULL
+      json_extract(value, '$.name') || ' ' || json_extract(value, '$.hint'), 0, NULL, NULL, NULL, NULL
     FROM json_each(@locals)
   ), matches AS (
     SELECT *, CASE WHEN search_fold(name) = @query THEN 0 WHEN instr(search_fold(name), @query) = 1 THEN 1 ELSE 2 END AS rank
     FROM options WHERE instr(search_fold(searchable), @query) > 0
+  ), branch_counts AS (
+    SELECT repo, count(DISTINCT ref) AS branches FROM matches WHERE repo IS NOT NULL GROUP BY repo
   )`;
   const params = { locals: JSON.stringify(locals), query: normalizeNameSearch(query) };
   const { total } = db.prepare(`${sql} SELECT count(*) AS total FROM matches`).get(params) as { total: number };
-  const rows = db.prepare(`${sql} SELECT value, label, hint, disabled, filePath, repoName FROM matches
-    ORDER BY rank, search_fold(name), label, value LIMIT @limit OFFSET @offset`).all({ ...params, offset, limit }) as (Omit<Option, 'disabled' | 'matches'> & { disabled: number; filePath: string | null; repoName: string | null })[];
-  const items: Option[] = rows.map(({ filePath, repoName, disabled, ...row }) => {
+  // 按完整匹配集统计分支，再取当前页；避免跨页的另一分支加载后才改变已显示的说明。
+  const rows = db.prepare(`${sql} SELECT m.value, m.label, m.hint, m.disabled, m.filePath, m.repoName, m.ref, b.branches
+    FROM matches m LEFT JOIN branch_counts b ON b.repo = m.repo
+    ORDER BY m.rank, search_fold(m.name), m.label, m.value LIMIT @limit OFFSET @offset`).all({ ...params, offset, limit }) as
+    (Omit<Option, 'disabled' | 'matches'> & { disabled: number; filePath: string | null; repoName: string | null; ref: string | null; branches: number | null })[];
+  const items: Option[] = rows.map(({ filePath, repoName, ref, branches, disabled, ...row }) => {
     if (filePath === null) return { ...row, disabled: !!disabled, matches: { label: nameSearchRanges(row.label, query), hint: nameSearchRanges(row.hint, query) } };
     const directoryLength = filePath.length - row.label.length;
     const ranges = nameSearchRanges(filePath, query);
-    return { ...row, disabled: !!disabled, matches: {
+    const separator = branches! > 1 ? ' * ' : ' · ';
+    const origin = branches! > 1 ? `${repoName}${separator}${ref}` : repoName!;
+    const directory = filePath.slice(0, directoryLength);
+    const hint = directory ? `${origin}${separator}${directory}` : origin;
+    return { ...row, hint, disabled: !!disabled, matches: {
       label: projectMatches(ranges, directoryLength, filePath.length, -directoryLength),
-      hint: projectMatches(ranges, 0, directoryLength, repoName!.length + ' · '.length),
+      hint: projectMatches(ranges, 0, directoryLength, origin.length + separator.length),
     } };
   });
   return { items, total, offset, limit, ...(offset + items.length < total ? { nextOffset: offset + items.length } : {}) };
