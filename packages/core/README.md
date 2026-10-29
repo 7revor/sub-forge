@@ -64,3 +64,6 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 策略组空组固定拒绝：生成时无成员补 REJECT，所有组自动输出 `empty-fallback: REJECT`；历史 `whenEmpty: direct` 与扩展字段不能覆盖。`exclude-type` 统一解析 ss / Shadowsocks 等协议别名，使内联筛选与 provider 客户端行为一致。
 
 2026-10-29 规则集前端移除整组 no-resolve 配置入口；核心保留 `RuleSet.noResolve` 以兼容历史数据，规则本身和模板引用的选项处理不变。
+
+
+2026-10-29：mihomo 转换时，PROCESS-NAME-WILDCARD / PROCESS-PATH-WILDCARD / DOMAIN-WILDCARD 按 lowercase 值去重，保留首条原始写法及行位；名称与路径不混合，精确、正则与 Surge 保持原行为。合并转换与展开共用去重键；来源原文预览保留重复行。远程文件存在 wildcard 重复时触发托管 LIST，避免原文件直连绕过去重。

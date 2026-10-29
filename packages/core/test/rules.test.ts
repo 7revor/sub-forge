@@ -179,6 +179,20 @@ describe('规则集组级内容改写', () => {
 });
 
 describe('规则集条件追加', () => {
+  it('mihomo 展开按 wildcard 小写键跨来源及追加去重，Surge 保留大小写差异', () => {
+    const inputs: RuleSetInputs = { rulesets: { r: { id: 'r', name: '', sources: [
+      { id: 'a', kind: 'local', format: 'auto', content: 'PROCESS-PATH-WILDCARD,/Apps/*\nPROCESS-NAME-WILDCARD,App*' },
+      { id: 'b', kind: 'local', format: 'auto', content: 'PROCESS-PATH-WILDCARD,/apps/*\nPROCESS-NAME-WILDCARD,app*' },
+    ], overrides: [{ override: { when: { client: 'mihomo' }, action: { append: [{ type: 'PROCESS', kind: 'path', mode: 'wildcard', value: '/APPS/*' }] } } }] } }, snapshots: {} };
+    const result = expandRuleSet('r', inputs, { client: 'mihomo' }, new Report());
+    expect(result).toMatchObject({ total: 5, duplicates: 3 });
+    expect(result.classical).toEqual([
+      { type: 'PROCESS', kind: 'path', mode: 'wildcard', value: '/Apps/*' },
+      { type: 'PROCESS', kind: 'name', mode: 'wildcard', value: 'App*' },
+    ]);
+    expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report())).toMatchObject({ total: 4, duplicates: 0 });
+  });
+
   it('多来源只追加一次，遵循客户端与平台条件、去重和 no-resolve', () => {
     const inputs: RuleSetInputs = { rulesets: { r: {
       id: 'r', name: '追加', noResolve: true,

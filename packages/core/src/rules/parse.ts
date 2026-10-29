@@ -3,7 +3,7 @@
 
 import { usesClashDomains } from './remote.ts';
 import { parse as parseYaml } from 'yaml';
-import type { RuleIR, RuleSetFormat, RuleSetSource } from '../types.ts';
+import type { Client, RuleIR, RuleSetFormat, RuleSetSource } from '../types.ts';
 
 // 二进制读取层在解码文本前写入此标记，防止把转换后正文误判为可直连的原始 URL。
 export const DECODED_MRS_HEADER = '# sub-forge: decoded-mrs-v1';
@@ -175,10 +175,11 @@ export function behaviorOf(rule: RuleIR): Behavior {
 }
 
 /** 去重键：type + value（+ 进程规则的 kind/mode） */
-export function ruleKey(rule: RuleIR): string {
+export function ruleKey(rule: RuleIR, client?: Client): string {
   switch (rule.type) {
-    case 'PROCESS': return `PROCESS|${rule.kind}|${rule.mode}|${rule.value}`;
-    case 'AND': case 'OR': case 'NOT': return `${rule.type}|${rule.children.map(ruleKey).join(';')}`;
+    case 'PROCESS': return `PROCESS|${rule.kind}|${rule.mode}|${client === 'mihomo' && rule.mode === 'wildcard' ? rule.value.toLowerCase() : rule.value}`;
+    case 'DOMAIN-WILDCARD': return `${rule.type}|${client === 'mihomo' ? rule.value.toLowerCase() : rule.value}`;
+    case 'AND': case 'OR': case 'NOT': return `${rule.type}|${rule.children.map(child => ruleKey(child, client)).join(';')}`;
     case 'RAW': return `RAW|${rule.client}|${rule.text}`;
     default: return `${rule.type}|${rule.value}`;
   }

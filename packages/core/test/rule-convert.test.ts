@@ -11,6 +11,34 @@ function convert(rs: RuleSet, ctx: ClientCtx, sourceId?: string) {
 const active = (r: RuleConversion) => r.lines.filter(l => l.trim() && !l.trimStart().startsWith('#'));
 
 describe('保留行位的通用规则转换', () => {
+  it.each(['PROCESS-NAME-WILDCARD', 'PROCESS-PATH-WILDCARD', 'DOMAIN-WILDCARD'])('mihomo 的 %s 按小写去重并保留首条原文与来源行位', type => {
+    const rs: RuleSet = { id: 'r', name: '', sources: [source(`${type},/Apps/Example*\n${type},/apps/example*\n${type},/Apps/Other*`)] };
+    const result = convert(rs, { client: 'mihomo' });
+    expect(active(result)).toEqual([`${type},/Apps/Example*`, `${type},/Apps/Other*`]);
+    expect(result.stats).toMatchObject({ output: 2, duplicates: 1 });
+    expect(result.lines[1]).toBe(`# [重复规则] ${type},/apps/example*`);
+    expect(result.origins).toEqual([1, 2, 3].map(line => ({ sourceId: 'a', line })));
+    expect(convert(rs, { client: 'surge', platform: 'macos' }).stats.duplicates).toBe(0);
+    expect(active(convert(rs, { client: 'mihomo' }, 'a'))).toHaveLength(3);
+  });
+
+  it('大小写去重贯穿来源、替换及追加，但不混淆名称/路径或精确/正则规则', () => {
+    const rs: RuleSet = { id: 'r', name: '', sources: [source([
+      'PROCESS-NAME-WILDCARD,App*', 'DOMAIN,replace.test',
+      'PROCESS-PATH-WILDCARD,App*', 'PROCESS-NAME,App', 'PROCESS-NAME,app',
+      'PROCESS-NAME-REGEX,^App', 'PROCESS-NAME-REGEX,^app',
+    ].join('\n')), { ...source('PROCESS-NAME-WILDCARD,app*'), id: 'b' }], overrides: [
+      { match: 'DOMAIN,replace.test', override: { when: { client: 'mihomo' }, action: { replace: [{ type: 'PROCESS', kind: 'name', mode: 'wildcard', value: 'APP*' }] } } },
+      { override: { when: { client: 'mihomo' }, action: { append: [{ type: 'PROCESS', kind: 'name', mode: 'wildcard', value: 'aPP*' }] } } },
+    ] };
+    const result = convert(rs, { client: 'mihomo' });
+    expect(result.stats).toMatchObject({ duplicates: 3, replaced: 1, appended: 1, output: 6 });
+    expect(active(result)).toEqual([
+      'PROCESS-NAME-WILDCARD,App*', 'PROCESS-PATH-WILDCARD,App*',
+      'PROCESS-NAME,App', 'PROCESS-NAME,app', 'PROCESS-NAME-REGEX,^App', 'PROCESS-NAME-REGEX,^app',
+    ]);
+  });
+
   it('四个客户端保留原注释、空行、未解析、重复和不兼容规则的位置', () => {
     const rs: RuleSet = { id: 'r', name: '', sources: [source('# 标题\n\nDOMAIN,a.test\nUSER-AGENT,x*\nDOMAIN,\nPROCESS-NAME,Example\nDOMAIN,a.test\nDOMAIN,last.test\n')] };
     const results = targets.map(t => convert(rs, t));
