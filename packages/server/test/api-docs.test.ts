@@ -82,7 +82,11 @@ describe('文档增删改查', () => {
     expect(badRegex.json.error).toMatch(/第 1 步.*非法正则/);
     expect((await alice.post('/api/sources', { ...remoteSource(), pipeline: [{ op: 'script', code: 'x' }] })).json.error).toMatch(/脚本/);
     expect((await alice.post('/api/rulesets', { name: 'M', kind: 'remote', format: 'mrs', url: 'https://a.example.com/x.mrs' })).json.error).toMatch(/behavior/);
-    expect((await alice.post('/api/bundles', { name: 'B', items: [{ kind: 'bundle', id: 'x' }] })).json.error).toMatch(/两层/);
+    expect((await alice.post('/api/rulesets', { name: 'D', sources: [{ id: 'a', kind: 'local', format: 'auto', content: '' }, { id: 'a', kind: 'local', format: 'auto', content: '' }] })).json.error).toMatch(/重复/);
+    expect((await alice.post('/api/rulesets', { name: 'U', sources: [{ id: 'a', kind: 'remote', format: 'auto', url: 'ftp://x' }] })).json.error).toMatch(/来源 1.*http/);
+    // 旧客户端的单一来源写法转成一个来源
+    expect((await alice.post('/api/rulesets', { name: 'L', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' })).json.item).toEqual(expect.objectContaining({ sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }] }));
+    expect((await alice.get('/api/bundles')).status).toBe(404);
   });
 
   it('组合成环时拒绝保存', async () => {
@@ -107,6 +111,17 @@ describe('文档增删改查', () => {
     const saved = await alice.post('/api/locals', { name: '完整分组', proxies: [proxy] });
     expect(saved.status).toBe(201);
     expect(saved.json.item.proxies).toEqual([proxy]);
+  });
+
+  it('本地节点不处理代理链：带前置字段时拒绝保存', async () => {
+    const { store, alice } = await twoUsers();
+    const proxy = { name: '节点 1', type: 'trojan', server: 'node.example.test', port: 443, password: 'p' };
+    for (const patch of [{ dialer: { kind: 'builtin', name: 'DIRECT' } }, { 'dialer-proxy': '中转' }, { 'underlying-proxy': '中转' }]) {
+      const res = await alice.post('/api/locals', { name: '分组', proxies: [{ ...proxy, ...patch }] });
+      expect(res.status).toBe(400);
+      expect(res.json.error).toMatch(/代理链/);
+    }
+    expect(store.list('local')).toEqual([]);
   });
 
   it('被引用的文档不能删除，返回引用方', async () => {

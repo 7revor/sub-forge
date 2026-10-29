@@ -64,14 +64,14 @@ describe('PRD 场景 4：规则出口为 provider 节点', () => {
     });
     const w = r.dependencies[0]!.output;
     expect((r.config.rules as string[]).slice(0, 4)).toEqual([
-      `RULE-SET,b_fin_domain,${w}`,
-      `RULE-SET,b_fin_classical,${w}`,
-      `RULE-SET,b_fin_ipcidr,${w},no-resolve`,
-      `RULE-SET,b_fin_broker_mrs,${w},no-resolve`,
+      `RULE-SET,rs_fin_domain,${w}`,
+      `RULE-SET,rs_fin_classical,${w}`,
+      `RULE-SET,rs_fin_ipcidr,${w},no-resolve`,
+      `RULE-SET,rs_fin_broker_mrs,${w},no-resolve`,
     ]);
-    expect(r.rulesets.b_fin_domain).toEqual({ behavior: 'domain', text: '+.paypal.com\n' });
-    expect(r.rulesets.b_fin_classical).toEqual({ behavior: 'classical', text: 'DOMAIN-KEYWORD,paypal\n' });
-    expect((r.config['rule-providers'] as Record<string, unknown>).b_fin_broker_mrs).toMatchObject({ format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' });
+    expect(r.rulesets.rs_fin_domain).toEqual({ behavior: 'domain', text: '+.paypal.com\n' });
+    expect(r.rulesets.rs_fin_classical).toEqual({ behavior: 'classical', text: 'DOMAIN-KEYWORD,paypal\n' });
+    expect((r.config['rule-providers'] as Record<string, unknown>).rs_fin_broker_mrs).toMatchObject({ format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' });
   });
 });
 
@@ -124,12 +124,19 @@ describe('依赖解析策略', () => {
   });
 });
 
-describe('本地节点前置与上游自带前置', () => {
-  it('本地节点（内联）的前置在 provider 中：写入 dialer-proxy 指向包装组', () => {
-    const r = render({ nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'source', id: 'T' }, output: 'provider' }] });
+describe('本地节点落地与上游自带前置', () => {
+  it('链规则的落地是本地节点（内联）、前置在 provider 中：写入 dialer-proxy 指向包装组', () => {
+    const r = render({
+      nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'source', id: 'T' }, output: 'provider' }],
+      chains: [{ id: 'c1', landing: { nodeSet: { type: 'local', id: 'self' } }, via: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'T' }, match: { exact: '🇭🇰 IPLC-01' } } } }],
+    });
     const p = (r.config.proxies as Record<string, unknown>[])[0]!;
     expect(p['dialer-proxy']).toMatch(/^__ref_T_/);
-    expect(p).not.toHaveProperty('dialer');
+  });
+
+  it('本地节点自身不带前置：没有链规则时不输出 dialer-proxy', () => {
+    const r = render({ nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'source', id: 'T' }, output: 'provider' }] });
+    expect((r.config.proxies as Record<string, unknown>[])[0]).not.toHaveProperty('dialer-proxy');
   });
 
   it('上游自带 dialer-proxy：同源前置也要经包装组（provider 中不能直接写节点名）', () => {

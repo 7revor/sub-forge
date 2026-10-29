@@ -11,7 +11,7 @@ function setup(format: RuleSetFormat, initial: string) {
   let body = initial;
   const env = setupApp({ fetcher: async () => ({ status: 200, body }) });
   envs.push(env);
-  env.store.put('ruleset', { id: 'r', name: '远程规则', kind: 'remote', format, url: 'https://rules.example.test/list' });
+  env.store.put('ruleset', { id: 'r', name: '远程规则', sources: [{ id: 's1', kind: 'remote', format, url: 'https://rules.example.test/list' }] });
   env.store.put('profile', {
     id: 'p', name: '测试订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' },
     overlay: { extraRules: [{ anchor: 'top', rule: { id: 'rule', matcher: { kind: 'ruleset', id: 'r' }, target: { kind: 'builtin', name: 'REJECT' } } }] },
@@ -19,7 +19,7 @@ function setup(format: RuleSetFormat, initial: string) {
   env.store.putToken({ token: 'test-token', profileId: 'p' });
   return { ...env, refresh: async (next: string) => {
     body = next; env.advance(1000);
-    return env.snapshots.refresh('ruleset', 'r', 'https://rules.example.test/list');
+    return env.snapshots.refresh('ruleset', 'r', 'https://rules.example.test/list', { format });
   } };
 }
 
@@ -89,7 +89,8 @@ describe('远程规则快照有效性', () => {
 
   it('有效规则被客户端覆盖全部丢弃时仍允许输出', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test');
-    h.store.put('ruleset', { ...h.store.get('ruleset', 'r')!, overrides: [{ line: 1, override: { when: { client: 'mihomo' }, action: { drop: true } } }] });
+    const rs = h.store.get('ruleset', 'r')!;
+    h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, overrides: [{ line: 1, override: { when: { client: 'mihomo' }, action: { drop: true } } }] }] });
     expect((await h.app.request('/sub/test-token')).status).toBe(200);
   });
 });

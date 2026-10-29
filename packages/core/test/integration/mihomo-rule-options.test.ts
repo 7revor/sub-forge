@@ -65,7 +65,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 规则选
     served = renderMihomo({
       profile: { id: 'p', name: 'P', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, options: { src }, target: { kind: 'builtin', name: reject ? 'REJECT' : 'DIRECT' } } }], final: { kind: 'builtin', name: reject ? 'DIRECT' : 'REJECT' } } },
       nodeSets: { sources: {}, collections: {}, locals: {}, snapshots: {} },
-      rules: { rulesets: { rs: { id: 'rs', name: 'R', kind: 'local', format: 'classical', content } }, bundles: {}, snapshots: {} },
+      rules: { rulesets: { rs: { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content }] } }, snapshots: {} },
       urls: { provider: key => `http://127.0.0.1:${filePort}/${key}`, ruleset: key => `http://127.0.0.1:${filePort}/${key}` },
       base: { 'mixed-port': mixed, 'external-controller': `127.0.0.1:${ctl}`, ipv6: false, 'log-level': 'warning', dns: { enable: true, ipv6: false, 'enhanced-mode': 'redir-host', nameserver: [`udp://127.0.0.1:${dnsPort}`] } },
     });

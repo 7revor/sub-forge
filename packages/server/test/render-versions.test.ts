@@ -28,7 +28,7 @@ function harness(store = new Store(':memory:')) {
 }
 function seed(store: Store) {
   store.put('source', { id: 's', name: 'S', urls: ['https://example.test/source'], pipeline: [] });
-  store.put('ruleset', { id: 'rs', name: 'R', kind: 'remote', format: 'classical', url: 'https://example.test/rules' });
+  store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://example.test/rules' }] });
   store.putTemplateVersion(template());
   store.put('profile', structuredClone(profile));
   store.putToken({ token: 'token', profileId: 'p' });
@@ -48,7 +48,7 @@ describe('订阅结构版本与独立刷新', () => {
     expect(parse(await (await h.get(oldUrls.provider)).text()).proxies[0]['dialer-proxy']).toBe('旧前置');
     expect(parse(await (await h.get(newUrls.provider)).text()).proxies[0]['dialer-proxy']).toBe('新前置');
     // 修改规则定义后旧资源仍存在，新模板可采用不同的规则集桶。
-    h.store.put('ruleset', { id: 'rs', name: 'R', kind: 'local', format: 'classical', content: 'IP-CIDR,203.0.113.0/24' });
+    h.store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'IP-CIDR,203.0.113.0/24' }] });
     expect((await h.main())['rule-providers']).not.toHaveProperty('rs_rs_domain');
     expect(await (await h.get(oldUrls.ruleset)).text()).toBe('old.example.test\n');
   });

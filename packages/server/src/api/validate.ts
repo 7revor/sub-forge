@@ -1,9 +1,10 @@
 // 保存前的校验：结构必填项、正则能否编译、引用是否存在且属于当前用户、组合是否成环。
 // 深层结构（规则、组参数等）由渲染报告兜住，这里只拦截保存后必然无法使用的数据。
 
-import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID, type Target } from '@sub-forge/core';
+import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID } from '@sub-forge/core';
 import type { DocKind, DocTypes } from '../docs.ts';
 import type { Store, User } from '../store.ts';
+import { normalizeRuleSet } from '../legacy-rules.ts';
 import { MIN_TTL_SEC } from '../snapshots.ts';
 import { bad, isStr } from './common.ts';
 
@@ -89,9 +90,9 @@ export class RefChecker {
     return !!row && row.owner === this.user.id;
   }
 
-  /** 规则集 / 规则包：自己的，或管理员名下的公共规则（模板由管理员维护，会引用这些） */
-  ruleVisible(kind: 'ruleset' | 'bundle', id: string): boolean {
-    const row = this.store.getWithOwner(kind, id);
+  /** 规则集：自己的，或管理员名下的公共规则集（模板由管理员维护，会引用这些） */
+  ruleVisible(id: string): boolean {
+    const row = this.store.getWithOwner('ruleset', id);
     if (!row) return false;
     if (row.owner === this.user.id) return true;
     return row.owner !== null && this.store.getUser(row.owner)?.role === 'admin';
@@ -150,26 +151,34 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       (doc.proxies as unknown[]).forEach((p, i) => {
         const port = isObj(p) ? Number(p.port) : NaN;
         if (!isObj(p) || !isStr(p.name) || !isStr(p.type) || !isStr(p.server) || !(port > 0 && port < 65536)) throw bad(`节点 ${i + 1} 缺少 name / type / server / port`);
-        if (p.dialer !== undefined) refs.target(p.dialer as Target, `节点「${p.name}」的前置`);
+        // 本地节点只录入节点信息，代理链统一在配置订阅的链规则中设置
+        for (const key of ['dialer', 'dialer-proxy', 'underlying-proxy']) {
+          if (p[key] !== undefined) throw bad(`节点「${p.name}」不能设置 ${key}：本地节点不处理代理链，请在配置订阅的「代理链」中添加链规则`);
+        }
       });
       break;
     }
     case 'ruleset': {
-      if (!RULESET_FORMATS.has(doc.format as string)) throw bad('format 不合法');
-      if (doc.kind === 'remote') { if (!isHttpUrl(doc.url)) throw bad('远程规则集需要 http(s) 地址'); }
-      else if (doc.kind === 'local') { if (typeof doc.content !== 'string') throw bad('本地规则集需要 content'); }
-      else throw bad('kind 只能是 remote 或 local');
-      checkFetch(doc.fetch);
-      if ((doc.format === 'mrs') && doc.behavior !== 'domain' && doc.behavior !== 'ipcidr') throw bad('mrs 规则集需要声明 behavior 为 domain 或 ipcidr');
-      break;
-    }
-    case 'bundle': {
-      if (!Array.isArray(doc.items)) throw bad('items 必须是数组');
-      (doc.items as unknown[]).forEach((it, i) => {
-        if (!isObj(it)) throw bad(`子项 ${i + 1} 格式错误`);
-        if (it.kind === 'bundle') throw bad('规则包不能包含规则包（最多两层）');
-        if (it.kind === 'ruleset') { if (!isStr(it.id) || !refs.ruleVisible('ruleset', it.id)) throw bad(`子项 ${i + 1}：规则集不存在`); }
-        else if (it.kind !== 'rule' || !isObj(it.rule)) throw bad(`子项 ${i + 1} 格式错误`);
+      // 兼容旧客户端的单一来源写法（kind / url / content 平铺）
+      if (doc.sources === undefined && doc.kind !== undefined) Object.assign(doc, normalizeRuleSet(doc), { id });
+      for (const k of ['kind', 'url', 'content', 'format', 'behavior', 'overrides', 'fetch']) delete doc[k];
+      if (!Array.isArray(doc.sources)) throw bad('sources 必须是数组');
+      if (doc.noResolve !== undefined && typeof doc.noResolve !== 'boolean') throw bad('noResolve 必须是布尔值');
+      const ids = new Set<string>();
+      (doc.sources as unknown[]).forEach((src, i) => {
+        const at = `来源 ${i + 1}`;
+        if (!isObj(src) || !isStr(src.id)) throw bad(`${at}：缺少 id`);
+        if (ids.has(src.id)) throw bad(`${at}：id ${src.id} 重复`);
+        ids.add(src.id);
+        if (!RULESET_FORMATS.has(src.format as string)) throw bad(`${at}：format 不合法`);
+        if (src.kind === 'remote') { if (!isHttpUrl(src.url)) throw bad(`${at}：远程来源需要 http(s) 地址`); delete src.content; }
+        else if (src.kind === 'local') { if (typeof src.content !== 'string') throw bad(`${at}：本地来源需要 content`); delete src.url; delete src.fetch; }
+        else throw bad(`${at}：kind 只能是 remote 或 local`);
+        if (src.name !== undefined && typeof src.name !== 'string') throw bad(`${at}：name 必须是字符串`);
+        if (src.enabled !== undefined && typeof src.enabled !== 'boolean') throw bad(`${at}：enabled 必须是布尔值`);
+        checkFetch(src.fetch);
+        if (src.format === 'mrs' && src.behavior !== 'domain' && src.behavior !== 'ipcidr') throw bad(`${at}：mrs 需要声明 behavior 为 domain 或 ipcidr`);
+        if (src.overrides !== undefined && !Array.isArray(src.overrides)) throw bad(`${at}：overrides 必须是数组`);
       });
       break;
     }
@@ -204,7 +213,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         extraRules.forEach((er: unknown, i) => {
           const m = isObj(er) && isObj(er.rule) && isObj(er.rule.matcher) ? er.rule.matcher : undefined;
           if (!m) throw bad(`私有规则 ${i + 1} 格式错误`);
-          if ((m.kind === 'ruleset' || m.kind === 'bundle') && !(isStr(m.id) && refs.ruleVisible(m.kind, m.id))) throw bad(`私有规则 ${i + 1}：${m.kind === 'ruleset' ? '规则集' : '规则包'}不存在`);
+          if (m.kind === 'ruleset' && !(isStr(m.id) && refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
         });
       }
       (doc.chains as Record<string, unknown>[]).forEach((ch, i) => {
@@ -237,21 +246,12 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
     for (const l of store.list('local', ownerId)) if (contains(l.proxies, 'type')) hits.push(`本地节点组「${l.name}」`);
   }
   if (kind === 'ruleset') {
-    for (const b of store.list('bundle')) if (b.items.some((i) => i.kind === 'ruleset' && i.id === id)) {
-      hits.push(store.getWithOwner('bundle', b.id)?.owner === ownerId ? `规则包「${b.name}」` : '其他用户的规则包');
-    }
-  }
-  if (kind === 'ruleset' || kind === 'bundle') {
     for (const p of store.list('profile')) if (contains(p.overlay, 'kind')) {
       hits.push(store.getWithOwner('profile', p.id)?.owner === ownerId ? `配置订阅「${p.name}」` : '其他用户的配置订阅');
     }
-  }
-  if (kind === 'ruleset' || kind === 'bundle') {
-    // 模板由管理员维护，可能引用管理员名下的公共规则集 / 规则包
+    // 模板由管理员维护，可能引用管理员名下的公共规则集
     for (const t of store.listAllTemplateVersions()) {
-      const used = t.rules.some((r) => r.matcher.kind === kind && r.matcher.id === id)
-        || (kind === 'ruleset' && t.rules.some((r) => r.matcher.kind === 'bundle' && store.get('bundle', r.matcher.id)?.items.some((i) => i.kind === 'ruleset' && i.id === id)));
-      if (used) hits.push(`模板「${t.name ?? t.id}」v${t.version}`);
+      if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」v${t.version}`);
     }
   }
   if (kind === 'preset') {

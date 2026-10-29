@@ -102,8 +102,7 @@ const RULE_PREVIEW = 8;
 function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; actions?: ReactNode }) {
   const tpl = useQuery({ queryKey: ['template', id], queryFn: () => api<TemplateDetailData>('GET', `/templates/${id}`) });
   const rulesets = useList('rulesets');
-  const bundles = useList('bundles');
-  const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })), bundles: (bundles.data ?? []).map(({ id, name }) => ({ id, name })) };
+  const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
   const [allRules, setAllRules] = useState(false);
   const [diffVersion, setDiffVersion] = useState<number>();
   if (!tpl.data) return tpl.error ? <ErrorBox error={tpl.error} /> : <div className="text-muted">加载中…</div>;
@@ -202,8 +201,7 @@ function TemplatePage({ id }: { id: string }) {
   const [diffVersion, setDiffVersion] = useState<number>();
   const [importing, setImporting] = useState<string>();
   const rulesets = useList('rulesets');
-  const bundles = useList('bundles');
-  const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })), bundles: (bundles.data ?? []).map(({ id, name }) => ({ id, name })) };
+  const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
   const [changelog, setChangelog] = useState('');
   const [impact, setImpact] = useState<{ report: ReportItem[]; impact: ImpactEntry[] }>();
   const [confirmed, setConfirmed] = useState(false);
@@ -362,7 +360,7 @@ function TemplatePage({ id }: { id: string }) {
       <div className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-5">
           <Card title="名称"><Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field></Card>
-          <ErrorBox error={rulesets.error || bundles.error} />
+          <ErrorBox error={rulesets.error} />
           <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} />
         </div>
         <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">

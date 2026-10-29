@@ -16,7 +16,7 @@ const TPL: Template = {
     g('fish', '🐟 漏网之鱼', { members: [{ kind: 'group', groupId: 'sel' }, { kind: 'builtin', name: 'DIRECT' }] }),
   ],
   rules: [
-    { id: 'r-ai', matcher: { kind: 'bundle', id: 'ai' }, target: { kind: 'group', groupId: 'ai' } },
+    { id: 'r-ai', matcher: { kind: 'ruleset', id: 'ai' }, target: { kind: 'group', groupId: 'ai' } },
     { id: 'r-tg', matcher: { kind: 'ruleset', id: 'telegram' }, target: { kind: 'group', groupId: 'sel' } },
     { id: 'r-cn', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN', noResolve: true } }, target: { kind: 'builtin', name: 'DIRECT' } },
   ],
@@ -73,13 +73,13 @@ describe('模板 ⊕ 覆盖层', () => {
 });
 
 describe('模板校验', () => {
-  const inputs = { rulesets: { telegram: { id: 'telegram', name: 'TG', kind: 'local' as const, format: 'auto' as const, content: '' } }, bundles: { ai: { id: 'ai', name: 'AI', items: [] } } };
+  const inputs = { rulesets: { telegram: { id: 'telegram', name: 'TG', sources: [] }, ai: { id: 'ai', name: 'AI', sources: [] } } };
 
   it('合法模板无问题', () => {
     expect(validateTemplate(TPL, inputs).items).toEqual([]);
   });
 
-  it('发现悬挂引用、环、节点、filter、超层规则包、重复名', () => {
+  it('发现悬挂引用、环、节点、filter、重复名', () => {
     const bad: Template = {
       ...TPL,
       groups: [
@@ -88,14 +88,13 @@ describe('模板校验', () => {
         g('c', 'A'),
       ],
       rules: [
-        { id: 'r1', matcher: { kind: 'bundle', id: 'deep' }, target: { kind: 'group', groupId: 'gone' } },
+        { id: 'r1', matcher: { kind: 'ruleset', id: 'ai' }, target: { kind: 'group', groupId: 'gone' } },
         { id: 'r2', matcher: { kind: 'ruleset', id: 'nope' }, target: { kind: 'node', ref: { nodeSet: { type: 'source', id: 's' }, match: { exact: 'n' } } } },
       ],
       final: { kind: 'group', groupId: 'gone' },
     };
-    const r = validateTemplate(bad, { ...inputs, bundles: { deep: { id: 'deep', name: '深', items: [{ kind: 'bundle', id: 'ai' } as never] } } });
+    const r = validateTemplate(bad, inputs);
     expect(r.items.map((i) => i.code).sort()).toEqual([
-      'bundle.nested',
       'template.dangling-group',
       'template.dangling-group',
       'template.dangling-ruleset',

@@ -1,8 +1,9 @@
-// 本地节点（LOC-01 / LOC-02）：与订阅源一致的三层页面——
-// /locals 分组列表 → /locals/:id 分组详情（节点表、粘贴导入、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（表单 / YAML 与前置）。
+// 本地节点（LOC-01）：与订阅源一致的三层页面——
+// /locals 分组列表 → /locals/:id 分组详情（节点表、粘贴导入、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（表单 / YAML）。
+// 本地节点只录入节点信息，不设置前置：代理链统一在配置订阅的「代理链」中配置（REF-03）。
 // 每个分组是一个节点集文档；节点子页直接保存整个分组。离开有未保存修改的页面前先确认。
 
-import type { LocalProxy, LocalProxyGroup, Target } from '@sub-forge/core';
+import type { LocalProxy, LocalProxyGroup } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useBeforeUnload, useBlocker, useLocation, useNavigate, useParams, type Blocker, type NavigateOptions } from 'react-router';
@@ -12,16 +13,15 @@ import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
 import { groupFromYaml, groupToYaml, parseProxyImport, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
-import { DeleteDialog, DeleteMenu, MoreMenu } from '../components/MoreMenu.tsx';
+import { DeleteAction, DeleteDialog, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { TargetPicker, useNodeSetNames } from '../components/pickers.tsx';
-import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Select, Switch, Textarea, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
 const INTRO = '自建、中转等手写节点。每个分组就是一个节点集，可单独加入配置订阅。';
 const EMPTY: LocalProxyGroup = { id: '', name: '', proxies: [] };
-const CORE = new Set(['name', 'type', 'server', 'port', 'dialer']);
+const CORE = new Set(['name', 'type', 'server', 'port']);
 const crumbLink = 'text-muted no-underline';
 
 /** 有未保存修改时拦截站内跳转与关闭页面；leave 用于保存/删除成功后的主动跳转，不再拦截 */
@@ -72,18 +72,19 @@ function NewGroupModal({ open, onClose }: { open: boolean; onClose: () => void }
 
 const typesText = (g: LocalProxyGroup) => [...new Set(g.proxies.map((p) => p.type))].join(' / ') || '—';
 
+const GROUP_DELETE_BODY = '分组里的节点会一起删除；引用它的配置订阅需要先移除。';
+
 /** /locals：分组列表，与订阅源列表同一形态 */
 export function LocalList() {
   const [creating, setCreating] = useState(false);
   return (
     <>
-      <DocList kind="locals" title="本地节点" noun="分组" onCreate={() => setCreating(true)} intro={INTRO}
+      <DocList kind="locals" title="本地节点" noun="分组" onCreate={() => setCreating(true)} intro={INTRO} deleteBody={GROUP_DELETE_BODY}
         empty="自建、中转等手写节点按分组管理，每个分组都能单独加入配置订阅。"
         columns={[
           { header: '名称', cell: (g) => g.name },
           { header: '节点', cell: (g) => <span className="font-mono text-[13px]">{g.proxies.length}</span> },
           { header: '协议', cell: (g) => <span className="font-mono text-[12.5px] text-ink-2">{typesText(g)}</span> },
-          { header: '设置前置', cell: (g) => <span className="font-mono text-[13px]">{g.proxies.filter((p) => p.dialer).length}</span> },
         ]} />
       <NewGroupModal open={creating} onClose={() => setCreating(false)} />
     </>
@@ -93,7 +94,9 @@ export function LocalList() {
 function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () => void; onImport: (p: LocalProxy[]) => void }) {
   const [text, setText] = useState('');
   const parsed = text.trim() ? parseProxyImport(text) : undefined;
+  // 本地节点不处理代理链：节点自带的 dialer-proxy / underlying-proxy 不导入，并提示到配置订阅中设置
   const proxies: LocalProxy[] = (parsed?.proxies ?? []).map(({ _source, _origName, _key, upstreamDialer, ...rest }) => rest as LocalProxy);
+  const dropped = (parsed?.proxies ?? []).filter((p) => p.upstreamDialer).length;
   return (
     <Modal title="粘贴导入节点" open={open} onClose={onClose} wide
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!proxies.length} onClick={() => { onImport(proxies); setText(''); onClose(); }}>导入 {proxies.length} 个节点</Button></>}>
@@ -103,33 +106,27 @@ function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () =>
       {parsed && <div className="flex flex-wrap gap-2">
         <Badge tone={proxies.length ? 'ok' : 'neutral'}>识别为 {parsed.format} · {proxies.length} 个节点</Badge>
         {parsed.failures.length > 0 && <Badge tone="err">{parsed.failures.length} 行无法解析</Badge>}
+        {dropped > 0 && <Badge tone="warn">{dropped} 个节点自带前置，不会导入</Badge>}
       </div>}
+      {dropped > 0 && <span className="text-[12.5px] leading-relaxed text-muted">本地节点只保存节点信息。需要经中转连接时，请在配置订阅的「代理链」中添加链规则。</span>}
       {parsed?.failures.length ? <ul className="m-0 pl-5 font-mono text-[12px] text-err">{parsed.failures.map((f, i) => <li key={i}>{f.line.slice(0, 60)} — {f.reason}</li>)}</ul> : null}
     </Modal>
   );
 }
 
-function dialerText(p: LocalProxy, nameOf: (r: NonNullable<Extract<Target, { kind: 'node' }>['ref']>['nodeSet']) => string): string {
-  const d = p.dialer;
-  if (!d) return '—';
-  if (d.kind === 'node') return `${nameOf(d.ref.nodeSet)} · ${'exact' in d.ref.match ? d.ref.match.exact : d.ref.match.regex}`;
-  if (d.kind === 'builtin') return d.name;
-  return '策略组';
-}
-
 /** /locals/:id：分组详情，节点表的「编辑」「新增节点」进入节点子页 */
 export function LocalEdit() {
   const e = useDocEditor('locals', EMPTY);
-  const { nameOf } = useNodeSetNames();
   const [pasting, setPasting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [groupText, setGroupText] = useState<string>();
+  const [deletingNode, setDeletingNode] = useState<number>();
   const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew);
   if (e.isNew) return <Navigate to="/locals" replace />;
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const setProxies = (proxies: LocalProxy[]) => e.setDraft({ ...d, proxies });
-  const groupResult = groupText === undefined ? undefined : groupFromYaml(groupText, d.proxies);
+  const groupResult = groupText === undefined ? undefined : groupFromYaml(groupText);
   const nodePath = (i: number | 'new') => `/locals/${d.id}/nodes/${i}`;
 
   return (
@@ -137,10 +134,10 @@ export function LocalEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / {e.doc.data?.name}</>}
         title={d.name || '未命名'}
         actions={<>
-          <DeleteMenu what="分组" name={d.name} body="分组里的节点会一起删除；引用它的配置订阅需要先移除。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
-            onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })}
-            extra={[{ label: '重命名分组…', onSelect: () => setRenaming(true) }, { label: '分组 YAML…', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
+          <MoreMenu items={[{ label: '重命名分组…', onSelect: () => setRenaming(true) }, { label: '分组 YAML…', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
           <Button variant="primary" onClick={() => e.submit()} disabled={e.save.isPending || !e.dirty}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
+          <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
+            onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })} />
         </>}>
         <Badge>{d.proxies.length} 个节点</Badge>
         {e.dirty && <Badge tone="warn">有未保存的修改</Badge>}
@@ -152,15 +149,17 @@ export function LocalEdit() {
         actions={<><Button size="sm" onClick={() => setPasting(true)}>粘贴导入</Button><Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link></>}>
         {!d.proxies.length ? <div className="px-4 pb-4 text-[13px] text-muted">这个分组还没有节点。新增一个，或粘贴 URI / YAML 一次导入多个。</div> : (
           <table className="w-full min-w-[620px] border-collapse">
-            <thead><tr><th className={cx(th, 'px-3.5')}>名称</th><th className={cx(th, 'px-3.5')}>协议</th><th className={cx(th, 'px-3.5')}>服务器</th><th className={cx(th, 'px-3.5')}>前置</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
+            <thead><tr><th className={cx(th, 'px-3.5')}>名称</th><th className={cx(th, 'px-3.5')}>协议</th><th className={cx(th, 'px-3.5')}>服务器</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>
               {d.proxies.map((p, i) => (
                 <DocTableRow key={i} to={nodePath(i)}>
                   <td className={cx(td, 'px-3.5 py-3 whitespace-nowrap')}><Link to={nodePath(i)} className={docNameLinkClass}>{p.name}</Link></td>
                   <td className={cx(td, 'px-3.5 py-3')}><span className="rounded bg-[#ebedf1] px-1.5 py-0.5 font-mono text-[12px]">{p.type}</span></td>
                   <td className={cx(td, 'px-3.5 py-3 font-mono text-[12.5px] text-ink-2')}>{p.server}:{p.port}</td>
-                  <td className={cx(td, 'px-3.5 py-3 text-[12.5px]')}>{dialerText(p, nameOf)}</td>
-                  <td className={cx(td, 'text-right')}><DocActionLink to={nodePath(i)} name={p.name} /></td>
+                  <td className={cx(td, 'text-right whitespace-nowrap')}>
+                    <Button size="sm" variant="danger" aria-label={`删除 ${p.name}`} className="mr-2" onClick={() => { e.save.reset(); setDeletingNode(i); }}>删除</Button>
+                    <DocActionLink to={nodePath(i)} name={p.name} />
+                  </td>
                 </DocTableRow>
               ))}
             </tbody>
@@ -172,11 +171,16 @@ export function LocalEdit() {
         footer={<><Button onClick={() => setGroupText(undefined)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {
           if (groupResult?.ok) { setProxies(groupResult.value); setGroupText(undefined); }
         }}>应用到分组</Button></>}>
-        <Field label="整个分组的 proxies 列表" hint="按节点名称保留已有前置；应用后请保存分组。">
+        <Field label="整个分组的 proxies 列表" hint="应用后请保存分组。本地节点不设置前置，代理链请在配置订阅中设置。">
           {(id) => <Textarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
         </Field>
         <ErrorBox error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
       </Modal>
+      <DeleteDialog open={deletingNode !== undefined} title={`删除节点「${deletingNode === undefined ? '' : d.proxies[deletingNode]?.name ?? ''}」？`} error={e.save.error} pending={e.save.isPending}
+        onClose={() => setDeletingNode(undefined)}
+        onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>
+        节点会从分组「{d.name}」中移除并立即保存{e.dirty ? '；分组里其他未保存的修改也会一起保存' : ''}。
+      </DeleteDialog>
       <PasteModal open={pasting} onClose={() => setPasting(false)} onImport={(ps) => setProxies([...d.proxies, ...ps])} />
       <RenameDialog open={renaming} title="重命名分组" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
       <LeaveModal blocker={blocker} what={`分组「${d.name}」`} canSave pending={e.save.isPending} error={e.save.error}
@@ -192,7 +196,6 @@ export function LocalNodeEdit() {
   const idx = Number(index);
   const doc = useDoc('locals', id);
   const save = useSaveDoc('locals');
-  const { all } = useNodeSetNames();
   const [base, setBase] = useState<LocalProxy>();
   const [draft, setDraft] = useState<LocalProxy>();
   const [rawValid, setRawValid] = useState(true);
@@ -214,12 +217,11 @@ export function LocalNodeEdit() {
 
   const cur = draft;
   const update = (patch: Partial<LocalProxy>) => setDraft({ ...cur, ...patch });
-  const nodeSets = all.filter((n) => !(n.ref.type === 'local' && n.ref.id === g.id));
   const changeType = (type: string) => {
     if (type === cur.type) return;
     const removed = Object.keys(cur).filter((key) => !CORE.has(key));
     if (removed.length && !confirm(`切换协议将清除以下协议配置：${removed.join('、')}。是否继续？`)) return;
-    setDraft({ ...defaultsFor(type), name: cur.name, server: cur.server, port: cur.port, ...(cur.dialer ? { dialer: cur.dialer } : {}) });
+    setDraft({ ...defaultsFor(type), name: cur.name, server: cur.server, port: cur.port });
   };
   const persist = (done?: () => void) => {
     if (!rawValid) return;
@@ -236,44 +238,30 @@ export function LocalNodeEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / <Link to={groupPath} className={crumbLink}>{g.name}</Link> / {isNew ? '新增节点' : base?.name}</>}
         title={isNew ? '新增节点' : cur.name || '未命名'}
         actions={<>
-          {!isNew && <MoreMenu items={[{ label: '删除节点…', danger: true, onSelect: () => { save.reset(); setDeleting(true); } }]} />}
           <Button variant="primary" onClick={() => persist()} disabled={save.isPending || !rawValid || !(dirty || isNew)}>{save.isPending ? '保存中…' : isNew ? '添加到分组' : dirty ? '保存节点' : '已保存'}</Button>
+          {!isNew && <Button variant="danger" onClick={() => { save.reset(); setDeleting(true); }}>删除</Button>}
         </>}>
         <Badge>分组 · {g.name}</Badge>
         {!isNew && dirty && <Badge tone="warn">有未保存的修改</Badge>}
       </PageHeader>
       <ErrorBox error={save.error} />
 
-      <div className="flex flex-wrap items-start gap-5">
-        <Card title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>} className="min-w-0 flex-[999_1_520px]">
-          <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={(text) => proxyDraftFromYaml(text, cur)} recoverForm={(text) => proxyFormFromYaml(text, cur)} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="名称" className="col-span-2">{(fid) => <Input id={fid} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>
-              <Field label="协议">{(fid) => <Select id={fid} value={cur.type} onChange={(x) => changeType(x.target.value)}>
-                {!PROXY_TYPES.some((type) => type.value === cur.type) && <option value={cur.type}>{cur.type}</option>}
-                {PROXY_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-              </Select>}</Field>
-              <Field label="端口">{(fid) => <Input id={fid} type="number" className="font-mono" value={cur.port || ''} onChange={(x) => update({ port: Number(x.target.value) })} />}</Field>
-              <Field label="服务器" className="col-span-2">{(fid) => <Input id={fid} className="font-mono" value={cur.server} onChange={(x) => update({ server: x.target.value })} />}</Field>
-            </div>
-            <SchemaForm groups={schemaFor(cur.type)} extra
-              value={Object.fromEntries(Object.entries(cur).filter(([key]) => !CORE.has(key)))}
-              onChange={(value) => setDraft({ ...Object.fromEntries(Object.entries(cur).filter(([key]) => CORE.has(key))), ...Object.fromEntries(Object.entries(value).filter(([key]) => !CORE.has(key))) } as LocalProxy)} />
-          </div>} />
-        </Card>
-
-        <Card title={<h2 className="m-0 text-[15px] font-semibold">前置（dialer-proxy）</h2>} className="min-w-0 flex-[1_1_340px]"
-          actions={<Switch label="设置前置" checked={!!cur.dialer} onChange={(on) => {
-            if (!rawValid) return;
-            if (on) update({ dialer: { kind: 'node', ref: { nodeSet: nodeSets[0]?.ref ?? { type: 'source', id: '' }, match: { exact: '' }, fallback: { kind: 'builtin', name: 'REJECT' } } } });
-            else { const { dialer: _d, ...rest } = cur; setDraft(rest); }
-          }} />}>
-          <fieldset disabled={!rawValid} className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0">
-            {cur.dialer && <TargetPicker label="前置" value={cur.dialer} groups={[]} allowGroup={false} nodeSets={nodeSets} onChange={(t: Target) => update({ dialer: t })} />}
-            <span className="text-[12px] leading-relaxed text-muted">保存的是引用，不是节点快照：上游节点改名或替换后，按引用重新解析。前置所在的节点集需要同时加入使用它的配置订阅；前置为策略组时，请在配置订阅的「代理链」中设置。<Link to="/profiles" className="text-accent">前往配置订阅</Link></span>
-          </fieldset>
-        </Card>
-      </div>
+      <Card title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
+        <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={proxyDraftFromYaml} recoverForm={proxyFormFromYaml} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="名称" className="col-span-2">{(fid) => <Input id={fid} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>
+            <Field label="协议">{(fid) => <Select id={fid} value={cur.type} onChange={(x) => changeType(x.target.value)}>
+              {!PROXY_TYPES.some((type) => type.value === cur.type) && <option value={cur.type}>{cur.type}</option>}
+              {PROXY_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+            </Select>}</Field>
+            <Field label="端口">{(fid) => <Input id={fid} type="number" className="font-mono" value={cur.port || ''} onChange={(x) => update({ port: Number(x.target.value) })} />}</Field>
+            <Field label="服务器" className="col-span-2">{(fid) => <Input id={fid} className="font-mono" value={cur.server} onChange={(x) => update({ server: x.target.value })} />}</Field>
+          </div>
+          <SchemaForm groups={schemaFor(cur.type)} extra
+            value={Object.fromEntries(Object.entries(cur).filter(([key]) => !CORE.has(key)))}
+            onChange={(value) => setDraft({ ...Object.fromEntries(Object.entries(cur).filter(([key]) => CORE.has(key))), ...Object.fromEntries(Object.entries(value).filter(([key]) => !CORE.has(key))) } as LocalProxy)} />
+        </div>} />
+      </Card>
 
       <DeleteDialog open={deleting} title={`删除节点「${base?.name ?? ''}」？`} error={save.error} pending={save.isPending}
         onClose={() => setDeleting(false)} onConfirm={remove}>

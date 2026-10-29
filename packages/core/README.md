@@ -7,7 +7,7 @@
 | `src/proxy` | 订阅内容解析：URI / Base64 / Clash YAML / Surge `[Proxy]` → `ProxyIR` | PRD SRC-01、SRC-04、SRC-10 |
 | `src/pipeline` | 处理链与 P0 处理器，逐步 trace，末尾去重兜底 | SRC-06、SRC-07、SRC-11 |
 | `src/nodeset` | 订阅源 / 组合 / 本地节点组解析，组合环检测 | COL-01–04、LOC-01 |
-| `src/rules` | 规则 IR、规则集解析、按客户端降级与覆盖、规则包拆分 | RS-01–03、RB-01–05、CR-01–02 |
+| `src/rules` | 规则 IR、规则集解析、按客户端降级与覆盖、多来源规则集合并与按 behavior 拆分（原规则包并入规则集） | RS-01–03、RS-08、原 RB-01–05、CR-01–02 |
 | `src/template` | 模板 ⊕ 覆盖层合并、模板发布前自检 | 03 §5、TPL-07 ①、PRF-04、PRF-09 |
 | `src/render` | mihomo 渲染：依赖解析、代理链、引用校验、环检测 | 03 §4、REF-01–12 |
 

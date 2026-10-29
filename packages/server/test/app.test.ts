@@ -20,14 +20,14 @@ const PROFILE: ProfileDoc = {
   base: { presetId: 'fakeip', patch: { 'allow-lan': true } },
   nodeSets: [{ ref: { type: 'source', id: 'air' }, output: 'provider' }, { ref: { type: 'local', id: 'self' }, output: 'inline' }],
   overlay: { groupPatches: { hk: { addMembers: [{ kind: 'nodeset', ref: { type: 'source', id: 'air' } }], set: { filter: 'HK' } } } },
-  chains: [],
+  chains: [{ id: 'c1', landing: { nodeSet: { type: 'local', id: 'self' } }, via: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'air' }, match: { exact: '🇭🇰 HK-01' } } } }],
   refPolicy: { default: 'wrap' },
 };
 
 const SEED: Seed = {
   sources: [{ id: 'air', name: '机场 A', urls: ['https://air.example.com/sub'], pipeline: [{ op: 'filter.useless' }, { op: 'rename.regex', rules: [{ pattern: '^香港\\s*(\\d+)', replace: 'HK-$1' }] }, { op: 'flag', mode: 'add' }] }],
-  locals: [{ id: 'self', name: '自建', proxies: [{ name: '自建 SG', type: 'trojan', server: 'sg.example.com', port: 443, password: 's', dialer: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'air' }, match: { exact: '🇭🇰 HK-01' } } } }] }],
-  rulesets: [{ id: 'tg', name: 'Telegram', kind: 'remote', format: 'auto', url: 'https://rules.example.com/telegram.list' }],
+  locals: [{ id: 'self', name: '自建', proxies: [{ name: '自建 SG', type: 'trojan', server: 'sg.example.com', port: 443, password: 's' }] }],
+  rulesets: [{ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'auto', url: 'https://rules.example.com/telegram.list' }] }],
   presets: [{ id: 'fakeip', name: 'fake-ip 推荐', version: 1, mihomo: { 'mixed-port': 7890, dns: { enable: true, 'enhanced-mode': 'fake-ip' } } }],
   templates: [{
     id: 'std', version: 1,

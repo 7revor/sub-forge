@@ -1,14 +1,14 @@
 // 组合（设计稿「组合」）：有序引用多个节点集，成员可加前后缀；成员各自跑完处理链后合并，再跑组合自身的处理链（COL-01–04）。
-// 详情页展示成员表、处理链摘要与合并后节点；处理链在单独的编辑页里逐步预览。
+// 详情页与订阅源一致：成员表下方直接展开组合自身的处理链编辑器，逐步预览合并结果。
 
 import type { Collection, NodeSetID } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, Navigate, useParams } from 'react-router';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { NodeSetPickerDialog, RenameDialog } from '../components/dialogs.tsx';
-import { PipelineEditor, OP_LABEL, stepSummary } from '../components/PipelineEditor.tsx';
+import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { useNodeSetNames } from '../components/pickers.tsx';
 import { Badge, Button, Card, ErrorBox, Field, Input, Select, cx } from '../components/ui.tsx';
@@ -45,31 +45,23 @@ export function CollectionEdit() {
   const profiles = useList('profiles');
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
-  const preview = usePipelinePreview('collections', e.isNew ? undefined : e.id, e.draft?.pipeline);
+  const preview = usePipelinePreview('collections', e.isNew ? undefined : e.id, e.draft?.pipeline, e.draft?.members);
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const set = (p: Partial<Collection>) => e.setDraft({ ...d, ...p });
   const options = all.filter((n) => !(n.ref.type === 'collection' && n.ref.id === d.id));
   const shell = { listPath: '/collections', listLabel: '组合', isNew: e.isNew, name: d.name, dirty: e.dirty, saving: e.save.isPending, onSave: () => e.submit(), saveError: e.save.error };
 
-  // 组合自身处理链的编辑页（逐步预览）
-  if (tab === 'pipeline' && !e.isNew) {
-    return (
-      <DetailShell {...shell} name="处理链" listPath={`/collections/${d.id}`} listLabel={d.name}>
-        <PipelineEditor steps={d.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}
-          loading={preview.isFetching} {...(preview.error ? { previewError: (preview.error as Error).message } : {})}
-          inputLabel={`合并后 ${preview.data?.input ?? '—'} 个节点`} />
-      </DetailShell>
-    );
-  }
+  // 旧的独立处理链编辑页已并入详情页
+  if (tab === 'pipeline' && !e.isNew) return <Navigate to={`/collections/${d.id}`} replace />;
 
   const usedBy = (profiles.data ?? []).filter((p) => p.nodeSets.some((n) => n.ref.type === 'collection' && n.ref.id === d.id));
-  const out = preview.data?.nodes ?? [];
   return (
     <DetailShell {...shell} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
       moreItems={[{ label: '重命名…', onSelect: () => setRenaming(true) }]}
       badges={<>
         <Badge>{d.members.length} 个成员{preview.data ? ` · 合并后 ${preview.data.input} 个节点` : ''}</Badge>
+        {!e.isNew && <Badge>被配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-accent">{p.name}</Link></span>) : '还没有'}</Badge>}
       </>}>
       {e.isNew && <Card title="名称"><Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field></Card>}
 
@@ -100,37 +92,9 @@ export function CollectionEdit() {
       </Card>
 
       {!e.isNew && (
-        <div className="flex flex-wrap items-start gap-5">
-          <section className="min-w-0 flex-[1_1_380px] rounded-[10px] border border-line bg-panel pt-3.5 pb-2">
-            <div className="flex items-center justify-between px-4 pb-2.5">
-              <h2 className="m-0 text-[15px] font-semibold">组合自身的处理链</h2>
-              <span className="text-[12px] text-muted">在合并之后执行</span>
-            </div>
-            {d.pipeline.map((s, i) => {
-              const t = preview.data?.trace[i];
-              return (
-                <div key={i} className={cx('flex items-center gap-3 border-t border-line-2 px-4 py-2.5', s.enabled === false && 'opacity-50')}>
-                  <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md bg-[#ebedf1] font-mono text-[12px]">{i + 1}</span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{OP_LABEL[s.op]}</span><span className="truncate font-mono text-[12px] text-muted">{stepSummary(s)}</span></span>
-                  {t && <span className="font-mono text-[12.5px] text-ink-2">{t.error ? '失败' : t.after}{!t.error && t.after !== t.before && <span className="text-err"> −{t.before - t.after}</span>}</span>}
-                </div>
-              );
-            })}
-            {!d.pipeline.length && <div className="border-t border-line-2 px-4 py-3 text-[13px] text-muted">没有处理步骤，合并结果原样输出（末尾仍会自动去重）。</div>}
-            <div className="border-t border-line-2 px-4 pt-2.5 pb-1.5"><Link to={`/collections/${d.id}/pipeline`} className="text-[13px] text-accent">在处理链编辑器中打开（逐步预览）</Link></div>
-          </section>
-
-          <section className="flex min-w-0 flex-[999_1_480px] flex-col gap-3 rounded-[10px] border border-line bg-panel p-4">
-            <h2 className="m-0 text-[15px] font-semibold">合并后节点{out.length > 16 ? '（前 16 个）' : ''}</h2>
-            {preview.error ? <ErrorBox error={preview.error} /> : (
-              <div className="flex flex-wrap gap-1.5">
-                {out.slice(0, 16).map((n, i) => <span key={i} title={`${n.type} ${n.server}:${n.port}`} className="rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]">{n.name}</span>)}
-                {!out.length && <span className="text-[13px] text-muted">{preview.isFetching ? '合并中…' : '没有节点'}</span>}
-              </div>
-            )}
-            <span className="text-[12.5px] text-muted">被哪些配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-accent">{p.name}</Link></span>) : '还没有'}</span>
-          </section>
-        </div>
+        <PipelineEditor title="组合自身的处理链" steps={d.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}
+          loading={preview.isFetching} {...(preview.error ? { previewError: (preview.error as Error).message } : {})}
+          inputLabel={`在合并之后执行 · 合并后 ${preview.data?.input ?? '—'} 个节点`} />
       )}
 
       <NodeSetPickerDialog open={adding} title="添加成员" options={options} added={d.members.map((m) => m.ref)} onClose={() => setAdding(false)}

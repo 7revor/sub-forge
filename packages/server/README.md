@@ -65,7 +65,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
 | `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限 |
-| `GET/POST /api/{kind}`、`GET/PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `bundles` `profiles` `presets`。id 由服务端生成；按用户隔离（别人的文档一律 404）；预设由管理员维护、所有人可读；被引用的文档不能删除（409 返回引用方） |
+| `GET/POST /api/{kind}`、`GET/PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles` `presets`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；按用户隔离（别人的文档一律 404）；预设由管理员维护、所有人可读；被引用的文档不能删除（409 返回引用方） |
 | `GET /api/templates`、`GET /api/templates/:id`、`GET /api/templates/:id/versions/:v` | 所有人可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
@@ -75,9 +75,9 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
 | `GET /api/profiles/:id/access-log` | 访问日志（保留 30 天） |
 | `POST /api/sources/:id/refresh`、`GET /api/sources/:id/snapshots` | 立即拉取、快照历史 |
-| `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿 |
+| `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；组合还可带未保存的 `members`（按保存规则校验引用与成环） |
 | `GET /api/nodesets/:type/:id/nodes` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
-| `POST /api/rulesets/:id/preview` | 规则集按 `client` + `platform` 的最终输出 |
+| `POST /api/rulesets/preview` | 规则集草稿按 `client` + `platform` 的输出，请求体 `{ ruleset, id?, source?, client, platform? }`：给出 `source` 时为该来源（含无法解析的行），否则为全部启用来源合并去重后的结果与 domain / classical / ipcidr 统计；每个来源的拉取 / 解析状态一并返回。`id` 为已保存的规则集时，已保存的远程地址读写它名下的快照；新建草稿与编辑中新填的地址只拉取、不写快照（同一地址 5 分钟内复用） |
 
 ### 占位接口（前端已有界面，服务端待实现）
 
@@ -90,11 +90,11 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `GET /api/rule-repos`、`GET /api/rule-repos/search`、`GET /api/rule-repos/entry`、`POST /api/rule-repos/import`、`POST /api/rule-repos`、`DELETE /api/rule-repos/:id` | 规则仓库（RS-07，见 docs/08）与系统页的仓库管理 |
 | `GET/PUT /api/system`、`POST /api/system/backup`、`POST /api/system/restore` | 系统：SSRF 白名单、mihomo 校验开关、GitHub 镜像、备份恢复 |
 
-保存前校验：必填项、正则能否编译、远程地址协议、脚本编写权限、引用是否存在且属于当前用户（规则集还可以是管理员名下的公共规则集）、组合是否成环、规则包层数。深层结构问题由预览与渲染报告给出。
+保存前校验：必填项、正则能否编译、远程地址协议、脚本编写权限、引用是否存在且属于当前用户（规则集还可以是管理员名下的公共规则集）、组合是否成环、规则集来源（id 唯一、远程地址协议、mrs 的 behavior）。深层结构问题由预览与渲染报告给出。
 
 处理链的创建、更新和草稿预览统一检查每个处理器的数组、对象、标量类型、枚举及正则 flags。非法参数返回带步骤位置的 400，禁用步骤也须满足结构要求；空数组与空正则占位仍允许，脚本编写权限不变。
 
-模板的即时校验、影响分析与发布都会检查启用的文本规则集（含规则包子项）能否取得并解析，不依赖已有 Profile。无可用内容时禁止发布，`force` 不能绕过自身错误；有可用旧快照时允许发布并告警。二进制透传仅标注由客户端检查，不宣称服务端已验证内容或可达性。
+模板的即时校验、影响分析与发布都会检查启用规则集中每个启用的文本来源能否取得并解析，不依赖已有 Profile。无可用内容时禁止发布，`force` 不能绕过自身错误；有可用旧快照时允许发布并告警。二进制透传仅标注由客户端检查，不宣称服务端已验证内容或可达性。
 
 ## 上游拉取
 
@@ -102,12 +102,12 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - 同一 URL 的并发拉取合并为一次；成功快照保留最近 5 份，失败只记录最新一条。
 - 文本规则集写入成功快照前按声明格式解析：空响应、错误页面、损坏的 YAML 和完全没有可用规则的内容均记为失败，继续使用旧快照；部分行有效时保留有效规则并在报告中记录被忽略的行。二进制透传资源仍由客户端直接下载。
 - 旧库中已保存的无效远程规则快照也不能生成成功配置：使用最近成功配置回退，没有可回退配置时返回 503。有效规则经客户端覆盖主动全部丢弃不受此限制。
-- 订阅只拉取模板与个人覆盖合并后实际启用的规则依赖；禁用规则、失效锚点规则及禁用的规则包子项不会触发上游请求。
+- 订阅只拉取模板与个人覆盖合并后实际启用的规则依赖；禁用规则、失效锚点规则及规则集中停用的来源不会触发上游请求。
 - 地址限制：仅禁止 URL 中直接填写的内网 / 保留 IP，重定向逐跳检查协议与字面 IP；域名按系统 DNS 解析，解析结果即使是 Fake-IP 或内网地址也允许连接。此策略不提供 DNS rebinding 防护。
 
 ## 敏感数据
 
-文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、最近一次成功的渲染结果与保留的结构版本、订阅 token 均以 AES-256-GCM 加密落盘；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL。
+文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、最近一次成功的渲染结果与保留的结构版本、订阅 token 均以 AES-256-GCM 加密落盘；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照。
 
 ## 测试
 
@@ -118,7 +118,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 ## 种子文件
 
-结构见 `src/docs.ts` 的 `Seed`，示例见 `examples/seed.example.json`（演示订阅只用本地节点组，不需要联网；旧种子里 `kind: "local"` 的订阅源导入时自动转为本地节点组）。`seed <文件> <用户名>` 把有归属的文档写到该用户名下；不指定用户时文档无归属，登录后看不到，只能通过订阅接口使用。同一模板的多个版本作为多条记录写入 `templates`。
+结构见 `src/docs.ts` 的 `Seed`，示例见 `examples/seed.example.json`（演示订阅只用本地节点组，不需要联网；旧种子里 `kind: "local"` 的订阅源导入时自动转为本地节点组；单一来源写法的旧规则集转为一个来源，旧的 `bundles` 转为同 id 的多来源规则集；本地节点不设置前置，旧种子里节点上的前置导入时转为直接使用该分组的配置订阅中的链规则）。`seed <文件> <用户名>` 把有归属的文档写到该用户名下；不指定用户时文档无归属，登录后看不到，只能通过订阅接口使用。同一模板的多个版本作为多条记录写入 `templates`。
 
 ## 与设计文档的差异
 

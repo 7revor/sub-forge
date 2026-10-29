@@ -4,7 +4,7 @@ import { recoverYaml } from './recoverYaml.ts';
 
 export type TemplateBody = Pick<Template, 'groups' | 'rules' | 'final'>;
 export type NamedRef = { id: string; name: string };
-export type ConvertCtx = { rulesets: NamedRef[]; bundles: NamedRef[] };
+export type ConvertCtx = { rulesets: NamedRef[] };
 
 const builtins = new Set<string>(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']);
 const groupTypes = new Set<string>(['select', 'url-test', 'fallback', 'load-balance']);
@@ -55,7 +55,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
   const lines = t.rules.map((r) => {
     const m = r.matcher;
     const lowered = m.kind === 'rule' ? lowerMatcher(m) : {
-      text: `RULE-SET,${(m.kind === 'ruleset' ? ctx.rulesets : ctx.bundles).find((ref) => ref.id === m.id)?.name ?? m.id}`,
+      text: `RULE-SET,${ctx.rulesets.find((ref) => ref.id === m.id)?.name ?? m.id}`,
     };
     return composeRule({ ...lowered, noResolve: ('noResolve' in lowered && lowered.noResolve) || r.options?.noResolve, src: ('src' in lowered && lowered.src) || r.options?.src }, targetName(r.target, t.groups));
   });
@@ -305,10 +305,8 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         if (type === 'RULE-SET') {
           const name = parts[1]!;
           const ruleset = ctx.rulesets.find((ref) => ref.name === name);
-          const bundle = ctx.bundles.find((ref) => ref.name === name);
           if (ruleset) matcher = { kind: 'ruleset', id: ruleset.id };
-          else if (bundle) matcher = { kind: 'bundle', id: bundle.id };
-          else throw new Error(`规则集或规则包「${name}」不存在`);
+          else throw new Error(`规则集「${name}」不存在`);
         } else {
           matcher = { kind: 'rule', rule: parseRuleLine(matchingParts.join(',')) };
         }

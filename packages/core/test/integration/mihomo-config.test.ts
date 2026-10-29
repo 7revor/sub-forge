@@ -29,7 +29,7 @@ const isolated: Partial<RenderInput> = {
     provider: (key, v) => `${UNREACHABLE}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
     ruleset: (key) => `${UNREACHABLE}/r/TOKEN/${key}`,
   },
-  rules: { ...RULES, rulesets: { ...RULES.rulesets, broker: { ...RULES.rulesets.broker!, url: `${UNREACHABLE}/broker.mrs` } } },
+  rules: { ...RULES, rulesets: { ...RULES.rulesets, fin: { ...RULES.rulesets.fin!, sources: RULES.rulesets.fin!.sources.map((s) => (s.id === 'broker' ? { ...s, url: `${UNREACHABLE}/broker.mrs` } : s)) } } },
   base: {
     'mixed-port': 0,
     'log-level': 'warning',
@@ -96,8 +96,9 @@ const SCENARIOS: [string, Partial<Profile>][] = [
     nodeSets: [{ ref: S('S'), output: 'provider' }],
     overlay: { rulePatches: { 'r-fin': { target: toNode('S', '🇺🇸 Home-Broadband') } } },
   }],
-  ['本地节点（内联）的前置在 provider 中', {
+  ['链规则：本地节点（内联）落地，前置在 provider 中', {
     nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: S('T'), output: 'provider' }],
+    chains: [{ id: 'c1', landing: { nodeSet: { type: 'local', id: 'self' } }, via: toNode('T', '🇭🇰 IPLC-01') }],
   }],
   ['引用策略：复制到本地', {
     nodeSets: [{ ref: S('S'), output: 'provider' }],

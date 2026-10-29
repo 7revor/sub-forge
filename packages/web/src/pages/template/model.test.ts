@@ -12,20 +12,20 @@ const fixture = (): TemplateBody => ({
   rules: [
     { id: 'r1', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'example.com' } }, target: selected },
     { id: 'r2', matcher: { kind: 'ruleset', id: 'rs' }, target: direct, enabled: false },
-    { id: 'r3', matcher: { kind: 'bundle', id: 'b' }, target: selected, options: { noResolve: true, src: true } },
+    { id: 'r3', matcher: { kind: 'ruleset', id: 'b' }, target: selected, options: { noResolve: true, src: true } },
   ], final: selected,
 });
 
 describe('模板草稿', () => {
-  it('两个组、三类规则的完整表单草稿无需 JSON 即可通过完整性检查', () => {
+  it('两个组、多条规则的完整表单草稿无需 JSON 即可通过完整性检查', () => {
     expect(draftIssues(fixture())).toEqual([]);
   });
 
-  it('空白单条规则、规则集、规则包都阻止发布并带可定位位置，包括禁用规则', () => {
+  it('空白单条规则、规则集都阻止发布并带可定位位置，包括禁用规则', () => {
     const body = fixture();
     body.rules[0]!.matcher = { kind: 'rule', rule: { type: 'DOMAIN', value: '  ' } };
     body.rules[1]!.matcher = { kind: 'ruleset', id: '' };
-    body.rules[2]!.matcher = { kind: 'bundle', id: '' };
+    body.rules[2]!.matcher = { kind: 'ruleset', id: '' };
     expect(draftIssues(body).map((r) => [r.level, r.where])).toEqual([
       ['error', 'rule:r1'], ['error', 'rule:r2'], ['error', 'rule:r3'],
     ]);

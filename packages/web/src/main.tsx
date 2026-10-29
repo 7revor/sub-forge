@@ -13,7 +13,7 @@ import { Overview } from './pages/Overview.tsx';
 import { PresetEdit, PresetList } from './pages/Presets.tsx';
 import { ProfileDetail } from './pages/profile/ProfileDetail.tsx';
 import { ProfileList, ProfileNew } from './pages/profile/ProfileList.tsx';
-import { BundleEdit, BundleList, RulesetEdit, RulesetList } from './pages/Rulesets.tsx';
+import { RulesetEdit, RulesetList } from './pages/Rulesets.tsx';
 import { SourceEdit, SourceList } from './pages/Sources.tsx';
 import { TemplateEdit, TemplateList, TemplateManage } from './pages/Templates.tsx';
 import { RuleRepoPage } from './pages/RuleRepo.tsx';
@@ -47,8 +47,6 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="locals/:id/nodes/:index" element={<LocalNodeEdit />} />
       <Route path="rulesets" element={<RulesetList />} />
       <Route path="rulesets/:id" element={<RulesetEdit />} />
-      <Route path="bundles" element={<BundleList />} />
-      <Route path="bundles/:id" element={<BundleEdit />} />
       <Route path="templates" element={<TemplateList />} />
       <Route path="templates/manage" element={<RequireAdmin><TemplateManage /></RequireAdmin>} />
       <Route path="templates/:id/:tab?" element={<TemplateEdit />} />

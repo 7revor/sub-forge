@@ -10,7 +10,7 @@ export const NODESETS: NodeSetInputs = {
   sources: { L: src('L', '落地'), T: src('T', '中转'), S: src('S', '家宽'), A: src('A', '机场 A') },
   collections: {},
   locals: {
-    self: { id: 'self', name: '自建', proxies: [{ name: '自建 SG-01', type: 'trojan', server: 'sg', port: 443, password: 'p', dialer: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'T' }, match: { exact: '🇭🇰 IPLC-01' } } } }] },
+    self: { id: 'self', name: '自建', proxies: [{ name: '自建 SG-01', type: 'trojan', server: 'sg', port: 443, password: 'p' }] },
   },
   snapshots: {
     L: [[trojan('L-01', 'l1'), trojan('L-02', 'l2'), trojan('L-JP', 'l3')].join('\n')],
@@ -29,7 +29,7 @@ export const TEMPLATE: Template = {
     { id: 'media', name: '📺 国内媒体', type: 'select', members: [], whenEmpty: 'direct' },
   ],
   rules: [
-    { id: 'r-fin', matcher: { kind: 'bundle', id: 'fin' }, target: { kind: 'group', groupId: 'sel' } },
+    { id: 'r-fin', matcher: { kind: 'ruleset', id: 'fin' }, target: { kind: 'group', groupId: 'sel' } },
     { id: 'r-ai', matcher: { kind: 'ruleset', id: 'ai' }, target: { kind: 'group', groupId: 'ai' } },
     { id: 'r-wx', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'path', mode: 'wildcard', value: '/Applications/*/WeChat.app/*' } }, target: { kind: 'builtin', name: 'DIRECT' } },
     { id: 'r-cn', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN' } }, target: { kind: 'builtin', name: 'DIRECT' }, options: { noResolve: true } },
@@ -39,11 +39,12 @@ export const TEMPLATE: Template = {
 
 export const RULES: RenderInput['rules'] = {
   rulesets: {
-    paypal: { id: 'paypal', name: 'PayPal', kind: 'local', format: 'auto', content: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21' },
-    ai: { id: 'ai', name: 'AI', kind: 'local', format: 'auto', content: '.openai.com\n.anthropic.com' },
-    broker: { id: 'broker', name: '券商', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' },
+    fin: { id: 'fin', name: '金融服务', noResolve: true, sources: [
+      { id: 'paypal', kind: 'local', format: 'auto', content: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21' },
+      { id: 'broker', name: '券商', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.com/broker.mrs' },
+    ] },
+    ai: { id: 'ai', name: 'AI', sources: [{ id: 's1', kind: 'local', format: 'auto', content: '.openai.com\n.anthropic.com' }] },
   },
-  bundles: { fin: { id: 'fin', name: '金融服务', noResolve: true, items: [{ kind: 'ruleset', id: 'paypal' }, { kind: 'ruleset', id: 'broker' }] } },
   snapshots: {},
 };
 

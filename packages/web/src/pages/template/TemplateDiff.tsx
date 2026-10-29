@@ -16,7 +16,7 @@ function displayField(field: string, value: unknown, body: TemplateBody, ctx: Co
   if (field.endsWith('groupId')) return groupName(String(value));
   if (field === 'target') return targetLabel(value as Target, groupName, (r) => r.id);
   if (field === 'matcher') return matcherLabel(value as RuleEntry['matcher'], ctx);
-  if (field === 'matcher.id') return [...ctx.rulesets, ...ctx.bundles].find((r) => r.id === value)?.name ?? String(value);
+  if (field === 'matcher.id') return ctx.rulesets.find((r) => r.id === value)?.name ?? String(value);
   return typeof value === 'string' ? value : stringify(value).trim();
 }
 

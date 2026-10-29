@@ -43,7 +43,16 @@ export type PipelinePreview = { input: number; inputNodes: NodeBrief[]; failures
 export type DependencyEntry = { refKey: string; nodeSet: string; node: string; strategy: 'wrap' | 'copy' | 'inline'; output: string; usedBy: string[] };
 export type ProfilePreview = { ok: boolean; yaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
-export type RulesetPreview = { passthrough: boolean; lines: string[]; dropped: { rule: string; reason: string }[]; notes?: string[]; rejected: { line: number; text: string; reason: string }[]; error?: string };
+/** 规则集预览中每个来源的拉取 / 解析状态 */
+export type RulesetSourceStatus = { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number };
+export type RulesetPreview = {
+  sources: RulesetSourceStatus[];
+  passthrough: boolean; lines: string[]; total?: number;
+  dropped: { rule: string; reason: string }[]; notes?: string[]; rejected: { line: number; text: string; reason: string }[]; error?: string;
+  /** 只在合并结果中出现 */
+  stats?: { domain: number; classical: number; ipcidr: number; total: number; duplicates: number };
+  passthroughSources?: { sourceId: string; name: string; format: string }[];
+};
 
 // ---------- 服务端尚未实现的接口（读接口返回空数据并带 pending，写接口返回 501；见 docs/11） ----------
 export type Pending = { pending?: boolean };

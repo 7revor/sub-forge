@@ -76,7 +76,7 @@ describe('用户管理（管理员）', () => {
     await addUser(store, 'root', 'admin');
     const user = await addUser(store, 'alice');
     store.put('local', { id: 's', name: 'S', proxies: [{ name: 'A', type: 'socks5', server: 'host.test', port: 1080 }] }, user.id);
-    store.put('ruleset', { id: 'rs', name: 'R', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' }, user.id);
+    store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' }] }, user.id);
     store.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'local', id: 's' }, output: 'provider' }], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } } }] }, chains: [], refPolicy: { default: 'wrap' } }, user.id);
     const token = store.createToken('p').token;
     const cfg = parse(await (await app.request(`/sub/${token}`)).text());
