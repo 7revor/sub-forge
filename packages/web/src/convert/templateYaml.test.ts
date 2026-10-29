@@ -310,3 +310,37 @@ rules:
     }
   });
 });
+
+describe('模板导入远程 URL', () => {
+  const url = 'https://example.test/Lan.list?branch=main&version=1';
+  it('从 provider 只取 URL，RULE-SET 优先引用外部来源，不匹配同名系统 ID', () => {
+    const text = `rule-providers:\n  lan:\n    type: http\n    behavior: classical\n    format: text\n    url: "${url}"\n    path: ./rules/lan.list\n    interval: 259200\nrules:\n  - RULE-SET,lan,DIRECT,no-resolve\n  - MATCH,REJECT`;
+    const body = imported(text, empty, { rulesets: [{id:'local-lan',name:'lan'}] }).value;
+    expect(body.rules[0]!.matcher).toMatchObject({ kind:'ruleset', remote: {url} });
+    expect(Object.keys(body.rules[0]!.matcher)).toEqual(['kind','id','remote']);
+    expect(body.rules[0]!.options?.noResolve).toBe(true);
+    expect(imported(templateToYaml(body,ctx),body).value).toEqual(body);
+  });
+  it('仅提供 rule-providers 时补入现有模板，保留组、规则和最终出口，重复 URL 不新增', () => {
+    const current = fixture();
+    const text = `rule-providers:\n  lan: {url: "${url}"}\n  same: {url: "${url}"}`;
+    const first = imported(text,current);
+    expect(first.value.groups).toEqual(current.groups); expect(first.value.final).toEqual(current.final);
+    expect(first.value.rules.slice(0,current.rules.length)).toEqual(current.rules);
+    expect(first.value.rules).toHaveLength(current.rules.length+1);
+    expect(first.value.rules.at(-1)!.target).toEqual({kind:'builtin',name:'REJECT'});
+    expect(imported(text,first.value).value).toEqual(first.value);
+  });
+  it('无 URL、本地文件地址及不合法的引用映射明确报错', () => {
+    for(const value of ['path: ./local.list', 'url: file:///tmp/local.list', 'url: ftp://example.test/rules']) {
+      const result=templateFromYaml(`rule-providers:\n  lan: {${value}}\nrules: ["RULE-SET,lan,DIRECT"]`,empty,ctx);
+      expect(result.ok).toBe(false);
+    }
+    const body=imported(`rule-providers:\n  lan: {url: "${url}"}`).value;
+    expect(templateFromYaml(templateToYaml(body,ctx).replace(url,'https://example.test/changed'),body,ctx).ok).toBe(false);
+  });
+  it('Clash 配置常用锚点不干扰 URL 提取', () => {
+    const body=imported(`rule-anchor:\n  domain: &domain {type: http, format: mrs, behavior: domain}\nrule-providers:\n  lan:\n    <<: *domain\n    url: "${url}"\nrules: ["RULE-SET,lan,DIRECT"]`).value;
+    expect(body.rules[0]!.matcher).toMatchObject({remote:{url}});
+  });
+});

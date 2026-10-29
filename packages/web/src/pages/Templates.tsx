@@ -382,7 +382,7 @@ function TemplatePage({ id }: { id: string }) {
           if (r.ok) { setBody(r.value); setImporting(undefined); notifySuccess('模板已导入，发布后生效'); }
           else alertError(r.error);
         }}>导入</Button></>}>
-        <Field label="mihomo 的 proxy-groups 与 rules（不含节点）" hint="完整配置替换组与规则；策略组列表补入当前组，规则列表替换当前规则。">
+        <Field label="mihomo 的策略组、规则与远程规则来源" hint="完整配置替换组与规则；策略组列表补入当前组，规则列表替换当前规则。rule-providers 只读取 URL，单独导入时补入当前模板。">
           {(fid) => <YamlTextarea id={fid} rows={16} className="font-mono text-[12.5px]" spellCheck={false} value={importing ?? ''} onChange={(e) => setImporting(e.target.value)} />}
         </Field>
         {importing !== undefined && (() => { const r = templateFromYaml(importing, body, ctx); return r.ok ? null : <FieldError error={`第 ${r.line ?? 1} 行：${r.error}`} />; })()}

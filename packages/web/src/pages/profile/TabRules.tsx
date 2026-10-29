@@ -26,13 +26,14 @@ function useMatcherLabel() {
   const rulesets = useRuleSetRefs().data ?? [];
   return (m: Matcher): { kind: string; text: string } => {
     if (m.kind === 'rule') return { kind: '单条规则', text: ruleText(m.rule) };
-    return { kind: '规则集', text: m.repository?.name ?? `本地 · ${rulesets.find((r) => r.id === m.id)?.name ?? m.id}` };
+    if (m.remote) return { kind: '远程 URL', text: m.remote.url };
+    return { kind: '系统规则集', text: m.repository?.name ?? `本地 · ${rulesets.find((r) => r.id === m.id)?.name ?? m.id}` };
   };
 }
 
 function privateRuleError(rule: RuleEntry): string | undefined {
   const matcher = rule.matcher;
-  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : '请选择规则集。';
+  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : matcher.remote ? '请填写远程规则 URL。' : '请选择规则集。';
 }
 
 function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (value: RuleEntry) => void }) {
@@ -115,7 +116,7 @@ export function TabRules() {
               onClick={() => { if (r.origin === 'profile') setEditing(r.id); }}>
               <span onClick={(e) => e.stopPropagation()}>{handle}</span>
               <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-              <button type="button" className="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-2 text-left" aria-expanded={editing === r.id}
+              <button type="button" className="flex w-[calc(100%-64px)] min-w-0 flex-none cursor-pointer flex-wrap items-center gap-2 text-left sm:w-auto sm:flex-1" aria-expanded={editing === r.id}
                 onClick={(e) => { e.stopPropagation(); setEditing(editing === r.id ? undefined : r.id); }}>
                 <Badge>{l.kind}</Badge><span className={cx('break-all font-mono text-[13px]', off && 'line-through')}>{l.text}</span>
               </button>
