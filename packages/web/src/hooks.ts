@@ -3,6 +3,7 @@ import { sourceFetchSummary } from './domain/sourceFetch.ts';
 // 数据读写的 React Query 封装。文档种类与后端 /api/{kind} 一一对应。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { normalizeNameSearch } from '@sub-forge/core';
 import type { Collection, LocalProxyGroup, RuleSet, RuleSetSource, Source, Template } from '@sub-forge/core';
 import { api, type User } from './api.ts';
 
@@ -70,12 +71,13 @@ export function useDeleteDoc(kind: Kind) {
 
 export const useTemplates = () => useQuery({ queryKey: ['templates'], queryFn: () => api<{ items: TemplateDoc[] }>('GET', '/templates').then((r) => r.items) });
 
-export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined) {
+export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined, query = '') {
+  const q = normalizeNameSearch(query);
   return useQuery({
-    queryKey: ['nodes', ref?.type, ref?.id],
+    queryKey: ['nodes', ref?.type, ref?.id, q],
     enabled: !!ref?.id,
     staleTime: 30_000,
-    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes`),
+    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   });
 }
 

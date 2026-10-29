@@ -5,7 +5,7 @@ import { migrateProfile, profileTemplate } from './profile-routing.ts';
 
 import Database from 'better-sqlite3';
 import { pageMeta, type PageOptions, type PageResult } from './pagination.ts';
-import { exactNameRegex, NodeSetResolver, type ChainRule, type LocalProxy, type Profile, type Target } from '@sub-forge/core';
+import { matchesNameSearch, normalizeNameSearch, exactNameRegex, NodeSetResolver, type ChainRule, type LocalProxy, type Profile, type Target } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
 import type { DocKind, DocTypes, ProfileDoc, LocalDoc, RuleSetDoc, Seed, SourceDoc, TemplateVersionDoc, TokenDoc } from './docs.ts';
@@ -136,6 +136,7 @@ export class Store {
     if (!opts.cipher && path !== ':memory:') throw new Error('持久化数据库必须提供加密密钥');
     this.cipher = opts.cipher ?? new Cipher(randomBytes(32));
     this.db = new Database(path);
+    this.db.function('search_fold', { deterministic: true }, (value: unknown) => normalizeNameSearch(typeof value === 'string' ? value : ''));
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('secure_delete = ON');
     try { this.migrate(); } catch (e) { this.db.close(); throw e; }
@@ -435,7 +436,7 @@ export class Store {
   private readPage<T extends { id: string; name?: string }>(sql: string, params: string[], options: PageOptions, decode: (data: string) => T): PageResult<T> {
     if (options.q) {
       const matches = (this.db.prepare(sql).all(...params) as { data: string }[])
-        .map(row => decode(row.data)).filter(doc => (doc.name ?? doc.id).toLowerCase().includes(options.q));
+        .map(row => decode(row.data)).filter(doc => matchesNameSearch(doc.name ?? doc.id, options.q));
       const meta = pageMeta(matches.length, options);
       return { ...meta, items: matches.slice((meta.page - 1) * meta.pageSize, meta.page * meta.pageSize) };
     }

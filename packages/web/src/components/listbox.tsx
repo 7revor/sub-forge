@@ -1,3 +1,4 @@
+import { matchesNameSearch, normalizeNameSearch } from '@sub-forge/core';
 import { alertError } from '../feedback.ts';
 import { Empty } from './Empty.tsx';
 // 下拉选择组件：所有下拉都用这里的 Select / Combobox，不使用浏览器自带的 <select> 弹层与 <datalist>（见仓库 CLAUDE.md）。
@@ -213,9 +214,9 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
   const listId = useId();
   const pos = usePopoverPos(input, open);
   useOutside([input, list], open, () => setOpen(false));
-  const q = filtering ? value.trim().toLowerCase() : '';
+  const q = filtering ? normalizeNameSearch(value) : '';
   const opts: Opt[] = options.map((o) => ({ value: o.value, label: o.label ?? o.value, text: o.value, hint: o.hint }))
-    .filter((o) => !q || o.text.toLowerCase().includes(q));
+    .filter((o) => matchesNameSearch(o.text, q));
   const pick = (o: Opt) => { setOpen(false); onChange(o.value); };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -272,8 +273,8 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
   useEffect(() => {
     const version = ++generation.current;
     setPage({ options: [] }); setActive(-1); setError('');
-    busy.current = false;
-    if (!open) { setLoading(false); return; }
+    busy.current = true;
+    if (!open) { busy.current = false; setLoading(false); return; }
     setLoading(true);
     const timer = setTimeout(() => {
       busy.current = true;
@@ -295,7 +296,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
     } catch (e) { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } }
     finally { if (generation.current === version) { busy.current = false; setLoading(false); } }
   };
-  const pick = (value: string) => { close(); onChange(value); };
+  const pick = (value: string) => { if (busy.current) return; close(); onChange(value); };
   return <>
     <button ref={btn} id={rest.id} type="button" role="combobox" aria-label={rest['aria-label']} aria-haspopup="dialog" aria-expanded={open}
       aria-controls={open ? `${listId}-popup` : undefined} disabled={disabled}
@@ -315,7 +316,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
         <input autoFocus role="combobox" aria-label={searchLabel} aria-autocomplete="list" aria-expanded="true" aria-controls={listId}
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
           value={query} placeholder={searchPlaceholder} className={cx(fieldCls, 'shrink-0')}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => { generation.current++; busy.current = true; setPage({ options: [] }); setActive(-1); setLoading(true); setQuery(e.target.value); }}
           onKeyDown={e => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, Math.min(page.options.length - 1, a + (e.key === 'ArrowDown' ? 1 : -1)))); }
             if (e.key === 'Enter') { e.preventDefault(); if (page.options[active]) pick(page.options[active]!.value); }
@@ -342,10 +343,11 @@ export type CascaderPage = { options: CascaderOption[]; notices?: string[] };
 
 /** 只允许选择文件叶子的嵌套级联；每次打开重新加载最新目录。 */
 export function Cascader({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon }: {
-  loadOptions: () => Promise<CascaderPage>; onChange: (value: string) => void;
+  loadOptions: (query: string) => Promise<CascaderPage>; onChange: (value: string) => void;
   label: string; ariaLabel?: string; disabled?: boolean; id?: string; triggerClassName?: string; triggerIcon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [page, setPage] = useState<CascaderPage>({ options: [] });
   const [trail, setTrail] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -362,17 +364,17 @@ export function Cascader({ loadOptions, onChange, label, ariaLabel = label, disa
     let current = true;
     if (!open) return;
     setTrail([]); setPage({ options: [] }); setLoading(true); setError('');
-    loadOptions().then(result => { if (current) setPage(result); })
+    const timer = setTimeout(() => { void loadOptions(query).then(result => { if (current) setPage(result); })
       .catch(error => { if (current) { setError(error instanceof Error ? error.message : String(error)); alertError(error); } })
-      .finally(() => { if (current) setLoading(false); });
-    return () => { current = false; };
-  }, [open, loadOptions, retry]);
+      .finally(() => { if (current) setLoading(false); }); }, query ? 250 : 0);
+    return () => { current = false; clearTimeout(timer); };
+  }, [open, query, loadOptions, retry]);
   useEffect(() => {
     const columns = columnsRef.current;
     if (columns) {
       columns.scrollLeft = columns.scrollWidth;
       const lists = columns.querySelectorAll('[role="listbox"]');
-      lists[lists.length - 1]?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus();
+      if (document.activeElement?.tagName !== 'INPUT') lists[lists.length - 1]?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus();
     }
   }, [trail, page.options]);
   const columns = [{ label: '规则来源', options: page.options }];
@@ -389,13 +391,16 @@ export function Cascader({ loadOptions, onChange, label, ariaLabel = label, disa
   return <>
     <button ref={btn} id={id} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? popupId : undefined}
       disabled={disabled} className={triggerClassName ?? cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
-      onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); } }}>
+      onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setQuery(''); setOpen(true); } }}>
       {triggerIcon}<span title={label} className={cx('min-w-0 truncate', !triggerClassName && 'flex-1')}>{label}</span>{!triggerClassName && <ChevronDown size={15} />}
     </button>
     {open && pos && createPortal(<div ref={popup} id={popupId} role="dialog" aria-label={ariaLabel}
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
       className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
+      <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="筛选名称" placeholder="输入名称筛选，忽略大小写" value={query}
+        className={fieldCls} onChange={event => { setQuery(event.target.value); setPage({ options: [] }); setLoading(true); }}
+        onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); popup.current?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus(); } }} /></div>
       {!!page.notices?.length && <div role="status" className="shrink-0 border-b border-line-2 px-3 py-2 text-[12px] text-muted">{page.notices.join('；')}</div>}
       {loading ? <div role="status" className="p-4 text-[13px] text-muted">正在读取目录…</div> : error ? <div role="alert" className="flex items-center gap-3 p-4 text-[13px]"><span>目录读取失败</span><button type="button" className="text-accent" onClick={() => setRetry(x => x + 1)}>重试</button></div> :
         <div ref={columnsRef} className="flex min-h-0 overflow-x-auto overscroll-contain">

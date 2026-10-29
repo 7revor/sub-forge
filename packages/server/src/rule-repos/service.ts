@@ -1,5 +1,5 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
-import { parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
+import { matchesNameSearch, nameLikePattern, normalizeNameSearch, parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { GitRepoCache, type RepoCache } from './git-cache.ts';
@@ -242,18 +242,18 @@ export class RuleRepoService {
   }
   search(q: string, repo: string | undefined, client: string | undefined, offset: number, limit: number) {
     if (repo) this.assertEnabled(repo);
-    const query = normalizeSearch(q);
+    const query = normalizeNameSearch(q);
     const rows = this.store.db.prepare(`SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo
-      WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?) AND instr(e.search_name, ?) > 0
-      ORDER BY CASE WHEN e.search_name = ? THEN 0 WHEN instr(e.search_name, ?) = 1 THEN 1 ELSE 2 END, e.search_name, e.repo, e.key`)
-      .all(repo ?? null, repo ?? null, query, query, query) as { data: string }[];
+      WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?) AND (search_fold(json_extract(e.data, '$.name')) LIKE ? ESCAPE '\\' OR search_fold(json_extract(e.data, '$.path')) LIKE ? ESCAPE '\\')
+      ORDER BY CASE WHEN search_fold(json_extract(e.data, '$.name')) = ? THEN 0 WHEN instr(search_fold(json_extract(e.data, '$.name')), ?) = 1 THEN 1 ELSE 2 END, e.search_name, e.repo, e.key`)
+      .all(repo ?? null, repo ?? null, nameLikePattern(q), nameLikePattern(q), query, query) as { data: string }[];
     const entries = rows.map(r => JSON.parse(r.data) as IndexedEntry).filter(e => !client || e.variants.some(v => (v.client === client || v.client === 'any')));
     return { items: entries.slice(offset, offset + limit).map(({ variants, ...e }) => ({ ...e, clients: [...new Set(variants.map(v => v.client))] })), total: entries.length, offset, limit };
   }
   /** 文件视图独立于历史分组键，每个路径和分支均可直接选择。 */
   searchFiles(q: string, repo: string | undefined, client: string | undefined, offset: number, limit: number) {
     if (repo) this.assertEnabled(repo);
-    const query = normalizeSearch(q);
+    const query = normalizeNameSearch(q);
     const rows = this.store.db.prepare(`SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo
       WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?)`).all(repo ?? null, repo ?? null) as { data: string }[];
     const files = new Map<string, { repo: string; path: string; name: string; filePath: string; ref: string; url: string }>();
@@ -265,26 +265,30 @@ export class RuleRepoService {
       for (const variant of entry.variants) {
         if (client && variant.client !== client && variant.client !== 'any') continue;
         for (const file of variant.files) {
-          if (!isIndexedRuleFile(file.path) || !normalizeSearch(file.path).includes(query)) continue;
+          if (!isIndexedRuleFile(file.path) || !matchesNameSearch(file.path, query)) continue;
           const key = JSON.stringify([entry.repo, entry.path, file.ref, file.path]);
           if (!files.has(key)) files.set(key, { repo: entry.repo, path: entry.path, name: file.path.split('/').at(-1)!, filePath: file.path, ref: file.ref, url: rawUrl(definition, file) });
         }
       }
     }
-    const rank = (name: string) => normalizeSearch(name.replace(/\.[^.]+$/, '')) === query ? 0 : normalizeSearch(name).startsWith(query) ? 1 : 2;
+    const rank = (name: string) => normalizeNameSearch(name.replace(/\.[^.]+$/, '')) === query ? 0 : normalizeNameSearch(name).startsWith(query) ? 1 : 2;
     const items = [...files.values()].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.repo.localeCompare(b.repo) || a.filePath.localeCompare(b.filePath) || a.ref.localeCompare(b.ref));
     return { items: items.slice(offset, offset + limit), total: items.length, offset, limit };
   }
-  catalog(id: string): { nodes: CatalogNode[]; complete: boolean } {
+  catalog(id: string, query = ''): { nodes: CatalogNode[]; complete: boolean } {
     this.assertEnabled(id);
     const saved = this.store.db.prepare('SELECT data FROM rule_repo_catalog WHERE repo = ?').get(id) as { data: string } | undefined;
-    if (saved) return { nodes: JSON.parse(saved.data) as CatalogNode[], complete: true };
+    if (saved) {
+      const rows = this.store.db.prepare(`SELECT n.value AS data FROM rule_repo_catalog c, json_each(c.data) n
+        WHERE c.repo = ? AND search_fold(json_extract(n.value, '$.path')) LIKE ? ESCAPE '\\'`).all(id, nameLikePattern(query)) as { data: string }[];
+      return { nodes: rows.map(row => JSON.parse(row.data) as CatalogNode), complete: true };
+    }
     // 更新失败期间仍提供已有规则文件；不把旧缓存当作完整目录索引。
     const rows = this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ?').all(id) as { data: string }[];
     const entries = rows.map(row => JSON.parse(row.data) as IndexedEntry);
     const trees: Record<string, string[]> = {};
     for (const entry of entries) for (const variant of entry.variants) for (const file of variant.files) (trees[file.ref] ??= []).push(file.path);
-    return { nodes: buildCatalog(this.definition(id, true), trees, entries), complete: false };
+    return { nodes: buildCatalog(this.definition(id, true), trees, entries).filter(node => matchesNameSearch(node.path, query)), complete: false };
   }
   private entry(repo: string, path: string): IndexedEntry {
     this.assertEnabled(repo);

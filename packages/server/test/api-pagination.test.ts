@@ -51,6 +51,22 @@ describe('列表分页', () => {
     } finally { store.close(); }
   });
 
+  it('所有文档列表在完整集合中按名称包含匹配，忽略大小写后再分页', async () => {
+    const { store, admin } = await setup();
+    try {
+      for (const [segment, body] of docs) {
+        for (const name of [...Array.from({ length: 32 }, (_, index) => `ordinary-${index}`), 'prefix-TARGET-tail', 'Target-middle', '终点-target']) {
+          expect((await admin.post(`/api/${segment}`, { ...body, name })).status).toBe(201);
+        }
+        const first = (await admin.get(`/api/${segment}?q=TaRgEt&pageSize=2`)).json;
+        const second = (await admin.get(`/api/${segment}?q=target&pageSize=2&page=2`)).json;
+        expect(first.total, segment).toBe(3); expect(second.total, segment).toBe(3);
+        expect(new Set([...first.items, ...second.items].map(item => item.name)).size, segment).toBe(3);
+        expect([...first.items, ...second.items].every(item => item.name.toLowerCase().includes('target')), segment).toBe(true);
+      }
+    } finally { store.close(); }
+  });
+
   it('模板只分页最新版本，搜索不匹配旧版本名称，无名模板可按 ID 搜索', async () => {
     const { store, admin, other } = await setup();
     try {

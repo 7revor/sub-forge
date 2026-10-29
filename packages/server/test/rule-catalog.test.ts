@@ -41,6 +41,24 @@ describe('平面目录索引与级联文件引用', () => {
     expect((await h.admin.get('/api/rule-options/catalog')).json.repositories).toEqual([]);
   });
 
+  it('目录 LIKE 查询忽略大小写并覆盖完整清单，空格和通配符均按字面匹配', async () => {
+    const h = await setup();
+    h.setPaths([...Array.from({ length: 40 }, (_, index) => `rule/Clash/Other/other-${index}.list`), 'rule/Clash/China/China.list', 'rule/Clash/China/100%_Target.list', 'rule/Clash/China/100XXTarget.list', 'rule/Clash/Other/ÄPFEL.txt']);
+    await h.repos.refresh('blackmatrix7');
+    for (const q of ['CHINA', 'china', 'ChInA']) {
+      const result = (await h.admin.get(`/api/rule-options/catalog?q=${q}`)).json;
+      expect(result.repositories[0].nodes.filter((node: { kind: string }) => node.kind === 'file')).toHaveLength(3);
+      expect(result.repositories[0].nodes.every((node: { path: string }) => node.path.includes('/China'))).toBe(true);
+    }
+    const literal = (await h.admin.get(`/api/rule-options/catalog?q=${encodeURIComponent('%_')}`)).json;
+    expect(literal.repositories[0].nodes.map((node: { path: string }) => node.path)).toEqual(['rule/Clash/China/100%_Target.list']);
+    expect(h.repos.search('%_', undefined, undefined, 0, 100).total).toBe(0);
+    expect(h.repos.search('Other', undefined, undefined, 0, 100).total).toBe(1);
+    expect(h.repos.catalog('blackmatrix7', 'äpfel').nodes.map(node => node.path)).toEqual(['rule/Clash/Other/ÄPFEL.txt']);
+    expect((await h.admin.get('/api/rule-options/catalog?q=GOOGLE')).json.locals).toHaveLength(1);
+    expect((await h.admin.get('/api/rule-options/catalog?q=not-found')).json).toMatchObject({ locals: [], repositories: [] });
+  });
+
   it('级联选中单文件仅保存该文件映射，模板与订阅可保存渲染，伪造文件被拒绝', async () => {
     const h = await setup();
     h.setPaths(['rule/Clash/China/China.list', 'rule/Clash/China/China_Domain.list', 'rule/Surge/China/China.list']);

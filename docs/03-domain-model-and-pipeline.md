@@ -463,3 +463,7 @@ SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`�
 
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
+
+## 2026-10-29：名称搜索谓词
+
+`normalizeNameSearch`/`matchesNameSearch` 统一大小写、全半角与首尾空白处理。公开仓库缓存使用 SQLite `search_fold(value) LIKE ? ESCAPE` 与转义参数；本地加密文档先按权限读取、解密后包含筛选，再分页。节点接口支持 `q`，先解析完整节点集、按名称筛选，再执行 5000 条响应上限。此处只改变搜索候选，不改变 NodeRef 精确匹配或规则正则语义。

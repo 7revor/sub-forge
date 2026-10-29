@@ -135,8 +135,8 @@ describe('规则仓库索引', () => {
     await h.service.refresh('blackmatrix7');
     await h.service.refresh('zydou');
     expect(h.service.list()[0]).toMatchObject({ entries: 3, indexing: false });
-    expect(h.service.search('OPEN _- ai', undefined, undefined, 0, 50).total).toBe(3);
-    expect(h.service.search('open ai', 'blackmatrix7', 'surge', 0, 50).items).toEqual([expect.objectContaining({ path: 'OpenAI' })]);
+    expect(h.service.search('OpEnAI', undefined, undefined, 0, 50).total).toBe(3);
+    expect(h.service.search('openai', 'blackmatrix7', 'surge', 0, 50).items).toEqual([expect.objectContaining({ path: 'OpenAI' })]);
     expect(h.service.search('', undefined, undefined, 1, 1).items).toHaveLength(1);
     expect(h.service.search('%', undefined, undefined, 0, 50).total).toBe(0);
     const another = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));

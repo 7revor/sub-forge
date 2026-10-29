@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import { stableHash, type RuleSetSource } from '@sub-forge/core';
+import { matchesNameSearch, normalizeNameSearch, stableHash, type RuleSetSource } from '@sub-forge/core';
 import type { RuleRepoService } from '../rule-repos/service.ts';
 import type { Store } from '../store.ts';
 import { repositoryMatcher } from '../ruleset-reference.ts';
 import { bad, HttpError, isStr, jsonBody, requireUser, type ApiEnv } from './common.ts';
 import { RefChecker } from './validate.ts';
 
-const normalize = (s: string) => s.normalize('NFKC').trim().toLowerCase();
+const normalize = normalizeNameSearch;
 
 /** 本地与已启用仓库合并排序、分页，避免客户端拼接两套分页时遗漏候选。 */
 export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
@@ -18,16 +18,18 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
   });
   app.get('/rule-options/catalog', c => {
     const scope = c.req.query('scope') ?? 'all';
+    const query = c.req.query('q') ?? '';
+    if (query.length > 200) throw bad('关键词最多 200 个字符');
     if (!['all', 'repository'].includes(scope)) throw bad('规则集作用域不合法');
     const refs = new RefChecker(store, c.get('user'));
     const notices: string[] = [];
     const repositories = repos.list().filter(r => r.enabled).map(repo => {
-      const catalog = repos.catalog(repo.id);
+      const catalog = repos.catalog(repo.id, matchesNameSearch(repo.name, query) ? '' : query);
       if (repo.error) notices.push(`${repo.name}：索引更新失败，保留已有目录`);
       else if (!catalog.complete) notices.push(`${repo.name}：完整目录索引待更新`);
       return { id: repo.id, name: repo.name, ...catalog };
-    });
-    const locals = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(rs => ({ id: rs.id, name: rs.name, hint: rs.note || `${rs.sources.length} 个来源` }));
+    }).filter(repo => !normalize(query) || matchesNameSearch(repo.name, query) || repo.nodes.length);
+    const locals = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id) && matchesNameSearch(rs.name, query)).map(rs => ({ id: rs.id, name: rs.name, hint: rs.note || `${rs.sources.length} 个来源` }));
     return c.json({ repositories, locals, notices });
   });
   app.get('/rule-options/search', c => {

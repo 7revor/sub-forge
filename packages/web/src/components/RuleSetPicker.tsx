@@ -6,8 +6,8 @@ import { alertError } from '../feedback.ts';
 import { Cascader } from './listbox.tsx';
 
 type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
-const loader = (scope: 'all' | 'repository') => async () => {
-  const catalog = await api<RuleCatalog>('GET', `/rule-options/catalog?scope=${scope}`);
+const loader = (scope: 'all' | 'repository') => async (query: string) => {
+  const catalog = await api<RuleCatalog>('GET', `/rule-options/catalog?scope=${scope}&q=${encodeURIComponent(query)}`);
   return { options: buildRuleCatalog(catalog), notices: catalog.notices };
 };
 const loadAll = loader('all');
