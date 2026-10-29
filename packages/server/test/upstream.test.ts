@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertUrlAllowed, guardedLookup, isBlockedAddress, parseAllowList, SsrfError } from '../src/net/ssrf.ts';
+import { assertUrlAllowed, isBlockedAddress, parseAllowList, SsrfError } from '../src/net/ssrf.ts';
 import { createUpstreamFetcher, parseUserinfo, type FetchLike } from '../src/net/upstream.ts';
 import { SnapshotService } from '../src/snapshots.ts';
 import { Store } from '../src/store.ts';
@@ -29,13 +29,13 @@ describe('SSRF 防护', () => {
     expect(() => assertUrlAllowed(new URL('https://example.com/'), NONE)).not.toThrow();
   });
 
-  it('建连时的 DNS 解析：任一地址落在内网即拒绝', async () => {
-    const fake = (addrs: string[]) => (_h: string, cb: (e: null, a: { address: string; family: number }[]) => void) => cb(null, addrs.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })));
-    const run = (addrs: string[], host = 'evil.example.com') => new Promise<unknown>((resolve) => {
-      guardedLookup(NONE, fake(addrs))(host, {}, (err: unknown, addr: unknown) => resolve(err ?? addr));
-    });
-    expect(await run(['93.184.216.34'])).toBe('93.184.216.34');
-    expect(await run(['93.184.216.34', '10.0.0.1'])).toBeInstanceOf(SsrfError);
+  it('域名无需白名单，IP 字面量经 URL 规范化后仍受限制', () => {
+    for (const host of ['localhost', 'sub.home.arpa', 'weir.huajuanmantou.top']) {
+      expect(() => assertUrlAllowed(new URL(`https://${host}/sub`), NONE)).not.toThrow();
+    }
+    for (const host of ['198.18.0.152', '127.1', '2130706433', '0x7f000001', '[::ffff:127.0.0.1]']) {
+      expect(() => assertUrlAllowed(new URL(`http://${host}/sub`), NONE), host).toThrow(SsrfError);
+    }
   });
 });
 

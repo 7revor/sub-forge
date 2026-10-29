@@ -111,8 +111,8 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
       tokens: [{ token: 'tk-provider', profileId: 'p-provider' }, { token: 'tk-inline', profileId: 'p-inline' }],
     };
     store.importSeed(seed);
-    // 机场在本机，需要放行 localhost；同时验证生产路径上的 undici 建连与 SSRF 校验
-    snapshots = new SnapshotService(store, createUpstreamFetcher({ allow: parseAllowList(['localhost']) }));
+    // 机场在本机，用 localhost 验证生产路径上允许域名解析到回环地址。
+    snapshots = new SnapshotService(store, createUpstreamFetcher({ allow: parseAllowList([]) }));
     const renderer = new RenderService(store, snapshots, { publicUrl: `http://127.0.0.1:${ports.api}` });
     const app = createApp({ store, renderer, snapshots });
     api = serve({ fetch: (req) => { served.push(new URL(req.url).pathname); return app.fetch(req); }, hostname: '127.0.0.1', port: ports.api });

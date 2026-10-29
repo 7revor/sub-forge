@@ -1,4 +1,4 @@
-// 真实连接下的上游拉取与 SSRF 校验：走 undici 的建连路径（guardedLookup），目标是本机临时 HTTP 服务。
+// 真实连接下的上游拉取：域名解析后的 IP 不拦截，字面 IP 与重定向 URL 仍检查。
 // 只访问回环地址，不需要外网。
 
 import http from 'node:http';
@@ -35,26 +35,29 @@ afterAll(async () => {
 });
 
 describe('真实连接下的上游拉取', () => {
-  it('默认禁止访问本机：主机名经 DNS 解析后在建连时被拦截', async () => {
+  it('域名解析到回环地址仍正常拉取，无需白名单', async () => {
     const f = createUpstreamFetcher({ allow: parseAllowList([]) });
-    await expect(f(`http://localhost:${port}/sub`)).rejects.toThrow(/禁止访问内网地址 localhost/);
+    expect(await f(`http://localhost:${port}/sub`)).toMatchObject({ status: 200, body: 'ua=clash.meta' });
   });
 
   it('默认禁止访问本机：字面 IP 在发请求前被拦截', async () => {
     const f = createUpstreamFetcher({ allow: parseAllowList([]) });
-    await expect(f(`http://127.0.0.1:${port}/sub`)).rejects.toThrow(/禁止访问内网地址 127\.0\.0\.1/);
+    await expect(f(`http://127.0.0.1:${port}/sub`)).rejects.toThrow(/禁止访问内网或保留 IP 地址 127\.0\.0\.1/);
   });
 
-  it('白名单放行后正常拉取，带 UA 与流量信息', async () => {
-    const f = createUpstreamFetcher({ allow: parseAllowList(['localhost']) });
-    expect(await f(`http://localhost:${port}/sub`, { ua: 'FlClash' })).toEqual({ status: 200, body: 'ua=FlClash', userinfo: { upload: 1, download: 2, total: 3 } });
+  it('白名单放行字面 IP 后正常拉取，带 UA 与流量信息', async () => {
+    const f = createUpstreamFetcher({ allow: parseAllowList(['127.0.0.1']) });
+    expect(await f(`http://127.0.0.1:${port}/sub`, { ua: 'FlClash' })).toEqual({ status: 200, body: 'ua=FlClash', userinfo: { upload: 1, download: 2, total: 3 } });
   });
 
-  it('白名单主机重定向到未放行的地址时被拦截', async () => {
-    const f = createUpstreamFetcher({ allow: parseAllowList(['localhost']) });
-    await expect(f(`http://localhost:${port}/to-literal`)).rejects.toThrow(/禁止访问内网地址 127\.0\.0\.1/);
+  it('域名重定向到未放行的字面 IP 仍被拦截', async () => {
+    const f = createUpstreamFetcher({ allow: parseAllowList([]) });
+    await expect(f(`http://localhost:${port}/to-literal`)).rejects.toThrow(/禁止访问内网或保留 IP 地址 127\.0\.0\.1/);
+  });
+
+  it('重定向到域名不检查 DNS 结果', async () => {
     const g = createUpstreamFetcher({ allow: parseAllowList(['127.0.0.1']) });
-    await expect(g(`http://127.0.0.1:${port}/to-localhost`)).rejects.toThrow(/禁止访问内网地址 localhost/);
+    expect(await g(`http://127.0.0.1:${port}/to-localhost`)).toMatchObject({ status: 200, body: 'ua=clash.meta' });
   });
 
   it('超时与非 2xx', async () => {

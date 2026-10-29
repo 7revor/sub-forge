@@ -1,8 +1,6 @@
-// SSRF 防护（SYS-02）：远程拉取禁止访问内网与保留地址，管理员可配置白名单。
-// 校验发生在建立连接时的 DNS 解析环节（guardedLookup），重定向与 DNS rebinding 同样受约束；
-// URL 中直接写 IP 的情况不经过 DNS，由 assertUrlAllowed 预先检查。
+// 远程地址限制（SYS-02）：只检查 URL 直接填写的内网 / 保留 IP，管理员可配置白名单。
+// 域名按系统 DNS 正常解析，不检查解析后的 IP，兼容代理 Fake-IP；重定向仍逐跳检查 URL。
 
-import dns from 'node:dns';
 import { BlockList, isIP } from 'node:net';
 
 export class SsrfError extends Error {}
@@ -47,27 +45,5 @@ export function assertUrlAllowed(url: URL, allow: AllowList): void {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new SsrfError(`不支持的协议 ${url.protocol}`);
   const host = url.hostname.replace(/^\[|\]$/g, '');
   if (allow.hosts.has(host.toLowerCase())) return;
-  if (isIP(host) && isBlockedAddress(host, allow)) throw new SsrfError(`禁止访问内网地址 ${host}`);
-}
-
-type LookupAll = (hostname: string, cb: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
-
-const systemLookup: LookupAll = (hostname, cb) => dns.lookup(hostname, { all: true }, cb);
-
-/**
- * 供 undici 建连使用的 lookup：解析结果中只要有一个内网地址就拒绝（白名单主机除外）。
- * 签名与 node:dns 的 lookup 一致。
- */
-export function guardedLookup(allow: AllowList, base: LookupAll = systemLookup) {
-  return (hostname: string, options: dns.LookupOptions, callback: (...args: unknown[]) => void): void => {
-    base(hostname, (err, addresses) => {
-      if (err) { callback(err); return; }
-      const allowedHost = allow.hosts.has(hostname.toLowerCase());
-      const blocked = allowedHost ? undefined : addresses.find((a) => isBlockedAddress(a.address, allow));
-      if (blocked) { callback(new SsrfError(`禁止访问内网地址 ${hostname} → ${blocked.address}`)); return; }
-      if (!addresses.length) { callback(new Error(`无法解析 ${hostname}`)); return; }
-      if (options?.all) callback(null, addresses);
-      else callback(null, addresses[0]!.address, addresses[0]!.family);
-    });
-  };
+  if (isIP(host) && isBlockedAddress(host, allow)) throw new SsrfError(`禁止访问内网或保留 IP 地址 ${host}`);
 }

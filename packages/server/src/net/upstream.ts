@@ -1,8 +1,8 @@
 // 上游拉取：自定义 UA、超时、手动跟随重定向（逐跳校验）、响应大小上限、透传 subscription-userinfo（SRC-02 / SRC-05）。
 
-import { Agent, fetch as undiciFetch } from 'undici';
+import { fetch as undiciFetch } from 'undici';
 import type { TrafficInfo } from '../store.ts';
-import { assertUrlAllowed, guardedLookup, SsrfError, type AllowList } from './ssrf.ts';
+import { assertUrlAllowed, SsrfError, type AllowList } from './ssrf.ts';
 
 export class UpstreamError extends Error {}
 
@@ -51,10 +51,7 @@ function unwrapFetchError(e: unknown): Error {
 
 export function createUpstreamFetcher(opts: { allow: AllowList; fetchImpl?: FetchLike; maxBytes?: number }): UpstreamFetcher {
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
-  const fetchImpl: FetchLike = opts.fetchImpl ?? (() => {
-    const dispatcher = new Agent({ connect: { lookup: guardedLookup(opts.allow) as never } });
-    return (url, init) => undiciFetch(url, { ...init, dispatcher });
-  })();
+  const fetchImpl: FetchLike = opts.fetchImpl ?? ((url, init) => undiciFetch(url, init));
 
   return async (rawUrl, o = {}) => {
     const signal = AbortSignal.timeout(o.timeoutMs ?? DEFAULT_TIMEOUT_MS);

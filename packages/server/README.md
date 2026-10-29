@@ -37,7 +37,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `HOST` / `PORT` | `127.0.0.1` / `8080`（镜像中 HOST 为 `0.0.0.0`） | 监听地址 |
 | `PUBLIC_URL` | `http://HOST:PORT` | 对外地址，用于生成订阅、provider 与规则集链接；未设置时启动会告警 |
 | `ALLOWED_ORIGINS` | 空 | 逗号分隔，允许跨源调用管理接口的 Origin（如前端开发服务器） |
-| `SSRF_ALLOW` | 空 | 逗号分隔的白名单（主机名、IP 或 CIDR），允许拉取内网订阅 |
+| `SSRF_ALLOW` | 空 | 逗号分隔的字面 IP / CIDR 白名单；兼容接受主机名，域名本身已默认放行 |
 | `MIHOMO_BIN` | 空 | 设置后每次渲染都执行 `mihomo -t` 校验，失败时返回上一份成功结果 |
 | `MIHOMO_DIR` | 临时目录 | `-t` 的工作目录；GEOIP 规则需要其中有 `Country.mmdb`，否则 mihomo 会尝试下载 |
 
@@ -84,7 +84,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 - 订阅请求不等待上游：快照过期时先用旧快照渲染返回，后台刷新；只有从未拉取成功时才同步拉取。
 - 同一 URL 的并发拉取合并为一次；成功快照保留最近 5 份，失败只记录最新一条。
-- SSRF：禁止内网与保留地址。校验在建连时的 DNS 解析环节进行，重定向逐跳检查，DNS rebinding 同样受约束。
+- 地址限制：仅禁止 URL 中直接填写的内网 / 保留 IP，重定向逐跳检查协议与字面 IP；域名按系统 DNS 解析，解析结果即使是 Fake-IP 或内网地址也允许连接。此策略不提供 DNS rebinding 防护。
 
 ## 敏感数据
 

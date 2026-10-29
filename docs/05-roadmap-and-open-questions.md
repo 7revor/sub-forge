@@ -48,7 +48,7 @@ M1 服务端（代码在 `packages/server`，Docker 完整环境 103 个测试�
 | 存储 | ✅ | better-sqlite3 存 JSON 文档（未用 Drizzle）；模板按版本保存；种子文件导入；旧库自动升级 |
 | 敏感数据加密（SYS-04） | ✅ | 文档、快照 URL / 正文 / 错误、渲染结果与结构版本、订阅 token 用 AES-256-GCM 加密；URL / token / 会话以 HMAC 为索引；密码 scrypt |
 | 上游拉取与快照 | ✅ | UA / 超时 / 重定向 / 大小上限；stale-while-revalidate；同 URL 并发合并；保留最近 5 份 |
-| SSRF 防护（SYS-02） | ✅ | 建连时 DNS 解析校验 + 字面 IP 预检，支持白名单 |
+| 地址限制（SYS-02） | ✅ | 仅检查 URL 中的内网 / 保留 IP 字面量，支持白名单与重定向逐跳检查；域名解析结果不拦截，兼容 Fake-IP（2026-10-29 修订） |
 | 渲染服务 | ✅ | 缓存、上一份成功结果整套兜底（OUT-05 / TPL-12）、保留 32 个结构版本并配套下发资源、可选 `mihomo -t` 校验、流量信息汇总（SRC-05） |
 | 订阅接口（OUT-01 – 06） | 部分 | mihomo 全部完成；Surge 返回 501（M2） |
 | 端到端验证 | ✅ | Docker 内：服务经 undici 拉取上游、mihomo 客户端用订阅地址加载配置并从服务下载 provider，流量经代理链（落地在 provider / 内联） |
