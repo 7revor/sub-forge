@@ -4,6 +4,7 @@ import type { RawResult } from '../components/DualEditor.tsx';
 import { isRecord } from '../components/schema.ts';
 import { schemaFor } from '../schemas/proxy.ts';
 import { recoverFields, recoverYaml } from './recoverYaml.ts';
+import { parseYamlDocument } from './yamlDocument.ts';
 
 /** 本地节点只录入节点信息；代理链统一在配置订阅的链规则中设置，YAML 中出现这些字段直接报错 */
 const CHAIN_KEYS = ['dialer', 'dialer-proxy', 'underlying-proxy'];
@@ -106,7 +107,7 @@ class ProxyYamlError extends Error {
 function read<T>(text: string, group: boolean, convert: (value: unknown, line: (index: number) => number) => T): RawResult<T> {
   const lines = new LineCounter();
   try {
-    const doc = parseDocument(text, { lineCounter: lines });
+    const doc = parseYamlDocument(text, { lineCounter: lines }, group ? 'proxies' : 'mapping');
     const error = doc.errors[0] ?? doc.warnings[0];
     if (error) return { ok: false, error: error.message, line: lines.linePos(error.pos[0]).line };
     const line = (index: number) => {

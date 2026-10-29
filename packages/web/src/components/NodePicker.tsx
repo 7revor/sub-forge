@@ -18,7 +18,7 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
         onChange={(mode) => onChange({ ...value, match: mode === 'exact' ? { exact: text } : { regex: text } })} />
       {exact
         ? <Combobox aria-label={`${label}节点名称`} className="w-auto min-w-44 flex-1 font-mono" placeholder="搜索或输入节点名称（处理链之后）" value={text}
-            options={(data?.nodes ?? []).map((n) => ({ value: n.name, hint: `${n.type} · ${n.server}:${n.port}` }))}
+            options={(data?.nodes ?? []).map((n) => ({ value: n.name, hint: `${n.type.toUpperCase()} · ${n.server}:${n.port}` }))}
             empty={isLoading ? '节点列表加载中…' : text ? '没有匹配的节点，可直接使用输入的名称' : '节点集中没有节点'}
             onChange={(v) => onChange({ ...value, match: { exact: v } })} />
         : <Input aria-label={`${label}节点正则`} className="w-auto min-w-44 font-mono" placeholder="节点名称正则，支持 (?i)" value={text}

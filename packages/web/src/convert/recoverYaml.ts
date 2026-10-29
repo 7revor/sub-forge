@@ -1,18 +1,19 @@
-import { Document, isAlias, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument, type Node } from 'yaml';
+import { Document, isAlias, isMap, isNode, isScalar, isSeq, LineCounter, type Node } from 'yaml';
+import { parseYamlDocument } from './yamlDocument.ts';
 import { getPath, isRecord, setPath, type FieldGroup } from '../components/schema.ts';
 
 /** 返回表单时才执行的恢复解析；不猜测损坏内容，保留能确定含义的字段及身份注释。 */
-export function recoverYaml(text: string) {
-  try { return recoverDocument(text); }
+export function recoverYaml(text: string, shape: 'mapping' | 'template' = 'mapping') {
+  try { return recoverDocument(text, shape); }
   catch (error) {
     return { doc: new Document({}), value: {}, notes: [`无法恢复 YAML，已返回空表单：${error instanceof Error ? error.message : String(error)}`] };
   }
 }
 
-function recoverDocument(text: string) {
+function recoverDocument(text: string, shape: 'mapping' | 'template') {
   const lines = new LineCounter();
   const sourceLines = text.split('\n');
-  const doc: Document = parseDocument(text, { lineCounter: lines });
+  const doc: Document = parseYamlDocument(text, { lineCounter: lines }, shape);
   const notes: string[] = [];
   const nodes: Node[] = [];
   const collect = (node: unknown, depth = 0) => {

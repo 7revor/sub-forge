@@ -34,7 +34,7 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
   const node = !checking && result.ok ? result.value : undefined;
   const errorText = !checking && !result.ok && text.trim() ? `${result.line ? `第 ${result.line} 行：` : ''}${result.error}` : '';
   const details = node ? [
-    ['名称', node.name], ['协议', node.type], ['服务器', node.server], ['端口', node.port],
+    ['名称', node.name], ['协议', node.type.toUpperCase()], ['服务器', node.server], ['端口', node.port],
     ...(node.cipher ? [['加密方式', node.cipher]] : []), ...(node.network ? [['传输方式', node.network]] : []),
     ...(typeof node.tls === 'boolean' ? [['TLS', node.tls ? '开启' : '关闭']] : []),
     ...(typeof node.udp === 'boolean' ? [['UDP', node.udp ? '开启' : '关闭']] : []),

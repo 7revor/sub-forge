@@ -55,7 +55,7 @@ const NEW_STEP: Record<OperatorStep['op'], () => OperatorStep> = {
 export function stepSummary(s: OperatorStep): string {
   switch (s.op) {
     case 'filter.regex': return `${s.keep ? '保留' : '剔除'} ${s.patterns.filter(Boolean).join(' | ') || '（未填写）'}`;
-    case 'filter.type': return `${s.keep ? '保留' : '剔除'} ${s.types.join(', ')}`;
+    case 'filter.type': return `${s.keep ? '保留' : '剔除'} ${s.types.map(type => type.toUpperCase()).join(', ')}`;
     case 'filter.useless': return s.patterns?.length ? s.patterns.join(' | ') : '默认关键词（剩余流量、到期、官网…）';
     case 'rename.regex': return `${s.rules.filter((r) => r.pattern).length} 条规则 · 正则链`;
     case 'rename.delete': return s.patterns.filter(Boolean).join(' | ') || '（未填写）';
@@ -155,7 +155,7 @@ function TypeFilterForm({ step, onChange }: { step: Extract<OperatorStep, { op: 
             const types = e.target.checked ? [...step.types, type] : step.types.filter((v) => v !== type);
             if (!types.length) { alertError('至少选择一个协议类型'); return; }
             onChange({ ...step, types });
-          }} />{type}
+          }} />{type.toUpperCase()}
         </label>;
       })}
     </fieldset>

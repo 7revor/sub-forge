@@ -168,7 +168,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(result.rules[0]!.target).toEqual({ kind: 'builtin', name: 'REJECT' });
   });
 
-  it('导入真实风格片段，剥离节点和筛选字段，结果通过 core 模板校验', () => {
+  it('导入真实风格片段，保留筛选条件并剥离节点，结果通过 core 模板校验', () => {
     const result = imported(`
 proxies:
   - { name: 香港节点, type: ss, server: example.com, port: 443 }
@@ -198,10 +198,11 @@ rules:
   - MATCH,代理
 `);
     expect(result.notes.join('\n')).toContain('已忽略：proxies、proxy-providers、dns');
-    for (const key of ['use', 'filter', 'exclude-filter', 'exclude-type', 'include-all', 'include-all-proxies', 'include-all-providers', '香港节点']) expect(result.notes.join('\n')).toContain(key);
+    for (const key of ['use', 'include-all', 'include-all-proxies', 'include-all-providers', '香港节点']) expect(result.notes.join('\n')).toContain(key);
     const [select, auto] = result.value.groups;
     expect(select!.members).toEqual([{ kind: 'group', groupId: auto!.id }, direct]);
     expect(select!.extra).toEqual({ 'custom-field': { keep: true } });
+    expect(select).toMatchObject({ filter: '香港', excludeFilter: '到期', excludeType: 'direct' });
     expect(auto!.members).toEqual([]);
     const report = validateTemplate({ id: 'imported', version: 1, ...result.value }, {
       rulesets: { rs_ads: { id: 'rs_ads', name: '广告规则', sources: [] } },

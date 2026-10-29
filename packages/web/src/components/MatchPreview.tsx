@@ -19,7 +19,7 @@ export function MatchPreview({ nodeSet, filter, excludeFilter, excludeType, max 
       {data && !error && !result.error && <>
         <span className="text-muted">{data.truncated ? '当前列表：' : ''}命中 {result.nodes.length} / 总数 {data.total}</span>
         <div className="flex flex-wrap gap-1.5">
-          {shown.map((n, i) => <span key={i} title={`${n.type} ${n.server}:${n.port}`} className="rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]">{n.name}</span>)}
+          {shown.map((n, i) => <span key={i} title={`${n.type.toUpperCase()} ${n.server}:${n.port}`} className="rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]">{n.name}</span>)}
         </div>
         {shown.length < result.nodes.length && <span className="text-muted">仅显示前 {shown.length} 个命中节点</span>}
       </>}
