@@ -1,6 +1,7 @@
 // 基础组件：按设计稿的配色与尺寸（触控目标 ≥ 36–44px）。
 
 import { useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 export { Empty } from './Empty.tsx';
@@ -170,8 +171,9 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
   if (!open) return null;
+  // 挂到 body，避免页面限宽、裁切或定位祖先影响全屏遮罩。
   // 设计稿「对话框与危险操作」：标题 + 关闭、内容、灰底操作栏；宽度 560（表单）/ 720（粘贴、YAML）
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-label={title} className={cx('flex max-h-full min-h-0 w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
         <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-[18px] pb-2">
@@ -181,7 +183,7 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
         <div className="flex min-h-0 flex-col gap-3.5 overflow-auto overscroll-contain px-5 pt-2 pb-[18px]">{children}</div>
         {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2 rounded-b-xl border-t border-line-2 bg-[#fafbfc] px-5 py-3.5">{footer}</div>}
       </div>
-    </div>
+    </div>, document.body
   );
 }
 

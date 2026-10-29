@@ -32,7 +32,7 @@ export function Login() {
   // 设计稿「登录」：深色底（叠加光晕与网格背景），标志在上，白色卡片居中
   return (
     <div className="flex h-dvh min-h-0 flex-col login-bg">
-      <div className="page-scroll items-center gap-6 px-4 py-12 sm:py-24">
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-6 overflow-y-auto overscroll-contain px-4 py-12 sm:py-24 [&>*]:shrink-0">
         <div className="flex items-center gap-2.5">
           <LogoMark size={28} />
           <span className="font-mono text-xl font-semibold text-white">Sub Forge</span>
