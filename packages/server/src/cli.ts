@@ -88,7 +88,7 @@ async function start(): Promise<void> {
   prune.unref();
 
   const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
-    console.log(`sub-forge 已启动：http://${info.address}:${info.port}（对外地址 ${publicUrl}，数据库 ${dbPath}）`);
+    console.log(`Sub Forge 已启动：http://${info.address}:${info.port}（对外地址 ${publicUrl}，数据库 ${dbPath}）`);
   });
   const shutdown = () => {
     clearInterval(prune);

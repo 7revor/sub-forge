@@ -29,14 +29,14 @@ export function Login() {
     }
   };
 
-  // 设计稿「登录」：深色底，标志在上，白色卡片居中
+  // 设计稿「登录」：深色底（叠加光晕与网格背景），标志在上，白色卡片居中
   return (
-    <div className="flex min-h-full flex-col items-center gap-6 bg-nav px-4 py-24">
+    <div className="flex min-h-full flex-col items-center gap-6 login-bg px-4 py-24">
       <div className="flex items-center gap-2.5">
         <LogoMark size={28} />
-        <span className="font-mono text-xl font-semibold text-white">sub-forge</span>
+        <span className="font-mono text-xl font-semibold text-white">Sub Forge</span>
       </div>
-      <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-panel p-6">
+      <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-panel p-6 shadow-2xl shadow-black/40">
         <h1 className="m-0 text-lg font-semibold">登录</h1>
         <Field label="用户名">{(id) => <Input id={id} className="h-[42px] text-[14px]" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />}</Field>
         <Field label="密码">{(id) => <Input id={id} className="h-[42px] text-[14px]" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}</Field>
