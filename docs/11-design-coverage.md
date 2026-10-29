@@ -113,3 +113,9 @@ TemplateEditor 策略组编辑区使用与列表一致的白色面板背景。�
 规则仓库首页移除 GitHub Token 按钮、弹窗及设置路由；System 仅保留「规则仓库」管理链接。编辑页提示分支留空识别远程默认分支、许可证可手工填写。后端移除认证 API、上游认证参数及存储读写，v14 迁移清理旧凭据。验收见 [16](16-git-only-repositories-verification.md)；外部画布同步状态见 [13](13-design-canvas-sync.md)。
 
 2026-10-29 规则集页面精简：移除来源卡片底部「IP 类规则统一加 no-resolve」及规则集列表对应列，来源列表后直接进入客户端改写区块。规则级开关保留；后端继续兼容历史字段，无待实现接口或迁移，示例种子无需调整。本轮通过内置浏览器打开 Claude Design 画布显示「Sign in to view this page」，未能修改外部画板；待登录后同步规则集列表、新建与编辑画板。
+
+## 2026-10-29：模板与订阅两种模式
+
+ProfileNew、Profile 详情与 Lists/Main 显示「绑定模板 / 独立配置」；「模板与模式」提供绑定、复制初始化、解除绑定、成员映射及转换预览。绑定策略组仅追加成员可编辑，规则和最终出口只读；独立模式完整编辑。详情显示迁移记录和备份下载。TemplateBrowse 使用数量按绑定关系统计，TemplatePublish 对绑定冲突展示禁止强制发布说明并禁用发布。
+
+核心、后端、前端及种子已同步，无新增后端待实现项。内置浏览器本轮访问外部画布仍显示「Sign in to view this page」，未修改外部画板；按 docs/13 登记待同步，证据及实际页面见 [本轮验收](../research/verification/profile-template-modes-20261029/README.md)。
