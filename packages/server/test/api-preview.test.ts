@@ -51,6 +51,18 @@ describe('处理链逐步预览', () => {
     expect(res.json.input).toBe(3);
     expect(res.json.nodes.map((n: { name: string }) => n.name)).toEqual(['B·香港 09', 'A·香港 01 | 0.5x', 'A·日本 03']);
   });
+
+  it('组合：可带未保存的成员草稿，成员引用与成环仍按保存规则校验', async () => {
+    const { alice } = await scenario(UPSTREAM);
+    const a = (await alice.post('/api/sources', { ...remote('A'), pipeline: [] })).json.item.id;
+    const col = (await alice.post('/api/collections', { name: 'C', members: [], pipeline: [] })).json.item.id;
+    expect((await alice.post(`/api/collections/${col}/pipeline-preview`, {})).json.input).toBe(0);
+    const res = await alice.post(`/api/collections/${col}/pipeline-preview`, { pipeline: [], members: [{ ref: { type: 'source', id: a }, suffix: '·A' }] });
+    expect(res.json.input).toBe(3);
+    expect(res.json.nodes.map((n: { name: string }) => n.name)).toContain('日本 03·A');
+    expect((await alice.post(`/api/collections/${col}/pipeline-preview`, { members: [{ ref: { type: 'collection', id: col } }] })).status).toBe(400);
+    expect((await alice.post(`/api/collections/${col}/pipeline-preview`, { members: [{ ref: { type: 'source', id: 'nope' } }] })).status).toBe(400);
+  });
 });
 
 describe('立即拉取与快照', () => {

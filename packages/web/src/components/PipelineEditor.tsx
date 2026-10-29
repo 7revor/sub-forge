@@ -466,13 +466,15 @@ function StepChip({ index, tone, onClick, children }: { index: number; tone?: 'e
     className={cx('cursor-pointer rounded px-1.5 py-px font-mono text-[11.5px] hover:underline', tone === 'err' ? 'bg-err-soft text-err' : 'bg-accent-soft text-accent-ink')}>{children ?? index + 1}</button>;
 }
 
-export function PipelineEditor({ steps, onChange, preview, previewError, loading, inputLabel }: {
+export function PipelineEditor({ steps, onChange, preview, previewError, loading, inputLabel, title = '处理链' }: {
   steps: OperatorStep[];
   onChange: (s: OperatorStep[]) => void;
   preview?: PipelinePreview;
   previewError?: string;
   loading?: boolean;
   inputLabel?: string;
+  /** 左栏标题，组合页用「组合自身的处理链」 */
+  title?: string;
 }) {
   // dnd-kit 需要稳定的 id：按位置生成，拖动时随数组一起移动
   const [ids, setIds] = useState<string[]>(() => steps.map((_, i) => `s${i}`));
@@ -531,9 +533,9 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
   return (
     <div className="flex flex-wrap items-start gap-5">
-      <section aria-label="处理链" className="min-w-0 flex-[1_1_360px] rounded-[10px] border border-line bg-panel pt-4 pb-2">
+      <section aria-label={title} className="min-w-0 flex-[1_1_360px] rounded-[10px] border border-line bg-panel pt-4 pb-2">
         <div className="flex items-center justify-between px-4 pb-3">
-          <h2 className="m-0 text-[15px] font-semibold">处理链</h2>
+          <h2 className="m-0 text-[15px] font-semibold">{title}</h2>
           <span className="text-[12.5px] text-muted">拖动排序 · {inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
         {overviewRow}
