@@ -1,0 +1,82 @@
+{
+  "repository": {
+    "id": "custom-sL8iOydC9_CT",
+    "name": "7revor/proxy-rules",
+    "url": "https://github.com/7revor/proxy-rules",
+    "builtIn": false,
+    "ref": "main",
+    "directory": "",
+    "include": [
+      "**/*.list",
+      "**/*.txt",
+      "**/*.yaml",
+      "**/*.yml"
+    ],
+    "exclude": [],
+    "format": "auto",
+    "enabled": true,
+    "entries": 9,
+    "builtAt": 1793251164171,
+    "checkedAt": 1793251164171,
+    "indexing": false,
+    "revisions": {
+      "main": "ec27b953fc11627969447ba9b74f60425d81d481"
+    }
+  },
+  "files": [
+    {
+      "path": "ai.list",
+      "count": 41,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "claude.list",
+      "count": 15,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "direct_ip.list",
+      "count": 4,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "eu.list",
+      "count": 5,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "media.list",
+      "count": 16,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "openai.list",
+      "count": 16,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "privacy.list",
+      "count": 17,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "proxy.list",
+      "count": 3,
+      "rejected": 0,
+      "previewError": null
+    },
+    {
+      "path": "pt.list",
+      "count": 14,
+      "rejected": 0,
+      "previewError": null
+    }
+  ]
+}

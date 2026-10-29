@@ -385,3 +385,7 @@
 4. **规则出口为 provider 节点**：规则 `RuleSet(金融服务，多来源) → 源 S 中的 "🇺🇸 Home-Broadband"`。✅ mihomo 输出包装组并在规则中引用；Surge 输出 `select` + `fallback, …, REJECT` 两层包装组并在规则中引用。
 5. **模板更新同步**：管理员在模板中新增 "🤖 AI 服务" 组和对应规则并发布。✅ 所有"跟随最新"的 Profile 下次拉取即包含该组；该组尚未填充成员时，按空组输出（TPL-10），默认拒绝：mihomo 中显示为仅含 `REJECT` 的组，相关流量被拒绝而不是直连，配置校验通过。
 6. **进程规则分客户端**：规则 `process(path, wildcard, "/Applications/*/WeChat.app/*")`。✅ mihomo 输出 `PROCESS-PATH-WILDCARD,...`；Surge macOS 输出 `PROCESS-NAME,...`；Surge iOS 丢弃并在报告中注明。
+
+## 2026-10-29：自定义公开 GitHub 规则仓库
+
+RS-07 扩展：管理员添加、启停、更新、删除公开 GitHub 仓库；配置默认/指定分支、扫描目录、包含/排除 glob 和文本格式。先做一个文件一个条目，完整路径唯一；普通用户搜索、预览和导入为 remote 来源。内容按需解析，不支持行可查看详情，无有效规则不允许导入。删除仓库不删除已导入来源。私有仓库、配置编辑、多文件聚合与动态引用暂不实现。

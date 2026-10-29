@@ -17,10 +17,6 @@ export function pendingRoutes() {
   app.post('/shares', requireAdmin, todo('共享'));
   app.delete('/shares/:id', requireAdmin, todo('共享'));
 
-  // 自定义仓库适配器尚未实现；内置仓库由 rule-repos.ts 提供。
-  app.post('/rule-repos', requireAdmin, todo('添加自定义仓库'));
-  app.delete('/rule-repos/:id', requireAdmin, todo('删除自定义仓库'));
-
   // 系统设置：SSRF 白名单、mihomo 校验、仓库镜像、备份与恢复
   app.get('/system', requireAdmin, (c) => c.json({ pending: true, ssrfAllow: [], verify: null, mirror: '', lastBackup: null }));
   app.put('/system', requireAdmin, todo('系统设置'));

@@ -1,0 +1,46 @@
+# 自定义 GitHub 规则仓库验收
+
+日期：2026-10-29。分支：`codex/custom-github-rules`。
+
+## 验证环境
+
+独立数据库及密钥：仓库根 `.Codex/runtime/custom-github-rules/`。前端 15176，后端 18083。未修改正式数据库、现有规则集或 5173/8080 服务。验收后测试服务已停止，测试数据库保留以便复查。
+
+## 真实仓库
+
+通过内置浏览器在系统页添加 `https://github.com/7revor/proxy-rules`，分支留空，扫描根目录、默认四种文本扩展名、自动识别。后端读到默认分支 main，索引 commit 为 `ec27b953fc11627969447ba9b74f60425d81d481`。
+
+一个文件一个条目，共 9 条。各文件真实内容均通过 API 按需解析：
+
+| 文件 | 去重后规则数 | 拒绝行 |
+|---|---:|---:|
+| ai.list | 41 | 0 |
+| claude.list | 15 | 0 |
+| direct_ip.list | 4 | 0 |
+| eu.list | 5 | 0 |
+| media.list | 16 | 0 |
+| openai.list | 16 | 0 |
+| privacy.list | 17 | 0 |
+| proxy.list | 3 | 0 |
+| pt.list | 14 | 0 |
+
+浏览器实际操作：管理员添加 → 系统页出现 9 个规则 → 仓库筛选 → 选择 claude.list → 15 条内容预览 → 引用为规则集 → 拉取成功、mihomo 输出 15 条，无降级/丢弃/无法解析。重启隔离服务后重新登录，规则集、仓库配置及 9 条索引保留。没有修改上游仓库。自动检查 commit 与内容按分支 URL 拉取遵循现有行为，此期不锁定内容版本。
+
+- `live-results.json`：真实 API 统计和索引版本。
+- `repository-preview.png`：自定义仓库筛选及文件条目。
+- `imported-ruleset.png`：实际导入后的规则集和输出。
+- `repository-persisted.png`：重启后仓库状态。
+
+## 自动检查
+
+- 服务端：261 通过，3 跳过；覆盖 glob/路径与 URL 校验、默认分支、同名文件隔离、权限、重复添加、私有/404、失败保留与空索引、导入/去重/归属、无效内容拒绝、删除保留来源、索引中禁止删除、停用、重启读取及 v9/v10 迁移。
+- 核心：159 通过，23 跳过。
+- 前端：223 通过，2 跳过。
+- `pnpm typecheck`：全部通过；`git diff --check`：通过。
+- 上述跳过项为既有测试中的跳过场景，不计入通过。没有安装或运行 Playwright/独立浏览器；网页验收只使用 Codex 内置浏览器。
+
+## 本期边界
+
+仅公开 GitHub 文本规则；不支持私有仓库凭据、编辑配置、多文件变体聚合、mrs/srs 导入、镜像或持久 repo 关联。部分不支持行诊断复用现有弹层，后端用合成规则测试；本次真实仓库无不支持行，因此该弹层未用真实仓库再次触发。
+
+外部 Claude Design 画布本次仍显示“Sign in to view this page”，没有修改；新增表单和详情变化已登记 `docs/11-design-coverage.md` 和 `docs/13-design-canvas-sync.md`。

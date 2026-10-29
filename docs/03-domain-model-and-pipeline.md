@@ -345,3 +345,7 @@ expand(ruleset):
 仓库索引独立于用户文档，SQLite v10 新增 `rule_repos`（启停、更新时间、各分支 commit、失败原因）与 `rule_repo_entries`（仓库、逻辑 key、归一化名称、文件变体）。索引不写入种子。
 
 当前导入把选定文本变体的一个或多个文件转换为现有 `RuleSetSource { kind: 'remote', url, format, behavior }`。规则集所有权、改写、快照、合并与去重仍使用已有模型；本期没有增加 `kind: 'repo'`，没有动态客户端变体选择。完整目标见 [08](08-rule-repository-index.md)。
+
+## 2026-10-29：自定义仓库索引配置
+
+SQLite v11 的 `rule_repos.definition` 为可空 JSON：`id/name/owner/repo/refs/license/adapter=generic/options`，options 包含 directory、include、exclude、format；内置仓库保留空 definition。索引使用完整文件路径（含扩展名）作为 key，一个文件一个通用文本变体。添加先验证公开仓库与默认分支，再异步读取 commit/tree。详情按需解析并报告拒绝行，导入前校验有效内容及仓库启用状态。规则领域模型不变，导入仍写 remote，后续交给既有快照→解析→合并→改写→输出链；不表示持久 repo 关联。

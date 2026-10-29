@@ -26,6 +26,15 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
       throw new HttpError(502, `规则详情拉取失败：${error instanceof Error ? error.message : String(error)}`);
     }
   });
+  app.post('/rule-repos', requireAdmin, async c => {
+    const id = await repos.addCustom(await jsonBody(c));
+    void repos.refresh(id);
+    return c.json({ id, repos: repos.list() }, 201);
+  });
+  app.delete('/rule-repos/:id', requireAdmin, c => {
+    repos.removeCustom(c.req.param('id'));
+    return c.json({ ok: true });
+  });
   app.post('/rule-repos/:id/refresh', requireAdmin, c => {
     void repos.refresh(c.req.param('id'));
     return c.json({ repos: repos.list() }, 202);
@@ -58,12 +67,17 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
       throw new HttpError(502, `规则使用说明拉取失败：${error instanceof Error ? error.message : String(error)}`);
     }
     const variant = repos.importVariant(entry, body.variant as string | undefined);
+    if (repos.definition(body.repo).adapter === 'generic') {
+      const detail = await repos.detail(body.repo, body.path);
+      if (detail.previewError) throw new HttpError(400, `规则文件尚不可导入：${detail.previewError}`);
+    }
+    repos.assertEntry(body.repo, body.path);
     const target = loadTarget();
     const sources = [...(target?.sources ?? [])];
     for (const file of variant.files) {
       const url = rawUrl(repos.definition(body.repo), file);
       if (sources.some(s => s.kind === 'remote' && s.url === url)) continue;
-      sources.push({ id: randomId(9), kind: 'remote', name: `${body.repo} · ${file.path}`, url, format: file.format, behavior: file.behavior });
+      sources.push({ id: randomId(9), kind: 'remote', name: `${repos.definition(body.repo).name} · ${file.path}`, url, format: file.format, behavior: file.behavior });
     }
     const id = target?.id ?? randomId(9);
     const doc = validateDoc('ruleset', { ...(target ?? { name: entry.name }), sources }, id, user, store);

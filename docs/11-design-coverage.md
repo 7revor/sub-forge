@@ -47,7 +47,7 @@
 
 | 功能 | 前端 | 服务端现状 |
 |---|---|---|
-| 规则仓库后续（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | 内置索引/搜索/预览/文本导入已实现；自定义仓库增删仍 501，镜像、动态 repo 引用及 mrs 导入待实现 |
+| 规则仓库后续（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | 内置索引/搜索/预览/文本导入已实现；自定义公开 GitHub 仓库增删及逐文件索引已实现，镜像、动态 repo 引用及 mrs 导入待实现 |
 | 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制；保存、备份、恢复 501 |
 | 共享订阅源 / 组合（SYS-06） | 用户页「共享的订阅源与组合」 | `GET /api/shares` 返回空，写 501 |
 | 用户统计列 | 用户页「配置订阅 / 订阅源 / 最近订阅请求」 | `GET /api/users/stats` 返回空，显示「—」 |
@@ -64,3 +64,5 @@
 「不支持 N 行」徽标支持悬停、聚焦与点击：浮层显示来源名、行号、原文和原因，点击固定；支持关闭按钮、Escape 与点击外部关闭。超出 100 条时明确提示展示上限。前端及服务端已同步，数据模型无需迁移。
 
 外部 Claude Design 画布本次打开仍显示「Sign in to view this page」，画板未更新，以上交互规范与[验收截图](../research/verification/ruleset-preview-details-20261029/paypal-details.png)供后续同步。
+
+- 2026-10-29 自定义 GitHub 仓库：System 配置表单、删除确认；RuleRepo 通用文本条目、完整路径、自定义名称及拒绝行弹层已实现。外部画布本次实测仍要求登录，具体待同步控件见 [13](13-design-canvas-sync.md)。
