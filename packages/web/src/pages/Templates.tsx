@@ -5,7 +5,7 @@ import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { Notice } from '../components/Notice.tsx';
 import { VersionHistory } from './template/VersionHistory.tsx';
-// 模板：所有人在列表页浏览（组骨架、规则、版本记录）；管理员在详情页编辑并发布新版本。
+// 模板：点击列表进入详情（组骨架、完整规则、版本记录）；通过编辑入口修改并发布新版本。
 // 表单与 mihomo YAML 共用草稿，修改后即时校验（TPL-11）；发布前分析影响（TPL-07）。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -35,7 +35,7 @@ export function TemplateList() {
   const selectedId = params.get('id');
   const inUse = (id: string) => (profiles.data ?? []).filter((p) => boundTemplateId(p) === id).length;
   // 兼容发布完成和旧书签中的模板定位链接。
-  if (selectedId) return <Navigate to={`/templates/${encodeURIComponent(selectedId)}/overview`} replace />;
+  if (selectedId) return <Navigate to={`/templates/${encodeURIComponent(selectedId)}`} replace />;
   return (
     <>
       <PageHeader title="模板"
@@ -58,8 +58,8 @@ export function TemplateList() {
                 <td className={td}>{t.rules.length} 条</td>
                 <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{n ? `${n} 个配置订阅在用` : '未使用'}</td>
                 <td className={cx(td, 'whitespace-nowrap text-right')}><div className="flex justify-end gap-2">
-                  <DocActionLink to={`${path}/overview`} name={t.name ?? t.id} viewOnly />
-                  <DocActionLink to={path} name={t.name ?? t.id} />
+                  <DocActionLink to={path} name={t.name ?? t.id} viewOnly />
+                  <DocActionLink to={`${path}/edit`} name={t.name ?? t.id} />
                   <Link to={`${path}/publish`} className={buttonClass('default', 'sm')}>发布</Link>
                   <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
                 </div></td>
@@ -80,28 +80,25 @@ function TemplateOverview({ id }: { id: string }) {
     <PageHeader title="模板详情" crumbs={<Link to="/templates" className="text-muted no-underline">模板</Link>}
       actions={<Link to="/templates" className={buttonClass()}>返回列表</Link>} />
     <PageScroll><TemplateDetail id={id} inUse={(profiles.data ?? []).filter(p => boundTemplateId(p) === id).length} actions={<>
-      <Link to={`/templates/${id}`} className={buttonClass()}>编辑新版本</Link>
+      <Link to={`/templates/${id}/edit`} className={buttonClass()}>编辑新版本</Link>
       <Link to={`/templates/${id}/publish`} className={buttonClass()}>发布</Link>
       <Link to={`/profiles/new?template=${encodeURIComponent(id)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
     </>} /></PageScroll>
   </>;
 }
 
-const RULE_PREVIEW = 8;
-
-/** 模板详情：头部卡片、策略组骨架、规则（默认显示前几条）、版本记录与对比 */
+/** 模板详情默认展示全部规则；版本记录与对比通过顶部按钮打开弹窗。 */
 function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; actions?: ReactNode }) {
   const tpl = useQuery({ queryKey: ['template', id], queryFn: () => api<TemplateDetailData>('GET', `/templates/${id}`) });
   const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
-  const [allRules, setAllRules] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [diffVersion, setDiffVersion] = useState<number>();
   if (!tpl.data) return tpl.error ? <ErrorAlert error={tpl.error} /> : <div className="text-muted">加载中…</div>;
   const { item: t, versions } = tpl.data;
   const groupName = (gid: string) => t.groups.find((g) => g.id === gid)?.name ?? gid;
   const nsName = () => '';
   const published = versions.find((v) => v.version === t.version)?.createdAt;
-  const rules = allRules ? t.rules : t.rules.slice(0, RULE_PREVIEW);
   return (
     <>
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-panel px-4.5 py-4">
@@ -109,7 +106,10 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
           <h2 className="m-0 text-[17px] font-semibold">{t.name ?? t.id} <span className="font-mono text-[13px] font-medium text-muted">v{t.version}</span></h2>
           <span className="text-[12.5px] text-muted">{t.groups.length} 个策略组 · {t.rules.length} 条规则{published ? ` · 发布于 ${formatTime(published).slice(5, 10)}` : ''}{inUse !== undefined ? ` · 你有 ${inUse} 个配置订阅在用` : ''}</span>
         </div>
-        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setHistoryOpen(true)}>版本记录</Button>
+          {actions}
+        </div>
       </section>
       <Card title="策略组骨架" bodyClass="overflow-x-auto">
         {!t.groups.length ? <div className="px-4 pb-4"><Empty title="还没有组" /></div> : <table className="w-full border-collapse">
@@ -125,28 +125,28 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
           </tbody>
         </table>}
       </Card>
-      <div className="flex flex-wrap items-start gap-5">
-        <Card title="规则" className="min-w-0 flex-[999_1_420px]" actions={<span className="text-[12.5px] text-muted">{t.rules.length} 条{!allRules && t.rules.length > RULE_PREVIEW ? ` · 显示前 ${RULE_PREVIEW} 条` : ''}</span>} bodyClass="pb-1">
-          {!rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
-          {rules.map((r, i) => (
-            <div key={r.id} className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
-              <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-              <span className="truncate font-mono text-[12.5px]">{matcherLabel(r.matcher, ctx)}</span>
-              <span aria-hidden="true" className="text-faint">→</span>
-              <span className="truncate">{targetLabel(r.target, groupName, nsName)}</span>
-            </div>
-          ))}
-          {(allRules || t.rules.length <= RULE_PREVIEW) && (
-            <div className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
-              <span className="font-mono text-[12px] text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="text-faint">→</span><span>{targetLabel(t.final, groupName, nsName)}</span>
-            </div>
-          )}
-          {t.rules.length > RULE_PREVIEW && <div className="border-t border-line-2 px-4 py-2.5"><button type="button" className="cursor-pointer text-[13px] text-accent" onClick={() => setAllRules(!allRules)}>{allRules ? '收起' : `展开全部 ${t.rules.length} 条`}</button></div>}
-        </Card>
-        <Card title="版本记录" className="min-w-0 flex-[1_1_260px]">
-          <VersionHistory versions={versions} onCompare={setDiffVersion} dateOnly />
-        </Card>
-      </div>
+      <Card title="规则" className="min-w-0" actions={<span className="text-[12.5px] text-muted">{t.rules.length} 条</span>} bodyClass="pb-1">
+        {!t.rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
+        {t.rules.map((r, i) => (
+          <div key={r.id} className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
+            <span className="font-mono text-[12px] text-muted">{i + 1}</span>
+            {r.matcher.kind === 'ruleset' && r.matcher.remote ? (
+              <span className="flex min-w-0 items-center gap-2 font-mono text-[12.5px]">
+                <span className="shrink-0">远程 ·</span>
+                <span dir="rtl" title={r.matcher.remote.url} className="truncate text-left"><bdi dir="ltr">{r.matcher.remote.url}</bdi></span>
+              </span>
+            ) : <span className="truncate font-mono text-[12.5px]" title={matcherLabel(r.matcher, ctx)}>{matcherLabel(r.matcher, ctx)}</span>}
+            <span aria-hidden="true" className="text-faint">→</span>
+            <span className="truncate">{targetLabel(r.target, groupName, nsName)}</span>
+          </div>
+        ))}
+        <div className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
+          <span className="font-mono text-[12px] text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="text-faint">→</span><span>{targetLabel(t.final, groupName, nsName)}</span>
+        </div>
+      </Card>
+      <Modal title="版本记录" open={historyOpen && diffVersion === undefined} onClose={() => setHistoryOpen(false)}>
+        <VersionHistory versions={versions} onCompare={setDiffVersion} />
+      </Modal>
       {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
     </>
   );
@@ -162,13 +162,14 @@ function skeleton(): TemplateBody {
 
 export function TemplateEdit() {
   const { id = 'new', tab } = useParams();
-  if (id !== 'new' && tab === 'overview') return <TemplateOverview key={id} id={id} />;
+  if (id !== 'new' && tab !== 'edit' && tab !== 'publish') return <TemplateOverview key={id} id={id} />;
   return <TemplatePage key={id} id={id} />;
 }
 
 /** 管理员编辑模板（设计稿「管理员 · 模板编辑器」）与发布前校验（「管理员 · 模板发布前校验」）；草稿在两页之间共用 */
 function TemplatePage({ id }: { id: string }) {
   const isNew = id === 'new';
+  const editPath = isNew ? '/templates/new' : `/templates/${id}/edit`;
   const { tab } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -183,7 +184,6 @@ function TemplatePage({ id }: { id: string }) {
   const [step, setStep] = useState(0);
   const [validation, setValidation] = useState<{ body: TemplateBody; name: string; report: ReportItem[]; error?: string }>();
   const [focus, setFocus] = useState<{ where: string }>();
-  const [diffVersion, setDiffVersion] = useState<number>();
   const [importing, setImporting] = useState<string>();
   const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
@@ -281,7 +281,7 @@ function TemplatePage({ id }: { id: string }) {
             <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
               <Card title="① 模板自身" actions={<Badge tone={errors.length || parseErr ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : parseErr ? '校验失败' : ready ? '全部通过' : '校验中…'}</Badge>}>
                 <FieldError error={parseErr || (!rawValid ? '编辑器里的 YAML 有错误，请返回编辑器修复。' : undefined)} />
-                {own.length ? <TemplateReport items={own} onLocate={(where) => { setFocus({ where }); navigate(`/templates/${id}`); }} />
+                {own.length ? <TemplateReport items={own} onLocate={(where) => { setFocus({ where }); navigate(editPath); }} />
                   : ready && <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px] text-ink-2">{['出口只指向模板组或内置策略', '组成员不含节点或节点集', '组之间没有循环引用', 'YAML 可以生成并通过结构校验'].map((c) => <li key={c} className="flex gap-2"><span className="text-ok">✓</span>{c}</li>)}</ul>}
               </Card>
               {!isNew && (
@@ -328,7 +328,7 @@ function TemplatePage({ id }: { id: string }) {
           <Button variant={blocking.length ? 'danger' : 'primary'} disabled={!canPublish || (!isNew && !changed)} onClick={() => publish.mutate(blocking.length > 0)}>
             {publish.isPending ? '发布中…' : bindingBlocked ? '请先修复绑定订阅冲突' : isNew ? '创建 v1' : blocking.length ? (confirmed ? `强制发布 v${nextVersion}` : '存在阻断项，确认后才能发布') : `发布 v${nextVersion}`}
           </Button>
-          <Link to={isNew ? '/templates/new' : `/templates/${id}`} className={buttonClass()}>返回编辑器</Link>
+          <Link to={editPath} className={buttonClass()}>返回编辑器</Link>
         </div>
       </>
     );
@@ -365,10 +365,6 @@ function TemplatePage({ id }: { id: string }) {
         <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain">
           <ErrorAlert error={rulesets.error} />
           <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} modeControlContainer={modeControlContainer} />
-          {!isNew && <details className="border-t border-line p-4">
-            <summary className="cursor-pointer text-[13px] font-medium">版本记录</summary>
-            <div className="pt-3"><VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} /></div>
-          </details>}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
           <span className="text-[13px] text-muted">第 {step + 1} 步，共 2 步</span>
@@ -379,7 +375,6 @@ function TemplatePage({ id }: { id: string }) {
           </div>
         </div>
       </section>
-      {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
       <Modal title="从 YAML 导入" open={importing !== undefined} onClose={() => setImporting(undefined)} wide
         footer={<><Button onClick={() => setImporting(undefined)}>取消</Button><Button variant="primary" onClick={() => {
           const r = templateFromYaml(importing ?? '', body, ctx);
