@@ -60,3 +60,5 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 模板的 `ruleset` 匹配项支持可选 `repository` 文件映射。调用方在渲染前将本地与仓库引用统一为 `RuleSetInputs`；内核继续按同一规则管线处理，不负责访问 GitHub。没有 repository 的旧 ID 引用保持兼容。
 
 2026-10-29 模板规则集行内编辑仅调整前端布局；RuleEntry 的 matcher、target、enabled、options.noResolve 与规则顺序保持原语义，核心渲染和示例种子不变。
+
+2026-10-29 规则集前端移除整组 no-resolve 配置入口；核心保留 `RuleSet.noResolve` 以兼容历史数据，规则本身和模板引用的选项处理不变。
