@@ -101,16 +101,20 @@ export function Badge({ tone = 'neutral', children, className }: { tone?: Tone; 
   return <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] whitespace-nowrap', TONE[tone], className)}>{children}</span>;
 }
 
-export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+export function Segmented<T extends string>({ value, options, onChange, label, size = 'md' }: {
+  value: T; options: { value: T; label: string; disabled?: boolean; title?: string }[]; onChange: (v: T) => void; label: string; size?: 'sm' | 'md';
+}) {
   return (
-    <div role="group" aria-label={label} className="inline-flex rounded-lg bg-[#ebedf1] p-[3px]">
+    <div role="group" aria-label={label} className="inline-flex w-fit rounded-lg bg-[#ebedf1] p-[3px]">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           aria-pressed={o.value === value}
+          disabled={o.disabled}
+          title={o.title}
           onClick={() => onChange(o.value)}
-          className={cx('h-8 rounded-md px-3 text-[13px] cursor-pointer', o.value === value ? 'bg-panel font-medium shadow-[0_1px_2px_rgba(20,23,28,.08)]' : 'text-ink-2')}
+          className={cx('rounded-md px-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', size === 'sm' ? 'h-[30px] text-[12.5px]' : 'h-8 text-[13px]', o.value === value ? 'bg-panel font-medium shadow-[0_1px_2px_rgba(20,23,28,.08)]' : 'text-ink-2')}
         >
           {o.label}
         </button>

@@ -10,7 +10,7 @@ import { RuleEditor } from '../components/RuleEditor.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, Switch, Textarea } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, Switch, Textarea, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useList, type RuleSetDoc } from '../hooks.ts';
 import { ruleText } from './profile/TabRules.tsx';
@@ -74,7 +74,8 @@ export function RulesetEdit() {
         <Card title="输出预览" className="min-w-0 flex-[1_1_360px]">
           <div className="flex flex-col gap-3">
             <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
-              {TARGETS.map((x) => <Button key={x.key} size="sm" variant={x.key === target ? 'primary' : 'default'} aria-pressed={x.key === target} onClick={() => setTarget(x.key)}>{x.label}</Button>)}
+              {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
+                className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
             </div>
             {!saved ? <Empty>保存后预览。</Empty> : preview.error ? <ErrorBox error={preview.error} /> : preview.data && (
               preview.data.passthrough ? <p className="m-0 text-[13px] text-muted">mrs / srs 二进制规则集只做透传，不解析。</p> : (
