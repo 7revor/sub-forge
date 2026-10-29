@@ -1,6 +1,6 @@
 import { parseRuleLine, type RuleIR } from '@sub-forge/core';
 import { describe, expect, it } from 'vitest';
-import { emptyRule, RULE_TYPE_GROUPS, ruleToLine } from './rule.ts';
+import { emptyRule, RULE_TYPE_GROUPS, ruleToLine, ruleTypeValue } from './rule.ts';
 
 const rules: RuleIR[] = [
   { type: 'DOMAIN', value: 'example.com' },
@@ -45,10 +45,18 @@ describe('规则文本', () => {
   });
   it('每一种表单类型都有对应空规则', () => {
     for (const group of RULE_TYPE_GROUPS) {
-      for (const type of group.types) expect(emptyRule(type).type).toBe(type);
+      for (const type of group.types) expect(ruleTypeValue(emptyRule(type))).toBe(type);
     }
     expect(emptyRule('PROCESS')).toEqual({ type: 'PROCESS', kind: 'name', mode: 'exact', value: '' });
     expect(emptyRule('NETWORK')).toEqual({ type: 'NETWORK', value: 'tcp' });
+  });
+  it('进程的六种具体类型直接映射，已有语义化规则可回显', () => {
+    expect(RULE_TYPE_GROUPS.find(group => group.label === '进程')!.types).toEqual([
+      'PROCESS-NAME', 'PROCESS-PATH', 'PROCESS-NAME-WILDCARD', 'PROCESS-PATH-WILDCARD', 'PROCESS-NAME-REGEX', 'PROCESS-PATH-REGEX',
+    ]);
+    for (const rule of rules.filter(rule => rule.type === 'PROCESS')) {
+      expect(emptyRule(ruleTypeValue(rule) as Parameters<typeof emptyRule>[0])).toEqual({ ...rule, value: '' });
+    }
   });
   it('只读逻辑和 RAW 文本不丢内容', () => {
     expect(ruleToLine({ type: 'AND', children: [{ type: 'DOMAIN', value: 'a' }, { type: 'NETWORK', value: 'tcp' }] }))

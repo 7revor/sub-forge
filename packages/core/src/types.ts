@@ -198,7 +198,7 @@ export type GroupSpec = {
   display?: { hidden?: boolean; icon?: string };
   extra?: Record<string, unknown>;
   hint?: string;
-  /** 模板组为空时的行为，默认 reject（TPL-10） */
+  /** @deprecated 仅兼容历史数据，渲染时忽略；空组一律 REJECT。 */
   whenEmpty?: 'reject' | 'direct';
 };
 

@@ -70,10 +70,10 @@ describe('PRD 场景 4：规则出口为 provider 节点', () => {
 });
 
 describe('PRD 场景 5：模板新增组未填充', () => {
-  it('为空时=拒绝输出 REJECT，为空时=直连输出 COMPATIBLE，并告警', () => {
+  it('空组统一输出 REJECT，历史的直连配置不再生效，并告警', () => {
     const r = render({});
     expect(group(r, '🤖 AI 服务').proxies).toEqual(['REJECT']);
-    expect(group(r, '📺 国内媒体').proxies).toEqual(['COMPATIBLE']);
+    expect(group(r, '📺 国内媒体').proxies).toEqual(['REJECT']);
     expect(r.report.byCode('group.empty').map((i) => i.where)).toEqual(['group:hk', 'group:ai', 'group:media']);
   });
 });

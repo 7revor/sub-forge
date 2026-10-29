@@ -60,7 +60,7 @@
       "groups": [
         { "id": "sel", "name": "🚀 节点选择", "type": "select", "members": [{ "kind": "group", "groupId": "hk" }, { "kind": "builtin", "name": "DIRECT" }] },
         { "id": "hk", "name": "🇭🇰 香港", "type": "url-test", "members": [], "test": { "url": "https://www.gstatic.com/generate_204", "interval": 300 } },
-        { "id": "ai", "name": "🤖 AI 服务", "type": "select", "members": [], "whenEmpty": "reject" }
+        { "id": "ai", "name": "🤖 AI 服务", "type": "select", "members": [] }
       ],
       "rules": [
         { "id": "r-direct", "matcher": { "kind": "rule", "rule": { "type": "DOMAIN-SUFFIX", "value": "example.test" } }, "target": { "kind": "builtin", "name": "DIRECT" } },
@@ -133,8 +133,7 @@
               "id": "ai",
               "name": "🤖 AI 服务",
               "type": "select",
-              "members": [],
-              "whenEmpty": "reject"
+              "members": []
             }
           ],
           "rules": [

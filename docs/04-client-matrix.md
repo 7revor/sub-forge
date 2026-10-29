@@ -136,3 +136,6 @@ Surge 规则集约束：
 | 其他 | 默认 mihomo，记录 UA 以便后续补充 |
 
 URL 参数 `?target=&platform=` 优先于 UA。各客户端 UA 原文 ⏳（07 S12②、C1），识别规则在采集后补全。
+
+
+2026-10-29：mihomo 的 PROCESS-NAME-WILDCARD、PROCESS-PATH-WILDCARD 与 DOMAIN-WILDCARD 在合并转换中按小写键去重，保留首条输出原文；Surge 不作此归一化。实现依据：[mihomo 进程匹配源码](https://github.com/MetaCubeX/mihomo/blob/Meta/rules/common/process.go) 与 [域名 wildcard 源码](https://github.com/MetaCubeX/mihomo/blob/Meta/rules/common/domain_wildcard.go)。本次不扩展精确或正则规则的去重范围。

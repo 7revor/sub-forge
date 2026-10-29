@@ -5,10 +5,11 @@ import { templateFormFromYaml, templateFromYaml, templateToYaml, type ConvertCtx
 import { TemplateGroupsEditor } from './TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from './TemplateRulesEditor.tsx';
 
-export function TemplateEditor({ value, onChange, ctx, report, focus, onValidityChange, step, onStepChange }: {
+export function TemplateEditor({ value, onChange, ctx, report, focus, onValidityChange, step, onStepChange, modeControlContainer }: {
   step: number; onStepChange: (step: number) => void;
   value: TemplateBody; onChange: (body: TemplateBody) => void; ctx: ConvertCtx; report: ReportItem[];
   focus: { where: string } | undefined; onValidityChange: (valid: boolean) => void;
+  modeControlContainer: HTMLElement | null;
 }) {
   const [mode, setMode] = useState<EditorMode>('form');
   const [group, setGroup] = useState<string>();
@@ -27,7 +28,7 @@ export function TemplateEditor({ value, onChange, ctx, report, focus, onValidity
     const frame = requestAnimationFrame(() => document.getElementById(`template-${focus.where.replace(':', '-')}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     return () => cancelAnimationFrame(frame);
   }, [focus, group, rule, mode, step]);
-  return <div className={mode === 'raw' ? 'p-4' : 'px-4 pt-4'}><DualEditor value={value} onChange={onChange} rawLabel="mihomo YAML" mode={mode} onModeChange={setMode} onValidityChange={onValidityChange}
+  return <div className={mode === 'raw' ? 'px-4 pt-2 pb-4' : 'px-4'}><DualEditor value={value} onChange={onChange} rawLabel="mihomo YAML" mode={mode} onModeChange={setMode} onValidityChange={onValidityChange} modeControlContainer={modeControlContainer}
     toRaw={(body) => templateToYaml(body, ctx)} fromRaw={(text) => templateFromYaml(text, value, ctx)}
     fromPaste={(text) => /^\s*(?:#[^\n]*\n\s*)*-\s/.test(text) ? templateFromYaml(text, value, ctx) : undefined}
     recoverForm={(text) => templateFormFromYaml(text, value, ctx)} renderForm={() => <>

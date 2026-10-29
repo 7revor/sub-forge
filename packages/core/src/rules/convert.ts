@@ -88,7 +88,7 @@ export function convertRuleDocuments(
   const push = (text: string, sourceId: string, line: number) => { out.lines.push(text); out.origins.push({ sourceId, line }); };
   const emit = (rule: RuleIR, sourceId: string, line: number, text: string) => {
     const r = withIpOptions(withIpOptions(rule, { noResolve: rs.noResolve }), options.ipOptions ?? {});
-    const k = ruleKey(r);
+    const k = ruleKey(r, ctx.client);
     const issue = (kind: RuleDiagnostic['kind'], reason: string) => { out.diagnostics.push({ sourceId, line, text, kind, reason }); push(comment(reason, text), sourceId, line); };
     if (!options.sourceId && seen.has(k)) { out.stats.duplicates++; issue('duplicate', '重复规则'); return; }
     seen.add(k);

@@ -128,7 +128,7 @@ type GroupSpec = {
   display?: { hidden?: boolean; icon?: string };
   extra?: Record<string, unknown>;             // 高级参数，带客户端适用范围
   hint?: string;                               // 模板填充提示
-  whenEmpty?: 'reject' | 'direct';             // 模板组为空时的行为，默认 reject（TPL-10）
+  whenEmpty?: 'reject' | 'direct';             // 废弃，仅兼容历史存储；渲染忽略，空组固定 REJECT
 };
 
 type RuleEntry = { id: ID; matcher: Matcher; target: Target; options?: { noResolve?: boolean; src?: boolean }; enabled: boolean };
@@ -296,7 +296,7 @@ effective.final = overlay.final ?? template.final
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
 - 模板组不能在 Profile 中删除、改名或隐藏（Q6）；`groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。Profile 私有组（`extraGroups`）不受此限制。
-- 空组处理（TPL-10）：模板组在 Profile 中未被填充任何成员时照常输出为空组，`report.warn`。按 `whenEmpty` 输出：`reject`（默认）→ mihomo `proxies: [REJECT]`、Surge `select, REJECT`；`direct` → mihomo `proxies: [COMPATIBLE]`、Surge `select, DIRECT`。mihomo 的 `proxies` 与 `use` 都为空时直接报错，Surge 不接受无成员无参数的组，所以必须写一个内置成员；`COMPATIBLE` 实测等效直连（07 M7）。
+- 空组处理（TPL-10，2026-10-29 修订）：模板和私有组统一拒绝。静态无成员或内联节点筛空时补 `proxies: [REJECT]`，记录 `group.empty` 告警；所有组固定输出 `empty-fallback: REJECT`，由 Mihomo v1.19.27+ 处理运行时 provider 未加载、更新或筛选后无成员的情况。覆盖层、旧 `whenEmpty: direct` 和 `extra.empty-fallback` 都不能改变此行为。节点测速失败仍按组类型处理，不等于空组。UI 不提供空组设置，Surge 输出仍未开放。
 
 ## 6. 规则集展开与输出
 
@@ -409,6 +409,9 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 迁移删除 `server_secrets` 中的 `github-index-token`，表为空时删除表，存在未知其他服务凭据时保留。新数据库不建此表。订阅令牌、文档、索引与归属保持不变。仓库元信息通过 Git 获取，不新增领域字段，种子无此全局凭据，因此无需修改示例种子。
 
 2026-10-29 规则集页面移除整组 no-resolve 开关及列表列。`RuleSet.noResolve` 作为旧数据兼容字段保留，编辑其他字段时继续原样保存并参与预览与渲染；新建规则集不设置该字段。规则级选项与管线不变，无需数据迁移。
+
+
+2026-10-29：ruleKey 增加可选目标客户端；仅 mihomo 的进程 wildcard 与 DOMAIN-WILDCARD 对值执行 toLowerCase 后生成去重键，不改写 RuleIR 或来源内容。convertRuleDocuments 与 expandRuleSet 共用该键，替换及追加也参与；重复项保留来源行位并写为注释。单来源原文预览继续保留重复行。ruleSetDelivery 检测远程 wildcard 重复并强制托管（含 YAML），让实际下载与合并预览一致。客户端未指定时维持原有大小写敏感键，仓库索引计数不变。
 
 ## 2026-10-29：订阅分流所有权与数据库 v16
 

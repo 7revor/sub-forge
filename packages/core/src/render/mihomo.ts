@@ -14,6 +14,7 @@ import { type EffectiveGroup } from '../template/merge.ts';
 import type { GroupMember, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template } from '../types.ts';
 import { shortHash } from '../util/hash.ts';
 import { compileUserRegex, exactNameRegex } from '../util/regex.ts';
+import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
   /** Profile 专属 provider 地址（/p/:token/:key?v=） */
@@ -105,8 +106,8 @@ function displayName(ref: NodeSetID, inputs: NodeSetInputs): string {
 function filterNodes(nodes: ProxyIR[], f: { filter?: string; excludeFilter?: string; excludeType?: string }): ProxyIR[] {
   const inc = f.filter ? compileUserRegex(f.filter) : undefined;
   const exc = f.excludeFilter ? compileUserRegex(f.excludeFilter) : undefined;
-  const types = f.excludeType ? new Set(f.excludeType.split('|').map((t) => t.trim().toLowerCase())) : undefined;
-  return nodes.filter((n) => (!inc || inc.test(n.name)) && (!exc || !exc.test(n.name)) && (!types || !types.has(n.type.toLowerCase())));
+  const types = excludedAdapterTypes(f.excludeType);
+  return nodes.filter((n) => (!inc || inc.test(n.name)) && (!exc || !exc.test(n.name)) && !isExcludedAdapter(n.type, types));
 }
 
 function stripNode(n: ProxyIR): Record<string, unknown> {
@@ -244,19 +245,17 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     }
     const hasInclude = ['include-all', 'include-all-proxies', 'include-all-providers'].some((k) => out[k]);
     if (!proxies.length && !use.length && !hasInclude) {
-      // 空组（TPL-10）：两个客户端都不接受无成员的组
-      const direct = g.whenEmpty === 'direct';
-      proxies.push(direct ? 'COMPATIBLE' : 'REJECT');
-      report.warn('group.empty', `组「${g.name}」没有成员，按${direct ? '直连' : '拒绝'}输出`, where);
+      // 静态空组必须补一个合法成员；忽略历史 whenEmpty，统一拒绝。
+      proxies.push('REJECT');
+      report.warn('group.empty', `组「${g.name}」没有成员，按拒绝输出`, where);
     }
     if (proxies.length) out.proxies = proxies;
     if (use.length) out.use = use;
     if (use.length || hasInclude) {
       // 动态成员在客户端刷新后也可能筛空，不能只保护渲染时的静态空组。
-      out['empty-fallback'] = g.whenEmpty === 'direct' ? 'COMPATIBLE' : 'REJECT';
       if (g.filter) out.filter = g.filter;
       if (g.excludeFilter) out['exclude-filter'] = g.excludeFilter;
-      if (g.excludeType) out['exclude-type'] = g.excludeType;
+      if (g.excludeType) out['exclude-type'] = excludedAdapterTypes(g.excludeType).join('|');
     }
     const t = g.test ?? {};
     if (g.type !== 'select') {
@@ -271,7 +270,8 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     if (g.type === 'load-balance' && g.strategy) out.strategy = g.strategy;
     if (g.display?.hidden) out.hidden = true;
     if (g.display?.icon) out.icon = g.display.icon;
-    return { ...out, ...(g.extra ?? {}) } as MihomoGroup;
+    // 运行时筛空同样拒绝；放在扩展字段之后，防止历史配置覆盖固定策略。
+    return { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
   };
   const groups = eff.groups.map(lowerGroup);
 

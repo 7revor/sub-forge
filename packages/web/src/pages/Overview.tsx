@@ -61,7 +61,7 @@ export function Overview() {
       body: `${r.last!.client} 于 ${formatRelativeTime(r.last!.at)} 拉取。告警不影响下发，但可能有组为空或引用失效。`, action: '查看预览与渲染报告', to: `/profiles/${r.p.id}/preview`,
     })),
     ...rows.filter((r) => boundTemplateId(r.p) && !r.p.nodeSets.length).map((r) => ({
-      tone: 'info' as const, title: `「${r.p.name}」还没有节点集`, body: '模板组都会按「为空时」的设定输出。', action: '去加入节点集', to: `/profiles/${r.p.id}/nodesets`,
+      tone: 'info' as const, title: `「${r.p.name}」还没有节点集`, body: '没有成员的策略组会自动拒绝连接。', action: '去加入节点集', to: `/profiles/${r.p.id}/nodesets`,
     })),
   ];
 

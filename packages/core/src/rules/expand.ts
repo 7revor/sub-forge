@@ -76,7 +76,7 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
   const add = (rule: RuleIR) => {
     const r = withIpOptions(rule, { noResolve: rs.noResolve });
     out.total++;
-    const k = ruleKey(r);
+    const k = ruleKey(r, ctx.client);
     if (seen.has(k)) { out.duplicates++; return; }
     seen.add(k);
     out[behaviorOf(r)].push(r);

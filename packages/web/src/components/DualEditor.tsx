@@ -2,6 +2,7 @@ import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from './YamlTextarea.tsx';
 import { CopyButton } from './CopyButton.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { FieldError, Segmented } from './ui.tsx';
 
 export type EditorMode = 'form' | 'raw';
@@ -13,7 +14,7 @@ function tryRaw<T>(toRaw: (value: T) => string, value: T): { text: string } | { 
   try { return { text: toRaw(value) }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 }
 
-export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, recoverForm, fromPaste, rawHint, rawLabel = '原始配置', mode, onModeChange, onValidityChange }: {
+export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, recoverForm, fromPaste, rawHint, rawLabel = '原始配置', mode, onModeChange, onValidityChange, modeControlContainer }: {
   value: T; onChange: (value: T) => void; renderForm: () => ReactNode;
   toRaw: (value: T) => string; fromRaw: (text: string) => RawResult<T>;
   /** 返回表单时过滤错误字段，不以保存校验阻止切换。 */
@@ -24,6 +25,8 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
   rawLabel?: string; mode?: EditorMode; onModeChange?: (mode: EditorMode) => void;
   /** 让外层保存按钮同步阻止提交尚未解析成功的原始配置。 */
   onValidityChange?: (valid: boolean) => void;
+  /** 可把视图切换放进外层工具栏；传 null 时等待容器挂载，未传时仍在编辑器内展示。 */
+  modeControlContainer?: HTMLElement | null;
 }) {
   const [localMode, setLocalMode] = useState<EditorMode>('form');
   const current = mode ?? localMode;
@@ -67,11 +70,12 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
     if (mode === undefined) setLocalMode(next);
     onModeChange?.(next);
   };
+  const modeControl = <Segmented label="编辑视图" size="sm" value={current} onChange={changeMode} options={[
+    { value: 'form', label: '表单' },
+    { value: 'raw', label: '原始配置' },
+  ]} />;
   return <div className="dual-editor flex flex-col gap-3">
-    <Segmented label="编辑视图" size="sm" value={current} onChange={changeMode} options={[
-      { value: 'form', label: '表单' },
-      { value: 'raw', label: '原始配置' },
-    ]} />
+    {modeControlContainer === undefined ? modeControl : modeControlContainer && createPortal(modeControl, modeControlContainer)}
     <div className="editor-content flex flex-col gap-3">
       {current === 'form' ? renderForm() : <>
         <div className="flex items-center justify-between gap-2">

@@ -21,6 +21,7 @@ export * from './template/merge.ts';
 export * from './template/validate.ts';
 export * from './render/mihomo.ts';
 export * from './proxy/validateLocal.ts';
+export * from './proxy/adapterType.ts';
 
 export * from "./rules/convert.ts";
 
