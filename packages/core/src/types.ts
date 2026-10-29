@@ -107,7 +107,7 @@ export type RuleIR =
 
 export type ClientOverride = {
   when: { client: Client; platform?: Platform };
-  action: { replace: RuleIR[] } | { drop: true };
+  action: { replace: RuleIR[] } | { drop: true } | { append: RuleIR[] };
 };
 
 export type RuleSetFormat = 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
@@ -137,8 +137,8 @@ export type RuleSet = {
   id: ID;
   name: string;
   sources: RuleSetSource[];
-  /** 按所有来源的规则原文精确匹配；同一规则命中第一条客户端与平台匹配的改写 */
-  overrides?: { match: string; override: ClientOverride }[];
+  /** 替换、丢弃按原文匹配且首条命中生效；追加无需 match，按条件向整组加入规则 */
+  overrides?: { match?: string; override: ClientOverride }[];
   /** IP 类规则统一加 no-resolve */
   noResolve?: boolean;
 };

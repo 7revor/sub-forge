@@ -45,7 +45,7 @@ export function expandSource(rs: RuleSet, src: RuleSetSource, inputs: RuleSetInp
   }
   const rules: RuleIR[] = [];
   for (const p of parsed.rules) {
-    const group = rs.overrides?.filter((o) => o.match === p.text).map((o) => o.override) ?? [];
+    const group = rs.overrides?.filter((o) => !('append' in o.override.action) && o.match === p.text).map((o) => o.override) ?? [];
     const ov = src.overrides?.filter((o) => (o.line !== undefined && o.line === p.line) || (o.match !== undefined && o.match === p.text)).map((o) => o.override);
     rules.push(...applyOverrides(p.rule, [...group, ...(ov ?? [])], ctx));
   }
@@ -69,6 +69,14 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
   const rs = inputs.rulesets[id];
   if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${id}`); return out; }
   const seen = new Set<string>();
+  const add = (rule: RuleIR) => {
+    const r = withIpOptions(rule, { noResolve: rs.noResolve });
+    out.total++;
+    const k = ruleKey(r);
+    if (seen.has(k)) { out.duplicates++; return; }
+    seen.add(k);
+    out[behaviorOf(r)].push(r);
+  };
   for (const src of rs.sources) {
     if (src.enabled === false) continue;
     const ex = expandSource(rs, src, inputs, ctx, report);
@@ -76,13 +84,13 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
       out.passthrough.push({ sourceId: src.id, name: sourceLabel(src), format: ex.format, ...(ex.url ? { url: ex.url } : {}), ...(src.behavior ? { behavior: src.behavior } : {}) });
       continue;
     }
-    for (let r of ex.rules) {
-      r = withIpOptions(r, { noResolve: rs.noResolve });
-      out.total++;
-      const k = ruleKey(r);
-      if (seen.has(k)) { out.duplicates++; continue; }
-      seen.add(k);
-      out[behaviorOf(r)].push(r);
+    ex.rules.forEach(add);
+  }
+  // 追加作用于整个规则集，只执行一次，并沿用分桶、去重和 IP 选项。
+  for (const { override } of rs.overrides ?? []) {
+    if ('append' in override.action && override.when.client === ctx.client &&
+      (override.when.platform === undefined || override.when.platform === ctx.platform)) {
+      override.action.append.forEach(add);
     }
   }
   return out;

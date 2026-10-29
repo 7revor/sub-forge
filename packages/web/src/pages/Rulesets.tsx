@@ -1,8 +1,7 @@
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
-// 新建与编辑共用同一页面：来源列表在第一块直接编辑；点选来源时下方预览该来源（本地规则可实时编辑），
-// 不选时预览合并后的最终规则。原「规则包」已并入规则集（2026-10-29）。
+// 来源配置与本地内容就地编辑，下方始终只读预览最终合并结果。
 
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
@@ -78,12 +77,11 @@ export function RulesetEdit() {
   const t = TARGETS.find((x) => x.key === target)!;
   const draft = useDebouncedValue(e.draft, 400);
   const preview = useQuery({
-    queryKey: ['ruleset-preview', e.isNew ? '' : e.id, selected, target, JSON.stringify(draft)],
-    // 新加的来源要等防抖后的草稿里有它再请求，否则服务端找不到该来源
-    enabled: !!draft && (!selected || draft.sources.some((s) => s.id === selected)),
+    queryKey: ['ruleset-preview', e.isNew ? '' : e.id, target, JSON.stringify(draft)],
+    enabled: !!draft,
     placeholderData: keepPreviousData,
     queryFn: () => api<RulesetPreview>('POST', '/rulesets/preview', {
-      ...(e.isNew ? {} : { id: e.id }), ruleset: draft, ...(selected ? { source: selected } : {}),
+      ...(e.isNew ? {} : { id: e.id }), ruleset: draft,
       client: t.client, ...(t.platform ? { platform: t.platform } : {}),
     }),
   });
@@ -92,7 +90,6 @@ export function RulesetEdit() {
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
   const setSource = (id: string, p: Partial<RuleSetSourceDoc>) => set({ sources: d.sources.map((s) => (s.id === id ? { ...s, ...p } : s)) });
   const add = (src: RuleSetSourceDoc) => { set({ sources: [...d.sources, src] }); setSelected(src.id); };
-  const current = d.sources.find((s) => s.id === selected);
   const status = new Map((preview.data?.sources ?? []).map((s) => [s.id, s]));
   const failing = d.sources.filter((s) => s.kind === 'remote' && status.get(s.id)?.error).length;
   const error = rulesetError(d);
@@ -118,7 +115,7 @@ export function RulesetEdit() {
       </>}>
         <div className="flex flex-col gap-4">
           {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
-          <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源在下方预览它的输出，本地规则可在预览里直接编辑；不选中时预览合并后的最终规则。</p>
+          <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源展开配置，本地规则在配置块内编辑；下方统一展示合并后的最终只读结果。</p>
           {!d.sources.length ? <Empty title="还没有来源" description="添加远程地址或本地规则。" /> : (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
               <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
@@ -135,29 +132,15 @@ export function RulesetEdit() {
         onChange={(overrides) => set({ overrides: overrides.length ? overrides : undefined })}
         onRemoveLegacy={(id) => setSource(id, { overrides: undefined })} />
 
-      <Card className="min-w-0" title={<h2 className="m-0 min-w-0 truncate text-[15px] font-semibold">{current ? `输出预览 · ${sourceLabel(current)}` : '输出预览 · 合并结果'}</h2>}
-        actions={current && <Button size="sm" onClick={() => setSelected(undefined)}>查看合并结果</Button>}>
+      <Card className="min-w-0" title="最终结果（只读）">
         <div className="flex flex-col gap-3">
           <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
             {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
               className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
           </div>
-          {current?.kind === 'local' && !isPassthrough(current) ? (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,360px),1fr))] gap-3">
-              <Field label="内容（实时预览）" hint="每行一条，如 DOMAIN-SUFFIX,example.com；也可以是纯域名或纯 CIDR">{(id) => (
-                <Textarea id={id} rows={16} spellCheck={false} className="min-h-[320px] font-mono text-[12.5px]" value={current.content ?? ''} onChange={(x) => setSource(current.id, { content: x.target.value })} />
-              )}</Field>
-              <div className="flex min-w-0 flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">{t.label} 输出</span><PreviewBody preview={preview} /></div>
-            </div>
-          ) : current && isPassthrough(current) ? (
-            <p className="m-0 text-[13px] text-muted">mrs / srs 二进制规则集只做透传，不解析，也不参与合并去重。</p>
-          ) : (
-            <>
-              {!current && preview.data?.stats && <MergedStats stats={preview.data.stats} />}
-              <PreviewBody preview={preview} />
-              {!current && !!preview.data?.passthroughSources?.length && <span className="text-[12.5px] text-muted">另有 {preview.data.passthroughSources.map((p) => `「${p.name}」`).join('')}以 {preview.data.passthroughSources[0]!.format} 透传，单独输出。</span>}
-            </>
-          )}
+          {preview.data?.stats && <MergedStats stats={preview.data.stats} />}
+          <PreviewBody preview={preview} />
+          {!!preview.data?.passthroughSources?.length && <span className="text-[12.5px] text-muted">另有 {preview.data.passthroughSources.map((p) => `「${p.name}」`).join('')}以透传方式单独输出。</span>}
         </div>
       </Card>
       <RenameDialog open={renaming} title="重命名规则集" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => set({ name })} />
@@ -203,7 +186,9 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
             const { ttlSec: _, ...rest } = src.fetch ?? {};
             onChange({ fetch: h > 0 && h !== 24 ? { ...rest, ttlSec: h * 3600 } : Object.keys(rest).length ? rest : undefined });
           }} />}</Field>}
-          {src.kind === 'local' && !isPassthrough(src) && <span className="col-span-full text-[12px] text-muted">内容在下方「输出预览」里编辑，右侧实时显示输出。</span>}
+          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="每行一条，如 DOMAIN-SUFFIX,example.com；也可以是纯域名或纯 CIDR。最终结果在下方实时预览。">{(id) => (
+            <Textarea id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
+          )}</Field>}
         </div>
       )}
     </div>
@@ -224,7 +209,7 @@ function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> })
       <div className="grid grid-cols-3 gap-2">
         {(['domain', 'classical', 'ipcidr'] as const).map((b) => <div key={b} className="flex flex-col gap-0.5 rounded-lg bg-ground p-2.5"><span className="font-mono text-[11.5px] text-muted">{b}</span><span className="text-xl font-semibold">{stats[b]}</span></div>)}
       </div>
-      <span className="text-[12.5px] text-ink-2">启用来源共 {stats.total} 条，去重 {stats.duplicates} 条，输出 {stats.total - stats.duplicates} 条；按 domain → classical → ipcidr 分别输出，IP 类放在最后，避免过早触发 DNS 解析。</span>
+      <span className="text-[12.5px] text-ink-2">来源与改写共 {stats.total} 条，去重 {stats.duplicates} 条，输出 {stats.total - stats.duplicates} 条；按 domain → classical → ipcidr 分别输出，IP 类放在最后，避免过早触发 DNS 解析。</span>
     </div>
   );
 }

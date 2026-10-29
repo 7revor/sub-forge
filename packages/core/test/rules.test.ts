@@ -87,6 +87,7 @@ describe('客户端降级与覆盖', () => {
     expect(applyOverrides(rule, ov, { client: 'mihomo', platform: 'android' })).toEqual([{ ...rule, value: 'org.telegram.messenger' }]);
     expect(applyOverrides(rule, ov, { client: 'mihomo', platform: 'windows' })).toEqual([rule]);
     expect(applyOverrides(rule, [{ when: { client: 'surge' }, action: { drop: true } }], { client: 'surge', platform: 'ios' })).toEqual([]);
+    expect(applyOverrides(rule, [{ when: { client: 'surge' }, action: { append: [{ type: 'DOMAIN', value: 'added.test' }] } }], { client: 'surge' })).toEqual([rule, { type: 'DOMAIN', value: 'added.test' }]);
   });
 });
 
@@ -166,5 +167,30 @@ describe('规则集组级内容改写', () => {
     expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report()).domain).toHaveLength(3);
     inputs.rulesets.r!.sources.reverse();
     expect(expandRuleSet('r', inputs, { client: 'mihomo', platform: 'android' }, new Report()).ipcidr).toHaveLength(1);
+  });
+});
+
+describe('规则集条件追加', () => {
+  it('多来源只追加一次，遵循客户端与平台条件、去重和 no-resolve', () => {
+    const inputs: RuleSetInputs = { rulesets: { r: {
+      id: 'r', name: '追加', noResolve: true,
+      sources: ['a', 'b'].map((id) => ({ id, kind: 'local', format: 'auto', content: 'DOMAIN,keep.test' })),
+      overrides: [
+        { override: { when: { client: 'surge', platform: 'macos' }, action: { append: [
+          { type: 'DOMAIN', value: 'added.test' }, { type: 'DOMAIN', value: 'keep.test' },
+          { type: 'IP-CIDR', value: '192.0.2.0/24' },
+        ] } } },
+        { override: { when: { client: 'surge' }, action: { append: [{ type: 'DOMAIN', value: 'second.test' }] } } },
+        { match: 'DOMAIN,added.test', override: { when: { client: 'surge' }, action: { drop: true } } },
+      ],
+    } }, snapshots: {} };
+    const mac = expandRuleSet('r', inputs, { client: 'surge', platform: 'macos' }, new Report());
+    expect(mac.domain).toEqual(['keep.test', 'added.test', 'second.test'].map((value) => ({ type: 'DOMAIN', value })));
+    expect(mac.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24', noResolve: true }]);
+    expect(mac).toMatchObject({ total: 6, duplicates: 2 });
+    expect(expandRuleSet('r', inputs, { client: 'surge', platform: 'ios' }, new Report()).domain).toHaveLength(2);
+    expect(expandRuleSet('r', inputs, { client: 'mihomo' }, new Report()).domain).toHaveLength(1);
+    inputs.rulesets.r!.sources.forEach((s) => { s.enabled = false; });
+    expect(expandRuleSet('r', inputs, { client: 'surge', platform: 'macos' }, new Report()).domain).toHaveLength(3);
   });
 });

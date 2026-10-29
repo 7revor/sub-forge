@@ -16,7 +16,7 @@ const NODESET_KINDS = new Set(['source', 'collection', 'local']);
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isHttpUrl = (v: unknown) => { if (typeof v !== 'string') return false; try { const u = new URL(v); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; } };
 
-/** 组级改写只接受内容匹配；预览与保存共用校验，草稿不完整时返回可读错误。 */
+/** 替换、丢弃接受内容匹配，追加无需匹配；预览与保存共用校验。 */
 export function checkRuleSetOverrides(value: unknown): void {
   if (value === undefined) return;
   if (!Array.isArray(value)) throw bad('客户端改写必须是数组');
@@ -30,11 +30,18 @@ export function checkRuleSetOverrides(value: unknown): void {
   };
   value.forEach((item, i) => {
     const at = `客户端改写第 ${i + 1} 条`;
-    if (!isObj(item) || !isStr(item.match) || item.line !== undefined) throw bad(`${at}：只支持规则内容匹配，请填写完整规则内容`);
+    if (!isObj(item) || item.line !== undefined) throw bad(`${at}：只支持规则内容匹配，请填写完整规则内容`);
     const o = item.override;
     if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge'].includes(o.when.client as string) || (o.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(o.when.platform as string))) throw bad(`${at}：客户端或平台不合法`);
     const a = o.action;
-    if (!isObj(a) || !(a.drop === true && a.replace === undefined || a.drop === undefined && Array.isArray(a.replace) && a.replace.length > 0 && a.replace.every(rule))) throw bad(`${at}：请选择丢弃或填写完整的替换规则`);
+    if (!isObj(a) || !(
+      a.drop === true && a.replace === undefined && a.append === undefined ||
+      a.drop === undefined && a.append === undefined && Array.isArray(a.replace) && a.replace.length > 0 && a.replace.every(rule) ||
+      a.drop === undefined && a.replace === undefined && Array.isArray(a.append) && a.append.length > 0 && a.append.every(rule)
+    )) throw bad(`${at}：请选择丢弃或填写完整的替换、追加规则`);
+    if (a.append !== undefined) {
+      if (item.match !== undefined) throw bad(`${at}：追加无需规则内容匹配`);
+    } else if (!isStr(item.match)) throw bad(`${at}：请填写完整规则内容`);
   });
 }
 
