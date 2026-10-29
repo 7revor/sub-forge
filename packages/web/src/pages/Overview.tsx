@@ -1,3 +1,5 @@
+import { sourceFetchSummary } from '../domain/sourceFetch.ts';
+import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 总览（设计稿「总览」）：四个统计、我的配置订阅（最近访问与状态）、待处理事项、订阅源拉取。
 // 访问统计来自各配置订阅的访问日志，孤儿覆盖项按当前模板计算。
@@ -35,13 +37,7 @@ export function Overview() {
   const logs = useQueries({
     queries: (profiles.data ?? []).map((p) => ({ queryKey: ['access-log', p.id], queryFn: () => api<{ items: AccessLogRow[] }>('GET', `/profiles/${p.id}/access-log`).then((r) => r.items) })),
   });
-  const status = remote.map((s, i) => {
-    const items = snaps[i]?.data ?? [];
-    const lastOk = items.find((x) => x.ok);
-    const lastFail = items.find((x) => !x.ok);
-    const failing = !!lastFail && (!lastOk || lastFail.fetchedAt > lastOk.fetchedAt);
-    return { source: s, lastOk, lastFail, failing };
-  });
+  const status = remote.map((source, index) => ({ source, ...sourceFetchSummary(snaps[index]?.data ?? []) }));
   const failing = status.filter((s) => s.failing);
   const tpl = (id?: string) => templates.data?.find((t) => t.id === id);
 
@@ -158,7 +154,7 @@ export function Overview() {
                         </div>
                       ) : <span className="text-[12.5px] text-muted">—</span>}</td>
                       <td className={cx(td, 'whitespace-nowrap text-muted')}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
-                      <td className={td}>{st?.failing ? <Badge tone="err">{st.lastOk ? '拉取失败 · 使用快照' : '拉取失败'}</Badge> : st?.lastOk ? <Badge tone="ok">正常</Badge> : <Badge>未拉取</Badge>}</td>
+                      <td className={td}><SourceFetchStatus state={st ?? { failing: false, lastOk: undefined }} /></td>
                       <td className={cx(td, 'text-right')}><DocActionLink to={`/sources/${source.id}`} name={source.name} /></td>
                     </DocTableRow>
                   );

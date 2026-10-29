@@ -1,3 +1,4 @@
+import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展开查看快照历史。
 
@@ -15,8 +16,7 @@ import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc }
 
 function SourceState({ source }: { source: SourceDoc }) {
   const s = useSourceFetchState(source);
-  if (s.failing) return <Badge tone="err">{s.lastOk ? '拉取失败 · 使用快照' : '拉取失败'}</Badge>;
-  return s.lastOk ? <Badge tone="ok">正常</Badge> : <Badge>未拉取</Badge>;
+  return <SourceFetchStatus state={s} />;
 }
 
 function SourceLast({ source }: { source: SourceDoc }) {

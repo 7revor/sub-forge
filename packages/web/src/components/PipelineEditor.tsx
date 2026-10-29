@@ -130,7 +130,7 @@ const ROW = 'grid grid-cols-[150px_minmax(0,1fr)] items-center gap-3';
 function SetFieldsForm({ fields, onChange }: { fields: Record<string, unknown>; onChange: (fields: Record<string, unknown>) => void }) {
   const [error, setError] = useState<string>();
   const extra = Object.fromEntries(Object.entries(fields).filter(([key]) => !SET_KEYS.includes(key)));
-  // 公共 ExtraFields 没有键名校验接口，在此捕获输入并在写入前再次用内核校验。
+  // 字段名由公共编辑器显式校验，提交时再校验完整数据。
   return <div className="flex flex-col gap-2.5">
     {SET_BOOLS.map((key) => <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><OptionalBoolean label={key} size="sm" value={typeof fields[key] === 'boolean' ? fields[key] as boolean : undefined}
       onChange={(v) => onChange(updateSetField(fields, key, v))} /></div>)}
@@ -143,15 +143,9 @@ function SetFieldsForm({ fields, onChange }: { fields: Record<string, unknown>; 
         {options.map((v) => <option key={v} value={v}>{v}</option>)}
       </Select></div>;
     })}
-    <div className="flex flex-col gap-2 border-t border-line pt-2.5" onChangeCapture={(event) => {
-      const target = event.target;
-      if (target instanceof HTMLInputElement && (target.getAttribute('aria-label') === '新字段名称' || target.getAttribute('aria-label')?.endsWith('的字段名称'))) {
-        const key = target.value.trim();
-        setError(setFieldsError({ [key]: null }) || (SET_KEYS.includes(key) ? '请使用上方控件修改该字段' : undefined));
-      }
-    }}>
+    <div className="flex flex-col gap-2 border-t border-line pt-2.5">
       <span className={lbl}>其他字段</span>
-      <ExtraFields value={extra} onChange={(next) => {
+      <ExtraFields value={extra} validateName={(key) => setFieldsError({ [key]: null }) || (SET_KEYS.includes(key) ? '请使用上方控件修改该字段' : undefined)} onChange={(next) => {
         const error = setFieldsError(next) || (Object.keys(next).some((key) => SET_KEYS.includes(key)) ? '请使用上方控件修改该字段' : undefined);
         setError(error);
         if (error) return;

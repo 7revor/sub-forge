@@ -1,3 +1,4 @@
+import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { Notice } from '../../components/Notice.tsx';
 // 模板规则只改启用和出口；私有规则支持拖拽、匹配项及客户端覆盖编辑。
 
@@ -6,7 +7,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
-import { RuleEditor } from '../../components/RuleEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Modal, Select, Switch, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
@@ -39,22 +39,8 @@ function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (v
   const { groupOptions, profileNodeSets } = useProfile();
   const rulesets = useList('rulesets').data ?? [];
   const matcher = value.matcher;
-  const options = rulesets;
-  const changeRule = (rule: RuleIR) => {
-    if (matcher.kind === 'rule') onChange({ ...value, matcher: { ...matcher, rule } });
-  };
   return <div className="flex flex-col gap-3.5">
-    <Field label="匹配项">{(id) => <Select id={id} value={matcher.kind} onChange={(e) => {
-      const kind = e.target.value as Matcher['kind'];
-      const { rule: _, id: __, overrides: ___, ...rest } = matcher as { rule?: RuleIR; id?: string; overrides?: unknown };
-      onChange({ ...value, matcher: kind === 'rule' ? { ...rest, kind, rule: { type: 'DOMAIN', value: '' } } : { ...rest, kind, id: '' } });
-    }}><option value="rule">单条规则</option><option value="ruleset">规则集</option></Select>}</Field>
-    {matcher.kind === 'rule' ? <RuleEditor value={matcher.rule} onChange={changeRule} onIncomplete={changeRule} /> :
-      <Field label="规则集">{(id) => <Select id={id} value={matcher.id} onChange={(e) => onChange({ ...value, matcher: { ...matcher, id: e.target.value } })}>
-        <option value="">请选择</option>
-        {matcher.id && !options.some((item) => item.id === matcher.id) && <option value={matcher.id}>{matcher.id}（当前不可用）</option>}
-        {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </Select>}</Field>}
+    <MatcherEditor value={matcher} rulesets={rulesets} onChange={(matcher) => onChange({ ...value, matcher })} />
     <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
     <div className="flex flex-wrap gap-5">

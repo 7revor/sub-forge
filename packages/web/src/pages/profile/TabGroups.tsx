@@ -1,8 +1,9 @@
+import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { Notice } from '../../components/Notice.tsx';
 import { OptionalBoolean } from '../../components/OptionalBoolean.tsx';
 // 策略组：填充模板组（只能加成员、调整类型与测速参数，不能删除、改名或隐藏，PRF-09），管理私有组。
 
-import type { Builtin, GroupMember, GroupSpec, GroupType, NodeSetID } from '@sub-forge/core';
+import type { Builtin, GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
 import { Lock, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { BUILTINS, NodeSetSelect, memberLabel } from '../../components/pickers.tsx';
@@ -14,7 +15,6 @@ import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, cx } from 
 import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
 
-const TYPES: GroupType[] = ['select', 'url-test', 'fallback', 'load-balance'];
 type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'whenEmpty' | 'display' | 'extra'>;
 
 function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => void; excludeGroupId: string }) {
@@ -96,7 +96,6 @@ export function TabGroups() {
     patchOverlay((o) => ({ ...o, extraGroups: reorderExtraGroups(templateIds, groups.filter((x) => x.id !== g.id).map((x) => x.id), (o.extraGroups ?? []).filter((e) => e.group.id !== g.id)) }));
     setSelectedId(groups[0]?.id);
   };
-  const test = eff?.test ?? {};
   const totalMembers = (x: typeof groups[number]) => x.origin === 'template' ? x.members.length + (draft.overlay.groupPatches?.[x.id]?.addMembers?.length ?? 0) : x.members.length;
 
   const templateMembers = g?.origin === 'template' && <ul className="m-0 list-none p-0">
@@ -146,17 +145,7 @@ export function TabGroups() {
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
               <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                <Field label="类型">{(id) => <Select id={id} value={eff.type} onChange={(e) => setField('type', e.target.value as GroupType)}>{TYPES.map((t) => <option key={t}>{t}</option>)}</Select>}</Field>
-                {eff.type !== 'select' && <>
-                  <Field label="测速地址">{(id) => <Input id={id} className="font-mono" placeholder="默认" value={test.url ?? ''} onChange={(e) => setField('test', { ...test, url: e.target.value || undefined })} />}</Field>
-                  <Field label="间隔（秒）">{(id) => <Input id={id} type="number" value={test.interval ?? ''} onChange={(e) => setField('test', { ...test, interval: e.target.value ? Number(e.target.value) : undefined })} />}</Field>
-                  <Field label="超时（ms）">{(id) => <Input id={id} type="number" min={0} value={test.timeout ?? ''} onChange={(e) => setField('test', { ...test, timeout: e.target.value ? Number(e.target.value) : undefined })} />}</Field>
-                  <Field label="max-failed-times">{(id) => <Input id={id} type="number" min={0} step={1} value={test.maxFailedTimes ?? ''} onChange={(e) => setField('test', { ...test, maxFailedTimes: e.target.value ? Number(e.target.value) : undefined })} />}</Field>
-                  <Field label="expected-status">{(id) => <Input id={id} className="font-mono" placeholder="如 200 或 200/204" value={test.expectedStatus ?? ''} onChange={(e) => setField('test', { ...test, expectedStatus: e.target.value || undefined })} />}</Field>
-                  <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">lazy</span><OptionalBoolean label="lazy" value={test.lazy} onChange={(lazy) => setField('test', { ...test, lazy })} /></div>
-                  {eff.type === 'url-test' && <Field label="容差（ms）">{(id) => <Input id={id} type="number" value={test.tolerance ?? ''} onChange={(e) => setField('test', { ...test, tolerance: e.target.value ? Number(e.target.value) : undefined })} />}</Field>}
-                </>}
-                {eff.type === 'load-balance' && <Field label="策略">{(id) => <Select id={id} value={eff.strategy ?? 'consistent-hashing'} onChange={(e) => setField('strategy', e.target.value as GroupSpec['strategy'])}><option>consistent-hashing</option><option>round-robin</option><option>sticky-sessions</option></Select>}</Field>}
+                <GroupSettingsFields value={eff} onChange={setField} defaultStrategy="consistent-hashing" />
                 <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">为空时{g.origin === 'template' ? '（模板设定）' : ''}</span>{g.origin === 'template' ? <span className="flex h-[38px] items-center text-[13px]">{eff.whenEmpty === 'direct' ? '直连 · 输出 COMPATIBLE' : '拒绝 · 输出 REJECT'}</span> : <Segmented label="私有组为空时" value={eff.whenEmpty ?? 'reject'} options={[{ value: 'reject', label: '拒绝' }, { value: 'direct', label: '直连' }]} onChange={(value) => setField('whenEmpty', value)} />}</div>
               </div>
 

@@ -1,3 +1,4 @@
+import { sourceFetchSummary } from './domain/sourceFetch.ts';
 // 数据读写的 React Query 封装。文档种类与后端 /api/{kind} 一一对应。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -77,8 +78,5 @@ export function useSourceFetchState(source: SourceDoc | undefined) {
     enabled: !!source?.id,
     queryFn: () => api<{ items: import('./api.ts').SnapshotMeta[] }>('GET', `/sources/${source!.id}/snapshots`).then((r) => r.items),
   });
-  const items = snaps.data ?? [];
-  const lastOk = items.find((x) => x.ok);
-  const lastFail = items.find((x) => !x.ok);
-  return { snaps, lastOk, failing: !!lastFail && (!lastOk || lastFail.fetchedAt > lastOk.fetchedAt), okCount: items.filter((x) => x.ok).length };
+  return { snaps, ...sourceFetchSummary(snaps.data ?? []) };
 }

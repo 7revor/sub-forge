@@ -1,12 +1,13 @@
+import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 // 基础设置预设（BS-03，设计稿「管理员 · 基础设置预设」）：一页完成——左侧预设列表、中间编辑（分区跳转 + 表单 / YAML）、右侧引用方。
 // 保存即发布新版本，引用它的配置订阅随之更新，它们自己覆盖的项保持不变。
 
 import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { DeleteAction, ActionButtons } from '../components/DetailActions.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Button, Card, Empty, ErrorBox, Input, Modal, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
+import { Button, Card, Empty, ErrorBox, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { DualEditor, type EditorMode } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
@@ -21,18 +22,9 @@ const EMPTY: PresetDoc = { id: '', name: '', version: 1, mihomo: DEFAULT_MIHOMO 
 function NewPresetModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const save = useSaveDoc('presets');
-  const [name, setName] = useState('');
-  useEffect(() => { if (open) setName(''); }, [open]);
-  const create = () => save.mutate({ name: name.trim(), version: 1, mihomo: DEFAULT_MIHOMO }, { onSuccess: (item) => { onClose(); navigate(`/presets/${item.id}`); } });
-  return (
-    <Modal title="新建预设" open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!name.trim() || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建'}</Button></>}>
-      <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">名称</span>
-        <Input autoFocus placeholder="例如：fake-ip 推荐" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) create(); }} /></label>
-      <span className="text-[12px] text-muted">从常用的通用设置开始，创建后再补充 DNS、TUN 等。</span>
-      <ErrorBox error={save.error} />
-    </Modal>
-  );
+  return <NamedCreateDialog open={open} onClose={onClose} title="新建预设" placeholder="例如：fake-ip 推荐" hint="从常用的通用设置开始，创建后再补充 DNS、TUN 等。"
+    pending={save.isPending} error={save.error} onReset={save.reset}
+    onCreate={(name) => save.mutateAsync({ name, version: 1, mihomo: DEFAULT_MIHOMO }, { onSuccess: (item) => { onClose(); navigate(`/presets/${item.id}`); } })} />;
 }
 
 /** /presets：有预设时跳到第一个，否则显示空状态 */

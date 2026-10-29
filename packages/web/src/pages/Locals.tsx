@@ -1,3 +1,4 @@
+import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 // 本地节点（LOC-01）：与订阅源一致的三层页面——
 // /locals 分组列表 → /locals/:id 分组详情（节点表、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（表单 / YAML）。
 // 本地节点只录入节点信息，不设置前置：代理链统一在配置订阅的「代理链」中配置（REF-03）。
@@ -57,17 +58,9 @@ function LeaveModal({ blocker, what, canSave, pending, error, onSave }: {
 function NewGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const save = useSaveDoc('locals');
-  const [name, setName] = useState('');
-  useEffect(() => { if (open) setName(''); }, [open]);
-  const create = () => save.mutate({ name: name.trim(), proxies: [] }, { onSuccess: (item) => { onClose(); navigate(`/locals/${item.id}`); } });
-  return (
-    <Modal title="新建分组" open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!name.trim() || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建'}</Button></>}>
-      <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">分组名称</span>
-        <Input autoFocus placeholder="例如：自建、家宽" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) create(); }} /></label>
-      <ErrorBox error={save.error} />
-    </Modal>
-  );
+  return <NamedCreateDialog open={open} onClose={onClose} title="新建分组" label="分组名称" placeholder="例如：自建、家宽"
+    pending={save.isPending} error={save.error} onReset={save.reset}
+    onCreate={(name) => save.mutateAsync({ name, proxies: [] }, { onSuccess: (item) => { onClose(); navigate(`/locals/${item.id}`); } })} />;
 }
 
 const typesText = (g: LocalProxyGroup) => [...new Set(g.proxies.map((p) => p.type))].join(' / ') || '—';
