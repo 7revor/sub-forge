@@ -72,7 +72,7 @@ export function Field({ label, hint, children, className }: { label: string; hin
 
 /** 页面剩余展示区；同级的标题、筛选和操作栏保持固定。 */
 export function PageScroll({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx('page-scroll gap-5 p-0.5', className)}>{children}</div>;
+  return <div className={cx('page-scroll -m-1 gap-5 p-1', className)}>{children}</div>;
 }
 
 export function Card({ title, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {

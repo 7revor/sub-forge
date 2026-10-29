@@ -66,7 +66,7 @@ export function ProfileWizard() {
           );
         })}
       </ol>
-      <fieldset disabled={save.isPending} className="page-scroll m-0 gap-5 border-0 p-0.5">
+      <fieldset disabled={save.isPending} className="page-scroll -m-1 gap-5 border-0 p-1">
         {step === 0 && <>
           <Card title="名称与基础设置">
             <Field label="名称" hint="必填，客户端里显示的订阅名">{(id) => <Input id={id} required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>

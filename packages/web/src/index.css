@@ -80,7 +80,8 @@ body {
   gap: 1.25rem;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  /* 此层仅负责排版，允许焦点轮廓和菜单伸入外侧留白。 */
+  overflow: visible;
 }
 
 .page-layout > *,
@@ -153,4 +154,6 @@ body {
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  padding: 4px;
+  margin: -4px;
 }
