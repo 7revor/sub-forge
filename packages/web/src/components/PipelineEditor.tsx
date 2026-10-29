@@ -9,7 +9,7 @@ import { ExtraFields } from './ExtraFields.tsx';
 import { patternHits, regexError, renameHits, rowHit, setFieldsError, stepInputNames, updateSetField } from './pipelineForm.ts';
 import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview, TraceStep } from '../api.ts';
-import { Badge, Button, Input, Segmented, Select, Switch, Textarea, cx } from './ui.tsx';
+import { Badge, Button, DraftInput, DraftTextarea, Input, Segmented, Select, Switch, cx } from './ui.tsx';
 
 export const OP_LABEL: Record<OperatorStep['op'], string> = {
   'filter.useless': '无用节点过滤',
@@ -101,8 +101,8 @@ function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则
           <div key={i} className="flex flex-col gap-1">
             <div className={grid}>
               <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-              <Input aria-label={`${label} ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && error && 'border-err bg-[#fffbfa]')} placeholder={placeholder} value={p}
-                aria-invalid={!!p && !!error} onChange={(e) => onChange(patterns.map((x, j) => (j === i ? e.target.value : x)))} />
+              <DraftInput aria-label={`${label} ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && error && 'border-err bg-[#fffbfa]')} placeholder={placeholder} value={p}
+                aria-invalid={!!p && !!error} onCommit={(v) => onChange(patterns.map((x, j) => (j === i ? v : x)))} />
               <span className="text-right font-mono text-[12.5px] text-ink-2">{hits?.[i] ?? '—'}</span>
               <DeleteIcon label={`删除第 ${i + 1} 条`} onClick={() => onChange(patterns.filter((_, j) => j !== i))} />
             </div>
@@ -198,10 +198,9 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
       const value = step.patterns ?? [];
       return <div className="flex flex-col gap-2">
         <label htmlFor="useless" className={lbl}>关键词（正则，每行一条；命中任一条的节点被移除）</label>
-        <Textarea id="useless" rows={4} className="font-mono text-[12.5px]" value={value.join('\n')}
+        <DraftTextarea id="useless" rows={4} className="font-mono text-[12.5px]" value={value.join('\n')}
           aria-invalid={value.some((p) => !!regexError(p))}
-          onChange={(e) => { const lines = e.target.value.split('\n'); onChange({ ...step, patterns: lines.some((l) => l.trim()) ? lines : undefined }); }}
-          onBlur={() => { const lines = value.map((l) => l.trim()).filter(Boolean); onChange({ ...step, patterns: lines.length ? lines : undefined }); }} />
+          onCommit={(text) => { const lines = text.split('\n').map((l) => l.trim()).filter(Boolean); onChange({ ...step, patterns: lines.length ? lines : undefined }); }} />
         {value.map((p, i) => ({ i, error: p.trim() ? regexError(p.trim()) : undefined })).filter((x) => x.error).map(({ i, error }) => <span key={i} role="status" className="text-[12px] text-err">第 {i + 1} 行：{error}</span>)}
         <span className={hint}>清空后使用默认关键词：{DEFAULT_USELESS_PATTERNS.slice(0, 8).join('、')}…</span>
       </div>;
@@ -225,8 +224,8 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
           <div className="grid grid-cols-[24px_22px_minmax(0,1fr)_44px_32px] items-center gap-2 py-1">
             {handle}
             <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-            <Input aria-label={`优先级 ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && regexError(p) && 'border-err')} value={p} aria-invalid={!!p && !!regexError(p)}
-              onChange={(e) => onChange({ ...step, patterns: step.patterns.map((x, j) => (j === i ? e.target.value : x)) })} />
+            <DraftInput aria-label={`优先级 ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && regexError(p) && 'border-err')} value={p} aria-invalid={!!p && !!regexError(p)}
+              onCommit={(v) => onChange({ ...step, patterns: step.patterns.map((x, j) => (j === i ? v : x)) })} />
             <span className="text-right font-mono text-[12.5px] text-ink-2">{hits(step.patterns)?.[i] ?? '—'}</span>
             <DeleteIcon label={`删除优先级 ${i + 1}`} onClick={() => onChange({ ...step, patterns: step.patterns.filter((_, j) => j !== i) })} />
           </div>
@@ -244,10 +243,10 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
           return <div key={i} className="flex flex-col gap-1">
             <div className={grid}>
               <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-              <Input aria-label={`规则 ${i + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', r.pattern && error && 'border-err bg-[#fffbfa]')} placeholder="^香港\s*(\d+).*$" value={r.pattern}
-                aria-invalid={!!r.pattern && !!error} onChange={(e) => setRule(i, { pattern: e.target.value })} />
+              <DraftInput aria-label={`规则 ${i + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', r.pattern && error && 'border-err bg-[#fffbfa]')} placeholder="^香港\s*(\d+).*$" value={r.pattern}
+                aria-invalid={!!r.pattern && !!error} onCommit={(pattern) => setRule(i, { pattern })} />
               <span aria-hidden="true" className="text-center text-faint">→</span>
-              <Input aria-label={`规则 ${i + 1} 替换为`} className="h-9 min-w-0 font-mono" placeholder="HK-$1" value={r.replace} onChange={(e) => setRule(i, { replace: e.target.value })} />
+              <DraftInput aria-label={`规则 ${i + 1} 替换为`} className="h-9 min-w-0 font-mono" placeholder="HK-$1" value={r.replace} onCommit={(replace) => setRule(i, { replace })} />
               <span className="text-right font-mono text-[12.5px] text-ink-2">{counts?.[i] ?? '—'}</span>
               <DeleteIcon label={`删除规则 ${i + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, j) => j !== i) })} />
             </div>
@@ -263,8 +262,8 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'rename.affix': {
       const sample = names?.[0] ?? '🇭🇰 HK-01';
       return <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5"><span className={lbl}>前缀</span><Input className="h-9 font-mono" placeholder="不加" value={step.prefix ?? ''} onChange={(e) => onChange({ ...step, prefix: e.target.value })} /></label>
-        <label className="flex flex-col gap-1.5"><span className={lbl}>后缀</span><Input className="h-9 font-mono" placeholder="不加" value={step.suffix ?? ''} onChange={(e) => onChange({ ...step, suffix: e.target.value })} /></label>
+        <label className="flex flex-col gap-1.5"><span className={lbl}>前缀</span><DraftInput className="h-9 font-mono" placeholder="不加" value={step.prefix ?? ''} onCommit={(prefix) => onChange({ ...step, prefix })} /></label>
+        <label className="flex flex-col gap-1.5"><span className={lbl}>后缀</span><DraftInput className="h-9 font-mono" placeholder="不加" value={step.suffix ?? ''} onCommit={(suffix) => onChange({ ...step, suffix })} /></label>
         <span className={cx(hint, 'col-span-2')}>示例：<span className="font-mono">{sample}</span> → <span className="font-mono">{step.prefix ?? ''}{sample}{step.suffix ?? ''}</span></span>
       </div>;
     }
@@ -289,7 +288,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'script':
       return <div className="flex flex-col gap-2">
         <label htmlFor="script-code" className={lbl}>{'(nodes, ctx) => nodes'}</label>
-        <Textarea id="script-code" rows={7} className="bg-panel font-mono text-[12.5px]" value={step.code} onChange={(e) => onChange({ ...step, code: e.target.value })} />
+        <DraftTextarea id="script-code" rows={7} className="bg-panel font-mono text-[12.5px]" value={step.code} onCommit={(code) => onChange({ ...step, code })} />
         <span className={hint}>需要管理员授予脚本权限。在服务端沙箱中执行；出错时这一步被跳过，预览标为失败。</span>
       </div>;
   }
