@@ -43,7 +43,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <SortableList items={value.groups} getKey={g => g.id} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = g.members.map(m => memberLabel(m, groupName, ref => ref.id).text).join(' · ') || '—';
-          return <div className={cx(columns, 'items-center border-t border-line-2 px-4 py-1 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
+          return <div className={cx(columns, 'items-center border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
             {handle}
             <button type="button" onClick={() => onSelect(g.id)} className={cx('min-w-0 cursor-pointer truncate text-left font-medium hover:text-accent', error && 'text-err')}>{g.name || '未命名组'}{g.display?.hidden && <span className="ml-2 text-[11px] font-normal text-muted">已隐藏</span>}</button>
             <span className="font-mono text-[12px]">{g.type.toUpperCase()}</span>

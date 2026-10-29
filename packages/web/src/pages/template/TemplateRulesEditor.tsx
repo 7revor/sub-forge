@@ -10,7 +10,7 @@ import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)_64px]';
+const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(120px,14vw,200px)_64px]';
 
 function RuleMatcher({ matcher, ctx }: { matcher: Matcher; ctx: ConvertCtx }) {
   if (matcher.kind === 'ruleset' && matcher.remote) return <span className="flex min-w-0 items-center gap-2 font-mono text-[12.5px]">
@@ -53,20 +53,20 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       {!value.rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
       <SortableList items={value.rules} getKey={r => r.id} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
         const error = report.some(item => item.level === 'error' && item.where === `rule:${r.id}`);
-        return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-1 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
+        return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
           <span className="flex items-center text-[12px] text-muted">{handle}{i + 1}</span>
           <button type="button" aria-label={`编辑第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)} className="min-w-0 cursor-pointer text-left hover:text-accent"><RuleMatcher matcher={r.matcher} ctx={ctx} /></button>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-          <button type="button" aria-label={`修改第 ${i + 1} 条规则出口`} onClick={() => onSelect(r.id)} className="col-start-2 row-start-2 min-w-0 cursor-pointer truncate text-left text-ink-2 hover:text-accent sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</button>
+          <button type="button" aria-label={`修改第 ${i + 1} 条规则出口`} title={targetLabel(r.target, groupName, ref => ref.id)} onClick={() => onSelect(r.id)} className="col-start-2 row-start-2 min-w-0 cursor-pointer truncate text-left text-ink-2 hover:text-accent sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</button>
           <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
             <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
             <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
           </div>
         </div>;
       }} />
-      <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-3 text-[13px]')}>
+      <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
         <span className="pl-6 text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-        <button type="button" aria-label="修改 MATCH 出口" onClick={() => onSelect('final')} className="col-start-2 row-start-2 cursor-pointer truncate text-left hover:text-accent sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</button>
+        <button type="button" aria-label="修改 MATCH 出口" title={targetLabel(value.final, groupName, ref => ref.id)} onClick={() => onSelect('final')} className="col-start-2 row-start-2 min-w-0 cursor-pointer truncate text-left hover:text-accent sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</button>
         <Button size="sm" variant="ghost" className="col-start-3 row-start-1 justify-self-start px-1.5 sm:col-start-5" aria-label="编辑 MATCH" onClick={() => onSelect('final')}><Pencil size={14} /></Button>
       </div>
     </Card>
