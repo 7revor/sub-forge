@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { Store } from '../store.ts';
 import type { RuleRepoService } from '../rule-repos/service.ts';
-import { rawUrl } from '../rule-repos/adapters.ts';
 import { bad, HttpError, isStr, jsonBody, notFound, requireAdmin, requireUser, type ApiEnv } from './common.ts';
 import { validateDoc } from './validate.ts';
 
@@ -37,6 +36,19 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
     if (body.enabled) void repos.refresh(c.req.param('id'));
     return c.json({ repos: repos.list() });
   });
+  // 仅解析关联来源，编辑页保存前不写规则集。
+  app.post('/rule-repos/resolve', async c => {
+    const body = await jsonBody(c);
+    if (!isStr(body.repo) || !isStr(body.path)) throw bad('缺少 repo 或 path');
+    if (body.variant !== undefined && !isStr(body.variant)) throw bad('variant 必须是字符串');
+    try {
+      const result = await repos.linkedSources(body.repo, body.path, body.variant as string | undefined);
+      return c.json({ ...result, sources: result.sources.map(s => ({ ...s, id: randomId(9) })) });
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(502, `规则关联解析失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
   app.post('/rule-repos/import', async c => {
     const body = await jsonBody(c);
     if (!isStr(body.repo) || !isStr(body.path)) throw bad('缺少 repo 或 path');
@@ -52,18 +64,16 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
     };
     loadTarget();
     let entry;
-    try { entry = await repos.resolvedEntry(body.repo, body.path); }
+    try { entry = await repos.linkedSources(body.repo, body.path, body.variant as string | undefined); }
     catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(502, `规则使用说明拉取失败：${error instanceof Error ? error.message : String(error)}`);
     }
-    const variant = repos.importVariant(entry, body.variant as string | undefined);
     const target = loadTarget();
     const sources = [...(target?.sources ?? [])];
-    for (const file of variant.files) {
-      const url = rawUrl(repos.definition(body.repo), file);
-      if (sources.some(s => s.kind === 'remote' && s.url === url)) continue;
-      sources.push({ id: randomId(9), kind: 'remote', name: `${body.repo} · ${file.path}`, url, format: file.format, behavior: file.behavior });
+    for (const source of entry.sources) {
+      if (sources.some(s => s.kind === 'remote' && s.url === source.url)) continue;
+      sources.push({ ...source, id: randomId(9) });
     }
     const id = target?.id ?? randomId(9);
     const doc = validateDoc('ruleset', { ...(target ?? { name: entry.name }), sources }, id, user, store);

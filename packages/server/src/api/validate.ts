@@ -1,3 +1,4 @@
+import { BUILTIN_REPOS, rawUrl, type IndexedEntry } from '../rule-repos/adapters.ts';
 // 保存前的校验：结构必填项、正则能否编译、引用是否存在且属于当前用户、组合是否成环。
 // 深层结构（规则、组参数等）由渲染报告兜住，这里只拦截保存后必然无法使用的数据。
 
@@ -145,6 +146,25 @@ export class RefChecker {
   }
 }
 
+/** 草稿预览与持久化共用仓库关联约束；不限制普通远程来源输入中的未完成地址。 */
+export function checkRepositorySource(src: Record<string, unknown>, prior: { repository?: unknown; url?: string } | undefined, store: Store, at: string) {
+  const link = src.repository;
+  const sameLink = (a: unknown, b: unknown) => isObj(a) && isObj(b) && ['repo', 'entry', 'ref', 'path'].every(k => a[k] === b[k]);
+  if (prior?.repository && (!sameLink(link, prior.repository) || src.kind !== 'remote' || src.url !== prior.url)) throw bad(`${at}：关联来源的地址不可修改，请删除后重新关联`);
+  if (link !== undefined) {
+    if (src.kind !== 'remote' || !isObj(link) || !['repo', 'entry', 'ref', 'path'].every(k => isStr(link[k]))) throw bad(`${at}：仓库关联标识不合法`);
+    // 已保存关联可继续使用，停用仓库或上游删文件不会阻断其他配置的保存。
+    if (!prior?.repository) {
+      const repo = BUILTIN_REPOS.find(r => r.id === link.repo);
+      const row = store.db.prepare('SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo WHERE e.repo = ? AND e.key = ? AND r.enabled = 1').get(link.repo, link.entry) as { data: string } | undefined;
+      const entry = row ? JSON.parse(row.data) as IndexedEntry : undefined;
+      const file = entry?.variants.flatMap(v => v.files).find(f => f.path === link.path && f.ref === link.ref);
+      if (!repo || !file || src.url !== rawUrl(repo, file)) throw bad(`${at}：关联地址必须与仓库索引一致`);
+    }
+    src.repository = { repo: link.repo, entry: link.entry, ref: link.ref, path: link.path };
+  }
+}
+
 /** 校验并返回规范化后的文档（id 由调用方确定） */
 export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unknown>, id: string, user: User, store: Store): DocTypes[K] {
   if (!isStr(body.name)) throw bad('name 不能为空');
@@ -203,12 +223,16 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (!Array.isArray(doc.sources)) throw bad('sources 必须是数组');
       checkRuleSetOverrides(doc.overrides);
       if (doc.noResolve !== undefined && typeof doc.noResolve !== 'boolean') throw bad('noResolve 必须是布尔值');
+      const previous = store.getWithOwner('ruleset', id);
+      const priorSources = previous?.owner === user.id ? previous.doc.sources : [];
       const ids = new Set<string>();
       (doc.sources as unknown[]).forEach((src, i) => {
         const at = `来源 ${i + 1}`;
         if (!isObj(src) || !isStr(src.id)) throw bad(`${at}：缺少 id`);
         if (ids.has(src.id)) throw bad(`${at}：id ${src.id} 重复`);
         ids.add(src.id);
+        const prior = priorSources.find(s => s.id === src.id);
+        checkRepositorySource(src, prior, store, at);
         if (!RULESET_FORMATS.has(src.format as string)) throw bad(`${at}：format 不合法`);
         if (src.kind === 'remote') { if (!isHttpUrl(src.url)) throw bad(`${at}：远程来源需要 http(s) 地址`); delete src.content; }
         else if (src.kind === 'local') { if (typeof src.content !== 'string') throw bad(`${at}：本地来源需要 content`); delete src.url; delete src.fetch; }

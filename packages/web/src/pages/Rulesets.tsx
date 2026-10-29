@@ -1,3 +1,4 @@
+import { AsyncSelect, type AsyncSelectPage } from '../components/listbox.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
 import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
@@ -6,16 +7,15 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
-import { FileText, Globe, Trash2 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
-import { api, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
+import { FileText, Globe, Link2, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { api, type RepoEntry, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
@@ -30,8 +30,9 @@ const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remo
 
 function sourceSummary(rs: RuleSetDoc): string {
   const remote = rs.sources.filter((s) => s.kind === 'remote').length;
+  const linked = rs.sources.filter(s => s.repository).length;
   const local = rs.sources.length - remote;
-  return [remote && `${remote} 个远程`, local && `${local} 个本地`].filter(Boolean).join(' · ') || '没有来源';
+  return [linked && `${linked} 个关联`, (remote - linked) > 0 && `${remote - linked} 个远程`, local && `${local} 个本地`].filter(Boolean).join(' · ') || '没有来源';
 }
 
 export function RulesetList() {
@@ -116,9 +117,16 @@ export function RulesetEdit() {
       <Card title="来源" actions={<>
         <Button className="h-9" onClick={() => add(newRemote())}><Globe size={15} />添加远程地址</Button>
         <Button className="h-9" onClick={() => add(newLocal())}><FileText size={15} />添加本地规则</Button>
-        {!e.isNew && <Link to={`/rule-repo?ruleset=${encodeURIComponent(d.id)}`} className={buttonClass('default', 'md', 'h-9')}>从规则仓库添加</Link>}
       </>}>
         <div className="flex flex-col gap-4">
+          <RepositoryPicker key={d.id} onAdd={sources => {
+            e.setDraft(current => {
+              if (!current || current.id !== d.id) return current;
+              const added = sources.filter(s => !current.sources.some(existing => existing.url === s.url));
+              return { ...current, sources: [...current.sources, ...added] };
+            });
+            setSelected(d.sources.find(s => s.url === sources[0]?.url)?.id ?? sources[0]?.id);
+          }} />
           {!d.sources.length ? <Empty title="还没有来源" /> : (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
               <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
@@ -151,6 +159,36 @@ export function RulesetEdit() {
   );
 }
 
+async function loadRepositoryOptions(query: string, offset: number): Promise<AsyncSelectPage> {
+  const result = await api<{ items: RepoEntry[]; total: number }>('GET', `/rule-repos/search?q=${encodeURIComponent(query)}&offset=${offset}&limit=30`);
+  return {
+    options: result.items.map(item => ({ value: JSON.stringify([item.repo, item.path]), label: item.name, hint: `${item.repo} · ${item.path}` })),
+    nextOffset: offset + result.items.length < result.total ? offset + result.items.length : undefined,
+  };
+}
+
+function RepositoryPicker({ onAdd }: { onAdd: (sources: RuleSetSourceDoc[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  return <div className="flex flex-col gap-2">
+    <div className="flex items-center gap-2"><Link2 size={16} className="shrink-0 text-accent-ink" />
+      <AsyncSelect aria-label="关联仓库规则" placeholder={busy ? '正在解析关联…' : '关联仓库规则…'} disabled={busy} loadOptions={loadRepositoryOptions}
+        onChange={async value => {
+          setBusy(true); setError(undefined);
+          try {
+            const [repo, path] = JSON.parse(value) as [string, string];
+            const result = await api<{ sources: RuleSetSourceDoc[] }>('POST', '/rule-repos/resolve', { repo, path });
+            if (alive.current) onAdd(result.sources);
+          } catch (e) { if (alive.current) setError(e); }
+          finally { if (alive.current) setBusy(false); }
+        }} />
+    </div>
+    <ErrorBox error={error} />
+  </div>;
+}
+
 function SourceRow({ src, handle, active, status, loading, onSelect, onChange, onDelete }: {
   src: RuleSetSourceDoc; handle: ReactNode; active: boolean; status?: RulesetSourceStatus; loading: boolean;
   onSelect: () => void; onChange: (p: Partial<RuleSetSourceDoc>) => void; onDelete: () => void;
@@ -159,7 +197,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
   const label = sourceLabel(src);
   const lines = src.kind === 'local' ? (src.content ?? '').split('\n').filter((l) => l.trim() && !l.trim().startsWith('#')).length : undefined;
   const sub = src.kind === 'remote'
-    ? [src.name?.trim() && src.url, `远程 · ${FORMAT_TEXT[src.format] ?? src.format}`].filter(Boolean).join(' · ')
+    ? [src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${FORMAT_TEXT[src.format] ?? src.format}`].filter(Boolean).join(' · ')
     : `本地 · ${FORMAT_TEXT[src.format] ?? src.format} · ${lines} 行`;
   return (
     <div className={cx('my-2 rounded-lg border', active ? 'border-accent bg-[#f8faff]' : 'border-line', !on && 'opacity-60')}>
@@ -167,7 +205,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
         {handle}
         <button type="button" aria-pressed={active} onClick={onSelect} className="flex min-w-0 flex-[1_1_260px] cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left">
           <span className={cx('grid h-8 w-8 shrink-0 place-items-center rounded-md', src.kind === 'remote' ? 'bg-accent-soft text-accent-ink' : 'bg-[#ebedf1] text-ink-2')} aria-hidden="true">
-            {src.kind === 'remote' ? <Globe size={15} /> : <FileText size={15} />}
+            {src.repository ? <Link2 size={15} /> : src.kind === 'remote' ? <Globe size={15} /> : <FileText size={15} />}
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className={cx('truncate text-[13.5px] font-medium', src.kind === 'remote' && !src.name?.trim() && 'font-mono text-[12.5px]')}>{label}</span>
@@ -180,7 +218,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
       </div>
       {active && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
-          {src.kind === 'remote' && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
+          {src.kind === 'remote' && <Field label={src.repository ? '关联地址（只读）' : '地址'} className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} readOnly={!!src.repository} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
           <Field label="格式">{(id) => <Select id={id} value={src.format} onChange={(x) => onChange({ format: x.target.value as RuleSetFormat })}>{FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
           {src.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={src.behavior ?? ''} onChange={(x) => onChange({ behavior: (x.target.value || undefined) as 'domain' | 'ipcidr' | undefined })}><option value="">请选择</option><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
           {src.kind === 'remote' && <Field label="缓存（小时）">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
