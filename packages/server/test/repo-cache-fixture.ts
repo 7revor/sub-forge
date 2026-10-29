@@ -1,4 +1,4 @@
-// 旧接口场景复用已有正文样本；Git 缓存本身另用真实本地仓库验证。
+// 索引场景使用本地模拟数据协议，不发送网络请求；Git 传输另用真实本地仓库验证。
 import { createHash } from 'node:crypto';
 import { vi } from 'vitest';
 import type { RepoCache } from '../src/rule-repos/git-cache.ts';
@@ -8,10 +8,11 @@ export function fixtureCache(fetcher: UpstreamFetcher): RepoCache {
   const trees = new Map<string, string>();
   const refs = new Map<string, string>();
   return {
+    inspect: vi.fn(async () => ({ defaultBranch: 'main', branches: ['main', 'master', 'other', 'surge-rule-set', 'surge-domain-set'] })),
     sync: vi.fn(async (repo: RepoDefinition) => {
       const revisions: Record<string, string> = {};
       for (const ref of repo.refs) {
-        const response = await fetcher(`https://api.github.com/repos/${repo.owner}/${repo.repo}/commits/${encodeURIComponent(ref)}`);
+        const response = await fetcher(`fixture://git/${repo.owner}/${repo.repo}/commits/${encodeURIComponent(ref)}`);
         const commit = JSON.parse(response.body);
         const sha = createHash('sha1').update(commit.sha + ref).digest('hex');
         revisions[ref] = sha;
@@ -21,7 +22,7 @@ export function fixtureCache(fetcher: UpstreamFetcher): RepoCache {
       return revisions;
     }),
     files: vi.fn(async (repo, commit) => {
-      const response = await fetcher(`https://api.github.com/repos/${repo.owner}/${repo.repo}/git/trees/${trees.get(`${repo.id}:${commit}`)}?recursive=1`);
+      const response = await fetcher(`fixture://git/${repo.owner}/${repo.repo}/git/trees/${trees.get(`${repo.id}:${commit}`)}?recursive=1`);
       return JSON.parse(response.body).tree.filter((n: { type: string; mode?: string }) => n.type === 'blob' && n.mode !== '120000').map((n: { path: string }) => n.path);
     }),
     read: vi.fn(async (repo: RepoDefinition, commit: string, path: string) => {
