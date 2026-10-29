@@ -14,7 +14,7 @@ import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(120px,14vw,200px)_64px]';
+const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(100px,10vw,140px)_64px]';
 
 function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCtx; repos: NamedRef[] }) {
   if (matcher.kind === 'rule') {
@@ -87,7 +87,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
           <span className="flex items-center text-[12px] text-muted">{handle}{i + 1}</span>
           <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer text-left hover:text-accent"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-          <span title={targetLabel(r.target, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-left text-ink-2 sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</span>
+          <span title={targetLabel(r.target, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center text-ink-2 sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</span>
           <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
             <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
             <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
@@ -96,7 +96,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       }} />
       <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
         <span className="pl-6 text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-        <span title={targetLabel(value.final, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-left sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</span>
+        <span title={targetLabel(value.final, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</span>
         <Button size="sm" variant="ghost" className="col-start-3 row-start-1 justify-self-start px-1.5 sm:col-start-5" aria-label="编辑 MATCH" onClick={() => onSelect('final')}><Pencil size={14} /></Button>
       </div>
     </Card>
