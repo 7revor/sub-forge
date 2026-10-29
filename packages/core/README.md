@@ -31,10 +31,11 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 规则参数运行时测试（`test/integration/mihomo-rule-options.test.ts`）使用同样的开关，启动容器内回环 DNS 与 HTTP 服务，实测 `no-resolve` 的查询行为和 `src` 的来源 IP 匹配；测试结束自动关闭服务与内核进程。
 
+模板发布前的影响分析（TPL-07 ②）已在服务层完成：逐个试渲染现有 Profile。模板规则内容的可用性检查也由服务层负责，详见 [后端修复记录](../../docs/12-backend-regression-fixes.md)。内核负责结构校验，以及阻止无效远程规则快照被渲染为成功的空分流配置。
+
 ## 尚未实现
 
 - 脚本处理器与规则改写脚本（SRC-08、CR-03，需要沙箱，P1）
 - 逻辑规则 AND / OR / NOT（RS-04，P1）
 - Surge 输出（M2）
-- 模板发布前的影响分析（TPL-07 ②，需要对每个 Profile 试渲染，由服务层调用 `renderMihomo` 实现）
 - ssr、hysteria v1、wireguard、snell 的 URI 解析（这些协议目前只能通过 Clash YAML 导入）

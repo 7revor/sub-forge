@@ -22,10 +22,11 @@
 | **M0 内核** | 基本完成 | 见下表 |
 | M1 MVP | 基本完成 | 服务端（见下表）与前端（`packages/web`，按设计稿实现全部页面，主要编辑器为表单 + YAML 双视图，见 [09](09-frontend-forms-plan.md)；缺普通用户的模板可见性设置）；生产镜像同源托管 |
 | M1 稳定化 | 已合入 main | 用户禁用、快照地址加密、代理链防绕行与环检测、订阅资源版本、历史依赖保护、规则参数、YAML 部分恢复与稳定 ID、仅限制字面内网 IP；377 项通过、2 项跳过，见 [10](10-m1-stabilization.md)。本地服务已切到主分支，待用户决定生产部署 |
+| 后端六项修复 | 工作树已完成，待合并 | 规则快照有效性、按生效规则收集依赖、多 URL 部分成功、模板规则自检、流量缓存与汇总、处理链参数校验；新增 80 项回归，见 [12](12-backend-regression-fixes.md) |
 | M2 Surge | 未开始 | 内核中规则降级（含进程规则）已实现 Surge 分支 |
-| M3 增强 | 未开始 | — |
+| M3 增强 | 部分提前完成 | 模板版本对比与影响分析、访问日志、流量汇总已有实现；脚本沙箱与管理员共享仍未完成 |
 
-M0 明细（代码在 `packages/core`，Docker 完整环境 92 个测试通过）：
+M0 明细（代码在 `packages/core`，本轮工作树 Docker 完整环境 93 个测试通过，见 [12](12-backend-regression-fixes.md)）：
 
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
@@ -34,14 +35,14 @@ M0 明细（代码在 `packages/core`，Docker 完整环境 92 个测试通过�
 | Collection | ✅ | 前后缀、环检测；成员拉取失败策略（COL-05，P1）未做 |
 | 规则 IR 与解析 | ✅ | classical / DOMAIN-SET / 纯 CIDR / YAML payload，mrs 透传；逻辑规则（RS-04，P1）未做 |
 | 按客户端降级 | ✅ | mihomo 与 Surge 规则写法、进程规则降级、行级覆盖 |
-| 模板 ⊕ 覆盖层、模板校验器 | ✅ | 发布前影响分析（TPL-07 ②）需服务层逐个试渲染，未做 |
+| 模板 ⊕ 覆盖层、模板校验器 | ✅ | 结构校验在内核；发布前影响分析（TPL-07 ②）已由服务层逐个试渲染，规则可用性检查见 [12](12-backend-regression-fixes.md) |
 | mihomo Lowering 与依赖解析 | ✅ | wrap / copy / inline、四类代理链、引用校验、跨 provider 环检测 |
 | 快照测试 | ✅ | PRD 场景 1–6 均有用例 |
 | 集成测试 | ✅ | Docker 验证镜像（`--network none`）内运行：13 项配置校验（含 provider 展开与 GEOIP）、6 项代理链运行时验证、4 项规则参数运行时验证 |
 
 与文档的差异：PRD 场景 3 中落地整源走同一前置时，按 03 §4.2 输出 `override.dialer-proxy`，而非逐节点注入；只给部分落地挂前置时才注入 Profile 专属 provider。
 
-M1 服务端（代码在 `packages/server`，Docker 完整环境 103 个测试通过）：
+M1 服务端（代码在 `packages/server`，本轮工作树 Docker 完整环境 187 个测试通过，见 [12](12-backend-regression-fixes.md)）：
 
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |

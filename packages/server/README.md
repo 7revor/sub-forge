@@ -101,6 +101,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 ## 测试
 
 - 单元测试：`pnpm --filter @sub-forge/server test`。
+- 六项后端修复新增 80 项回归，覆盖快照、有效依赖、多 URL 部分成功、模板自检、流量缓存与处理链参数；验收与边界见 [修复记录](../../docs/12-backend-regression-fixes.md)。
 - `test/integration/upstream-real.test.ts`：真实连接下的拉取与 SSRF 校验，只访问回环地址，默认运行。
 - `test/integration/e2e-mihomo.test.ts`：服务真实运行，mihomo 客户端用订阅地址加载配置并经代理链访问目标。需要 `MIHOMO` 与 `MIHOMO_RUNTIME=1`，推荐在 Docker 验证镜像中运行（仓库根目录 `pnpm test:docker`）。
 
@@ -113,4 +114,4 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - 存储用 better-sqlite3 直接读写 JSON 文档，没有用 05 建议的 Drizzle ORM：文档结构仍在频繁变化，暂不需要关系模型。
 - 模板草稿只保存在前端，服务端只保存已发布的版本；编辑时用 `validate` 接口即时校验。
 - 管理员共享订阅源 / 组合给指定用户（SYS-06）、模板可见性（TPL-08）尚未实现：目前模板对所有人可见，管理员名下的规则集可被所有人引用。
-- 订阅源有多个 URL 且部分从未拉取成功时，只用成功的部分渲染；所有 URL 都失败时整个 Profile 渲染失败（成员级失败策略 COL-05 尚未实现）。
+- 订阅源有多个 URL 且部分从未拉取成功时，使用其余 URL 的可用内容并告警；只有所有 URL 都没有可用成功快照时，整个 Profile 才渲染失败。组合成员整体不可用时仍失败，成员级失败策略 COL-05 尚未实现。
