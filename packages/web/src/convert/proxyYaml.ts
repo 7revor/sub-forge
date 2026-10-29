@@ -42,16 +42,16 @@ export function proxyFromPaste(text: string): RawResult<LocalProxy> | undefined 
     if (nodeLike || listLike) {
       const items = Array.isArray(structured) ? structured : isRecord(structured) && 'proxies' in structured ? structured.proxies : isRecord(structured) && 'outbounds' in structured ? structured.outbounds : [structured];
       if (!Array.isArray(items)) throw new Error('proxies / outbounds 必须是节点列表');
-      if (items.length > 1) throw new Error(`识别到 ${items.length} 个节点，只允许单节点，请拆分后逐个添加`);
+      if (items.length > 1) throw new Error(`识别到 ${items.length} 个节点，只允许单节点，请拆分后逐个添加，或前往分组批量导入`);
       if (items.length === 0) throw new Error('配置中没有节点');
       input = stringify(parseClientProxyObject(items[0]) ?? items[0]);
     }
     const parsed = parseContent(input, { type: 'local', id: 'paste' });
-    if (parsed.proxies.length + parsed.failures.length > 1) throw new Error('包含多个节点或多行无效内容，只允许单节点，请拆分后逐个添加');
+    if (parsed.proxies.length + parsed.failures.length > 1) throw new Error('包含多个节点或多行无效内容，只允许单节点，请拆分后逐个添加，或前往分组批量导入');
     if (parsed.failures.length) throw new Error(parsed.failures.map((f) => f.reason).join('；'));
     if (parsed.proxies.length !== 1) throw new Error('未识别到节点，请粘贴受支持的单节点配置');
     const { _source, _origName, _key, upstreamDialer, ...fields } = parsed.proxies[0]!;
-    const notes = ['已转换为 Mihomo YAML 并同步表单，保存后生效。'];
+    const notes = ['已转换为 Mihomo YAML，保存后生效。'];
     for (const key of CHAIN_KEYS) {
       if (!(key in fields)) continue;
       delete fields[key];

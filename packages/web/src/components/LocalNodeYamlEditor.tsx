@@ -1,0 +1,67 @@
+import { useState } from 'react';
+import type { LocalProxy } from '@sub-forge/core';
+import { proxyFromPaste, proxyToYaml } from '../convert/proxyYaml.ts';
+import { formatLocalNodeYaml, inspectLocalNodeYaml } from '../convert/localNodeYaml.ts';
+import { Badge, Button, ErrorBox } from './ui.tsx';
+import { YamlTextarea } from './YamlTextarea.tsx';
+import { CopyButton } from './CopyButton.tsx';
+import { NodeConnectivity } from './NodeConnectivity.tsx';
+import type { RawResult } from './DualEditor.tsx';
+
+export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled = false }: { disabled?: boolean; text: string; onChange: (text: string) => void; result: RawResult<LocalProxy>; checking: boolean }) {
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [undo, setUndo] = useState<{ before: string; after: string }>();
+  const node = !checking && result.ok ? result.value : undefined;
+  const errorText = !checking && !result.ok && text.trim() ? `${result.line ? `第 ${result.line} 行：` : ''}${result.error}` : '';
+  const details = node ? [
+    ['名称', node.name], ['协议', node.type], ['服务器', node.server], ['端口', node.port],
+    ...(node.cipher ? [['加密方式', node.cipher]] : []), ...(node.network ? [['传输方式', node.network]] : []),
+    ...(typeof node.tls === 'boolean' ? [['TLS', node.tls ? '开启' : '关闭']] : []),
+    ...(typeof node.udp === 'boolean' ? [['UDP', node.udp ? '开启' : '关闭']] : []),
+  ] : [];
+  return <div className="flex flex-col gap-3">
+    <div className="flex items-center justify-between gap-3">
+      <label htmlFor="local-node-yaml" className="text-[13px] text-muted">节点 YAML</label>
+      <div className="flex items-center gap-2">
+        <Button size="sm" disabled={disabled || !node} onClick={() => {
+          try { const after = formatLocalNodeYaml(text); setUndo({ before: text, after }); onChange(after); setNotice('已格式化'); setError(''); }
+          catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+        }}>格式化</Button>
+        <CopyButton size="sm" text={text} />
+      </div>
+    </div>
+    <p className="m-0 text-[12px] text-muted">支持直接编辑 YAML，粘贴节点分享链接、JSON 或 Surge 配置自动转换。</p>
+    <YamlTextarea disabled={disabled} id="local-node-yaml" aria-label="节点 YAML" aria-invalid={!!errorText} aria-describedby="local-node-status" rows={16} value={text}
+      onChange={e => { onChange(e.target.value); setNotice(''); setError(''); setUndo(undefined); }}
+      onPaste={event => {
+        const input = event.clipboardData.getData('text/plain');
+        const imported = proxyFromPaste(input);
+        if (!imported) return;
+        // 完整节点替换全文；字段片段继续使用原生粘贴行为。
+        event.preventDefault();
+        if (!imported.ok) { setNotice(''); setUndo(undefined); setError(`未导入：${imported.error}`); return; }
+        const keepYaml = !/^[{\[]/.test(input.trim()) && inspectLocalNodeYaml(input).ok;
+        const after = keepYaml ? input : proxyToYaml(imported.value);
+        setUndo({ before: text, after }); onChange(after); setError('');
+        setNotice(keepYaml ? '已导入 YAML，保存后生效。' : imported.notes?.join('；') || '已转换为 YAML，保存后生效。');
+      }} />
+    <ErrorBox error={error} />
+    {notice && <div role="status" className="flex items-center gap-3 text-[12px] text-muted">{notice}
+      {undo?.after === text && <Button size="sm" disabled={disabled} onClick={() => { onChange(undo.before); setUndo(undefined); setNotice('已撤销'); }}>撤销</Button>}
+    </div>}
+    <section aria-label="节点信息" className="rounded-xl border border-line bg-[#f8fafc] p-4 flex flex-col gap-3">
+      <div id="local-node-status" role="status" className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] font-semibold">节点信息</span>
+        <Badge tone={!text.trim() || checking ? 'neutral' : node ? 'ok' : 'err'}>{!text.trim() ? '待输入' : checking ? '校验中…' : node ? '配置有效' : '配置有误'}</Badge>
+        {node && <span className="text-[12px] text-muted">已通过基础配置校验</span>}
+      </div>
+      {node ? <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4">{details.map(([label, value]) => <div key={String(label)} className="min-w-0">
+        <dt className="mb-1 text-[12px] text-muted">{String(label)}</dt><dd className="m-0 break-all text-[13px]">{String(value)}</dd>
+      </div>)}</dl> : <div className="text-[13px] text-muted">{!text.trim() ? '粘贴配置后显示节点摘要' : checking ? '正在解析当前配置…' : '当前配置无法解析'}</div>}
+      {errorText && <div role="alert" className="text-[13px] text-err whitespace-pre-wrap">{errorText}</div>}
+      {node && result.ok && result.notes?.map(note => <div key={note} className="text-[12px] text-warn">{note}</div>)}
+      <NodeConnectivity node={node} text={text} />
+    </section>
+  </div>;
+}
