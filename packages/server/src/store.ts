@@ -48,7 +48,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 17;
+const SCHEMA_VERSION = 18;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -220,7 +220,8 @@ export class Store {
           this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(JSON.stringify(migrated)), row.id);
         }
       }
-      if (version < 17) this.removeRuleSwitches();
+      // v18 同时清除规则集和规则引用上的独立 no-resolve，保留原始内容中的标记。
+      if (version < 18) this.removeRuleSwitches();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();

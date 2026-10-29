@@ -34,17 +34,30 @@ describe('规则选项在解析与最终输出之间保真', () => {
     expect(Object.values(r.rulesets).map(x => x.text)).toEqual(['IP-CIDR,192.0.2.0/24,no-resolve\nIP-CIDR,198.51.100.0/24\nIP-CIDR,203.0.113.0/24,no-resolve,src\n']);
   });
 
-  it('同一规则集的不同规则级选项互不污染，classical 中的 IP 选项也保留', () => {
+  it('src 继续生效，旧 no-resolve 不再改变来源内容', () => {
     const plain: RuleEntry = { id: 'plain', matcher: { kind: 'ruleset', id: 'rs' }, target: to };
     const r = render('DOMAIN,example.test\nGEOIP,CN\nIP-CIDR,192.0.2.0/24', [plain, { ...plain, id: 'src', options: { noResolve: true, src: true } }]);
     expect(r.rulesets['rs_rs_classical.list']!.text).toBe('DOMAIN,example.test\nGEOIP,CN\nIP-CIDR,192.0.2.0/24\n');
-    expect(r.rulesets['rs_rs_nr_src_classical.list']!.text).toBe('DOMAIN,example.test\nGEOIP,CN,no-resolve,src\nIP-CIDR,192.0.2.0/24,no-resolve,src\n');
-    expect(r.config.rules).toContain('RULE-SET,rs_rs_nr_src_classical,DIRECT');
+    expect(r.rulesets['rs_rs_src_classical.list']!.text).toBe('DOMAIN,example.test\nGEOIP,CN,src\nIP-CIDR,192.0.2.0/24,src\n');
+    expect(r.config.rules).toContain('RULE-SET,rs_rs_src_classical,DIRECT');
     expect(r.config.rules).toContain('RULE-SET,rs_rs_classical,DIRECT');
   });
 
   it('单条规则的规则级 src 进入最终输出', () => {
     const r = render('', [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'IP-CIDR', value: '192.0.2.0/24' } }, options: { src: true }, target: to }]);
     expect(r.config.rules).toContain('IP-CIDR,192.0.2.0/24,DIRECT,src');
+  });
+
+  it.each([true, false])('旧独立开关 %s 不改变 RAW 和结构化单条自身的标记', noResolve => {
+    const rules: RuleEntry[] = [
+      { id: 'raw-on', matcher: { kind: 'rule', rule: { type: 'RAW', text: 'IP-CIDR,192.0.2.0/24,no-resolve' } }, target: to, options: { noResolve } },
+      { id: 'raw-off', matcher: { kind: 'rule', rule: { type: 'RAW', text: 'IP-CIDR,198.51.100.0/24' } }, target: to, options: { noResolve } },
+      { id: 'ir-on', matcher: { kind: 'rule', rule: { type: 'IP-CIDR6', value: '2001:db8::/32', noResolve: true } }, target: to, options: { noResolve } },
+      { id: 'ir-off', matcher: { kind: 'rule', rule: { type: 'GEOIP', value: 'CN' } }, target: to, options: { noResolve } },
+    ];
+    expect(render('', rules).config.rules).toEqual([
+      'IP-CIDR,192.0.2.0/24,DIRECT,no-resolve', 'IP-CIDR,198.51.100.0/24,DIRECT',
+      'IP-CIDR6,2001:db8::/32,DIRECT,no-resolve', 'GEOIP,CN,DIRECT', 'MATCH,DIRECT',
+    ]);
   });
 });

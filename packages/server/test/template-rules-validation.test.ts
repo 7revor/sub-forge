@@ -94,7 +94,7 @@ describe('模板自身的规则可用性检查', () => {
   });
   it('没有订阅引用时也拒绝需要合并或改写的旧二进制来源', async () => {
     const h = await setup();
-    h.store.put('ruleset', { id: 'r', name: '旧二进制', noResolve: true, sources: [{ id: 's', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.test/ip.mrs' }] });
+    h.store.put('ruleset', { id: 'r', name: '旧二进制', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.test/ip.mrs' }] });
     const validation = await h.admin.post('/api/templates/validate', h.template);
     expect(validation.json.report).toContainEqual(expect.objectContaining({ level: 'error', code: 'template.ruleset-invalid', message: expect.stringContaining('无法合并或改写') }));
     expect((await h.admin.post('/api/templates/new/publish', { ...h.template, force: true })).status).toBe(400);

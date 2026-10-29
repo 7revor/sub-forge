@@ -151,7 +151,7 @@ describe('规则集预览（CR-05）', () => {
     expect(res.json.sources[0].rejectedDetails[99].line).toBe(100);
   });
 
-  it('不指定来源时返回合并结果：注释重复项、保留原顺序、跳过停用来源、统一 no-resolve', async () => {
+  it('不指定来源时返回合并结果：注释重复项、保留原顺序、跳过停用来源、忽略旧 no-resolve 开关', async () => {
     const { alice } = await scenario();
     const ruleset = { name: 'M', noResolve: true, sources: [
       local('a', 'IP-CIDR,10.0.0.0/8\nDOMAIN-KEYWORD,x\nDOMAIN,a.test'),
@@ -159,7 +159,7 @@ describe('规则集预览（CR-05）', () => {
       { ...local('off', 'DOMAIN,off.test'), enabled: false },
     ] };
     const res = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
-    expect(activeLines(res.json.lines)).toEqual(['IP-CIDR,10.0.0.0/8,no-resolve', 'DOMAIN-KEYWORD,x', 'DOMAIN,a.test', 'DOMAIN-SUFFIX,b.test']);
+    expect(activeLines(res.json.lines)).toEqual(['IP-CIDR,10.0.0.0/8', 'DOMAIN-KEYWORD,x', 'DOMAIN,a.test', 'DOMAIN-SUFFIX,b.test']);
     expect(res.json.stats).toEqual({ domain: 2, classical: 1, ipcidr: 1, total: 5, duplicates: 1 });
   });
 

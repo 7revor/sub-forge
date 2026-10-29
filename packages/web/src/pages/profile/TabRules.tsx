@@ -53,8 +53,6 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
     <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
     {matcher.kind === 'ruleset' && <div className="flex flex-wrap gap-5">
-      <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 no-resolve" checked={value.options?.noResolve === true}
-        onChange={(noResolve) => onChange({ ...value, options: { ...value.options, noResolve } })} />no-resolve</label>
       <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={value.options?.src === true}
         onChange={(src) => onChange({ ...value, options: { ...value.options, src } })} />src</label>
     </div>}

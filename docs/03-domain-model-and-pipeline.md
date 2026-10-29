@@ -101,7 +101,7 @@ type RuleSet = {
   id: ID; name: string;
   sources: RuleSetSource[];      // 按序合并、去重
   overrides?: { match: string; override: ClientOverride }[]; // 整组按规则原文精确匹配，第一条客户端/平台匹配项生效
-  noResolve?: boolean;           // IP 类规则统一加 no-resolve
+  noResolve?: boolean;           // 仅兼容旧输入，忽略；以来源原文为准
   script?: string;               // (rule, ctx) => rule | rule[] | null（P1）
 };
 
@@ -311,7 +311,7 @@ expand(ruleset):
     domain   : DOMAIN / DOMAIN-SUFFIX（可转为 mihomo domain behavior: +.suffix）
     ipcidr   : IP-CIDR / IP-CIDR6
     classical: 其余（KEYWORD、REGEX、PROCESS、GEOIP、AND/OR…）
-  输出顺序：domain → classical(非 IP 类) → ipcidr（IP 类统一 no-resolve 可选）
+  输出顺序：domain → classical(非 IP 类) → ipcidr（IP 类逐行保留原文 no-resolve）
 ```
 
 改写对各来源解析后的规则原文精确匹配（不含出口），在合并去重之前应用；单来源预览与合并、订阅输出共用同一逻辑。v8 迁移将启用来源的旧原文匹配直接提升，旧行号按本地内容或已有成功快照转成内容匹配；停用来源及无法定位的旧项保留，并在独立改写区块提示，补充内容并保存时重试转换。组级匹配优先于兼容旧项。
@@ -382,7 +382,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 本节替代此前“YAML 只能托管”与“三类 provider 分桶输出”的约定。格式不再由用户选择；文本按内容自动识别，历史格式仅用于域名方言兼容。预览始终经过 IR 转换，并返回识别出的 format/behavior 与整组 delivery。
 
-- 单个启用远程来源、无组级/来源级覆写、无 no-resolve/src 等处理或自定义 UA，且目标客户端支持内容语义时：引用原 URL，并按识别结果设置 format（text/yaml）与 behavior。
+- 单个启用远程来源、无组级/来源级覆写、无 src 等处理或自定义 UA，且目标客户端支持内容语义时：引用原 URL，并按识别结果设置 format（text/yaml）与 behavior。
 - 多来源、改写、IP 选项、未知行过滤或方言翻译等情况：一个 `.list`，`format: text`、`behavior: classical`；继续去重并保留行内 IP 选项。
 - Surge DOMAIN-SET 的 `.域名` 包含根域；Clash/YAML domain 的前导点只含子域，转换不能扩大匹配范围。纯文本方言存在歧义时沿用既有领域约定，并参考仓库元数据。
 - 旧 MRS/SRS 仅保留已有透传能力，不新增解码器；无法转换时报告错误，订阅服务沿用已有失败回退。
@@ -454,3 +454,6 @@ SQLite v17 在事务中处理规则集、全部模板历史版本、独立订阅
 
 
 2026-10-29 绑定规则页的说明位置、搜索区间距及规则行对齐仅为前端样式修正，不更改数据模型、接口、种子或输出规则。
+
+
+2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。

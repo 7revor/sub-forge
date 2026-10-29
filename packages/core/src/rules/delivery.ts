@@ -15,7 +15,7 @@ export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientC
   const sources = rs.sources.filter(s => s.enabled !== false);
   const binary = sources.some(s => s.format === 'mrs' || s.format === 'srs');
   const src = sources[0];
-  const changed = sources.length !== 1 || !!rs.overrides?.length || !!rs.noResolve || !!options?.noResolve || !!options?.src || sources.some(s => s.overrides?.length);
+  const changed = sources.length !== 1 || !!rs.overrides?.length || !!options?.src || sources.some(s => s.overrides?.length);
   if (changed || !src || src.kind !== 'remote' || !src.url) {
     return binary ? { mode: 'unsupported', reason: '二进制规则无法合并或改写，请使用对应的文本规则来源' } : managed;
   }

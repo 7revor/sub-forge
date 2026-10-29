@@ -27,7 +27,7 @@ const PROFILE: ProfileDoc = {
 const SEED: Seed = {
   sources: [{ id: 'air', name: '机场 A', url: 'https://air.example.com/sub', pipeline: [{ op: 'filter.useless' }, { op: 'rename.regex', rules: [{ pattern: '^香港\\s*(\\d+)', replace: 'HK-$1' }] }, { op: 'flag', mode: 'add' }] }],
   locals: [{ id: 'self', name: '自建', proxies: [{ name: '自建 SG', type: 'trojan', server: 'sg.example.com', port: 443, password: 's' }] }],
-  rulesets: [{ id: 'tg', name: 'Telegram', noResolve: true, sources: [{ id: 's1', kind: 'remote', format: 'auto', url: 'https://rules.example.com/telegram.list' }] }],
+  rulesets: [{ id: 'tg', name: 'Telegram', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's1', kind: 'remote', format: 'auto', url: 'https://rules.example.com/telegram.list' }] }],
   presets: [{ id: 'fakeip', name: 'fake-ip 推荐', version: 1, mihomo: { 'mixed-port': 7890, dns: { enable: true, 'enhanced-mode': 'fake-ip' } } }],
   templates: [{
     id: 'std', version: 1,

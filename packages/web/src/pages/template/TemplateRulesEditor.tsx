@@ -96,9 +96,6 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <span className="text-[12px] text-muted sm:hidden">出口</span>
                   <TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={rule.target} groups={value.groups} onChange={(target) => update({ ...rule, target })} />
-                  {rule.matcher.kind === 'ruleset' && <label className="flex min-h-6 cursor-pointer items-center gap-2 text-[12px] text-muted" title="IP 规则不通过 DNS 解析域名">
-                    <input type="checkbox" className="h-3.5 w-3.5 accent-accent" aria-label={`第 ${i + 1} 条规则 no-resolve`} checked={rule.options?.noResolve ?? false} onChange={event => update({ ...rule, options: { ...rule.options, noResolve: event.target.checked } })} />no-resolve
-                  </label>}
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5">
                   <span className="text-[12px] text-muted sm:hidden">操作</span>

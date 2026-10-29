@@ -16,15 +16,15 @@ const TARGETS: { key: string; client: Client; platform?: Platform; label: string
   { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
 ];
 /** 客户端选择自控；转换由服务器完成。整个更新周期保持文本区域挂载。 */
-export function RulesetPreview({ inputs, ready, sourceId, overrides, noResolve, sourceError, sourceNames, sourceReading, onRefreshSources }: {
+export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError, sourceNames, sourceReading, onRefreshSources }: {
   inputs: ReturnType<typeof useRulesetSources>['inputs']; ready: boolean; sourceId?: string;
-  overrides: RuleSetDoc['overrides']; noResolve?: boolean; sourceError?: unknown; sourceNames: Record<string, string>; sourceReading: boolean; onRefreshSources: () => Promise<void>;
+  overrides: RuleSetDoc['overrides']; sourceError?: unknown; sourceNames: Record<string, string>; sourceReading: boolean; onRefreshSources: () => Promise<void>;
 }) {
   const [target, setTarget] = useState('mihomo');
   const t = TARGETS.find(x => x.key === target)!;
-  const process = useDebouncedValue({ overrides, noResolve }, 300);
+  const process = useDebouncedValue({ overrides }, 300);
   const body = { inputs, sourceId, ...process, client: t.client, platform: t.platform };
-  const settled = JSON.stringify(process) === JSON.stringify({ overrides, noResolve });
+  const settled = JSON.stringify(process) === JSON.stringify({ overrides });
   const preview = useQuery({
     queryKey: ['rule-conversion', body], enabled: ready && settled, retry: false, staleTime: 60_000,
     queryFn: () => api<Result>('POST', '/rules/convert', body),

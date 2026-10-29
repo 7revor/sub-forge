@@ -115,12 +115,12 @@ describe('规则集多来源', () => {
     snapshots: { [sourceKey('fin', 'remote')]: 'DOMAIN,remote.example.com' },
   };
 
-  it('按 behavior 拆分、去重、IP 类统一 no-resolve、mrs 透传、读远程快照', () => {
+  it('按 behavior 拆分、去重、忽略旧 no-resolve 开关、mrs 透传、读远程快照', () => {
     const report = new Report();
     const b = expandRuleSet('fin', inputs, { client: 'mihomo' }, report);
     expect(b.domain).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'paypal.com' }, { type: 'DOMAIN-SUFFIX', value: 'stripe.com' }, { type: 'DOMAIN', value: 'paypal.com' }, { type: 'DOMAIN', value: 'remote.example.com' }]);
     expect(b.classical).toEqual([{ type: 'DOMAIN-KEYWORD', value: 'paypal' }]);
-    expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '64.4.240.0/21', noResolve: true }]);
+    expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '64.4.240.0/21' }]);
     expect(b.passthrough).toEqual([{ sourceId: 'broker', name: '券商', format: 'mrs', url: 'https://example.com/broker.mrs', behavior: 'ipcidr' }]);
     expect(b).toMatchObject({ total: 7, duplicates: 1 });
     expect(report.items).toEqual([]);
@@ -160,10 +160,10 @@ describe('规则集组级内容改写', () => {
     ],
   } }, snapshots: { 'r/b': 'DOMAIN,same.test\nDOMAIN,remote.test' } });
 
-  it('所有来源按内容匹配，平台优先级、替换后去重、no-resolve 与二进制透传保持一致', () => {
+  it('所有来源按内容匹配，平台优先级、替换后去重、忽略独立 no-resolve 且保留二进制透传', () => {
     const b = expandRuleSet('r', make(), { client: 'mihomo', platform: 'android' }, new Report());
     expect(b.domain.map((r) => 'value' in r && r.value)).toEqual(['keep.test', 'remote.test']);
-    expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24', noResolve: true }]);
+    expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24' }]);
     expect(b).toMatchObject({ total: 4, duplicates: 1, passthrough: [{ sourceId: 'binary' }] });
   });
 
@@ -193,7 +193,7 @@ describe('规则集条件追加', () => {
     expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report())).toMatchObject({ total: 4, duplicates: 0 });
   });
 
-  it('多来源只追加一次，遵循客户端与平台条件、去重和 no-resolve', () => {
+  it('多来源只追加一次，遵循客户端与平台条件、去重并忽略旧 no-resolve', () => {
     const inputs: RuleSetInputs = { rulesets: { r: {
       id: 'r', name: '追加', noResolve: true,
       sources: ['a', 'b'].map((id) => ({ id, kind: 'local', format: 'auto', content: 'DOMAIN,keep.test' })),
@@ -208,7 +208,7 @@ describe('规则集条件追加', () => {
     } }, snapshots: {} };
     const mac = expandRuleSet('r', inputs, { client: 'surge', platform: 'macos' }, new Report());
     expect(mac.domain).toEqual(['keep.test', 'added.test', 'second.test'].map((value) => ({ type: 'DOMAIN', value })));
-    expect(mac.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24', noResolve: true }]);
+    expect(mac.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24' }]);
     expect(mac).toMatchObject({ total: 6, duplicates: 2 });
     expect(expandRuleSet('r', inputs, { client: 'surge', platform: 'ios' }, new Report()).domain).toHaveLength(2);
     expect(expandRuleSet('r', inputs, { client: 'mihomo' }, new Report()).domain).toHaveLength(1);

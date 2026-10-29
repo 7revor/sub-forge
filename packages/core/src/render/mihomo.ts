@@ -324,7 +324,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
       continue;
     }
     // 不同规则级选项可能改变 classical 正文或 CIDR 分段，不能共用同名 provider。
-    const base = `rs_${safeId(m.id)}${r.options?.noResolve ? '_nr' : ''}${r.options?.src ? '_src' : ''}`;
+    const base = `rs_${safeId(m.id)}${r.options?.src ? '_src' : ''}`;
     const rs = input.rules.rulesets[m.id];
     if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${m.id}`); continue; }
     // 只解析一次：校验、输出方式判断和正文转换共用容错文档。

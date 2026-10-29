@@ -11,17 +11,30 @@ const active = (items: unknown, normalize: (item: Record<string, unknown>) => Re
 };
 const matcher = (value: unknown): unknown => obj(value) && value.kind === 'ruleset' && obj(value.repository)
   ? { ...value, repository: { ...value.repository, sources: active(value.repository.sources) } } : value;
-const rules = (value: unknown): unknown => active(value, rule => ({ ...rule, matcher: matcher(rule.matcher) }));
+const ruleOptions = (value: unknown): unknown => {
+  if (!obj(value)) return value;
+  const { noResolve: _, ...options } = value;
+  return options;
+};
+const normalizeRule = (rule: Record<string, unknown>) => ({ ...rule, matcher: matcher(rule.matcher),
+  ...(rule.options !== undefined ? { options: ruleOptions(rule.options) } : {}) });
+const rules = (value: unknown): unknown => active(value, normalizeRule);
 
 export function normalizeRulePresence<T>(kind: string, value: T): T {
   if (!obj(value)) return value;
   let next: Record<string, unknown> = value;
-  if (kind === 'ruleset') next = { ...value, sources: active(value.sources) };
+  if (kind === 'ruleset') {
+    const { noResolve: _, ...ruleset } = value;
+    next = { ...ruleset, sources: active(value.sources) };
+  }
   if (kind === 'template') next = { ...value, rules: rules(value.rules) };
   if (kind === 'profile' && obj(value.routing)) {
     const routing = value.routing;
     if (routing.mode === 'bound' && routing.prependRules !== undefined) next = { ...value, routing: { ...routing, prependRules: rules(routing.prependRules) } };
     if (routing.mode === 'independent' && obj(routing.config)) next = { ...value, routing: { ...routing, config: normalizeRulePresence('template', routing.config) } };
   }
+  // 旧订阅先清除额外选项，再进行分流模式迁移；原文和结构化规则中的标记保留。
+  if (kind === 'profile' && obj(next.overlay) && Array.isArray(next.overlay.extraRules)) next = { ...next, overlay: { ...next.overlay,
+    extraRules: next.overlay.extraRules.map(extra => obj(extra) && obj(extra.rule) ? { ...extra, rule: normalizeRule(extra.rule) } : extra) } };
   return next as T;
 }

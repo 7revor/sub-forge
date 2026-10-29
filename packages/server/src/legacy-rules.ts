@@ -69,7 +69,7 @@ export function convertBundles(bundles: LegacyBundle[], rulesets: Map<string, Ru
     }
     if (lines.on.length) sources.push({ id: uniqueId('rules'), name: '单条规则', kind: 'local', format: 'classical', content: lines.on.join('\n') });
     if (lines.off.length) sources.push({ id: uniqueId('rules-off'), name: '单条规则（停用）', kind: 'local', format: 'classical', content: lines.off.join('\n'), enabled: false });
-    out.rulesets.push({ id, name: b.name, sources, ...(b.noResolve ? { noResolve: true } : {}) });
+    out.rulesets.push({ id, name: b.name, sources });
   }
   return out;
 }

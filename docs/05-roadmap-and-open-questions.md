@@ -185,3 +185,6 @@ Docker 验证中发现并修复的问题：
 2026-10-29：已修正绑定规则页说明、搜索框与列表挤在一起的问题。构建、类型检查及内置浏览器搜索验证通过，截图见 `research/verification/subscription-rule-spacing-20261029/after.png`。
 
 2026-10-29：按用户要求，将前置规则、规则存在即生效及绑定规则页间距调整整合到 main；保留主干的远程规则、MRS 与具体进程类型功能。合并复核通过 873 项测试、类型检查、生产构建及内置浏览器保存/预览；见 `research/verification/template-prepend-merge-20261029/README.md`。保留 worktree。
+
+
+2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。

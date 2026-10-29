@@ -69,7 +69,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     const lowered = m.kind === 'rule' ? lowerMatcher(m) : {
       text: `RULE-SET,${rulesetAlias(m, ctx)}`,
     };
-    return composeRule({ ...lowered, noResolve: ('noResolve' in lowered && lowered.noResolve) || r.options?.noResolve, src: ('src' in lowered && lowered.src) || r.options?.src }, targetName(r.target, t.groups));
+    return composeRule({ ...lowered, src: ('src' in lowered && lowered.src) || r.options?.src }, targetName(r.target, t.groups));
   });
   lines.push(`MATCH,${targetName(t.final, t.groups)}`);
   const references = Object.fromEntries(t.rules.flatMap(r => r.matcher.kind === 'ruleset' ? [[rulesetAlias(r.matcher, ctx), r.matcher]] : []));
@@ -95,14 +95,14 @@ function matcherKey(m: Matcher): string {
 }
 
 function restoreRule(matcher: Matcher, old: RuleEntry | undefined, noResolve: boolean, src: boolean): Pick<RuleEntry, 'matcher' | 'options'> {
-  const options = { ...old?.options };
+  const { noResolve: _legacyNoResolve, ...options } = old?.options ?? {};
   const oldRaw = old?.matcher.kind === 'rule' && old.matcher.rule.type === 'RAW' ? rawRuleParts(old.matcher.rule.text) : undefined;
   const keepSrcInRule = old?.matcher.kind === 'rule' && ('src' in old.matcher.rule || oldRaw?.src) && old.options?.src === undefined;
   if (!keepSrcInRule && (src || old?.options?.src !== undefined)) options.src = src;
-  const oldNoResolve = old?.options?.noResolve || oldRaw?.noResolve || (old?.matcher.kind === 'rule' && 'noResolve' in old.matcher.rule && old.matcher.rule.noResolve) || false;
+  const oldNoResolve = oldRaw?.noResolve || (old?.matcher.kind === 'rule' && 'noResolve' in old.matcher.rule && old.matcher.rule.noResolve) || false;
   const oldSrc = old?.options?.src || oldRaw?.src || (old?.matcher.kind === 'rule' && 'src' in old.matcher.rule && old.matcher.rule.src) || false;
   if (old && matcherKey(old.matcher) === matcherKey(matcher) && oldNoResolve === noResolve && oldSrc === src) {
-    // YAML 无法区分选项来自 IR 还是 RuleEntry，也不承载客户端覆盖，按原表示保留。
+    // 保留原始表示和客户端覆盖；历史独立 no-resolve 不参与回显或恢复。
     matcher = old.matcher;
   } else if (matcher.kind === 'rule') {
     if (options.src !== undefined && 'src' in matcher.rule) {
@@ -110,14 +110,7 @@ function restoreRule(matcher: Matcher, old: RuleEntry | undefined, noResolve: bo
       matcher = { ...matcher, rule };
     }
     if (old?.matcher.kind === 'rule' && old.matcher.overrides !== undefined) matcher = { ...matcher, overrides: old.matcher.overrides };
-    if (old?.options?.noResolve !== undefined || (noResolve && !('noResolve' in matcher.rule))) {
-      options.noResolve = noResolve;
-      if ('noResolve' in matcher.rule) {
-        const { noResolve: _noResolve, ...rule } = matcher.rule;
-        matcher = { ...matcher, rule };
-      }
-    }
-  } else if (noResolve || old?.options?.noResolve !== undefined) options.noResolve = noResolve;
+  }
   return { matcher, ...(old?.options !== undefined || Object.keys(options).length ? { options } : {}) };
 }
 

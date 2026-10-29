@@ -2,7 +2,7 @@
 
 import type { Report } from '../report.ts';
 import type { ID, RuleIR, RuleSet, RuleSetSource } from '../types.ts';
-import { applyOverrides, lowerRule, withIpOptions, type ClientCtx } from './client.ts';
+import { applyOverrides, lowerRule, type ClientCtx } from './client.ts';
 import { behaviorOf, isYamlRuleUrl, parseRuleSourceContent, ruleKey, type Behavior } from './parse.ts';
 
 export type RuleSetInputs = {
@@ -73,8 +73,7 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
   const rs = inputs.rulesets[id];
   if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${id}`); return out; }
   const seen = new Set<string>();
-  const add = (rule: RuleIR) => {
-    const r = withIpOptions(rule, { noResolve: rs.noResolve });
+  const add = (r: RuleIR) => {
     out.total++;
     const k = ruleKey(r, ctx.client);
     if (seen.has(k)) { out.duplicates++; return; }

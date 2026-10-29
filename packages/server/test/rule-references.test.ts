@@ -41,7 +41,7 @@ describe('模板统一规则引用', () => {
     expect(await h.resolve()).toEqual(matcher);
     expect(h.store.list('ruleset')).toHaveLength(2);
     const draft = template(matcher);
-    const published = await h.admin.post('/api/templates/new/publish', { ...draft, rules: draft.rules.map(r => ({ ...r, options: { noResolve: true } })) });
+    const published = await h.admin.post('/api/templates/new/publish', { ...draft, rules: draft.rules.map(r => ({ ...r, options: { src: true } })) });
     expect(published.status).toBe(201);
     h.store.put('profile', { id: 'p', name: '引用配置', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, template: { id: published.json.item.id, follow: 'latest' } }, h.user.id);
     const rendered = await h.renderer.render('p', { client: 'mihomo' });

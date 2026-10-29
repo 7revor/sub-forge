@@ -151,7 +151,7 @@ export type RuleSet = {
   sources: RuleSetSource[];
   /** 替换、丢弃按原文匹配且首条命中生效；追加无需 match，按条件向整组加入规则 */
   overrides?: { match?: string; override: ClientOverride }[];
-  /** IP 类规则统一加 no-resolve */
+  /** @deprecated 仅兼容旧输入，忽略此字段；以来源内容中的 no-resolve 为准。 */
   noResolve?: boolean;
 };
 
@@ -207,7 +207,11 @@ export type RuleEntry = {
   id: ID;
   matcher: Matcher;
   target: Target;
-  options?: { noResolve?: boolean; src?: boolean };
+  options?: {
+    /** @deprecated 忽略此字段；no-resolve 仅从规则原文读取。 */
+    noResolve?: boolean;
+    src?: boolean;
+  };
   /** @deprecated 仅兼容旧输入；规则以存在与否决定生效。 */
   enabled?: boolean;
 };
