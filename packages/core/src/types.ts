@@ -42,7 +42,7 @@ export type OperatorStep = Operator & { enabled?: boolean };
 export type Source = {
   id: ID;
   name: string;
-  urls: string[];
+  url: string;
   pipeline: OperatorStep[];
 };
 

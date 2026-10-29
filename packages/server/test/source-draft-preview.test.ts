@@ -16,19 +16,19 @@ async function scenario(fetcher: UpstreamFetcher = async (url) => ({ status: 200
   await addUser(env.store, 'alice');
   const alice = client(env.app);
   await alice.login('alice');
-  const saved = (await alice.post('/api/sources', { name: '测试源', urls: [a], pipeline: [], fetch: { ua: 'saved-agent', timeoutMs: 10000, ttlSec: 86400 } })).json.item;
+  const saved = (await alice.post('/api/sources', { name: '测试源', url: a, pipeline: [], fetch: { ua: 'saved-agent', timeoutMs: 10000, ttlSec: 86400 } })).json.item;
   await alice.post(`/api/sources/${saved.id}/refresh`);
   const preview = (source: unknown, pipeline: unknown[] = []) => alice.post(`/api/sources/${saved.id}/pipeline-preview`, { source, pipeline });
   return { ...env, alice, saved, preview };
 }
 
 describe('订阅源拉取参数草稿预览', () => {
-  it('按草稿地址顺序预览，不改已保存文档和正式快照', async () => {
+  it('按草稿单个地址预览，不改已保存文档和正式快照', async () => {
     const h = await scenario();
     const before = h.store.snapshotHistory('source', h.saved.id);
-    const result = await h.preview({ urls: [b, a], fetch: {} }, [{ op: 'rename.affix', prefix: '草稿·' }]);
+    const result = await h.preview({ url: b, fetch: {} }, [{ op: 'rename.affix', prefix: '草稿·' }]);
     expect(result.status).toBe(200);
-    expect(result.json.nodes.map((n: { name: string }) => n.name)).toEqual(['草稿·节点 B', '草稿·节点 A']);
+    expect(result.json.nodes.map((n: { name: string }) => n.name)).toEqual(['草稿·节点 B']);
     expect(h.store.get('source', h.saved.id)).toEqual(h.saved);
     expect(h.store.snapshotHistory('source', h.saved.id)).toEqual(before);
   });
@@ -37,7 +37,7 @@ describe('订阅源拉取参数草稿预览', () => {
     const requests: { url: string; opts: unknown }[] = [];
     const h = await scenario(async (url, opts) => { requests.push({ url, opts }); return { status: 200, body: node(opts?.ua ?? '默认 UA') }; });
     requests.length = 0;
-    const source = { urls: [a], fetch: { ua: 'draft-agent', timeoutMs: 5000, ttlSec: 3600 } };
+    const source = { url: a, fetch: { ua: 'draft-agent', timeoutMs: 5000, ttlSec: 3600 } };
     expect((await h.preview(source)).json.nodes[0].name).toBe('draft-agent');
     expect((await h.preview(source, [{ op: 'rename.affix', prefix: '新·' }])).json.nodes[0].name).toBe('新·draft-agent');
     expect(requests).toEqual([{ url: a, opts: source.fetch }]);
@@ -50,44 +50,54 @@ describe('订阅源拉取参数草稿预览', () => {
 
   it('清空选填参数后使用默认值，不沿用已保存参数', async () => {
     const h = await scenario(async (_url, opts) => ({ status: 200, body: node(opts?.ua ?? '默认 UA') }));
-    expect((await h.preview({ urls: [a], fetch: {} })).json.nodes[0].name).toBe('默认 UA');
+    expect((await h.preview({ url: a, fetch: {} })).json.nodes[0].name).toBe('默认 UA');
     expect(h.store.get('source', h.saved.id)?.fetch?.ua).toBe('saved-agent');
   });
 
   it('未修改拉取参数时继续使用正式成功快照', async () => {
     let calls = 0;
     const h = await scenario(async () => { calls++; return { status: 200, body: node('正式节点') }; });
-    const result = await h.preview({ urls: h.saved.urls, fetch: h.saved.fetch });
+    const result = await h.preview({ url: h.saved.url, fetch: h.saved.fetch });
     expect(result.json.nodes[0].name).toBe('正式节点');
     expect(calls).toBe(1);
   });
 
   it('草稿全部失败或返回空内容时报告失败，不展示旧参数的节点', async () => {
     const h = await scenario(async (url) => ({ status: 200, body: url === a ? node('旧节点') : '' }));
-    const result = await h.preview({ urls: [b] });
+    const result = await h.preview({ url: b });
     expect(result.json.input).toBe(0);
     expect(result.json.nodes).toEqual([]);
     expect(result.json.report).toContainEqual(expect.objectContaining({ level: 'error', code: 'source.fetch-failed', message: expect.stringContaining('空内容') }));
     expect(h.store.snapshotHistory('source', h.saved.id)).toHaveLength(1);
   });
 
-  it('草稿部分地址失败时保留成功结果并告警', async () => {
-    const h = await scenario(async (url) => { if (url === b) throw new Error('模拟连接失败'); return { status: 200, body: node('可用节点') }; });
-    const result = await h.preview({ urls: [b, a] });
-    expect(result.json.input).toBe(1);
-    expect(result.json.report).toContainEqual(expect.objectContaining({ level: 'warn', message: '地址 1 预览拉取失败：模拟连接失败' }));
+  it('多地址草稿拒绝预览，不拉取任何新地址', async () => {
+    let calls = 0;
+    const h = await scenario(async () => { calls++; return { status: 200, body: node('原节点') }; });
+    expect((await h.preview({ urls: [b, a] })).status).toBe(400);
+    expect((await h.preview({ url: [a, b] })).status).toBe(400);
+    expect(calls).toBe(1);
+  });
+
+  it('旧客户端单地址草稿可预览，正式文档保持 url 格式', async () => {
+    const h = await scenario();
+    const result = await h.preview({ urls: [b] });
+    expect(result.status).toBe(200);
+    expect(result.json.nodes[0].name).toBe('节点 B');
+    expect(h.store.get('source', h.saved.id)).toEqual(h.saved);
+    expect(h.saved).not.toHaveProperty('urls');
   });
 
   it('草稿沿用保存校验与用户隔离，非法输入不会触发拉取', async () => {
     let calls = 0;
     const h = await scenario(async () => { calls++; return { status: 200, body: node('节点') }; });
-    for (const source of [null, [], { urls: [] }, { urls: ['file:///tmp/source'] }, { urls: [b], fetch: { ttlSec: 1 } }, { urls: [b], fetch: { ua: 1 } }, { urls: [b], fetch: { timeoutMs: -1 } }]) {
+    for (const source of [null, [], { urls: [] }, { url: 'file:///tmp/source' }, { url: b, fetch: { ttlSec: 1 } }, { url: b, fetch: { ua: 1 } }, { url: b, fetch: { timeoutMs: -1 } }]) {
       expect((await h.preview(source)).status).toBe(400);
     }
     await addUser(h.store, 'bob');
     const bob = client(h.app);
     await bob.login('bob');
-    expect((await bob.post(`/api/sources/${h.saved.id}/pipeline-preview`, { source: { urls: [b] } })).status).toBe(404);
+    expect((await bob.post(`/api/sources/${h.saved.id}/pipeline-preview`, { source: { url: b } })).status).toBe(404);
     expect(calls).toBe(1);
   });
 });

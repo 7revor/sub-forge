@@ -255,26 +255,13 @@ export class RenderService {
     const hashes: string[] = [];
     const report: ReportItem[] = [];
     for (const src of sources) {
-      const bodies: string[] = [];
-      const failures: ReportItem[] = [];
-      const trafficByUrl = new Map<string, TrafficInfo>();
-      for (const url of src.urls) {
-        const r = await this.snapshots.get('source', src.id, url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
-        if (r.snapshot?.body !== undefined) {
-          bodies.push(r.snapshot.body);
-          hashes.push(`${src.id}|${url}|${r.snapshot.hash}`);
-          if (r.snapshot.userinfo) trafficByUrl.set(url, r.snapshot.userinfo);
-        }
-        if (r.error) failures.push({ level: 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
+      const r = await this.snapshots.get('source', src.id, src.url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
+      if (r.snapshot?.body !== undefined) {
+        inputs.snapshots[src.id] = [r.snapshot.body];
+        hashes.push(`${src.id}|${src.url}|${r.snapshot.hash}`);
+        if (r.snapshot.userinfo) userinfo.set(src.id, r.snapshot.userinfo);
       }
-      if (bodies.length) {
-        inputs.snapshots[src.id] = bodies;
-        // 同一源仍有可用内容（含成功快照）时允许部分输出；不改变组合成员整体不可用的策略。
-        for (const failure of failures) failure.level = 'warn';
-      }
-      report.push(...failures);
-      const traffic = sumTraffic(trafficByUrl.values());
-      if (traffic) userinfo.set(src.id, traffic);
+      if (r.error) report.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
     }
     return { inputs, userinfo, hashes, report };
   }

@@ -140,8 +140,8 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
       profile, template,
       nodeSets: {
         sources: {
-          T: { id: 'T', name: '中转', urls: ['https://t.test/sub'], pipeline: [] },
-          L: { id: 'L', name: '落地源', urls: ['https://l.test/sub'], pipeline: [] },
+          T: { id: 'T', name: '中转', url: 'https://t.test/sub', pipeline: [] },
+          L: { id: 'L', name: '落地源', url: 'https://l.test/sub', pipeline: [] },
         },
         collections: {}, locals: {},
         snapshots: { T: [`proxies:\n  ${socks(opts.entryName, ports.entry)}\n`], L: [`proxies:\n  ${socks('落地', ports.exit)}\n`] },

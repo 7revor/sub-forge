@@ -4,7 +4,7 @@ import { addUser, client, serve, setupApp } from './helpers.ts';
 
 const AIRPORT = 'trojan://pw@a.example.com:443#香港 01 | 0.5x\ntrojan://pw@b.example.com:443#剩余流量：10G\ntrojan://pw@c.example.com:443#日本 03';
 const UPSTREAM = serve({ 'https://a.example.com/sub': AIRPORT, 'https://b.example.com/sub': 'trojan://pw@d.example.com:443#香港 09' });
-const remote = (name: string, url = 'https://a.example.com/sub') => ({ name, urls: [url] });
+const remote = (name: string, url = 'https://a.example.com/sub') => ({ name, url: url });
 
 async function scenario(fetcher?: UpstreamFetcher) {
   const env = setupApp(fetcher ? { fetcher } : {});
@@ -87,7 +87,7 @@ describe('立即拉取与快照', () => {
       if (fail) throw new Error('HTTP 502');
       return { status: 200, body: AIRPORT, userinfo: { total: 100 } };
     });
-    const id = (await alice.post('/api/sources', { name: 'R', urls: ['https://air.example.com/sub'] })).json.item.id;
+    const id = (await alice.post('/api/sources', { name: 'R', url: 'https://air.example.com/sub' })).json.item.id;
     const ok = await alice.post(`/api/sources/${id}/refresh`);
     expect(ok.json.items[0]).toMatchObject({ url: 'https://air.example.com/sub', ok: true, userinfo: { total: 100 } });
     fail = true;
@@ -226,26 +226,32 @@ describe('节点集最终节点列表', () => {
     expect(res.json.nodes[4999].name).toBe('节点-4999');
   });
 
-  it('返回快照加载与解析报告，读取有效快照不重复拉取', async () => {
+  it('单地址返回快照加载与解析报告，读取有效快照不重复拉取', async () => {
     let calls = 0;
-    const { alice, advance } = await scenario(async (url) => {
+    let fail = false;
+    const { alice, advance, snapshots } = await scenario(async () => {
       calls++;
-      if (url.endsWith('/bad')) throw new Error('上游不可用');
+      if (fail) throw new Error('上游不可用');
       return { status: 200, body: AIRPORT + '\ntrojan://broken' };
     });
-    const id = (await alice.post('/api/sources', { name: '远程源', urls: ['https://example.com/good', 'https://example.com/bad'] })).json.item.id;
+    const id = (await alice.post('/api/sources', { name: '远程源', url: 'https://example.com/sub', fetch: { ttlSec: 300 } })).json.item.id;
     const res = await alice.get(`/api/nodesets/source/${id}/nodes`);
     expect(res.status).toBe(200);
     expect(res.json.total).toBe(3);
-    expect(res.json.report.map((r: { code: string }) => r.code)).toEqual(['source.fetch-failed', 'source.parse-failure']);
-    expect(calls).toBe(2);
-    // 刚失败的地址在退避期内不重试，仍报告失败；有效快照对应的地址不再拉取。
+    expect(res.json.report.map((r: { code: string }) => r.code)).toEqual(['source.parse-failure']);
+    expect(calls).toBe(1);
+    await alice.get(`/api/nodesets/source/${id}/nodes`);
+    expect(calls).toBe(1);
+    fail = true;
+    advance(1000);
+    await alice.post(`/api/sources/${id}/refresh`);
     const again = await alice.get(`/api/nodesets/source/${id}/nodes`);
-    expect(again.json.report.map((r: { code: string }) => r.code)).toContain('source.fetch-failed');
+    expect(again.json.report.map((r: { code: string }) => r.code)).toEqual(['source.fetch-failed', 'source.parse-failure']);
+    expect(again.json.total).toBe(3);
     expect(calls).toBe(2);
-    // 退避期过后，从未成功的地址重试。
     advance(301_000);
     await alice.get(`/api/nodesets/source/${id}/nodes`);
+    await snapshots.settled();
     expect(calls).toBe(3);
   });
 });

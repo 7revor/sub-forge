@@ -6,6 +6,7 @@ import { exactNameRegex, NodeSetResolver, type ChainRule, type LocalProxy, type 
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
 import type { DocKind, DocTypes, LocalDoc, RuleSetDoc, Seed, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import { sourceUrl } from './source-url.ts';
 import { convertBundles, normalizeRuleSet, retargetBundleRefs } from './legacy-rules.ts';
 
 export type SnapshotOwner = 'source' | 'ruleset';
@@ -44,7 +45,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -119,12 +120,12 @@ export class Store {
     this.db = new Database(path);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('secure_delete = ON');
-    this.migrate();
+    try { this.migrate(); } catch (e) { this.db.close(); throw e; }
   }
 
   close(): void { this.db.close(); }
 
-  /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包） */
+  /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包；v7 及以前：订阅地址保存在 urls 数组） */
   private migrate(): void {
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version >= SCHEMA_VERSION) return;
@@ -168,6 +169,7 @@ export class Store {
       if (hasDocs && version < 5) this.convertLocalSources();
       if (hasDocs && version < 6) this.moveLocalDialers();
       if (hasDocs && version < 7) this.convertRuleBundles();
+      if (hasDocs && version < 8) this.convertSourceUrls();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -192,7 +194,7 @@ export class Store {
       const { kind: _kind, content, ...rest } = src;
       const id = r.id;
       const resolver = new NodeSetResolver({
-        sources: { [id]: { ...(rest as { name: string; pipeline: [] }), id, urls: ['local'] } },
+        sources: { [id]: { ...(rest as { name: string; pipeline: [] }), id, url: 'local' } },
         collections: {}, locals: {}, snapshots: { [id]: [typeof content === 'string' ? content : ''] },
       });
       const nodes = resolver.resolve({ type: 'source', id });
@@ -220,6 +222,16 @@ export class Store {
       const before = this.cipher.decrypt(r.data);
       const after = JSON.stringify(retarget(JSON.parse(before)));
       if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(after), r.rowid);
+    }
+  }
+
+  /** 单地址旧文档无损升级，意外多地址数据拒绝迁移，事务回滚保留原数据。 */
+  private convertSourceUrls(): void {
+    for (const row of this.db.prepare("SELECT rowid, data FROM docs WHERE kind = 'source'").all() as { rowid: number; data: string }[]) {
+      const raw = JSON.parse(this.cipher.decrypt(row.data)) as Record<string, unknown>;
+      const { urls: _, ...rest } = raw;
+      const next = { ...rest, url: sourceUrl(raw) };
+      this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify(next)), row.rowid);
     }
   }
 
@@ -605,6 +617,7 @@ export class Store {
       this.convertLocalSources();
       this.moveLocalDialers();
       this.convertRuleBundles();
+      this.convertSourceUrls();
     });
     tx();
   }

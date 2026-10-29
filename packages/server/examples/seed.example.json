@@ -3,7 +3,7 @@
     {
       "id": "remote-example",
       "name": "远程订阅（示例，需改成真实地址）",
-      "urls": ["https://[YOUR-SUBSCRIPTION-URL]"],
+      "url": "https://[YOUR-SUBSCRIPTION-URL]",
       "fetch": { "ua": "clash.meta", "ttlSec": 3600 },
       "pipeline": [
         { "op": "filter.useless" },

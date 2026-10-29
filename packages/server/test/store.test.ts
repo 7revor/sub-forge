@@ -12,8 +12,8 @@ const T = (version: number) => ({ id: 'std', version, groups: [], rules: [], fin
 describe('Store', () => {
   it('文档读写与覆盖', () => {
     const s = new Store(':memory:');
-    s.put('source', { id: 'a', name: 'A', urls: ['https://a.test/sub'], pipeline: [] });
-    s.put('source', { id: 'a', name: 'A2', urls: ['https://a.test/sub'], pipeline: [] });
+    s.put('source', { id: 'a', name: 'A', url: 'https://a.test/sub', pipeline: [] });
+    s.put('source', { id: 'a', name: 'A2', url: 'https://a.test/sub', pipeline: [] });
     expect(s.get('source', 'a')!.name).toBe('A2');
     expect(s.get('source', 'missing')).toBeUndefined();
     expect(s.list('source')).toHaveLength(1);
@@ -51,7 +51,7 @@ describe('Store', () => {
 describe('加密与迁移', () => {
   it('文档、快照正文、token 落盘时加密；token 按 HMAC 查找', () => {
     const s = new Store(':memory:');
-    s.put('source', { id: 'a', name: 'A', urls: ['https://secret.example.com/sub?token=xyz'], pipeline: [] }, 'u1');
+    s.put('source', { id: 'a', name: 'A', url: 'https://secret.example.com/sub?token=xyz', pipeline: [] }, 'u1');
     const url = 'https://secret.example.com/sub?token=xyz';
     s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url, fetchedAt: 1, ok: true, body: 'password: hunter2', error: `连接 ${url} 失败` });
     const t = s.createToken('p', 'Mac');
@@ -63,7 +63,7 @@ describe('加密与迁移', () => {
     expect(dump).not.toContain('secret.example.com');
     expect(dump).not.toContain('hunter2');
     expect(dump).not.toContain(t.token);
-    expect(s.get('source', 'a')!.urls).toEqual(['https://secret.example.com/sub?token=xyz']);
+    expect(s.get('source', 'a')!.url).toEqual('https://secret.example.com/sub?token=xyz');
     expect(s.getWithOwner('source', 'a')!.owner).toBe('u1');
     expect(s.latestSnapshot('source', 'a', url)).toMatchObject({ url, body: 'password: hunter2', error: `连接 ${url} 失败` });
     expect(s.snapshotHistory('source', 'a')[0]!.url).toBe(url);
@@ -95,7 +95,7 @@ describe('加密与迁移', () => {
     const content = 'proxies:\n  - { name: 香港 01, type: trojan, server: hk.test, port: 443, password: p, dialer-proxy: 中转 }\n  - { name: 中转, type: socks5, server: relay.test, port: 1080 }\n  - { name: 剩余流量：10G, type: trojan, server: info.test, port: 443, password: p }\n';
     const legacy = { id: 'L', name: '手写', kind: 'local', content, pipeline: [{ op: 'filter.useless' }, { op: 'rename.affix', prefix: 'A·' }] };
     old.put('source', legacy as never, 'u1');
-    old.put('source', { id: 'R', name: '远程', urls: ['https://r.test/sub'], pipeline: [] }, 'u1');
+    old.put('source', { id: 'R', name: '远程', url: 'https://r.test/sub', pipeline: [] }, 'u1');
     old.put('collection', { id: 'c', name: 'C', members: [{ ref: { type: 'source', id: 'L' }, prefix: 'x' }, { ref: { type: 'source', id: 'R' } }], pipeline: [] }, 'u1');
     old.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'source', id: 'L' }, output: 'inline' }], overlay: {}, chains: [{ id: 'ch', landing: { nodeSet: { type: 'source', id: 'L' } }, via: { kind: 'builtin', name: 'DIRECT' } }], refPolicy: { default: 'wrap' } }, 'u1');
     old.db.pragma('user_version = 4');
@@ -137,7 +137,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(8);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
@@ -170,7 +170,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(8);
     expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } }] });
     expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test', overrides }] });
     expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', noResolve: true, sources: [
@@ -192,7 +192,7 @@ describe('加密与迁移', () => {
     const migratedRulesets = s.list('ruleset');
     s.close();
     const reopened = new Store(file, { cipher });
-    expect(reopened.db.pragma('user_version', { simple: true })).toBe(7);
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(8);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
     expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });

@@ -14,6 +14,7 @@ import { Hono, type Context } from 'hono';
 import type { RenderService } from '../render.ts';
 import type { SourceDoc } from '../docs.ts';
 import type { SnapshotService } from '../snapshots.ts';
+import { sourceUrl } from '../source-url.ts';
 import type { Store } from '../store.ts';
 import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
 import { validateDoc } from './validate.ts';
@@ -61,12 +62,8 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
 
   app.post('/sources/:id/refresh', async (c) => {
     const src = own('source', c.req.param('id'), c.get('user').id);
-    const items = [];
-    for (const url of src.urls) {
-      const r = await snapshots.refresh('source', src.id, url, src.fetch ?? {});
-      items.push({ url, ok: r.ok, fetchedAt: r.fetchedAt, ...(r.error ? { error: r.error } : {}), ...(r.userinfo ? { userinfo: r.userinfo } : {}) });
-    }
-    return c.json({ items });
+    const r = await snapshots.refresh('source', src.id, src.url, src.fetch ?? {});
+    return c.json({ items: [{ url: src.url, ok: r.ok, fetchedAt: r.fetchedAt, ...(r.error ? { error: r.error } : {}), ...(r.userinfo ? { userinfo: r.userinfo } : {}) }] });
   });
 
   app.get('/sources/:id/snapshots', (c) => {
@@ -83,21 +80,25 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const user = c.get('user');
     let doc = own(kind, c.req.param('id') ?? '', user.id);
     const saved = doc;
-    const body = await jsonBody<{ pipeline?: unknown; members?: unknown; source?: { urls?: unknown; fetch?: unknown } }>(c);
+    const body = await jsonBody<{ pipeline?: unknown; members?: unknown; source?: { url?: unknown; urls?: unknown; fetch?: unknown } }>(c);
     if (kind === 'source' && body.source !== undefined && (!body.source || typeof body.source !== 'object' || Array.isArray(body.source))) throw bad('订阅源草稿必须是对象');
+    let url: string | undefined;
+    if (kind === 'source' && body.source !== undefined) {
+      try { url = sourceUrl(body.source); } catch (e) { throw bad((e as Error).message); }
+    }
     if (body.pipeline !== undefined || (kind === 'collection' && body.members !== undefined) || (kind === 'source' && body.source !== undefined)) {
       // 借用保存前校验检查草稿（正则、脚本权限、成员引用与成环）
       const patch = {
         pipeline: body.pipeline ?? doc.pipeline,
         ...(kind === 'collection' && body.members !== undefined ? { members: body.members } : {}),
-        ...(kind === 'source' && body.source !== undefined ? { urls: body.source.urls, fetch: body.source.fetch } : {}),
+        ...(kind === 'source' && body.source !== undefined ? { url, fetch: body.source.fetch } : {}),
       };
       doc = validateDoc(kind, { ...(doc as unknown as Record<string, unknown>), ...patch }, doc.id, user, store);
     }
     const steps: OperatorStep[] = doc.pipeline;
 
     const ref: NodeSetID = { type: kind, id: doc.id };
-    const sourceChanged = kind === 'source' && JSON.stringify([(doc as SourceDoc).urls, (doc as SourceDoc).fetch ?? {}]) !== JSON.stringify([(saved as SourceDoc).urls, (saved as SourceDoc).fetch ?? {}]);
+    const sourceChanged = kind === 'source' && JSON.stringify([(doc as SourceDoc).url, (doc as SourceDoc).fetch ?? {}]) !== JSON.stringify([(saved as SourceDoc).url, (saved as SourceDoc).fetch ?? {}]);
     const loaded = sourceChanged ? await renderer.loadNodeSets([])
       : kind === 'collection'
       ? await renderer.loadNodeSets((doc as Collection).members.map((m) => m.ref))
@@ -110,11 +111,9 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       const bodies: string[] = [];
       if (sourceChanged) {
         const src = doc as SourceDoc;
-        const results = await Promise.all(src.urls.map((url) => snapshots.previewSource(src.id, url, src.fetch)));
-        for (const result of results) if (result.body !== undefined) bodies.push(result.body);
-        for (const [index, result] of results.entries()) if (result.error) {
-          report[bodies.length ? 'warn' : 'error']('source.fetch-failed', `地址 ${index + 1} 预览拉取失败：${result.error}`, `source:${src.id}`);
-        }
+        const result = await snapshots.previewSource(src.id, src.url, src.fetch);
+        if (result.body !== undefined) bodies.push(result.body);
+        if (result.error) report.error('source.fetch-failed', `预览拉取失败：${result.error}`, `source:${src.id}`);
       } else bodies.push(...(loaded.inputs.snapshots[doc.id] ?? []));
       for (const b of bodies) {
         const r = parseContent(b, ref);

@@ -6,6 +6,7 @@ import type { DocKind, DocTypes } from '../docs.ts';
 import type { Store, User } from '../store.ts';
 import { normalizeRuleSet } from '../legacy-rules.ts';
 import { MIN_TTL_SEC } from '../snapshots.ts';
+import { sourceUrl } from '../source-url.ts';
 import { bad, isStr } from './common.ts';
 
 const OPS = new Set(['filter.regex', 'filter.type', 'filter.useless', 'rename.regex', 'rename.delete', 'rename.affix', 'flag', 'sort.name', 'sort.regex', 'dedupe', 'set', 'script']);
@@ -127,7 +128,8 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (doc.kind !== undefined && doc.kind !== 'remote') throw bad('订阅源只支持远程地址，粘贴的节点请放到本地节点组');
       delete doc.kind;
       if (doc.content !== undefined) throw bad('订阅源不再支持 content，粘贴的节点请放到本地节点组');
-      if (!Array.isArray(doc.urls) || !doc.urls.length || !doc.urls.every(isHttpUrl)) throw bad('订阅源需要至少一个 http(s) 地址');
+      try { doc.url = sourceUrl(doc); } catch (e) { throw bad((e as Error).message); }
+      delete doc.urls;
       checkFetch(doc.fetch);
       if (doc.pipeline === undefined) doc.pipeline = [];
       checkPipeline(doc.pipeline, '处理链', user);
