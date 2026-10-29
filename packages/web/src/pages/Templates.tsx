@@ -184,6 +184,13 @@ function TemplatePage({ id }: { id: string }) {
   const [step, setStep] = useState(0);
   const [validation, setValidation] = useState<{ body: TemplateBody; name: string; report: ReportItem[]; error?: string }>();
   const [focus, setFocus] = useState<{ where: string }>();
+  const [pendingRules, setPendingRules] = useState<Set<string>>(() => new Set());
+  const onRuleValidationReady = (id: string, ready: boolean) => setPendingRules(current => {
+    const next = new Set(current);
+    if (ready) next.delete(id);
+    else next.add(id);
+    return next;
+  });
   const [importing, setImporting] = useState<string>();
   const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })) };
@@ -203,6 +210,9 @@ function TemplatePage({ id }: { id: string }) {
   const currentValidation = validation?.body === body && validation.name === name ? validation : undefined;
   const report = [...draftIssues(body), ...(currentValidation?.report ?? [])];
   const errors = report.filter((r) => r.level === 'error');
+  // 首次失焦前隐藏新增规则的问题；发布仍使用完整报告，不能绕过校验。
+  const visibleReport = report.filter(r => !r.where?.startsWith('rule:') || !pendingRules.has(r.where.slice(5)));
+  const visibleErrors = visibleReport.filter(r => r.level === 'error');
   const parseErr = currentValidation?.error;
   const ready = !!currentValidation && !parseErr && rawValid;
   const draft = () => {
@@ -342,8 +352,8 @@ function TemplatePage({ id }: { id: string }) {
         </>}>
         <Badge tone="accent">{isNew ? '新模板 · 未发布' : changed ? `草稿 · 基于 v${t!.version} · 未发布` : `已发布 v${t!.version}`}</Badge>
       </PageHeader>
-      {(errors.length > 0 || parseErr) && (
-        <Notice tone="err" actions={errors[0]?.where && <Button size="sm" onClick={() => setFocus({ where: errors[0]!.where! })}>定位</Button>}><span><b>草稿校验：{errors.length || 1} 个错误。</b>{errors[0]?.message ?? parseErr}修复前不能发布。</span></Notice>
+      {(visibleErrors.length > 0 || parseErr) && (
+        <Notice tone="err" actions={visibleErrors[0]?.where && <Button size="sm" onClick={() => setFocus({ where: visibleErrors[0]!.where! })}>定位</Button>}><span><b>草稿校验：{visibleErrors.length || 1} 个错误。</b>{visibleErrors[0]?.message ?? parseErr}修复前不能发布。</span></Notice>
       )}
       <ol aria-label="模板设置步骤" className="m-0 flex shrink-0 list-none gap-2 p-0">
         {['策略组', '规则'].map((label, index) => <li key={label} className="min-w-0 flex-1">
@@ -364,14 +374,14 @@ function TemplatePage({ id }: { id: string }) {
         </div>
         <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain">
           <ErrorAlert error={rulesets.error} />
-          <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} modeControlContainer={modeControlContainer} />
+          <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={visibleReport} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} modeControlContainer={modeControlContainer} onRuleValidationReady={onRuleValidationReady} />
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
           <span className="text-[13px] text-muted">第 {step + 1} 步，共 2 步</span>
           <div className="flex gap-2">
             <Button disabled={step === 0 || !rawValid} onClick={() => setStep(0)}>上一步</Button>
             {step === 0 ? <Button variant="primary" disabled={!rawValid} onClick={() => setStep(1)}>下一步：规则</Button>
-              : <Button variant="primary" disabled={!rawValid || !name.trim()} onClick={() => navigate(isNew ? '/templates/new/publish' : `/templates/${id}/publish`)}>发布前校验</Button>}
+              : <Button variant="primary" disabled={!rawValid || !name.trim()} onClick={() => { setPendingRules(new Set()); navigate(isNew ? '/templates/new/publish' : `/templates/${id}/publish`); }}>发布前校验</Button>}
           </div>
         </div>
       </section>

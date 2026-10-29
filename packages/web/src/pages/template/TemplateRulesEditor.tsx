@@ -23,8 +23,9 @@ function summary(matcher: Matcher, ctx: ConvertCtx) {
     kind: matcher.repository ? '规则仓库' : '规则增强', detail: undefined };
 }
 
-function RuleFields({ rule, onChange, ctx, report }: {
+function RuleFields({ rule, onChange, ctx, report, onBlur }: {
   rule: RuleEntry; onChange: (rule: RuleEntry) => void; ctx: ConvertCtx; report: ReportItem[];
+  onBlur: () => void;
 }) {
   const matcher = rule.matcher;
   const refs = ctx.rulesets;
@@ -35,14 +36,15 @@ function RuleFields({ rule, onChange, ctx, report }: {
   };
   // 旧选项合并到 RAW 回显，编辑后从独立 options 移除，避免删除文本选项后又被补回。
   const ir = matcher.kind === 'rule' ? withIpOptions(matcher.rule, rule.options ?? {}) : undefined;
-  return <div className="flex flex-col gap-3">
+  return <div className="flex flex-col gap-3" onBlur={onBlur}>
     <ItemIssues report={report} where={`rule:${rule.id}`} />
     <MatcherEditor fixedKind value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
   </div>;
 }
 
-export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report }: {
+export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady }: {
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
+  onRuleValidationReady: (id: string, ready: boolean) => void;
 }) {
   useEffect(() => {
     if (!selected) return;
@@ -50,10 +52,15 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     return () => cancelAnimationFrame(frame);
   }, [selected]);
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map((r) => r.id === rule.id ? rule : r) });
+  const select = (id: string | undefined) => {
+    if (selected && selected !== id) onRuleValidationReady(selected, true);
+    onSelect(id);
+  };
   const add = (matcher: Matcher) => {
     const id = newId('r');
+    if (matcher.kind === 'rule') onRuleValidationReady(id, false);
     onChange({ ...value, rules: [...value.rules, { id, matcher, target: { kind: 'builtin', name: 'REJECT' } }] });
-    onSelect(matcher.kind === 'rule' ? id : undefined);
+    select(matcher.kind === 'rule' ? id : undefined);
   };
   return <section className="pt-3 pb-5" aria-label="分流规则">
     <div className="mb-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
@@ -79,13 +86,13 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
               <span className="flex h-9 items-center text-[12px] tabular-nums text-muted">{handle}{i + 1}</span>
               <div className="min-w-0">
                 <div className="flex min-h-9 items-center gap-2">
-                  {rule.matcher.kind === 'rule' ? <button type="button" aria-expanded={expanded} onClick={() => onSelect(expanded ? undefined : rule.id)}
+                  {rule.matcher.kind === 'rule' ? <button type="button" aria-expanded={expanded} onClick={() => select(expanded ? undefined : rule.id)}
                     className={cx('min-w-0 cursor-pointer rounded text-left font-medium break-all text-ink hover:text-accent-ink', error && 'text-err')}>{text.title || '填写规则内容'}</button>
                     : <span className="min-w-0 truncate font-medium text-ink" title={text.title}>{text.title}</span>}
                   {rule.matcher.kind === 'ruleset' ? rule.matcher.remote
                     ? <RemoteRulePicker value={rule.matcher.remote.url} label="编辑" ariaLabel={`编辑第 ${i + 1} 条远程规则`} triggerClassName={editClass} onSelect={matcher => update({ ...rule, matcher })} />
                     : <RuleSetPicker label="更换" ariaLabel={`更换第 ${i + 1} 条规则集`} triggerClassName={editClass} onSelect={matcher => update({ ...rule, matcher })} />
-                    : <button type="button" className={editClass} aria-label={`${expanded ? '收起' : '编辑'}第 ${i + 1} 条规则`} aria-expanded={expanded} onClick={() => onSelect(expanded ? undefined : rule.id)}>{expanded ? '收起' : '编辑'}</button>}
+                    : <button type="button" className={editClass} aria-label={`${expanded ? '收起' : '编辑'}第 ${i + 1} 条规则`} aria-expanded={expanded} onClick={() => select(expanded ? undefined : rule.id)}>{expanded ? '收起' : '编辑'}</button>}
                 </div>
                 <div className="flex min-w-0 items-center gap-2 text-[12px] leading-5 text-muted">
                   <span className="shrink-0">{text.kind}</span>
@@ -106,8 +113,8 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
               </div>
             </div>
             {expanded && <div className="mt-3 rounded-lg bg-ground p-4 sm:ml-16">
-              <div className="mb-3 flex items-center justify-between gap-3"><span className="text-[12px] font-medium text-muted">编辑第 {i + 1} 条规则</span><button type="button" className={editClass} onClick={() => onSelect(undefined)}>完成</button></div>
-              <RuleFields rule={rule} onChange={update} ctx={ctx} report={report} />
+              <div className="mb-3 flex items-center justify-between gap-3"><span className="text-[12px] font-medium text-muted">编辑第 {i + 1} 条规则</span><button type="button" className={editClass} onClick={() => select(undefined)}>完成</button></div>
+              <RuleFields rule={rule} onChange={update} ctx={ctx} report={report} onBlur={() => onRuleValidationReady(rule.id, true)} />
             </div>}
             {!expanded && <ItemIssues report={report} where={`rule:${rule.id}`} />}
           </div>;

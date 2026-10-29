@@ -5,11 +5,12 @@ import { templateFormFromYaml, templateFromYaml, templateToYaml, type ConvertCtx
 import { TemplateGroupsEditor } from './TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from './TemplateRulesEditor.tsx';
 
-export function TemplateEditor({ value, onChange, ctx, report, focus, onValidityChange, step, onStepChange, modeControlContainer }: {
+export function TemplateEditor({ value, onChange, ctx, report, focus, onValidityChange, step, onStepChange, modeControlContainer, onRuleValidationReady }: {
   step: number; onStepChange: (step: number) => void;
   value: TemplateBody; onChange: (body: TemplateBody) => void; ctx: ConvertCtx; report: ReportItem[];
   focus: { where: string } | undefined; onValidityChange: (valid: boolean) => void;
   modeControlContainer: HTMLElement | null;
+  onRuleValidationReady: (id: string, ready: boolean) => void;
 }) {
   const [mode, setMode] = useState<EditorMode>('form');
   const [group, setGroup] = useState<string>();
@@ -33,6 +34,6 @@ export function TemplateEditor({ value, onChange, ctx, report, focus, onValidity
     fromPaste={(text) => (/^\s*(?:#[^\n]*\n\s*)*-\s/.test(text) || /^(?:proxy-groups|rule-providers|rules)\s*:/m.test(text)) ? templateFromYaml(text, value, ctx) : undefined}
     recoverForm={(text) => templateFormFromYaml(text, value, ctx)} renderForm={() => <>
       {step === 0 && <TemplateGroupsEditor value={value} onChange={onChange} selected={group} onSelect={setGroup} report={report} />}
-      {step === 1 && <TemplateRulesEditor value={value} onChange={onChange} selected={rule} onSelect={setRule} ctx={ctx} report={report} />}
+      {step === 1 && <TemplateRulesEditor value={value} onChange={onChange} selected={rule} onSelect={setRule} ctx={ctx} report={report} onRuleValidationReady={onRuleValidationReady} />}
     </>} /></div>;
 }
