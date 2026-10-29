@@ -26,6 +26,15 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
       throw new HttpError(502, `规则详情拉取失败：${error instanceof Error ? error.message : String(error)}`);
     }
   });
+  app.get('/rule-repos/file-preview', async c => {
+    const { repo, ref, path } = c.req.query();
+    if (!repo || !ref || !path) throw bad('缺少 repo、ref 或 path');
+    try { return c.json({ item: await repos.filePreview(repo, ref, path) }); }
+    catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(502, `文件内容读取失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
   app.get('/rule-repos/files', c => {
     const { repo, path } = c.req.query();
     if (!repo || !path) throw bad('缺少 repo 或 path');

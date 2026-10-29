@@ -64,6 +64,7 @@ export type RepoScan = { ref: string; directory: string; include: string[]; excl
 export type RuleRepo = { id: string; name: string; url: string; refs: string[]; scans: RepoScan[]; license: string; configRevision: string; pending: boolean; enabled: boolean; entries: number; builtAt?: number; checkedAt?: number; error?: string; indexing: boolean };
 export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
 export type RepoFileEntry = RepoEntry & { filePath: string; ref: string; url: string };
+export type RepoFilePreview = { repo: string; entry?: string; ref: string; path: string; name: string; content: string; url: string; upstream: string; license: string };
 export type RuleCatalog = {
   repositories: { id: string; name: string; complete: boolean; nodes: { kind: 'file' | 'directory'; ref: string; root: string; path: string; entry?: string }[] }[];
   locals: { id: string; name: string; hint: string }[];

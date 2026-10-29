@@ -467,3 +467,7 @@ SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`�
 ## 2026-10-29：名称搜索谓词
 
 `normalizeNameSearch`/`matchesNameSearch` 统一大小写、全半角与首尾空白处理。公开仓库缓存使用 SQLite `search_fold(value) LIKE ? ESCAPE` 与转义参数；本地加密文档先按权限读取、解密后包含筛选，再分页。节点接口支持 `q`，先解析完整节点集、按名称筛选，再执行 5000 条响应上限。此处只改变搜索候选，不改变 NodeRef 精确匹配或规则正则语义。
+
+## 2026-10-29：按物理文件读取正文
+
+`GET /api/rule-repos/file-preview?repo&ref&path` 先检查启用仓库和平面目录成员资格，再按索引固定 commit 读取单个 list/txt 文件。返回原始 content、文件名、路径、分支、许可证与源链接，不解析 README、不合并同目录文件、不创建本地文档。读取结束重验索引快照；索引变化或仓库停用时拒绝返回过期内容。目录与名称查询仍走 SQLite，正文通过现有 Git 对象缓存按需读取。原有来源和规则领域结构不变。

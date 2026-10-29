@@ -119,6 +119,20 @@ export class RuleRepoService {
       files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path) || a.ref.localeCompare(b.ref))
         .map(file => ({ ...file, url: rawUrl(definition, file), upstream: upstreamUrl(definition, file) })) };
   }
+  /** 只预览选中的目录文件，保留注释和空行，不解析 README 或聚合其他来源。 */
+  async filePreview(id: string, ref: string, path: string) {
+    const version = this.snapshotVersion(id);
+    const node = this.catalog(id).nodes.find(node => node.kind === 'file' && node.ref === ref && node.path === path);
+    if (!node || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中，请刷新后重试');
+    const definition = this.definition(id, true);
+    const row = this.rows().find(row => row.id === id)!;
+    const commit = (JSON.parse(row.revisions) as Record<string, string>)[ref];
+    const file: RepoFile = { ref, path, format: 'auto', ...(commit ? { commit } : {}) };
+    const content = await this.readFile(definition, file);
+    this.assertSnapshot(id, version);
+    return { repo: id, entry: node.entry, ref, path, name: path.split('/').at(-1)!, content,
+      url: rawUrl(definition, file), upstream: upstreamUrl(definition, file), license: definition.license };
+  }
   async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
     const find = () => {
       const entry = this.fileList(repo, path);
