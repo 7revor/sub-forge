@@ -1,0 +1,84 @@
+[
+  {
+    "path": "profiles",
+    "noun": "配置订阅",
+    "border": "dashed",
+    "padding": "28px",
+    "publicEmpty": true,
+    "radius": "10px",
+    "searchEmpty": true,
+    "prevEnabled": false,
+    "nextEnabled": false
+  },
+  {
+    "path": "sources",
+    "noun": "订阅源",
+    "border": "dashed",
+    "padding": "28px",
+    "publicEmpty": true,
+    "radius": "10px",
+    "searchEmpty": true,
+    "prevEnabled": false,
+    "nextEnabled": false
+  },
+  {
+    "path": "locals",
+    "noun": "分组",
+    "border": "dashed",
+    "padding": "28px",
+    "publicEmpty": true,
+    "radius": "10px",
+    "searchEmpty": true,
+    "prevEnabled": false,
+    "nextEnabled": false
+  },
+  {
+    "path": "collections",
+    "noun": "组合",
+    "border": "dashed",
+    "padding": "28px",
+    "publicEmpty": true,
+    "radius": "10px",
+    "searchEmpty": true,
+    "prevEnabled": false,
+    "nextEnabled": false
+  },
+  {
+    "path": "rulesets",
+    "noun": "规则集",
+    "border": "dashed",
+    "padding": "28px",
+    "publicEmpty": true,
+    "radius": "10px",
+    "searchEmpty": true,
+    "prevEnabled": false,
+    "nextEnabled": false
+  },
+  {
+    "path": "presets",
+    "noun": "预设",
+    "border": "dashed",
+    "padding": "28px",
+    "publicEmpty": true,
+    "radius": "10px",
+    "searchEmpty": true,
+    "prevEnabled": false,
+    "nextEnabled": false
+  },
+  {
+    "path": "templates",
+    "noun": "模板",
+    "border": "dashed",
+    "padding": "28px",
+    "publicEmpty": true,
+    "radius": "10px",
+    "searchEmpty": true,
+    "prevEnabled": false,
+    "nextEnabled": false
+  },
+  {
+    "path": "rule-repo",
+    "publicEmpty": true,
+    "searchEmpty": true
+  }
+]
