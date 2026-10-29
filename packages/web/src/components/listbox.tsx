@@ -1,3 +1,4 @@
+import { Empty } from './Empty.tsx';
 // 下拉选择组件：所有下拉都用这里的 Select / Combobox，不使用浏览器自带的 <select> 弹层与 <datalist>（见仓库 CLAUDE.md）。
 // 弹层渲染到 body，避免被卡片、表格的 overflow 裁掉；层级高于对话框。
 
@@ -76,7 +77,7 @@ function OptionList({ id, opts, active, selected, pos, listRef, label, onPick, o
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: pos.width, maxHeight: pos.maxHeight }}
       className="fixed z-[60] max-w-[min(480px,calc(100vw-16px))] overflow-y-auto rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onMouseDown={(e) => e.preventDefault()}>
-      {!opts.length && <div className="px-2.5 py-2 text-[12.5px] text-muted">{empty ?? '没有选项'}</div>}
+      {!opts.length && <Empty size="compact" title={empty ?? '没有选项'} />}
       {opts.map((o, i) => <Fragment key={`${o.group ?? ''}\u0000${o.value}\u0000${i}`}>
         {o.group && o.group !== opts[i - 1]?.group && <div role="presentation" className="px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-faint">{o.group}</div>}
         <div id={`${id}-${i}`} data-i={i} role="option" aria-selected={o.value === selected} aria-disabled={o.disabled || undefined}

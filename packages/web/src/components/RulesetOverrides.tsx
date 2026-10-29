@@ -23,9 +23,8 @@ export function RulesetOverrides({ value, legacySources, onChange, onRemoveLegac
   onRemoveLegacy: (id: string) => void;
 }) {
   const update = (index: number, item: ContentOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
-  return <Card title="客户端改写" actions={<Button onClick={() => onChange([...value, { match: '', override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
-    <p className="mt-0 text-[12.5px] text-muted">作用于整个规则集，按规则内容精确匹配所有启用来源中的规则，不含出口。每条规则命中第一条客户端与平台匹配的改写，可拖拽调整优先级。mrs / srs 透传内容不参与改写。</p>
-    {legacySources.filter((s) => s.overrides?.length).map((s) => <div key={s.id} className="mb-3 rounded-lg border border-line p-3 text-[12.5px]">
+  return <Card title="客户端改写" description="作用于整个规则集，按规则内容精确匹配所有启用来源中的规则，不含出口。每条规则命中第一条客户端与平台匹配的改写，可拖拽调整优先级。mrs / srs 透传内容不参与改写。" actions={<Button onClick={() => onChange([...value, { match: '', override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
+    {legacySources.filter((s) => s.overrides?.length).map((s) => <div key={s.id} className="mb-4 rounded-lg border border-line p-3 text-[12.5px]">
       <p className="mt-0">来源「{s.name || s.url || '本地规则'}」有 {s.overrides!.length} 条旧改写尚无法转换为内容匹配，仍按原配置生效。请启用来源、补充规则内容或拉取远程内容后保存，或添加组级改写后移除旧配置。</p>
       <ul className="pl-5">{s.overrides!.map((o, i) => <li key={i} className="break-all">{o.match ? `内容 ${o.match}` : `原第 ${o.line} 行`} · {o.override.when.client} / {o.override.when.platform || '不限平台'} · {'drop' in o.override.action ? '丢弃' : `替换为 ${o.override.action.replace.map(formatRuleLine).join('；')}`}</li>)}</ul>
       <Button size="sm" onClick={() => onRemoveLegacy(s.id)}>移除该来源的旧改写</Button>

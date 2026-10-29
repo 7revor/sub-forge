@@ -90,7 +90,7 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </section>
       <Card title="策略组骨架" actions={<span className="text-[12.5px] text-muted">节点由你在配置订阅里填充</span>} bodyClass="overflow-x-auto">
-        <table className="w-full border-collapse">
+        {!t.groups.length ? <div className="px-4 pb-4"><Empty title="还没有组" description="编辑模板以添加策略组骨架。" /></div> : <table className="w-full border-collapse">
           <thead><tr><th className={th}>组</th><th className={th}>类型</th><th className={th}>成员（组 / 内置）</th><th className={th}>为空时</th><th className={th}>填充提示</th></tr></thead>
           <tbody>
             {t.groups.map((g) => (
@@ -103,10 +103,11 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
               </tr>
             ))}
           </tbody>
-        </table>
+        </table>}
       </Card>
       <div className="flex flex-wrap items-start gap-5">
         <Card title="规则" className="min-w-0 flex-[999_1_420px]" actions={<span className="text-[12.5px] text-muted">{t.rules.length} 条{!allRules && t.rules.length > RULE_PREVIEW ? ` · 显示前 ${RULE_PREVIEW} 条` : ''}</span>} bodyClass="pb-1">
+          {!rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="所有流量走 MATCH。" /></div>}
           {rules.map((r, i) => (
             <div key={r.id} className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
               <span className="font-mono text-[12px] text-muted">{i + 1}</span>
@@ -123,6 +124,7 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
           {t.rules.length > RULE_PREVIEW && <div className="border-t border-line-2 px-4 py-2.5"><button type="button" className="cursor-pointer text-[13px] text-accent" onClick={() => setAllRules(!allRules)}>{allRules ? '收起' : `展开全部 ${t.rules.length} 条`}</button></div>}
         </Card>
         <Card title="版本记录" className="min-w-0 flex-[1_1_260px]">
+          {!versions.length && <Empty title="还没有版本记录" />}
           <ul className="m-0 flex list-none flex-col p-0">
             {versions.map((v) => (
               <li key={v.version} className="flex flex-col gap-1 border-t border-line-2 py-2.5 first:border-0 first:pt-0">
@@ -338,7 +340,7 @@ function TemplatePage({ id }: { id: string }) {
           </div>
           <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
             <Card title="版本">
-              {isNew ? <span className="text-[13px] text-muted">还没有发布过。</span> : (
+              {isNew ? <Empty title="还没有发布过" description="发布后将在这里显示版本记录。" /> : (
                 <ul className="m-0 flex list-none flex-col p-0">
                   {tpl.data!.versions.map((v) => (
                     <li key={v.version} className="flex flex-col gap-1 border-t border-line-2 py-2.5 first:border-0 first:pt-0">

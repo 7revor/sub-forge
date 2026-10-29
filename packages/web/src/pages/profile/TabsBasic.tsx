@@ -181,7 +181,7 @@ export function TabBase() {
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
             <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
             {client === 'surge' ? (
-              <div className="rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-5 py-6 text-center text-[13px] text-muted">Surge 的 [General]、[Host] 等基础设置在 M2 提供；目前只输出 mihomo。</div>
+              <Empty title="Surge 基础设置暂未开放" description="Surge 的 [General]、[Host] 等基础设置在 M2 提供；目前只输出 mihomo。" />
             ) : (
               <DualEditor key={`${draft.id}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
                 toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} rawLabel={mode === 'preset' ? '覆盖项 YAML' : 'mihomo YAML'}

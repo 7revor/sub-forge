@@ -3,6 +3,7 @@
 import { useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { X } from 'lucide-react';
 
+export { Empty } from './Empty.tsx';
 export { cx } from './cx.ts';
 export { Select, Combobox, type SelectProps, type ComboOption } from './listbox.tsx';
 import { cx } from './cx.ts';
@@ -76,16 +77,19 @@ export function PageScroll({ children, className }: { children: ReactNode; class
   return <div className={cx('page-scroll -m-1 gap-5 p-1', className)}>{children}</div>;
 }
 
-export function Card({ title, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
+export function Card({ title, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
   return (
     <section className={cx('rounded-[10px] border border-line bg-panel', scroll && 'scroll-card', className)}>
       {(title || actions) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-3.5 pb-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-3.5 pb-4">
           {typeof title === 'string' ? <h2 className="m-0 text-[15px] font-semibold">{title}</h2> : title}
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
       )}
-      <div className={bodyClass ?? 'px-4 pb-4'}>{children}</div>
+      <div className={bodyClass ?? 'px-4 pb-4'}>
+        {description && <p className="m-0 mb-4 text-[12.5px] leading-relaxed text-muted">{description}</p>}
+        {children}
+      </div>
     </section>
   );
 }
@@ -150,18 +154,6 @@ export function PageHeader({ title, subtitle, crumbs, actions, children }: { tit
       </div>
     </div>
   );
-}
-
-/** 页面与卡片共用的空状态：白底虚线框、居中标题和说明。 */
-export function Empty({ title, description, action, children, className }: {
-  title?: ReactNode; description?: ReactNode; action?: ReactNode; children?: ReactNode; className?: string;
-}) {
-  return <div className={cx('flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-7 py-7 text-center', className)}>
-    {title && <span className="text-[14px] font-semibold text-ink">{title}</span>}
-    {description && <span className="max-w-[420px] text-[12.5px] leading-relaxed text-muted">{description}</span>}
-    {children && <span className="text-[12.5px] leading-relaxed text-muted">{children}</span>}
-    {action}
-  </div>;
 }
 
 export function ErrorBox({ error }: { error: unknown }) {

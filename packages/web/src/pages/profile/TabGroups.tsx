@@ -141,7 +141,7 @@ export function TabGroups() {
               );
             }} /></div>
           {!groups.length && <Empty title="没有组" description="选择模板或新增私有组。" />}
-          <div className="-mx-4 border-t border-line-2 px-4 pt-2.5"><Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button></div>
+          <div className="-mx-4 mt-4 border-t border-line-2 px-4 pt-2.5"><Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button></div>
         </Card>
 
         {g && eff && (

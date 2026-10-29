@@ -108,7 +108,7 @@ export function PresetEdit() {
                 <DeleteAction what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove} />
               </div>
             </div>
-            {client === 'surge' && <div className="rounded-lg border border-dashed border-[#d5d9e0] px-4 py-6 text-center text-[13px] text-muted">Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。</div>}
+            {client === 'surge' && <Empty title="Surge 预设暂未开放" description="Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。" />}
             {client === 'mihomo' && mode === 'form' && <div className="flex flex-wrap gap-1.5">
               {mihomoBaseGroups.map((g) => <button key={g.title} type="button" onClick={() => jump(g.title)}
                 className="cursor-pointer rounded-full border border-line bg-ground px-2.5 py-1 text-[12.5px] text-ink-2 hover:border-[#c5cad3]">{g.title}</button>)}

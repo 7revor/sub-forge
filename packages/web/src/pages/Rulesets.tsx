@@ -121,7 +121,7 @@ export function RulesetEdit() {
         <Button className="h-9" onClick={() => add(newLocal())}><FileText size={15} />添加本地规则</Button>
         {!e.isNew && <Link to={`/rule-repo?ruleset=${encodeURIComponent(d.id)}`} className={buttonClass('default', 'md', 'h-9')}>从规则仓库添加</Link>}
       </>}>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
           <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源在下方预览它的输出，本地规则可在预览里直接编辑；不选中时预览合并后的最终规则。</p>
           {!d.sources.length ? <Empty title="还没有来源" description="添加远程地址或本地规则。" /> : (
@@ -237,11 +237,11 @@ function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> })
 function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
   if (preview.error) return <ErrorBox error={preview.error} />;
   const p = preview.data;
-  if (!p) return <Empty>加载中…</Empty>;
+  if (!p) return <div className="text-[13px] text-muted">加载中…</div>;
   return (
     <>
       {p.error && <ErrorBox error={`拉取失败：${p.error}`} />}
-      <pre className={cx('m-0 max-h-[420px] min-h-[120px] overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7] transition-opacity', preview.isFetching && 'opacity-70')}>{p.lines.join('\n') || '（空）'}</pre>
+      {p.lines.length ? <pre className={cx('m-0 max-h-[420px] min-h-[120px] overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7] transition-opacity', preview.isFetching && 'opacity-70')}>{p.lines.join('\n')}</pre> : <Empty title="没有可输出的规则" description="添加或启用来源，或检查规则内容和客户端改写。" />}
       <span className="text-[12px] text-muted">{p.total ?? p.lines.length} 行{(p.total ?? 0) > p.lines.length ? `（显示前 ${p.lines.length} 行）` : ''} · 降级 {p.notes?.length ?? 0} · 丢弃 {p.dropped.length} · 无法解析 {p.rejected.length}</span>
       {[...(p.notes ?? []).map((n) => ['降级', n]), ...p.dropped.map((x) => ['丢弃', x.reason]), ...p.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].slice(0, 50).map(([k, v], i) => (
         <div key={i} className="flex gap-2 text-[12.5px]"><Badge tone={k === '降级' ? 'accent' : k === '丢弃' ? 'err' : 'warn'}>{k}</Badge><span className="min-w-0 break-all">{v}</span></div>
