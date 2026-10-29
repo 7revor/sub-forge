@@ -33,19 +33,16 @@ const BTN: Record<BtnVariant, string> = {
   ghost: 'bg-transparent border-transparent text-ink-2 hover:bg-ground',
 };
 
+/** 按钮样式；链接需要长得像按钮时（如表格行的「编辑」）也用它 */
+export const buttonClass = (variant: BtnVariant = 'default', size: 'sm' | 'md' = 'md', className?: string) => cx(
+  'inline-flex items-center justify-center gap-2 rounded-lg border font-medium whitespace-nowrap no-underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
+  size === 'sm' ? 'h-8 px-2.5 text-[12.5px]' : 'h-10 px-3.5 text-[13.5px]',
+  BTN[variant],
+  className,
+);
+
 export function Button({ variant = 'default', size = 'md', className, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: 'sm' | 'md' }) {
-  return (
-    <button
-      type="button"
-      {...p}
-      className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-lg border font-medium whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
-        size === 'sm' ? 'h-8 px-2.5 text-[12.5px]' : 'h-10 px-3.5 text-[13.5px]',
-        BTN[variant],
-        className,
-      )}
-    />
-  );
+  return <button type="button" {...p} className={buttonClass(variant, size, className)} />;
 }
 
 export const inputCls = 'h-[38px] w-full rounded-lg border border-[#d5d9e0] bg-panel px-3 text-[13px] text-ink placeholder:text-faint';

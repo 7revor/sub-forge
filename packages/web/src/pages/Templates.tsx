@@ -7,7 +7,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
-import { DocActionLink, DocTableRow, docNameLinkClass } from '../components/DocTableRow.tsx';
+import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
@@ -28,7 +28,7 @@ export function TemplateList() {
       <Card bodyClass="overflow-x-auto">
         {!list.data?.length ? <div className="p-4"><Empty>还没有模板。</Empty></div> : (
           <table className="w-full border-collapse">
-            <thead><tr><th className={th}>名称</th><th className={th}>版本</th><th className={th}>组</th><th className={th}>规则</th><th className={cx(th, 'w-px text-right')}>操作</th></tr></thead>
+            <thead><tr><th className={th}>名称</th><th className={th}>版本</th><th className={th}>组</th><th className={th}>规则</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>
               {list.data.map((t) => (
                 <DocTableRow key={t.id} to={`/templates/${t.id}`}>
