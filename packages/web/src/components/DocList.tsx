@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useDeleteDoc, useList, type DocMap, type Kind } from '../hooks.ts';
-import { Button, buttonClass, Card, cx, Empty, ErrorBox, Input, PageHeader, td, th } from './ui.tsx';
+import { Button, buttonClass, Card, cx, Empty, ErrorBox, Input, PageHeader, PageScroll, td, th } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { DeleteDialog } from './MoreMenu.tsx';
 
@@ -35,10 +35,10 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
     <>
       <PageHeader title={title} subtitle={intro} actions={canCreate && createButton('md', 'primary')} />
       <ErrorBox error={list.error} />
-      {list.isLoading ? <div className="text-muted">加载中…</div> : !list.data?.length ? (
-        <Empty title={`还没有${name}`} description={empty} action={canCreate && createButton('sm', 'default')} />
+      {list.isLoading ? <PageScroll><div className="text-muted">加载中…</div></PageScroll> : !list.data?.length ? (
+        <PageScroll><Empty title={`还没有${name}`} description={empty} action={canCreate && createButton('sm', 'default')} /></PageScroll>
       ) : (
-        <Card bodyClass="overflow-x-auto" title={<Input aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-[280px]" value={q} onChange={(e) => setQ(e.target.value)} />}
+        <Card scroll bodyClass="overflow-x-auto" title={<Input aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-[280px]" value={q} onChange={(e) => setQ(e.target.value)} />}
           actions={<span className="text-[12.5px] text-muted">{q.trim() ? `${rows.length} / ` : ''}{list.data.length} 个{name}</span>}>
           <table className="w-full border-collapse">
             <thead><tr>{columns.map((c) => <th key={c.header} className={cx(th, 'px-3.5')}>{c.header}</th>)}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>

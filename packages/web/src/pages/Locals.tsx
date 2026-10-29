@@ -144,7 +144,7 @@ export function LocalEdit() {
       </PageHeader>
       <ErrorBox error={e.save.error} />
 
-      <Card bodyClass="overflow-x-auto"
+      <Card scroll bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
         actions={<><Button size="sm" onClick={() => setPasting(true)}>粘贴导入</Button><Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link></>}>
         {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增一个，或粘贴 URI / YAML 一次导入多个。" /></div> : (
@@ -246,7 +246,7 @@ export function LocalNodeEdit() {
       </PageHeader>
       <ErrorBox error={save.error} />
 
-      <Card title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
+      <Card scroll title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
         <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={proxyDraftFromYaml} recoverForm={proxyFormFromYaml} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="名称" className="col-span-2">{(fid) => <Input id={fid} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>

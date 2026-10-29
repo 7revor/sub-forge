@@ -10,7 +10,7 @@ import { api, type PipelinePreview } from '../api.ts';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/MoreMenu.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
-import { Badge, Button, Empty, ErrorBox, Input, Modal, PageHeader, Segmented, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Empty, ErrorBox, Input, Modal, PageHeader, PageScroll, Segmented, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useNodeList, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
 function SourceNodes({ source }: { source: SourceDoc }) {
@@ -218,9 +218,11 @@ export function SourceEdit() {
       <ErrorBox error={refresh.error} />
       {refresh.data?.items.some((i) => !i.ok) && <ErrorBox error={refresh.data.items.filter((i) => !i.ok).map((i) => `${i.url}：${i.error}`).join('；')} />}
 
-      <PipelineEditor steps={draft.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}
-        loading={preview.isFetching} {...(preview.error ? { previewError: (preview.error as Error).message } : {})} />
+      <PageScroll>
+        <PipelineEditor steps={draft.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}
+          loading={preview.isFetching} {...(preview.error ? { previewError: (preview.error as Error).message } : {})} />
 
+      </PageScroll>
       <FetchDialog open={fetchOpen} draft={draft} set={set} onClose={() => setFetchOpen(false)} onDelete={openDelete} />
       <DeleteDialog open={deleting} title={`删除订阅源「${draft.name}」？`} error={del.error} pending={del.isPending}
         onClose={() => setDeleting(false)} onConfirm={() => del.mutate(draft.id, { onSuccess: () => navigate('/sources') })}>

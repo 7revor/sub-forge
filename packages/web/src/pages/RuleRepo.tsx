@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api, type RepoEntry, type RepoEntryDetail, type RuleRepo } from '../api.ts';
-import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Input, PageHeader, PendingNotice, cx, formatTime, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Input, PageHeader, PageScroll, PendingNotice, cx, formatTime, td, th } from '../components/ui.tsx';
 
 export function RuleRepoPage() {
   const navigate = useNavigate();
@@ -50,54 +50,56 @@ export function RuleRepoPage() {
       </div>
       <ErrorBox error={repos.error ?? search.error} />
 
-      <div className="flex flex-wrap items-start gap-5">
-        <section aria-label="搜索结果" className="min-w-0 flex-[1_1_360px] overflow-hidden rounded-[10px] border border-line bg-panel">
-          <div className="border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{search.isFetching ? '搜索中…' : `${search.data?.total ?? 0} 个结果`}</div>
-          {items.map((x) => {
-            const on = sel?.repo === x.repo && sel.path === x.path;
-            return (
-              <button key={`${x.repo}:${x.path}`} type="button" aria-current={on || undefined} onClick={() => setSel(x)}
-                className={cx('flex w-full cursor-pointer items-center gap-3 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'hover:bg-ground')}>
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{x.name}</span><span className="truncate font-mono text-[12px] text-muted">{x.path}</span></span>
-                <span className="flex flex-col items-end gap-0.5"><span className="font-mono text-[12.5px]">{x.count}</span><span className="text-[11.5px] text-muted">{x.repo}</span></span>
-              </button>
-            );
-          })}
-          {!items.length && !search.isFetching && <div className="px-4 py-4"><Empty title={debounced ? `没有找到「${debounced}」` : '输入关键词开始搜索'} /></div>}
-        </section>
+      <PageScroll>
+        <div className="flex flex-wrap items-start gap-5">
+          <section aria-label="搜索结果" className="min-w-0 flex-[1_1_360px] overflow-hidden rounded-[10px] border border-line bg-panel">
+            <div className="border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{search.isFetching ? '搜索中…' : `${search.data?.total ?? 0} 个结果`}</div>
+            {items.map((x) => {
+              const on = sel?.repo === x.repo && sel.path === x.path;
+              return (
+                <button key={`${x.repo}:${x.path}`} type="button" aria-current={on || undefined} onClick={() => setSel(x)}
+                  className={cx('flex w-full cursor-pointer items-center gap-3 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'hover:bg-ground')}>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{x.name}</span><span className="truncate font-mono text-[12px] text-muted">{x.path}</span></span>
+                  <span className="flex flex-col items-end gap-0.5"><span className="font-mono text-[12.5px]">{x.count}</span><span className="text-[11.5px] text-muted">{x.repo}</span></span>
+                </button>
+              );
+            })}
+            {!items.length && !search.isFetching && <div className="px-4 py-4"><Empty title={debounced ? `没有找到「${debounced}」` : '输入关键词开始搜索'} /></div>}
+          </section>
 
-        <section aria-label="详情" className="flex min-w-0 flex-[999_1_520px] flex-col gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-          {!sel ? <Empty title="还没有选择规则" description="从左侧选择一个规则查看详情。" /> : <>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex flex-col gap-1">
-                <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>
-                <span className="font-mono text-[12px] text-muted">{sel.repo} · {sel.path}</span>
+          <section aria-label="详情" className="flex min-w-0 flex-[999_1_520px] flex-col gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
+            {!sel ? <Empty title="还没有选择规则" description="从左侧选择一个规则查看详情。" /> : <>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>
+                  <span className="font-mono text-[12px] text-muted">{sel.repo} · {sel.path}</span>
+                </div>
+                <Badge>{sel.count} 条</Badge>
               </div>
-              <Badge>{sel.count} 条</Badge>
-            </div>
-            <ErrorBox error={detail.error} />
-            {d && <>
-              <div className="flex flex-wrap gap-2 text-[12.5px]">
-                {d.license && <Badge>许可证 {d.license} · 下发时保留来源注释</Badge>}
-                {d.updatedAt && <Badge>更新于 {formatTime(d.updatedAt).slice(0, 10)}</Badge>}
+              <ErrorBox error={detail.error} />
+              {d && <>
+                <div className="flex flex-wrap gap-2 text-[12.5px]">
+                  {d.license && <Badge>许可证 {d.license} · 下发时保留来源注释</Badge>}
+                  {d.updatedAt && <Badge>更新于 {formatTime(d.updatedAt).slice(0, 10)}</Badge>}
+                </div>
+                <Card title="按客户端选择的变体" bodyClass="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead><tr><th className={th}>客户端</th><th className={th}>文件</th><th className={th}>方式</th></tr></thead>
+                    <tbody>{d.variants.map((v) => <tr key={v.client}><td className={cx(td, 'font-medium')}>{v.client}</td><td className={cx(td, 'font-mono text-[12px]')}>{v.file}</td><td className={cx(td, 'text-ink-2')}>{v.how}</td></tr>)}</tbody>
+                  </table>
+                </Card>
+                <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">内容预览</span>
+                  <pre className="m-0 max-h-64 overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7]">{d.preview.join('\n')}</pre></div>
+              </>}
+              <ErrorBox error={use.error} />
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary" disabled={use.isPending} onClick={() => use.mutate()}>{ruleset ? '加入规则集' : '引用为规则集'}</Button>
+                {!ruleset && <Link to="/rulesets" className={buttonClass()}>加入已有规则集…</Link>}
               </div>
-              <Card title="按客户端选择的变体" bodyClass="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead><tr><th className={th}>客户端</th><th className={th}>文件</th><th className={th}>方式</th></tr></thead>
-                  <tbody>{d.variants.map((v) => <tr key={v.client}><td className={cx(td, 'font-medium')}>{v.client}</td><td className={cx(td, 'font-mono text-[12px]')}>{v.file}</td><td className={cx(td, 'text-ink-2')}>{v.how}</td></tr>)}</tbody>
-                </table>
-              </Card>
-              <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">内容预览</span>
-                <pre className="m-0 max-h-64 overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7]">{d.preview.join('\n')}</pre></div>
             </>}
-            <ErrorBox error={use.error} />
-            <div className="flex flex-wrap gap-2">
-              <Button variant="primary" disabled={use.isPending} onClick={() => use.mutate()}>{ruleset ? '加入规则集' : '引用为规则集'}</Button>
-              {!ruleset && <Link to="/rulesets" className={buttonClass()}>加入已有规则集…</Link>}
-            </div>
-          </>}
-        </section>
-      </div>
+          </section>
+        </div>
+      </PageScroll>
     </>
   );
 }

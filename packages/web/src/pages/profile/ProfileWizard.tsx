@@ -52,11 +52,11 @@ export function ProfileWizard() {
         <span className="text-[13px] text-muted">完成后才会保存；离开页面会丢失当前草稿。</span>
       </PageHeader>
       <ProfileEditGuard valid={ctx!.baseValid} onDiscard={ctx!.resetBaseEditor} />
-      <ol aria-label="新建 Profile 步骤" className="m-0 flex list-none flex-wrap gap-2 p-0">
+      <ol aria-label="新建 Profile 步骤" className="m-0 flex shrink-0 list-none gap-2 overflow-x-auto p-0">
         {STEPS.map(([label, sub], index) => {
           const now = step === index, done = index < reached && !now;
           return (
-            <li key={label} className="flex-[1_1_140px]">
+            <li key={label} className="min-w-[140px] flex-1">
               <button type="button" aria-current={now ? 'step' : undefined} disabled={index > reached || !ctx!.baseValid || save.isPending || (index > 0 && !nameValid)} onClick={() => setStep(index)}
                 className={cx('flex min-h-14 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60', now ? 'border-accent bg-[#f5f8ff]' : 'border-line bg-panel hover:bg-ground')}>
                 <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[12px]', now || done ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}>{done ? <Check size={13} /> : index + 1}</span>
@@ -66,7 +66,7 @@ export function ProfileWizard() {
           );
         })}
       </ol>
-      <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+      <fieldset disabled={save.isPending} className="page-scroll m-0 gap-5 border-0 p-0.5">
         {step === 0 && <>
           <Card title="名称与基础设置">
             <Field label="名称" hint="必填，客户端里显示的订阅名">{(id) => <Input id={id} required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>

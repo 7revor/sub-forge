@@ -32,6 +32,7 @@ html,
 body,
 #root {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -69,4 +70,87 @@ body {
   background-size: 40px 40px;
   background-position: center top;
   mask-image: radial-gradient(70% 60% at 50% 30%, #000, transparent);
+}
+
+/* 高度沿 flex 容器逐层传递；标题与操作区不收缩，只有内容区域滚动。 */
+.page-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.page-layout > *,
+.page-scroll > * {
+  flex-shrink: 0;
+}
+
+.page-scroll,
+.scroll-card {
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.page-scroll {
+  /* 将 sr-only 等绝对定位后代也限制在滚动区内，避免撑大文档。 */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.scroll-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scroll-card > :first-child:not(:last-child) {
+  flex-shrink: 0;
+}
+
+.scroll-card > :last-child {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.scroll-card thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-panel);
+}
+
+/* 独立表单卡片将滚动交给编辑器正文，模式切换始终可见。 */
+.scroll-card > :last-child:has(> .dual-editor) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scroll-card > :last-child > .dual-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.scroll-card .dual-editor > :not(.editor-content) {
+  flex-shrink: 0;
+}
+
+.scroll-card .dual-editor > .editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }

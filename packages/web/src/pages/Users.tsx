@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PendingNotice, Select, Switch, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, PendingNotice, Select, Switch, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
 
 function ago(ms: number): string {
@@ -51,54 +51,56 @@ export function Users() {
       <PageHeader title="用户" subtitle={`${list.length} 个用户。用户之间数据隔离；禁用或重置密码会让其所有登录立即失效。`}
         actions={<Button variant="primary" onClick={() => setCreating(true)}><Plus size={16} />创建用户</Button>} />
       <ErrorBox error={users.error ?? patch.error} />
-      <Card bodyClass="overflow-x-auto">
-        <table className="w-full min-w-[900px] border-collapse">
-          <thead><tr><th className={th}>用户</th><th className={th}>角色</th><th className={th}>配置订阅</th><th className={th}>订阅源</th><th className={th}>最近订阅请求</th><th className={th}>脚本编写权限</th><th className={th}>状态</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
-          <tbody>
-            {list.map((u) => {
-              const self = u.id === me?.id;
-              const s = st(u.id);
-              return (
-                <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
-                  <td className={cx(td, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-muted">（我）</span>}</td>
-                  <td className={td}>
-                    <Select aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
-                      <option value="user">用户</option><option value="admin">管理员</option>
-                    </Select>
-                  </td>
-                  <td className={cx(td, 'font-mono')}>{s?.profiles ?? '—'}</td>
-                  <td className={cx(td, 'font-mono')}>{s?.sources ?? '—'}</td>
-                  <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{s?.lastRequestAt ? ago(s.lastRequestAt) : '—'}</td>
-                  <td className={td}>{u.role === 'admin' ? <span className="text-[12.5px] text-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
-                  <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
-                  <td className={td}>
-                    <div className="flex justify-end gap-1.5">
-                      <Button size="sm" onClick={() => { setResetting(u); setNewPass(''); }}>重置密码</Button>
-                      {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {stats.data?.pending && <p className="mx-4 my-3 text-[12px] text-muted">配置订阅、订阅源与最近订阅请求的统计还没有接入服务端，暂时显示为「—」。</p>}
-      </Card>
+      <PageScroll>
+        <Card bodyClass="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse">
+            <thead><tr><th className={th}>用户</th><th className={th}>角色</th><th className={th}>配置订阅</th><th className={th}>订阅源</th><th className={th}>最近订阅请求</th><th className={th}>脚本编写权限</th><th className={th}>状态</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
+            <tbody>
+              {list.map((u) => {
+                const self = u.id === me?.id;
+                const s = st(u.id);
+                return (
+                  <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
+                    <td className={cx(td, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-muted">（我）</span>}</td>
+                    <td className={td}>
+                      <Select aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
+                        <option value="user">用户</option><option value="admin">管理员</option>
+                      </Select>
+                    </td>
+                    <td className={cx(td, 'font-mono')}>{s?.profiles ?? '—'}</td>
+                    <td className={cx(td, 'font-mono')}>{s?.sources ?? '—'}</td>
+                    <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{s?.lastRequestAt ? ago(s.lastRequestAt) : '—'}</td>
+                    <td className={td}>{u.role === 'admin' ? <span className="text-[12.5px] text-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
+                    <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
+                    <td className={td}>
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="sm" onClick={() => { setResetting(u); setNewPass(''); }}>重置密码</Button>
+                        {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {stats.data?.pending && <p className="mx-4 my-3 text-[12px] text-muted">配置订阅、订阅源与最近订阅请求的统计还没有接入服务端，暂时显示为「—」。</p>}
+        </Card>
 
-      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">共享的订阅源与组合</h2><span className="text-[12.5px] text-muted">被共享的用户只能引用，看不到原始 URL。</span></div>}
-        actions={<Button onClick={() => { setShare({ doc: '', to: [] }); setSharing(true); }}>共享…</Button>}>
-        {shares.data?.pending && <div className="mb-3"><PendingNotice>共享模型还没有接入，「共享…」会被拒绝。</PendingNotice></div>}
-        <div className="flex flex-col">
-          {(shares.data?.items ?? []).map((x) => (
-            <div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
-              <span className="text-[13.5px] font-medium">{x.name}</span><Badge>{x.kind === 'source' ? '订阅源' : '组合'}</Badge>
-              <span className="text-[12.5px] text-muted">共享给：{x.to.map(nameOf).join('、') || '—'}</span>
-            </div>
-          ))}
-          {!shares.data?.items.length && <Empty title="还没有共享" />}
-        </div>
-      </Card>
+        <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">共享的订阅源与组合</h2><span className="text-[12.5px] text-muted">被共享的用户只能引用，看不到原始 URL。</span></div>}
+          actions={<Button onClick={() => { setShare({ doc: '', to: [] }); setSharing(true); }}>共享…</Button>}>
+          {shares.data?.pending && <div className="mb-3"><PendingNotice>共享模型还没有接入，「共享…」会被拒绝。</PendingNotice></div>}
+          <div className="flex flex-col">
+            {(shares.data?.items ?? []).map((x) => (
+              <div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
+                <span className="text-[13.5px] font-medium">{x.name}</span><Badge>{x.kind === 'source' ? '订阅源' : '组合'}</Badge>
+                <span className="text-[12.5px] text-muted">共享给：{x.to.map(nameOf).join('、') || '—'}</span>
+              </div>
+            ))}
+            {!shares.data?.items.length && <Empty title="还没有共享" />}
+          </div>
+        </Card>
 
+      </PageScroll>
       <Modal title="创建用户" open={creating} onClose={() => setCreating(false)}
         footer={<><Button onClick={() => setCreating(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建'}</Button></>}>
         <div className="grid grid-cols-2 gap-3">

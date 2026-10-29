@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
 import { DeleteAction, MoreMenu } from '../../components/MoreMenu.tsx';
 import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
-import { Badge, Button, buttonClass, ErrorBox, Modal, PageHeader, cx } from '../../components/ui.tsx';
+import { Badge, Button, buttonClass, ErrorBox, Modal, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
 import { TemplateCard } from './TemplateCard.tsx';
 import { useDeleteDoc, useDoc, useList, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
@@ -82,14 +82,16 @@ export function ProfileDetail() {
       <ProfileEditGuard valid={ctx.baseValid} onDiscard={discard} />
       {template.error && <ErrorBox error={template.error} />}
 
-      {tab === 'overview' && <TabOverview />}
-      {tab === 'base' && <TabBase />}
-      {tab === 'nodesets' && <TabNodeSets />}
-      {tab === 'groups' && <TabGroups />}
-      {tab === 'rules' && <TabRules />}
-      {tab === 'chains' && <TabChains />}
-      {tab === 'preview' && <TabPreview />}
+      <PageScroll>
+        {tab === 'overview' && <TabOverview />}
+        {tab === 'base' && <TabBase />}
+        {tab === 'nodesets' && <TabNodeSets />}
+        {tab === 'groups' && <TabGroups />}
+        {tab === 'rules' && <TabRules />}
+        {tab === 'chains' && <TabChains />}
+        {tab === 'preview' && <TabPreview />}
 
+      </PageScroll>
       <Modal title="模板" open={tplOpen} onClose={() => setTplOpen(false)} footer={<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}>
         <TemplateCard bare />
       </Modal>

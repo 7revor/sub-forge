@@ -70,9 +70,14 @@ export function Field({ label, hint, children, className }: { label: string; hin
   );
 }
 
-export function Card({ title, actions, children, className, bodyClass }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string }) {
+/** 页面剩余展示区；同级的标题、筛选和操作栏保持固定。 */
+export function PageScroll({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx('page-scroll gap-5 p-0.5', className)}>{children}</div>;
+}
+
+export function Card({ title, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
   return (
-    <section className={cx('rounded-[10px] border border-line bg-panel', className)}>
+    <section className={cx('rounded-[10px] border border-line bg-panel', scroll && 'scroll-card', className)}>
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-3.5 pb-2.5">
           {typeof title === 'string' ? <h2 className="m-0 text-[15px] font-semibold">{title}</h2> : title}
@@ -130,7 +135,7 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
 
 export function PageHeader({ title, subtitle, crumbs, actions, children }: { title: ReactNode; subtitle?: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="shrink-0 flex flex-col gap-2.5 break-words">
       {crumbs && <div className="text-[12.5px] text-muted">{crumbs}</div>}
       <div className={cx('flex flex-wrap justify-between gap-3', subtitle ? 'items-end' : 'items-center')}>
         <div className="flex flex-col gap-1">
@@ -173,14 +178,14 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
   if (!open) return null;
   // 设计稿「对话框与危险操作」：标题 + 关闭、内容、灰底操作栏；宽度 560（表单）/ 720（粘贴、YAML）
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={cx('flex w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
-        <div className="flex items-center justify-between gap-3 px-5 pt-[18px] pb-2">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={cx('flex max-h-full min-h-0 w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
+        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-[18px] pb-2">
           <h2 className="m-0 text-base font-semibold">{title}</h2>
           <button type="button" aria-label="关闭" onClick={onClose} className="grid h-8 w-8 cursor-pointer place-items-center rounded-md text-muted hover:bg-ground hover:text-ink"><X size={16} /></button>
         </div>
-        <div className="flex flex-col gap-3.5 px-5 pt-2 pb-[18px]">{children}</div>
-        {footer && <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-line-2 bg-[#fafbfc] px-5 py-3.5">{footer}</div>}
+        <div className="flex min-h-0 flex-col gap-3.5 overflow-auto overscroll-contain px-5 pt-2 pb-[18px]">{children}</div>
+        {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2 rounded-b-xl border-t border-line-2 bg-[#fafbfc] px-5 py-3.5">{footer}</div>}
       </div>
     </div>
   );
