@@ -111,10 +111,10 @@ function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () =>
   );
 }
 
-function dialerText(p: LocalProxy, nameOf: (r: NonNullable<Extract<Target, { kind: 'node' }>['ref']>['nodeSet']) => string): string {
+function dialerText(p: LocalProxy, nameOf: (r: NonNullable<Extract<Target, { kind: 'node' }>['ref']>['nodeSet']) => string, groupId: string): string {
   const d = p.dialer;
   if (!d) return '—';
-  if (d.kind === 'node') return `${nameOf(d.ref.nodeSet)} · ${'exact' in d.ref.match ? d.ref.match.exact : d.ref.match.regex}`;
+  if (d.kind === 'node') return `${d.ref.nodeSet.type === 'local' && d.ref.nodeSet.id === groupId ? '本组' : nameOf(d.ref.nodeSet)} · ${'exact' in d.ref.match ? d.ref.match.exact : d.ref.match.regex}`;
   if (d.kind === 'builtin') return d.name;
   return '策略组';
 }
@@ -162,7 +162,7 @@ export function LocalEdit() {
                   <td className={cx(td, 'px-3.5 py-3 whitespace-nowrap')}><Link to={nodePath(i)} className={docNameLinkClass}>{p.name}</Link></td>
                   <td className={cx(td, 'px-3.5 py-3')}><span className="rounded bg-[#ebedf1] px-1.5 py-0.5 font-mono text-[12px]">{p.type}</span></td>
                   <td className={cx(td, 'px-3.5 py-3 font-mono text-[12.5px] text-ink-2')}>{p.server}:{p.port}</td>
-                  <td className={cx(td, 'px-3.5 py-3 text-[12.5px]')}>{dialerText(p, nameOf)}</td>
+                  <td className={cx(td, 'px-3.5 py-3 text-[12.5px]')}>{dialerText(p, nameOf, d.id)}</td>
                   <td className={cx(td, 'text-right whitespace-nowrap')}>
                     <Button size="sm" variant="danger" aria-label={`删除 ${p.name}`} className="mr-2" onClick={() => { e.save.reset(); setDeletingNode(i); }}>删除</Button>
                     <DocActionLink to={nodePath(i)} name={p.name} />
@@ -226,7 +226,7 @@ export function LocalNodeEdit() {
   const cur = draft;
   const update = (patch: Partial<LocalProxy>) => setDraft({ ...cur, ...patch });
   // 同组节点也可以做前置，只排除节点自己（环由渲染时的 chain.cycle 兜底）
-  const nodeSets = all;
+  const nodeSets = all.map((n) => (n.ref.type === 'local' && n.ref.id === g.id ? { ...n, name: `${n.name}（本组）` } : n));
   const self = { nodeSet: { type: 'local' as const, id: g.id }, names: [cur.name, ...(isNew ? [] : [g.proxies[idx]?.name ?? ''])] };
   const changeType = (type: string) => {
     if (type === cur.type) return;
@@ -283,6 +283,7 @@ export function LocalNodeEdit() {
           }} />}>
           <fieldset disabled={!rawValid} className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0">
             {cur.dialer && <TargetPicker label="前置" value={cur.dialer} groups={[]} allowGroup={false} nodeSets={nodeSets} exclude={self} onChange={(t: Target) => update({ dialer: t })} />}
+            {cur.dialer?.kind === 'node' && <span className="text-[12px] leading-relaxed text-muted">可以选择本组的其他节点；节点自己不在候选中，正则命中自己时提示会成环。</span>}
             <span className="text-[12px] leading-relaxed text-muted">保存的是引用，不是节点快照：上游节点改名或替换后，按引用重新解析。前置所在的节点集需要同时加入使用它的配置订阅；前置为策略组时，请在配置订阅的「代理链」中设置。<Link to="/profiles" className="text-accent">前往配置订阅</Link></span>
           </fieldset>
         </Card>
