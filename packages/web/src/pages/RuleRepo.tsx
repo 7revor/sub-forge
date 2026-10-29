@@ -54,7 +54,7 @@ export function RuleRepoPage() {
         <div role="group" aria-label="仓库" className="flex flex-wrap gap-1.5">
           {[{ id: undefined, name: '全部仓库' }, ...(repos.data?.repos.filter(r => r.enabled) ?? [])].map((r) => (
             <button key={r.id ?? 'all'} type="button" aria-pressed={repo === r.id} onClick={() => setRepo(r.id)}
-              className={cx('h-9 cursor-pointer rounded-full border px-3.5 text-[13px]', repo === r.id ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink-2 hover:bg-ground')}>{r.name}</button>
+              className={cx('h-9 shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3.5 text-[13px]', repo === r.id ? 'border-accent bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink-2 hover:bg-ground')}>{r.name}</button>
           ))}
         </div>
       </div>
