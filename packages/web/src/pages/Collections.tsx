@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { DetailShell } from '../components/DetailShell.tsx';
+import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { NodeSetPickerDialog, RenameDialog } from '../components/dialogs.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
@@ -21,6 +22,7 @@ export function CollectionList() {
     <DocList kind="collections" title="组合" empty="把多个订阅源、本地节点组合并成一个节点集，成员可以加前后缀区分来源。" intro="把多个订阅源、组合或本地节点组按顺序合并成一个节点集，可整体加入配置订阅。"
       columns={[
         { header: '名称', cell: (c) => c.name },
+        { header: '备注', cell: (c) => <NoteCell note={c.note} /> },
         { header: '成员', cell: (c) => <span className="font-mono">{c.members.length}</span> },
         { header: '处理链', cell: (c) => <span className="font-mono">{c.pipeline.length} 步</span> },
       ]} />
@@ -63,7 +65,10 @@ export function CollectionEdit() {
         <Badge>{d.members.length} 个成员{preview.data ? ` · 合并后 ${preview.data.input} 个节点` : ''}</Badge>
         {!e.isNew && <Badge>被配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-accent">{p.name}</Link></span>) : '还没有'}</Badge>}
       </>}>
-      {e.isNew && <Card title="名称"><Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field></Card>}
+      <Card title="基本信息">
+        {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
+        <NoteField value={d.note} onChange={(note) => set({ note })} />
+      </Card>
 
       <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">成员</h2><span className="text-[12.5px] text-muted">按顺序合并。每个成员先跑自己的处理链，前后缀等价于自动追加一个改名处理器。组合之间不能成环。</span></div>}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加成员</Button>}

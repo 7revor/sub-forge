@@ -6,6 +6,7 @@ import { RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api, type PipelinePreview } from '../api.ts';
+import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
@@ -40,6 +41,7 @@ export function SourceList() {
         empty="添加机场的订阅地址，之后在处理链里改名、过滤、排序。自己整理的节点请放到「本地节点」。"
         columns={[
           { header: '名称', cell: (s) => s.name },
+          { header: '备注', cell: (s) => <NoteCell note={s.note} /> },
           { header: '地址', cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[12px] text-ink-2">{s.url}</span> },
           { header: '节点', cell: (s) => <SourceNodes source={s} /> },
           { header: '处理链', cell: (s) => <span className="font-mono text-[13px]">{s.pipeline.length} 步</span> },
@@ -56,9 +58,10 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
   const save = useSaveDoc('sources');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const [note, setNote] = useState('');
   const ready = name.trim() && url.trim();
   const create = () => save.mutate(
-    { name: name.trim(), url: url.trim(), pipeline: [] },
+    { name: name.trim(), url: url.trim(), note, pipeline: [] },
     { onSuccess: (item) => navigate(`/sources/${item.id}`, { state: { justCreated: true } }) },
   );
   return (
@@ -66,6 +69,7 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}>
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
       <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
+      <NoteField value={note} onChange={setNote} />
       <span className="text-[12px] leading-relaxed text-muted">每个订阅源只使用一个 URL；多个来源请通过「组合」合并。User-Agent、快照有效期在详情页的「基础设置」里设置。创建后立即拉取一次，并打开编辑与预览。自己整理的节点请到 <Link to="/locals" onClick={onClose}>本地节点</Link>，在新增节点的原始配置中粘贴。</span>
       <ErrorBox error={save.error} />
     </Modal>
@@ -111,6 +115,7 @@ function BasicSettings({ draft, set, state }: {
         <Field label="快照有效期（小时）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min={5 / 60} step="any" className="font-mono" inputMode="decimal" placeholder="24" value={draft.fetch?.ttlSec === undefined ? '' : String(draft.fetch.ttlSec / 3600)} onCommit={(value) => setFetch({ ttlSec: num(value, 3600) })} />}</Field>
         <Field label="超时（秒）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min="0.001" step="any" className="font-mono" inputMode="decimal" placeholder="10" value={draft.fetch?.timeoutMs === undefined ? '' : String(draft.fetch.timeoutMs / 1000)} onCommit={(value) => setFetch({ timeoutMs: num(value, 1000) })} />}</Field>
       </div>
+      <NoteField value={draft.note} onChange={(note) => set({ note })} />
       <p className="m-0 text-[12px] leading-relaxed text-muted">拉取选项留空使用默认值，快照有效期最短 5 分钟。快照过期后在后台刷新，失败时继续使用上一份成功快照。</p>
       <details className="min-w-0 border-t border-line pt-3">
         <summary className="cursor-pointer text-[13px] font-medium">快照历史 · {state.snaps.data?.length ?? 0}</summary>

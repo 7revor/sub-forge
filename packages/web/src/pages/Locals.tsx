@@ -7,6 +7,7 @@ import type { LocalProxy, LocalProxyGroup } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useBeforeUnload, useBlocker, useLocation, useNavigate, useParams, type Blocker, type NavigateOptions } from 'react-router';
+import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { DualEditor } from '../components/DualEditor.tsx';
@@ -58,13 +59,15 @@ function NewGroupModal({ open, onClose }: { open: boolean; onClose: () => void }
   const navigate = useNavigate();
   const save = useSaveDoc('locals');
   const [name, setName] = useState('');
-  useEffect(() => { if (open) setName(''); }, [open]);
-  const create = () => save.mutate({ name: name.trim(), proxies: [] }, { onSuccess: (item) => { onClose(); navigate(`/locals/${item.id}`); } });
+  const [note, setNote] = useState('');
+  useEffect(() => { if (open) { setName(''); setNote(''); } }, [open]);
+  const create = () => save.mutate({ name: name.trim(), note, proxies: [] }, { onSuccess: (item) => { onClose(); navigate(`/locals/${item.id}`); } });
   return (
     <Modal title="新建分组" open={open} onClose={onClose}
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!name.trim() || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建'}</Button></>}>
       <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">分组名称</span>
         <Input autoFocus placeholder="例如：自建、家宽" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) create(); }} /></label>
+      <NoteField value={note} onChange={setNote} />
       <ErrorBox error={save.error} />
     </Modal>
   );
@@ -83,6 +86,7 @@ export function LocalList() {
         empty="自建、中转等手写节点按分组管理，每个分组都能单独加入配置订阅。"
         columns={[
           { header: '名称', cell: (g) => g.name },
+          { header: '备注', cell: (g) => <NoteCell note={g.note} /> },
           { header: '节点', cell: (g) => <span className="font-mono text-[13px]">{g.proxies.length}</span> },
           { header: '协议', cell: (g) => <span className="font-mono text-[12.5px] text-ink-2">{typesText(g)}</span> },
         ]} />
@@ -119,6 +123,7 @@ export function LocalEdit() {
         {e.dirty && <Badge tone="warn">有未保存的修改</Badge>}
       </PageHeader>
       <ErrorBox error={e.save.error} />
+      <Card bodyClass="p-4"><NoteField value={d.note} onChange={(note) => e.setDraft({ ...d, note })} /></Card>
 
       <Card scroll bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}

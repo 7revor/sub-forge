@@ -10,6 +10,7 @@ import { api, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
+import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
@@ -36,6 +37,7 @@ export function RulesetList() {
     <DocList kind="rulesets" title="规则集" empty="一组匹配条件，可以由多个远程地址与本地规则合并而成，在配置订阅的规则里配上出口。" intro="一组匹配条件（不含出口），可以引用多个远程地址与本地规则，合并去重后只配一个出口；管理员名下的规则集可被所有人引用。"
       columns={[
         { header: '名称', cell: (r) => r.name },
+        { header: '备注', cell: (r) => <NoteCell note={r.note} /> },
         { header: '来源', cell: (r) => <span className="text-ink-2">{sourceSummary(r)}</span> },
         { header: 'IP 类 no-resolve', cell: (r) => (r.noResolve ? '是' : '否') },
       ]} />
@@ -113,13 +115,16 @@ export function RulesetEdit() {
         {failing > 0 && <Badge tone="err">{failing} 个来源拉取失败</Badge>}
         {failing === 0 && d.sources.some((s) => s.kind === 'remote' && status.get(s.id)?.ok) && <Badge tone="ok">拉取成功</Badge>}
       </>}>
+      <Card title="基本信息">
+        {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
+        <NoteField value={d.note} onChange={(note) => set({ note })} />
+      </Card>
       <Card title="来源" actions={<>
         <Button className="h-9" onClick={() => add(newRemote())}><Globe size={15} />添加远程地址</Button>
         <Button className="h-9" onClick={() => add(newLocal())}><FileText size={15} />添加本地规则</Button>
         {!e.isNew && <Link to={`/rule-repo?ruleset=${encodeURIComponent(d.id)}`} className={buttonClass('default', 'md', 'h-9')}>从规则仓库添加</Link>}
       </>}>
         <div className="flex flex-col gap-4">
-          {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
           <p className="m-0 text-[12.5px] text-muted">可以引用多个远程地址与本地规则，合并去重后在规则列表里只占一行、只配一个出口。点击来源展开配置，本地规则在配置块内编辑；下方统一展示合并后的最终只读结果。</p>
           {!d.sources.length ? <Empty title="还没有来源" description="添加远程地址或本地规则。" /> : (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (

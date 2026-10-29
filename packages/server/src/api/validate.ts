@@ -148,6 +148,7 @@ export class RefChecker {
 /** 校验并返回规范化后的文档（id 由调用方确定） */
 export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unknown>, id: string, user: User, store: Store): DocTypes[K] {
   if (!isStr(body.name)) throw bad('name 不能为空');
+  if (['source', 'collection', 'local', 'ruleset'].includes(kind) && body.note !== undefined && typeof body.note !== 'string') throw bad('备注必须是字符串');
   const doc = { ...body, id } as Record<string, unknown>;
   const refs = new RefChecker(store, user);
 
