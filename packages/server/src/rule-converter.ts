@@ -8,7 +8,7 @@ export class RuleConverter {
   private readonly parsed = new Map<string, { document: RuleDocument; bytes: number }>();
   private bytes = 0;
   prepare(content: string, source: RuleSetSource): RuleDocument {
-    const key = createHash('sha256').update(JSON.stringify([source.id, source.format, source.repository?.path, content])).digest('hex');
+    const key = createHash('sha256').update(JSON.stringify([source.id, source.format, source.repository?.path, source.url, content])).digest('hex');
     const hit = this.parsed.get(key);
     if (hit) { this.parsed.delete(key); this.parsed.set(key, hit); return hit.document; }
     const document = prepareRuleDocument(content, source);
