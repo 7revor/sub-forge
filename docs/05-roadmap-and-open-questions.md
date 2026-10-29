@@ -18,7 +18,7 @@
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| 前端设计稿 | ✅ | 21 张画板覆盖 PRD §7 信息架构（缺普通用户的模板浏览页）；位于 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库 |
+| 前端设计稿 | ✅ | 21 张画板覆盖 PRD §7 信息架构，另补 8 张编辑细节、列表、对话框与账户画板（覆盖情况见 [11](11-design-coverage.md)）；位于 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库 |
 | **M0 内核** | 基本完成 | 见下表 |
 | M1 MVP | 基本完成 | 服务端（见下表）与前端（`packages/web`，按设计稿实现全部页面，主要编辑器为表单 + YAML 双视图，见 [09](09-frontend-forms-plan.md)；缺普通用户的模板可见性设置）；生产镜像同源托管 |
 | M1 稳定化 | 已合入 main | 用户禁用、快照地址加密、代理链防绕行与环检测、订阅资源版本、历史依赖保护、规则参数、YAML 部分恢复与稳定 ID、仅限制字面内网 IP；377 项通过、2 项跳过，见 [10](10-m1-stabilization.md)。本地服务已切到主分支，待用户决定生产部署 |
