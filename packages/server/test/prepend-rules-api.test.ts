@@ -93,3 +93,18 @@ describe('绑定模板订阅的前置规则接口', () => {
     }
   });
 });
+
+it('前置单条规则跟随公共 RAW 编辑器保存与输出，空值及多行仍拒绝', async () => {
+  const { alice, draft } = await setup();
+  const profile = { ...draft, routing: { ...draft.routing, prependRules: [{ ...rule('raw'), matcher: { kind: 'rule', rule: { type: 'RAW', text: 'DOMAIN,raw.example.test' } } }] } };
+  const saved = await alice.post('/api/profiles', profile);
+  expect(saved.status).toBe(201);
+  const preview = await alice.post('/api/profiles/preview', { profile: saved.json.item });
+  expect(preview.json.ok).toBe(true);
+  expect(parse(preview.json.yaml).rules[0]).toBe('DOMAIN,raw.example.test,DIRECT');
+  for (const text of ['', 'DOMAIN,a.test\nDOMAIN,b.test']) {
+    const invalid = { ...profile, routing: { ...profile.routing, prependRules: [{ ...rule('raw'), matcher: { kind: 'rule', rule: { type: 'RAW', text } } }] } };
+    expect((await alice.post('/api/profiles', invalid)).status).toBe(400);
+    expect((await alice.post('/api/profiles/preview', { profile: invalid })).status).toBe(400);
+  }
+});

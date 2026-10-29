@@ -241,6 +241,9 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 
 2026-10-29 规则转换：合并预览及实际订阅资源对 mihomo wildcard 按小写键去重，保留首条原文；存在重复 wildcard 的远程文本和 YAML 自动返回托管资源，下载与合并预览一致。单来源原文预览仍保留全部行，接口及保存数据无需迁移。
 
+
+2026-10-29：订阅私有规则、规则集改写和模板发布均接受 `{ type: "RAW", text: "完整匹配原文" }`，client 可省略，旧客户端专用 RAW 继续兼容。接口校验空白 / 多行 RAW；未知单行规则类型可原样保存。出口仍由 RuleEntry.target 配置，no-resolve / src 由输出层置于出口后。种子改写示例采用 RAW，既有 demo 单条规则保留原表示；旧 IR 编辑后写 RAW，无批量数据迁移。
+
 ## 模板关系与旧数据升级（数据库 v16）
 
 新订阅保存 `routing.mode = bound | independent`、空 `overlay` 与 `revision`。绑定只允许模板 ID 和 `groupAdditions`，保存须带 GET 返回的 `templateVersion`；独立保存完整 groups/rules/final，初始化来源仅作说明。旧的 template/overlay 创建请求与种子会自动转换，新模式 PUT 不允许回退为旧形状。

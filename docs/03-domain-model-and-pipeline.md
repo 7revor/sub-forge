@@ -78,7 +78,7 @@ type RuleIR =
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string } // 语义化
   | { type: 'AND' | 'OR' | 'NOT'; children: RuleIR[] }
-  | { type: 'RAW'; client: Client; text: string };   // 逃生通道：只对指定客户端原样输出
+  | { type: 'RAW'; client?: Client; text: string };  // 单条原文；未指定客户端时按目标客户端原样输出，旧 client 限制继续生效
 
 type ClientOverride = {
   when: { client: Client; platform?: Platform };
@@ -412,6 +412,9 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 
 2026-10-29：ruleKey 增加可选目标客户端；仅 mihomo 的进程 wildcard 与 DOMAIN-WILDCARD 对值执行 toLowerCase 后生成去重键，不改写 RuleIR 或来源内容。convertRuleDocuments 与 expandRuleSet 共用该键，替换及追加也参与；重复项保留来源行位并写为注释。单来源原文预览继续保留重复行。ruleSetDelivery 检测远程 wildcard 重复并强制托管（含 YAML），让实际下载与合并预览一致。客户端未指定时维持原有大小写敏感键，仓库索引计数不变。
+
+
+2026-10-29 RAW 为单条编辑的默认表示，text 保存完整匹配原文，不含出口；client 改为可选，不设置时在目标客户端原样输出，设置时保留旧的客户端专用语义。新建与编辑写入 RAW；已有结构化 IR 不做批量迁移。RAW 不受 parseRuleLine 的类型枚举限制，不进行客户端方言翻译，语法由目标客户端解释。末尾 no-resolve / src 在 Lowering 中拆成选项，由 composeRule 在出口之后输出，避免重复；旧 RuleEntry 选项在表单回显时合入文本，编辑后移除独立副本。RAW wildcard 与结构化 wildcard 共用 mihomo 大小写去重键。空白及多行 RAW 不允许保存 / 发布或输出。模板 YAML 识别既有 RAW 并保留原文、稳定 ID 和覆盖；未知语法回落为 RAW，已支持的既有 IR 导入逻辑继续兼容。
 
 ## 2026-10-29：订阅分流所有权与数据库 v16
 

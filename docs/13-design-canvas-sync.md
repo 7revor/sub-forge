@@ -180,6 +180,16 @@
 
 外部画布沿用待登录同步事项，截图与验证见 research/verification/process-rule-types-20261029/。IR、示例种子与 API 保存结构不变。
 
+
+### 单条规则统一 RAW（2026-10-29，覆盖上方单条编辑旧方案）
+
+- [ ] `ProfileRules` 私有规则 / 客户端覆盖、`RuleSets` 改写、`TemplateEdit` 单条规则只显示规则输入框，移除可见的「RAW 规则」标签及下方说明；删除按钮与输入框居中对齐。
+- [ ] 移除规则类型与值的组合、六种进程类型选择、进程分类、单条选项开关以及整行解析入口；RAW 允许直接编辑自定义规则类型和逻辑表达式。
+- [ ] 保留独立出口、规则集引用及其选项、客户端 / 平台条件和整条改写排序；旧结构化规则显示完整文本。
+- [ ] RAW 与 YAML 往返保留规则 ID、客户端覆盖、出口与选项；RAW wildcard 继续按 mihomo lowercase 键去重。
+
+画布沿用待登录同步事项，以 [三入口验收截图](../research/verification/raw-rule-editor-20261029/README.md) 为准。
+
 ## 2026-10-29：模板绑定与独立配置（待同步）
 
 本轮通过内置浏览器实查目标画布，仍显示「Sign in to view this page」，未能编辑。以本轮代码与 [验收截图](../research/verification/profile-template-modes-20261029/README.md) 为同步依据：

@@ -5,7 +5,7 @@ import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/ad
 // 保存前的校验：结构必填项、正则能否编译、引用是否存在且属于当前用户、组合是否成环。
 // 深层结构（规则、组参数等）由渲染报告兜住，这里只拦截保存后必然无法使用的数据。
 
-import { compileUserRegex, findCollectionCycles, isYamlRuleUrl, type Collection, type NodeSetID } from '@sub-forge/core';
+import { compileUserRegex, findCollectionCycles, isYamlRuleUrl, rawRuleError, type Collection, type NodeSetID } from '@sub-forge/core';
 import type { DocKind, DocTypes, RuleSetDoc } from '../docs.ts';
 import type { Store, User } from '../store.ts';
 import { normalizeRuleSet, promoteRuleSetOverrides } from '../legacy-rules.ts';
@@ -27,7 +27,7 @@ export function checkRuleSetOverrides(value: unknown): void {
   if (!Array.isArray(value)) throw bad('客户端改写必须是数组');
   const rule = (r: unknown): boolean => {
     if (!isObj(r)) return false;
-    if (r.type === 'RAW') return ['mihomo', 'surge'].includes(r.client as string) && isStr(r.text);
+    if (r.type === 'RAW') return (r.client === undefined || ['mihomo', 'surge'].includes(r.client as string)) && typeof r.text === 'string' && !rawRuleError(r.text);
     if (['AND', 'OR', 'NOT'].includes(r.type as string)) return Array.isArray(r.children) && r.children.length > 0 && r.children.every(rule);
     if (r.type === 'PROCESS') return ['name', 'path'].includes(r.kind as string) && ['exact', 'wildcard', 'regex'].includes(r.mode as string) && isStr(r.value);
     if (r.type === 'NETWORK') return r.value === 'tcp' || r.value === 'udp';
@@ -53,6 +53,19 @@ export function checkRuleSetOverrides(value: unknown): void {
 function checkRegex(pattern: unknown, where: string, flags = ''): void {
   if (typeof pattern !== 'string') throw bad(`${where}：正则必须是字符串`);
   try { compileUserRegex(pattern, flags); } catch (e) { throw bad(`${where}：${(e as Error).message}`); }
+}
+
+/** 不限制 RAW 的规则类型，但单条编辑不能注入额外规则行。 */
+function checkRawRules(value: unknown, where: string): void {
+  if (Array.isArray(value)) { value.forEach(item => checkRawRules(item, where)); return; }
+  if (!isObj(value)) return;
+  if (value.type === 'RAW') {
+    if (value.client !== undefined && !['mihomo', 'surge'].includes(value.client as string)) throw bad(`${where}：RAW 客户端不合法`);
+    if (typeof value.text !== 'string') throw bad(`${where}：RAW 内容必须是字符串`);
+    const error = rawRuleError(value.text);
+    if (error) throw bad(`${where}：${error}`);
+  }
+  for (const key of ['matcher', 'rule', 'overrides', 'action', 'replace', 'append', 'children']) checkRawRules(value[key], where);
 }
 
 export function checkFetch(fetch: unknown, source = false): void {
@@ -287,6 +300,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         extraRules.forEach((er: unknown, i) => {
           const m = isObj(er) && isObj(er.rule) && isObj(er.rule.matcher) ? er.rule.matcher : undefined;
           if (!m) throw bad(`私有规则 ${i + 1} 格式错误`);
+          checkRawRules(m, `私有规则 ${i + 1}`);
           if (m.kind === 'ruleset') {
             const prior = store.get('profile', id)?.overlay.extraRules?.find(r => r.rule.id === (er as { rule: { id: string } }).rule.id)?.rule.matcher;
             checkRuleSetReference(m as RuleSetMatcher, store, prior?.kind === 'ruleset' ? prior : undefined);
@@ -300,7 +314,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (ch.landing.filter !== undefined) checkRegex(ch.landing.filter, `链规则 ${i + 1}`);
         refs.target(ch.via, `链规则 ${i + 1} 的前置`);
       });
-      if (doc.routing !== undefined) validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);
+      if (doc.routing !== undefined) {
+        validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);
+        checkRawRules((doc.routing as { config?: { rules?: unknown } }).config?.rules, '分流规则');
+      }
       break;
     }
   }

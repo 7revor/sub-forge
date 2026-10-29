@@ -1,4 +1,4 @@
-import type { Matcher, ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
+import { withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Button, Empty, Switch, buttonClass, cx } from '../../components/ui.tsx';
@@ -16,12 +16,11 @@ function RuleFields({ rule, onChange, ctx, report }: {
   const refs = ctx.rulesets;
   const changeRule = (next: RuleIR) => {
     if (matcher.kind !== 'rule') return;
-    const ip = 'noResolve' in next || ['IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'SRC-IP-CIDR'].includes(next.type);
-    onChange({ ...rule, matcher: { ...matcher, rule: next }, ...(ip && rule.options?.noResolve !== undefined ? { options: { ...rule.options, noResolve: false } } : {}) });
+    const { noResolve: _noResolve, src: _src, ...options } = rule.options ?? {};
+    onChange({ ...rule, matcher: { ...matcher, rule: next }, ...(rule.options ? { options } : {}) });
   };
-  // 历史数据可能把 IP 规则的 no-resolve 放在 options 中，统一交给 RuleEditor 编辑。
-  const ir = matcher.kind === 'rule' && rule.options?.noResolve && ['IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'SRC-IP-CIDR'].includes(matcher.rule.type)
-    ? { ...matcher.rule, noResolve: true } : matcher.kind === 'rule' ? matcher.rule : undefined;
+  // 旧选项合并到 RAW 回显，编辑后从独立 options 移除，避免删除文本选项后又被补回。
+  const ir = matcher.kind === 'rule' ? withIpOptions(matcher.rule, rule.options ?? {}) : undefined;
   return <div className="flex flex-col gap-3 border-t border-line bg-ground p-4">
     <ItemIssues report={report} where={`rule:${rule.id}`} />
     <MatcherEditor fixedKind value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
@@ -44,7 +43,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         <span className="text-[12.5px] text-muted">出口只能是模板组或内置策略。</span>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => add({ kind: 'rule', rule: { type: 'DOMAIN', value: '' } })}>添加单条规则</Button>
+        <Button onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}>添加单条规则</Button>
         <RemoteRulePicker onSelect={add} />
         <RuleSetPicker label="引用系统规则集" onSelect={add} triggerClassName={buttonClass()} />
       </div>

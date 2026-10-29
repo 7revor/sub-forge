@@ -1,4 +1,4 @@
-import { findGroupCycles, Report, resolveProfileRouting, type GroupSpec } from '@sub-forge/core';
+import { findGroupCycles, rawRuleError, Report, resolveProfileRouting, type GroupSpec } from '@sub-forge/core';
 import type { ProfileDoc } from '../docs.ts';
 import type { Store } from '../store.ts';
 import { profileTemplate } from '../profile-routing.ts';
@@ -9,10 +9,16 @@ import type { RefChecker } from './validate.ts';
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const builtins = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']);
 
-/** 与全局单条编辑器保持一致，拒绝空值、伪造类型及通过原样文本注入额外规则。 */
+/** 与全局单条编辑器保持一致，兼容结构化旧规则和 RAW 编辑，校验空值及单条文本的行边界。 */
 function checkPrependRule(value: unknown): void {
   if (!obj(value) || !isStr(value.type)) throw bad('前置规则格式错误');
-  if (value.type === 'RAW' || ['AND', 'OR', 'NOT'].includes(value.type)) throw bad('前置规则暂不支持原样或逻辑规则');
+  if (value.type === 'RAW') {
+    if (value.client !== undefined && !['mihomo', 'surge'].includes(String(value.client))) throw bad('前置 RAW 规则客户端不合法');
+    const error = typeof value.text === 'string' ? rawRuleError(value.text) : 'RAW 内容必须是字符串';
+    if (error) throw bad(`前置规则：${error}`);
+    return;
+  }
+  if (['AND', 'OR', 'NOT'].includes(value.type)) throw bad('前置逻辑规则请使用 RAW 文本编辑');
   const types = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'GEOSITE', 'SRC-IP-CIDR', 'DST-PORT', 'SRC-PORT', 'NETWORK', 'PROCESS'];
   if (!types.includes(value.type) || !isStr(value.value) || /[\r\n]/.test(value.value)) throw bad('前置规则类型或规则值不合法');
   if (value.type === 'NETWORK' && !['tcp', 'udp'].includes(value.value)) throw bad('NETWORK 只能是 tcp 或 udp');

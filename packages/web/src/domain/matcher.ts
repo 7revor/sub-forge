@@ -4,5 +4,5 @@ import type { Matcher } from '@sub-forge/core';
 export function changeMatcherKind(matcher: Matcher, kind: Matcher['kind']): Matcher {
   if (matcher.kind === kind) return matcher;
   const { rule: _rule, id: _id, overrides: _overrides, repository: _repository, remote: _remote, ...rest } = matcher as { rule?: unknown; id?: string; overrides?: unknown; repository?: unknown; remote?: unknown };
-  return kind === 'rule' ? { ...rest, kind, rule: { type: 'DOMAIN', value: '' } } : { ...rest, kind, id: '' };
+  return kind === 'rule' ? { ...rest, kind, rule: { type: 'RAW', text: '' } } : { ...rest, kind, id: '' };
 }

@@ -139,3 +139,6 @@ URL 参数 `?target=&platform=` 优先于 UA。各客户端 UA 原文 ⏳（07 S
 
 
 2026-10-29：mihomo 的 PROCESS-NAME-WILDCARD、PROCESS-PATH-WILDCARD 与 DOMAIN-WILDCARD 在合并转换中按小写键去重，保留首条输出原文；Surge 不作此归一化。实现依据：[mihomo 进程匹配源码](https://github.com/MetaCubeX/mihomo/blob/Meta/rules/common/process.go) 与 [域名 wildcard 源码](https://github.com/MetaCubeX/mihomo/blob/Meta/rules/common/domain_wildcard.go)。本次不扩展精确或正则规则的去重范围。
+
+
+2026-10-29 表单中的单条规则统一 RAW；上表的类型映射仍用于既有结构化 IR 与来源转换。未限定客户端的 RAW 在目标客户端原样输出，不作类型降级或方言翻译；旧 client 限定仍生效。RAW 末尾 no-resolve / src 放在出口后输出；mihomo 的 RAW wildcard 延用 lowercase 去重。

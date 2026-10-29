@@ -68,6 +68,9 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 2026-10-29：mihomo 转换时，PROCESS-NAME-WILDCARD / PROCESS-PATH-WILDCARD / DOMAIN-WILDCARD 按 lowercase 值去重，保留首条原始写法及行位；名称与路径不混合，精确、正则与 Surge 保持原行为。合并转换与展开共用去重键；来源原文预览保留重复行。远程文件存在 wildcard 重复时触发托管 LIST，避免原文件直连绕过去重。
 
+
+2026-10-29：RAW 支持可选 client；未指定时在目标客户端原样输出，旧客户端限定保持兼容。单条规则允许未收录类型与逻辑文本，不经过结构化规则解析 / 翻译；拒绝空白和换行。末尾 no-resolve / src 在 Lowering 拆分，拼接时排在出口之后，旧选项合并不重复。RAW wildcard 与结构化 wildcard 共用 mihomo lowercase 去重键。
+
 ## 订阅分流模式
 
 `Profile.routing` 包含 `bound`（最新模板 + 按稳定组 ID 追加成员）和 `independent`（完整 groups/rules/final）两类。渲染统一调用 `resolveProfileRouting`；绑定组失效或合并成环为错误，独立配置不依赖模板。`routingConfig` 展开有效配置，`profileEditorOverlay` 仅为现有编辑器提供视图，不能作为第二份配置持久化。历史 `overlay` 入口用于旧数据迁移与兼容测试。
