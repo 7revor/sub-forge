@@ -1,14 +1,14 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { api, type User } from '../api.ts';
 import { LogoMark } from '../components/LogoMark.tsx';
-import { Button, ErrorBox, Field, Input } from '../components/ui.tsx';
+import { Button, Field, Input } from '../components/ui.tsx';
 
 export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -17,13 +17,13 @@ export function Login() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    setError(undefined);
     try {
       const { user } = await api<{ user: User }>('POST', '/auth/login', { username, password });
       qc.setQueryData(['me'], user);
+      notifySuccess('登录成功');
       navigate(from === '/login' ? '/' : from, { replace: true });
     } catch (err) {
-      setError(err);
+      alertError(err);
     } finally {
       setBusy(false);
     }
@@ -41,7 +41,6 @@ export function Login() {
           <h1 className="m-0 text-lg font-semibold">登录</h1>
           <Field label="用户名">{(id) => <Input id={id} className="h-[42px] text-[14px]" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />}</Field>
           <Field label="密码">{(id) => <Input id={id} className="h-[42px] text-[14px]" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}</Field>
-          <ErrorBox error={error} />
           <Button type="submit" variant="primary" className="h-11 text-[14px] font-semibold" disabled={busy}>{busy ? '登录中…' : '登录'}</Button>
           <span className="text-[12px] leading-relaxed text-muted">账户由管理员创建。忘记密码请联系管理员重置。</span>
         </form>

@@ -12,7 +12,7 @@ import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type TokenItem } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Modal, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
@@ -33,9 +33,9 @@ export function TabOverview() {
   const [label, setLabel] = useState('');
   const [adding, setAdding] = useState(false);
   const [resetting, setResetting] = useState<TokenItem>();
-  const create = useMutation({ mutationFn: () => api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}), onSuccess: () => { setLabel(''); setAdding(false); void refreshTokens(); } });
-  const reset = useMutation({ mutationFn: (t: string) => api('POST', `/profiles/${draft.id}/tokens/${t}/reset`), onSuccess: () => { setResetting(undefined); void refreshTokens(); } });
-  const remove = useMutation({ mutationFn: (t: string) => api('DELETE', `/profiles/${draft.id}/tokens/${t}`), onSuccess: refreshTokens });
+  const create = useMutation({ meta: { successMessage: '订阅链接已创建' }, mutationFn: () => api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}), onSuccess: () => { setLabel(''); setAdding(false); void refreshTokens(); } });
+  const reset = useMutation({ meta: { successMessage: '订阅链接已重置' }, mutationFn: (t: string) => api('POST', `/profiles/${draft.id}/tokens/${t}/reset`), onSuccess: () => { setResetting(undefined); void refreshTokens(); } });
+  const remove = useMutation({ meta: { successMessage: '订阅链接已删除' }, mutationFn: (t: string) => api('DELETE', `/profiles/${draft.id}/tokens/${t}`), onSuccess: refreshTokens });
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
   const sources = allNodeSets.filter((n) => n.ref.type === 'source' && draft.nodeSets.some((p) => p.ref.type === 'source' && p.ref.id === n.ref.id));
   const rows = log.data ?? [];
@@ -49,7 +49,7 @@ export function TabOverview() {
         <Card className="min-w-0 flex-[999_1_560px]"
           title={`订阅链接`}
           actions={<Button onClick={() => setAdding(true)}><Plus size={15} />新增链接</Button>}>
-          <ErrorBox error={reset.error ?? remove.error} />
+          <ErrorAlert error={reset.error ?? remove.error} />
           {!tokens.data?.length ? <Empty title="还没有订阅链接" /> : (
             <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
               {tokens.data.map((t) => {
@@ -118,7 +118,7 @@ export function TabOverview() {
       <Modal title="新增订阅链接" open={adding} onClose={() => setAdding(false)}
         footer={<><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建链接'}</Button></>}>
         <Field label="设备备注">{(id) => <Input id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>
-        <ErrorBox error={create.error} />
+        <ErrorAlert error={create.error} />
       </Modal>
       <Modal title={`重置「${resetting?.label || '未命名设备'}」的 token？`} open={!!resetting} onClose={() => setResetting(undefined)}
         footer={<><Button onClick={() => setResetting(undefined)}>取消</Button><Button className="border-err bg-err text-white hover:bg-[#912018]" disabled={reset.isPending} onClick={() => resetting && reset.mutate(resetting.token)}>{reset.isPending ? '重置中…' : '重置'}</Button></>}>

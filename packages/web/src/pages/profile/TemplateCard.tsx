@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../api.ts';
-import { Card, ErrorBox, Field, Segmented, Select } from '../../components/ui.tsx';
+import { Card, ErrorAlert, Field, Segmented, Select } from '../../components/ui.tsx';
 import { useTemplates, type ProfileDoc, type TemplateDoc } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { findOverlayOrphans } from './orphans.ts';
@@ -18,7 +18,7 @@ export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
     queryKey: ['template-versions', ref?.id], enabled: !!ref,
     queryFn: () => api<TemplateDetails>('GET', `/templates/${ref!.id}`),
   });
-  const change = useMutation({
+  const change = useMutation({ meta: { successMessage: '模板已切换，保存后生效' },
     mutationFn: async (next: ProfileDoc['template']) => ({
       next,
       template: next ? (await api<{ item: TemplateDoc }>('GET', next.follow === 'latest' ? `/templates/${next.id}` : `/templates/${next.id}/versions/${next.follow.pinned}`)).item : undefined,
@@ -37,7 +37,7 @@ export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
   const body = (
       <div className="flex flex-col gap-3.5">
         <p className="m-0 text-[13px] text-muted">{ref ? `${template?.name ?? ref.id} · v${template?.version ?? pinned ?? '?'} · ${pinned === undefined ? '跟随最新' : '锁定版本'}` : '不使用模板'}</p>
-        <ErrorBox error={templates.error ?? details.error ?? change.error} />
+        <ErrorAlert error={templates.error ?? details.error ?? change.error} />
         <Field label="更换模板" hint="保留现有覆盖项">{(id) => (
           <Select id={id} value={ref?.id ?? ''} disabled={change.isPending || templates.isPending || templates.isError}
             onChange={(e) => change.mutate(e.target.value ? { id: e.target.value, follow: 'latest' } : undefined)}>

@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { api } from '../api.ts';
-import { Button, Card, ErrorBox, Field, Input, PageHeader, PageScroll } from '../components/ui.tsx';
+import { Button, Card, ErrorAlert, Field, Input, PageHeader, PageScroll } from '../components/ui.tsx';
 import { useMe } from '../hooks.ts';
 
 export function Account() {
@@ -9,7 +9,7 @@ export function Account() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const change = useMutation({ mutationFn: () => api('POST', '/me/password', { current, next }) });
+  const change = useMutation({ meta: { successMessage: '密码已更新，其他设备需要重新登录' }, mutationFn: () => api('POST', '/me/password', { current, next }) });
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -36,9 +36,8 @@ export function Account() {
               <Field label="当前密码">{(id) => <Input id={id} type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />}</Field>
               <Field label="新密码（至少 8 位）">{(id) => <Input id={id} type="password" autoComplete="new-password" minLength={8} value={next} onChange={(e) => setNext(e.target.value)} required />}</Field>
               <Field label="再次输入新密码" hint={confirm && confirm !== next ? '两次输入不一致' : undefined}>{(id) => <Input id={id} type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />}</Field>
-              <ErrorBox error={change.error} />
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[12.5px] text-ok">{change.isSuccess ? '密码已更新，其他设备需要重新登录' : ''}</span>
+              <ErrorAlert error={change.error} />
+              <div className="flex items-center justify-end gap-3">
                 <Button type="submit" variant="primary" disabled={change.isPending || next !== confirm}>{change.isPending ? '更新中…' : '更新密码'}</Button>
               </div>
             </form>

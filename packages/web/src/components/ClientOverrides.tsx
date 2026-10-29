@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { RuleEditor } from './RuleEditor.tsx';
 import { emptyRule } from './rule.ts';
 import { SortableList } from './SortableList.tsx';
-import { Button, ErrorBox, Field, Segmented, Select } from './ui.tsx';
+import { Button, FieldError, Field, Segmented, Select } from './ui.tsx';
 
 export function ruleInputError(rule: RuleIR | undefined): string | undefined {
   if (!rule) return '请选择规则类型并填写规则值。';
@@ -69,7 +69,7 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
     {!single && <p className="m-0 text-[12.5px] text-muted">命中第一条匹配的覆盖</p>}
     {single ? value.map((override, i) => <div key={i}>{render(override, i)}</div>) : <SortableList items={value} onReorder={onChange}
       renderItem={(override, i, handle) => <div className="my-2 flex items-start gap-2 rounded-lg border border-line p-3">{handle}{render(override, i)}</div>} />}
-    <ErrorBox error={clientOverridesError(value)} />
+    <FieldError error={clientOverridesError(value)} />
     {!single && <Button className="self-start" size="sm" onClick={() => onChange([...value, newClientOverride()])}><Plus size={14} />添加客户端覆盖</Button>}
   </div>;
 }

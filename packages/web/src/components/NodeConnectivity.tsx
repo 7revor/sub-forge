@@ -1,3 +1,4 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { LocalProxy } from '@sub-forge/core';
@@ -10,14 +11,13 @@ export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: stri
   const capability = useQuery({ queryKey: ['node-probe'], queryFn: () => api<{ available: boolean }>('GET', '/node-probe'), retry: false });
   const [result, setResult] = useState<{ text: string; data: Result }>();
   const [running, setRunning] = useState(false);
-  const [cancelError, setCancelError] = useState('');
   const active = useRef<string | undefined>(undefined);
   const currentText = useRef(text);
   currentText.current = text;
   const cancel = () => {
     const id = active.current;
     active.current = undefined;
-    if (id) void api('DELETE', `/node-probe/${id}`).catch(() => setCancelError('取消请求未送达，服务端会在超时后结束测试'));
+    if (id) void api('DELETE', `/node-probe/${id}`).catch(() => alertError('取消请求未送达，服务端会在超时后结束测试'));
   };
   useEffect(() => {
     setRunning(false);
@@ -26,14 +26,18 @@ export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: stri
   const run = async () => {
     if (!node || active.current) return;
     let requestId: string | undefined;
-    setRunning(true); setCancelError('');
+    setRunning(true);
     try {
       requestId = createProbeRequestId();
       active.current = requestId;
       const data = await api<Result>('POST', '/node-probe', { node, requestId });
-      if (active.current === requestId && currentText.current === text) setResult({ text, data });
+      if (active.current === requestId && currentText.current === text) {
+        setResult({ text, data });
+        if (data.ok) notifySuccess(data.message);
+        else if (data.status !== 'cancelled') alertError(data.message);
+      }
     } catch (error) {
-      if (active.current === requestId && currentText.current === text) setResult({ text, data: { ok: false, status: 'failed', message: error instanceof Error ? error.message : String(error), testedAt: Date.now(), target: '' } });
+      if (active.current === requestId && currentText.current === text) { alertError(error); setResult({ text, data: { ok: false, status: 'failed', message: error instanceof Error ? error.message : String(error), testedAt: Date.now(), target: '' } }); }
     } finally {
       if (active.current === requestId) { active.current = undefined; setRunning(false); }
     }
@@ -55,6 +59,5 @@ export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: stri
       {result && !running && !stale && <span> 上次测试：{new Date(result.data.testedAt).toLocaleString('zh-CN')}{result.data.target ? ` · ${result.data.target}` : ''}</span>}
       {capability.error && <Button size="sm" onClick={() => void capability.refetch()}>重试</Button>}
     </div>
-    {cancelError && <div role="alert" className="text-[12px] text-warn">{cancelError}</div>}
   </div>;
 }

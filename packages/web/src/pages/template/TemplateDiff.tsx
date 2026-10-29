@@ -3,7 +3,7 @@ import type { GroupMember, GroupSpec, RuleEntry, Target } from '@sub-forge/core'
 import { stringify } from 'yaml';
 import { api } from '../../api.ts';
 import { memberLabel, targetLabel } from '../../components/pickers.tsx';
-import { Badge, ErrorBox, Modal } from '../../components/ui.tsx';
+import { Badge, ErrorAlert, Modal } from '../../components/ui.tsx';
 import { templateDiff, type EntityDiff, type FieldChange } from '../../convert/templateDiff.ts';
 import type { ConvertCtx, TemplateBody } from '../../convert/templateYaml.ts';
 import type { TemplateDoc } from '../../hooks.ts';
@@ -45,7 +45,7 @@ export function TemplateDiff({ id, version, ctx, onClose }: { id: string; versio
   const diff = data && templateDiff(data.before, data.after);
   const target = (value: Target, body: TemplateBody) => targetLabel(value, (id) => body.groups.find((g) => g.id === id)?.name ?? id, (r) => r.id);
   return <Modal title={`版本对比：v${version - 1} → v${version}`} open onClose={onClose} wide>
-    <ErrorBox error={versions.error} />
+    <ErrorAlert error={versions.error} />
     {!data && !versions.error && <span className="text-muted">加载中…</span>}
     {data && diff && <>
       <Changes label="组" diff={diff.groups} before={data.before} after={data.after} nameOf={(g) => g.name} ctx={ctx} />

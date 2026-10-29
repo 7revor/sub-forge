@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { formatRuleLine, type RuleSet } from '@sub-forge/core';
 import { ClientOverrides, clientOverridesError, newClientOverride } from './ClientOverrides.tsx';
 import { SortableList } from './SortableList.tsx';
-import { Button, Card, Empty, ErrorBox, Field, Input } from './ui.tsx';
+import { Button, Card, Empty, FieldError, Field, Input } from './ui.tsx';
 
 type ContentOverride = NonNullable<RuleSet['overrides']>[number];
 
@@ -40,6 +40,6 @@ export function RulesetOverrides({ value, legacySources, onChange, onRemoveLegac
         <Button size="sm" variant="ghost" aria-label={`删除客户端改写 ${i + 1}`} onClick={() => onChange(value.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
       </div>
     )} />}
-    <ErrorBox error={overridesError(value)} />
+    <FieldError error={overridesError(value)} />
   </Card>;
 }

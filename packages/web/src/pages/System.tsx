@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { GithubTokenSettings } from '../components/GithubTokenSettings.tsx';
 import { api, type SystemInfo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorBox, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
 export function System() {
   const qc = useQueryClient();
@@ -15,11 +15,11 @@ export function System() {
   const [draft, setDraft] = useState<SystemInfo>();
   const [allow, setAllow] = useState('');
   useEffect(() => { if (info.data) setDraft(info.data); }, [info.data]);
-  const save = useMutation({ mutationFn: (body: SystemInfo) => api('PUT', '/system', body), onSuccess: () => qc.invalidateQueries({ queryKey: ['system'] }) });
-  const backup = useMutation({ mutationFn: () => api('POST', '/system/backup') });
-  const restore = useMutation({ mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
+  const save = useMutation({ meta: { successMessage: '系统设置已保存' }, mutationFn: (body: SystemInfo) => api('PUT', '/system', body), onSuccess: () => qc.invalidateQueries({ queryKey: ['system'] }) });
+  const backup = useMutation({ meta: { successMessage: '备份已导出' }, mutationFn: () => api('POST', '/system/backup') });
+  const restore = useMutation({ meta: { successMessage: '备份已恢复' }, mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
 
-  if (!draft) return info.error ? <ErrorBox error={info.error} /> : <div className="text-muted">加载中…</div>;
+  if (!draft) return info.error ? <ErrorAlert error={info.error} /> : <div className="text-muted">加载中…</div>;
   const dirty = JSON.stringify(draft) !== JSON.stringify(info.data);
   const verify = draft.verify ?? { enabled: false };
 
@@ -27,7 +27,7 @@ export function System() {
     <>
       <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
       {info.data?.pending && <PendingNotice>GitHub 索引认证可用，其余系统设置暂不可用。</PendingNotice>}
-      <ErrorBox error={save.error} />
+      <ErrorAlert error={save.error} />
 
       <PageScroll>
         <div className="flex flex-wrap items-start gap-5">
@@ -81,7 +81,7 @@ export function System() {
                   </label>
                 </div>
                 <span className="text-[12.5px] text-muted">{draft.lastBackup ? `上次导出：${formatTime(draft.lastBackup.at).slice(5)} · ${formatBytes(draft.lastBackup.size)}` : '还没有导出过'}</span>
-                <ErrorBox error={backup.error ?? restore.error} />
+                <ErrorAlert error={backup.error ?? restore.error} />
               </div>
             </Card>
           </div>

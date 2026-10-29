@@ -1,3 +1,4 @@
+import { alertError } from '../feedback.ts';
 import { Empty } from './Empty.tsx';
 // 下拉选择组件：所有下拉都用这里的 Select / Combobox，不使用浏览器自带的 <select> 弹层与 <datalist>（见仓库 CLAUDE.md）。
 // 弹层渲染到 body，避免被卡片、表格的 overflow 裁掉；层级高于对话框。
@@ -38,7 +39,7 @@ function collect(children: ReactNode, group?: string, out: Opt[] = []): Opt[] {
 }
 
 /** 跟随触发元素定位的弹层：下方空间不够时翻到上方，滚动、缩放时重新定位 */
-function usePopoverPos(anchor: RefObject<HTMLElement | null>, open: boolean) {
+function usePopoverPos(anchor: RefObject<HTMLElement | null>, open: boolean, preferredWidth?: number) {
   const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; width: number; maxHeight: number } | null>(null);
   useLayoutEffect(() => {
     if (!open) return;
@@ -48,13 +49,15 @@ function usePopoverPos(anchor: RefObject<HTMLElement | null>, open: boolean) {
       const below = window.innerHeight - r.bottom - 8;
       const above = r.top - 8;
       const up = below < 200 && above > below;
-      setPos({ left: r.left, width: r.width, maxHeight: Math.min(300, up ? above : below) - 4, ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
+      const width = preferredWidth ? Math.min(preferredWidth, window.innerWidth - 16) : r.width;
+      const left = preferredWidth ? Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) : r.left;
+      setPos({ left, width, maxHeight: Math.min(300, up ? above : below) - 4, ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
     };
     place();
     window.addEventListener('scroll', place, true);
     window.addEventListener('resize', place);
     return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
-  }, [anchor, open]);
+  }, [anchor, open, preferredWidth]);
   return pos;
 }
 
@@ -199,10 +202,11 @@ export type AsyncSelectOption = { value: string; label: string; hint?: string };
 export type AsyncSelectPage = { options: AsyncSelectOption[]; nextOffset?: number };
 
 /** 懒加载单选：打开才请求，搜索防抖并隔离旧响应；分页追加，不允许提交任意文本。 */
-export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', disabled, ...rest }: {
+export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', disabled, triggerClassName, triggerIcon, ...rest }: {
   loadOptions: (query: string, offset: number) => Promise<AsyncSelectPage>;
   onChange: (value: string) => void;
   placeholder?: string; disabled?: boolean; 'aria-label': string;
+  triggerClassName?: string; triggerIcon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -216,7 +220,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
   const btn = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const listId = useId();
-  const pos = usePopoverPos(btn, open);
+  const pos = usePopoverPos(btn, open, 420);
   const close = () => { setOpen(false); btn.current?.focus(); };
   useOutside([btn, popup], open, () => setOpen(false));
   useEffect(() => {
@@ -229,7 +233,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
       busy.current = true;
       loadOptions(query, 0).then(result => {
         if (generation.current === version) { setPage(result); setActive(result.options.length ? 0 : -1); }
-      }).catch(e => { if (generation.current === version) setError(e instanceof Error ? e.message : String(e)); })
+      }).catch(e => { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } })
         .finally(() => { if (generation.current === version) { busy.current = false; setLoading(false); } });
     }, query ? 300 : 0);
     return () => { clearTimeout(timer); generation.current++; };
@@ -242,44 +246,46 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
     try {
       const next = await loadOptions(query, page.nextOffset);
       if (generation.current === version) setPage(p => ({ options: [...p.options, ...next.options], nextOffset: next.nextOffset }));
-    } catch (e) { if (generation.current === version) setError(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { if (generation.current === version) { setError(e instanceof Error ? e.message : String(e)); alertError(e); } }
     finally { if (generation.current === version) { busy.current = false; setLoading(false); } }
   };
   const pick = (value: string) => { close(); onChange(value); };
   return <>
     <button ref={btn} type="button" role="combobox" aria-label={rest['aria-label']} aria-haspopup="dialog" aria-expanded={open}
       aria-controls={open ? `${listId}-popup` : undefined} disabled={disabled}
-      className={cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
+      className={triggerClassName ?? cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
       onClick={() => { setQuery(''); setOpen(!open); }}
       onKeyDown={e => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); setOpen(true); } }}>
-      <span className="min-w-0 flex-1 truncate">{placeholder}</span><ChevronDown size={15} />
+      {triggerIcon}<span className={cx('min-w-0', !triggerClassName && 'flex-1 truncate')}>{placeholder}</span>{!triggerClassName && <ChevronDown size={15} />}
     </button>
     {open && pos && createPortal(<div ref={popup} id={`${listId}-popup`} role="dialog" aria-label={rest['aria-label']}
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
-      className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel p-1.5 shadow-lg"
+      className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onKeyDown={e => {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
         if (e.key === 'Tab') setOpen(false);
       }}>
-      <input autoFocus role="combobox" aria-label="搜索仓库规则" aria-autocomplete="list" aria-expanded="true" aria-controls={listId}
-        aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
-        value={query} placeholder="搜索规则名或路径" className={cx(fieldCls, 'shrink-0')}
-        onChange={e => setQuery(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, Math.min(page.options.length - 1, a + (e.key === 'ArrowDown' ? 1 : -1)))); }
-          if (e.key === 'Enter') { e.preventDefault(); if (page.options[active]) pick(page.options[active]!.value); }
-        }} />
-      <div id={listId} role="listbox" aria-label="仓库规则候选" aria-busy={loading} className="min-h-0 overflow-y-auto overscroll-contain"
+      <div className="shrink-0 border-b border-line-2 p-3">
+        <input autoFocus role="combobox" aria-label="搜索仓库规则" aria-autocomplete="list" aria-expanded="true" aria-controls={listId}
+          aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
+          value={query} placeholder="搜索规则名或路径" className={cx(fieldCls, 'shrink-0')}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, Math.min(page.options.length - 1, a + (e.key === 'ArrowDown' ? 1 : -1)))); }
+            if (e.key === 'Enter') { e.preventDefault(); if (page.options[active]) pick(page.options[active]!.value); }
+          }} />
+      </div>
+      <div id={listId} role="listbox" aria-label="仓库规则候选" aria-busy={loading} className="min-h-0 overflow-y-auto overscroll-contain p-1.5 empty:hidden"
         onScroll={e => { const el = e.currentTarget; if (!error && el.scrollHeight - el.scrollTop - el.clientHeight < 32) void more(); }}>
         {page.options.map((o, i) => <div key={o.value} id={`${listId}-${i}`} data-option={i} role="option" aria-selected={i === active}
           onMouseDown={e => e.preventDefault()} onMouseEnter={() => setActive(i)} onClick={() => pick(o.value)}
-          className={cx('cursor-pointer rounded-md px-2.5 py-2 text-[13px]', i === active && 'bg-ground')}>
+          className={cx('flex min-h-12 cursor-pointer flex-col justify-center gap-0.5 rounded-md px-3 py-2 text-[13px]', i === active && 'bg-ground')}>
           <div className="truncate">{o.label}</div><div className="truncate text-[11.5px] text-muted">{o.hint}</div>
         </div>)}
       </div>
-      <div role="status" className="shrink-0 text-[12px] text-muted">
-        {loading ? '加载中…' : error ? <><span>{error}</span><button type="button" className="ml-2 text-accent-ink" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full py-2 text-accent-ink" onClick={() => void more()}>加载更多</button> : !page.options.length ? <div className="p-2">没有匹配的规则</div> : null}
-      </div>
+      {(loading || error || page.nextOffset !== undefined || !page.options.length) && <div role="status" className="flex min-h-12 shrink-0 items-center justify-center gap-2 border-t border-line-2 px-3 py-2 text-center text-[12px] text-muted">
+        {loading ? '加载中…' : error ? <><button type="button" className="shrink-0 rounded-md px-2 py-1 text-accent-ink hover:bg-ground" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full cursor-pointer rounded-md py-1 text-accent-ink hover:bg-ground" onClick={() => void more()}>加载更多</button> : '没有匹配的规则'}
+      </div>}
     </div>, document.body)}
   </>;
 }
