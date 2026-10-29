@@ -2,7 +2,7 @@ import { remoteRuleMatcher, type Matcher } from '@sub-forge/core';
 import { useState } from 'react';
 import { useRulesetSources } from '../hooks/useRulesetSources.ts';
 import { RulesetPreview } from './RulesetPreview.tsx';
-import { Button, Field, FieldError, Input, Modal } from './ui.tsx';
+import { Button, Field, FieldError, Input, Modal, buttonClass } from './ui.tsx';
 
 type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
 function RemoteRuleDialog({ value, onSelect, onClose }: { value?: string; onSelect: (matcher: RuleSetMatcher) => void; onClose: () => void }) {
@@ -21,7 +21,9 @@ function RemoteRuleDialog({ value, onSelect, onClose }: { value?: string; onSele
     {previewUrl && <RulesetPreview key={previewUrl} inputs={loaded.inputs} ready={loaded.ready} overrides={undefined} sourceError={loaded.error} sourceNames={{ remote: '远程规则' }} sourceReading={loaded.reading} onRefreshSources={loaded.refresh} />}
   </Modal>;
 }
-export function RemoteRulePicker({ value, label = '引用远程 URL', id, onSelect }: { value?: string; label?: string; id?: string; onSelect: (matcher: RuleSetMatcher) => void }) {
+export function RemoteRulePicker({ value, label = '引用远程 URL', id, ariaLabel, triggerClassName, onSelect }: {
+  value?: string; label?: string; id?: string; ariaLabel?: string; triggerClassName?: string; onSelect: (matcher: RuleSetMatcher) => void;
+}) {
   const [open, setOpen] = useState(false);
-  return <><Button id={id} title={value} className="min-w-0 max-w-full justify-start text-left" onClick={() => setOpen(true)}><span className="truncate">{label}</span></Button>{open && <RemoteRuleDialog value={value} onSelect={onSelect} onClose={() => setOpen(false)} />}</>;
+  return <><button type="button" id={id} aria-label={ariaLabel} title={value} className={triggerClassName ?? buttonClass('default', 'md', 'min-w-0 max-w-full justify-start text-left')} onClick={() => setOpen(true)}><span className="truncate">{label}</span></button>{open && <RemoteRuleDialog value={value} onSelect={onSelect} onClose={() => setOpen(false)} />}</>;
 }
