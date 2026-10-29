@@ -1,7 +1,9 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from 'react-router';
+import { FeedbackHost } from './components/FeedbackHost.tsx';
+import { alertError, notifySuccess } from './feedback.ts';
 import { ApiError } from './api.ts';
 import './index.css';
 import { AppLayout, RequireAdmin } from './layout.tsx';
@@ -23,6 +25,13 @@ import { System } from './pages/System.tsx';
 import { Users } from './pages/Users.tsx';
 
 const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onSuccess: (_data, _variables, _result, mutation) => {
+      const message = mutation.meta?.successMessage;
+      if (typeof message === 'string') notifySuccess(message);
+    },
+    onError: error => alertError(error),
+  }),
   defaultOptions: {
     queries: {
       // 401 / 403 / 404 重试没有意义
@@ -70,6 +79,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
+      <FeedbackHost />
     </QueryClientProvider>
   </StrictMode>,
 );

@@ -27,7 +27,7 @@ const PROFILE: ProfileDoc = {
 const SEED: Seed = {
   sources: [{ id: 'air', name: '机场 A', url: 'https://air.example.com/sub', pipeline: [{ op: 'filter.useless' }, { op: 'rename.regex', rules: [{ pattern: '^香港\\s*(\\d+)', replace: 'HK-$1' }] }, { op: 'flag', mode: 'add' }] }],
   locals: [{ id: 'self', name: '自建', proxies: [{ name: '自建 SG', type: 'trojan', server: 'sg.example.com', port: 443, password: 's' }] }],
-  rulesets: [{ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'auto', url: 'https://rules.example.com/telegram.list' }] }],
+  rulesets: [{ id: 'tg', name: 'Telegram', noResolve: true, sources: [{ id: 's1', kind: 'remote', format: 'auto', url: 'https://rules.example.com/telegram.list' }] }],
   presets: [{ id: 'fakeip', name: 'fake-ip 推荐', version: 1, mihomo: { 'mixed-port': 7890, dns: { enable: true, 'enhanced-mode': 'fake-ip' } } }],
   templates: [{
     id: 'std', version: 1,
@@ -80,7 +80,7 @@ describe('订阅接口', () => {
     expect(cfg['mixed-port']).toBe(7890);
     expect(cfg['allow-lan']).toBe(true);
     expect(cfg['proxy-providers']['机场 A'].url).toMatch(/^https:\/\/sub\.test\/p\/tk-mac\/source%3Aair\?v=[0-9a-f]{32}&h=[0-9a-f]{8}&platform=macos$/);
-    expect(cfg['rule-providers'].rs_tg_domain.url).toMatch(/^https:\/\/sub\.test\/r\/tk-mac\/rs_tg_domain\?v=[0-9a-f]{32}&platform=macos$/);
+    expect(cfg['rule-providers'].rs_tg_classical.url).toMatch(/^https:\/\/sub\.test\/r\/tk-mac\/rs_tg_classical\.list\?v=[0-9a-f]{32}&platform=macos$/);
     expect(cfg.proxies[0]['dialer-proxy']).toMatch(/^__ref_air_/);
     expect(cfg.rules.at(-1)).toBe('MATCH,🚀 节点选择');
   });
@@ -99,8 +99,8 @@ describe('订阅接口', () => {
     const prov = await get(app, provPath);
     expect(prov.status).toBe(200);
     expect((parse(await prov.text()) as { proxies: { name: string }[] }).proxies.map((p) => p.name)).toEqual(['🇭🇰 HK-01', '🇯🇵 日本 01']);
-    const rs = await get(app, '/r/tk-mac/rs_tg_ipcidr');
-    expect(await rs.text()).toBe('91.108.4.0/22\n');
+    const rs = await get(app, '/r/tk-mac/rs_tg_classical.list');
+    expect(await rs.text()).toBe('DOMAIN-SUFFIX,t.me\nIP-CIDR,91.108.4.0/22,no-resolve\n');
     expect((await get(app, '/r/tk-mac/nope')).status).toBe(404);
   });
 

@@ -11,7 +11,7 @@ function setup(format: RuleSetFormat, initial: string) {
   let body = initial;
   const env = setupApp({ fetcher: async () => ({ status: 200, body }) });
   envs.push(env);
-  env.store.put('ruleset', { id: 'r', name: '远程规则', sources: [{ id: 's1', kind: 'remote', format, url: 'https://rules.example.test/list' }] });
+  env.store.put('ruleset', { id: 'r', name: '远程规则', noResolve: true, sources: [{ id: 's1', kind: 'remote', format, url: 'https://rules.example.test/list' }] });
   env.store.put('profile', {
     id: 'p', name: '测试订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' },
     overlay: { extraRules: [{ anchor: 'top', rule: { id: 'rule', matcher: { kind: 'ruleset', id: 'r' }, target: { kind: 'builtin', name: 'REJECT' } } }] },
@@ -62,12 +62,12 @@ describe('远程规则快照有效性', () => {
   it('部分行无法解析仍保留有效规则，并允许之后恢复正常更新', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test\nUNKNOWN,value');
     const before = await h.renderer.render('p', { client: 'mihomo' });
-    expect(before.ok && before.render.rulesets.rs_r_domain).toBe('valid.example.test\n');
+    expect(before.ok && before.render.rulesets['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n');
     expect(before.report).toContainEqual(expect.objectContaining({ code: 'ruleset.rejected-lines' }));
     expect((await h.refresh('<html>error</html>')).ok).toBe(false);
     expect((await h.refresh('DOMAIN,recovered.example.test')).ok).toBe(true);
     const after = await h.renderer.render('p', { client: 'mihomo' });
-    expect(after.ok && after.render.rulesets.rs_r_domain).toBe('recovered.example.test\n');
+    expect(after.ok && after.render.rulesets['rs_r_classical.list']).toBe('DOMAIN,recovered.example.test\n');
   });
 
   it.each([false, true])('历史库中已存在错误快照时保护主配置（已有成功配置：%s）', async hasLastGood => {

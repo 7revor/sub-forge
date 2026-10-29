@@ -7,7 +7,7 @@
 | `src/proxy` | 订阅内容解析：URI / Base64 / Clash YAML / Surge `[Proxy]` → `ProxyIR` | PRD SRC-01、SRC-04、SRC-10 |
 | `src/pipeline` | 处理链与 P0 处理器，逐步 trace，末尾去重兜底 | SRC-06、SRC-07、SRC-11 |
 | `src/nodeset` | 订阅源 / 组合 / 本地节点组解析，组合环检测 | COL-01–04、LOC-01 |
-| `src/rules` | 规则 IR、规则集解析、按客户端降级与覆盖、多来源规则集合并与按 behavior 拆分（原规则包并入规则集） | RS-01–03、RS-08、原 RB-01–05、CR-01–02 |
+| `src/rules` | 规则 IR、规则集解析、按客户端降级与覆盖、多来源规则集合并与自动输出格式（原规则包并入规则集） | RS-01–03、RS-08、原 RB-01–05、CR-01–02 |
 | `src/template` | 模板 ⊕ 覆盖层合并、模板发布前自检 | 03 §5、TPL-07 ①、PRF-04、PRF-09 |
 | `src/render` | mihomo 渲染：依赖解析、代理链、引用校验、环检测 | 03 §4、REF-01–12 |
 
@@ -46,7 +46,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 - Surge 输出（M2）
 - ssr、hysteria v1、wireguard、snell 的 URI 解析（这些协议目前只能通过 Clash YAML 导入）
 
-规则集客户端改写存放在 `RuleSet.overrides`：仅按规则内容精确匹配所有启用来源，不依赖来源选择或行号。先应用第一条客户端/平台匹配的改写，再合并去重、按 behavior 拆分；二进制透传内容不参与改写。来源级 `overrides` 只用于未能转换的历史数据兼容。
+规则集客户端改写存放在 `RuleSet.overrides`：仅按规则内容精确匹配所有启用来源，不依赖来源选择或行号。先应用第一条客户端/平台匹配的改写，再合并去重并输出一个 classical LIST；二进制来源需要改写时明确报错。来源级 `overrides` 只用于未能转换的历史数据兼容。
 
 
 规则仓库首期（2026-10-29）在服务端将文本变体转换为本内核已有的多个远程来源，再复用规则集解析、合并与去重。内核数据模型不变；动态 `repo` 来源与客户端变体切换仍为后续能力。
@@ -55,4 +55,4 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 规则来源可带 `repository: { repo, entry, ref, path }` 表示仓库文件关联；仍为远程来源，URL 约束由服务端负责，内核解析、合并、去重不变。
 
-远程输入的 YAML payload（含带引号和流式 payload）仍支持自动解析；解析结果 `conversion: yaml-to-list` 表示只能经过 IR 转换为托管文本，不能透传 YAML 地址。仓库索引不提供 YAML 文件。输入格式与最终 provider 文本格式分别处理，保留不支持行诊断。
+文本来源统一通过 `parseRuleSourceContent` 按内容识别，旧 format 不再强制指定解析器（仅保留域名方言与二进制兼容）。预览始终解析为规则 IR；`ruleSetDelivery` 判断原格式透传或托管转换。单一启用远程来源、无覆写、IP 选项处理或自定义 UA，且目标客户端支持原内容时直接引用上游，并设置实际 format 和 behavior；否则生成一个 `.list`（text/classical）。拒绝行、方言转换也触发托管。旧 MRS/SRS 无解码能力，无法转换时明确失败。`conversion: yaml-to-list` 仅作为旧版预览解析诊断兼容，是否托管以 delivery 为准。仓库仍只索引 list/txt。

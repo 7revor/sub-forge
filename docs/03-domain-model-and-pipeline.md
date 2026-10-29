@@ -298,14 +298,16 @@ effective.final = overlay.final ?? template.final
 - 模板组不能在 Profile 中删除、改名或隐藏（Q6）；`groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。Profile 私有组（`extraGroups`）不受此限制。
 - 空组处理（TPL-10）：模板组在 Profile 中未被填充任何成员时照常输出为空组，`report.warn`。按 `whenEmpty` 输出：`reject`（默认）→ mihomo `proxies: [REJECT]`、Surge `select, REJECT`；`direct` → mihomo `proxies: [COMPATIBLE]`、Surge `select, DIRECT`。mihomo 的 `proxies` 与 `use` 都为空时直接报错，Surge 不接受无成员无参数的组，所以必须写一个内置成员；`COMPATIBLE` 实测等效直连（07 M7）。
 
-## 6. 规则集展开与拆分
+## 6. 规则集展开与输出
 
 ```
 expand(ruleset):
   rules = concat(sources.filter(enabled).map(s => applyOverrides(parse(s.kind == 'local' ? s.content : snapshot(ruleset.id, s.url)), ruleset.overrides)))
-  mrs / srs 来源不解析，单独透传为一个 rule-provider（mihomo 需要 URL 与 domain/ipcidr behavior）
+  单一启用的远程来源且无额外处理、客户端支持原内容：原格式透传
+  其他可解析来源：合并为一个 classical LIST；不再按桶创建多个 provider
+  mrs / srs 无解码能力，需要处理或客户端不支持时明确失败
   去重（按 type+value）
-  按 behavior 分桶：
+  内部按 behavior 分类，仅用于排序与统计：
     domain   : DOMAIN / DOMAIN-SUFFIX（可转为 mihomo domain behavior: +.suffix）
     ipcidr   : IP-CIDR / IP-CIDR6
     classical: 其余（KEYWORD、REGEX、PROCESS、GEOIP、AND/OR…）
@@ -373,3 +375,14 @@ SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使
 ## 2026-10-29 追加：布局隔离
 
 登录页不复用业务页面的 page-scroll 容器；通用 Modal 使用 Portal 挂载到 body，以避免页面限宽选择器和祖先裁切影响遮罩。纯前端修复，领域模型、后端接口与示例种子不变。
+
+### 2026-10-29：输入格式自动识别与原格式透传
+
+本节替代此前“YAML 只能托管”与“三类 provider 分桶输出”的约定。格式不再由用户选择；文本按内容自动识别，历史格式仅用于域名方言兼容。预览始终经过 IR 转换，并返回识别出的 format/behavior 与整组 delivery。
+
+- 单个启用远程来源、无组级/来源级覆写、无 no-resolve/src 等处理或自定义 UA，且目标客户端支持内容语义时：引用原 URL，并按识别结果设置 format（text/yaml）与 behavior。
+- 多来源、改写、IP 选项、未知行过滤或方言翻译等情况：一个 `.list`，`format: text`、`behavior: classical`；继续去重并保留行内 IP 选项。
+- Surge DOMAIN-SET 的 `.域名` 包含根域；Clash/YAML domain 的前导点只含子域，转换不能扩大匹配范围。纯文本方言存在歧义时沿用既有领域约定，并参考仓库元数据。
+- 旧 MRS/SRS 仅保留已有透传能力，不新增解码器；无法转换时报告错误，订阅服务沿用已有失败回退。
+
+格式支持依据：[mihomo rule-providers](https://wiki.metacubex.one/en/config/rule-providers/)、[文件内容格式](https://wiki.metacubex.one/en/config/rule-providers/content/)。当前完整订阅下载实现为 mihomo；Surge 继续用于规则预览。

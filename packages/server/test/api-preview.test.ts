@@ -111,7 +111,7 @@ describe('规则集预览（CR-05）', () => {
     const mihomo = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'mihomo' });
     expect(mihomo.json.lines).toEqual(['DOMAIN-SUFFIX,notion.so', 'PROCESS-NAME-REGEX,^steam.*', 'PROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(mihomo.json.rejected.map((r: { reason: string }) => r.reason)).toEqual(['不支持的规则类型 USER-AGENT']);
-    expect(mihomo.json.sources).toEqual([{ id: 'a', ok: true, rules: 4, rejected: 1, rejectedDetails: [{ line: 5, text: 'USER-AGENT,x*', reason: '不支持的规则类型 USER-AGENT' }] }]);
+    expect(mihomo.json.sources).toEqual([{ id: 'a', ok: true, format: 'classical', behavior: 'classical', rules: 4, rejected: 1, rejectedDetails: [{ line: 5, text: 'USER-AGENT,x*', reason: '不支持的规则类型 USER-AGENT' }] }]);
     const mac = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'macos' });
     expect(mac.json.lines).toContain('PROCESS-NAME,steam*');
     expect(mac.json.notes).toHaveLength(1);
@@ -173,9 +173,9 @@ describe('规则集预览（CR-05）', () => {
     const draft = await alice.post('/api/rulesets/preview', { ruleset: { name: 'N', sources }, client: 'mihomo' });
     expect(draft.json.lines).toEqual(['DOMAIN,remote.test', 'DOMAIN,local.test']);
     expect(draft.json.sources).toEqual([
-      { id: 'r', ok: true, rules: 1, rejected: 0 },
+      { id: 'r', ok: true, format: 'classical', behavior: 'classical', rules: 1, rejected: 0 },
       { id: 'x', ok: false, error: '上游 500' },
-      { id: 'l', ok: true, rules: 1, rejected: 0 },
+      { id: 'l', ok: true, format: 'classical', behavior: 'classical', rules: 1, rejected: 0 },
     ]);
     expect(store.snapshotHistory('ruleset', 'draft')).toEqual([]);
     // 同一地址短时间内复用，不重复拉取

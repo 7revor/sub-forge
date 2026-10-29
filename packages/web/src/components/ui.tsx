@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAt
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
+export { ErrorAlert } from './FeedbackHost.tsx';
 export { Empty } from './Empty.tsx';
 export { cx } from './cx.ts';
 export { Select, Combobox, type SelectProps, type ComboOption } from './listbox.tsx';
@@ -158,7 +159,8 @@ export function PageHeader({ title, subtitle, crumbs, actions, children }: { tit
   );
 }
 
-export function ErrorBox({ error }: { error: unknown }) {
+/** 随输入变化的字段诊断，避免每次按键打断用户。 */
+export function FieldError({ error }: { error: unknown }) {
   if (!error) return null;
   return <div role="alert" className="rounded-lg bg-err-soft px-3 py-2.5 text-[13px] text-[#8f2a1f]">{error instanceof Error ? error.message : String(error)}</div>;
 }
@@ -166,7 +168,7 @@ export function ErrorBox({ error }: { error: unknown }) {
 export function Modal({ title, open, onClose, children, footer, wide }: { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('dialog[open][role="alertdialog"]')) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);

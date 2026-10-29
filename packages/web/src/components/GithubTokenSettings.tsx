@@ -1,7 +1,8 @@
+import { notifySuccess } from '../feedback.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api.ts';
-import { Badge, Button, ErrorBox, Field, Input } from './ui.tsx';
+import { Badge, Button, ErrorAlert, Field, Input } from './ui.tsx';
 
 type TokenStatus = { configured: boolean };
 
@@ -13,7 +14,7 @@ export function GithubTokenSettings() {
     mutationFn: (value: string | undefined) => value === undefined
       ? api<TokenStatus>('DELETE', '/rule-repos/github-token')
       : api<TokenStatus>('PUT', '/rule-repos/github-token', { token: value }),
-    onSuccess: data => { qc.setQueryData(['github-index-token'], data); setToken(''); },
+    onSuccess: data => { qc.setQueryData(['github-index-token'], data); setToken(''); notifySuccess(data.configured ? '已保存，后续仓库信息查询立即生效。' : '已清除，后续 API 查询使用匿名请求。'); },
   });
   return (
     <form className="flex flex-col gap-2 border-b border-line-2 pb-4" onSubmit={e => { e.preventDefault(); if (token.trim()) save.mutate(token.trim()); }}>
@@ -26,8 +27,7 @@ export function GithubTokenSettings() {
         {status.data?.configured && <Button type="button" disabled={save.isPending} onClick={() => save.mutate(undefined)}>清除 Token</Button>}
         <a className="text-[12px] text-accent" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">创建 GitHub Token</a>
       </div>
-      {save.isSuccess && <span role="status" className="text-[12px] text-muted">{status.data?.configured ? '已保存，后续仓库信息查询立即生效。' : '已清除，后续 API 查询使用匿名请求。'}</span>}
-      <ErrorBox error={save.error ?? status.error} />
+      <ErrorAlert error={save.error ?? status.error} />
     </form>
   );
 }

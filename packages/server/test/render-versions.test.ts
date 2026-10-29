@@ -14,7 +14,7 @@ import { Store } from '../src/store.ts';
 const template = (version = 1, name = '旧前置'): TemplateVersionDoc => ({ id: 't', name: '模板', version, groups: [{ id: 'g', name, type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [{ id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'group', groupId: 'g' } }], final: { kind: 'group', groupId: 'g' } });
 const profile: ProfileDoc = { id: 'p', name: 'P', template: { id: 't', follow: 'latest' }, nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'provider' }], overlay: { groupPatches: { g: { addMembers: [{ kind: 'builtin', name: 'REJECT' }] } } }, chains: [{ id: 'c', landing: { nodeSet: { type: 'source', id: 's' }, filter: '^落地' }, via: { kind: 'group', groupId: 'g' } }], refPolicy: { default: 'wrap' } };
 const path = (url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; };
-const urls = (cfg: any) => ({ provider: cfg['proxy-providers'].S.url as string, ruleset: cfg['rule-providers'].rs_rs_domain.url as string });
+const urls = (cfg: any) => ({ provider: cfg['proxy-providers'].S.url as string, ruleset: cfg['rule-providers'].rs_rs_classical.url as string });
 const version = (url: string) => new URL(url).searchParams.get('v');
 function harness(store = new Store(':memory:')) {
   let now = 1000;
@@ -28,7 +28,7 @@ function harness(store = new Store(':memory:')) {
 }
 function seed(store: Store) {
   store.put('source', { id: 's', name: 'S', url: 'https://example.test/source', pipeline: [] });
-  store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://example.test/rules' }] });
+  store.put('ruleset', { id: 'rs', name: 'R', noResolve: true, sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://example.test/rules' }] });
   store.putTemplateVersion(template());
   store.put('profile', structuredClone(profile));
   store.putToken({ token: 'token', profileId: 'p' });
@@ -49,8 +49,8 @@ describe('订阅结构版本与独立刷新', () => {
     expect(parse(await (await h.get(newUrls.provider)).text()).proxies[0]['dialer-proxy']).toBe('新前置');
     // 修改规则定义后旧资源仍存在，新模板可采用不同的规则集桶。
     h.store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'IP-CIDR,203.0.113.0/24' }] });
-    expect((await h.main())['rule-providers']).not.toHaveProperty('rs_rs_domain');
-    expect(await (await h.get(oldUrls.ruleset)).text()).toBe('old.example.test\n');
+    expect(version(urls(await h.main()).ruleset)).not.toBe(version(oldUrls.ruleset));
+    expect(await (await h.get(oldUrls.ruleset)).text()).toBe('DOMAIN,old.example.test\n');
   });
 
   it('锁定模板版本不会随模板发布改变', async () => {
@@ -70,7 +70,7 @@ describe('订阅结构版本与独立刷新', () => {
     h.advance();
     await h.get(old.provider); await h.snapshots.settled();
     expect(parse(await (await h.get(old.provider)).text()).proxies.map((p: any) => p.name)).toEqual(['落地 A', '落地 B']);
-    expect(await (await h.get(old.ruleset)).text()).toBe('new.example.test\n');
+    expect(await (await h.get(old.ruleset)).text()).toBe('DOMAIN,new.example.test\n');
     const next = urls(await h.main());
     expect(version(next.provider)).toBe(version(old.provider));
     expect(new URL(next.provider).searchParams.get('h')).not.toBe(new URL(old.provider).searchParams.get('h'));

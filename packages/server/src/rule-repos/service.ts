@@ -1,5 +1,5 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
-import { parseRuleSetContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
+import { parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { GitRepoCache, type RepoCache } from './git-cache.ts';
@@ -126,7 +126,7 @@ export class RuleRepoService {
     const { file } = find();
     const definition = this.definition(repo, true);
     const body = await this.readFile(definition, file);
-    const parsed = parseRuleSetContent(body, file.format, file.behavior);
+    const parsed = parseRuleSourceContent(body, { ...file, repository: { repo, entry: path, ref: file.ref, path: file.path } });
     if (parsed.passthrough || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
     const current = find();
     if (JSON.stringify(current.file) !== JSON.stringify(file) || JSON.stringify(this.definition(repo, true)) !== JSON.stringify(definition)) throw new HttpError(409, '索引已更新，请重新选择文件');
@@ -359,7 +359,7 @@ export class RuleRepoService {
       try {
         for (const file of variant.files) {
           const body = await this.readFile(repo, file);
-          const parsed = parseRuleSetContent(body, file.format, file.behavior);
+          const parsed = parseRuleSourceContent(body, { ...file, repository: { repo: id, entry: path, ref: file.ref, path: file.path } });
           if (parsed.passthrough || !parsed.rules.length) throw new Error('文件中没有可解析的规则');
           rejected += parsed.rejected.length;
           rejectedDetails.push(...parsed.rejected.slice(0, Math.max(0, 50 - rejectedDetails.length)).map(r => ({ ...r, text: r.text.slice(0, 500) })));

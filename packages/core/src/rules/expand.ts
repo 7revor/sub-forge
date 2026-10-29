@@ -3,7 +3,7 @@
 import type { Report } from '../report.ts';
 import type { ID, RuleIR, RuleSet, RuleSetSource } from '../types.ts';
 import { applyOverrides, lowerRule, withIpOptions, type ClientCtx } from './client.ts';
-import { behaviorOf, isYamlRuleUrl, parseRuleSetContent, ruleKey, type Behavior } from './parse.ts';
+import { behaviorOf, isYamlRuleUrl, parseRuleSourceContent, ruleKey, type Behavior } from './parse.ts';
 
 export type RuleSetInputs = {
   rulesets: Record<ID, RuleSet>;
@@ -36,7 +36,7 @@ export function expandSource(rs: RuleSet, src: RuleSetSource, inputs: RuleSetInp
     report.error('ruleset.no-snapshot', `${label}没有可用快照`, where);
     return { passthrough: false, rules: [] };
   }
-  const parsed = parseRuleSetContent(body, src.format, src.behavior);
+  const parsed = parseRuleSourceContent(body, src);
   if (parsed.passthrough) return passthrough(parsed.format);
   // 旧版本可能已经把错误页面保存为成功快照；读取时也要阻止这些内容变成空分流配置。
   // 此处在客户端覆盖之前检查，显式 drop 所有规则仍是合法操作。

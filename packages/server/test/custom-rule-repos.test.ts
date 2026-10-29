@@ -94,6 +94,15 @@ describe('自定义仓库配置与文件发现', () => {
 });
 
 describe('自定义仓库管理及导入 API', () => {
+  it('Git 缓存正文按实际格式识别，旧格式配置不阻止预览和单文件导入', async () => {
+    const h = setup();
+    h.body('payload:\n  - DOMAIN,example.com\n  - DOMAIN-SUFFIX,example.org\n');
+    const id = await h.service.addCustom({ url, format: 'classical' });
+    await h.service.refresh(id);
+    expect(await h.service.detail(id, 'ai.list')).toMatchObject({ count: 2, rejected: 0 });
+    const linked = await h.service.linkedFileSource(id, 'ai.list', { ref: 'main', path: 'ai.list' });
+    expect(linked.sources[0]).toMatchObject({ url: 'https://raw.githubusercontent.com/7revor/proxy-rules/main/ai.list', repository: { repo: id, path: 'ai.list' } });
+  });
   it('管理员添加、预览诊断、用户导入、追加去重，删除保留已导入来源', async () => {
     const h = setup();
     await addUser(h.store, 'admin', 'admin'); await addUser(h.store, 'alice');

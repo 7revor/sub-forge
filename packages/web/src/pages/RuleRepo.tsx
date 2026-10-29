@@ -7,7 +7,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
 import { useMe } from '../hooks.ts';
 import { api, type RepoEntry, type RepoFileList, type RuleRepo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorBox, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
 
 export function RuleRepoPage() {
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ export function RuleRepoPage() {
     enabled: !!sel,
     queryFn: () => api<{ item: RepoFileList }>('GET', `/rule-repos/files?repo=${encodeURIComponent(sel!.repo)}&path=${encodeURIComponent(sel!.path)}`).then((r) => r.item),
   });
-  const use = useMutation({
+  const use = useMutation({ meta: { successMessage: '规则文件已加入规则集' },
     mutationFn: (file: { ref: string; path: string }) => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: sel!.repo, path: sel!.path, file, ...(ruleset ? { ruleset } : {}) }),
     onSuccess: async (r) => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${r.item.id}`); },
   });
@@ -58,7 +58,7 @@ export function RuleRepoPage() {
           ))}
         </div>
       </div>
-      <ErrorBox error={repos.error ?? search.error} />
+      <ErrorAlert error={repos.error ?? search.error} />
 
       <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(240px,1fr)_minmax(320px,1.5fr)] gap-5 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
           <section aria-label="搜索结果" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
@@ -92,7 +92,7 @@ export function RuleRepoPage() {
                 </div>
                 {d && <Badge>{d.files.length} 个文件</Badge>}
               </div>
-              <ErrorBox error={detail.error} />
+              <ErrorAlert error={detail.error} />
               {detail.isPending && <span className="text-[13px] text-muted">正在读取文件列表…</span>}
               {d && <>
                 <div className="flex flex-wrap gap-2 text-[12.5px]">
@@ -110,7 +110,7 @@ export function RuleRepoPage() {
                   {!d.files.length && <div className="p-4"><Empty title="没有可用的文本文件" /></div>}
                 </Card>
               </>}
-              <ErrorBox error={use.error} />
+              <ErrorAlert error={use.error} />
 
             </>}
           </section>

@@ -1,13 +1,15 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { AsyncSelect, type AsyncSelectPage } from '../components/listbox.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { CodePreview } from '../components/CodePreview.tsx';
+import { CopyButton } from '../components/CopyButton.tsx';
 import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { isYamlRuleUrl, type Client, type Platform, type RuleSetFormat } from '@sub-forge/core';
+import type { Client, Platform } from '@sub-forge/core';
 import { FileText, Globe, Link2, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type RepoEntry, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
@@ -16,16 +18,12 @@ import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, FieldError, Field, Input, Switch, Textarea, buttonClass, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
 
-const FORMATS: { value: RuleSetFormat; label: string }[] = [
-  { value: 'auto', label: '自动识别' }, { value: 'classical', label: 'classical 文本' }, { value: 'domain-set', label: 'Surge DOMAIN-SET' },
-  { value: 'ipcidr', label: '纯 CIDR' }, { value: 'yaml', label: 'YAML → LIST（仅托管）' }, { value: 'mrs', label: 'mrs（透传）' },
-];
-const FORMAT_TEXT: Record<string, string> = { auto: '自动识别', classical: 'classical', 'domain-set': 'DOMAIN-SET', domain: 'DOMAIN-SET', ipcidr: 'CIDR', yaml: 'YAML → LIST · 托管', mrs: 'mrs', srs: 'srs' };
+const FORMAT_TEXT: Record<string, string> = { auto: '待识别', classical: 'classical 文本', 'domain-set': '域名文本', domain: '域名文本', ipcidr: 'CIDR 文本', yaml: 'YAML', mrs: 'MRS', srs: 'SRS' };
 const isPassthrough = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
 const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : '本地规则');
 
@@ -50,8 +48,8 @@ export function RulesetList() {
 
 const newLocal = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'local', format: 'auto', content: '' });
 const newRemote = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'remote', format: 'auto', url: '' });
-const FIRST_SOURCE = 'src_first';
-const EMPTY_RS: RuleSetDoc = { id: '', name: '', sources: [{ ...newLocal(), id: FIRST_SOURCE }] };
+const EMPTY_RS: RuleSetDoc = { id: '', name: '', sources: [] };
+const sourceActionClass = buttonClass('default', 'md', 'w-full min-w-0 whitespace-normal max-sm:gap-1.5 max-sm:px-2 max-sm:text-[12px]');
 
 const TARGETS: { key: string; client: Client; platform?: Platform; label: string }[] = [
   { key: 'mihomo', client: 'mihomo', label: 'mihomo' },
@@ -66,7 +64,6 @@ function rulesetError(d: RuleSetDoc): string | undefined {
   for (const [i, s] of d.sources.entries()) {
     const at = `来源 ${i + 1}「${sourceLabel(s)}」`;
     if (s.kind === 'remote' && !/^https?:\/\/[^/]+/.test(s.url ?? '')) return `${at}：请填写 http(s) 地址。`;
-    if (s.format === 'mrs' && s.behavior !== 'domain' && s.behavior !== 'ipcidr') return `${at}：mrs 需要选择 behavior。`;
   }
   return overridesError(d.overrides ?? []);
 }
@@ -75,8 +72,7 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
-  const [selected, setSelected] = useState<string | undefined>(() => (e.isNew ? FIRST_SOURCE : undefined));
-  const [showError, setShowError] = useState(false);
+  const [selected, setSelected] = useState<string | undefined>();
   const t = TARGETS.find((x) => x.key === target)!;
   const draft = useDebouncedValue(e.draft, 400);
   const preview = useQuery({
@@ -88,7 +84,7 @@ export function RulesetEdit() {
       client: t.client, ...(t.platform ? { platform: t.platform } : {}),
     }),
   });
-  if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const selectedSource = d.sources.find((s) => s.id === selected);
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
@@ -101,10 +97,10 @@ export function RulesetEdit() {
   return (
     <DetailShell listPath="/rulesets" listLabel="规则集" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
       onSave={() => {
-        setShowError(true);
+        if (error) { alertError(error); return; }
         if (!error) e.submit((x) => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => (s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' })) }));
       }}
-      saveError={(showError && error) || e.save.error}
+      saveError={e.save.error}
       onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
       badges={!e.isNew && <>
         <Badge>{sourceSummary(d)}</Badge>
@@ -115,20 +111,21 @@ export function RulesetEdit() {
         <Field label="名称">{(id) => <Input id={id} autoFocus={e.isNew} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
         <NoteField value={d.note} onChange={(note) => set({ note })} />
       </Card>
-      <Card title="来源" actions={<>
-        <Button className="h-9" onClick={() => add(newRemote())}><Globe size={15} />添加远程地址</Button>
-        <Button className="h-9" onClick={() => add(newLocal())}><FileText size={15} />添加本地规则</Button>
-      </>}>
+      <Card title="来源">
         <div className="flex flex-col gap-4">
-          <RepositoryPicker key={d.id} onAdd={sources => {
-            e.setDraft(current => {
-              if (!current || current.id !== d.id) return current;
-              const added = sources.filter(s => !current.sources.some(existing => existing.url === s.url));
-              return { ...current, sources: [...current.sources, ...added] };
-            });
-            setSelected(d.sources.find(s => s.url === sources[0]?.url)?.id ?? sources[0]?.id);
-          }} />
-          {!d.sources.length ? <Empty title="还没有来源" /> : (
+          <div role="group" aria-label="添加规则来源" className="grid grid-cols-3 gap-2">
+            <RepositoryPicker key={d.id} onAdd={sources => {
+              e.setDraft(current => {
+                if (!current || current.id !== d.id) return current;
+                const added = sources.filter(s => !current.sources.some(existing => existing.url === s.url));
+                return { ...current, sources: [...current.sources, ...added] };
+              });
+              setSelected(d.sources.find(s => s.url === sources[0]?.url)?.id ?? sources[0]?.id);
+            }} />
+            <button type="button" className={sourceActionClass} onClick={() => add(newRemote())}><Globe size={15} className="hidden shrink-0 sm:block" />添加远程地址</button>
+            <button type="button" className={sourceActionClass} onClick={() => add(newLocal())}><FileText size={15} className="hidden shrink-0 sm:block" />添加本地规则</button>
+          </div>
+          {!!d.sources.length && (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
               <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
                 onSelect={() => setSelected(s.id === selected ? undefined : s.id)}
@@ -170,24 +167,21 @@ async function loadRepositoryOptions(query: string, offset: number): Promise<Asy
 
 function RepositoryPicker({ onAdd }: { onAdd: (sources: RuleSetSourceDoc[]) => void }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>();
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  return <div className="flex flex-col gap-2">
-    <div className="flex items-center gap-2"><Link2 size={16} className="shrink-0 text-accent-ink" />
-      <AsyncSelect aria-label="关联仓库规则" placeholder={busy ? '正在解析关联…' : '关联仓库规则…'} disabled={busy} loadOptions={loadRepositoryOptions}
-        onChange={async value => {
-          setBusy(true); setError(undefined);
-          try {
-            const [repo, path] = JSON.parse(value) as [string, string];
-            const result = await api<{ sources: RuleSetSourceDoc[] }>('POST', '/rule-repos/resolve', { repo, path });
-            if (alive.current) onAdd(result.sources);
-          } catch (e) { if (alive.current) setError(e); }
-          finally { if (alive.current) setBusy(false); }
-        }} />
-    </div>
-    <ErrorBox error={error} />
-  </div>;
+  return <>
+    <AsyncSelect aria-label="关联仓库规则" placeholder={busy ? '正在关联…' : '关联仓库规则'} disabled={busy} loadOptions={loadRepositoryOptions}
+      triggerClassName={sourceActionClass} triggerIcon={<Link2 size={15} className="hidden shrink-0 sm:block" />}
+      onChange={async value => {
+        setBusy(true);
+        try {
+          const [repo, path] = JSON.parse(value) as [string, string];
+          const result = await api<{ sources: RuleSetSourceDoc[] }>('POST', '/rule-repos/resolve', { repo, path });
+          if (alive.current) { onAdd(result.sources); notifySuccess('仓库规则已关联，保存后生效'); }
+        } catch (e) { if (alive.current) alertError(e); }
+        finally { if (alive.current) setBusy(false); }
+      }} />
+  </>;
 }
 
 function SourceRow({ src, handle, active, status, loading, onSelect, onChange, onDelete }: {
@@ -196,10 +190,13 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
 }) {
   const on = src.enabled !== false;
   const label = sourceLabel(src);
+  const editingUrl = active && src.kind === 'remote' && !src.repository;
+  const title = editingUrl ? src.name?.trim() || '远程地址' : label;
   const lines = src.kind === 'local' ? (src.content ?? '').split('\n').filter((l) => l.trim() && !l.trim().startsWith('#')).length : undefined;
+  const detected = status?.format ? FORMAT_TEXT[status.format] ?? status.format : '自动识别';
   const sub = src.kind === 'remote'
-    ? [src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${FORMAT_TEXT[src.format] ?? src.format}`].filter(Boolean).join(' · ')
-    : `本地 · ${FORMAT_TEXT[src.format] ?? src.format} · ${lines} 行`;
+    ? [!editingUrl && src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${detected}`].filter(Boolean).join(' · ')
+    : `本地 · ${detected} · ${lines} 行`;
   return (
     <div className={cx('my-2 rounded-lg border', active ? 'border-accent bg-[#f8faff]' : 'border-line', !on && 'opacity-60')}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 pr-3 pl-2">
@@ -209,27 +206,25 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
             {src.repository ? <Link2 size={15} /> : src.kind === 'remote' ? <Globe size={15} /> : <FileText size={15} />}
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className={cx('truncate text-[13.5px] font-medium', src.kind === 'remote' && !src.name?.trim() && 'font-mono text-[12.5px]')}>{label}</span>
-            <span className="truncate text-[12px] text-muted">{sub}</span>
+            <span title={title} className={cx('truncate text-[13.5px] font-medium', src.kind === 'remote' && !src.name?.trim() && !editingUrl && 'font-mono text-[12.5px]')}>{title}</span>
+            <span title={sub} className="truncate text-[12px] text-muted">{sub}</span>
           </span>
         </button>
-        {status?.conversion === 'yaml-to-list' && <Badge tone="accent">YAML → LIST · 托管</Badge>}
+        {src.kind === 'remote' && src.repository && src.url && <CopyButton text={src.url} size="sm" variant="ghost" aria-label={`复制关联地址 ${label}`}>复制地址</CopyButton>}
         <SourceStatus src={src} status={status} loading={loading} />
         <Switch label={`启用 ${label}`} checked={on} onChange={(v) => onChange({ enabled: v ? undefined : false })} />
         <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${label}`} onClick={onDelete}><Trash2 size={14} /></Button>
       </div>
       {active && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
-          {src.kind === 'remote' && <Field label={src.repository ? '关联地址（只读）' : '地址'} className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} readOnly={!!src.repository} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
-          <Field label="输入格式" hint={src.kind === 'remote' ? '自动识别支持 YAML payload，转换为 LIST 后仅托管输出。' : undefined}>{(id) => <Select id={id} value={src.format} onChange={(x) => onChange({ format: x.target.value as RuleSetFormat })}>{FORMATS.filter(f => f.value !== 'mrs' || !(isYamlRuleUrl(src.url) || src.format === 'yaml' || status?.conversion === 'yaml-to-list')).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
-          {src.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={src.behavior ?? ''} onChange={(x) => onChange({ behavior: (x.target.value || undefined) as 'domain' | 'ipcidr' | undefined })}><option value="">请选择</option><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
+          {src.kind === 'remote' && !src.repository && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
           {src.kind === 'remote' && <Field label="缓存（小时）">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
             const h = Number(x.target.value);
             const { ttlSec: _, ...rest } = src.fetch ?? {};
             onChange({ fetch: h > 0 && h !== 24 ? { ...rest, ttlSec: h * 3600 } : Object.keys(rest).length ? rest : undefined });
           }} />}</Field>}
-          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint={src.format === 'yaml' ? '填写包含 payload 列表的 YAML。' : '每行一条，支持 classical 规则、域名或 CIDR。'}>{(id) => (
-            <LocalContentInput format={src.format} id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
+          {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="自动识别 classical 规则、域名、CIDR 或 YAML payload。">{(id) => (
+            <LocalContentInput format={status?.format} id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
           )}</Field>}
         </div>
       )}
@@ -258,13 +253,17 @@ function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> })
 }
 
 function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
-  if (preview.error) return <ErrorBox error={preview.error} />;
+  if (preview.error) return <ErrorAlert error={preview.error} />;
   const p = preview.data;
   if (!p) return <div className="text-[13px] text-muted">加载中…</div>;
+  if (p.delivery?.mode === 'unsupported') return <FieldError error={p.delivery.reason} />;
   if (p.passthrough) return <Empty title="该来源为二进制透传" description="由客户端直接读取，无法在此展示文本规则。" />;
   return (
     <>
-      {p.error && <ErrorBox error={`拉取失败：${p.error}`} />}
+      {p.delivery && <span className="text-[12.5px] text-muted">{p.delivery.mode === 'original'
+        ? `下载时使用原始来源 · ${p.delivery.format} / ${p.delivery.behavior}`
+        : '下载时转换为 .list · classical 文本'}</span>}
+      {p.error && <FieldError error={p.error} />}
       {p.lines.length ? <CodePreview text={p.lines.join('\n')} loading={preview.isFetching} bodyClassName="min-h-[120px]" /> : <Empty title="没有可输出的规则" />}
       <span className="text-[12px] text-muted">{p.total ?? p.lines.length} 行{(p.total ?? 0) > p.lines.length ? `（显示前 ${p.lines.length} 行）` : ''} · 降级 {p.notes?.length ?? 0} · 丢弃 {p.dropped.length} · 无法解析 {p.rejected.length}</span>
       {[...(p.notes ?? []).map((n) => ['降级', n]), ...p.dropped.map((x) => ['丢弃', x.reason]), ...p.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].slice(0, 50).map(([k, v], i) => (

@@ -4,7 +4,7 @@
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { parseRuleSetContent, validateTemplate, sourceLabel, type ReportItem, type RuleSet, type Template } from '@sub-forge/core';
+import { ruleSetDelivery, parseRuleSourceContent, validateTemplate, sourceLabel, type ReportItem, type RuleSet, type Template } from '@sub-forge/core';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { TemplateVersionDoc } from '../docs.ts';
@@ -27,6 +27,13 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template):
   for (const id of ids) {
     const rs = store.get('ruleset', id)!;
     const where = `ruleset:${id}`;
+    // 二进制只有无需处理的单来源可以透传；发布前也必须执行相同约束。
+    if (rs.sources.some(src => src.enabled !== false && (src.format === 'mrs' || src.format === 'srs'))) {
+      for (const entry of t.rules.filter(r => r.enabled !== false && r.matcher.kind === 'ruleset' && r.matcher.id === id)) {
+        const delivery = ruleSetDelivery(rs, { rulesets, snapshots: {} }, { client: 'mihomo' }, entry.options);
+        if (delivery.mode === 'unsupported') report.push({ level: 'error', code: 'template.ruleset-invalid', message: delivery.reason, where });
+      }
+    }
     for (const src of rs.sources) {
       if (src.enabled === false) continue;
       const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
@@ -49,7 +56,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template):
         report.push({ level: 'error', code: 'template.ruleset-invalid', message: `${label}不可用：${reason}`, where });
         continue;
       }
-      const parsed = parseRuleSetContent(content, src.format, src.behavior);
+      const parsed = parseRuleSourceContent(content, src);
       if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', message: `${label}有 ${parsed.rejected.length} 行无法解析或不支持`, where });
     }
   }

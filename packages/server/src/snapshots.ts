@@ -9,7 +9,7 @@
 // 上游返回 2xx 但内容为空（或订阅源解析不出任何节点）同样记为失败：机场在 token 过期、
 // 限流时常这样返回，若当作成功快照，会顶掉上一份可用内容，订阅变成空的。
 
-import { parseContent, parseRuleSetContent, stableHash, type RuleSetFormat } from '@sub-forge/core';
+import { parseContent, parseRuleSourceContent, stableHash, type RuleSetFormat } from '@sub-forge/core';
 import type { FetchOptions } from './docs.ts';
 import { DEFAULT_TIMEOUT_MS, DEFAULT_UA, type UpstreamFetcher } from './net/upstream.ts';
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
@@ -25,7 +25,7 @@ export function unusableBody(kind: SnapshotOwner, id: string, body: string, form
   if (!body.trim()) return '上游返回了空内容';
   if (kind === 'ruleset') {
     try {
-      const parsed = parseRuleSetContent(body, format);
+      const parsed = parseRuleSourceContent(body, { format });
       if (parsed.passthrough || parsed.rules.length) return undefined;
       return `上游内容中没有可用规则（${parsed.rejected.length} 行无法解析）`;
     } catch (e) {

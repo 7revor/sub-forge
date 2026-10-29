@@ -3,7 +3,7 @@
 // - 旧规则包 → 同 id 的规则集：引用的规则集的来源依次复制进来，单条规则合成一个本地来源；
 //   id 与已有规则集冲突时换新 id，模板与 Profile 里的引用由调用方按 idMap 改写。
 
-import { formatRuleLine, parseRuleSetContent, type RuleIR } from '@sub-forge/core';
+import { formatRuleLine, parseRuleSourceContent, type RuleIR } from '@sub-forge/core';
 import type { RuleSetDoc, RuleSetSourceDoc } from './docs.ts';
 
 type LegacyBundle = {
@@ -90,7 +90,7 @@ export function promoteRuleSetOverrides(rs: RuleSetDoc, snapshot: (src: RuleSetS
   const sources = rs.sources.map((src) => {
     if (!src.overrides?.length || src.enabled === false) return src;
     const content = src.kind === 'local' ? src.content : snapshot(src);
-    const parsed = content === undefined ? undefined : parseRuleSetContent(content, src.format, src.behavior);
+    const parsed = content === undefined ? undefined : parseRuleSourceContent(content, src);
     const promoted: NonNullable<RuleSetDoc['overrides']> = [];
     for (const item of src.overrides) {
       const matches = new Set<string>();

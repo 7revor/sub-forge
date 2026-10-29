@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { Button, ErrorBox, Field, Input, Modal } from './ui.tsx';
+import { Button, ErrorAlert, Field, Input, Modal } from './ui.tsx';
 
 /** 创建请求和跳转由调用方负责；按钮和回车共用一次提交入口。 */
 export function NamedCreateDialog({ open, onClose, title, label = '名称', placeholder, hint, pending, error, onCreate, onReset, children }: {
@@ -29,7 +29,7 @@ export function NamedCreateDialog({ open, onClose, title, label = '名称', plac
       <Field label={label}>{(id) => <Input id={id} autoFocus required disabled={pending} placeholder={placeholder} value={name} onChange={(event) => setName(event.target.value)} />}</Field>
       {children}
       {hint && <span className="text-[12px] text-muted">{hint}</span>}
-      <ErrorBox error={submitError ?? error} />
+      <ErrorAlert error={submitError ?? error} />
     </form>
   </Modal>;
 }

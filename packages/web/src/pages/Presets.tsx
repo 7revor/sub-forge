@@ -9,7 +9,7 @@ import { Link, Navigate, useNavigate } from 'react-router';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteAction, ActionButtons } from '../components/DetailActions.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Button, Card, Empty, ErrorBox, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
+import { Button, Card, Empty, ErrorAlert, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { DualEditor, type EditorMode } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
@@ -36,7 +36,7 @@ export function PresetList() {
   const [creating, setCreating] = useState(false);
   return (
     <>
-      <ErrorBox error={profiles.error} />
+      <ErrorAlert error={profiles.error} />
       <DocList kind="presets" title="基础设置预设" noun="预设" intro={INTRO} onCreate={() => setCreating(true)} deleteBody={DELETE_BODY}
         columns={[
           { header: '名称', cell: (p) => p.name },
@@ -59,7 +59,7 @@ export function PresetEdit() {
   const dirty = !!e.draft && (e.dirty || !rawValid);
   const { blocker, leave } = useLeaveGuard(!e.isNew && dirty);
   if (e.isNew) return <Navigate to="/presets" replace />;
-  if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const refs = (profiles.data ?? []).filter((p) => p.base?.presetId === d.id);
   const publish = () => { if (rawValid) e.submit((x) => ({ ...x, version: x.version + 1 })); };
@@ -82,7 +82,7 @@ export function PresetEdit() {
         </>}>
         <span className={cx('text-[12.5px]', rawValid ? 'text-ok' : 'text-err')}>{rawValid ? (dirty ? `有未发布的修改 · 当前 v${d.version}` : `已发布 v${d.version}`) : '请先修复 YAML 中的错误'}</span>
       </PageHeader>
-      <ErrorBox error={e.save.error} />
+      <ErrorAlert error={e.save.error} />
       <PageScroll>
         <div className="flex flex-wrap items-start gap-5">
           <section className="flex min-w-0 flex-[999_1_520px] flex-col gap-3.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
@@ -100,7 +100,7 @@ export function PresetEdit() {
           </section>
 
           <Card title={`引用方${profiles.data ? ` · ${refs.length}` : ''}`} className="min-w-0 flex-[1_1_260px]" bodyClass="px-4 pb-3">
-            <ErrorBox error={profiles.error} />
+            <ErrorAlert error={profiles.error} />
             {profiles.isLoading && <span className="text-muted">加载中…</span>}
             {refs.map((p) => {
               const overrides = Object.keys(p.base?.patch ?? {}).length;

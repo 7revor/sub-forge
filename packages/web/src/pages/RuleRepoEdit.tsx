@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type RepoScan, type RuleRepo } from '../api.ts';
-import { Button, Card, ErrorBox, Field, Input, PageHeader, PageScroll, Select, Textarea } from '../components/ui.tsx';
+import { Button, Card, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Textarea } from '../components/ui.tsx';
 
 const blankScan = () => ({ ref: '', directory: '', include: '**/*.list\n**/*.txt', exclude: '', format: 'auto', client: 'any', groupBy: 'path', readme: false, preferred: '' });
 const lines = (text: string) => text.split('\n').map(s => s.trim()).filter(Boolean);
@@ -16,7 +16,7 @@ export function RuleRepoEditorPage() {
     refetchOnMount: 'always', refetchInterval: query => query.state.data?.repos.some(r => r.id === id && r.indexing) ? 3000 : false });
   if (id && (repos.isPending || repos.error || !repos.data?.repos.some(r => r.id === id))) return <>
     <PageHeader title="编辑仓库" crumbs={<Link to={`/rule-repo${search}`} className="text-muted hover:text-accent">规则仓库</Link>} />
-    {repos.error ? <ErrorBox error={repos.error} /> : <div className="text-muted">{repos.isPending ? '加载中…' : '仓库不存在或已删除。'}</div>}
+    {repos.error ? <ErrorAlert error={repos.error} /> : <div className="text-muted">{repos.isPending ? '加载中…' : '仓库不存在或已删除。'}</div>}
   </>;
   return <RepositoryForm key={id ?? 'new'} repo={repos.data?.repos.find(r => r.id === id)} />;
 }
@@ -32,6 +32,7 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
   const [scans, setScans] = useState(initial.scans);
   const dirty = JSON.stringify({ form, scans }) !== JSON.stringify({ form: initial.form, scans: initial.scans });
   const save = useMutation({
+    meta: { successMessage: initial.repo ? '仓库配置已保存' : '仓库已添加，正在建立索引' },
     mutationFn: () => api(initial.repo ? 'PUT' : 'POST', initial.repo ? `/rule-repos/${initial.repo.id}` : '/rule-repos', {
       ...form, ...(form.license ? {} : { license: undefined }), configRevision: initial.repo?.configRevision,
       scans: scans.map(s => ({ ...s, include: lines(s.include), exclude: lines(s.exclude), preferred: lines(s.preferred) })),
@@ -57,7 +58,7 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
       </div>
     </section>}
     {repo?.indexing && <p role="status" className="m-0 text-[13px] text-muted">索引正在更新，完成后可保存修改。</p>}
-    <ErrorBox error={save.error} />
+    <ErrorAlert error={save.error} />
     <PageScroll>
     <form id="repository-form" className="flex flex-col gap-5" onSubmit={e => { e.preventDefault(); submit(); }}>
     <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">

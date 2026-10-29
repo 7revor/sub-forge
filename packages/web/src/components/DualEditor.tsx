@@ -1,7 +1,8 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from './YamlTextarea.tsx';
 import { CopyButton } from './CopyButton.tsx';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ErrorBox, Segmented } from './ui.tsx';
+import { FieldError, Segmented } from './ui.tsx';
 
 export type EditorMode = 'form' | 'raw';
 export type RawResult<T> = { ok: true; value: T; notes?: string[] } | { ok: false; error: string; line?: number };
@@ -28,7 +29,6 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
   const current = mode ?? localMode;
   const [text, setText] = useState(() => { const r = current === 'raw' ? tryRaw(toRaw, value) : undefined; return r && 'text' in r ? r.text : ''; });
   const [result, setResult] = useState<RawResult<T>>(() => { const r = current === 'raw' ? tryRaw(toRaw, value) : undefined; return r && 'text' in r ? fromRaw(r.text) : { ok: true, value }; });
-  const [rawError, setRawError] = useState('');
   const previous = useRef({ value, mode: current });
   const emitted = useRef<{ value: T; canonical: string } | undefined>(undefined);
 
@@ -55,15 +55,15 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
     if (next === current) return;
     if (next === 'form') {
       const recovered = recoverForm(text);
+      notifySuccess(recovered.notes.length ? `已返回表单，保留可识别的有效字段：\n${recovered.notes.join('\n')}` : '已返回表单');
       setResult({ ok: true, ...recovered });
       onChange(recovered.value);
       onValidityChange?.(true);
     }
     if (next === 'raw') {
       const raw = tryRaw(toRaw, value);
-      if ('error' in raw) { setRawError(`无法生成${rawLabel}：${raw.error}`); return; }
+      if ('error' in raw) { alertError(`无法生成${rawLabel}：${raw.error}`); return; }
     }
-    setRawError('');
     if (mode === undefined) setLocalMode(next);
     onModeChange?.(next);
   };
@@ -72,11 +72,6 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
       { value: 'form', label: '表单' },
       { value: 'raw', label: '原始配置' },
     ]} />
-    <ErrorBox error={rawError} />
-    {current === 'form' && result.ok && !!result.notes?.length && <div role="status" className="text-[13px] text-muted">
-      已返回表单，保留可识别的有效字段：
-      <ul className="m-0 pl-5">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
-    </div>}
     <div className="editor-content flex flex-col gap-3">
       {current === 'form' ? renderForm() : <>
         <div className="flex items-center justify-between gap-2">
@@ -88,16 +83,17 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
           if (!imported) return;
           event.preventDefault();
-          if (!imported.ok) { setRawError(`未导入：${imported.error}`); return; }
+          if (!imported.ok) { alertError(`未导入：${imported.error}`); return; }
           const canonical = tryRaw(toRaw, imported.value);
-          if ('error' in canonical) { setRawError(`未导入：${canonical.error}`); return; }
-          setText(canonical.text); setResult(imported); setRawError('');
+          if ('error' in canonical) { alertError(`未导入：${canonical.error}`); return; }
+          setText(canonical.text); setResult(imported);
           emitted.current = { value: imported.value, canonical: canonical.text };
           onValidityChange?.(true);
           onChange(imported.value);
+          notifySuccess(imported.notes?.join('；') || '已导入配置，保存后生效');
         }} onChange={(event) => {
           const raw = event.target.value;
-          setText(raw); setRawError('');
+          setText(raw);
           const parsed = fromRaw(raw);
           setResult(parsed);
           onValidityChange?.(parsed.ok);
@@ -112,7 +108,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
             onChange(parsed.value);
           }
         }} />
-        <ErrorBox error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
+        <FieldError error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
         {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[13px] text-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
       </>}
     </div>

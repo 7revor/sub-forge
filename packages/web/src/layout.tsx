@@ -1,3 +1,4 @@
+import { alertError, notifySuccess } from './feedback.ts';
 // 外壳：左侧导航（窄屏时叠在上方）+ 内容区；未登录时跳转登录页。
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,9 +46,12 @@ export function AppLayout() {
   const isAdmin = me.data.role === 'admin';
 
   const logout = async () => {
-    await api('POST', '/auth/logout');
-    qc.clear();
-    navigate('/login', { replace: true });
+    try {
+      await api('POST', '/auth/logout');
+      qc.clear();
+      navigate('/login', { replace: true });
+      notifySuccess('已退出登录');
+    } catch (error) { alertError(error); }
   };
 
   return (

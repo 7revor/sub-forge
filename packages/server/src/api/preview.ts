@@ -6,7 +6,7 @@
 //   POST /api/rulesets/preview               规则集草稿按客户端 + 平台的输出（CR-05）：指定来源时为该来源，否则为合并结果
 
 import {
-  composeRule, expandRuleSet, expandSource, lowerRule, NodeSetResolver, parseContent, parseRuleSetContent, Report, runPipeline, sourceKey, withIpOptions,
+  ruleSetDelivery, composeRule, expandRuleSet, expandSource, lowerRule, NodeSetResolver, parseContent, parseRuleSourceContent, Report, runPipeline, sourceKey, withIpOptions,
   type RejectedRule, type Client, type ClientCtx, type Collection, type NodeSetID, type OperatorStep, type Platform, type ProxyIR, type RuleIR,
 } from '@sub-forge/core';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../docs.ts';
@@ -189,9 +189,11 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const rs: RuleSetDoc = { id: savedId ?? 'draft', name: typeof draft.name === 'string' && draft.name ? draft.name : '未命名', sources: draft.sources, ...(draft.overrides ? { overrides: draft.overrides } : {}), ...(draft.noResolve ? { noResolve: true } : {}) };
 
     const snapshotsIn: Record<string, string> = {};
-    const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRule[]; conversion?: 'yaml-to-list' }[] = [];
+    const parseErrors = new Set<string>();
+    const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRule[]; conversion?: 'yaml-to-list'; format?: string; behavior?: string }[] = [];
     for (const src of rs.sources) {
       if (!src || typeof src !== 'object' || typeof src.id !== 'string') throw bad('来源格式错误');
+      src.format ??= 'auto';
       checkRepositorySource(src, saved?.sources.find(s => s.id === src.id), store, '来源');
       const passthrough = src.format === 'mrs' || src.format === 'srs';
       let content = src.kind === 'local' ? src.content ?? '' : undefined;
@@ -211,28 +213,35 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
         }
       }
       if (content !== undefined && src.kind === 'remote') snapshotsIn[sourceKey(rs.id, src.id)] = content;
-      const parsed = content === undefined || passthrough ? undefined : parseRuleSetContent(content, src.format, src.behavior);
+      let parsed: ReturnType<typeof parseRuleSourceContent> | undefined;
+      try { parsed = content === undefined || passthrough ? undefined : parseRuleSourceContent(content, src); }
+      catch (cause) {
+        error = `规则内容无法解析：${cause instanceof Error ? cause.message : String(cause)}`;
+        parseErrors.add(src.id);
+        delete snapshotsIn[sourceKey(rs.id, src.id)];
+      }
       status.push({
         id: src.id, ok: !error && (passthrough || content !== undefined),
         ...(error ? { error } : {}), ...(fetchedAt ? { fetchedAt } : {}), ...(passthrough ? { passthrough: true } : {}),
-        ...(parsed && !parsed.passthrough ? { rules: parsed.rules.length, rejected: parsed.rejected.length, ...(parsed.conversion ? { conversion: parsed.conversion } : {}), ...(parsed.rejected.length ? { rejectedDetails: parsed.rejected.slice(0, 100) } : {}) } : {}),
+        ...(parsed && !parsed.passthrough ? { format: parsed.format, behavior: parsed.behavior, rules: parsed.rules.length, rejected: parsed.rejected.length, ...(parsed.conversion ? { conversion: parsed.conversion } : {}), ...(parsed.rejected.length ? { rejectedDetails: parsed.rejected.slice(0, 100) } : {}) } : {}),
       });
     }
     const inputs = { rulesets: { [rs.id]: rs }, snapshots: snapshotsIn };
     const report = new Report();
+    const delivery = ruleSetDelivery(rs, inputs, ctx);
 
     if (body.source !== undefined) {
       const src = rs.sources.find((x) => x.id === body.source);
       if (!src) throw bad('来源不存在');
       const st = status.find((x) => x.id === src.id)!;
-      if (src.format === 'mrs' || src.format === 'srs') return c.json({ sources: status, passthrough: true, lines: [], dropped: [], notes: [], rejected: [] });
+      if (src.format === 'mrs' || src.format === 'srs') return c.json({ sources: status, delivery, passthrough: true, lines: [], dropped: [], notes: [], rejected: [] });
       const content = src.kind === 'local' ? src.content ?? '' : snapshotsIn[sourceKey(rs.id, src.id)];
-      if (content === undefined) return c.json({ sources: status, passthrough: false, lines: [], dropped: [], notes: [], rejected: [], ...(st.error ? { error: st.error } : {}) });
-      const parsed = parseRuleSetContent(content, src.format, src.behavior);
+      if (content === undefined || parseErrors.has(src.id)) return c.json({ sources: status, delivery, passthrough: false, lines: [], dropped: [], notes: [], rejected: [], ...(st.error ? { error: st.error } : {}) });
+      const parsed = parseRuleSourceContent(content, src);
       const ex = expandSource(rs, src, inputs, ctx, report);
       const out = ex.passthrough ? { lines: [], dropped: [], notes: [] } : lower(ex.rules.map((r) => withIpOptions(r, { noResolve: rs.noResolve })), ctx);
       return c.json({
-        sources: status, passthrough: ex.passthrough,
+        sources: status, delivery, passthrough: ex.passthrough,
         ...out, lines: out.lines.slice(0, MAX_RULE_LINES), total: out.lines.length,
         rejected: parsed.passthrough ? [] : parsed.rejected,
         ...(st.error ? { error: st.error } : {}),
@@ -240,11 +249,11 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     }
 
     // 合并结果：只合并已拿到内容的来源；拉取失败的来源在 sources 里标红，不阻断预览
-    const usable: RuleSetDoc = { ...rs, sources: rs.sources.filter((s) => s.kind === 'local' || s.format === 'mrs' || s.format === 'srs' || snapshotsIn[sourceKey(rs.id, s.id)] !== undefined) };
+    const usable: RuleSetDoc = { ...rs, sources: rs.sources.filter((s) => !parseErrors.has(s.id) && (s.kind === 'local' || s.format === 'mrs' || s.format === 'srs' || snapshotsIn[sourceKey(rs.id, s.id)] !== undefined)) };
     const b = expandRuleSet(rs.id, { ...inputs, rulesets: { [rs.id]: usable } }, ctx, report);
     const out = lower([...b.domain, ...b.classical, ...b.ipcidr], ctx);
     return c.json({
-      sources: status, passthrough: false,
+      sources: status, delivery, passthrough: false,
       ...out, lines: out.lines.slice(0, MAX_RULE_LINES), total: out.lines.length,
       rejected: [],
       stats: { domain: b.domain.length, classical: b.classical.length, ipcidr: b.ipcidr.length, total: b.total, duplicates: b.duplicates },

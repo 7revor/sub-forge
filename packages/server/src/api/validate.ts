@@ -236,6 +236,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         ids.add(src.id);
         const prior = priorSources.find(s => s.id === src.id);
         checkRepositorySource(src, prior, store, at);
+        src.format ??= 'auto';
         if (!RULESET_FORMATS.has(src.format as string)) throw bad(`${at}：format 不合法`);
         if (src.kind === 'remote') { if (!isHttpUrl(src.url)) throw bad(`${at}：远程来源需要 http(s) 地址`); delete src.content; }
         else if (src.kind === 'local') { if (typeof src.content !== 'string') throw bad(`${at}：本地来源需要 content`); delete src.url; delete src.fetch; }
