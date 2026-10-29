@@ -3,6 +3,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { Link } from 'react-router';
+import { DocActionLink, DocTableRow, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { api, type SnapshotMeta } from '../api.ts';
 import { Badge, Card, Empty, PageHeader, formatBytes, formatTime, td, th } from '../components/ui.tsx';
 import { useList, useTemplates } from '../hooks.ts';
@@ -63,15 +64,16 @@ export function Overview() {
       <Card title="我的配置订阅" bodyClass="overflow-x-auto">
         {profiles.data?.length === 0 ? <div className="px-4 pb-4"><Empty>还没有配置订阅。<Link to="/profiles/new" className="text-accent">新建一个</Link></Empty></div> : (
           <table className="w-full border-collapse">
-            <thead><tr><th className={th}>名称</th><th className={th}>模板</th><th className={th}>节点集</th><th className={th}>代理链</th></tr></thead>
+            <thead><tr><th className={th}>名称</th><th className={th}>模板</th><th className={th}>节点集</th><th className={th}>代理链</th><th className={`${th} w-px text-right`}>操作</th></tr></thead>
             <tbody>
               {(profiles.data ?? []).map((p) => (
-                <tr key={p.id}>
-                  <td className={td}><Link to={`/profiles/${p.id}`} className="font-medium text-ink no-underline hover:text-accent">{p.name}</Link></td>
+                <DocTableRow key={p.id} to={`/profiles/${p.id}`}>
+                  <td className={td}><Link to={`/profiles/${p.id}`} className={docNameLinkClass}>{p.name}</Link></td>
                   <td className={td}>{p.template ? <>{tplName(p.template.id)} <span className="text-[12px] text-muted">{p.template.follow === 'latest' ? '跟随最新' : `锁定 v${p.template.follow.pinned}`}</span></> : '—'}</td>
                   <td className={`${td} font-mono`}>{p.nodeSets.length}</td>
                   <td className={`${td} font-mono`}>{p.chains.length}</td>
-                </tr>
+                  <td className={`${td} text-right`}><DocActionLink to={`/profiles/${p.id}`} name={p.name} /></td>
+                </DocTableRow>
               ))}
             </tbody>
           </table>
@@ -81,19 +83,20 @@ export function Overview() {
       <Card title="订阅源拉取" actions={<Link to="/sources" className="text-[13px] text-accent">全部订阅源</Link>} bodyClass="overflow-x-auto">
         {remote.length === 0 ? <div className="px-4 pb-4"><Empty>没有远程订阅源。</Empty></div> : (
           <table className="w-full border-collapse">
-            <thead><tr><th className={th}>订阅源</th><th className={th}>上次成功</th><th className={th}>流量</th><th className={th}>到期</th><th className={th}>状态</th></tr></thead>
+            <thead><tr><th className={th}>订阅源</th><th className={th}>上次成功</th><th className={th}>流量</th><th className={th}>到期</th><th className={th}>状态</th><th className={`${th} w-px text-right`}>操作</th></tr></thead>
             <tbody>
               {status.map(({ source, lastOk, failing: f }) => {
                 const u = lastOk?.userinfo;
                 const used = u ? (u.upload ?? 0) + (u.download ?? 0) : undefined;
                 return (
-                  <tr key={source.id}>
-                    <td className={td}><Link to={`/sources/${source.id}`} className="font-medium text-ink no-underline hover:text-accent">{source.name}</Link></td>
+                  <DocTableRow key={source.id} to={`/sources/${source.id}`}>
+                    <td className={td}><Link to={`/sources/${source.id}`} className={docNameLinkClass}>{source.name}</Link></td>
                     <td className={td}>{lastOk ? formatTime(lastOk.fetchedAt) : '—'}</td>
                     <td className={td}>{u?.total ? `${formatBytes(used)} / ${formatBytes(u.total)}` : '无流量信息'}</td>
                     <td className={`${td} text-muted`}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
                     <td className={td}>{f ? <Badge tone="err">{lastOk ? '拉取失败 · 使用快照' : '拉取失败'}</Badge> : lastOk ? <Badge tone="ok">正常</Badge> : <Badge>未拉取</Badge>}</td>
-                  </tr>
+                    <td className={`${td} text-right`}><DocActionLink to={`/sources/${source.id}`} name={source.name} /></td>
+                  </DocTableRow>
                 );
               })}
             </tbody>

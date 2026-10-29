@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
+import { DocActionLink, DocTableRow, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
@@ -27,15 +28,16 @@ export function TemplateList() {
       <Card bodyClass="overflow-x-auto">
         {!list.data?.length ? <div className="p-4"><Empty>还没有模板。</Empty></div> : (
           <table className="w-full border-collapse">
-            <thead><tr><th className={th}>名称</th><th className={th}>版本</th><th className={th}>组</th><th className={th}>规则</th></tr></thead>
+            <thead><tr><th className={th}>名称</th><th className={th}>版本</th><th className={th}>组</th><th className={th}>规则</th><th className={`${th} w-px text-right`}>操作</th></tr></thead>
             <tbody>
               {list.data.map((t) => (
-                <tr key={t.id} className="hover:bg-ground">
-                  <td className={td}><Link to={`/templates/${t.id}`} className="font-medium text-ink no-underline hover:text-accent">{t.name ?? t.id}</Link></td>
+                <DocTableRow key={t.id} to={`/templates/${t.id}`}>
+                  <td className={td}><Link to={`/templates/${t.id}`} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
                   <td className={`${td} font-mono`}>v{t.version}</td>
                   <td className={`${td} font-mono`}>{t.groups.length}</td>
                   <td className={`${td} font-mono`}>{t.rules.length}</td>
-                </tr>
+                  <td className={`${td} text-right`}><DocActionLink to={`/templates/${t.id}`} name={t.name ?? t.id} viewOnly /></td>
+                </DocTableRow>
               ))}
             </tbody>
           </table>
