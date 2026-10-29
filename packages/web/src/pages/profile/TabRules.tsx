@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, FieldError, Field, Modal, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, FieldError, Field, Input, Modal, Select, Switch, cx } from '../../components/ui.tsx';
 import { useRuleSetRefs } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
@@ -62,7 +62,7 @@ function ExtraRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (ancho
   const [anchor, setAnchor] = useState('top');
   const [rule, setRule] = useState<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'DIRECT' }, enabled: true }));
   const error = privateRuleError(rule);
-  return <Modal title="插入私有规则" open onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
+  return <Modal title="插入规则" open onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
     const position: ExtraRule['anchor'] = anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
     onAdd(position, rule); onClose();
   }}>插入</Button></>}>
@@ -91,6 +91,8 @@ export function TabRules() {
   const label = useMatcherLabel();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string>();
+  const [search, setSearch] = useState('');
+  const bound = draft.routing?.mode === 'bound';
   const patches = draft.overlay.rulePatches ?? {};
   const orphans = Object.keys(patches).filter((id) => !template?.rules.some((r) => r.id === id));
   const rows = mergeRuleRows(template?.rules ?? [], draft.overlay);
@@ -101,10 +103,19 @@ export function TabRules() {
     extraRules: (o.extraRules ?? []).flatMap((e) => { if (e.rule.id !== id) return [e]; const r = fn(e.rule); return r ? [{ ...e, rule: r }] : []; }),
   }));
 
+  if (bound) return <Card title="规则（由模板维护）">
+    <Input aria-label="搜索规则" placeholder="搜索规则或出口" value={search} onChange={e => setSearch(e.target.value)} />
+    <p className="text-[13px] text-muted">规则顺序、启用状态和出口跟随模板。需要修改时，请在「模板与模式」中转为独立配置。</p>
+    {rows.filter(r => `${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`.toLowerCase().includes(search.toLowerCase())).map(r => <div key={r.id} className="flex flex-wrap gap-3 border-t border-line py-3 text-[13px]">
+      <Badge>{r.enabled === false ? '停用' : '模板'}</Badge><span className="min-w-0 flex-1 break-all font-mono">{label(r.matcher).text}</span><span>{targetLabel(r.target, groupName, nodeSetName)}</span>
+    </div>)}
+    <div className="border-t border-line pt-3 text-[13px]">MATCH → {targetLabel(final, groupName, nodeSetName)}</div>
+  </Card>;
+
   return <>
     {orphans.length > 0 && <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span></Notice>}
     <Card title={`规则（自上而下匹配）`}
-      actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>}>
+      actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入规则</Button>}>
       {!rows.length ? <Empty title="没有规则" description="未匹配的流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
         onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}
         renderItem={(r, i, handle) => {
@@ -127,7 +138,7 @@ export function TabRules() {
               <span className="flex gap-1" aria-label="客户端输出"><span className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2">mihomo</span><span className="rounded border border-dashed border-line px-1.5 py-0.5 font-mono text-[11.5px] text-faint" title="Surge 暂未开放">Surge</span></span>
               <span onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
                 <Switch label={`启用规则 ${i + 1}`} checked={!off} onChange={(enabled) => r.origin === 'template' ? patchRule(r.id, { enabled }) : setExtra(r.id, (rule) => ({ ...rule, enabled }))} />
-                {r.origin === 'profile' && <Button size="sm" variant="ghost" aria-label={`删除私有规则 ${i + 1}`} onClick={() => { setExtra(r.id, () => undefined); if (editing === r.id) setEditing(undefined); }}><Trash2 size={14} /></Button>}
+                {r.origin === 'profile' && <Button size="sm" variant="ghost" aria-label={`删除规则 ${i + 1}`} onClick={() => { setExtra(r.id, () => undefined); if (editing === r.id) setEditing(undefined); }}><Trash2 size={14} /></Button>}
               </span>
             </div>
             {editing === r.id && (r.origin === 'profile' ? <PrivateRuleEdit key={r.id} rule={draft.overlay.extraRules!.find((e) => e.rule.id === r.id)!.rule}
@@ -143,7 +154,7 @@ export function TabRules() {
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
         <span className="font-mono text-[13px]">MATCH</span>
         <TargetPicker label="MATCH 出口" value={final} groups={groupOptions} nodeSets={profileNodeSets} onChange={(target) => patchOverlay((o) => ({ ...o, final: target }))} />
-        {draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _, ...rest } = o; return rest; })}>还原为模板</Button>}
+        {template && draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _, ...rest } = o; return rest; })}>还原为模板</Button>}
       </div>
     </Card>
     {adding && <ExtraRuleModal onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />}

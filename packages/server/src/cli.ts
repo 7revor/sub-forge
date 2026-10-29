@@ -1,10 +1,12 @@
+import { profileMigrationPlan } from './profile-migration-plan.ts';
 // 命令行入口：
 //   tsx src/cli.ts create-admin <用户名>          创建管理员，密码取自 SUBFORGE_ADMIN_PASSWORD
 //   tsx src/cli.ts seed <seed.json> [用户名]      导入种子文件，有归属的文档写到该用户名下
+//   tsx src/cli.ts profile-migration-plan         在一致性副本上只读预检旧订阅迁移
 //   tsx src/cli.ts serve                          启动服务
 // 配置全部来自环境变量，见 packages/server/README.md。
 
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.ts';
 import { Cipher, hashPassword, loadMasterKey } from './crypto.ts';
@@ -38,6 +40,13 @@ async function createAdmin(store: Store, username: string, password: string | un
 
 async function main(): Promise<void> {
   const [cmd, arg, arg2] = process.argv.slice(2);
+  if (cmd === 'profile-migration-plan') {
+    if (dbPath === ':memory:' || !existsSync(dbPath)) throw new Error('迁移预检需要现有数据库文件');
+    if (!env.SUBFORGE_SECRET && !existsSync(join(dirname(dbPath), 'secret.key'))) throw new Error('迁移预检需要原数据库密钥，不会生成新密钥');
+    const plan = await profileMigrationPlan(dbPath, new Cipher(loadMasterKey(dbPath, env.SUBFORGE_SECRET)));
+    console.log(JSON.stringify(plan, null, 2));
+    return;
+  }
   if (cmd === 'create-admin') {
     if (!arg) throw new Error('用法：cli.ts create-admin <用户名>');
     const store = openStore();
@@ -58,7 +67,7 @@ async function main(): Promise<void> {
     return;
   }
   if (cmd === 'serve') return start();
-  throw new Error('用法：cli.ts create-admin <用户名> | seed <seed.json> [用户名] | serve');
+  throw new Error('用法：cli.ts create-admin <用户名> | seed <seed.json> [用户名] | profile-migration-plan | serve');
 }
 
 async function start(): Promise<void> {

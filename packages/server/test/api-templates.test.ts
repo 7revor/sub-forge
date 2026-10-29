@@ -57,22 +57,14 @@ describe('模板', () => {
     expect((await admin.post('/api/templates/validate', bad)).json.report).toHaveLength(2);
   });
 
-  it('影响分析：会让现有 Profile 渲染失败的版本需要强制发布，孤儿覆盖项记为警告', async () => {
+  it('旧覆盖配置转为独立模式后，模板发布不影响原订阅', async () => {
     const { admin, alice, tplId, rs, profile } = await scenario();
+    expect((await alice.get(`/api/profiles/${profile}`)).json.item.routing.mode).toBe('independent');
     const withoutHk = { ...TEMPLATE(rs), groups: [{ id: 'sel', name: '🚀 节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], changelog: '删除香港组' };
-    const impact = await admin.post(`/api/templates/${tplId}/impact`, withoutHk);
-    expect(impact.json.impact).toHaveLength(1);
-    expect(impact.json.impact[0]).toMatchObject({ profileId: profile, profileName: '我的订阅', level: 'error' });
-
-    const blocked = await admin.post(`/api/templates/${tplId}/publish`, withoutHk);
-    expect(blocked.status).toBe(409);
-    expect((await admin.get(`/api/templates/${tplId}`)).json.item.version).toBe(1);
-
-    const forced = await admin.post(`/api/templates/${tplId}/publish`, { ...withoutHk, force: true });
-    expect(forced.status).toBe(200);
-    expect(forced.json.item.version).toBe(2);
-    expect((await admin.get(`/api/templates/${tplId}`)).json.versions.map((v: { version: number; changelog?: string }) => [v.version, v.changelog])).toEqual([[2, '删除香港组'], [1, '初版']]);
-    expect((await alice.get(`/api/templates/${tplId}/versions/1`)).json.item.groups).toHaveLength(2);
+    expect((await admin.post(`/api/templates/${tplId}/impact`, withoutHk)).json.impact).toEqual([]);
+    expect((await admin.post(`/api/templates/${tplId}/publish`, withoutHk)).status).toBe(200);
+    expect((await alice.post(`/api/profiles/${profile}/preview`)).json.ok).toBe(true);
+    expect((await admin.get(`/api/templates/${tplId}`)).json.item.version).toBe(2);
   });
 });
 

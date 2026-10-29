@@ -71,7 +71,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `GET /api/templates`、`GET /api/templates/:id`、`GET /api/templates/:id/versions/:v` | 所有人可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
-| `POST /api/templates/:id/publish` | 管理员：`:id` 为 `new` 时新建。自身校验不通过 400；有 Profile 会渲染失败时 409，带 `force: true` 才发布（TPL-07） |
+| `POST /api/templates/:id/publish` | 管理员：`:id` 为 `new` 时新建。自身校验不通过 400；绑定订阅渲染失败或检查期间发生并发修改时 409，绑定冲突不允许 `force` 跳过（TPL-07、PRF-12） |
 | `GET/POST /api/profiles/:id/tokens`、`POST .../tokens/:token/reset`、`DELETE .../tokens/:token` | 订阅链接；重置后旧链接立即失效 |
 | `POST /api/profiles/:id/preview` | 预览配置、依赖节点与渲染报告；请求体可带未保存的 `profile` 草稿 |
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
@@ -240,3 +240,23 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 
 
 2026-10-29 规则转换：合并预览及实际订阅资源对 mihomo wildcard 按小写键去重，保留首条原文；存在重复 wildcard 的远程文本和 YAML 自动返回托管资源，下载与合并预览一致。单来源原文预览仍保留全部行，接口及保存数据无需迁移。
+
+## 模板关系与旧数据升级（数据库 v16）
+
+新订阅保存 `routing.mode = bound | independent`、空 `overlay` 与 `revision`。绑定只允许模板 ID 和 `groupAdditions`，保存须带 GET 返回的 `templateVersion`；独立保存完整 groups/rules/final，初始化来源仅作说明。旧的 template/overlay 创建请求与种子会自动转换，新模式 PUT 不允许回退为旧形状。
+
+- `POST /api/profiles/routing/convert`：`{ profile, mode, currentTemplateVersion?, templateId?, templateVersion?, mapping? }`。只返回 `{ item, changes }` 草稿；mapping 以旧组 ID 映射目标 ID，null 表示明确不迁移。应用后通过原 PUT 保存，revision 过期返回 409。
+- `GET /api/profiles/:id/migration-backup`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；备份在库内加密，删除订阅时一并删除。
+- 模板 impact/publish 仅影响绑定订阅。组改名保留成员；删组和合并环等冲突不能强制发布。发布检查中的并发更新要求重试。
+
+升级前先停止写入并保留完整数据库一致性备份及原密钥（运行中的 SQLite 使用 backup API，不能只复制主文件遗漏 WAL）。可在现有库上执行只读预检：
+
+```bash
+SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx src/cli.ts profile-migration-plan
+```
+
+预检读取数据库旁 `secret.key` 或现有 `SUBFORGE_SECRET`，不会生成新密钥、修改源库或输出完整配置。它在临时一致性副本上执行迁移并清理副本；任何失败均报错退出。审核清单后启动新版服务，数据库自动在事务内升级到 v16。纯追加、跟随最新且无诊断的旧订阅继续绑定；其他配置完整展开为独立模式，原始文档另外加密保存。
+
+订阅 ID、归属、链接、基础设置、节点源、代理链及 last-good/版本资源保留；迁移前后有效分流配置必须一致。历史孤儿项原本不生效，留在备份与诊断中。缺失模板版本或旧合并错误会中止整批迁移，不能靠丢弃配置继续启动；修复旧库后再试。回退旧程序应恢复升级前整库及对应密钥，单份 Profile 备份不等于数据库降级工具。
+
+示例种子保留原 `demo` 的筛选配置及 `demo-token`，将其完整展开为独立模式；另有 `demo-bound` / `demo-bound-token` 演示纯成员绑定。

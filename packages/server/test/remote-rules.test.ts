@@ -7,14 +7,17 @@ const url = 'https://example.test/owned.yaml?branch=main&download=1';
 const draft = (matcher = remoteRuleMatcher(url)) => ({ name: '远程模板', groups: [], rules: [{ id: 'remote-rule', matcher, target: { kind: 'builtin', name: 'DIRECT' }, options: { noResolve: true } }], final: { kind: 'builtin', name: 'REJECT' } });
 
 describe('外部 URL 与系统 ID 分开引用', () => {
-  it('发布、订阅输出嵌套 GET、快照缓存、版本保留和撤销 token 闭环', async () => {
+  it.each(['legacy', 'bound'])('%s 模式发布、订阅输出嵌套 GET、快照缓存、版本保留和撤销 token 闭环', async mode => {
     const calls: string[] = [];
     const h = setupApp({ fetcher: async value => { calls.push(value); return { status: 200, body: 'payload:\n  - DOMAIN,example.test\n  - IP-CIDR,10.0.0.0/8' }; } });
     try {
       const user = await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
       const published = await c.post('/api/templates/new/publish', draft());
       expect(published.status, published.text).toBe(201);
-      const p = await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], template: { id: published.json.item.id, follow: 'latest' }, overlay: {} });
+      const routing = mode === 'bound'
+        ? { routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} }, templateVersion: 1 }
+        : { template: { id: published.json.item.id, follow: 'latest' } };
+      const p = await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], overlay: {}, ...routing });
       expect(p.status, p.text).toBe(201);
       const token = h.store.createToken(p.json.item.id).token;
       const main = await h.app.request(`/sub/${token}`);
@@ -49,20 +52,54 @@ describe('外部 URL 与系统 ID 分开引用', () => {
     } finally { await h.snapshots.settled(); h.store.close(); }
   });
 
-  it('订阅私有规则可直接引用 URL；系统 ID 不根据地址自动替换，私有 ID 权限不变', async () => {
+  it.each(['legacy', 'independent'])('%s 模式可直接引用 URL；系统 ID 不根据地址自动替换，私有 ID 权限不变', async mode => {
     const h = setupApp({ fetcher: async () => ({ status: 200, body: 'DOMAIN,example.test' }) });
     try {
       const alice = await addUser(h.store, 'alice'); const bob = await addUser(h.store, 'bob'); const c = client(h.app); await c.login('alice');
       h.store.put('ruleset', { id: 'system', name: '系统规则', sources: [{ id:'s', kind:'remote', format:'auto', url }] }, alice.id);
       h.store.put('ruleset', { id: 'private', name: '私有规则', sources: [] }, bob.id);
-      const create = (matcher: object) => c.post('/api/profiles', { name: '私有规则引用', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { ...draft().rules[0], matcher } }] } });
+      const create = (matcher: object) => {
+        const rule = { ...draft().rules[0], matcher };
+        return c.post('/api/profiles', { name: '私有规则引用', nodeSets: [], ...(mode === 'independent'
+          ? { overlay: {}, routing: { mode, config: { groups: [], rules: [rule], final: draft().final } } }
+          : { overlay: { extraRules: [{ anchor: 'top', rule }] } }) });
+      };
       const external = await create(remoteRuleMatcher(url)); expect(external.status).toBe(201);
       const internal = await create({ kind: 'ruleset', id: 'system' }); expect(internal.status).toBe(201);
-      expect(internal.json.item.overlay.extraRules[0].rule.matcher).toEqual({ kind:'ruleset',id:'system' });
-      expect(external.json.item.overlay.extraRules[0].rule.matcher.remote).toEqual({ url });
+      expect(internal.json.item.routing.mode).toBe('independent');
+      expect(external.json.item.routing.mode).toBe('independent');
+      expect(internal.json.item.routing.config.rules[0].matcher).toEqual({ kind:'ruleset',id:'system' });
+      expect(external.json.item.routing.config.rules[0].matcher.remote).toEqual({ url });
+      const token = h.store.createToken(external.json.item.id).token;
+      const config = parse(await (await h.app.request(`/sub/${token}`)).text());
+      const provider = Object.values(config['rule-providers'])[0] as { url: string };
+      expect(new URL(provider.url).searchParams.get('url')).toBe(url);
+      expect(await (await h.app.request(provider.url)).text()).toContain('DOMAIN,example.test');
       expect((await create({ kind: 'ruleset', id: 'private' })).status).toBe(400);
       expect((await create({ ...remoteRuleMatcher(url), id: 'system' })).status).toBe(400);
       expect((await create({ ...remoteRuleMatcher(url), repository: {} })).status).toBe(400);
+    } finally { await h.snapshots.settled(); h.store.close(); }
+  });
+
+  it('绑定模板转为独立配置后保留远程引用，保存和下载继续有效', async () => {
+    const h = setupApp({ fetcher: async () => ({ status: 200, body: 'DOMAIN,example.test' }) });
+    try {
+      await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
+      const published = await c.post('/api/templates/new/publish', draft());
+      const profile = await c.post('/api/profiles', { name: '转为独立配置', nodeSets: [], overlay: {}, routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} }, templateVersion: 1 });
+      expect(profile.status, profile.text).toBe(201);
+      const converted = await c.post('/api/profiles/routing/convert', { profile: profile.json.item, mode: 'independent', currentTemplateVersion: 1 });
+      expect(converted.status, converted.text).toBe(200);
+      expect(converted.json.item.routing.config.rules[0].matcher).toEqual(remoteRuleMatcher(url));
+      const saved = await c.put(`/api/profiles/${profile.json.item.id}`, converted.json.item);
+      expect(saved.status, saved.text).toBe(200);
+      expect((await c.post(`/api/templates/${published.json.item.id}/publish`, draft(remoteRuleMatcher('https://example.test/changed.list')))).status).toBe(200);
+      const token = h.store.createToken(profile.json.item.id).token;
+      const config = parse(await (await h.app.request(`/sub/${token}`)).text());
+      const provider = Object.values(config['rule-providers'])[0] as { url: string };
+      expect(new URL(provider.url).searchParams.get('url')).toBe(url);
+      expect(await (await h.app.request(provider.url)).text()).toContain('DOMAIN,example.test');
+      expect(h.store.list('ruleset')).toEqual([]);
     } finally { await h.snapshots.settled(); h.store.close(); }
   });
 

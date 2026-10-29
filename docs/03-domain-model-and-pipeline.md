@@ -140,7 +140,7 @@ type Template = {
   final: Target;            // MATCH 出口
 };
 
-// ---------- 订阅 ----------
+// ---------- 订阅（历史模型；2026-10-29 起采用文末 routing 两种模式） ----------
 type Profile = {
   id: ID; owner: UserID; name: string;
   base?: { presetId?: ID; patch?: BasePatch };
@@ -412,3 +412,23 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 
 2026-10-29：ruleKey 增加可选目标客户端；仅 mihomo 的进程 wildcard 与 DOMAIN-WILDCARD 对值执行 toLowerCase 后生成去重键，不改写 RuleIR 或来源内容。convertRuleDocuments 与 expandRuleSet 共用该键，替换及追加也参与；重复项保留来源行位并写为注释。单来源原文预览继续保留重复行。ruleSetDelivery 检测远程 wildcard 重复并强制托管（含 YAML），让实际下载与合并预览一致。客户端未指定时维持原有大小写敏感键，仓库索引计数不变。
+
+## 2026-10-29：订阅分流所有权与数据库 v16
+
+```ts
+type RoutingConfig = Pick<Template, 'groups' | 'rules' | 'final'>;
+type ProfileRouting =
+  | { mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]> }
+  | { mode: 'independent'; config: RoutingConfig;
+      initializedFrom?: { templateId: ID; version: number; name?: string } };
+// Profile.routing 为新持久化入口；overlay: {} 仅保留兼容形状，不再同时存 template。
+// 服务层额外存 revision、templateVersion（保存并发检查用，不锁定模板）和 migration 说明。
+```
+
+绑定输出 = 最新模板 + 按稳定组 ID 追加的成员。`groupAdditions` 保存期望状态，无操作回放链；反复保存不会重复追加。独立输出直接读取 config，不访问初始化模板。`resolveProfileRouting` 供渲染、规则依赖收集和校验共用，旧 `mergeTemplate` 仅保留迁移与编辑器适配能力。
+
+数据库 v16 在同一事务中逐份展开旧配置，对迁移前后的标准化 groups/rules/final 做一致性比较；只将无诊断的 latest + append 纯成员覆盖转绑定，其余转独立。原始文档写入加密 `profile_migration_backups`，不修改 owner、updated_at、令牌、last_good 或结构版本资源。已有孤儿覆盖项原本就不生效，仍保存在原始备份中，迁移诊断保留，绝不悄悄将其激活。任一缺失版本、合并错误或输出不一致都回滚整批。旧种子导入使用同一转换；重复启动不重复迁移。
+
+`POST /api/profiles/routing/convert` 接受订阅草稿、目标 mode、模板版本与组映射，返回草稿和变更清单，不写库。绑定转独立保留完整有效配置；重新绑定替换模板负责的结构、规则和最终出口，仅迁移显式映射的成员与代理链/节点回退引用。不迁移使用 null 明确表达，仍被引用的组不能丢弃。最终 PUT 使用 revision 原子保存，模板版本过期拒绝。发布前试渲染所有绑定订阅，检查过程中的并发改动拒绝发布。
+
+`profile-migration-plan` 通过 SQLite backup 在临时一致性副本上迁移，源库只读；输出订阅名称、目标模式、原因及诊断，不包含完整配置或令牌。操作步骤见 server README。

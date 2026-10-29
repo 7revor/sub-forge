@@ -1,3 +1,5 @@
+import { migrateProfile, profileTemplate } from '../profile-routing.ts';
+import type { ProfileDoc } from '../docs.ts';
 // 文档增删改查：订阅源、组合、本地节点组、规则集、配置订阅（按用户隔离），基础设置预设（管理员维护，所有人可读）。
 
 import { readPagination } from './pagination.ts';
@@ -44,14 +46,16 @@ export function docRoutes(store: Store) {
 
     app.get(`/${seg}/:id`, (c) => {
       const row = load(c.req.param('id'), c.get('user').id);
-      return c.json({ item: row.doc, updatedAt: row.updatedAt });
+      const item = row.doc as ProfileDoc;
+      return c.json({ item: kind === 'profile' && item.routing?.mode === 'bound' ? { ...item, templateVersion: store.getTemplate(item.routing.templateId)?.version } : row.doc, updatedAt: row.updatedAt });
     });
 
     app.post(`/${seg}`, async (c) => {
       const user = c.get('user');
       assertWritable(user.role);
       const body = await jsonBody(c);
-      const doc = validateDoc(kind, body, randomId(9), user, store);
+      let doc = validateDoc(kind, body, randomId(9), user, store);
+      if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), revision: 1, migration: undefined };
       store.put(kind, doc, shared ? null : user.id);
       return c.json({ item: doc }, 201);
     });
@@ -60,10 +64,13 @@ export function docRoutes(store: Store) {
       const user = c.get('user');
       const id = c.req.param('id');
       assertWritable(user.role);
-      load(id, user.id);
       const body = await jsonBody(c);
+      const current = load(id, user.id);
       if (body.id !== undefined && body.id !== id) throw new HttpError(400, 'id 与路径不一致');
-      const doc = validateDoc(kind, body, id, user, store);
+      if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.routing === undefined) throw new HttpError(400, '不能移除分流模式，请使用模式转换');
+      if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.revision !== (current.doc as ProfileDoc).revision) throw new HttpError(409, '订阅已被其他编辑更新，请重新加载后保存');
+      let doc = validateDoc(kind, body, id, user, store);
+      if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), revision: ((current.doc as ProfileDoc).revision ?? 0) + 1, migration: (current.doc as ProfileDoc).migration };
       store.put(kind, doc, shared ? null : user.id);
       return c.json({ item: doc });
     });

@@ -26,6 +26,10 @@ export type TemplateVersionDoc = Template & { name?: string };
 export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; surge?: { general?: Record<string, unknown>; host?: Record<string, string> } };
 
 export type ProfileDoc = Profile & {
+  revision?: number;
+  /** 编辑时看到的模板版本，只做并发检查，不锁定渲染版本。 */
+  templateVersion?: number;
+  migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
   template?: { id: string; follow: 'latest' | { pinned: number } };
   /** 不设置表示不输出基础设置（使用客户端默认） */
   base?: { presetId?: string; patch?: Record<string, unknown> };
