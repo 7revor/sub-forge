@@ -36,7 +36,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     onChange({ ...value, rules: [...value.rules, { id, matcher, target: { kind: 'builtin', name: 'REJECT' } }] });
     onSelect(matcher.kind === 'rule' ? id : undefined);
   };
-  return <section className="-mx-4 border-t border-line">
+  return <section className="-mx-4">
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
       <div className="flex min-w-0 flex-col gap-0.5">
         <h2 className="m-0 text-[15px] font-semibold">规则（{value.rules.length} 条）</h2>
@@ -73,7 +73,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
             {rule.matcher.kind === 'ruleset' && <ItemIssues report={report} where={`rule:${rule.id}`} />}
           </div>;
         }} />
-        <div className="mt-3 grid grid-cols-1 items-center gap-3 border-t border-line px-2 py-3 text-[13px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"><span className="font-mono">MATCH（固定）</span><TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={(final) => onChange({ ...value, final })} /></div>
+        <div className="mt-3 grid grid-cols-1 items-center gap-3 px-2 py-3 text-[13px] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"><span className="font-mono">MATCH（固定）</span><TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={(final) => onChange({ ...value, final })} /></div>
         <ItemIssues report={report} where="final" />
       </div>
     </div>

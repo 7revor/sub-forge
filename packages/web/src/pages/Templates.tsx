@@ -351,7 +351,7 @@ function TemplatePage({ id }: { id: string }) {
         </li>)}
       </ol>
       <section className="list-panel" aria-label="模板编辑">
-        <div className="shrink-0 border-b border-line p-4">
+        <div className="shrink-0 p-4">
           <Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
         </div>
         <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain">

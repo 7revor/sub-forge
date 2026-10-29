@@ -23,8 +23,8 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
     if (!window.confirm(`删除「${groupName(id)}」？\n影响 ${affected.length} 个组${affected.length ? `（${affected.map((g) => g.name).join('、')}）` : ''}、${rules.length} 条规则${final ? '及 MATCH 出口' : ''}。\n确认后移除引用成员，相关规则和 MATCH 出口改为 REJECT。`)) return;
     onChange(removeGroup(value, id));
   };
-  return <section className="-mx-4 border-t border-line">
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5">
+  return <section className="-mx-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
       <h2 className="m-0 text-[15px] font-semibold">策略组（{value.groups.length}）</h2>
       <div className="flex flex-wrap gap-2"><Button disabled={REGION_GROUPS.every(region => value.groups.some(group => group.name === region.name))} onClick={() => {
         const added = createRegionGroups(value.groups);
@@ -67,7 +67,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={group.excludeFilter ?? ''} onChange={(event) => update({ excludeFilter: event.target.value || undefined })} />}</Field>
           <Field label="exclude-type">{(id) => <Input id={id} className="font-mono" value={group.excludeType ?? ''} onChange={(event) => update({ excludeType: event.target.value || undefined })} />}</Field>
         </div>
-        <section className="flex min-w-0 flex-col gap-3 border-t border-line pt-4" aria-label="策略组成员">
+        <section className="flex min-w-0 flex-col gap-3 pt-4" aria-label="策略组成员">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-muted">{group.members.length} 个</span></h3>
             <TemplateTargetSelect action label="添加成员" value={undefined} groups={value.groups.filter((g) => g.id !== group.id)} onChange={(member) => update({ members: [...group.members, member] })} />
           </div>
@@ -78,7 +78,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             </div>} />
           </div>}
         </section>
-        <div className="flex justify-end border-t border-line pt-4"><Button variant="danger" size="sm" onClick={() => remove(group.id)}>删除组</Button></div>
+        <div className="flex justify-end pt-4"><Button variant="danger" size="sm" onClick={() => remove(group.id)}>删除组</Button></div>
       </div>
     </div>}
   </section>;
