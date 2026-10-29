@@ -51,16 +51,16 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex min-h-full flex-wrap bg-ground">
-      <nav aria-label="主导航" className={cx('flex w-full flex-col gap-3.5 bg-nav px-3 py-3 md:w-auto md:max-w-[240px] md:flex-[1_1_216px] md:py-5', !menuOpen && 'max-md:pb-3')}>
-        <div className="flex items-center justify-between">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-ground md:flex-row">
+      <nav aria-label="主导航" className={cx('flex max-h-[45dvh] w-full shrink-0 flex-col gap-3.5 overflow-hidden bg-nav px-3 py-3 md:h-full md:max-h-none md:w-[216px] md:py-5', !menuOpen && 'max-md:pb-3')}>
+        <div className="flex shrink-0 items-center justify-between">
           <Logo />
           <button type="button" aria-expanded={menuOpen} aria-label={menuOpen ? '收起菜单' : '展开菜单'} onClick={() => setMenuOpen(!menuOpen)}
             className="grid h-10 w-10 cursor-pointer place-items-center rounded-md text-nav-text hover:bg-nav-hover md:hidden">
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
-        <div className={cx('flex-1 flex-col gap-3.5', menuOpen ? 'flex' : 'hidden md:flex')}>
+        <div className={cx('nav-scroll min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain', menuOpen ? 'flex' : 'hidden md:flex')}>
         {NAV.map((g, i) => {
           const items = g.items.filter((it) => !it.admin || isAdmin);
           if (!items.length) return null;
@@ -82,8 +82,8 @@ export function AppLayout() {
         </div>
         </div>
       </nav>
-      <main className="min-w-0 flex-[999_1_560px] px-4 py-7 md:px-10">
-        <div className="mx-auto flex max-w-[1280px] flex-col gap-5">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 py-4 md:px-10 md:py-7">
+        <div className="page-layout mx-auto w-full max-w-[1280px]">
           <Outlet />
         </div>
       </main>

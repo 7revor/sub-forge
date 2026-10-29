@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addUser, client, setupApp } from './helpers.ts';
 
-const remoteSource = (name = '远程源') => ({ name, urls: ['https://a.example.com/sub'], pipeline: [] });
+const remoteSource = (name = '远程源') => ({ name, url: 'https://a.example.com/sub', pipeline: [] });
 
 async function twoUsers() {
   const env = setupApp();
@@ -72,11 +72,11 @@ describe('文档增删改查', () => {
 
   it('保存前校验：必填项、正则、远程地址、脚本权限', async () => {
     const { alice } = await twoUsers();
-    expect((await alice.post('/api/sources', { urls: ['https://a.example.com/sub'] })).json.error).toMatch(/name/);
+    expect((await alice.post('/api/sources', { url: 'https://a.example.com/sub' })).json.error).toMatch(/name/);
     expect((await alice.post('/api/sources', { name: 'L', kind: 'local', content: 'x' })).json.error).toMatch(/本地节点组/);
     expect((await alice.post('/api/sources', { ...remoteSource(), content: 'x' })).json.error).toMatch(/本地节点组/);
-    expect((await alice.post('/api/sources', { name: 'R', kind: 'remote', urls: ['https://a.example.com/sub'] })).json.item).not.toHaveProperty('kind');
-    expect((await alice.post('/api/sources', { name: 'R', urls: ['file:///etc/passwd'] })).json.error).toMatch(/http/);
+    expect((await alice.post('/api/sources', { name: 'R', kind: 'remote', url: 'https://a.example.com/sub' })).json.item).not.toHaveProperty('kind');
+    expect((await alice.post('/api/sources', { name: 'R', url: 'file:///etc/passwd' })).json.error).toMatch(/http/);
     const badRegex = await alice.post('/api/sources', { ...remoteSource(), pipeline: [{ op: 'filter.regex', patterns: ['(['], keep: true }] });
     expect(badRegex.status).toBe(400);
     expect(badRegex.json.error).toMatch(/第 1 步.*非法正则/);
@@ -177,7 +177,7 @@ describe('预设 Surge 预留字段', () => {
 describe('拉取参数校验', () => {
   it('快照有效期不能短于 5 分钟', async () => {
     const { alice } = await twoUsers();
-    const src = { name: '远程源', urls: ['https://example.com/sub'] };
+    const src = { name: '远程源', url: 'https://example.com/sub' };
     const short = await alice.post('/api/sources', { ...src, fetch: { ttlSec: 60 } });
     expect(short.status).toBe(400);
     expect(short.json.error).toMatch(/快照有效期不能短于 5 分钟/);

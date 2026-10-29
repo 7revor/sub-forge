@@ -1,0 +1,97 @@
+Browser tab: 6, Title: "Sub Forge", URL: "http://localhost:18872/locals/I07K24hbmoii/nodes/0".
+1 AXWebArea Sub Forge, URL: localhost:18872/locals/I07K24hbmoii/nodes/0
+	2 container root
+		3 container 主导航
+			4 text Sub Forge
+			5 container
+				6 link Description: 总览, Value: localhost:18872/
+				7 link Description: 配置订阅, Value: localhost:18872/profiles
+				8 text 节点
+				9 link Description: 订阅源, Value: localhost:18872/sources
+				10 link Description: 组合, Value: localhost:18872/collections
+				11 link Description: 本地节点, Value: localhost:18872/locals
+				12 text 规则
+				13 link Description: 规则集, Value: localhost:18872/rulesets
+				14 link Description: 规则仓库, Value: localhost:18872/rule-repo
+				15 link Description: 模板, Value: localhost:18872/templates
+				16 text 管理员
+				17 link Description: 基础设置预设, Value: localhost:18872/presets
+				18 link Description: 用户, Value: localhost:18872/users
+				19 link Description: 系统, Value: localhost:18872/system
+				20 link Description: merge-test · 管理员, Value: localhost:18872/account
+				21 button 退出登录
+		22 container
+			23 link Description: 本地节点, Value: localhost:18872/locals
+			24 text  /
+			25 link Description: 合并验收, Value: localhost:18872/locals/I07K24hbmoii
+			26 text  /  URL Reality
+			27 heading URL Reality, Value: 1
+				28 text URL Reality
+			29 text 分组 ·  合并验收
+			30 button (disabled) 已保存
+			31 button 删除
+			32 heading 节点配置, Value: 2
+				33 text 节点配置
+			34 container 编辑视图
+				35 checkbox 表单, Value: 1
+				36 checkbox 原始配置, Value: 0
+			37 container
+				38 text 名称
+				39 text field (settable) 名称, Value: URL Reality
+				40 text 协议
+				41 combo box (collapsed) 协议, Value: VLESS, Secondary Actions: Expand
+					42 text VLESS
+				43 text 端口
+				44 stepper (settable, integer) 端口, Value: 443
+				45 text 服务器
+				46 text field (settable) 服务器, Value: us.example.com
+				47 heading 认证, Value: 3
+					48 text 认证
+				49 text UUID
+				50 text field (settable) UUID, Value: 00000000-0000-4000-8000-000000000001
+				51 text 流控
+				52 combo box (collapsed) 流控, Value: xtls-rprx-vision, Secondary Actions: Expand
+					53 text xtls-rprx-vision
+				54 heading TLS, Value: 3
+					55 text TLS
+				56 text 启用 TLS
+				57 combo box (collapsed) 启用 TLS, Value: 开启, Secondary Actions: Expand
+					58 text 开启
+				59 text 服务器名称（SNI）
+				60 text field (settable) 服务器名称（SNI）, Value: www.example.com
+				61 text 跳过证书验证
+				62 combo box (collapsed) 跳过证书验证, Value: 未设置, Secondary Actions: Expand
+					63 text 未设置
+				64 text 客户端指纹
+				65 combo box (collapsed) 客户端指纹, Value: chrome, Secondary Actions: Expand
+					66 text chrome
+				67 text ALPN（每行一项）
+				68 text entry area (settable) ALPN（每行一项）
+				69 heading Reality, Value: 3
+					70 text Reality
+				71 text Reality 公钥
+				72 text field (settable) Reality 公钥, Value: test-public-key
+				73 text Reality 短 ID
+				74 text field (settable) Reality 短 ID, Value: 00123456
+				75 heading 传输, Value: 3
+					76 text 传输
+				77 text 传输协议
+				78 combo box (collapsed) 传输协议, Value: 未设置, Secondary Actions: Expand
+					79 text 未设置
+				80 heading 通用, Value: 3
+					81 text 通用
+				82 text UDP
+				83 combo box (collapsed) UDP, Value: 未设置, Secondary Actions: Expand
+					84 text 未设置
+				85 text TCP Fast Open
+				86 combo box (collapsed) TCP Fast Open, Value: 未设置, Secondary Actions: Expand
+					87 text 未设置
+				88 text IP 版本
+				89 combo box (collapsed) IP 版本, Value: 未设置, Secondary Actions: Expand
+					90 text 未设置
+				91 button (collapsed) 其他字段 0 个, Secondary Actions: Expand
+					92 text 其他字段
+					93 text 0
+					94 text  个
+
+The focused UI element is 1 AXWebArea Sub Forge, URL: localhost:18872/locals/I07K24hbmoii/nodes/0

@@ -26,7 +26,7 @@ async function scenario() {
   const rs = (await admin.post('/api/rulesets', { name: 'AI', kind: 'local', format: 'auto', content: '.openai.com\n' })).json.item.id as string;
   const published = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), changelog: '初版' });
   const tplId = published.json.item.id as string;
-  const src = (await alice.post('/api/sources', { name: '机场', urls: ['https://air.example.com/sub'], pipeline: [] })).json.item.id as string;
+  const src = (await alice.post('/api/sources', { name: '机场', url: 'https://air.example.com/sub', pipeline: [] })).json.item.id as string;
   const profile = (await alice.post('/api/profiles', {
     name: '我的订阅',
     template: { id: tplId, follow: 'latest' },

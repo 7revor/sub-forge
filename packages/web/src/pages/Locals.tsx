@@ -120,7 +120,7 @@ export function LocalEdit() {
       </PageHeader>
       <ErrorBox error={e.save.error} />
 
-      <Card bodyClass="overflow-x-auto"
+      <Card scroll bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
         actions={<Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link>}>
         {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增节点后，可填写表单或在原始配置中粘贴单个节点。" /></div> : (
@@ -221,7 +221,7 @@ export function LocalNodeEdit() {
       </PageHeader>
       <ErrorBox error={save.error} />
 
-      <Card title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
+      <Card scroll title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
         <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={proxyDraftFromYaml} recoverForm={proxyFormFromYaml} fromPaste={proxyFromPaste} rawLabel="节点 YAML" rawHint="粘贴单个节点的分享链接、YAML、JSON 或 Surge 配置，将自动转为 Mihomo YAML 并同步表单。多个节点请拆分添加。" renderForm={() => <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="名称" className="col-span-2">{(fid) => <Input id={fid} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>

@@ -42,7 +42,7 @@ export type OperatorStep = Operator & { enabled?: boolean };
 export type Source = {
   id: ID;
   name: string;
-  urls: string[];
+  url: string;
   pipeline: OperatorStep[];
 };
 
@@ -112,7 +112,7 @@ export type ClientOverride = {
 
 export type RuleSetFormat = 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
 
-/** 规则集的一个来源：远程地址或本地手写规则。行级覆盖按该来源解析后的行号或原文定位 */
+/** 规则集的一个来源：远程地址或本地手写规则。 */
 export type RuleSetSource = {
   /** 规则集内唯一；远程快照以 (规则集 id, URL) 定位，与来源 id 无关 */
   id: ID;
@@ -124,7 +124,7 @@ export type RuleSetSource = {
   format: RuleSetFormat;
   /** 透传的二进制规则集（mrs）必须声明 behavior，其余格式解析后自动拆分 */
   behavior?: 'domain' | 'ipcidr' | 'classical';
-  /** 行级客户端覆盖：按该来源解析后的行号（从 1 开始）或原文精确匹配定位 */
+  /** 仅兼容旧数据；新改写统一存放在 RuleSet.overrides，按规则内容定位 */
   overrides?: { line?: number; match?: string; override: ClientOverride }[];
   enabled?: boolean;
 };
@@ -137,6 +137,8 @@ export type RuleSet = {
   id: ID;
   name: string;
   sources: RuleSetSource[];
+  /** 按所有来源的规则原文精确匹配；同一规则命中第一条客户端与平台匹配的改写 */
+  overrides?: { match: string; override: ClientOverride }[];
   /** IP 类规则统一加 no-resolve */
   noResolve?: boolean;
 };

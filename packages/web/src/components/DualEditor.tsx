@@ -67,7 +67,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
     if (mode === undefined) setLocalMode(next);
     onModeChange?.(next);
   };
-  return <div className="flex flex-col gap-3">
+  return <div className="dual-editor flex flex-col gap-3">
     <Segmented label="编辑视图" size="sm" value={current} onChange={changeMode} options={[
       { value: 'form', label: '表单' },
       { value: 'raw', label: '原始配置' },
@@ -77,46 +77,48 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
       已返回表单，保留可识别的有效字段：
       <ul className="m-0 pl-5">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
     </div>}
-    {current === 'form' ? renderForm() : <>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] text-muted">{rawLabel}</span>
-        <Button size="sm" onClick={async () => {
-          try { await navigator.clipboard.writeText(text); setCopyMessage('已复制'); }
-          catch (error) { setCopyMessage(`复制失败：${error instanceof Error ? error.message : String(error)}`); }
-        }}>复制</Button>
-      </div>
-      {rawHint && <span className="text-[12px] leading-relaxed text-muted">{rawHint}</span>}
-      <Textarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
-        const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
-        if (!imported) return;
-        event.preventDefault();
-        if (!imported.ok) { setRawError(`未导入：${imported.error}`); return; }
-        const canonical = tryRaw(toRaw, imported.value);
-        if ('error' in canonical) { setRawError(`未导入：${canonical.error}`); return; }
-        setText(canonical.text); setResult(imported); setRawError(''); setCopyMessage('');
-        emitted.current = { value: imported.value, canonical: canonical.text };
-        onValidityChange?.(true);
-        onChange(imported.value);
-      }} onChange={(event) => {
-        const raw = event.target.value;
-        setText(raw); setCopyMessage(''); setRawError('');
-        const parsed = fromRaw(raw);
-        setResult(parsed);
-        onValidityChange?.(parsed.ok);
-        if (parsed.ok) {
-          const canonical = tryRaw(toRaw, parsed.value);
-          if ('error' in canonical) {
-            setResult({ ok: false, error: canonical.error });
-            onValidityChange?.(false);
-            return;
+    <div className="editor-content flex flex-col gap-3">
+      {current === 'form' ? renderForm() : <>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[13px] text-muted">{rawLabel}</span>
+          <Button size="sm" onClick={async () => {
+            try { await navigator.clipboard.writeText(text); setCopyMessage('已复制'); }
+            catch (error) { setCopyMessage(`复制失败：${error instanceof Error ? error.message : String(error)}`); }
+          }}>复制</Button>
+        </div>
+        {rawHint && <span className="text-[12px] leading-relaxed text-muted">{rawHint}</span>}
+        <Textarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
+          const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
+          if (!imported) return;
+          event.preventDefault();
+          if (!imported.ok) { setRawError(`未导入：${imported.error}`); return; }
+          const canonical = tryRaw(toRaw, imported.value);
+          if ('error' in canonical) { setRawError(`未导入：${canonical.error}`); return; }
+          setText(canonical.text); setResult(imported); setRawError(''); setCopyMessage('');
+          emitted.current = { value: imported.value, canonical: canonical.text };
+          onValidityChange?.(true);
+          onChange(imported.value);
+        }} onChange={(event) => {
+          const raw = event.target.value;
+          setText(raw); setCopyMessage(''); setRawError('');
+          const parsed = fromRaw(raw);
+          setResult(parsed);
+          onValidityChange?.(parsed.ok);
+          if (parsed.ok) {
+            const canonical = tryRaw(toRaw, parsed.value);
+            if ('error' in canonical) {
+              setResult({ ok: false, error: canonical.error });
+              onValidityChange?.(false);
+              return;
+            }
+            emitted.current = { value: parsed.value, canonical: canonical.text };
+            onChange(parsed.value);
           }
-          emitted.current = { value: parsed.value, canonical: canonical.text };
-          onChange(parsed.value);
-        }
-      }} />
-      <ErrorBox error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
-      {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[13px] text-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
-      {copyMessage && <span role="status" className="text-[12px] text-muted">{copyMessage}</span>}
-    </>}
+        }} />
+        <ErrorBox error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
+        {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[13px] text-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
+        {copyMessage && <span role="status" className="text-[12px] text-muted">{copyMessage}</span>}
+      </>}
+    </div>
   </div>;
 }

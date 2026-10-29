@@ -3,7 +3,7 @@
 // - 旧规则包 → 同 id 的规则集：引用的规则集的来源依次复制进来，单条规则合成一个本地来源；
 //   id 与已有规则集冲突时换新 id，模板与 Profile 里的引用由调用方按 idMap 改写。
 
-import { formatRuleLine, type RuleIR } from '@sub-forge/core';
+import { formatRuleLine, parseRuleSetContent, type RuleIR } from '@sub-forge/core';
 import type { RuleSetDoc, RuleSetSourceDoc } from './docs.ts';
 
 type LegacyBundle = {
@@ -61,6 +61,7 @@ export function convertBundles(bundles: LegacyBundle[], rulesets: Map<string, Ru
       if (!rs) { warn(`规则包「${b.name}」引用的规则集 ${item.id} 不存在，已跳过`); continue; }
       for (const src of rs.sources) {
         const copy: RuleSetSourceDoc = { ...structuredClone(src), id: uniqueId(rs.sources.length > 1 ? `${rs.id}-${src.id}` : rs.id), name: src.name ?? rs.name };
+        if (rs.overrides?.length) copy.overrides = [...structuredClone(rs.overrides), ...(copy.overrides ?? [])];
         if (item.enabled === false) copy.enabled = false;
         sources.push(copy);
         if (src.kind === 'remote' && src.url) out.snapshotCopies.push({ from: rs.id, to: id, url: src.url });
@@ -80,4 +81,34 @@ export function retargetBundleRefs(value: unknown, idMap: Map<string, string>): 
   const o = value as Record<string, unknown>;
   if (o.kind === 'bundle' && typeof o.id === 'string' && Object.keys(o).length === 2) return { kind: 'ruleset', id: idMap.get(o.id) ?? o.id };
   return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, retargetBundleRefs(v, idMap)]));
+}
+
+/** 将可定位的旧来源改写提升为组级内容匹配；无法确认时保留整个来源的旧配置及优先级。 */
+export function promoteRuleSetOverrides(rs: RuleSetDoc, snapshot: (src: RuleSetSourceDoc) => string | undefined): RuleSetDoc {
+  const overrides = [...(rs.overrides ?? [])];
+  const seen = new Set(overrides.map((o) => JSON.stringify(o)));
+  const sources = rs.sources.map((src) => {
+    if (!src.overrides?.length || src.enabled === false) return src;
+    const content = src.kind === 'local' ? src.content : snapshot(src);
+    const parsed = content === undefined ? undefined : parseRuleSetContent(content, src.format, src.behavior);
+    const promoted: NonNullable<RuleSetDoc['overrides']> = [];
+    for (const item of src.overrides) {
+      const matches = new Set<string>();
+      if (item.match?.trim()) matches.add(item.match);
+      if (item.line !== undefined) {
+        const row = parsed && !parsed.passthrough ? parsed.rules.find((r) => r.line === item.line) : undefined;
+        if (!row) return src;
+        matches.add(row.text);
+      }
+      if (!matches.size) return src;
+      for (const match of matches) promoted.push({ match, override: item.override });
+    }
+    for (const item of promoted) {
+      const key = JSON.stringify(item);
+      if (!seen.has(key)) { seen.add(key); overrides.push(item); }
+    }
+    const { overrides: _, ...clean } = src;
+    return clean;
+  });
+  return { ...rs, sources, ...(overrides.length ? { overrides } : {}) };
 }

@@ -103,7 +103,7 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     store = new Store(':memory:');
     const seed: Seed = {
       sources: [
-        { id: 'airport', name: '机场', urls: [`http://localhost:${ports.airport}/sub`], pipeline: [{ op: 'filter.useless' }, { op: 'flag', mode: 'add' }] },
+        { id: 'airport', name: '机场', url: `http://localhost:${ports.airport}/sub`, pipeline: [{ op: 'filter.useless' }, { op: 'flag', mode: 'add' }] },
       ],
       locals: [{ id: 'land', name: '落地源', proxies: [{ name: '落地', type: 'socks5', server: '127.0.0.1', port: ports.exit }] }],
       templates: [{ id: 'tpl', version: 1, groups: [{ id: 'land', name: '落地组', type: 'select', members: [] }], rules: [], final: { kind: 'group', groupId: 'land' } }],

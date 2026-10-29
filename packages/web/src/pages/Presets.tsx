@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { DeleteAction, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Button, Card, Empty, ErrorBox, Input, Modal, PageHeader, Segmented, cx } from '../components/ui.tsx';
+import { Button, Card, Empty, ErrorBox, Input, Modal, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { DualEditor, type EditorMode } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
@@ -45,8 +45,10 @@ export function PresetList() {
     <>
       <PageHeader title="基础设置预设" subtitle={INTRO} actions={<Button variant="primary" onClick={() => setCreating(true)}><Plus size={16} />新建预设</Button>} />
       <ErrorBox error={list.error} />
-      <Empty title="还没有预设" description="把 DNS、TUN、嗅探等通用设置做成预设，配置订阅引用后自动同步。"
-        action={<Button size="sm" onClick={() => setCreating(true)}>新建预设</Button>} />
+      <PageScroll>
+        <Empty title="还没有预设" description="把 DNS、TUN、嗅探等通用设置做成预设，配置订阅引用后自动同步。"
+          action={<Button size="sm" onClick={() => setCreating(true)}>新建预设</Button>} />
+      </PageScroll>
       <NewPresetModal open={creating} onClose={() => setCreating(false)} />
     </>
   );
@@ -74,62 +76,63 @@ export function PresetEdit() {
 
   return (
     <>
-      <PageHeader title="基础设置预设" subtitle={INTRO} actions={<Button onClick={() => setCreating(true)}>新建预设</Button>} />
+      <PageHeader title="基础设置预设" subtitle={INTRO} actions={<>
+        <Button disabled={!e.dirty} onClick={discard}>放弃</Button>
+        <Button variant="primary" disabled={!dirty || !rawValid || e.save.isPending} onClick={publish}>{e.save.isPending ? '发布中…' : `发布 v${d.version + 1}`}</Button>
+        <Button onClick={() => setCreating(true)}>新建预设</Button>
+      </>}>
+        <span className={cx('text-[12.5px]', rawValid ? 'text-ok' : 'text-err')}>{rawValid ? (dirty ? `有未发布的修改 · 当前 v${d.version}` : `已发布 v${d.version}`) : '请先修复 YAML 中的错误'}</span>
+      </PageHeader>
       <ErrorBox error={e.save.error} />
-      <div className="flex flex-wrap items-start gap-5">
-        <nav aria-label="预设列表" className="min-w-0 flex-[1_1_240px] overflow-hidden rounded-[10px] border border-line bg-panel py-1.5">
-          {(presets.data ?? []).map((p) => {
-            const on = p.id === d.id;
-            return (
-              <button key={p.id} type="button" aria-current={on || undefined} onClick={() => { if (!on && (!dirty || confirm(`「${d.name}」有未保存的修改，离开后会丢失。继续？`))) navigate(`/presets/${p.id}`); }}
-                className={cx('flex w-full cursor-pointer flex-col gap-0.5 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'bg-panel hover:bg-ground')}>
-                <span className="text-[13.5px] font-semibold">{on ? d.name : p.name}</span>
-                <span className="text-[12px] text-muted">v{p.version} · {refCount(p.id)} 个配置订阅引用</span>
-              </button>
-            );
-          })}
-        </nav>
+      <PageScroll>
+        <div className="flex flex-wrap items-start gap-5">
+          <nav aria-label="预设列表" className="min-w-0 flex-[1_1_240px] overflow-hidden rounded-[10px] border border-line bg-panel py-1.5">
+            {(presets.data ?? []).map((p) => {
+              const on = p.id === d.id;
+              return (
+                <button key={p.id} type="button" aria-current={on || undefined} onClick={() => { if (!on && (!dirty || confirm(`「${d.name}」有未保存的修改，离开后会丢失。继续？`))) navigate(`/presets/${p.id}`); }}
+                  className={cx('flex w-full cursor-pointer flex-col gap-0.5 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'bg-panel hover:bg-ground')}>
+                  <span className="text-[13.5px] font-semibold">{on ? d.name : p.name}</span>
+                  <span className="text-[12px] text-muted">v{p.version} · {refCount(p.id)} 个配置订阅引用</span>
+                </button>
+              );
+            })}
+          </nav>
 
-        <section className="flex min-w-0 flex-[999_1_520px] flex-col gap-3.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <h2 className="m-0 text-[17px] font-semibold">{d.name}</h2>
-            <div className="flex items-center gap-2">
-              <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
-              <MoreMenu items={[{ label: '重命名…', onSelect: () => setRenaming(true) }]} />
-              <DeleteAction what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove} />
-            </div>
-          </div>
-          {client === 'surge' && <div className="rounded-lg border border-dashed border-[#d5d9e0] px-4 py-6 text-center text-[13px] text-muted">Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。</div>}
-          {client === 'mihomo' && mode === 'form' && <div className="flex flex-wrap gap-1.5">
-            {mihomoBaseGroups.map((g) => <button key={g.title} type="button" onClick={() => jump(g.title)}
-              className="cursor-pointer rounded-full border border-line bg-ground px-2.5 py-1 text-[12.5px] text-ink-2 hover:border-[#c5cad3]">{g.title}</button>)}
-          </div>}
-          {client === 'mihomo' && <DualEditor key={d.id} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
-            toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} onValidityChange={setRawValid} rawLabel="mihomo · YAML"
-            renderForm={() => <SchemaForm groups={mihomoBaseGroups} value={baseToForm(d.mihomo)} extra
-              onChange={(value) => e.setDraft({ ...d, mihomo: baseFromForm(value, d.mihomo) })} />} />}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-2 pt-3.5">
-            <span className={cx('text-[12.5px]', rawValid ? 'text-ok' : 'text-err')}>{rawValid ? (dirty ? `有未发布的修改 · 当前 v${d.version}` : `已发布 v${d.version}`) : '请先修复 YAML 中的错误'}</span>
-            <div className="flex gap-2">
-              <Button disabled={!e.dirty} onClick={discard}>放弃</Button>
-              <Button variant="primary" disabled={!dirty || !rawValid || e.save.isPending} onClick={publish}>{e.save.isPending ? '发布中…' : `发布 v${d.version + 1}`}</Button>
-            </div>
-          </div>
-        </section>
-
-        <Card title={`引用方 · ${refs.length}`} className="min-w-0 flex-[1_1_260px]" bodyClass="px-4 pb-3">
-          {refs.map((p) => {
-            const overrides = Object.keys(p.base?.patch ?? {}).length;
-            return (
-              <div key={p.id} className="flex justify-between gap-2 border-t border-line-2 py-2.5 text-[13px] first:border-0 first:pt-0">
-                <Link to={`/profiles/${p.id}/base`} className="font-medium text-ink no-underline hover:text-accent">{p.name}</Link>
-                <span className="text-[12px] whitespace-nowrap text-muted">{overrides ? `覆盖 ${overrides} 项` : '无覆盖'}</span>
+          <section className="flex min-w-0 flex-[999_1_520px] flex-col gap-3.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <h2 className="m-0 text-[17px] font-semibold">{d.name}</h2>
+              <div className="flex items-center gap-2">
+                <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
+                <MoreMenu items={[{ label: '重命名…', onSelect: () => setRenaming(true) }]} />
+                <DeleteAction what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove} />
               </div>
-            );
-          })}
-          {!refs.length && <Empty title="还没有配置订阅引用它" />}
-        </Card>
-      </div>
+            </div>
+            {client === 'surge' && <div className="rounded-lg border border-dashed border-[#d5d9e0] px-4 py-6 text-center text-[13px] text-muted">Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。</div>}
+            {client === 'mihomo' && mode === 'form' && <div className="flex flex-wrap gap-1.5">
+              {mihomoBaseGroups.map((g) => <button key={g.title} type="button" onClick={() => jump(g.title)}
+                className="cursor-pointer rounded-full border border-line bg-ground px-2.5 py-1 text-[12.5px] text-ink-2 hover:border-[#c5cad3]">{g.title}</button>)}
+            </div>}
+            {client === 'mihomo' && <DualEditor key={d.id} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
+              toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} onValidityChange={setRawValid} rawLabel="mihomo · YAML"
+              renderForm={() => <SchemaForm groups={mihomoBaseGroups} value={baseToForm(d.mihomo)} extra
+                onChange={(value) => e.setDraft({ ...d, mihomo: baseFromForm(value, d.mihomo) })} />} />}
+          </section>
+
+          <Card title={`引用方 · ${refs.length}`} className="min-w-0 flex-[1_1_260px]" bodyClass="px-4 pb-3">
+            {refs.map((p) => {
+              const overrides = Object.keys(p.base?.patch ?? {}).length;
+              return (
+                <div key={p.id} className="flex justify-between gap-2 border-t border-line-2 py-2.5 text-[13px] first:border-0 first:pt-0">
+                  <Link to={`/profiles/${p.id}/base`} className="font-medium text-ink no-underline hover:text-accent">{p.name}</Link>
+                  <span className="text-[12px] whitespace-nowrap text-muted">{overrides ? `覆盖 ${overrides} 项` : '无覆盖'}</span>
+                </div>
+              );
+            })}
+            {!refs.length && <Empty title="还没有配置订阅引用它" />}
+          </Card>
+        </div>
+      </PageScroll>
       <NewPresetModal open={creating} onClose={() => setCreating(false)} />
       <RenameDialog open={renaming} title="重命名预设" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
     </>

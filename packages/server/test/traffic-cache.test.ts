@@ -9,7 +9,7 @@ afterEach(async () => {
 });
 const a = 'https://sub.example.test/a';
 const b = 'https://sub.example.test/b';
-function setup(urls = [a]) {
+function setup() {
   const traffic: Record<string, TrafficInfo | undefined> = { [a]: { download: 10, total: 1000 }, [b]: { upload: 2, download: 20, total: 2000 } };
   let failed = false;
   const h = setupApp({ fetcher: async url => {
@@ -17,12 +17,12 @@ function setup(urls = [a]) {
     return { status: 200, body: 'trojan://test@node.example.test:443#节点', ...(traffic[url] ? { userinfo: traffic[url] } : {}) };
   } });
   envs.push(h);
-  h.store.put('source', { id: 's', name: '源', urls, pipeline: [] });
+  h.store.put('source', { id: 's', name: '源', url: a, pipeline: [] });
   h.store.put('profile', { id: 'p', name: '测试', nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'provider' }], overlay: {}, chains: [], refPolicy: { default: 'wrap' } });
   h.store.putToken({ token: 'token', profileId: 'p' });
   return { ...h, traffic, fail: () => { failed = true; }, refresh: async () => {
     h.advance(1000);
-    for (const url of urls) await h.snapshots.refresh('source', 's', url);
+    await h.snapshots.refresh('source', 's', a);
   } };
 }
 
@@ -54,24 +54,27 @@ describe('订阅流量与渲染缓存', () => {
     expect(h.store.getLastGood<StoredRender>('p', 'mihomo:any')?.data.userinfo).toBeUndefined();
   });
 
-  it('同源多 URL 汇总流量、取最早到期时间，重复 URL 不重复计费', async () => {
-    const h = setup([a, b, a]);
+  it('多个单地址源汇总流量、取最早到期时间，可单独选择来源', async () => {
+    const h = setup();
+    h.store.put('source', { id: 's2', name: '第二个源', url: b, pipeline: [] });
+    const p = h.store.get('profile', 'p')!;
+    h.store.put('profile', { ...p, nodeSets: [...p.nodeSets, { ref: { type: 'source', id: 's2' }, output: 'provider' }] });
     h.traffic[a] = { download: 10, total: 1000, expire: 2000000000 };
     h.traffic[b] = { upload: 2, download: 20, total: 2000, expire: 1900000000 };
     const expected = 'upload=2; download=30; total=3000; expire=1900000000';
     expect((await h.app.request('/sub/token')).headers.get('subscription-userinfo')).toBe(expected);
     h.store.put('profile', { ...h.store.get('profile', 'p')!, userinfo: { mode: 'source', sourceId: 's' } });
-    expect((await h.app.request('/sub/token')).headers.get('subscription-userinfo')).toBe(expected);
+    expect((await h.app.request('/sub/token')).headers.get('subscription-userinfo')).toBe('download=10; total=1000; expire=2000000000');
     h.store.put('profile', { ...h.store.get('profile', 'p')!, userinfo: { mode: 'none' } });
     expect((await h.app.request('/sub/token')).headers.get('subscription-userinfo')).toBeNull();
   });
 
   it('同一源经组合和直接引用重复出现时只汇总一次', async () => {
-    const h = setup([a, b]);
+    const h = setup();
     h.store.put('collection', { id: 'c', name: '组合', members: [{ ref: { type: 'source', id: 's' } }], pipeline: [] });
     const p = h.store.get('profile', 'p')!;
     h.store.put('profile', { ...p, nodeSets: [...p.nodeSets, { ref: { type: 'collection', id: 'c' }, output: 'provider' }] });
-    expect((await h.app.request('/sub/token')).headers.get('subscription-userinfo')).toBe('upload=2; download=30; total=3000');
+    expect((await h.app.request('/sub/token')).headers.get('subscription-userinfo')).toBe('download=10; total=1000');
   });
 
   it('缓存命中时更新拉取告警计数且保留内核告警', async () => {
