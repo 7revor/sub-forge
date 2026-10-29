@@ -47,7 +47,7 @@ export function FieldInput({ field, value, id, onChange }: {
 
 /** 表单内的分区：嵌在卡片里使用，以分隔线区分，不再套一层卡片 */
 export function FormSection({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="flex flex-col gap-3 border-t border-line-2 pt-3.5">
+  return <section data-section={title} className="flex scroll-mt-4 flex-col gap-3 border-t border-line-2 pt-3.5">
     <h3 className="m-0 text-[13.5px] font-semibold">{title}</h3>
     {children}
   </section>;
