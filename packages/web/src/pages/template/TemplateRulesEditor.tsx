@@ -17,12 +17,12 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(100px,10vw,140px)_64px]';
 
 function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCtx; repos: NamedRef[] }) {
-  if (matcher.kind === 'rule') {
-    const line = ruleToLine(matcher.rule);
-    return <span className="block truncate font-mono text-[12.5px]" title={line}>{line || '填写规则内容'}</span>;
-  }
   const sourceClass = 'shrink-0 text-[12px] text-muted';
   const lineClass = 'flex min-w-0 items-center gap-2 text-[12.5px]';
+  if (matcher.kind === 'rule') {
+    const line = ruleToLine(matcher.rule);
+    return <span className={lineClass}><span className={sourceClass}>静态规则 ·</span><span className="min-w-0 truncate font-mono" title={line}>{line || '填写规则内容'}</span></span>;
+  }
   if (matcher.repository) {
     const repository = matcher.repository;
     const name = repos.find(repo => repo.id === repository.repo)?.name ?? repository.repo;
