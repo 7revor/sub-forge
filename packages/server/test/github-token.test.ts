@@ -51,7 +51,7 @@ describe('GitHub 索引凭据', () => {
       expect(store.getGithubToken()).toBeUndefined();
       store.setGithubToken('test_persisted_token');
       store.close(); store = new Store(path, { cipher });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(13);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(14);
       expect(store.getGithubToken()).toBe('test_persisted_token');
       expect((store.db.prepare('SELECT value FROM server_secrets').get() as { value: string }).value).not.toContain('test_persisted_token');
     } finally {

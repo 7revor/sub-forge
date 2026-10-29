@@ -6,11 +6,13 @@ export type FetchOptions = {
   /** 拉取时使用的 User-Agent */
   ua?: string;
   timeoutMs?: number;
-  /** 快照有效期，过期后后台刷新（SRC-02） */
+  /** 自动更新间隔，超过后在下次读取时后台刷新 */
   ttlSec?: number;
 };
 
-export type SourceDoc = Source & { fetch?: FetchOptions };
+/** 节点订阅源仅配置自动更新间隔，拉取身份和超时固定。 */
+export type SourceFetchOptions = Pick<FetchOptions, 'ttlSec'>;
+export type SourceDoc = Source & { fetch?: SourceFetchOptions };
 /** 远程来源各自带拉取参数 */
 export type RuleSetSourceDoc = RuleSetSource & { fetch?: FetchOptions };
 export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[] };

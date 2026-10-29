@@ -33,25 +33,31 @@ describe('订阅源拉取参数草稿预览', () => {
     expect(h.store.snapshotHistory('source', h.saved.id)).toEqual(before);
   });
 
-  it('使用草稿 UA 与超时，处理链变化复用内容，参数变化或过期后重新拉取', async () => {
+  it('草稿固定 UA 和超时，处理链与旧拉取选项变化复用内容，缓存过期后重新拉取', async () => {
     const requests: { url: string; opts: unknown }[] = [];
-    const h = await scenario(async (url, opts) => { requests.push({ url, opts }); return { status: 200, body: node(opts?.ua ?? '默认 UA') }; });
+    const h = await scenario(async (url, opts) => { requests.push({ url, opts }); return { status: 200, body: node(opts?.ua ?? '缺少 UA') }; });
+    expect(h.saved.fetch).toEqual({ ttlSec: 86400 });
+    expect(requests[0]?.opts).toEqual({ ua: 'clash.meta', timeoutMs: 10000 });
     requests.length = 0;
-    const source = { url: a, fetch: { ua: 'draft-agent', timeoutMs: 5000, ttlSec: 3600 } };
-    expect((await h.preview(source)).json.nodes[0].name).toBe('draft-agent');
-    expect((await h.preview(source, [{ op: 'rename.affix', prefix: '新·' }])).json.nodes[0].name).toBe('新·draft-agent');
-    expect(requests).toEqual([{ url: a, opts: source.fetch }]);
+    const source = { url: b, fetch: { ua: 'draft-agent', timeoutMs: 5000, ttlSec: 3600 } };
+    expect((await h.preview(source)).json.nodes[0].name).toBe('clash.meta');
+    expect((await h.preview(source, [{ op: 'rename.affix', prefix: '新·' }])).json.nodes[0].name).toBe('新·clash.meta');
+    expect(requests).toEqual([{ url: b, opts: { ua: 'clash.meta', timeoutMs: 10000 } }]);
     await h.preview({ ...source, fetch: { ...source.fetch, timeoutMs: 2000 } });
-    expect(requests).toHaveLength(2);
+    expect(requests).toHaveLength(1);
     h.advance(60_001);
     await h.preview(source);
-    expect(requests).toHaveLength(3);
+    expect(requests).toHaveLength(2);
   });
 
-  it('清空选填参数后使用默认值，不沿用已保存参数', async () => {
-    const h = await scenario(async (_url, opts) => ({ status: 200, body: node(opts?.ua ?? '默认 UA') }));
-    expect((await h.preview({ url: a, fetch: {} })).json.nodes[0].name).toBe('默认 UA');
-    expect(h.store.get('source', h.saved.id)?.fetch?.ua).toBe('saved-agent');
+  it('只改自动更新时间不会另拉草稿，也不会提前修改正式配置', async () => {
+    let calls = 0;
+    const h = await scenario(async () => { calls++; return { status: 200, body: node('正式节点') }; });
+    expect((await h.preview({ url: a, fetch: { ttlSec: 3600 } })).json.nodes[0].name).toBe('正式节点');
+    expect(calls).toBe(1);
+    expect(h.store.get('source', h.saved.id)?.fetch).toEqual({ ttlSec: 86400 });
+    const saved = await h.alice.put(`/api/sources/${h.saved.id}`, { ...h.saved, fetch: { ttlSec: 3600, ua: '旧 UA', timeoutMs: 1 } });
+    expect(saved.json.item.fetch).toEqual({ ttlSec: 3600 });
   });
 
   it('未修改拉取参数时继续使用正式成功快照', async () => {
@@ -91,7 +97,7 @@ describe('订阅源拉取参数草稿预览', () => {
   it('草稿沿用保存校验与用户隔离，非法输入不会触发拉取', async () => {
     let calls = 0;
     const h = await scenario(async () => { calls++; return { status: 200, body: node('节点') }; });
-    for (const source of [null, [], { urls: [] }, { url: 'file:///tmp/source' }, { url: b, fetch: { ttlSec: 1 } }, { url: b, fetch: { ua: 1 } }, { url: b, fetch: { timeoutMs: -1 } }]) {
+    for (const source of [null, [], { urls: [] }, { url: 'file:///tmp/source' }, { url: b, fetch: { ttlSec: 1 } }, { url: b, fetch: [] }]) {
       expect((await h.preview(source)).status).toBe(400);
     }
     await addUser(h.store, 'bob');

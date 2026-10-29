@@ -14,3 +14,9 @@ export function sourceUrl(data: Record<string, unknown>): string {
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('订阅地址必须是有效的 http(s) URL');
   return url;
 }
+
+/** 兼容旧请求和种子：只保留订阅源仍支持的自动更新间隔。 */
+export function normalizeSourceFetch<T extends { fetch?: { ttlSec?: number } }>(source: T): T {
+  const { fetch, ...rest } = source;
+  return { ...rest, ...(fetch?.ttlSec !== undefined ? { fetch: { ttlSec: fetch.ttlSec } } : {}) } as T;
+}
