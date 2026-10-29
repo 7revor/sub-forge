@@ -47,7 +47,7 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="bundles" element={<BundleList />} />
       <Route path="bundles/:id" element={<BundleEdit />} />
       <Route path="templates" element={<TemplateList />} />
-      <Route path="templates/:id" element={<TemplateEdit />} />
+      <Route path="templates/:id/:tab?" element={<TemplateEdit />} />
       <Route path="presets" element={<RequireAdmin><PresetList /></RequireAdmin>} />
       <Route path="presets/:id" element={<RequireAdmin><PresetEdit /></RequireAdmin>} />
       <Route path="users" element={<RequireAdmin><Users /></RequireAdmin>} />

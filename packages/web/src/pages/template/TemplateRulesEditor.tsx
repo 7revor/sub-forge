@@ -42,7 +42,13 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
 }) {
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map((r) => r.id === rule.id ? rule : r) });
-  return <Card title="规则" bodyClass="overflow-x-auto px-4 pb-4">
+  return <Card bodyClass="overflow-x-auto px-4 pb-4"
+    title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（{value.rules.length} 条）</h2><span className="text-[12.5px] text-muted">出口只能是模板组或内置策略。</span></div>}
+    actions={<Button onClick={() => {
+      const id = newId('r');
+      onChange({ ...value, rules: [...value.rules, { id, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'REJECT' } }] });
+      onSelect(id);
+    }}>新增规则</Button>}>
     <div className="min-w-[580px]">
       <div className={`${columns} border-b border-line px-2 py-2 text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>启用</span><span>操作</span></div>
       <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
@@ -61,10 +67,5 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       <div className={`${columns} border-t border-line px-2 py-3 text-[13px]`}><span>—</span><span className="font-mono">MATCH（固定）</span><TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={(final) => onChange({ ...value, final })} /><span /><span /></div>
       <ItemIssues report={report} where="final" />
     </div>
-    <Button onClick={() => {
-      const id = newId('r');
-      onChange({ ...value, rules: [...value.rules, { id, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'REJECT' } }] });
-      onSelect(id);
-    }}>新增规则</Button>
   </Card>;
 }
