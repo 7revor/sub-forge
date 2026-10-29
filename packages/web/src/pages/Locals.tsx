@@ -225,7 +225,9 @@ export function LocalNodeEdit() {
 
   const cur = draft;
   const update = (patch: Partial<LocalProxy>) => setDraft({ ...cur, ...patch });
-  const nodeSets = all.filter((n) => !(n.ref.type === 'local' && n.ref.id === g.id));
+  // 同组节点也可以做前置，只排除节点自己（环由渲染时的 chain.cycle 兜底）
+  const nodeSets = all;
+  const self = { nodeSet: { type: 'local' as const, id: g.id }, names: [cur.name, ...(isNew ? [] : [g.proxies[idx]?.name ?? ''])] };
   const changeType = (type: string) => {
     if (type === cur.type) return;
     const removed = Object.keys(cur).filter((key) => !CORE.has(key));
@@ -280,7 +282,7 @@ export function LocalNodeEdit() {
             else { const { dialer: _d, ...rest } = cur; setDraft(rest); }
           }} />}>
           <fieldset disabled={!rawValid} className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0">
-            {cur.dialer && <TargetPicker label="前置" value={cur.dialer} groups={[]} allowGroup={false} nodeSets={nodeSets} onChange={(t: Target) => update({ dialer: t })} />}
+            {cur.dialer && <TargetPicker label="前置" value={cur.dialer} groups={[]} allowGroup={false} nodeSets={nodeSets} exclude={self} onChange={(t: Target) => update({ dialer: t })} />}
             <span className="text-[12px] leading-relaxed text-muted">保存的是引用，不是节点快照：上游节点改名或替换后，按引用重新解析。前置所在的节点集需要同时加入使用它的配置订阅；前置为策略组时，请在配置订阅的「代理链」中设置。<Link to="/profiles" className="text-accent">前往配置订阅</Link></span>
           </fieldset>
         </Card>

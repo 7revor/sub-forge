@@ -18,7 +18,8 @@
       "name": "演示节点",
       "proxies": [
         { "name": "🇭🇰 HK-01", "type": "trojan", "server": "hk.example.com", "port": 443, "password": "demo" },
-        { "name": "🇯🇵 JP-03", "type": "trojan", "server": "jp.example.com", "port": 443, "password": "demo" }
+        { "name": "🇯🇵 JP-03", "type": "trojan", "server": "jp.example.com", "port": 443, "password": "demo",
+          "dialer": { "kind": "node", "ref": { "nodeSet": { "type": "local", "id": "demo-a" }, "match": { "exact": "🇭🇰 HK-01" }, "fallback": { "kind": "builtin", "name": "REJECT" } } } }
       ]
     }
   ],
