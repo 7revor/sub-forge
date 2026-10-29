@@ -12,23 +12,27 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
   const text = 'exact' in value.match ? value.match.exact : value.match.regex;
   const result = resolveRef(data?.nodes ?? [], value.match);
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <div className="w-auto min-w-44"><NodeSetSelect label={`${label}所在节点集`} value={value.nodeSet} options={nodeSets} onChange={(nodeSet) => onChange({ ...value, nodeSet })} /></div>
-      <Segmented label={`${label}匹配方式`} value={exact ? 'exact' : 'regex'} options={[{ value: 'exact', label: '精确' }, { value: 'regex', label: '正则' }]}
-        onChange={(mode) => onChange({ ...value, match: mode === 'exact' ? { exact: text } : { regex: text } })} />
-      {exact
-        ? <Combobox aria-label={`${label}节点名称`} className="w-auto min-w-44 flex-1 font-mono" placeholder="搜索或输入节点名称（处理链之后）" value={text}
-            options={(data?.nodes ?? []).map((n) => ({ value: n.name, hint: `${n.type} · ${n.server}:${n.port}` }))}
-            empty={isLoading ? '节点列表加载中…' : text ? '没有匹配的节点，可直接使用输入的名称' : '节点集中没有节点'}
-            onChange={(v) => onChange({ ...value, match: { exact: v } })} />
-        : <Input aria-label={`${label}节点正则`} className="w-auto min-w-44 font-mono" placeholder="节点名称正则，支持 (?i)" value={text}
-            onChange={(e) => onChange({ ...value, match: { regex: e.target.value } })} />}
-      <span className="text-[12px] text-muted">找不到时</span>
-      <Select aria-label={`${label}兜底`} className="w-auto" value={value.fallback === 'error' || !value.fallback ? 'error' : value.fallback.kind === 'builtin' ? value.fallback.name : 'error'}
-        onChange={(e) => onChange({ ...value, fallback: e.target.value === 'error' ? 'error' : { kind: 'builtin', name: e.target.value as Builtin } })}>
-        <option value="REJECT">REJECT</option><option value="DIRECT">DIRECT</option><option value="error">报错</option>
-      </Select>
-      <div className="flex w-full flex-col gap-1 text-[12px]" aria-live="polite">
+    <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="w-auto min-w-0 flex-[1_1_176px]"><NodeSetSelect label={`${label}所在节点集`} value={value.nodeSet} options={nodeSets} onChange={(nodeSet) => onChange({ ...value, nodeSet })} /></div>
+        <Segmented label={`${label}匹配方式`} value={exact ? 'exact' : 'regex'} options={[{ value: 'exact', label: '精确' }, { value: 'regex', label: '正则' }]}
+          onChange={(mode) => onChange({ ...value, match: mode === 'exact' ? { exact: text } : { regex: text } })} />
+        {exact
+          ? <Combobox aria-label={`${label}节点名称`} className="w-auto min-w-0 flex-[2_1_176px] font-mono" placeholder="搜索或输入节点名称（处理链之后）" value={text}
+              options={(data?.nodes ?? []).map((n) => ({ value: n.name, hint: `${n.type.toUpperCase()} · ${n.server}:${n.port}` }))}
+              empty={isLoading ? '节点列表加载中…' : text ? '没有匹配的节点，可直接使用输入的名称' : '节点集中没有节点'}
+              onChange={(v) => onChange({ ...value, match: { exact: v } })} />
+          : <Input aria-label={`${label}节点正则`} className="w-auto min-w-0 flex-[2_1_176px] font-mono" placeholder="节点名称正则，支持 (?i)" value={text}
+              onChange={(e) => onChange({ ...value, match: { regex: e.target.value } })} />}
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="whitespace-nowrap text-[12px] text-muted">找不到时</span>
+          <Select aria-label={`${label}兜底`} className="w-auto" value={value.fallback === 'error' || !value.fallback ? 'error' : value.fallback.kind === 'builtin' ? value.fallback.name : 'error'}
+            onChange={(e) => onChange({ ...value, fallback: e.target.value === 'error' ? 'error' : { kind: 'builtin', name: e.target.value as Builtin } })}>
+            <option value="REJECT">REJECT</option><option value="DIRECT">DIRECT</option><option value="error">报错</option>
+          </Select>
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 break-words text-[12px]" aria-live="polite">
         {!value.nodeSet.id && <span className="text-muted">请选择节点集</span>}
         {isLoading && <span className="text-muted">节点列表加载中…</span>}
         {error && <span className="text-err">节点列表加载失败：{error.message}</span>}

@@ -46,14 +46,11 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS server_secrets (
-  name TEXT PRIMARY KEY, value TEXT NOT NULL
-);
 CREATE TABLE IF NOT EXISTS rule_repos (
   id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, built_at INTEGER, checked_at INTEGER,
   revisions TEXT NOT NULL DEFAULT '{}', error TEXT, definition TEXT, indexed_definition TEXT
@@ -138,16 +135,6 @@ export class Store {
 
   close(): void { this.db.close(); }
 
-  getGithubToken(): string | undefined {
-    const row = this.db.prepare("SELECT value FROM server_secrets WHERE name = 'github-index-token'").get() as { value: string } | undefined;
-    return row ? this.cipher.decrypt(row.value) : undefined;
-  }
-
-  setGithubToken(token: string | undefined): void {
-    if (token === undefined) this.db.prepare("DELETE FROM server_secrets WHERE name = 'github-index-token'").run();
-    else this.db.prepare("INSERT OR REPLACE INTO server_secrets (name, value) VALUES ('github-index-token', ?)").run(this.cipher.encrypt(token));
-  }
-
   /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包；v7：客户端改写绑定来源；v8 及以前：订阅地址可能保存在 urls 数组） */
   private migrate(): void {
     const version = this.db.pragma('user_version', { simple: true }) as number;
@@ -200,8 +187,9 @@ export class Store {
         this.promoteRuleOverrides();
         this.convertSourceUrls();
       }
-      if (version < 14) {
-        // 订阅源固定拉取选项；保留归属、更新时间及最近成功内容，规则集不变。
+      if (version < 15) {
+        // v15：订阅源固定拉取选项；兼容主干及开发分支曾各自使用的 v14。
+        // 保留归属、更新时间及最近成功内容，规则集不变。
         for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'source'").all() as { id: string; data: string }[]) {
           const source = JSON.parse(this.cipher.decrypt(row.data)) as SourceDoc;
           this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'source' AND id = ?")
@@ -211,9 +199,16 @@ export class Store {
           SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY owner_id, ok ORDER BY fetched_at DESC, id DESC) AS position
             FROM snapshots WHERE owner_kind = 'source') WHERE position = 1)`);
       }
+      // v14：移除 GitHub API 凭据；不触碰订阅令牌或未知的其他服务凭据。
+      if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'server_secrets'").get()) {
+        this.db.prepare("DELETE FROM server_secrets WHERE name = 'github-index-token'").run();
+        if (!this.db.prepare('SELECT 1 FROM server_secrets LIMIT 1').get()) this.db.exec('DROP TABLE server_secrets');
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
+    // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
+    if (version < 15) this.db.pragma('wal_checkpoint(TRUNCATE)');
     if (hadSnapshots && version < 3) {
       // 清除迁移前留在空闲页和 WAL 中的明文副本。
       this.db.pragma('wal_checkpoint(TRUNCATE)');

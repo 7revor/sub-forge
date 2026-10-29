@@ -1,12 +1,13 @@
 import { TESTABLE_PROXY_TYPES, validateLocalProxy, type LocalProxy } from '@sub-forge/core';
-import { LineCounter, parseDocument } from 'yaml';
+import { LineCounter } from 'yaml';
+import { parseYamlDocument } from './yamlDocument.ts';
 import type { RawResult } from '../components/DualEditor.tsx';
 
 export function inspectLocalNodeYaml(text: string): RawResult<LocalProxy> {
   const lines = new LineCounter();
   try {
     if (!text.trim()) return { ok: false, error: '请输入或粘贴节点配置' };
-    const doc = parseDocument(text, { lineCounter: lines });
+    const doc = parseYamlDocument(text, { lineCounter: lines });
     const syntax = doc.errors[0] ?? doc.warnings[0];
     if (syntax) return { ok: false, error: syntax.message, line: lines.linePos(syntax.pos[0]).line };
     const value: unknown = doc.toJS({ maxAliasCount: 100 });
@@ -27,7 +28,7 @@ export function inspectLocalNodeYaml(text: string): RawResult<LocalProxy> {
 
 /** 保留注释和扩展字段，仅在用户明确点击格式化时修改排版。 */
 export function formatLocalNodeYaml(text: string): string {
-  const doc = parseDocument(text);
+  const doc = parseYamlDocument(text);
   if (doc.errors.length) throw doc.errors[0];
   return doc.toString();
 }

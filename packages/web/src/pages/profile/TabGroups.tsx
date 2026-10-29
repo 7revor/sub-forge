@@ -14,6 +14,7 @@ import { SortableList } from '../../components/SortableList.tsx';
 import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
+import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
 type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'whenEmpty' | 'display' | 'extra'>;
 
@@ -36,7 +37,7 @@ function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => voi
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-ground p-2.5">
+    <div className="flex flex-wrap items-start gap-2 rounded-lg bg-ground p-2.5">
       <Select aria-label="成员类型" className="w-auto" value={kind} onChange={(e) => setKind(e.target.value as GroupMember['kind'])}>
         <option value="nodeset">节点集</option>
         <option value="group">其他组</option>
@@ -55,7 +56,10 @@ function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => voi
 }
 
 export function TabGroups() {
-  const { draft, groups, template, patchOverlay, groupName, nodeSetName } = useProfile();
+  const { draft, groups, template, patchOverlay, groupName, nodeSetName, profileNodeSets } = useProfile();
+  const [regionSource, setRegionSource] = useState<NodeSetID>();
+  const regionNodeSet = profileNodeSets.find(option => option.ref.type === regionSource?.type && option.ref.id === regionSource.id)
+    ?? profileNodeSets.find(option => option.name === 'FlowerCloud') ?? profileNodeSets[0];
   const [selectedId, setSelectedId] = useState<string | undefined>(groups[0]?.id);
   const [previewSelection, setPreviewSelection] = useState<{ groupId: string; key: string }>();
   const templateIds = (template?.groups ?? []).map((group) => group.id);
@@ -91,6 +95,21 @@ export function TabGroups() {
     patchOverlay((o) => ({ ...o, extraGroups: [...(o.extraGroups ?? []), { group: { id, name: '新的组', type: 'select', members: [] } }] }));
     setSelectedId(id);
   };
+  const addRegions = () => {
+    const added = createRegionGroups(groups, regionNodeSet?.ref);
+    const inherited = groups.filter(group => group.origin === 'template' && REGION_GROUPS.some(region => region.name === group.name));
+    patchOverlay(o => {
+      const groupPatches = { ...o.groupPatches };
+      if (regionNodeSet) for (const group of inherited) {
+        const previous = groupPatches[group.id] ?? {};
+        const members = [...group.members, ...(previous.addMembers ?? [])];
+        if (members.some(member => member.kind === 'nodeset' && member.ref.type === regionNodeSet.ref.type && member.ref.id === regionNodeSet.ref.id)) continue;
+        groupPatches[group.id] = { ...previous, addMembers: [...(previous.addMembers ?? []), { kind: 'nodeset', ref: { ...regionNodeSet.ref } }] };
+      }
+      return { ...o, groupPatches, extraGroups: [...(o.extraGroups ?? []), ...added.map(group => ({ group }))] };
+    });
+    setSelectedId(added[0]?.id ?? inherited[0]?.id);
+  };
   const removePrivate = () => {
     if (!g || g.origin !== 'profile') return;
     patchOverlay((o) => ({ ...o, extraGroups: reorderExtraGroups(templateIds, groups.filter((x) => x.id !== g.id).map((x) => x.id), (o.extraGroups ?? []).filter((e) => e.group.id !== g.id)) }));
@@ -125,7 +144,7 @@ export function TabGroups() {
                   <button type="button" onClick={() => setSelectedId(x.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-2.5 text-left">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-[13.5px] font-medium">{x.name}</span>
-                      <span className="text-[12px] text-muted">{current.type} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
+                      <span className="text-[12px] text-muted">{current.type.toUpperCase()} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
                     </span>
                     {n === 0 ? <Badge tone="warn">空 · {current.whenEmpty === 'direct' ? '直连' : '拒绝'}</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
                   </button>
@@ -133,7 +152,11 @@ export function TabGroups() {
               );
             }} /></div>
           {!groups.length && <Empty title="没有组" />}
-          <div className="-mx-4 mt-4 border-t border-line-2 px-4 pt-2.5"><Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button></div>
+          <div className="-mx-4 mt-4 flex flex-col gap-2 border-t border-line-2 px-4 pt-2.5">
+            <NodeSetSelect label="地区节点来源" value={regionNodeSet?.ref} options={profileNodeSets} onChange={setRegionSource} placeholder="先在「节点集」中加入" />
+            <Button onClick={addRegions}><Plus size={15} />添加地区节点</Button>
+            <Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button>
+          </div>
         </Card>
 
         {g && eff && (

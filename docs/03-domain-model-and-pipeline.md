@@ -121,7 +121,7 @@ type GroupSpec = {
   id: ID; name: string;
   type: 'select' | 'url-test' | 'fallback' | 'load-balance';
   members: GroupMember[];
-  filter?: string; excludeFilter?: string; excludeType?: string;   // 仅 Profile 层可设置，模板中禁止
+  filter?: string; excludeFilter?: string; excludeType?: string;   // 模板可预设，Profile 可覆盖；仅筛选节点集成员
   test?: { url?: string; interval?: number; timeout?: number; tolerance?: number; lazy?: boolean;
            maxFailedTimes?: number; expectedStatus?: string };
   strategy?: 'consistent-hashing' | 'round-robin' | 'sticky-sessions';
@@ -368,7 +368,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 ## 2026-10-29 追加：索引凭据
 
-SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使用现有 Cipher 加密保存，与规则集、索引文件及用户订阅 Token 分离。管理员接口 `GET/PUT/DELETE /api/rule-repos/github-token` 仅返回 `{ configured: boolean }`，PUT 接受 `{ token: string }`。每次 GitHub API 请求读取最新凭据，不向 raw 文件请求或转换输出传播，跨源（包括 HTTP 降级）重定向后永久剥离认证头。种子导入不携带该服务凭据，示例种子保持不变。
+历史方案（已由 v14 移除）：SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使用现有 Cipher 加密保存，与规则集、索引文件及用户订阅 Token 分离。管理员接口 `GET/PUT/DELETE /api/rule-repos/github-token` 仅返回 `{ configured: boolean }`，PUT 接受 `{ token: string }`。每次 GitHub API 请求读取最新凭据，不向 raw 文件请求或转换输出传播，跨源（包括 HTTP 降级）重定向后永久剥离认证头。种子导入不携带该服务凭据，示例种子保持不变。
 
 ## 2026-10-29 追加：按文件创建仓库关联
 
@@ -402,3 +402,8 @@ SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使
 模板编辑 YAML 的 `x-sub-forge-rulesets` 保存别名到完整 Matcher 的映射，避免名称重用与跨来源重名改变引用。该元数据仅用于模板编辑器，不进入最终订阅配置。旧的无映射 YAML 按唯一名称导入；同名本地引用导出为 `local:<id>` 别名。
 
 2026-10-29 模板编辑布局精简：行内规则集选择只替换 `RuleEntry.matcher`；`id`、顺序、`target`、`enabled` 和 `options.noResolve` 沿用现有对象与持久化语义，无领域模型或管线变更。
+
+
+## 2026-10-29：SQLite v14 移除 GitHub 凭据
+
+迁移删除 `server_secrets` 中的 `github-index-token`，表为空时删除表，存在未知其他服务凭据时保留。新数据库不建此表。订阅令牌、文档、索引与归属保持不变。仓库元信息通过 Git 获取，不新增领域字段，种子无此全局凭据，因此无需修改示例种子。

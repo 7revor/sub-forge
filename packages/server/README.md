@@ -150,7 +150,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - `POST /api/rule-repos/:id/refresh`：管理员触发，202 返回后通过列表轮询状态；同仓库并发任务合并。
 - `PATCH /api/rule-repos/:id`：管理员设置 `{ enabled: boolean }`，停用不删除索引或已导入的规则集。
 
-GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。仅索引 list/txt，默认导入文本后走已有托管流程。动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
+仓库识别、分支检查与目录索引均使用匿名 HTTPS Git，不依赖 GitHub API。仅索引 list/txt；失败保留旧索引。完整行为见下方「规则仓库 Git 缓存与编辑」与 [08](../../docs/08-rule-repository-index.md)。示例种子保持离线可用。
 
 ### 自定义 GitHub 仓库
 
@@ -167,9 +167,9 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 
 所有仓库只索引 `.list` / `.txt`，任意 include 也不能放开 YAML、MRS、SRS 等后缀。zydou 只检查两个 Surge 文本分支。启动即清理旧缓存中的不支持变体，并使相关仓库同 commit 也重建；既有规则来源保留。自定义仓库旧 YAML 格式配置降为 auto，不改 include/exclude。手动远程 YAML 不受索引限制，预览报告 `conversion: yaml-to-list`，实际 provider 使用本服务文本 URL；已知 YAML 输入不得标为二进制透传。
 
-### GitHub 索引 Token
+### 移除 GitHub Token（2026-10-29）
 
-管理员通过 `GET/PUT/DELETE /api/rule-repos/github-token` 读取状态、保存或清除 Token；PUT body 为 `{ "token": "你的 Token" }`，响应只有 `configured`。SQLite v12 加密保存该服务凭据，不写入示例种子；下一次索引 API 请求立即生效。只向 HTTPS GitHub API 携带认证，跨源重定向永久移除。不会用于 raw 文件、一般订阅源或客户端输出；公开仓库限制不变。
+不再提供 GitHub Token 配置或 `GET/PUT/DELETE /api/rule-repos/github-token` 接口。SQLite v14 升级删除旧 `github-index-token`，清空后删除专用 `server_secrets` 表；若存在未知其他服务凭据则保留其记录和表。订阅令牌及业务文档不受影响。迁移使用 secure_delete 并截断 WAL；外部备份不在迁移范围内。
 
 ### 按单文件创建规则集
 
@@ -202,7 +202,11 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 默认每 24 小时同步；失败后 15 分钟重试；可手动更新。Git 操作有进程内串行队列、磁盘锁、120 秒超时和 32 MiB 输出上限；退出时取消并等待 Git 进程组。崩溃遗留锁在确认所属进程不存在后自动恢复。单个缓存目录不支持多个主机共享。删除仓库时删除其 Git 缓存，但保留已导入规则集。缓存不是用户配置备份：如需释放累计 Git 对象，可在停止服务后清空专用缓存目录，启动后手动更新仓库重建缓存；重建完成前文件预览可能不可用，SQLite 中的旧目录仍保留。
 
-Git 同步使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，也不继承全局 Git URL 重写及认证配置。Token 只用于添加/修改仓库时的 GitHub 元数据 API。无需 Token 即可同步已配置仓库，但网络仍需能访问 github.com。重命名/迁移的上游地址须编辑为当前地址。
+新增和修改仓库统一使用 `git ls-remote --symref` 读取远程 HEAD 与分支，留空分支按远程 HEAD 解析；所有指定分支均在保存前验证。仓库无提交、默认分支无法识别或指定分支不存在会明确报错，不写入配置。Git 失败返回 502；保存时需要访问 github.com，包括停用仓库的编辑。
+
+全流程使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，不继承全局 Git URL 重写及认证配置，不调用 GitHub API。重命名/迁移的上游地址须编辑为当前地址。Git 不提供平台许可证分类：同仓库保留已有说明，新仓库默认「见上游仓库许可证」，也可手动填写许可证说明。
+
+隔离浏览器验收：构建 web 后运行 `pnpm --filter @sub-forge/server exec tsx test/manual-git-repository-server.ts`，访问 `http://git-only.localhost:18744`。使用内存库、临时 Git 缓存和专用测试账号，允许真实匿名 Git、禁止全部 HTTP 上游请求；退出打印 HTTP 请求计数并清理缓存和进程。不得用于生产部署。
 
 ### 自动识别规则格式与下载策略（2026-10-29）
 
@@ -228,4 +232,4 @@ Git 同步使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，也
 
 ### 订阅源固定拉取设置（2026-10-29）
 
-SQLite v14 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文档归属和更新时间；订阅源历史压缩为最近一次成功及最新失败状态。规则集拉取设置和历史不受影响。服务层对正式拉取、草稿预览都强制使用默认 UA 与 10 秒超时，旧种子与保存接口也会规范化。节点只能内联输出或由本服务 `/p/…` 托管，不提供节点订阅地址透传；规则集仍按既有条件决定原格式透传或托管。
+SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文档归属和更新时间；订阅源历史压缩为最近一次成功及最新失败状态。规则集拉取设置和历史不受影响。服务层对正式拉取、草稿预览都强制使用默认 UA 与 10 秒超时，旧种子与保存接口也会规范化。节点只能内联输出或由本服务 `/p/…` 托管，不提供节点订阅地址透传；规则集仍按既有条件决定原格式透传或托管。

@@ -14,7 +14,7 @@ export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: 
   const toggle = useMutation({ meta: { successMessage: '仓库状态已更新' }, mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: invalidate });
   const remove = useMutation({ meta: { successMessage: '仓库已删除' }, mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => { setDeleting(undefined); return invalidate(); } });
   return <>
-    <Card title="仓库" subtitle="仅扫描 .list 和 .txt 文件" className="shrink-0" bodyClass="px-4 pb-4" actions={admin && <><Link to={`/rule-repo/settings${search}`} className={buttonClass('default', 'sm')}>GitHub Token</Link><Link to={`/rule-repo/new${search}`} className={buttonClass('default', 'sm')}><Plus size={14} />添加仓库</Link></>}>
+    <Card title="仓库" subtitle="仅扫描 .list 和 .txt 文件" className="shrink-0" bodyClass="px-4 pb-4" actions={admin && <><Link to={`/rule-repo/new${search}`} className={buttonClass('default', 'sm')}><Plus size={14} />添加仓库</Link></>}>
       <div aria-label="仓库管理" className="grid max-h-[26vh] min-h-0 grid-cols-1 gap-2 overflow-y-auto overscroll-contain xl:grid-cols-2">
         {repos.map(r => <div key={r.id} className="flex min-w-0 flex-col gap-2 rounded-lg border border-line-2 px-3 py-2.5">
           <div className="flex min-w-0 items-start justify-between gap-2">
