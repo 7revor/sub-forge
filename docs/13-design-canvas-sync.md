@@ -228,6 +228,8 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 
 ### 2026-10-29：规则来源分页文件树（待同步，替代左右级联）
 
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
 本轮访问画布仍显示「Sign in to view this page」，无法编辑。
 
 - TemplateEdit、ProfileRules、RuleSets 的来源弹层改为单列缩进文件树；不再绘制左右分栏级联。
@@ -241,3 +243,14 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 2026-10-29 待同步补充：文件树不得剥离扫描根或合并同名分类；示例应画为 `blackmatrix7/ios_rule_script → rule → Clash → China → China.list` 和独立的 `rule → Surge → China → China.list`。两条路径分别分页和选择，初始折叠、搜索展开行为不变。
 
 原始目录结构的[验收记录与截图](../research/verification/rule-catalog-original-paths-20261029/README.md)。
+
+## 2026-10-29：规则来源平铺分页
+
+待同步：此方案取代前文全部来源级联／文件树画法。本会话已确认外部画布提示「Sign in to view this page」，未修改远程画布。
+
+- TemplateEdit、ProfileRules、RuleSets：单列搜索弹层，无文件夹、树连线、缩进、默认分组和展开控件。
+- 每个文件占两行：`China.list`；`blackmatrix7/ios_rule_script · rule/Clash/China/China.list · 分支：master`。另列 Surge 同名文件，禁止合并；本地候选显示名称与来源说明。
+- 默认只加载 30 项，页脚显示「已加载 30 / 90 项」「加载更多」；搜索结果同样分页。切换关键词显示「搜索中…」，失败可在原处重试。
+- RuleRepo 左侧替换为相同平铺文件列表，右侧保留文件原文预览。
+
+参考 [最新验收截图](../research/verification/rule-options-flat-20261029/README.md)。

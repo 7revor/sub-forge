@@ -281,6 +281,8 @@ Stash：/sub/:token?target=stash&platform=ios 或 macos 输出完整订阅；UA 
 
 ### 2026-10-29：目录级联索引
 
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
 SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和提交同事务更新。仅记录扫描范围内目录及 list/txt；YAML、二进制、README.md 等不进入该缓存。目录由 Git 普通文件路径提取，符号链接与子模块沿用现有排除规则。原 include/exclude 和格式配置继续控制文件能否关联。缺少新缓存的旧仓库会在同提交下补建；更新失败保留旧目录，接口明确提示目录未完整。
 
 `GET /api/rule-options/catalog?scope=all|repository` 只返回当前用户可见本地规则集、启用仓库的平面节点，由前端组装目录。`POST /api/rule-options/resolve` 新选项携带 `file:{ref,path}`，仅关联该文件；旧无 file 请求保留兼容。目录读取不访问上游正文，创建/引用前重新校验文件成员资格。删除仓库时一并删除目录缓存。
@@ -296,4 +298,12 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 
 ### 2026-10-29：目录分页接口（替代全量清单响应）
 
+> 2026-10-29：本节目录树／逐层加载方案已被本文末尾的「规则来源平铺分页」替代；保留历史决策，当前不显示文件夹。
+
 `GET /api/rule-options/catalog?scope=all|repository&q=&offset=0&limit=30` 返回 `{items,total,offset,limit,nextOffset?,notices}`。不传 `repo` 返回本地规则与仓库入口；传 `repo`、可选 `directory`（相对仓库根）仅返回当前层。默认每页 30 项，上限 100。SQL 先在完整索引搜索，按完整原始路径列出当前层，再稳定排序和分页，文件按完整路径与分支区分。缺失目录缓存时回退旧条目且同样分页并提示；不传分页参数也不会返回全量文件。数据模型和示例种子无需迁移。
+
+## 2026-10-29：规则来源平铺分页
+
+当前接口：`GET /api/rule-options/search?scope=all|repository&q=&offset=0&limit=30`，默认 30、上限 100，返回 `{items,total,offset,limit,nextOffset?,notices}`。items 包含 value（JSON 编码的 local 或 repository 单文件选择）、label（文件名）、hint（仓库名 · 原始路径 · 分支）、disabled。本地候选先按权限读取；仓库文件和本地候选统一由 SQLite 筛选、排序、分页。缺失缓存时从已有文件变体在 SQL 中回退，不在应用层读取全部文件。
+
+移除 `/rule-options/catalog` 及目录树查询；新文件缓存不再生成目录节点，兼容旧缓存并在下次更新替换。正文预览只查询所选文件。单文件 resolve、历史引用和种子格式不变。隔离浏览器验收：`pnpm exec tsx test/manual-rule-options-server.ts`，使用内存数据和模拟 Git，结束后停止该进程。

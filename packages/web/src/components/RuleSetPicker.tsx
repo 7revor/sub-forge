@@ -1,22 +1,22 @@
 import type { Matcher } from '@sub-forge/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api.ts';
-import { ruleCatalogLoader, type RuleCatalogSelection } from '../domain/ruleCatalog.ts';
+import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
 import { alertError } from '../feedback.ts';
-import { TreeSelect } from './listbox.tsx';
+import { AsyncSelect } from './listbox.tsx';
 
 type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
-const loadAll = ruleCatalogLoader('all');
-const loadRepository = ruleCatalogLoader('repository');
+const loadAll = ruleOptionsLoader('all');
+const loadRepository = ruleOptionsLoader('repository');
 
-export function RuleCatalogPicker({ scope = 'all', label, onSelect, ...props }: {
-  scope?: 'all' | 'repository'; label: string; onSelect: (selection: RuleCatalogSelection) => void;
+function RuleOptionPicker({ scope = 'all', label, onSelect, ...props }: {
+  scope?: 'all' | 'repository'; label: string; onSelect: (selection: RuleSelection) => void;
   id?: string; ariaLabel?: string; disabled?: boolean; triggerClassName?: string; triggerIcon?: ReactNode;
 }) {
-  return <TreeSelect {...props} label={label} loadOptions={scope === 'all' ? loadAll : loadRepository} onChange={value => onSelect(JSON.parse(value) as RuleCatalogSelection)} />;
+  return <AsyncSelect {...props} label={label} loadOptions={scope === 'all' ? loadAll : loadRepository} onChange={value => onSelect(JSON.parse(value) as RuleSelection)} />;
 }
 
-/** 模板、订阅和本地规则集共用分页文件树；解析成功前不改动原草稿。 */
+/** 模板、订阅和本地规则集共用两行分页列表；解析成功前不改动原草稿。 */
 export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则集', ariaLabel = label, id, triggerClassName, triggerIcon }: {
   onSelect: (matcher: RuleSetMatcher) => void; scope?: 'all' | 'repository'; label?: string; id?: string;
   ariaLabel?: string; triggerClassName?: string; triggerIcon?: ReactNode;
@@ -26,7 +26,7 @@ export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则�
   const currentSelect = useRef(onSelect);
   currentSelect.current = onSelect;
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  return <RuleCatalogPicker id={id} label={busy ? '正在读取…' : label} ariaLabel={ariaLabel} disabled={busy} scope={scope}
+  return <RuleOptionPicker id={id} label={busy ? '正在读取…' : label} ariaLabel={ariaLabel} disabled={busy} scope={scope}
     triggerClassName={triggerClassName} triggerIcon={triggerIcon}
     onSelect={async selection => {
       setBusy(true);
