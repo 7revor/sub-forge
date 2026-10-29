@@ -60,7 +60,7 @@ describe('Stash 主订阅与资源隔离', () => {
     const mihomo = parse(await (await h.app.request(`/sub/${h.token}?target=mihomo&platform=ios`)).text());
     expect(mihomo['mixed-port']).toBe(7890); expect(mihomo.proxies).toEqual([]);
     const mihomoUrl = (Object.values(mihomo['rule-providers'])[0] as { url: string }).url;
-    expect(await (await h.app.request(mihomoUrl)).text()).toContain('# [当前客户端无法输出：mihomo 不支持 USER-AGENT]');
+    expect(await (await h.app.request(mihomoUrl)).text()).toContain('# [mihomo 不支持 USER-AGENT]');
     expect(h.store.recentAccess(h.profile.id).map(x => x.client)).toContain('stash');
     h.store.deleteToken(h.token);
     expect((await h.app.request(provider.url)).status).toBe(404);

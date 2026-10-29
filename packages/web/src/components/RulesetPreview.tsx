@@ -56,7 +56,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
     </div>
     <CodePreview label="规则输出" text={result?.lines.join('\n') ?? ''} loading={old} className="shrink-0" bodyClassName="h-[420px]" lineNumbers />
     <div className="min-h-10 text-[12.5px] text-ink-2" aria-label="转换统计">
-      {stats ? <>已解析 {stats.parsed} 条 · 未解析 {stats.rejected} 行 · 去重 {stats.duplicates} 条 · 有效输出 {stats.output} 条<br />改写移除 {stats.removed} 条 · 替换 {stats.replaced} 条 · 追加 {stats.appended} 条 · 客户端无法输出 {stats.unsupported} 条 · 降级 {stats.degraded} 条</> : '等待转换结果'}
+      {stats ? <>已解析 {stats.parsed} 条 · 未解析 {stats.rejected} 行 · 去重 {stats.duplicates} 条 · 有效输出 {stats.output} 条<br />改写移除 {stats.removed} 条 · 替换 {stats.replaced} 条 · 追加 {stats.appended} 条 · 不支持 {stats.unsupported} 条 · 降级 {stats.degraded} 条</> : '等待转换结果'}
     </div>
     {(status || preview.error || sourceError) ? <div className="flex min-h-8 flex-wrap items-center gap-2 text-[12px] text-muted" role="status">
       {status}
@@ -65,7 +65,10 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
       {preview.error && <Button size="sm" onClick={() => void preview.refetch()} disabled={!ready || !settled || preview.isFetching}>重新转换</Button>}
     </div> : null}
     <details className={cx("text-[12.5px]", !diagnostic.length && "invisible")}><summary className="cursor-pointer">客户端处理详情（{diagnostic.length} 条）</summary>
-      <div className="mt-2 max-h-64 overflow-auto">{diagnostic.slice(0, 100).map((d, i) => <div key={i} className="flex gap-2 py-1"><Badge tone={d.kind === 'client' ? 'warn' : 'accent'}>{d.kind === 'client' ? '无法输出' : d.kind === 'degraded' ? '降级' : '改写'}</Badge><span className="min-w-0 break-all">{d.sourceId === '$append' ? '组级追加' : sourceNames[d.sourceId] ?? d.sourceId} · 原第 {d.line} 行：{d.reason}</span></div>)}{diagnostic.length > 100 && <p>显示前 100 条，未显示的诊断可通过来源行号定位。</p>}</div>
+      <div className="mt-2 max-h-64 overflow-auto">{diagnostic.slice(0, 100).map((d, i) => <div key={i} className="flex gap-2 py-1">
+        {d.kind !== 'client' && <Badge tone="accent">{d.kind === 'degraded' ? '降级' : '改写'}</Badge>}
+        <span className="min-w-0 break-all">{d.sourceId === '$append' ? '组级追加' : sourceNames[d.sourceId] ?? d.sourceId} · <code>{d.text}</code> · {d.reason}</span>
+      </div>)}{diagnostic.length > 100 && <p>仅显示前 100 条。</p>}</div>
     </details>
   </div>;
 }

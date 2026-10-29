@@ -93,7 +93,7 @@ export function convertRuleDocuments(
     if (!options.sourceId && seen.has(k)) { out.stats.duplicates++; issue('duplicate', '重复规则'); return; }
     seen.add(k);
     const lowered = lowerRule(r, ctx);
-    if (lowered.kind === 'drop') { out.stats.unsupported++; issue('client', `当前客户端无法输出：${lowered.reason}`); return; }
+    if (lowered.kind === 'drop') { out.stats.unsupported++; issue('client', lowered.reason); return; }
     const rendered = composeRule(lowered);
     if (/[\r\n\u2028\u2029]/.test(rendered)) { out.stats.unsupported++; issue('client', '规则包含换行，无法安全输出'); return; }
     if (lowered.note) { out.stats.degraded++; out.diagnostics.push({ sourceId, line, text, kind: 'degraded', reason: lowered.note }); }
@@ -144,7 +144,7 @@ export function convertRuleDocuments(
     const active = matches(override);
     for (const r of override.action.append) {
       if (active) { out.stats.appended++; emit(r, '$append', index + 1, composeForComment(r)); }
-      else push(comment('追加未匹配当前客户端', composeForComment(r)), '$append', index + 1);
+      else push(comment('追加未匹配', composeForComment(r)), '$append', index + 1);
     }
   }
   return out;
