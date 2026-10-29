@@ -45,11 +45,19 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS rule_repos (
+  id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, built_at INTEGER, checked_at INTEGER,
+  revisions TEXT NOT NULL DEFAULT '{}', error TEXT
+);
+CREATE TABLE IF NOT EXISTS rule_repo_entries (
+  repo TEXT NOT NULL, key TEXT NOT NULL, search_name TEXT NOT NULL, data TEXT NOT NULL,
+  PRIMARY KEY (repo, key)
+);
 CREATE TABLE IF NOT EXISTS docs (
   kind TEXT NOT NULL, id TEXT NOT NULL, owner TEXT, data TEXT NOT NULL, updated_at INTEGER NOT NULL,
   PRIMARY KEY (kind, id)

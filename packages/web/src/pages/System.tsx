@@ -10,7 +10,7 @@ import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, 
 export function System() {
   const qc = useQueryClient();
   const info = useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('GET', '/system') });
-  const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ pending?: boolean; repos: RuleRepo[] }>('GET', '/rule-repos') });
+  const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ pending?: boolean; repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
   const [draft, setDraft] = useState<SystemInfo>();
   const [allow, setAllow] = useState('');
   const [addingRepo, setAddingRepo] = useState(false);
@@ -20,6 +20,8 @@ export function System() {
   const backup = useMutation({ mutationFn: () => api('POST', '/system/backup') });
   const restore = useMutation({ mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
   const addRepo = useMutation({ mutationFn: () => api('POST', '/rule-repos', repoForm), onSuccess: () => { setAddingRepo(false); void qc.invalidateQueries({ queryKey: ['rule-repos'] }); } });
+  const refreshRepo = useMutation({ mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
+  const toggleRepo = useMutation({ mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
   const removeRepo = useMutation({ mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
 
   if (!draft) return info.error ? <ErrorBox error={info.error} /> : <div className="text-muted">加载中…</div>;
@@ -29,7 +31,7 @@ export function System() {
   return (
     <>
       <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
-      {info.data?.pending && <PendingNotice>系统设置接口还没有接入：这里显示的是空的默认值，保存、导出与恢复会被服务端拒绝。目前 SSRF 白名单与 mihomo 校验由环境变量 <span className="font-mono">SSRF_ALLOW</span>、<span className="font-mono">MIHOMO_BIN</span> 控制。</PendingNotice>}
+      {info.data?.pending && <PendingNotice>SSRF、配置校验、镜像及备份设置仍是占位，保存、导出与恢复会被服务端拒绝。内置规则仓库可独立更新与启停。目前 SSRF 白名单与 mihomo 校验由环境变量 <span className="font-mono">SSRF_ALLOW</span>、<span className="font-mono">MIHOMO_BIN</span> 控制。</PendingNotice>}
       <ErrorBox error={save.error} />
 
       <PageScroll>
@@ -71,16 +73,18 @@ export function System() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col">
                   {(repos.data?.repos ?? []).map((r) => (
-                    <div key={r.id} className="flex items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
+                    <div key={r.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{r.name}</span><span className="truncate text-[12px] text-muted">{r.builtIn ? '内置' : r.url}{r.entries !== undefined ? ` · ${r.entries} 个规则` : ''}{r.builtAt ? ` · ${formatTime(r.builtAt).slice(5)} 建索引` : ''}</span></span>
-                      {r.error ? <Badge tone="err">{r.error}</Badge> : <Badge tone="ok">正常</Badge>}
+                      <Badge tone={r.error ? 'err' : r.builtAt ? 'ok' : 'neutral'}>{!r.enabled ? '已停用' : r.indexing ? '更新中…' : r.error ? r.error : r.builtAt ? '已索引' : '等待首次索引'}</Badge>
+                      <Button size="sm" disabled={!r.enabled || r.indexing || refreshRepo.isPending} onClick={() => refreshRepo.mutate(r.id)}>更新索引</Button>
+                      <Button size="sm" disabled={toggleRepo.isPending} onClick={() => toggleRepo.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button>
                       {!r.builtIn && <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${r.name}`} onClick={() => removeRepo.mutate(r.id)}><Trash2 size={14} /></Button>}
                     </div>
                   ))}
                   {!repos.data?.repos.length && <Empty title="还没有仓库索引" />}
                 </div>
-                <ErrorBox error={removeRepo.error} />
-                <Field label="GitHub 镜像地址" hint="用于在无法直连 GitHub 时拉取规则">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
+                <ErrorBox error={repos.error ?? removeRepo.error ?? refreshRepo.error ?? toggleRepo.error} />
+                <Field label="GitHub 镜像地址" hint="镜像设置尚未接入，当前使用 GitHub 官方地址">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
               </div>
             </Card>
 

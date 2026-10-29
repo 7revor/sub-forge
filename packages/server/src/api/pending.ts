@@ -17,11 +17,7 @@ export function pendingRoutes() {
   app.post('/shares', requireAdmin, todo('共享'));
   app.delete('/shares/:id', requireAdmin, todo('共享'));
 
-  // 规则仓库：搜索内置 GitHub 规则仓库并直接引用
-  app.get('/rule-repos', requireUser, (c) => c.json({ pending: true, repos: [] }));
-  app.get('/rule-repos/search', requireUser, (c) => c.json({ pending: true, items: [], total: 0 }));
-  app.get('/rule-repos/entry', requireUser, todo('规则仓库'));
-  app.post('/rule-repos/import', requireUser, todo('从规则仓库引用'));
+  // 自定义仓库适配器尚未实现；内置仓库由 rule-repos.ts 提供。
   app.post('/rule-repos', requireAdmin, todo('添加自定义仓库'));
   app.delete('/rule-repos/:id', requireAdmin, todo('删除自定义仓库'));
 

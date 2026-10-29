@@ -47,3 +47,6 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 - ssr、hysteria v1、wireguard、snell 的 URI 解析（这些协议目前只能通过 Clash YAML 导入）
 
 规则集客户端改写存放在 `RuleSet.overrides`：仅按规则内容精确匹配所有启用来源，不依赖来源选择或行号。先应用第一条客户端/平台匹配的改写，再合并去重、按 behavior 拆分；二进制透传内容不参与改写。来源级 `overrides` 只用于未能转换的历史数据兼容。
+
+
+规则仓库首期（2026-10-29）在服务端将文本变体转换为本内核已有的多个远程来源，再复用规则集解析、合并与去重。内核数据模型不变；动态 `repo` 来源与客户端变体切换仍为后续能力。

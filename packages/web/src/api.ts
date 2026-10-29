@@ -54,13 +54,13 @@ export type RulesetPreview = {
   passthroughSources?: { sourceId: string; name: string; format: string }[];
 };
 
-// ---------- 服务端尚未实现的接口（读接口返回空数据并带 pending，写接口返回 501；见 docs/11） ----------
+// ---------- 仓库与系统接口；Pending 标注的功能仍为占位（见 docs/11） ----------
 export type Pending = { pending?: boolean };
 export type UserStats = Pending & { items: Record<string, { profiles: number; sources: number; lastRequestAt?: number }> };
 export type Share = { id: string; kind: 'source' | 'collection'; docId: string; name: string; to: string[] };
-export type RuleRepo = { id: string; name: string; url: string; builtIn: boolean; entries?: number; builtAt?: number; error?: string };
-export type RepoEntry = { repo: string; path: string; name: string; count: number; behavior?: string };
-export type RepoEntryDetail = RepoEntry & { license?: string; updatedAt?: number; variants: { client: string; file: string; how: string }[]; preview: string[] };
+export type RuleRepo = { id: string; name: string; url: string; builtIn: boolean; enabled: boolean; entries: number; builtAt?: number; checkedAt?: number; error?: string; indexing: boolean };
+export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
+export type RepoEntryDetail = RepoEntry & { license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };
 export type SystemInfo = Pending & {
   ssrfAllow: { value: string; note?: string }[];
   verify: { enabled: boolean; version?: string; checks24h?: number; fails24h?: number } | null;

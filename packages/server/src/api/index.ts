@@ -4,6 +4,10 @@ import { Hono } from 'hono';
 import type { RenderService } from '../render.ts';
 import type { SnapshotService } from '../snapshots.ts';
 import type { Store } from '../store.ts';
+import { RuleRepoService } from '../rule-repos/service.ts';
+import { parseAllowList } from '../net/ssrf.ts';
+import { createUpstreamFetcher } from '../net/upstream.ts';
+import { ruleRepoRoutes } from './rule-repos.ts';
 import { authRoutes } from './auth.ts';
 import { pendingRoutes } from './pending.ts';
 import { docRoutes } from './docs.ts';
@@ -14,6 +18,7 @@ import { csrfGuard, HttpError, sessionLoader, type ApiEnv } from './common.ts';
 
 export type ApiDeps = {
   store: Store;
+  ruleRepos?: RuleRepoService;
   renderer: RenderService;
   snapshots: SnapshotService;
   now: () => number;
@@ -35,6 +40,7 @@ export function createApi(deps: ApiDeps) {
   api.use('*', csrfGuard(() => deps.allowedOrigins));
   api.use('*', sessionLoader(deps.store));
   // 占位接口先于 /users/:id 等通配路由注册
+  api.route('/', ruleRepoRoutes(deps.store, deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now)));
   api.route('/', pendingRoutes());
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
   api.route('/', templateRoutes(deps.store, deps.renderer, deps.snapshots));
