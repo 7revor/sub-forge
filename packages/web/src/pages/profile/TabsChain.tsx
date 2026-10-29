@@ -48,7 +48,7 @@ export function TabChains() {
 
   return (
     <>
-      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">链规则</h2><span className="text-[12.5px] text-muted">落地 = 某节点集中命中筛选的节点 → 前置 = 策略组或单个节点。provider 中的节点不需要打平。</span></div>}
+      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">链规则</h2><span className="text-[12.5px] text-muted">代理链只在这里设置：落地 = 已加入节点集中命中筛选的节点 → 前置 = 策略组或单个节点。本地节点只保存节点信息，订阅源自带的前置会自动识别。</span></div>}
         actions={<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加链规则</Button>}>
         {!draft.chains.length ? <Empty>{profileNodeSets.length ? '还没有链规则。' : '先在「节点集」中加入节点集。'}</Empty> : (
           <div className="flex flex-col gap-3">

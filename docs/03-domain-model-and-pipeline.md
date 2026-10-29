@@ -51,7 +51,7 @@ type OperatorRef = { enabled: boolean } & (Operator | { op: 'fragment'; fragment
 
 type ProxyIR = {                  // 客户端无关的节点表示（字段对齐 mihomo）
   name: string; type: string; server: string; port: number; [k: string]: unknown;
-  dialer?: Target;                // 前置（渲染时转为 dialer-proxy / underlying-proxy）
+  upstreamDialer?: string;        // 上游订阅自带的 dialer-proxy / underlying-proxy 原文（REF-04）
   _source: NodeSetID; _origName: string; _key: string;   // 隐式字段，输出时剥离
 };
 
@@ -211,7 +211,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
    - 组成员中的 {kind:'node'}
    - 规则 / final 的 target {kind:'node'}
    - ChainRule.via 为 node 时
-   - 任意节点的 dialer（本地节点设置的前置、上游订阅自带的 dialer-proxy）
+   - 上游订阅自带的 dialer-proxy（本地节点不设置前置，代理链只来自 Profile 的链规则）
 2. 对每个引用 r 解析出具体节点 n（按 NodeRef.match 在 NodeSet 处理结果中查找）：
    - 找不到 → 走 fallback；无 fallback → report.error
 3. 若 n 所在 NodeSet 输出方式为 inline → 直接用 n.name，结束

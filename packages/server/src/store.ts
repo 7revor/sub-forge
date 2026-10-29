@@ -2,7 +2,7 @@
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
 import Database from 'better-sqlite3';
-import { NodeSetResolver, type LocalProxy } from '@sub-forge/core';
+import { exactNameRegex, NodeSetResolver, type ChainRule, type LocalProxy, type Profile, type Target } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
 import type { DocKind, DocTypes, LocalDoc, RuleSetDoc, Seed, TemplateVersionDoc, TokenDoc } from './docs.ts';
@@ -44,7 +44,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 每个 (来源, URL) 保留的成功快照份数（非功能需求：数据保留） */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -124,7 +124,7 @@ export class Store {
 
   close(): void { this.db.close(); }
 
-  /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：规则集单一来源、另有规则包） */
+  /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包） */
   private migrate(): void {
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version >= SCHEMA_VERSION) return;
@@ -166,7 +166,8 @@ export class Store {
         this.db.exec('DROP TABLE tokens');
       }
       if (hasDocs && version < 5) this.convertLocalSources();
-      if (hasDocs && version < 6) this.convertRuleBundles();
+      if (hasDocs && version < 6) this.moveLocalDialers();
+      if (hasDocs && version < 7) this.convertRuleBundles();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -220,6 +221,44 @@ export class Store {
       const after = JSON.stringify(retarget(JSON.parse(before)));
       if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(after), r.rowid);
     }
+  }
+
+  /**
+   * 本地节点不再设置前置（代理链只在配置订阅中管理）：节点上的前置改写成直接加入了该分组的配置订阅里的链规则，
+   * 落地按节点名精确匹配。只经组合间接用到该分组的配置订阅无法按名称可靠匹配，跳过并告警，需要用户重新配置。
+   */
+  private moveLocalDialers(): void {
+    const locals = (this.db.prepare("SELECT rowid, id, data FROM docs WHERE kind = 'local'").all() as { rowid: number; id: string; data: string }[])
+      .map((r) => ({ ...r, doc: JSON.parse(this.cipher.decrypt(r.data)) as LocalDoc }));
+    const profiles = (this.db.prepare("SELECT rowid, data FROM docs WHERE kind = 'profile'").all() as { rowid: number; data: string }[])
+      .map((r) => ({ rowid: r.rowid, doc: JSON.parse(this.cipher.decrypt(r.data)) as Profile, changed: false }));
+    for (const l of locals) {
+      const moved: { name: string; via: Target }[] = [];
+      let changed = false;
+      const proxies = l.doc.proxies.map((p) => {
+        const { dialer, 'dialer-proxy': dp, 'underlying-proxy': up, ...rest } = p as LocalProxy & { dialer?: Target };
+        if (dialer === undefined && dp === undefined && up === undefined) return p;
+        changed = true;
+        const name = typeof dp === 'string' && dp ? dp : typeof up === 'string' && up ? up : undefined;
+        if (dialer) moved.push({ name: p.name, via: dialer });
+        else if (name && l.doc.proxies.some((x) => x.name === name)) moved.push({ name: p.name, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: l.id }, match: { exact: name } } } });
+        else if (name) console.warn(`[迁移] 本地节点组「${l.doc.name}」的节点「${p.name}」前置「${name}」不在同一分组，无法转成链规则，已移除，请在配置订阅的「代理链」中重新设置`);
+        return rest as LocalProxy;
+      });
+      if (!changed) continue;
+      this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify({ ...l.doc, proxies })), l.rowid);
+      if (!moved.length) continue;
+      let used = false;
+      for (const pr of profiles) {
+        if (!pr.doc.nodeSets?.some((n) => n.ref.type === 'local' && n.ref.id === l.id)) continue;
+        used = true;
+        const chains: ChainRule[] = moved.map((m) => ({ id: `c_${randomId(8)}`, landing: { nodeSet: { type: 'local', id: l.id }, filter: exactNameRegex(m.name) }, via: m.via }));
+        pr.doc = { ...pr.doc, chains: [...(pr.doc.chains ?? []), ...chains] };
+        pr.changed = true;
+      }
+      if (!used) console.warn(`[迁移] 本地节点组「${l.doc.name}」的 ${moved.length} 个前置没有直接加入它的配置订阅可承接，已移除；经组合使用时请在配置订阅的「代理链」中重新设置`);
+    }
+    for (const pr of profiles) if (pr.changed) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify(pr.doc)), pr.rowid);
   }
 
   /**
@@ -562,8 +601,9 @@ export class Store {
         this.putTemplateVersion(t);
       }
       for (const t of seed.tokens ?? []) this.putToken(t);
-      // 旧种子里的本地内容订阅源同样转成本地节点组；旧格式规则集与规则包转成多来源规则集
+      // 旧种子里的本地内容订阅源同样转成本地节点组，本地节点上的前置同样转成链规则；旧格式规则集与规则包转成多来源规则集
       this.convertLocalSources();
+      this.moveLocalDialers();
       this.convertRuleBundles();
     });
     tx();
