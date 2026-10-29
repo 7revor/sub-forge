@@ -134,6 +134,16 @@ export class SnapshotService {
     }
   }
 
+  /** 编辑器读取原文：即使格式暂不支持也保留正文，诊断由解析层负责；不落正式快照。 */
+  async peekRuleContent(url: string, opts: FetchOptions = {}): Promise<{ body?: string; error?: string }> {
+    try {
+      const result = await this.fetcher(url, opts);
+      return { body: result.body };
+    } catch (cause) {
+      return { error: cause instanceof Error ? cause.message : String(cause) };
+    }
+  }
+
   /** 等待后台刷新全部结束（测试与优雅退出用） */
   async settled(): Promise<void> {
     while (this.background.size) await Promise.all([...this.background]);

@@ -52,7 +52,7 @@ function checkRegex(pattern: unknown, where: string, flags = ''): void {
   try { compileUserRegex(pattern, flags); } catch (e) { throw bad(`${where}：${(e as Error).message}`); }
 }
 
-function checkFetch(fetch: unknown): void {
+export function checkFetch(fetch: unknown): void {
   if (fetch === undefined) return;
   if (!isObj(fetch)) throw bad('拉取参数格式错误');
   if (fetch.ua !== undefined && typeof fetch.ua !== 'string') throw bad('User-Agent 必须是字符串');

@@ -26,7 +26,9 @@ describe('远程 YAML 转换为托管 LIST', () => {
       expect(providers).toHaveLength(1);
       expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub.test/r/'))).toBe(true);
       expect(rendered.render.yaml).not.toContain(source.url);
-      expect(Object.values(rendered.render.rulesets).every(text=>!String(text).includes('payload:'))).toBe(true);
+      expect(Object.values(rendered.render.rulesets).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
+      expect(Object.values(rendered.render.rulesets).join('')).toContain('# [YAML 原文] payload:');
+      expect(Object.values(rendered.render.rulesets).join('')).toContain('USER-AGENT,Unsupported*');
       expect((await c.get(`/api/rulesets/${id}`)).json.item.sources[0].url).toBe(source.url);
     } finally { h.store.close(); }
   });

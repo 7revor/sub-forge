@@ -63,24 +63,24 @@ export function RejectedRulesPopover({ sourceName, status }: { sourceName: strin
   }, [open]);
 
   return <>
-    <button ref={anchor} type="button" aria-label={`${sourceName}：不支持 ${status.rejected} 行，查看详情`}
+    <button ref={anchor} type="button" aria-label={`${sourceName}：未解析 ${status.rejected} 行，查看详情`}
       aria-expanded={open} aria-controls={open ? id : undefined}
       onMouseEnter={show} onMouseLeave={leave} onFocus={show}
       onClick={() => { cancelClose(); pinned.current = !pinned.current; setOpen(pinned.current); }}
       className="cursor-pointer rounded-full border-0 bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-      <Badge tone="warn">{status.rules} 条 · 不支持 {status.rejected} 行</Badge>
+      <Badge tone="warn">已解析 {status.rules} 条 · 未解析 {status.rejected} 行</Badge>
     </button>
-    {open && pos && createPortal(<div ref={panel} id={id} role="region" aria-label={`${sourceName} 不支持的规则`} style={pos}
+    {open && pos && createPortal(<div ref={panel} id={id} role="region" aria-label={`${sourceName} 未解析的规则`} style={pos}
       onMouseEnter={show} onMouseLeave={leave} onFocus={show}
       className="fixed z-[80] overflow-auto overscroll-contain rounded-lg border border-line bg-panel p-3.5 text-ink shadow-xl">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <strong className="min-w-0 break-all text-[13px]">{sourceName} · 不支持 {status.rejected} 行</strong>
+        <strong className="min-w-0 break-all text-[13px]">{sourceName} · 未解析 {status.rejected} 行</strong>
         <button type="button" aria-label="关闭规则详情" className="shrink-0 cursor-pointer border-0 bg-transparent text-[12px] text-muted hover:text-ink"
           onClick={() => { anchor.current?.focus(); close(); }}>关闭</button>
       </div>
       <div className="flex flex-col gap-3">
         {details.map((r, i) => <div key={`${r.line}-${i}`} className="min-w-0 border-t border-line-2 pt-2 text-[12px]">
-          <div className="mb-1 text-muted">第 {r.line} 行 · {r.reason}</div>
+          <div className="mb-1 text-muted">第 {r.line} 行 · {r.reason.includes('不支持') ? `本系统暂未支持解析：${r.reason}` : `输入格式有误：${r.reason}`} </div>
           <code className="block whitespace-pre-wrap break-all rounded bg-ground p-2 font-mono">{r.text}</code>
         </div>)}
         {!details.length && <span className="text-[12px] text-muted">暂无详情，请刷新预览后重试。</span>}

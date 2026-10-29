@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { UpstreamFetcher } from '../src/net/upstream.ts';
 import { addUser, client, serve, setupApp } from './helpers.ts';
 
+const activeLines = (lines: string[]) => lines.filter(line => line.trim() && !line.trimStart().startsWith('#'));
 const AIRPORT = 'trojan://pw@a.example.com:443#香港 01 | 0.5x\ntrojan://pw@b.example.com:443#剩余流量：10G\ntrojan://pw@c.example.com:443#日本 03';
 const UPSTREAM = serve({ 'https://a.example.com/sub': AIRPORT, 'https://b.example.com/sub': 'trojan://pw@d.example.com:443#香港 09' });
 const remote = (name: string, url = 'https://a.example.com/sub') => ({ name, url: url });
@@ -109,14 +110,14 @@ describe('规则集预览（CR-05）', () => {
     const { alice } = await scenario();
     const ruleset = { name: '', sources: [local('a', RULES)] };
     const mihomo = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'mihomo' });
-    expect(mihomo.json.lines).toEqual(['DOMAIN-SUFFIX,notion.so', 'PROCESS-NAME-REGEX,^steam.*', 'PROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*', 'IP-CIDR,1.1.1.0/24,no-resolve']);
+    expect(activeLines(mihomo.json.lines)).toEqual(['DOMAIN-SUFFIX,notion.so', 'PROCESS-NAME-REGEX,^steam.*', 'PROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(mihomo.json.rejected.map((r: { reason: string }) => r.reason)).toEqual(['不支持的规则类型 USER-AGENT']);
     expect(mihomo.json.sources).toEqual([{ id: 'a', ok: true, format: 'classical', behavior: 'classical', rules: 4, rejected: 1, rejectedDetails: [{ line: 5, text: 'USER-AGENT,x*', reason: '不支持的规则类型 USER-AGENT' }] }]);
     const mac = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'macos' });
     expect(mac.json.lines).toContain('PROCESS-NAME,steam*');
     expect(mac.json.notes).toHaveLength(1);
     const ios = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'ios' });
-    expect(ios.json.lines).toEqual(['DOMAIN-SUFFIX,notion.so', 'IP-CIDR,1.1.1.0/24,no-resolve']);
+    expect(activeLines(ios.json.lines)).toEqual(['DOMAIN-SUFFIX,notion.so', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(ios.json.dropped).toHaveLength(2);
   });
 
@@ -130,12 +131,12 @@ describe('规则集预览（CR-05）', () => {
     for (const source of ['a', 'b', 'off']) {
       const res = await alice.post('/api/rulesets/preview', { ruleset, source, client: 'mihomo' });
       expect(res.status).toBe(200);
-      expect(res.json.lines).toEqual([`DOMAIN,${source}.test`]);
+      expect(activeLines(res.json.lines)).toEqual([`DOMAIN,${source}.test`]);
       expect(res.json.stats).toBeUndefined();
       expect(res.json.rejected).toHaveLength(source === 'off' ? 0 : 1);
     }
     const merged = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
-    expect(merged.json.lines).toEqual(['DOMAIN,a.test', 'DOMAIN,b.test']);
+    expect(activeLines(merged.json.lines)).toEqual(['DOMAIN,a.test', 'DOMAIN,b.test']);
     expect(merged.json.sources[0].rejectedDetails).toEqual([{ line: 3, text: 'USER-AGENT,a*', reason: '不支持的规则类型 USER-AGENT' }]);
     expect(merged.json.sources[1].rejectedDetails).toEqual([{ line: 2, text: 'USER-AGENT,b*', reason: '不支持的规则类型 USER-AGENT' }]);
   });
@@ -150,7 +151,7 @@ describe('规则集预览（CR-05）', () => {
     expect(res.json.sources[0].rejectedDetails[99].line).toBe(100);
   });
 
-  it('不指定来源时返回合并结果：去重、domain → classical → ipcidr、跳过停用来源、统一 no-resolve', async () => {
+  it('不指定来源时返回合并结果：注释重复项、保留原顺序、跳过停用来源、统一 no-resolve', async () => {
     const { alice } = await scenario();
     const ruleset = { name: 'M', noResolve: true, sources: [
       local('a', 'IP-CIDR,10.0.0.0/8\nDOMAIN-KEYWORD,x\nDOMAIN,a.test'),
@@ -158,7 +159,7 @@ describe('规则集预览（CR-05）', () => {
       { ...local('off', 'DOMAIN,off.test'), enabled: false },
     ] };
     const res = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
-    expect(res.json.lines).toEqual(['DOMAIN,a.test', 'DOMAIN-SUFFIX,b.test', 'DOMAIN-KEYWORD,x', 'IP-CIDR,10.0.0.0/8,no-resolve']);
+    expect(activeLines(res.json.lines)).toEqual(['IP-CIDR,10.0.0.0/8,no-resolve', 'DOMAIN-KEYWORD,x', 'DOMAIN,a.test', 'DOMAIN-SUFFIX,b.test']);
     expect(res.json.stats).toEqual({ domain: 2, classical: 1, ipcidr: 1, total: 5, duplicates: 1 });
   });
 
@@ -171,7 +172,7 @@ describe('规则集预览（CR-05）', () => {
     });
     const sources = [{ id: 'r', kind: 'remote', format: 'classical', url: 'https://rules.example.test/ok' }, { id: 'x', kind: 'remote', format: 'classical', url: 'https://rules.example.test/bad' }, local('l', 'DOMAIN,local.test')];
     const draft = await alice.post('/api/rulesets/preview', { ruleset: { name: 'N', sources }, client: 'mihomo' });
-    expect(draft.json.lines).toEqual(['DOMAIN,remote.test', 'DOMAIN,local.test']);
+    expect(activeLines(draft.json.lines)).toEqual(['DOMAIN,remote.test', 'DOMAIN,local.test']);
     expect(draft.json.sources).toEqual([
       { id: 'r', ok: true, format: 'classical', behavior: 'classical', rules: 1, rejected: 0 },
       { id: 'x', ok: false, error: '上游 500' },
@@ -187,7 +188,7 @@ describe('规则集预览（CR-05）', () => {
     await alice.post('/api/rulesets/preview', { id, ruleset: { name: 'N', sources }, client: 'mihomo' });
     expect(store.snapshotHistory('ruleset', id)).toHaveLength(1);
     const saved = await alice.post('/api/rulesets/preview', { id, ruleset: { name: 'N', sources: sources.slice(0, 1) }, source: 'r', client: 'mihomo' });
-    expect(saved.json.lines).toEqual(['DOMAIN,remote.test']);
+    expect(activeLines(saved.json.lines)).toEqual(['DOMAIN,remote.test']);
   });
 
   it('别人的规则集不能借 id 读快照', async () => {
@@ -310,7 +311,7 @@ describe('规则集组级改写保存与预览', () => {
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
     expect(rendered.ok && Object.values(rendered.render.rulesets).join('')).toContain('changed.test');
-    expect(rendered.ok && Object.values(rendered.render.rulesets).join('')).not.toContain('same.test');
+    expect(rendered.ok && activeLines(Object.values(rendered.render.rulesets).join('\n').split('\n')).join('\n')).not.toContain('same.test');
     const removed = await alice.put(`/api/rulesets/${rs.id}`, { ...rs, overrides: [] });
     const restored = await alice.post('/api/rulesets/preview', { ruleset: removed.json.item, client: 'mihomo' });
     expect(restored.json.lines).toContain('DOMAIN,same.test');
@@ -330,9 +331,9 @@ describe('规则集组级改写保存与预览', () => {
     expect(rs.overrides).toEqual(overrides);
     const preview = await alice.post('/api/rulesets/preview', { id: rs.id, ruleset: rs, client: 'mihomo' });
     expect(preview.status).toBe(200);
-    expect(preview.json.lines).toEqual(['DOMAIN,keep.test', 'DOMAIN,added.test']);
+    expect(activeLines(preview.json.lines)).toEqual(['DOMAIN,keep.test', 'DOMAIN,added.test']);
     const surge = await alice.post('/api/rulesets/preview', { ruleset: rs, client: 'surge' });
-    expect(surge.json.lines).toEqual(['DOMAIN,keep.test']);
+    expect(activeLines(surge.json.lines)).toEqual(['DOMAIN,keep.test']);
     const profile = await alice.post('/api/profiles', { name: '追加输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);

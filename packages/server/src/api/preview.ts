@@ -3,13 +3,11 @@
 //   GET  /api/sources/:id/snapshots          快照历史（不含正文）
 //   POST /api/{sources,collections}/:id/pipeline-preview   处理链逐步预览（SRC-06），支持拉取参数与成员草稿
 //   GET  /api/nodesets/:type/:id/nodes      已保存处理链之后的节点列表
-//   POST /api/rulesets/preview               规则集草稿按客户端 + 平台的输出（CR-05）：指定来源时为该来源，否则为合并结果
 
 import {
-  ruleSetDelivery, composeRule, expandRuleSet, expandSource, lowerRule, NodeSetResolver, parseContent, parseRuleSourceContent, Report, runPipeline, sourceKey, withIpOptions,
-  type RejectedRule, type Client, type ClientCtx, type Collection, type NodeSetID, type OperatorStep, type Platform, type ProxyIR, type RuleIR,
+  NodeSetResolver, parseContent, Report, runPipeline,
+  type Collection, type NodeSetID, type OperatorStep, type ProxyIR,
 } from '@sub-forge/core';
-import type { RuleSetDoc, RuleSetSourceDoc } from '../docs.ts';
 import { Hono, type Context } from 'hono';
 import type { RenderService } from '../render.ts';
 import type { SourceDoc } from '../docs.ts';
@@ -17,25 +15,18 @@ import type { SnapshotService } from '../snapshots.ts';
 import { sourceUrl } from '../source-url.ts';
 import type { Store } from '../store.ts';
 import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
-import { checkRepositorySource, checkRuleSetOverrides, validateDoc } from './validate.ts';
+import { validateDoc } from './validate.ts';
 
-const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
 /** 逐步预览每步最多返回的节点数，避免大订阅撑爆响应 */
 const MAX_NODES_PER_STEP = 500;
 /** 节点选择器最多返回的节点数 */
 const MAX_NODE_LIST_SIZE = 5000;
-/** 规则集预览最多返回的输出行数 */
-const MAX_RULE_LINES = 5000;
-/** 未保存草稿的远程来源只拉取不落快照，短时间内复用结果，避免每次按键都去拉 */
-const PEEK_TTL_MS = 5 * 60_000;
-
 const brief = (n: ProxyIR) => ({ name: n.name, type: n.type, server: n.server, port: n.port });
 
 export function previewRoutes(store: Store, renderer: RenderService, snapshots: SnapshotService) {
   const app = new Hono<ApiEnv>();
   app.use('/sources/:id/*', requireUser);
   app.use('/collections/:id/*', requireUser);
-  app.use('/rulesets/preview', requireUser);
   app.use('/nodesets/:type/:id/*', requireUser);
 
   const own = <K extends 'source' | 'collection' | 'local' | 'ruleset'>(kind: K, id: string, userId: string) => {
@@ -143,123 +134,6 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
   };
   app.post('/sources/:id/pipeline-preview', pipelinePreview('source'));
   app.post('/collections/:id/pipeline-preview', pipelinePreview('collection'));
-
-  const peeked = new Map<string, { at: number; result: { body?: string; error?: string } }>();
-  const peek = async (src: RuleSetSourceDoc) => {
-    const key = `${src.format}\u0000${src.url}`;
-    const hit = peeked.get(key);
-    if (hit && Date.now() - hit.at < PEEK_TTL_MS) return hit.result;
-    const result = await snapshots.peek(src.url!, { ...src.fetch, format: src.format });
-    peeked.set(key, { at: Date.now(), result });
-    while (peeked.size > 64) peeked.delete(peeked.keys().next().value!);
-    return result;
-  };
-
-  const lower = (rules: RuleIR[], ctx: ClientCtx) => {
-    const lines: string[] = [];
-    const dropped: { rule: string; reason: string }[] = [];
-    const notes: string[] = [];
-    for (const rule of rules) {
-      const l = lowerRule(rule, ctx);
-      if (l.kind === 'drop') dropped.push({ rule: JSON.stringify(rule), reason: l.reason });
-      else { lines.push(composeRule(l)); if (l.note) notes.push(l.note); }
-    }
-    return { lines, dropped, notes };
-  };
-
-  /**
-   * 规则集预览：请求体带编辑中的草稿（可未保存），不写入任何文档。
-   * - id：已保存的规则集，已保存的远程地址读写它名下的快照；其余地址（新建草稿、编辑中新填的）只拉取不落快照；
-   * - source：来源 id，给出时返回该来源的输出与无法解析的行，否则返回全部启用来源合并（去重、按 behavior 排序）后的结果；
-   * - 每个来源的拉取状态一并返回，界面在来源列表上标出。
-   */
-  app.post('/rulesets/preview', async (c) => {
-    const user = c.get('user');
-    const body = await jsonBody<{ ruleset?: unknown; id?: unknown; source?: unknown; client?: unknown; platform?: unknown }>(c);
-    const client: Client = body.client === 'surge' ? 'surge' : 'mihomo';
-    const platform = PLATFORMS.find((p) => p === body.platform);
-    const ctx: ClientCtx = platform ? { client, platform } : { client };
-    const saved = typeof body.id === 'string' && body.id ? own('ruleset', body.id, user.id) : undefined;
-    const savedId = saved?.id;
-    // 只有已保存的地址读写快照；编辑中尚未保存的地址（含输入到一半的）只拉取，不在快照表里留下记录
-    const savedUrls = new Set((saved?.sources ?? []).flatMap((x) => (x.kind === 'remote' && x.url ? [x.url] : [])));
-    const draft = body.ruleset as Partial<RuleSetDoc> | undefined;
-    if (!draft || typeof draft !== 'object' || !Array.isArray(draft.sources)) throw bad('ruleset.sources 必须是数组');
-    checkRuleSetOverrides(draft.overrides);
-    const rs: RuleSetDoc = { id: savedId ?? 'draft', name: typeof draft.name === 'string' && draft.name ? draft.name : '未命名', sources: draft.sources, ...(draft.overrides ? { overrides: draft.overrides } : {}), ...(draft.noResolve ? { noResolve: true } : {}) };
-
-    const snapshotsIn: Record<string, string> = {};
-    const parseErrors = new Set<string>();
-    const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRule[]; conversion?: 'yaml-to-list'; format?: string; behavior?: string }[] = [];
-    for (const src of rs.sources) {
-      if (!src || typeof src !== 'object' || typeof src.id !== 'string') throw bad('来源格式错误');
-      src.format ??= 'auto';
-      checkRepositorySource(src, saved?.sources.find(s => s.id === src.id), store, '来源');
-      const passthrough = src.format === 'mrs' || src.format === 'srs';
-      let content = src.kind === 'local' ? src.content ?? '' : undefined;
-      let error: string | undefined;
-      let fetchedAt: number | undefined;
-      if (src.kind === 'remote' && !passthrough && (body.source === undefined || body.source === src.id || src.enabled !== false)) {
-        if (!src.url || !/^https?:\/\/[^/]+/.test(src.url)) error = '请填写 http(s) 地址';
-        else if (savedId && savedUrls.has(src.url)) {
-          const r = await snapshots.get('ruleset', savedId, src.url, { ttlSec: src.fetch?.ttlSec ?? 86400, ...src.fetch, format: src.format });
-          content = r.snapshot?.body;
-          fetchedAt = r.snapshot?.fetchedAt;
-          error = r.error;
-        } else {
-          const r = await peek(src);
-          content = r.body;
-          error = r.error;
-        }
-      }
-      if (content !== undefined && src.kind === 'remote') snapshotsIn[sourceKey(rs.id, src.id)] = content;
-      let parsed: ReturnType<typeof parseRuleSourceContent> | undefined;
-      try { parsed = content === undefined || passthrough ? undefined : parseRuleSourceContent(content, src); }
-      catch (cause) {
-        error = `规则内容无法解析：${cause instanceof Error ? cause.message : String(cause)}`;
-        parseErrors.add(src.id);
-        delete snapshotsIn[sourceKey(rs.id, src.id)];
-      }
-      status.push({
-        id: src.id, ok: !error && (passthrough || content !== undefined),
-        ...(error ? { error } : {}), ...(fetchedAt ? { fetchedAt } : {}), ...(passthrough ? { passthrough: true } : {}),
-        ...(parsed && !parsed.passthrough ? { format: parsed.format, behavior: parsed.behavior, rules: parsed.rules.length, rejected: parsed.rejected.length, ...(parsed.conversion ? { conversion: parsed.conversion } : {}), ...(parsed.rejected.length ? { rejectedDetails: parsed.rejected.slice(0, 100) } : {}) } : {}),
-      });
-    }
-    const inputs = { rulesets: { [rs.id]: rs }, snapshots: snapshotsIn };
-    const report = new Report();
-    const delivery = ruleSetDelivery(rs, inputs, ctx);
-
-    if (body.source !== undefined) {
-      const src = rs.sources.find((x) => x.id === body.source);
-      if (!src) throw bad('来源不存在');
-      const st = status.find((x) => x.id === src.id)!;
-      if (src.format === 'mrs' || src.format === 'srs') return c.json({ sources: status, delivery, passthrough: true, lines: [], dropped: [], notes: [], rejected: [] });
-      const content = src.kind === 'local' ? src.content ?? '' : snapshotsIn[sourceKey(rs.id, src.id)];
-      if (content === undefined || parseErrors.has(src.id)) return c.json({ sources: status, delivery, passthrough: false, lines: [], dropped: [], notes: [], rejected: [], ...(st.error ? { error: st.error } : {}) });
-      const parsed = parseRuleSourceContent(content, src);
-      const ex = expandSource(rs, src, inputs, ctx, report);
-      const out = ex.passthrough ? { lines: [], dropped: [], notes: [] } : lower(ex.rules.map((r) => withIpOptions(r, { noResolve: rs.noResolve })), ctx);
-      return c.json({
-        sources: status, delivery, passthrough: ex.passthrough,
-        ...out, lines: out.lines.slice(0, MAX_RULE_LINES), total: out.lines.length,
-        rejected: parsed.passthrough ? [] : parsed.rejected,
-        ...(st.error ? { error: st.error } : {}),
-      });
-    }
-
-    // 合并结果：只合并已拿到内容的来源；拉取失败的来源在 sources 里标红，不阻断预览
-    const usable: RuleSetDoc = { ...rs, sources: rs.sources.filter((s) => !parseErrors.has(s.id) && (s.kind === 'local' || s.format === 'mrs' || s.format === 'srs' || snapshotsIn[sourceKey(rs.id, s.id)] !== undefined)) };
-    const b = expandRuleSet(rs.id, { ...inputs, rulesets: { [rs.id]: usable } }, ctx, report);
-    const out = lower([...b.domain, ...b.classical, ...b.ipcidr], ctx);
-    return c.json({
-      sources: status, delivery, passthrough: false,
-      ...out, lines: out.lines.slice(0, MAX_RULE_LINES), total: out.lines.length,
-      rejected: [],
-      stats: { domain: b.domain.length, classical: b.classical.length, ipcidr: b.ipcidr.length, total: b.total, duplicates: b.duplicates },
-      passthroughSources: b.passthrough.map(({ sourceId, name, format }) => ({ sourceId, name, format })),
-    });
-  });
 
   return app;
 }

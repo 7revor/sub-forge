@@ -1,3 +1,5 @@
+import { sourceKey } from '../rules/expand.ts';
+import { convertRuleDocuments, prepareRuleDocument } from '../rules/convert.ts';
 import { ruleSetDelivery } from '../rules/delivery.ts';
 // mihomo 渲染（docs/03 §3 ②–⑥、§4）：模板合并 → 节点集 → 依赖解析 → 规则展开 → 引用校验 → YAML。
 // 纯函数：所有外部数据（快照、模板、规则集）由调用方传入。
@@ -308,12 +310,6 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
   const ruleLines: string[] = [];
   const ruleProviders: Record<string, Record<string, unknown>> = {};
   const rulesets: Record<string, RulesetOutput> = {};
-  const lowerInline = (rule: RuleIR, where: string): string | undefined => {
-    const l = lowerRule(rule, ctx);
-    if (l.kind === 'drop') { report.info('rule.dropped', l.reason, where); return undefined; }
-    if (l.note) report.info('rule.degraded', l.note, where);
-    return composeRule(l);
-  };
 
   for (const r of eff.rules) {
     if (r.enabled === false) continue;
@@ -332,7 +328,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     }
     // 不同规则级选项可能改变 classical 正文或 CIDR 分段，不能共用同名 provider。
     const base = `rs_${safeId(m.id)}${r.options?.noResolve ? '_nr' : ''}${r.options?.src ? '_src' : ''}`;
-    const buckets = expandRuleSet(m.id, input.rules, ctx, report);
+    expandRuleSet(m.id, input.rules, ctx, report);
     const rs = input.rules.rulesets[m.id];
     if (!rs) continue;
     const delivery = ruleSetDelivery(rs, input.rules, ctx, r.options);
@@ -350,11 +346,14 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     const key = `${base}_classical`;
     const file = `${key}.list`;
     if (!rulesets[file]) {
-      const lines = [...buckets.domain, ...buckets.classical, ...buckets.ipcidr]
-        .map(rule => lowerInline(withIpOptions(rule, r.options ?? {}), where))
-        .filter((line): line is string => line !== undefined);
-      if (!lines.length) continue;
-      rulesets[file] = { behavior: 'classical', text: lines.join('\n') + '\n' };
+      const documents = new Map(rs.sources.filter(s => s.enabled !== false).map(s => {
+        const content = s.kind === 'local' ? s.content ?? '' : input.rules.snapshots[sourceKey(rs.id, s.id)] ?? '';
+        return [s.id, prepareRuleDocument(content, s)] as const;
+      }));
+      const converted = convertRuleDocuments(rs, documents, ctx, { ipOptions: r.options });
+      for (const diagnostic of converted.diagnostics) report.info(`rule.${diagnostic.kind}`, diagnostic.reason, where);
+      if (!converted.lines.length) continue;
+      rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n' };
       ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
     }
     ruleLines.push(`RULE-SET,${key},${target}`);
