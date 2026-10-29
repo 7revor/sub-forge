@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { UpstreamFetcher } from '../src/net/upstream.ts';
-import { addUser, client, setupApp } from './helpers.ts';
+import { addUser, client, serve, setupApp } from './helpers.ts';
 
 const AIRPORT = 'trojan://pw@a.example.com:443#香港 01 | 0.5x\ntrojan://pw@b.example.com:443#剩余流量：10G\ntrojan://pw@c.example.com:443#日本 03';
+const UPSTREAM = serve({ 'https://a.example.com/sub': AIRPORT, 'https://b.example.com/sub': 'trojan://pw@d.example.com:443#香港 09' });
+const remote = (name: string, url = 'https://a.example.com/sub') => ({ name, urls: [url] });
 
 async function scenario(fetcher?: UpstreamFetcher) {
   const env = setupApp(fetcher ? { fetcher } : {});
@@ -17,8 +19,8 @@ async function scenario(fetcher?: UpstreamFetcher) {
 
 describe('处理链逐步预览', () => {
   it('订阅源：按草稿处理链逐步执行，返回每步节点与差异', async () => {
-    const { alice } = await scenario();
-    const id = (await alice.post('/api/sources', { name: 'A', kind: 'local', content: AIRPORT, pipeline: [] })).json.item.id;
+    const { alice } = await scenario(UPSTREAM);
+    const id = (await alice.post('/api/sources', { ...remote('A'), pipeline: [] })).json.item.id;
     const res = await alice.post(`/api/sources/${id}/pipeline-preview`, {
       pipeline: [{ op: 'filter.useless' }, { op: 'rename.regex', rules: [{ pattern: '^香港\\s*(\\d+).*$', replace: 'HK-$1' }] }, { op: 'flag', mode: 'add' }],
     });
@@ -34,16 +36,16 @@ describe('处理链逐步预览', () => {
   });
 
   it('草稿里的非法正则直接报错；别人的订阅源不能预览', async () => {
-    const { alice, bob } = await scenario();
-    const id = (await alice.post('/api/sources', { name: 'A', kind: 'local', content: AIRPORT, pipeline: [] })).json.item.id;
+    const { alice, bob } = await scenario(UPSTREAM);
+    const id = (await alice.post('/api/sources', { ...remote('A'), pipeline: [] })).json.item.id;
     expect((await alice.post(`/api/sources/${id}/pipeline-preview`, { pipeline: [{ op: 'filter.regex', patterns: ['(['], keep: true }] })).status).toBe(400);
     expect((await bob.post(`/api/sources/${id}/pipeline-preview`, {})).status).toBe(404);
   });
 
   it('组合：成员先跑各自处理链与前缀，再逐步执行组合自身的处理链', async () => {
-    const { alice } = await scenario();
-    const a = (await alice.post('/api/sources', { name: 'A', kind: 'local', content: AIRPORT, pipeline: [{ op: 'filter.useless' }] })).json.item.id;
-    const b = (await alice.post('/api/sources', { name: 'B', kind: 'local', content: 'trojan://pw@d.example.com:443#香港 09', pipeline: [] })).json.item.id;
+    const { alice } = await scenario(UPSTREAM);
+    const a = (await alice.post('/api/sources', { ...remote('A'), pipeline: [{ op: 'filter.useless' }] })).json.item.id;
+    const b = (await alice.post('/api/sources', { ...remote('B', 'https://b.example.com/sub'), pipeline: [] })).json.item.id;
     const col = (await alice.post('/api/collections', { name: 'C', members: [{ ref: { type: 'source', id: a }, prefix: 'A·' }, { ref: { type: 'source', id: b }, prefix: 'B·' }], pipeline: [] })).json.item.id;
     const res = await alice.post(`/api/collections/${col}/pipeline-preview`, { pipeline: [{ op: 'sort.name', order: 'desc' }] });
     expect(res.json.input).toBe(3);
@@ -58,7 +60,7 @@ describe('立即拉取与快照', () => {
       if (fail) throw new Error('HTTP 502');
       return { status: 200, body: AIRPORT, userinfo: { total: 100 } };
     });
-    const id = (await alice.post('/api/sources', { name: 'R', kind: 'remote', urls: ['https://air.example.com/sub'] })).json.item.id;
+    const id = (await alice.post('/api/sources', { name: 'R', urls: ['https://air.example.com/sub'] })).json.item.id;
     const ok = await alice.post(`/api/sources/${id}/refresh`);
     expect(ok.json.items[0]).toMatchObject({ url: 'https://air.example.com/sub', ok: true, userinfo: { total: 100 } });
     fail = true;
@@ -102,10 +104,10 @@ describe('节点集最终节点列表', () => {
     });
   });
 
-  it('本地订阅源使用保存的改名与过滤，组合继续执行成员前缀和自身处理链', async () => {
-    const { alice } = await scenario();
+  it('订阅源使用保存的改名与过滤，组合继续执行成员前缀和自身处理链', async () => {
+    const { alice } = await scenario(UPSTREAM);
     const source = (await alice.post('/api/sources', {
-      name: '源', kind: 'local', content: AIRPORT,
+      ...remote('源'),
       pipeline: [{ op: 'rename.regex', rules: [{ pattern: '^香港.*$', replace: 'HK' }] }, { op: 'filter.regex', patterns: ['^HK$'], keep: true }],
     })).json.item.id;
     const local = (await alice.post('/api/locals', { name: '本地组', proxies: [{ name: 'HK', type: 'trojan', server: 'd.example.com', port: 443, password: 'pw' }] })).json.item.id;
@@ -125,7 +127,7 @@ describe('节点集最终节点列表', () => {
   it.each(['source', 'collection', 'local'] as const)('%s：未登录 401，别人的或不存在的节点集 404', async (type) => {
     const { alice, bob, app } = await scenario();
     const path = { source: 'sources', collection: 'collections', local: 'locals' }[type];
-    const body = { source: { name: '源', kind: 'local', content: AIRPORT }, collection: { name: '组合', members: [] }, local: { name: '本地组', proxies: [] } }[type];
+    const body = { source: remote('源'), collection: { name: '组合', members: [] }, local: { name: '本地组', proxies: [] } }[type];
     const id = (await alice.post(`/api/${path}`, body)).json.item.id;
     expect((await client(app).get(`/api/nodesets/${type}/${id}/nodes`)).status).toBe(401);
     expect((await bob.get(`/api/nodesets/${type}/${id}/nodes`)).status).toBe(404);
@@ -155,7 +157,7 @@ describe('节点集最终节点列表', () => {
       if (url.endsWith('/bad')) throw new Error('上游不可用');
       return { status: 200, body: AIRPORT + '\ntrojan://broken' };
     });
-    const id = (await alice.post('/api/sources', { name: '远程源', kind: 'remote', urls: ['https://example.com/good', 'https://example.com/bad'] })).json.item.id;
+    const id = (await alice.post('/api/sources', { name: '远程源', urls: ['https://example.com/good', 'https://example.com/bad'] })).json.item.id;
     const res = await alice.get(`/api/nodesets/source/${id}/nodes`);
     expect(res.status).toBe(200);
     expect(res.json.total).toBe(3);

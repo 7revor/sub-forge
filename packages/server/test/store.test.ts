@@ -12,8 +12,8 @@ const T = (version: number) => ({ id: 'std', version, groups: [], rules: [], fin
 describe('Store', () => {
   it('文档读写与覆盖', () => {
     const s = new Store(':memory:');
-    s.put('source', { id: 'a', name: 'A', kind: 'local', content: 'x', pipeline: [] });
-    s.put('source', { id: 'a', name: 'A2', kind: 'local', content: 'x', pipeline: [] });
+    s.put('source', { id: 'a', name: 'A', urls: ['https://a.test/sub'], pipeline: [] });
+    s.put('source', { id: 'a', name: 'A2', urls: ['https://a.test/sub'], pipeline: [] });
     expect(s.get('source', 'a')!.name).toBe('A2');
     expect(s.get('source', 'missing')).toBeUndefined();
     expect(s.list('source')).toHaveLength(1);
@@ -51,7 +51,7 @@ describe('Store', () => {
 describe('加密与迁移', () => {
   it('文档、快照正文、token 落盘时加密；token 按 HMAC 查找', () => {
     const s = new Store(':memory:');
-    s.put('source', { id: 'a', name: 'A', kind: 'remote', urls: ['https://secret.example.com/sub?token=xyz'], pipeline: [] }, 'u1');
+    s.put('source', { id: 'a', name: 'A', urls: ['https://secret.example.com/sub?token=xyz'], pipeline: [] }, 'u1');
     const url = 'https://secret.example.com/sub?token=xyz';
     s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url, fetchedAt: 1, ok: true, body: 'password: hunter2', error: `连接 ${url} 失败` });
     const t = s.createToken('p', 'Mac');
@@ -83,6 +83,35 @@ describe('加密与迁移', () => {
     const s = new Store(file, { cipher: new Cipher(randomBytes(32)) });
     expect(s.get('profile', 'p')!.name).toBe('旧');
     expect(s.getToken('old-token')).toEqual({ token: 'old-token', profileId: 'p' });
+    s.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('v4 的本地内容订阅源迁移为本地节点组：节点为处理链结果，引用改指向本地节点组', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-mig-'));
+    const file = join(dir, 'v4.db');
+    const cipher = new Cipher(randomBytes(32));
+    const old = new Store(file, { cipher });
+    const content = 'proxies:\n  - { name: 香港 01, type: trojan, server: hk.test, port: 443, password: p, dialer-proxy: 中转 }\n  - { name: 中转, type: socks5, server: relay.test, port: 1080 }\n  - { name: 剩余流量：10G, type: trojan, server: info.test, port: 443, password: p }\n';
+    const legacy = { id: 'L', name: '手写', kind: 'local', content, pipeline: [{ op: 'filter.useless' }, { op: 'rename.affix', prefix: 'A·' }] };
+    old.put('source', legacy as never, 'u1');
+    old.put('source', { id: 'R', name: '远程', urls: ['https://r.test/sub'], pipeline: [] }, 'u1');
+    old.put('collection', { id: 'c', name: 'C', members: [{ ref: { type: 'source', id: 'L' }, prefix: 'x' }, { ref: { type: 'source', id: 'R' } }], pipeline: [] }, 'u1');
+    old.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'source', id: 'L' }, output: 'inline' }], overlay: {}, chains: [{ id: 'ch', landing: { nodeSet: { type: 'source', id: 'L' } }, via: { kind: 'builtin', name: 'DIRECT' } }], refPolicy: { default: 'wrap' } }, 'u1');
+    old.db.pragma('user_version = 4');
+    old.close();
+
+    const s = new Store(file, { cipher });
+    expect(s.get('source', 'L')).toBeUndefined();
+    expect(s.get('source', 'R')!.name).toBe('远程');
+    expect(s.getWithOwner('local', 'L')).toMatchObject({ owner: 'u1', doc: { id: 'L', name: '手写', proxies: [
+      { name: 'A·香港 01', type: 'trojan', server: 'hk.test', port: 443, password: 'p', 'dialer-proxy': 'A·中转' },
+      { name: 'A·中转', type: 'socks5', server: 'relay.test', port: 1080 },
+    ] } });
+    expect(s.get('collection', 'c')!.members.map((m) => m.ref)).toEqual([{ type: 'local', id: 'L' }, { type: 'source', id: 'R' }]);
+    const p = s.get('profile', 'p')!;
+    expect(p.nodeSets[0]!.ref).toEqual({ type: 'local', id: 'L' });
+    expect(p.chains[0]!.landing.nodeSet).toEqual({ type: 'local', id: 'L' });
     s.close();
     rmSync(dir, { recursive: true, force: true });
   });

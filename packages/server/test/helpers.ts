@@ -18,6 +18,13 @@ export function setupApp(opts: { fetcher?: UpstreamFetcher; now?: () => number }
   return { store, app, snapshots, renderer, advance: (ms: number) => { t += ms; } };
 }
 
+/** 按 URL 返回固定正文的上游，供远程订阅源测试使用 */
+export const serve = (bodies: Record<string, string>): UpstreamFetcher => async (url) => {
+  const body = bodies[url];
+  if (body === undefined) throw new Error(`测试中未提供 ${url}`);
+  return { status: 200, body };
+};
+
 export async function addUser(store: Store, username: string, role: Role = 'user', password = 'password-123') {
   return store.createUser({ username, passwordHash: await hashPassword(password), role });
 }

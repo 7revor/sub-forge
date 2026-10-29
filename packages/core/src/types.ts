@@ -40,12 +40,11 @@ export type Operator =
 
 export type OperatorStep = Operator & { enabled?: boolean };
 
+/** 远程订阅源；手写或粘贴的节点放在本地节点组（LocalProxyGroup） */
 export type Source = {
   id: ID;
   name: string;
-  kind: 'remote' | 'local';
-  urls?: string[];
-  content?: string;
+  urls: string[];
   pipeline: OperatorStep[];
 };
 

@@ -15,9 +15,7 @@
 // ---------- 节点侧 ----------
 type Source = {
   id: ID; owner: UserID; name: string;
-  kind: 'remote' | 'local';
-  urls?: string[];               // remote：可多个，按序合并
-  content?: string;              // local
+  urls: string[];                // 可多个，按序合并；手写或粘贴的节点放在 LocalProxyGroup
   fetch?: { ua?: string; timeoutMs?: number; ttlSec?: number; viaProxy?: string };
   pipeline: OperatorRef[];       // 处理链
 };

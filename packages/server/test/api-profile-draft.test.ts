@@ -15,7 +15,7 @@ async function scenario() {
 describe('未保存 Profile 草稿预览', () => {
   it('能渲染 YAML 和依赖，忽略传入 id，不读写渲染缓存或持久化 Profile、last-good、访问日志', async () => {
     const { alice, store, renderer } = await scenario();
-    const source = (await alice.post('/api/sources', { name: '节点', kind: 'local', content: 'trojan://pw@a.example.com:443#香港' })).json.item;
+    const local = (await alice.post('/api/locals', { name: '节点', proxies: [{ name: '香港', type: 'trojan', server: 'a.example.com', port: 443, password: 'pw' }] })).json.item;
     const get = vi.spyOn(store, 'get');
     const put = vi.spyOn(store, 'put');
     const putLast = vi.spyOn(store, 'putLastGood');
@@ -25,7 +25,7 @@ describe('未保存 Profile 草稿预览', () => {
     const cacheGet = vi.spyOn(cache, 'get');
     const cacheSet = vi.spyOn(cache, 'set');
     const res = await alice.post('/api/profiles/preview', {
-      profile: { ...draft, id: '某个已保存文档', nodeSets: [{ ref: { type: 'source', id: source.id }, output: 'provider' }] }, platform: 'macos',
+      profile: { ...draft, id: '某个已保存文档', nodeSets: [{ ref: { type: 'local', id: local.id }, output: 'provider' }] }, platform: 'macos',
     });
     expect(res.status).toBe(200);
     expect(res.json).toMatchObject({ ok: true, report: [], dependencies: [] });
@@ -43,8 +43,8 @@ describe('未保存 Profile 草稿预览', () => {
     await addUser(store, 'bob');
     const bob = client(app);
     await bob.login('bob');
-    const source = (await bob.post('/api/sources', { name: '私有节点', kind: 'local', content: 'trojan://secret@b.example.com:443#私有' })).json.item;
-    const res = await alice.post('/api/profiles/preview', { profile: { ...draft, nodeSets: [{ ref: { type: 'source', id: source.id }, output: 'provider' }] } });
+    const local = (await bob.post('/api/locals', { name: '私有节点', proxies: [{ name: '私有', type: 'trojan', server: 'b.example.com', port: 443, password: 'secret' }] })).json.item;
+    const res = await alice.post('/api/profiles/preview', { profile: { ...draft, nodeSets: [{ ref: { type: 'local', id: local.id }, output: 'provider' }] } });
     expect(res.status).toBe(400);
     expect(res.json.error).toContain('不存在');
     expect(res.json).not.toHaveProperty('yaml');
