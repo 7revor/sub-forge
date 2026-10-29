@@ -1,10 +1,11 @@
+import { profileTemplate } from './profile-routing.ts';
 // 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 缓存；失败时返回上一份成功结果（OUT-05 / TPL-12）。
 // 渲染结果与 token 无关：地址里先写占位符，下发时再替换成请求所用的 token，
 // 这样同一 Profile 的多个订阅链接共用缓存与"上一份成功结果"。
 
 import { createHash } from 'node:crypto';
 import {
-  mergeTemplate, Report, renderMihomo, sourceKey, sourceLabel, stableHash, stableStringify,
+  resolveProfileRouting, Report, renderMihomo, sourceKey, sourceLabel, stableHash, stableStringify,
   type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -24,6 +25,7 @@ export type StoredRender = {
   yaml: string;
   providers: Record<string, string>;
   rulesets: Record<string, string>;
+  remoteRuleUrls?: Record<string, string>;
   userinfo?: TrafficInfo;
   warnings: number;
 };
@@ -151,7 +153,7 @@ export class RenderService {
     const profile = opts.profile ?? this.store.get('profile', profileId);
     if (!profile) return { report: pre, failure: 'Profile 不存在' };
 
-    const template = opts.template ?? (profile.template ? this.store.getTemplate(profile.template.id, profile.template.follow === 'latest' ? undefined : profile.template.follow.pinned) : undefined);
+    const template = profile.routing?.mode === 'independent' ? undefined : opts.template ?? profileTemplate(profile, (id, v) => this.store.getTemplate(id, v));
     if (profile.template && !template) pre.push({ level: 'error', code: 'template.missing', message: `模板 ${profile.template.id} 不存在` });
 
     const loaded = await this.loadNodeSets(profile.nodeSets.map((n) => n.ref));
@@ -203,7 +205,7 @@ export class RenderService {
       ...(base ? { base } : {}),
       urls: {
         provider: (k, v) => `${publicUrl}/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}&h=${v}${qs}`,
-        ruleset: (k) => `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}${qs}`,
+        ruleset: (k, url) => url ? `${publicUrl}/api/rules/convert?url=${encodeURIComponent(url)}&token=${TOKEN_PLACEHOLDER}&key=${encodeURIComponent(k)}&v=${GENERATION_PLACEHOLDER}${qs}` : `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}${qs}`,
       },
     });
     const report = [...pre, ...result.report.items];
@@ -236,6 +238,7 @@ export class RenderService {
       yaml: result.yaml,
       providers: Object.fromEntries(Object.entries(result.providers).map(([k, p]) => [k, p.yaml])),
       rulesets: Object.fromEntries(Object.entries(result.rulesets).map(([k, r]) => [k, r.text])),
+      remoteRuleUrls: Object.fromEntries(Object.entries(result.rulesets).flatMap(([k, r]) => r.remoteUrl ? [[k, r.remoteUrl]] : [])),
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };
@@ -292,7 +295,7 @@ export class RenderService {
     };
     // 与内核渲染使用同一份有效规则：覆盖层可禁用或重新启用模板规则，孤儿锚点也不再参与拉取。
     // 合并报告由 renderMihomo 统一返回，避免重复记录。
-    for (const r of mergeTemplate(template, profile.overlay, new Report()).rules) {
+    for (const r of resolveProfileRouting(profile, template, new Report()).rules) {
       if (r.enabled !== false) visit(r.matcher);
     }
     return out;

@@ -1,5 +1,6 @@
 // 上游拉取：自定义 UA、超时、手动跟随重定向（逐跳校验）、响应大小上限、透传 subscription-userinfo（SRC-02 / SRC-05）。
 
+import { decodeRuleBytes } from './mrs.ts';
 import { fetch as undiciFetch } from 'undici';
 import type { TrafficInfo } from '../store.ts';
 import { assertUrlAllowed, SsrfError, type AllowList } from './ssrf.ts';
@@ -7,7 +8,7 @@ import { assertUrlAllowed, SsrfError, type AllowList } from './ssrf.ts';
 export class UpstreamError extends Error {}
 
 export type UpstreamResponse = { status: number; body: string; userinfo?: TrafficInfo };
-export type UpstreamOptions = { ua?: string; timeoutMs?: number };
+export type UpstreamOptions = { ua?: string; timeoutMs?: number; ruleContent?: boolean };
 export type UpstreamFetcher = (url: string, opts?: UpstreamOptions) => Promise<UpstreamResponse>;
 
 /** 只用到 fetch 响应的这几个成员，便于测试替换 */
@@ -15,6 +16,7 @@ export type FetchLike = (url: string, init: { headers: Record<string, string>; s
   status: number;
   headers: { get(name: string): string | null };
   text(): Promise<string>;
+  arrayBuffer?(): Promise<ArrayBuffer>;
 }>;
 
 export const DEFAULT_UA = 'clash.meta';
@@ -75,7 +77,9 @@ export function createUpstreamFetcher(opts: { allow: AllowList; fetchImpl?: Fetc
       if (res.status < 200 || res.status >= 300) throw new UpstreamError(`HTTP ${res.status}`);
       const len = Number(res.headers.get('content-length'));
       if (Number.isFinite(len) && len > maxBytes) throw new UpstreamError(`响应过大（${len} 字节）`);
-      const body = await res.text();
+      const bytes = o.ruleContent && res.arrayBuffer ? Buffer.from(await res.arrayBuffer()) : undefined;
+      if (bytes && bytes.length > maxBytes) throw new UpstreamError(`响应过大（${bytes.length} 字节）`);
+      const body = bytes ? await decodeRuleBytes(bytes) : await res.text();
       if (body.length > maxBytes) throw new UpstreamError(`响应过大（${body.length} 字符）`);
       const userinfo = parseUserinfo(res.headers.get('subscription-userinfo'));
       return userinfo ? { status: res.status, body, userinfo } : { status: res.status, body };

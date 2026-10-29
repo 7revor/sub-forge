@@ -13,3 +13,7 @@ describe('匹配类型切换', () => {
     expect(changeMatcherKind(set, 'rule')).toEqual({ kind: 'rule', rule: { type: 'RAW', text: '' } });
   });
 });
+
+it('从远程 URL 切换到单条规则时移除引用字段', () => {
+  expect(changeMatcherKind({kind:'ruleset',id:'remote:test',remote:{url:'https://example.test/rules'}},'rule')).toEqual({kind:'rule',rule:{type:'RAW',text:''}});
+});

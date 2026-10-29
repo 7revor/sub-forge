@@ -1,3 +1,4 @@
+import { TemplateCard } from './TemplateCard.tsx';
 // 七步新建向导：所有步骤共用前端草稿，仅在完成时创建文档。
 
 import { Check } from 'lucide-react';
@@ -20,25 +21,17 @@ export function ProfileWizard() {
   const save = useSaveDoc('profiles');
   // 从模板页「用这个模板新建配置订阅」进入时预选模板
   const preset = useSearchParams()[0].get('template');
-  const [draft, setDraft] = useState<ProfileDoc>({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, ...(preset ? { template: { id: preset, follow: 'latest' as const } } : {}) });
+  const [draft, setDraft] = useState<ProfileDoc>({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: preset ? { mode: 'bound', templateId: preset, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const { ctx, template } = useProfileCtx(draft, setDraft);
   const nameValid = !!draft.name.trim();
-  const templateReady = !draft.template || (!!template.data && !template.isError);
+  const templateReady = draft.routing?.mode !== 'bound' || (!!template.data && !template.isError);
   const next = () => {
     if (!nameValid || !ctx?.baseValid || save.isPending) return;
     const nextStep = Math.min(step + 1, STEPS.length - 1);
     setStep(nextStep);
     setReached(Math.max(reached, nextStep));
-  };
-  const changeTemplate = (id: string) => {
-    if (id === (draft.template?.id ?? '')) return;
-    const o = draft.overlay;
-    const hasOverlay = Object.keys(o.groupPatches ?? {}).length || Object.keys(o.rulePatches ?? {}).length || o.extraGroups?.length || o.extraRules?.length || o.final;
-    if (hasOverlay && !confirm('更换模板会清空策略组和规则的全部覆盖层（包括私有组、私有规则和最终出口），是否继续？')) return;
-    const { template: _template, ...rest } = draft;
-    setDraft({ ...rest, overlay: {}, ...(id ? { template: { id, follow: 'latest' } as const } : {}) });
   };
   const finish = () => {
     if (!nameValid || !ctx?.baseValid || !templateReady || save.isPending) return;
@@ -74,20 +67,7 @@ export function ProfileWizard() {
           <TabBase />
         </>}
         {step === 1 && <TabNodeSets />}
-        {step === 2 && <Card title="模板">
-          <ErrorAlert error={templates.error} />
-          {templates.isPending && <p className="text-[13px] text-muted">正在加载模板…</p>}
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
-            {[{ id: '', name: '空白', desc: '不使用模板，只用私有组和私有规则' }, ...(templates.data ?? []).map((t) => ({ id: t.id, name: `${t.name ?? t.id} v${t.version}`, desc: `${t.groups.length} 个组 · ${t.rules.length} 条规则` }))].map((t) => (
-              <button key={t.id || 'blank'} type="button" aria-pressed={(draft.template?.id ?? '') === t.id} onClick={() => changeTemplate(t.id)}
-                className={cx('flex cursor-pointer flex-col gap-0.5 rounded-[10px] border px-3.5 py-3 text-left', (draft.template?.id ?? '') === t.id ? 'border-accent bg-[#f5f8ff]' : 'border-[#d5d9e0] bg-panel')}>
-                <span className="text-[13.5px] font-semibold">{t.name}</span>
-                <span className="text-[12.5px] text-muted">{t.desc}</span>
-              </button>
-            ))}
-          </div>
-          {draft.template && <p className="mt-3 mb-0 text-[12.5px] text-muted">自动跟随模板最新版本。</p>}
-        </Card>}
+        {step === 2 && <TemplateCard />}
         <ErrorAlert error={template.error} />
         {step >= 3 && !templateReady && <div className="text-muted">{template.isError ? '模板加载失败，请返回模板步骤重新选择，或重试。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
         {templateReady && step === 3 && <TabGroups />}

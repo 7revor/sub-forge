@@ -4,7 +4,7 @@
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { ruleSetDelivery, parseRuleSourceContent, validateTemplate, sourceLabel, type ReportItem, type Template } from '@sub-forge/core';
+import { ruleSetDelivery, parseRuleSourceContent, validateTemplate, sourceLabel, stableStringify, type ReportItem, type Template } from '@sub-forge/core';
 import { readPagination } from './pagination.ts';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
@@ -16,7 +16,7 @@ import { bad, HttpError, isStr, jsonBody, notFound, requireAdmin, requireUser, t
 import { checkRuleSetReference, resolveRuleSetReference } from '../ruleset-reference.ts';
 import { RefChecker } from './validate.ts';
 
-export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
+export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; forceable?: boolean; issues: ReportItem[] };
 
 /** 只关心新版本带来的问题：渲染错误、孤儿覆盖项、空组 */
 const IMPACT_CODES = new Set(['overlay.orphan', 'overlay.orphan-anchor', 'group.empty']);
@@ -32,7 +32,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
       const old = prior?.rules.find(r => r.matcher.kind === 'ruleset' && r.matcher.id === matcher.id)?.matcher;
       checkRuleSetReference(rule.matcher, store, old?.kind === 'ruleset' ? old : undefined);
       // 无归属种子保持兼容；有归属的本地规则必须符合公共/本人可见性。
-      if (!matcher.repository && store.getWithOwner('ruleset', matcher.id)?.owner && !new RefChecker(store, user).ruleVisible(matcher.id)) throw bad('本地规则集不可用');
+      if (!matcher.repository && !matcher.remote && store.getWithOwner('ruleset', matcher.id)?.owner && !new RefChecker(store, user).ruleVisible(matcher.id)) throw bad('本地规则集不可用');
       const rs = resolveRuleSetReference(rule.matcher, store);
       if (rs) rulesets[rs.id] = rs;
     } catch (error) {
@@ -129,11 +129,15 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     if (!isNew && !current) throw notFound('模板');
     const draft = draftFrom(body, id, (current?.version ?? 0) + 1);
 
+    const boundState = () => stableStringify(store.list('profile').filter(p => p.routing?.mode === 'bound' && p.routing.templateId === id));
+    const beforeImpact = boundState();
     const own = await selfCheck(store, snapshots, draft, c.get('user'));
     if (own.some((i) => i.level === 'error')) throw new HttpError(400, '模板自身校验未通过，禁止发布', { report: own });
 
     const impact = isNew ? [] : await analyzeImpact(store, renderer, draft);
+    if ((!isNew && store.getTemplate(id)?.version !== current?.version) || boundState() !== beforeImpact) throw new HttpError(409, '检查期间模板或绑定订阅已变化，请重新检查后发布');
     const blocking = impact.filter((i) => i.level === 'error');
+    if (blocking.some(i => store.get('profile', i.profileId)?.routing?.mode === 'bound')) throw new HttpError(409, '绑定订阅存在冲突，必须先修复成员或引用，不能强制发布', { report: own, impact });
     if (blocking.length && body.force !== true) {
       throw new HttpError(409, `${blocking.length} 个配置订阅会渲染失败，确认后可强制发布`, { report: own, impact });
     }
@@ -157,7 +161,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
 /** 对所有跟随最新版本的 Profile 用新版本试渲染 */
 export async function analyzeImpact(store: Store, renderer: RenderService, draft: TemplateVersionDoc): Promise<ImpactEntry[]> {
   const out: ImpactEntry[] = [];
-  const profiles = store.list('profile').filter((p) => p.template?.id === draft.id && p.template.follow === 'latest');
+  const profiles = store.list('profile').filter((p) => p.routing?.mode === 'bound' ? p.routing.templateId === draft.id : !p.routing && p.template?.id === draft.id && p.template.follow === 'latest');
   for (const p of profiles) {
     const res = await renderer.preview(p.id, { client: 'mihomo' }, { template: draft });
     const errors = res.report.filter((i) => i.level === 'error');
@@ -166,7 +170,7 @@ export async function analyzeImpact(store: Store, renderer: RenderService, draft
     const owner = store.getWithOwner('profile', p.id)?.owner ?? null;
     const issues = errors.length ? errors : warns;
     if (!res.ok && !errors.length) issues.push({ level: 'error', code: 'render.failed', message: res.failure ?? '渲染失败' });
-    out.push({ profileId: p.id, profileName: p.name, owner, level: res.ok ? 'warn' : 'error', issues });
+    out.push({ profileId: p.id, profileName: p.name, owner, level: res.ok ? 'warn' : 'error', forceable: p.routing?.mode !== 'bound', issues });
   }
   return out;
 }

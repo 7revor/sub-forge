@@ -1,3 +1,4 @@
+import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
 import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/adapters.ts';
 // 保存前的校验：结构必填项、正则能否编译、引用是否存在且属于当前用户、组合是否成环。
@@ -63,7 +64,7 @@ function checkRawRules(value: unknown, where: string): void {
     const error = rawRuleError(value.text);
     if (error) throw bad(`${where}：${error}`);
   }
-  for (const key of ['rule', 'overrides', 'action', 'replace', 'append', 'children']) checkRawRules(value[key], where);
+  for (const key of ['matcher', 'rule', 'overrides', 'action', 'replace', 'append', 'children']) checkRawRules(value[key], where);
 }
 
 export function checkFetch(fetch: unknown, source = false): void {
@@ -302,7 +303,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
           if (m.kind === 'ruleset') {
             const prior = store.get('profile', id)?.overlay.extraRules?.find(r => r.rule.id === (er as { rule: { id: string } }).rule.id)?.rule.matcher;
             checkRuleSetReference(m as RuleSetMatcher, store, prior?.kind === 'ruleset' ? prior : undefined);
-            if (!isStr(m.id) || (!m.repository && !refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
+            if (!isStr(m.id) || (!m.repository && !m.remote && !refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
           }
         });
       }
@@ -312,6 +313,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (ch.landing.filter !== undefined) checkRegex(ch.landing.filter, `链规则 ${i + 1}`);
         refs.target(ch.via, `链规则 ${i + 1} 的前置`);
       });
+      if (doc.routing !== undefined) {
+        validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);
+        checkRawRules((doc.routing as { config?: { rules?: unknown } }).config?.rules, '分流规则');
+      }
       break;
     }
   }
@@ -331,12 +336,12 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
   if (kind === 'source' || kind === 'collection' || kind === 'local') {
     for (const c of store.list('collection', ownerId)) if (c.members.some((m) => isRef(m.ref))) hits.push(`组合「${c.name}」`);
     for (const p of store.list('profile', ownerId)) {
-      if (p.nodeSets.some((n) => isRef(n.ref)) || contains([p.overlay, p.chains], 'type')) hits.push(`配置订阅「${p.name}」`);
+      if (p.nodeSets.some((n) => isRef(n.ref)) || contains([p.overlay, p.routing, p.chains], 'type')) hits.push(`配置订阅「${p.name}」`);
     }
     for (const l of store.list('local', ownerId)) if (contains(l.proxies, 'type')) hits.push(`本地节点组「${l.name}」`);
   }
   if (kind === 'ruleset') {
-    for (const p of store.list('profile')) if (contains(p.overlay, 'kind')) {
+    for (const p of store.list('profile')) if (contains([p.overlay, p.routing], 'kind')) {
       hits.push(store.getWithOwner('profile', p.id)?.owner === ownerId ? `配置订阅「${p.name}」` : '其他用户的配置订阅');
     }
     // 模板由管理员维护，可能引用管理员名下的公共规则集

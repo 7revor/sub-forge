@@ -1,3 +1,5 @@
+import { profileEditorOverlay } from '@sub-forge/core';
+import { boundTemplateId, modeLabel } from './profile/routing.ts';
 import { formatRelativeTime } from '../utils/format.ts';
 import { accessLogOptions, snapshotOptions } from '../hooks/documentQueries.ts';
 import { sourceFetchSummary } from '../domain/sourceFetch.ts';
@@ -36,8 +38,8 @@ export function Overview() {
 
   const rows = (profiles.data ?? []).map((p, i) => {
     const log = logs[i]?.data ?? [];
-    const t = p.template ? tpl(p.template.id) : undefined;
-    const o = t ? findOverlayOrphans(p.overlay, t) : undefined;
+    const t = tpl(boundTemplateId(p));
+    const o = t ? findOverlayOrphans(profileEditorOverlay(p), t) : undefined;
     return { p, last: log[0], recent: log.filter((r) => Date.now() - r.at < DAY), orphans: o ? Object.values(o).reduce((n, ids) => n + ids.length, 0) : 0 };
   });
   const recent = rows.flatMap((r) => r.recent);
@@ -58,7 +60,7 @@ export function Overview() {
       tone: 'warn' as const, title: `「${r.p.name}」最近一次渲染有 ${r.last!.warnings} 条告警`,
       body: `${r.last!.client} 于 ${formatRelativeTime(r.last!.at)} 拉取。告警不影响下发，但可能有组为空或引用失效。`, action: '查看预览与渲染报告', to: `/profiles/${r.p.id}/preview`,
     })),
-    ...rows.filter((r) => r.p.template && !r.p.nodeSets.length).map((r) => ({
+    ...rows.filter((r) => boundTemplateId(r.p) && !r.p.nodeSets.length).map((r) => ({
       tone: 'info' as const, title: `「${r.p.name}」还没有节点集`, body: '没有成员的策略组会自动拒绝连接。', action: '去加入节点集', to: `/profiles/${r.p.id}/nodesets`,
     })),
   ];
@@ -95,7 +97,7 @@ export function Overview() {
                   {rows.map(({ p, last }) => (
                     <DocTableRow key={p.id} to={`/profiles/${p.id}`}>
                       <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${p.id}`} className={docNameLinkClass}>{p.name}</Link></td>
-                      <td className={cx(td, 'whitespace-nowrap')}>{p.template ? <>{tpl(p.template.id)?.name ?? p.template.id} <span className="text-[12.5px] text-muted">{p.template.follow === 'latest' ? '跟随最新' : `锁定 v${p.template.follow.pinned}`}</span></> : '—'}</td>
+                      <td className={cx(td, 'whitespace-nowrap')}>{modeLabel(p, tpl(boundTemplateId(p))?.name)}</td>
                       <td className={cx(td, 'font-mono')}>{p.nodeSets.length}</td>
                       <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-[12px] text-muted">{last.client}</span></div> : <span className="text-muted">从未访问</span>}</td>
                       <td className={td}>{!last ? <Badge>未访问</Badge> : last.status !== 200 ? <Badge tone="err">渲染失败</Badge> : last.warnings ? <Badge tone="warn">{last.warnings} 条告警</Badge> : <Badge tone="ok">正常</Badge>}</td>

@@ -156,7 +156,7 @@ export type RuleSet = {
 
 export type Matcher =
   | { kind: 'rule'; rule: RuleIR; overrides?: ClientOverride[] }
-  | { kind: 'ruleset'; id: ID; repository?: RepositoryRuleSetReference };
+  | { kind: 'ruleset'; id: ID; repository?: RepositoryRuleSetReference; remote?: { url: string } };
 
 /** 仓库规则直接引用：保存所选文件映射，内容仍按快照策略刷新，不创建本地规则集。 */
 export type RepositoryRuleSetReference = {
@@ -243,7 +243,14 @@ export type ChainRule = {
 
 export type ProfileNodeSet = { ref: NodeSetID; output: 'provider' | 'inline'; providerName?: string };
 
+export type RoutingConfig = Pick<Template, 'groups' | 'rules' | 'final'>;
+export type ProfileRouting =
+  | { mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]> }
+  | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version: number; name?: string } };
+
 export type Profile = {
+  /** 旧文档兼容读取；新订阅以 routing 为唯一分流配置来源。 */
+  routing?: ProfileRouting;
   id: ID;
   name: string;
   nodeSets: ProfileNodeSet[];

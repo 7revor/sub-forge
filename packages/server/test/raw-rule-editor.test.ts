@@ -21,13 +21,20 @@ describe('三个入口的 RAW 保存及输出', () => {
       const created = await c.post('/api/profiles', { ...profile([{ anchor: 'top', rule: entry('private-raw', 'IP-SUFFIX,8.8.8.8/24,no-resolve,src') }]), template: { id: published.json.item.id, follow: 'latest' } });
       expect(created.status).toBe(201);
       const id = created.json.item.id;
-      expect((await c.get(`/api/profiles/${id}`)).json.item.overlay.extraRules[0].rule.matcher.rule).toEqual(raw('IP-SUFFIX,8.8.8.8/24,no-resolve,src'));
+      const saved = (await c.get(`/api/profiles/${id}`)).json.item;
+      expect(saved.routing.mode).toBe('independent');
+      expect(saved.routing.config.rules.find((rule: { id: string }) => rule.id === 'private-raw').matcher.rule).toEqual(raw('IP-SUFFIX,8.8.8.8/24,no-resolve,src'));
       const rendered = await h.renderer.render(id, { client: 'mihomo' });
       expect(rendered.ok).toBe(true);
       if (!rendered.ok) throw new Error(rendered.message);
       expect(parse(rendered.render.yaml).rules).toEqual([
         'IP-SUFFIX,8.8.8.8/24,DIRECT,no-resolve,src', `${text},DIRECT`, 'MATCH,DIRECT',
       ]);
+      const bound = await c.post('/api/profiles', { name: 'RAW 绑定', nodeSets: [], chains: [], overlay: {}, routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} }, templateVersion: 1 });
+      expect(bound.status).toBe(201);
+      const boundOutput = await h.renderer.render(bound.json.item.id, { client: 'mihomo' });
+      expect(boundOutput.ok).toBe(true);
+      if (boundOutput.ok) expect(parse(boundOutput.render.yaml).rules).toEqual([`${text},DIRECT`, 'MATCH,DIRECT']);
     } finally { await h.snapshots.settled(); h.store.close(); }
   });
   it('规则增强 RAW 追加可保存重读，与结构化来源的 wildcard 跨大小写去重', async () => {
@@ -53,6 +60,7 @@ describe('三个入口的 RAW 保存及输出', () => {
       await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
       expect((await c.post('/api/templates/new/publish', template(text))).status).toBe(400);
       expect((await c.post('/api/profiles', profile([{ anchor: 'top', rule: entry('bad', text) }]))).status).toBe(400);
+      expect((await c.post('/api/profiles', { name: 'RAW 独立', nodeSets: [], chains: [], overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [entry('bad', text)], final: direct } } })).status).toBe(400);
       expect((await c.post('/api/rulesets', ruleset(text))).status).toBe(400);
     } finally { await h.snapshots.settled(); h.store.close(); }
   });

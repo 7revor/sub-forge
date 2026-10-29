@@ -1,3 +1,4 @@
+import { persistedProfile } from './routing.ts';
 import { CodePreview } from '../../components/CodePreview.tsx';
 // 代理链（链规则 + 依赖节点面板，REF-03 / REF-07）与预览（按平台查看最终配置与渲染报告）。
 
@@ -15,7 +16,7 @@ const STRATEGIES: { value: RefStrategy; label: string }[] = [{ value: 'wrap', la
 
 function usePreview() {
   const { draft } = useProfile();
-  return useMutation({ mutationFn: (platform?: Platform) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: draft, ...(platform ? { platform } : {}) }) });
+  return useMutation({ mutationFn: (platform?: Platform) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: persistedProfile(draft), ...(platform ? { platform } : {}) }) });
 }
 
 function Hop({ k, v, accent }: { k: string; v: string; accent?: boolean }) {

@@ -3,7 +3,7 @@ import type { RuleDocument } from './convert.ts';
 import type { RuleSet, RuleEntry } from '../types.ts';
 import { composeRule, lowerRule, type ClientCtx } from './client.ts';
 import { sourceKey, type RuleSetInputs } from './expand.ts';
-import { parseRuleSourceContent, ruleKey, type Behavior } from './parse.ts';
+import { DECODED_MRS_HEADER, parseRuleSourceContent, ruleKey, type Behavior } from './parse.ts';
 
 export type RuleSetDelivery =
   | { mode: 'original'; format: 'text' | 'yaml' | 'mrs'; behavior: Behavior; url: string }
@@ -28,7 +28,7 @@ export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientC
       : { mode: 'unsupported', reason: '目标客户端不支持该二进制规则，无法转换为 LIST' };
   }
   const body = inputs.snapshots[sourceKey(rs.id, src.id)];
-  if (body === undefined) return managed;
+  if (body === undefined || body.startsWith(DECODED_MRS_HEADER)) return managed;
   const document = prepared?.get(src.id);
   const parsed = document ? {
     passthrough: document.passthrough, format: document.format, behavior: document.behavior ?? 'classical',

@@ -7,6 +7,7 @@ import type { ConvertCtx, NamedRef } from '../../convert/templateYaml.ts';
 
 export function matcherLabel(matcher: Matcher, ctx: ConvertCtx): string {
   if (matcher.kind === 'rule') return ruleToLine(matcher.rule);
+  if (matcher.remote) return `远程 · ${matcher.remote.url}`;
   return matcher.repository?.name ?? `本地 · ${ctx.rulesets.find((r) => r.id === matcher.id)?.name ?? (matcher.id || '未选择')}`;
 }
 

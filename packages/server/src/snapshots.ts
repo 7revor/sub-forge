@@ -83,7 +83,7 @@ export class SnapshotService {
       const fetchedAt = Math.max(this.now(), (previous?.fetchedAt ?? -1) + 1);
       try {
         const { format, ...fetchOpts } = opts;
-        const res = await this.fetcher(url, kind === 'source' ? SOURCE_REQUEST_OPTIONS : fetchOpts);
+        const res = await this.fetcher(url, kind === 'source' ? SOURCE_REQUEST_OPTIONS : { ...fetchOpts, ruleContent: true });
         const unusable = unusableBody(kind, id, res.body, format);
         if (unusable) throw new Error(unusable);
         const hash = stableHash(res.body);
@@ -135,7 +135,7 @@ export class SnapshotService {
   async peek(url: string, opts: SnapshotFetchOptions = {}): Promise<{ body?: string; error?: string }> {
     const { format, ...fetchOpts } = opts;
     try {
-      const res = await this.fetcher(url, fetchOpts);
+      const res = await this.fetcher(url, { ...fetchOpts, ruleContent: true });
       const unusable = unusableBody('ruleset', '', res.body, format);
       return unusable ? { error: unusable } : { body: res.body };
     } catch (e) {
@@ -146,7 +146,7 @@ export class SnapshotService {
   /** 编辑器读取原文：即使格式暂不支持也保留正文，诊断由解析层负责；不落正式快照。 */
   async peekRuleContent(url: string, opts: FetchOptions = {}): Promise<{ body?: string; error?: string }> {
     try {
-      const result = await this.fetcher(url, opts);
+      const result = await this.fetcher(url, { ...opts, ruleContent: true });
       return { body: result.body };
     } catch (cause) {
       return { error: cause instanceof Error ? cause.message : String(cause) };

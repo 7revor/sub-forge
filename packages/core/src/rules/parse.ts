@@ -1,9 +1,13 @@
 // 规则解析：各种规则集格式 → 规则中间表示 RuleIR（RS-02 / RS-03）。
 // 无法解析或不支持的行记录下来，不中断。
 
+import { usesClashDomains } from './remote.ts';
 import { parse as parseYaml } from 'yaml';
 import type { Client, RuleIR, RuleSetFormat, RuleSetSource } from '../types.ts';
 import { rawRuleParts } from './raw.ts';
+
+// 二进制读取层在解码文本前写入此标记，防止把转换后正文误判为可直连的原始 URL。
+export const DECODED_MRS_HEADER = '# sub-forge: decoded-mrs-v1';
 
 export class UnsupportedRuleError extends Error {}
 
@@ -191,9 +195,9 @@ export function ruleKey(rule: RuleIR, client?: Client): string {
 }
 
 /** 业务入口始终按内容识别；历史格式只用于区分域名方言和兼容二进制来源。 */
-export function parseRuleSourceContent(text: string, source: Pick<RuleSetSource, 'format' | 'repository'>): RuleSetParseResult {
+export function parseRuleSourceContent(text: string, source: Pick<RuleSetSource, 'format' | 'repository' | 'url'>): RuleSetParseResult {
   if (source.format === 'mrs' || source.format === 'srs') return parseRuleSetContent(text, source.format);
   const detected = detectFormat(text);
-  const clashDomain = source.format === 'domain' || source.repository?.path.startsWith('rule/Clash/');
+  const clashDomain = usesClashDomains(source);
   return parseRuleSetContent(text, detected === 'domain-set' && clashDomain ? 'domain' : detected);
 }
