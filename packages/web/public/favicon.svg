@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Sub-Forge：两段圆弧组成 S，末端节点表示订阅加工后的统一出口 -->
+  <!-- Sub Forge：两段圆弧组成 S，末端节点表示订阅加工后的统一出口 -->
   <rect width="32" height="32" rx="8" fill="#2952cc"/>
   <path d="M21.5 9.5H13.75a3.25 3.25 0 0 0 0 6.5h4.5a3.25 3.25 0 0 1 0 6.5H10.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
   <circle cx="22" cy="22.5" r="2" fill="#9fb6f5"/>

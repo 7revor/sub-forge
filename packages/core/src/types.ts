@@ -52,7 +52,8 @@ export type Source = {
 export type Collection = {
   id: ID;
   name: string;
-  members: { ref: NodeSetID; prefix?: string; suffix?: string }[];
+  /** onFail：成员拉取失败时的处理（使用快照 / 跳过该成员 / 整体失败）；界面已提供，渲染尚未读取，见 docs/11 */
+  members: { ref: NodeSetID; prefix?: string; suffix?: string; onFail?: 'snapshot' | 'skip' | 'fail' }[];
   pipeline: OperatorStep[];
 };
 

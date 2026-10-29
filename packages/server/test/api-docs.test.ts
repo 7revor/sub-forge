@@ -155,3 +155,16 @@ describe('预设 Surge 预留字段', () => {
     expect(res.json.error).toMatch(/surge.*必须是/);
   });
 });
+
+describe('拉取参数校验', () => {
+  it('快照有效期不能短于 5 分钟', async () => {
+    const { alice } = await twoUsers();
+    const src = { name: '远程源', kind: 'remote', urls: ['https://example.com/sub'] };
+    const short = await alice.post('/api/sources', { ...src, fetch: { ttlSec: 60 } });
+    expect(short.status).toBe(400);
+    expect(short.json.error).toMatch(/快照有效期不能短于 5 分钟/);
+    expect((await alice.post('/api/sources', { ...src, fetch: { ttlSec: 300 } })).status).toBe(201);
+    const rs = await alice.post('/api/rulesets', { name: '远程规则', kind: 'remote', format: 'classical', url: 'https://example.com/r.list', fetch: { ttlSec: 0 } });
+    expect(rs.status).toBe(400);
+  });
+});

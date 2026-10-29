@@ -1,15 +1,17 @@
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
 // 左侧步骤列表（拖拽排序、节点数变化、末尾自动去重兜底、添加处理器菜单）；
-// 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方是这一步之后的 diff 或节点列表。
+// 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方是这一步输入 → 输出的逐节点对照；
+// 列表顶部的「总览」对照原始节点与整条处理链跑完后的结果。
 
 import { DEFAULT_USELESS_PATTERNS, type OperatorStep } from '@sub-forge/core';
-import { Plus, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ExtraFields } from './ExtraFields.tsx';
-import { patternHits, regexError, renameHits, rowHit, setFieldsError, stepInputNames, updateSetField } from './pipelineForm.ts';
+import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetField } from './pipelineForm.ts';
+import { mapRows, mapStats, removedAtStep, renamedAtSteps, rowChanged, type MapRow } from './pipelineMap.ts';
 import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview, TraceStep } from '../api.ts';
-import { Badge, Button, Input, Segmented, Select, Switch, Textarea, cx } from './ui.tsx';
+import { Badge, Button, DraftInput, DraftTextarea, Input, Segmented, Select, Switch, cx } from './ui.tsx';
 
 export const OP_LABEL: Record<OperatorStep['op'], string> = {
   'filter.useless': '无用节点过滤',
@@ -101,8 +103,8 @@ function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则
           <div key={i} className="flex flex-col gap-1">
             <div className={grid}>
               <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-              <Input aria-label={`${label} ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && error && 'border-err bg-[#fffbfa]')} placeholder={placeholder} value={p}
-                aria-invalid={!!p && !!error} onChange={(e) => onChange(patterns.map((x, j) => (j === i ? e.target.value : x)))} />
+              <DraftInput aria-label={`${label} ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && error && 'border-err bg-[#fffbfa]')} placeholder={placeholder} value={p}
+                aria-invalid={!!p && !!error} onCommit={(v) => onChange(patterns.map((x, j) => (j === i ? v : x)))} />
               <span className="text-right font-mono text-[12.5px] text-ink-2">{hits?.[i] ?? '—'}</span>
               <DeleteIcon label={`删除第 ${i + 1} 条`} onClick={() => onChange(patterns.filter((_, j) => j !== i))} />
             </div>
@@ -198,10 +200,9 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
       const value = step.patterns ?? [];
       return <div className="flex flex-col gap-2">
         <label htmlFor="useless" className={lbl}>关键词（正则，每行一条；命中任一条的节点被移除）</label>
-        <Textarea id="useless" rows={4} className="font-mono text-[12.5px]" value={value.join('\n')}
+        <DraftTextarea id="useless" rows={4} className="font-mono text-[12.5px]" value={value.join('\n')}
           aria-invalid={value.some((p) => !!regexError(p))}
-          onChange={(e) => { const lines = e.target.value.split('\n'); onChange({ ...step, patterns: lines.some((l) => l.trim()) ? lines : undefined }); }}
-          onBlur={() => { const lines = value.map((l) => l.trim()).filter(Boolean); onChange({ ...step, patterns: lines.length ? lines : undefined }); }} />
+          onCommit={(text) => { const lines = text.split('\n').map((l) => l.trim()).filter(Boolean); onChange({ ...step, patterns: lines.length ? lines : undefined }); }} />
         {value.map((p, i) => ({ i, error: p.trim() ? regexError(p.trim()) : undefined })).filter((x) => x.error).map(({ i, error }) => <span key={i} role="status" className="text-[12px] text-err">第 {i + 1} 行：{error}</span>)}
         <span className={hint}>清空后使用默认关键词：{DEFAULT_USELESS_PATTERNS.slice(0, 8).join('、')}…</span>
       </div>;
@@ -225,8 +226,8 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
           <div className="grid grid-cols-[24px_22px_minmax(0,1fr)_44px_32px] items-center gap-2 py-1">
             {handle}
             <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-            <Input aria-label={`优先级 ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && regexError(p) && 'border-err')} value={p} aria-invalid={!!p && !!regexError(p)}
-              onChange={(e) => onChange({ ...step, patterns: step.patterns.map((x, j) => (j === i ? e.target.value : x)) })} />
+            <DraftInput aria-label={`优先级 ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && regexError(p) && 'border-err')} value={p} aria-invalid={!!p && !!regexError(p)}
+              onCommit={(v) => onChange({ ...step, patterns: step.patterns.map((x, j) => (j === i ? v : x)) })} />
             <span className="text-right font-mono text-[12.5px] text-ink-2">{hits(step.patterns)?.[i] ?? '—'}</span>
             <DeleteIcon label={`删除优先级 ${i + 1}`} onClick={() => onChange({ ...step, patterns: step.patterns.filter((_, j) => j !== i) })} />
           </div>
@@ -244,10 +245,10 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
           return <div key={i} className="flex flex-col gap-1">
             <div className={grid}>
               <span className="font-mono text-[12px] text-muted">{i + 1}</span>
-              <Input aria-label={`规则 ${i + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', r.pattern && error && 'border-err bg-[#fffbfa]')} placeholder="^香港\s*(\d+).*$" value={r.pattern}
-                aria-invalid={!!r.pattern && !!error} onChange={(e) => setRule(i, { pattern: e.target.value })} />
+              <DraftInput aria-label={`规则 ${i + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', r.pattern && error && 'border-err bg-[#fffbfa]')} placeholder="^香港\s*(\d+).*$" value={r.pattern}
+                aria-invalid={!!r.pattern && !!error} onCommit={(pattern) => setRule(i, { pattern })} />
               <span aria-hidden="true" className="text-center text-faint">→</span>
-              <Input aria-label={`规则 ${i + 1} 替换为`} className="h-9 min-w-0 font-mono" placeholder="HK-$1" value={r.replace} onChange={(e) => setRule(i, { replace: e.target.value })} />
+              <DraftInput aria-label={`规则 ${i + 1} 替换为`} className="h-9 min-w-0 font-mono" placeholder="HK-$1" value={r.replace} onCommit={(replace) => setRule(i, { replace })} />
               <span className="text-right font-mono text-[12.5px] text-ink-2">{counts?.[i] ?? '—'}</span>
               <DeleteIcon label={`删除规则 ${i + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, j) => j !== i) })} />
             </div>
@@ -263,8 +264,8 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'rename.affix': {
       const sample = names?.[0] ?? '🇭🇰 HK-01';
       return <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5"><span className={lbl}>前缀</span><Input className="h-9 font-mono" placeholder="不加" value={step.prefix ?? ''} onChange={(e) => onChange({ ...step, prefix: e.target.value })} /></label>
-        <label className="flex flex-col gap-1.5"><span className={lbl}>后缀</span><Input className="h-9 font-mono" placeholder="不加" value={step.suffix ?? ''} onChange={(e) => onChange({ ...step, suffix: e.target.value })} /></label>
+        <label className="flex flex-col gap-1.5"><span className={lbl}>前缀</span><DraftInput className="h-9 font-mono" placeholder="不加" value={step.prefix ?? ''} onCommit={(prefix) => onChange({ ...step, prefix })} /></label>
+        <label className="flex flex-col gap-1.5"><span className={lbl}>后缀</span><DraftInput className="h-9 font-mono" placeholder="不加" value={step.suffix ?? ''} onCommit={(suffix) => onChange({ ...step, suffix })} /></label>
         <span className={cx(hint, 'col-span-2')}>示例：<span className="font-mono">{sample}</span> → <span className="font-mono">{step.prefix ?? ''}{sample}{step.suffix ?? ''}</span></span>
       </div>;
     }
@@ -289,7 +290,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'script':
       return <div className="flex flex-col gap-2">
         <label htmlFor="script-code" className={lbl}>{'(nodes, ctx) => nodes'}</label>
-        <Textarea id="script-code" rows={7} className="bg-panel font-mono text-[12.5px]" value={step.code} onChange={(e) => onChange({ ...step, code: e.target.value })} />
+        <DraftTextarea id="script-code" rows={7} className="bg-panel font-mono text-[12.5px]" value={step.code} onCommit={(code) => onChange({ ...step, code })} />
         <span className={hint}>需要管理员授予脚本权限。在服务端沙箱中执行；出错时这一步被跳过，预览标为失败。</span>
       </div>;
   }
@@ -365,6 +366,72 @@ function resultText(t: TraceStep): string {
   return parts.join('，');
 }
 
+/** 左侧列表中「总览」的序号；自动去重兜底的序号为 steps.length */
+const OVERVIEW = -1;
+
+type Side = { names: string[]; origins: (number | null)[] };
+type MapOptions = { order: 'out' | 'in'; changedOnly: boolean };
+
+const th = 'border-b border-line px-3 py-2 text-left text-[12px] font-medium text-muted whitespace-nowrap';
+const td = 'border-b border-line-2 px-3 py-[7px]';
+
+/** 输入 → 输出对照表：一行一个节点，左边是它进入时的样子，右边是出来时的样子 */
+function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, options, onOptions, truncated }: {
+  before: Side; after: Side; inLabel: string; outLabel: string;
+  extraLabel?: string; extra?: (r: MapRow) => ReactNode;
+  options: MapOptions; onOptions: (o: MapOptions) => void; truncated?: boolean;
+}) {
+  const rows = useMemo(() => mapRows(before, after, options.order), [before, after, options.order]);
+  const shown = options.changedOnly ? rows.filter(rowChanged) : rows;
+  return <>
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3">
+      <Segmented label="排列方式" size="sm" value={options.order} options={[{ value: 'out', label: '按输出顺序' }, { value: 'in', label: '按输入顺序' }]} onChange={(order) => onOptions({ ...options, order })} />
+      <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-ink-2">
+        <input type="checkbox" checked={options.changedOnly} onChange={(e) => onOptions({ ...options, changedOnly: e.target.checked })} />只看有变化的
+      </label>
+    </div>
+    {shown.length ? <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-[13px]">
+        <thead><tr>
+          <th className={cx(th, 'w-10 pl-4 text-right')}>#</th>
+          <th className={th}>{inLabel} <span className="font-normal text-faint">{before.names.length}</span></th>
+          <th className="w-6 border-b border-line" aria-hidden="true" />
+          <th className={cx(th, 'w-10 text-right')}>#</th>
+          <th className={th}>{outLabel} <span className="font-normal text-faint">{after.names.length}</span></th>
+          <th className={cx(th, 'w-14')}>位置</th>
+          {extra && <th className={cx(th, 'pr-4')}>{extraLabel}</th>}
+        </tr></thead>
+        <tbody>
+          {shown.map((r) => {
+            const renamed = !!r.in && !!r.out && r.in.name !== r.out.name;
+            return (
+              <tr key={`${r.in?.index ?? ''}:${r.out?.index ?? ''}`} className={cx(!r.out && 'bg-[#fafbfc]')}>
+                <td className={cx(td, 'pl-4 text-right font-mono text-[12px] text-faint')}>{r.in ? r.in.index + 1 : ''}</td>
+                <td className={cx(td, 'font-mono whitespace-nowrap', !r.in ? 'text-faint italic' : !r.out ? 'text-muted line-through decoration-[#c9a8a4]' : renamed ? 'bg-[#fdf4f3] text-[#8f2a1f]' : 'text-ink-2')}>{r.in ? r.in.name : '（新增）'}</td>
+                <td className={cx(td, 'text-center text-faint')} aria-hidden="true">→</td>
+                <td className={cx(td, 'text-right font-mono text-[12px] text-faint')}>{r.out ? r.out.index + 1 : ''}</td>
+                <td className={cx(td, 'font-mono whitespace-nowrap', !r.out ? 'text-muted italic' : renamed || !r.in ? 'bg-[#f2faf5] text-[#17633a]' : 'text-ink-2')}>{r.out ? r.out.name : '（移除）'}</td>
+                <td className={cx(td, 'font-mono text-[12px] whitespace-nowrap')}>
+                  {r.moved !== 0 && <span className="text-accent-ink" title={`在保留的节点中${r.moved > 0 ? '上移' : '下移'} ${Math.abs(r.moved)} 位`}>{r.moved > 0 ? '↑' : '↓'}{Math.abs(r.moved)}</span>}
+                </td>
+                {extra && <td className={cx(td, 'pr-4 font-mono text-[12px] whitespace-nowrap text-muted')}>{extra(r)}</td>}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div> : <div className="px-4 pb-4 text-[13px] text-muted">{rows.length ? '没有任何节点发生变化。' : '没有节点。'}</div>}
+    <div className="px-4 pt-3 pb-4 text-[12.5px] text-muted">
+      显示 {shown.length} / {rows.length} 行 · 「位置」是在保留下来的节点中名次的变化{truncated && ' · 节点较多，预览只包含前 500 个'}
+    </div>
+  </>;
+}
+
+function StepChip({ index, tone, onClick, children }: { index: number; tone?: 'err'; onClick: () => void; children?: ReactNode }) {
+  return <button type="button" onClick={onClick} title={`查看第 ${index + 1} 步`}
+    className={cx('cursor-pointer rounded px-1.5 py-px font-mono text-[11.5px] hover:underline', tone === 'err' ? 'bg-err-soft text-err' : 'bg-accent-soft text-accent-ink')}>{children ?? index + 1}</button>;
+}
+
 export function PipelineEditor({ steps, onChange, preview, previewError, loading, inputLabel }: {
   steps: OperatorStep[];
   onChange: (s: OperatorStep[]) => void;
@@ -376,8 +443,8 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   // dnd-kit 需要稳定的 id：按位置生成，拖动时随数组一起移动
   const [ids, setIds] = useState<string[]>(() => steps.map((_, i) => `s${i}`));
   const [seq, setSeq] = useState(steps.length);
-  const [selected, setSelected] = useState(0);
-  const [view, setView] = useState<'diff' | 'nodes'>('diff');
+  const [selected, setSelected] = useState(OVERVIEW);
+  const [mapOptions, setMapOptions] = useState<MapOptions>({ order: 'out', changedOnly: false });
   const keys = ids.length === steps.length ? ids : steps.map((_, i) => ids[i] ?? `x${i}`);
   const add = (op: OperatorStep['op']) => {
     onChange([...steps, NEW_STEP[op]()]);
@@ -388,20 +455,45 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   const remove = (i: number) => {
     onChange(steps.filter((_, j) => j !== i));
     setIds(keys.filter((_, j) => j !== i));
-    setSelected(Math.max(0, Math.min(selected, steps.length - 2)));
+    setSelected(steps.length <= 1 ? OVERVIEW : Math.min(selected, steps.length - 2));
   };
 
   const trace = preview?.trace;
-  const cur = trace?.[selected];
   const last = trace?.at(-1);
   const autoDedupe = trace && trace.length > steps.length ? last : undefined;
-  const step = steps[selected];
+  const mode = selected === OVERVIEW || selected > steps.length || (selected === steps.length && !autoDedupe) ? 'overview' : selected === steps.length ? 'auto' : 'step';
+  const step = mode === 'step' ? steps[selected] : undefined;
+  const cur = mode === 'overview' ? undefined : trace?.[selected];
   const enabled = step?.enabled !== false;
-  const names = useMemo(() => cur && stepInputNames(cur.nodes.map((n) => n.name), cur.renamed, cur.removed), [cur]);
-  const diffRows = useMemo(() => cur && step ? [
-    ...cur.renamed.map((r) => ({ from: r.from, to: r.to, removed: false, hit: rowHit(step, r.from) })),
-    ...cur.removed.map((n) => ({ from: n, to: '（移除）', removed: true, hit: rowHit(step, n) })),
-  ] : [], [cur, step]);
+
+  // 每一步的节点与来源序号；-1 为原始输入
+  const sides = useMemo(() => {
+    if (!preview) return undefined;
+    const input: Side = { names: preview.inputNodes.map((n) => n.name), origins: preview.inputNodes.map((_, i) => i) };
+    return [input, ...preview.trace.map((t): Side => ({ names: t.nodes.map((n) => n.name), origins: t.origins }))];
+  }, [preview]);
+  const sideAt = (k: number) => sides?.[k + 1];
+  const finalSide = sides?.at(-1);
+  const truncated = !!preview && (preview.input > preview.inputNodes.length || preview.trace.some((t) => t.truncated));
+  const before = mode === 'overview' ? sideAt(-1) : sideAt(selected - 1);
+  const after = mode === 'overview' ? finalSide : sideAt(selected);
+
+  const removedAt = useMemo(() => (preview ? removedAtStep(preview.inputNodes.length, preview.trace) : new Map<number, number>()), [preview]);
+  const renamedAt = useMemo(() => (sides ? renamedAtSteps(sides[0]!.names, sides.slice(1)) : new Map<number, number[]>()), [sides]);
+  const overviewStats = useMemo(() => (sides && finalSide ? mapStats(mapRows(sides[0]!, finalSide)) : undefined), [sides, finalSide]);
+  const stepName = (k: number) => (k >= steps.length ? '自动去重' : OP_LABEL[steps[k]!.op]);
+
+  const overviewRow = (
+    <button type="button" onClick={() => setSelected(OVERVIEW)} aria-current={mode === 'overview' || undefined}
+      className={cx('flex w-full cursor-pointer items-center gap-3 border-t border-line-2 py-3 pr-4 pl-4 text-left', mode === 'overview' ? 'bg-accent-soft' : 'bg-panel hover:bg-[#fafbfc]')}>
+      <span aria-hidden="true" className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md', mode === 'overview' ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}><ArrowLeftRight size={13} /></span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[13.5px] font-medium">总览 · 原始 → 最终</span>
+        <span className="truncate text-[12px] text-muted">原始节点与处理链跑完后的结果逐个对照</span>
+      </span>
+      {preview && <span className="shrink-0 font-mono text-[12.5px] text-ink-2">{preview.input} → {last ? last.after : preview.input}</span>}
+    </button>
+  );
 
   return (
     <div className="flex flex-wrap items-start gap-5">
@@ -410,6 +502,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           <h2 className="m-0 text-[15px] font-semibold">处理链</h2>
           <span className="text-[12.5px] text-muted">拖动排序 · {inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
+        {overviewRow}
         <SortableList items={steps.map((s, i) => ({ step: s, id: keys[i]! }))} getKey={(item) => item.id}
           onReorder={(items, { to }) => {
             setIds(items.map((item) => item.id));
@@ -417,28 +510,61 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
             setSelected(to);
           }}
           renderItem={({ step: s }, i, handle) => (
-            <StepRow handle={handle} index={i} step={s} selected={i === selected} onSelect={() => setSelected(i)} {...(trace?.[i] ? { trace: trace[i] } : {})} />
+            <StepRow handle={handle} index={i} step={s} selected={mode === 'step' && i === selected} onSelect={() => setSelected(i)} {...(trace?.[i] ? { trace: trace[i] } : {})} />
           )} />
-        <div className="flex items-center gap-3 border-t border-line-2 bg-[#fafbfc] px-4 py-3">
+        <button type="button" disabled={!autoDedupe} onClick={() => setSelected(steps.length)} aria-current={mode === 'auto' || undefined}
+          className={cx('flex w-full items-center gap-3 border-t border-line-2 px-4 py-3 text-left', mode === 'auto' ? 'bg-accent-soft' : 'bg-[#fafbfc]', autoDedupe && 'cursor-pointer')}>
           <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md bg-[#ebedf1] font-mono text-[12px] text-faint">✓</span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="text-[13.5px] font-medium text-ink-2">去重 · 加序号 <span className="text-[12px] font-normal text-muted">自动兜底，不可移除</span></span>
             <span className="font-mono text-[12px] text-muted">{autoDedupe?.renamed.length ? `${autoDedupe.renamed.length} 个重名节点追加了序号` : '同名节点追加 2、3…'}</span>
           </span>
-          {last && <span className="font-mono text-[12.5px] text-ink-2">{last.after}</span>}
-        </div>
+          {last && <span className="font-mono text-[12.5px] text-ink-2">{last.after}{autoDedupe && <span className="text-ok"> ~{autoDedupe.renamed.length}</span>}</span>}
+        </button>
         <AddMenu onAdd={add} />
       </section>
 
       <section aria-label="编辑与预览" className="min-w-0 flex-[999_1_540px] rounded-[10px] border border-line bg-panel">
-        {!step ? (
-          <div className="flex flex-col gap-3 p-4">
-            <h2 className="m-0 text-[15px] font-semibold">还没有处理步骤</h2>
-            <p className="m-0 text-[13px] text-muted">节点会原样输出。从左侧「添加处理器」开始，每加一步都能在这里看到它的效果。</p>
-            {previewError && <div role="alert" className="rounded-lg bg-err-soft px-3 py-2 text-[13px] text-err">{previewError}</div>}
-            {preview && preview.nodes.length > 0 && <NodeChips nodes={preview.nodes} />}
+        {mode === 'overview' && <>
+          <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="m-0 text-[15px] font-semibold">总览 · 原始 → 最终</h2>
+              <span className="text-[12.5px] text-muted">{steps.length ? '左边是解析出的原始节点，右边是所有步骤和自动去重跑完后的输出。点「经过的步骤」里的序号跳到那一步调试。' : '还没有处理步骤，节点会原样输出。从左侧「添加处理器」开始，每加一步都能看到它的效果。'}</span>
+            </div>
+            {preview && overviewStats && <div className="flex flex-wrap gap-1.5">
+              <Badge>原始 {preview.input}</Badge>
+              <Badge>最终 {last ? last.after : preview.input}</Badge>
+              {overviewStats.renamed > 0 && <Badge tone="ok">改名 {overviewStats.renamed}</Badge>}
+              {overviewStats.removed > 0 && <Badge tone="err">移除 {overviewStats.removed}</Badge>}
+              {overviewStats.added > 0 && <Badge tone="ok">新增 {overviewStats.added}</Badge>}
+              {overviewStats.moved > 0 && <Badge>调整顺序 {overviewStats.moved}</Badge>}
+            </div>}
+            {loading && <span className="text-[12.5px] text-muted">预览中…</span>}
           </div>
-        ) : <>
+          {previewError && <div role="alert" className="mx-4 mb-3 rounded-lg bg-err-soft px-3 py-2 text-[13px] text-err">{previewError}</div>}
+          {before && after && <MappingView before={before} after={after} inLabel="原始节点" outLabel="最终输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated}
+            extraLabel="经过的步骤" extra={(r) => {
+              if (r.origin === null) return null;
+              const gone = removedAt.get(r.origin);
+              const renames = renamedAt.get(r.origin) ?? [];
+              return <span className="flex flex-wrap items-center gap-1">
+                {renames.map((k) => <StepChip key={k} index={k} onClick={() => setSelected(k)}>{k >= steps.length ? '去重' : k + 1}</StepChip>)}
+                {gone !== undefined && <StepChip index={gone} tone="err" onClick={() => setSelected(gone)}>第 {gone + 1} 步 {stepName(gone)} 移除</StepChip>}
+              </span>;
+            }} />}
+          {!preview && !previewError && <div className="px-4 pb-4 text-[13px] text-muted">{loading ? '预览中…' : '保存后可预览'}</div>}
+        </>}
+
+        {mode === 'auto' && autoDedupe && <>
+          <div className="flex flex-col gap-0.5 px-4 pt-4 pb-3">
+            <h2 className="m-0 text-[15px] font-semibold">去重 · 加序号（自动兜底）</h2>
+            <span className="text-[12.5px] text-muted">所有步骤跑完后，同名节点从第二个起追加 2、3…，保证名称唯一。这一步不可移除。</span>
+          </div>
+          <div className="border-t border-line-2 px-4 pt-3 pb-3"><h3 className="m-0 text-[13.5px] font-semibold">输入 → 输出 <span className="font-normal text-muted">· {resultText(autoDedupe)}</span></h3></div>
+          {before && after && <MappingView before={before} after={after} inLabel="输入" outLabel="输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated} />}
+        </>}
+
+        {mode === 'step' && step && <>
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">
               <h2 className="m-0 text-[15px] font-semibold">第 {selected + 1} 步 · {OP_LABEL[step.op]}</h2>
@@ -453,40 +579,19 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           </div>
           {cur?.error && <div role="alert" className="mx-4 mb-3 rounded-lg bg-err-soft px-3 py-2 text-[13px] text-[#8f2a1f]">这一步失败，已跳过：{cur.error}</div>}
           <div className="mx-4 mb-4 flex flex-col gap-2.5 rounded-lg bg-ground p-3.5">
-            <StepForm key={`${keys[selected]}-${step.op}`} step={step} names={names}
+            <StepForm key={`${keys[selected]}-${step.op}`} step={step} names={before?.names}
               onChange={(s) => onChange(steps.map((x, j) => (j === selected ? { ...s, ...(x.enabled === false ? { enabled: false } : {}) } : x)))} />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-2 px-4 pt-3 pb-3">
-            <h3 className="m-0 text-[13.5px] font-semibold">这一步之后 <span className="font-normal text-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
-            <Segmented label="预览方式" value={view} options={[{ value: 'diff', label: '与上一步 diff' }, { value: 'nodes', label: '节点列表' }]} onChange={setView} />
+            <h3 className="m-0 text-[13.5px] font-semibold">这一步的输入 → 输出 <span className="font-normal text-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
           </div>
           {previewError && <div role="alert" className="mx-4 mb-3 rounded-lg bg-err-soft px-3 py-2 text-[13px] text-err">{previewError}</div>}
-          {cur && view === 'diff' && (diffRows.length ? <>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[13px]">
-                <thead><tr>
-                  <th className="border-b border-line px-4 py-2 text-left text-[12px] font-medium text-muted">上一步</th>
-                  <th className="w-6 border-b border-line" aria-hidden="true" />
-                  <th className="border-b border-line px-4 py-2 text-left text-[12px] font-medium text-muted">这一步之后</th>
-                  <th className="border-b border-line px-4 py-2 text-left text-[12px] font-medium text-muted">命中</th>
-                </tr></thead>
-                <tbody>
-                  {diffRows.slice(0, 200).map((d, i) => (
-                    <tr key={i}>
-                      <td className="border-b border-line-2 bg-[#fdf4f3] px-4 py-2 font-mono whitespace-nowrap text-[#8f2a1f]">{d.from}</td>
-                      <td className="border-b border-line-2 text-center text-faint" aria-hidden="true">→</td>
-                      <td className={cx('border-b border-line-2 px-4 py-2 font-mono whitespace-nowrap', d.removed ? 'text-muted italic' : 'bg-[#f2faf5] text-[#17633a]')}>{d.to}</td>
-                      <td className="border-b border-line-2 px-4 py-2 font-mono text-muted">{d.hit}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-4 pt-3 pb-4 text-[12.5px] text-muted">只列出有变化的节点 · 显示 {Math.min(diffRows.length, 200)} / {diffRows.length} 条</div>
-          </> : <div className="px-4 pb-4 text-[13px] text-muted">{cur.error ? '这一步失败，节点保持上一步的结果。' : !cur.enabled ? '这一步已停用。' : step.op.startsWith('sort') ? '这一步只调整顺序，切换到「节点列表」查看。' : '这一步没有改名或移除任何节点。'}</div>)}
-          {cur && view === 'nodes' && <div className="px-4 pb-4"><NodeChips nodes={cur.nodes} truncated={cur.truncated} /></div>}
+          {cur && before && after && <MappingView before={before} after={after} inLabel={selected === 0 ? '输入（原始节点）' : `输入（第 ${selected} 步之后）`} outLabel="输出"
+            options={mapOptions} onOptions={setMapOptions} truncated={truncated}
+            extraLabel="命中" extra={(r) => (r.in && (!r.out || r.in.name !== r.out.name || r.moved !== 0) ? rowHit(step, r.in.name) : null)} />}
         </>}
+
         {preview && preview.failures.length > 0 && (
           <details className="border-t border-line-2 px-4 py-3 text-[12.5px]">
             <summary className="cursor-pointer text-accent">{preview.failures.length} 个节点解析失败</summary>
@@ -494,15 +599,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           </details>
         )}
       </section>
-    </div>
-  );
-}
-
-function NodeChips({ nodes, truncated }: { nodes: PipelinePreview['nodes']; truncated?: boolean }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {nodes.map((n, i) => <span key={i} title={`${n.type} ${n.server}:${n.port}`} className="rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]">{n.name}</span>)}
-      {truncated && <span className="px-0.5 py-1 text-[12.5px] text-muted">仅显示前 {nodes.length} 个</span>}
     </div>
   );
 }

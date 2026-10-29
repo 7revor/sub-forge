@@ -1,6 +1,6 @@
 // 基础组件：按设计稿的配色与尺寸（触控目标 ≥ 36–44px）。
 
-import { useEffect, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { X } from 'lucide-react';
 
 // 宽、高、字号类在同一元素上冲突时，以后传入的为准（Tailwind 按样式表顺序而非 class 顺序生效）
@@ -53,6 +53,27 @@ export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement>
 
 export function Textarea({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...p} className={cx('w-full rounded-lg border border-[#d5d9e0] bg-panel px-3 py-2 text-[13px] text-ink', className)} />;
+}
+
+type DraftProps<E> = { value: string; onCommit: (value: string) => void } & Omit<E, 'value' | 'onChange'>;
+
+/** 只在失焦（或回车）时提交的输入框：输入过程只改本地草稿，避免每次按键都触发预览、命中数等反馈 */
+export function DraftInput({ value, onCommit, onBlur, onKeyDown, ...p }: DraftProps<InputHTMLAttributes<HTMLInputElement>>) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return <Input {...p} value={draft}
+    onChange={(e) => setDraft(e.target.value)}
+    onBlur={(e) => { if (draft !== value) onCommit(draft); onBlur?.(e); }}
+    onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.currentTarget.blur(); onKeyDown?.(e); }} />;
+}
+
+/** 同 DraftInput，多行版本（回车换行，只在失焦时提交） */
+export function DraftTextarea({ value, onCommit, onBlur, ...p }: DraftProps<TextareaHTMLAttributes<HTMLTextAreaElement>>) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return <Textarea {...p} value={draft}
+    onChange={(e) => setDraft(e.target.value)}
+    onBlur={(e) => { if (draft !== value) onCommit(draft); onBlur?.(e); }} />;
 }
 
 export function Select({ className, children, ...p }: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -214,4 +235,9 @@ export function formatBytes(n?: number): string {
   let v = n;
   while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
   return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${u[i]}`;
+}
+
+/** 服务端尚未实现的功能：界面已就位，操作会被服务端拒绝（501） */
+export function PendingNotice({ children }: { children: ReactNode }) {
+  return <div role="note" className="rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-4 py-3 text-[12.5px] leading-relaxed text-muted"><b className="font-medium text-ink-2">服务端尚未实现：</b>{children}</div>;
 }

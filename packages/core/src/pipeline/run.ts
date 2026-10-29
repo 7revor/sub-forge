@@ -17,6 +17,8 @@ export type StepTrace = {
   error?: string;
   /** 逐步预览时提供这一步之后的节点 */
   nodes?: ProxyIR[];
+  /** 逐步预览时与 nodes 一一对应：每个节点来自第几个输入节点（0 起），脚本新增的节点为 null */
+  origins?: (number | null)[];
 };
 
 export type PipelineResult = { nodes: ProxyIR[]; trace: StepTrace[] };
@@ -25,6 +27,16 @@ export type PipelineOptions = {
   /** 每步保存节点快照，供 UI 逐步预览；订阅渲染时不需要 */
   keepSnapshots?: boolean;
 };
+
+/** 按 _key 把输出节点对回输入节点的来源序号；同一 _key 按出现顺序配对，与 diff 一致 */
+function trackOrigins(before: ProxyIR[], beforeOrigins: (number | null)[], after: ProxyIR[]): (number | null)[] {
+  const queue = new Map<string, (number | null)[]>();
+  before.forEach((n, i) => {
+    const q = queue.get(n._key);
+    if (q) q.push(beforeOrigins[i]!); else queue.set(n._key, [beforeOrigins[i]!]);
+  });
+  return after.map((n) => queue.get(n._key)?.shift() ?? null);
+}
 
 function diff(before: ProxyIR[], after: ProxyIR[]): Pick<StepTrace, 'renamed' | 'removed'> {
   // 同一 _key 可能出现多次（去重前），按出现顺序配对
@@ -45,6 +57,7 @@ function diff(before: ProxyIR[], after: ProxyIR[]): Pick<StepTrace, 'renamed' | 
 
 export function runPipeline(input: ProxyIR[], steps: OperatorStep[], opts: PipelineOptions = {}): PipelineResult {
   let nodes = input;
+  let origins: (number | null)[] = input.map((_, i) => i);
   const trace: StepTrace[] = [];
   steps.forEach((step, index) => {
     const enabled = step.enabled !== false;
@@ -58,14 +71,17 @@ export function runPipeline(input: ProxyIR[], steps: OperatorStep[], opts: Pipel
         t.error = (e as Error).message;
       }
     }
-    if (opts.keepSnapshots) t.nodes = nodes;
+    if (opts.keepSnapshots) {
+      if (nodes !== before) origins = trackOrigins(before, origins, nodes);
+      Object.assign(t, { nodes, origins });
+    }
     trace.push(t);
   });
   // 末尾自动兜底：名称唯一（SRC-11）
   const unique = dedupeNames(nodes);
   if (unique !== nodes && unique.some((n, i) => n !== nodes[i])) {
     const t: StepTrace = { index: steps.length, op: 'dedupe', enabled: true, before: nodes.length, after: unique.length, ...diff(nodes, unique) };
-    if (opts.keepSnapshots) t.nodes = unique;
+    if (opts.keepSnapshots) Object.assign(t, { nodes: unique, origins: trackOrigins(nodes, origins, unique) });
     trace.push(t);
   }
   return { nodes: unique, trace };

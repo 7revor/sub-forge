@@ -23,7 +23,11 @@ function ValueRow({ name, value, onChange, onRename, onRemove }: {
         <Input aria-label={`${name} 的值`} className="font-mono" value={text} aria-invalid={!!error} onChange={(event) => {
           const text = event.target.value;
           const parsed = parseExtraValue(text);
-          setDraft({ source: parsed.ok ? parsed.value : value, text, error: parsed.ok ? undefined : parsed.error });
+          setDraft({ source: value, text, error: parsed.ok ? undefined : parsed.error });
+        }} onBlur={() => {
+          // 失焦时才提交，避免每次按键都触发预览
+          if (!draft || !Object.is(draft.source, value) || draft.error) return;
+          const parsed = parseExtraValue(draft.text);
           if (parsed.ok) onChange(parsed.value);
         }} />
         <Button size="sm" aria-label={`删除 ${name}`} onClick={onRemove}>删除</Button>

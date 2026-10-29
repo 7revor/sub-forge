@@ -9,7 +9,8 @@ import { findOverlayOrphans } from './orphans.ts';
 
 type TemplateDetails = { item: TemplateDoc; versions: { version: number; changelog?: string; createdAt: number }[] };
 
-export function TemplateCard() {
+/** bare：放进对话框时不套卡片 */
+export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
   const { draft, setDraft, template } = useProfile();
   const templates = useTemplates();
   const ref = draft.template;
@@ -33,8 +34,7 @@ export function TemplateCard() {
   const pinned = ref && ref.follow !== 'latest' ? ref.follow.pinned : undefined;
   const versions = details.data?.versions ?? [];
 
-  return (
-    <Card title="模板">
+  const body = (
       <div className="flex flex-col gap-3.5">
         <p className="m-0 text-[13px] text-muted">{ref ? `${template?.name ?? ref.id} · v${template?.version ?? pinned ?? '?'} · ${pinned === undefined ? '跟随最新' : '锁定版本'}` : '不使用模板'}</p>
         <ErrorBox error={templates.error ?? details.error ?? change.error} />
@@ -60,6 +60,6 @@ export function TemplateCard() {
           )}</Field>}
         </>}
       </div>
-    </Card>
   );
+  return bare ? body : <Card title="模板">{body}</Card>;
 }

@@ -1,4 +1,4 @@
-# Sub-Forge
+# Sub Forge
 
 面向小规模用户群体的**订阅聚合 + 分流配置生成**服务。
 目标是取 Sub-Store 的"订阅加工"之长、取妙妙屋（miaomiaowu）的"可视化生成配置"之长，并补上两者都没解决好的问题：
@@ -24,6 +24,7 @@
 | [docs/08-rule-repository-index.md](docs/08-rule-repository-index.md) | 新需求：内置规则仓库的搜索、索引与引用 |
 | [docs/09-frontend-forms-plan.md](docs/09-frontend-forms-plan.md) | 前端表单化改造方案：可视化表单 + 原始配置双模式、分期 |
 | [docs/10-m1-stabilization.md](docs/10-m1-stabilization.md) | M1 稳定化修复、订阅资源版本与模板更新策略、验收记录 |
+| [docs/11-design-coverage.md](docs/11-design-coverage.md) | 前端页面与设计稿的逐页对照，服务端待实现的功能 |
 | [docs/12-backend-regression-fixes.md](docs/12-backend-regression-fixes.md) | 后端六项问题修复、边界约定与回归验证 |
 
 ## 状态
@@ -35,7 +36,7 @@
 2026-10-29 后端复查的六项问题已在 `codex/backend-six-fixes` 修复，新增 80 项回归用例；当前工作树的 Docker 全量验证为 core 93、server 187、web 183 项通过，2 项原有前端用例跳过。修复范围、行为边界及复现方式见 [12](docs/12-backend-regression-fixes.md)。本轮仅修复既有功能，尚未合并或部署。
 
 - 需求：PRD v0.2，待决问题已暂定（[07 §8](docs/07-verification-checklist.md#8-决策记录)）；剩余需要 GUI / 真机 / 国内网络的采集项见 [07 §7.1](docs/07-verification-checklist.md#71-剩余采集项)，结果与暂定决策冲突时再修订。实测用例见 [research/verification](research/verification/README.md)。
-- 设计：前端页面设计稿（21 张画板）在 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库；链接默认仅所有者可见，需要在页面的 Share 菜单中分享给他人。
+- 设计：前端页面设计稿（29 张画板，前端按画板实现，对照见 [docs/11](docs/11-design-coverage.md)）在 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库；链接默认仅所有者可见，需要在页面的 Share 菜单中分享给他人。
 
 ```bash
 pnpm install
@@ -46,7 +47,7 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 
 本地试用订阅服务见 [packages/server](packages/server/README.md#运行)。
 
-macOS 一键启动 / 停止：双击 [start-local.command](scripts/start-local.command) 或 [stop-local.command](scripts/stop-local.command)。启动会构建当前主目录的前端并在后台运行服务，停止会保留数据库和密钥；使用方法与数据位置见 [本地脚本说明](scripts/README.md)。
+本地开发：运行 [start](scripts/start)（`./scripts/start`）启动 Vite 前端热更新与后端源码监听，访问 `http://127.0.0.1:5173`；运行 [stop](scripts/stop)（`./scripts/stop`）同时停止两者。启动不打包，停止保留数据库和密钥；使用方法与数据位置见 [本地脚本说明](scripts/README.md)。
 
 ## 许可证
 

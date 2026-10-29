@@ -109,7 +109,13 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       input: input.length,
       failures,
       report: [...loaded.report, ...report.items],
-      trace: result.trace.map(({ nodes, ...t }) => ({ ...t, nodes: (nodes ?? []).slice(0, MAX_NODES_PER_STEP).map(brief), truncated: (nodes?.length ?? 0) > MAX_NODES_PER_STEP })),
+      inputNodes: input.slice(0, MAX_NODES_PER_STEP).map(brief),
+      trace: result.trace.map(({ nodes, origins, ...t }) => ({
+        ...t,
+        nodes: (nodes ?? []).slice(0, MAX_NODES_PER_STEP).map(brief),
+        origins: (origins ?? []).slice(0, MAX_NODES_PER_STEP),
+        truncated: (nodes?.length ?? 0) > MAX_NODES_PER_STEP,
+      })),
       nodes: result.nodes.slice(0, MAX_NODES_PER_STEP).map(brief),
     });
   };
