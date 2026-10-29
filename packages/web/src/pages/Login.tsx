@@ -34,7 +34,7 @@ export function Login() {
     <div className="flex min-h-full flex-col items-center gap-6 bg-nav px-4 py-24">
       <div className="flex items-center gap-2.5">
         <LogoMark size={28} />
-        <span className="font-mono text-xl font-semibold text-white">sub-forge</span>
+        <span className="font-mono text-xl font-semibold text-white">Sub Forge</span>
       </div>
       <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-panel p-6">
         <h1 className="m-0 text-lg font-semibold">登录</h1>

@@ -259,7 +259,7 @@ class LocalService:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Sub-Forge 本地服务启动 / 停止")
+    parser = argparse.ArgumentParser(description="Sub Forge 本地服务启动 / 停止")
     parser.add_argument("action", choices=["start", "stop"])
     args = parser.parse_args()
     try:

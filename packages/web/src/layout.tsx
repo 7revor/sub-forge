@@ -21,7 +21,7 @@ function Logo() {
   return (
     <div className="flex items-center gap-2.5 px-2.5 pt-1 pb-2">
       <LogoMark size={24} />
-      <span className="font-mono text-[15px] font-semibold text-white">sub-forge</span>
+      <span className="font-mono text-[15px] font-semibold text-white">Sub Forge</span>
     </div>
   );
 }
