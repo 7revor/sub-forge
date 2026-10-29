@@ -12,7 +12,7 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
-const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_64px]';
+const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_56px_64px]';
 
 export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; report: ReportItem[];
@@ -41,7 +41,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
       }}><Plus size={14} />新增组</Button>
     </>}>
       {!value.groups.length ? <div className="px-4 pb-4"><Empty title="还没有策略组" /></div> : <>
-        <div className={cx(columns, 'items-center px-4 pb-2 text-[12px] font-medium text-muted')}><span /><span>组</span><span>类型</span><span className="hidden sm:block">成员（组 / 内置）</span><span className="sr-only">操作</span></div>
+        <div className={cx(columns, 'items-center px-4 pb-2 text-[12px] font-medium text-muted')}><span /><span>组</span><span>类型</span><span className="hidden sm:block">成员（组 / 内置）</span><span className="hidden text-center sm:block">隐藏</span><span className="sr-only">操作</span></div>
         <SortableList items={value.groups} getKey={g => g.id} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = g.members.map(m => memberLabel(m, groupName, ref => ref.id).text).join(' · ') || '—';
@@ -49,8 +49,12 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             {handle}
             <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left font-medium', error && 'text-err')}>{g.name || '未命名组'}{g.display?.hidden && <span className="ml-2 text-[11px] font-normal text-muted">已隐藏</span>}</span>
             <span className="font-mono text-[12px]">{g.type.toUpperCase()}</span>
-            <span className="col-span-3 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-auto sm:row-start-auto" title={members}>{members}</span>
-            <div className="col-start-4 row-start-1 flex gap-1 sm:col-start-5">
+            <span className="col-span-2 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-4 sm:row-start-1" title={members}>{members}</span>
+            <div className="col-start-4 row-start-2 flex flex-col items-center justify-center gap-0.5 sm:col-start-5 sm:row-start-1 sm:flex-row">
+              <span className="text-[12px] text-muted sm:hidden">隐藏</span>
+              <Switch label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
+            </div>
+            <div className="col-start-4 row-start-1 flex gap-1 sm:col-start-6">
               <Button size="sm" variant="ghost" className="px-1.5" aria-label={`编辑策略组「${g.name}」`} onClick={() => onSelect(g.id)}><Pencil size={14} /></Button>
               <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除策略组「${g.name}」`} onClick={() => setDeleting(g.id)}><Trash2 size={14} /></Button>
             </div>
