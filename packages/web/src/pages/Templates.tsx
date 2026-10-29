@@ -30,12 +30,12 @@ export function TemplateList() {
   const inUse = (id: string) => (profiles.data ?? []).filter((p) => p.template?.id === id).length;
   return (
     <>
-      <PageHeader title="模板" subtitle="管理员维护的分流骨架：策略组和规则，不含节点。配置订阅选择一个模板，再填充自己的节点。"
+      <PageHeader title="模板"
         actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
       <ErrorBox error={list.error} />
       <PageScroll>
         {list.isLoading ? <div className="text-muted">加载中…</div> : !list.data?.length ? (
-          <Empty title="还没有模板" description="新建一个模板：定义策略组骨架和规则，用户的配置订阅会以它为基础。" />
+          <Empty title="还没有模板" />
         ) : (
           <div className="flex flex-wrap items-start gap-5">
             <nav aria-label="模板列表" className="min-w-0 flex-[1_1_260px] overflow-hidden rounded-[10px] border border-line bg-panel py-1.5">
@@ -91,8 +91,8 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </section>
-      <Card title="策略组骨架" actions={<span className="text-[12.5px] text-muted">节点由你在配置订阅里填充</span>} bodyClass="overflow-x-auto">
-        {!t.groups.length ? <div className="px-4 pb-4"><Empty title="还没有组" description="编辑模板以添加策略组骨架。" /></div> : <table className="w-full border-collapse">
+      <Card title="策略组骨架" bodyClass="overflow-x-auto">
+        {!t.groups.length ? <div className="px-4 pb-4"><Empty title="还没有组" /></div> : <table className="w-full border-collapse">
           <thead><tr><th className={th}>组</th><th className={th}>类型</th><th className={th}>成员（组 / 内置）</th><th className={th}>为空时</th><th className={th}>填充提示</th></tr></thead>
           <tbody>
             {t.groups.map((g) => (
@@ -109,7 +109,7 @@ function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; ac
       </Card>
       <div className="flex flex-wrap items-start gap-5">
         <Card title="规则" className="min-w-0 flex-[999_1_420px]" actions={<span className="text-[12.5px] text-muted">{t.rules.length} 条{!allRules && t.rules.length > RULE_PREVIEW ? ` · 显示前 ${RULE_PREVIEW} 条` : ''}</span>} bodyClass="pb-1">
-          {!rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="所有流量走 MATCH。" /></div>}
+          {!rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
           {rules.map((r, i) => (
             <div key={r.id} className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
               <span className="font-mono text-[12px] text-muted">{i + 1}</span>
@@ -251,7 +251,7 @@ function TemplatePage({ id }: { id: string }) {
     return (
       <>
         <PageHeader crumbs={crumbs} title={isNew ? `创建 v1 · ${name || '新模板'}` : `发布 v${nextVersion} · ${name}`}
-          subtitle={isNew ? '创建后，用户就能在新建配置订阅时选择这个模板。' : '发布后对「跟随最新」的配置订阅立即生效，订阅方无需确认。以下结果来自逐个试渲染。'} />
+          subtitle={isNew ? undefined : '发布后立即更新跟随最新版本的配置订阅。'} />
         <PageScroll>
           <div className="flex flex-wrap items-start gap-5">
             <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
@@ -330,7 +330,7 @@ function TemplatePage({ id }: { id: string }) {
           </div>
           <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
             <Card title="版本">
-              {isNew ? <Empty title="还没有发布过" description="发布后将在这里显示版本记录。" /> : (
+              {isNew ? <Empty title="还没有发布过" /> : (
                 <VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} />
               )}
             </Card>
@@ -348,7 +348,7 @@ function TemplatePage({ id }: { id: string }) {
           const r = templateFromYaml(importing ?? '', body, ctx);
           if (r.ok) { setBody(r.value); setImporting(undefined); }
         }}>导入</Button></>}>
-        <Field label="mihomo 的 proxy-groups 与 rules（不含节点）" hint="导入会替换当前草稿的组与规则；发布前不会影响任何配置订阅。">
+        <Field label="mihomo 的 proxy-groups 与 rules（不含节点）" hint="导入会替换当前草稿的组与规则。">
           {(fid) => <Textarea id={fid} rows={16} className="font-mono text-[12.5px]" spellCheck={false} value={importing ?? ''} onChange={(e) => setImporting(e.target.value)} />}
         </Field>
         {importing !== undefined && (() => { const r = templateFromYaml(importing, body, ctx); return r.ok ? null : <ErrorBox error={`第 ${r.line ?? 1} 行：${r.error}`} />; })()}

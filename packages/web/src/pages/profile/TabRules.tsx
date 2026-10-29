@@ -79,7 +79,6 @@ function PrivateRuleEdit({ rule, onApply, onClose }: { rule: RuleEntry; onApply:
   const [value, setValue] = useState(rule);
   const error = privateRuleError(value);
   return <div className="flex flex-col gap-3 border-t border-line-2 bg-ground p-4">
-    <p className="m-0 text-[12.5px] text-muted">编辑后点击「应用修改」，再保存 Profile。</p>
     <PrivateRuleFields value={value} onChange={setValue} />
     <ErrorBox error={error} />
     <div className="flex gap-2"><Button variant="primary" disabled={!!error} onClick={() => { onApply(value); onClose(); }}>应用修改</Button><Button onClick={onClose}>取消</Button></div>
@@ -103,9 +102,9 @@ export function TabRules() {
 
   return <>
     {orphans.length > 0 && <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span></Notice>}
-    <Card title={`规则（自上而下匹配）`} subtitle={`继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则；点击行展开编辑。`}
+    <Card title={`规则（自上而下匹配）`}
       actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>}>
-      {!rows.length ? <Empty title="没有规则" description="所有流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
+      {!rows.length ? <Empty title="没有规则" description="未匹配的流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
         onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}
         renderItem={(r, i, handle) => {
           const l = label(r.matcher);
@@ -124,7 +123,7 @@ export function TabRules() {
                 {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-[12px] font-normal text-accent">已改出口</span>}
               </button>
               <Badge tone={r.origin === 'profile' ? 'ok' : 'neutral'}>{r.origin === 'profile' ? '私有' : '模板'}</Badge>
-              <span className="flex gap-1" aria-label="客户端输出"><span className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2">mihomo</span><span className="rounded border border-dashed border-line px-1.5 py-0.5 font-mono text-[11.5px] text-faint" title="Surge 在 M2 输出">Surge</span></span>
+              <span className="flex gap-1" aria-label="客户端输出"><span className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2">mihomo</span><span className="rounded border border-dashed border-line px-1.5 py-0.5 font-mono text-[11.5px] text-faint" title="Surge 暂未开放">Surge</span></span>
               <span onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
                 <Switch label={`启用规则 ${i + 1}`} checked={!off} onChange={(enabled) => r.origin === 'template' ? patchRule(r.id, { enabled }) : setExtra(r.id, (rule) => ({ ...rule, enabled }))} />
                 {r.origin === 'profile' && <Button size="sm" variant="ghost" aria-label={`删除私有规则 ${i + 1}`} onClick={() => { setExtra(r.id, () => undefined); if (editing === r.id) setEditing(undefined); }}><Trash2 size={14} /></Button>}

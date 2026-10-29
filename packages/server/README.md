@@ -89,7 +89,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `GET /api/users/stats` | 用户：每人的配置订阅数、订阅源数、最近订阅请求 |
 | `GET/POST /api/shares`、`DELETE /api/shares/:id` | 用户：共享订阅源 / 组合（SYS-06） |
-| `GET /api/rule-repos`、`GET /api/rule-repos/search`、`GET /api/rule-repos/entry`、`POST /api/rule-repos/import`、`POST /api/rule-repos`、`DELETE /api/rule-repos/:id` | 规则仓库（RS-07，见 docs/08）与系统页的仓库管理 |
+| `POST /api/rule-repos`、`DELETE /api/rule-repos/:id` | 自定义规则仓库（内置仓库已接通，见下文） |
 | `GET/PUT /api/system`、`POST /api/system/backup`、`POST /api/system/restore` | 系统：SSRF 白名单、mihomo 校验开关、GitHub 镜像、备份恢复 |
 
 订阅源保存格式为 `{ name, url, fetch?, pipeline? }`，`url` 必须是单个 HTTP(S) 地址。旧客户端的单元素 `urls` 可自动转换；空数组、多元素数组、非字符串地址以及同时提供 `url` / `urls` 均返回 400。读取只返回 `url`。多个来源应各建一个订阅源并加入组合。
@@ -136,3 +136,17 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - 管理员共享订阅源 / 组合给指定用户（SYS-06）、模板可见性（TPL-08）尚未实现：目前模板对所有人可见，管理员名下的规则集可被所有人引用。
 - 订阅源只拉取一个 URL；拉取失败时使用该地址上一份成功快照并告警，没有可用成功快照时整个 Profile 渲染失败并尝试 last-good 回退。流量读取该源的快照；跨源汇总按源 ID 去重。组合成员整体不可用时仍失败，成员级失败策略 COL-05 尚未实现：前端可设置组合成员的 `onFail` 并随文档保存，渲染尚未读取。
 - 配置订阅基础设置的原样片段（`base.raw`，BS-04）随文档保存，渲染尚未输出。
+
+
+## 内置规则仓库
+
+服务初始化自动建立 blackmatrix7 / zydou 元数据，`serve` 启动后台索引；每日检查各分支 commit，更新失败保留旧索引并在 15 分钟后重试，退出前停止定时器并等待当前任务。SQLite v10 新增公共索引表，用户规则文档仍加密存储。
+
+- `GET /api/rule-repos`：状态与数量（需要登录）。
+- `GET /api/rule-repos/search?q=&repo=&client=&offset=0&limit=50`：归一化名称搜索，最大 100 条/页。
+- `GET /api/rule-repos/entry?repo=&path=`：变体、上游链接、许可证及推荐文本预览；网络错误明确返回。
+- `POST /api/rule-repos/import`：`{ repo, path, variant?, ruleset? }`，新建当前用户的规则集或向其已有规则集追加选中文本来源，按 URL 防重复。
+- `POST /api/rule-repos/:id/refresh`：管理员触发，202 返回后通过列表轮询状态；同仓库并发任务合并。
+- `PATCH /api/rule-repos/:id`：管理员设置 `{ enabled: boolean }`，停用不删除索引或已导入的规则集。
+
+GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。mrs 只显示不导入，默认导入文本后走已有托管流程。自定义仓库、镜像、动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。

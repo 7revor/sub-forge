@@ -46,10 +46,10 @@ export function TabOverview() {
     <>
       <div className="flex flex-wrap items-start gap-5">
         <Card className="min-w-0 flex-[999_1_560px]"
-          title={`订阅链接`} subtitle={`一个设备一个链接，便于单独重置。按 UA 或 ?target= 自动输出 mihomo（Surge 在 M2）。`}
+          title={`订阅链接`}
           actions={<Button onClick={() => setAdding(true)}><Plus size={15} />新增链接</Button>}>
           <ErrorBox error={reset.error ?? remove.error} />
-          {!tokens.data?.length ? <Empty title="还没有订阅链接" description="为每台设备新增一个，便于单独重置。" /> : (
+          {!tokens.data?.length ? <Empty title="还没有订阅链接" /> : (
             <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
               {tokens.data.map((t) => {
                 const seen = lastSeen(t.token);
@@ -73,9 +73,9 @@ export function TabOverview() {
         </Card>
         <Card title="输出设置" className="min-w-0 flex-[1_1_340px]">
           <div className="flex flex-col gap-3.5">
-            <Field label="更新间隔" hint="写入 profile-update-interval 响应头（Surge 在 M2 同时写入 MANAGED-CONFIG）">{(id) => (
+            <Field label="更新间隔">{(id) => (
               <Select id={id} value={String(draft.updateIntervalSec ?? 86400)} onChange={(e) => setDraft({ ...draft, updateIntervalSec: Number(e.target.value) })}>
-                {[[86400, '24 小时（86400 秒）'], [43200, '12 小时'], [21600, '6 小时'], [3600, '1 小时']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {[[86400, '24 小时'], [43200, '12 小时'], [21600, '6 小时'], [3600, '1 小时']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </Select>
             )}</Field>
             <Field label="流量 / 到期信息">{(id) => (
@@ -90,8 +90,8 @@ export function TabOverview() {
             )}</Field>
             <Field label="客户端中的显示名">{(id) => <Input id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
             {lastGood
-              ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）· 校验失败时订阅接口返回这一份，不会下发半成品。</div>
-              : <Empty title="还没有成功渲染过" description="客户端首次拉取时渲染；校验失败时不会下发半成品。" />}
+              ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）</div>
+              : <Empty title="还没有成功渲染过" />}
           </div>
         </Card>
       </div>
@@ -116,7 +116,7 @@ export function TabOverview() {
       </Card>
       <Modal title="新增订阅链接" open={adding} onClose={() => setAdding(false)}
         footer={<><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建链接'}</Button></>}>
-        <Field label="设备备注" hint="例如 MacBook · Surge；用于区分设备，可以留空">{(id) => <Input id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>
+        <Field label="设备备注">{(id) => <Input id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>
         <ErrorBox error={create.error} />
       </Modal>
       <Modal title={`重置「${resetting?.label || '未命名设备'}」的 token？`} open={!!resetting} onClose={() => setResetting(undefined)}
@@ -158,11 +158,6 @@ export function TabBase() {
             {presets.map((p) => <option key={p.id} value={p.id}>{p.name}（v{p.version}）</option>)}
           </Select>
         )}</Field>}
-        <p className="m-0 flex-[2_1_320px] text-[12.5px] leading-relaxed text-ink-2">
-          {mode === 'preset' ? '预设更新会同步到这里。你只需改需要不同的项；被覆盖的项标为「覆盖」，可一键还原为预设值。'
-            : mode === 'custom' ? '不引用预设，下面填写的内容就是完整的基础设置。'
-              : '不输出通用、DNS、TUN 等设置，使用客户端自己的默认值。'}
-        </p>
       </section>
 
       {hasProcess && processMode !== undefined && processMode !== 'strict' && processMode !== 'always' && mode !== 'none' && (
@@ -174,7 +169,7 @@ export function TabBase() {
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
             <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
             {client === 'surge' ? (
-              <Empty title="Surge 基础设置暂未开放" description="Surge 的 [General]、[Host] 等基础设置在 M2 提供；目前只输出 mihomo。" />
+              <Empty title="Surge 基础设置暂未开放" />
             ) : (
               <DualEditor key={`${draft.id}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
                 toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} rawLabel={mode === 'preset' ? '覆盖项 YAML' : 'mihomo YAML'}
@@ -186,12 +181,12 @@ export function TabBase() {
             )}
           </div>
           <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-2.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-            <div className="flex items-center justify-between"><h2 className="m-0 text-[14px] font-semibold">原样片段</h2><span className="text-[12px] text-muted">逃生通道 · 追加到末尾</span></div>
-            <label htmlFor="raw-snippet" className="text-[12.5px] text-muted">{client === 'mihomo' ? 'YAML · 合并到 mihomo 配置' : 'INI · 追加到 Surge 配置'}</label>
+            <div className="flex items-center justify-between"><h2 className="m-0 text-[14px] font-semibold">原样片段</h2></div>
+            <label htmlFor="raw-snippet" className="text-[12.5px] text-muted">{client === 'mihomo' ? 'YAML' : 'INI'}</label>
             <Textarea id="raw-snippet" rows={10} className="bg-[#fafbfc] font-mono text-[12.5px] leading-relaxed" spellCheck={false}
-              disabled={client === 'surge'} placeholder={client === 'mihomo' ? 'hosts:\n  router.home: 192.168.1.1' : 'M2 提供'}
+              disabled={client === 'surge'} placeholder={client === 'mihomo' ? 'hosts:\n  router.home: 192.168.1.1' : '暂未开放'}
               value={client === 'mihomo' ? draft.base?.raw ?? '' : ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, raw: e.target.value || undefined } })} />
-            <span className="text-[12px] leading-normal text-muted">原样片段不参与校验，写错可能导致客户端无法加载。服务端暂未输出这一段，保存后先存档。</span>
+            <span className="text-[12px] leading-normal text-muted">原样片段暂不输出。</span>
           </section>
         </div>
       )}
@@ -208,9 +203,9 @@ export function TabNodeSets() {
 
   return (
     <>
-      <Card title={`已加入的节点集`} subtitle={`默认按源输出 provider，面板中可按源查看、分别更新。代理链和被引用的单个节点不用在这里添加，系统会自动解析。`}
+      <Card title={`已加入的节点集`}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="overflow-x-auto">
-        {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" description="点击「添加节点集」选择订阅源、组合或本地节点组。" /></div> : (
+        {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : (
           <table className="w-full min-w-[820px] border-collapse">
             <thead><tr><th className={th}>节点集</th><th className={th}>类型</th><th className={th}>节点</th><th className={th}>输出方式</th><th className={th}>下发地址</th><th className={th}>备注</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
             <tbody>
@@ -229,16 +224,8 @@ export function TabNodeSets() {
           </table>
         )}
       </Card>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
-        {[
-          ['provider（默认）', 'mihomo 输出 proxy-providers，不写 path；Surge 输出 policy-path。地址带内容版本 ?v=，链配置变了地址也会变。'],
-          ['inline', '展开到 proxies / [Proxy]。适合节点少、不需要单独更新的本地节点组。'],
-          ['Profile 专属 provider', '节点集上有链规则时，它的 provider 内容为本配置订阅单独生成，并注入 dialer-proxy。'],
-        ].map(([t, d]) => <div key={t} className="flex flex-col gap-1 rounded-[10px] border border-line bg-panel px-4 py-3"><span className="font-mono text-[13px] font-semibold">{t}</span><span className="text-[12.5px] leading-relaxed text-muted">{d}</span></div>)}
-      </div>
       <NodeSetPickerDialog open={adding} options={allNodeSets} added={draft.nodeSets.map((n) => n.ref)} onClose={() => setAdding(false)}
-        onAdd={(refs) => setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...refs.map((ref) => ({ ref, output: 'provider' as const }))] })}
-        hint="新加入的节点集默认以 provider 输出，可在表格里改成 inline。" />
+        onAdd={(refs) => setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...refs.map((ref) => ({ ref, output: 'provider' as const }))] })} />
     </>
   );
 }

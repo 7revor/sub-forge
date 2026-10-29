@@ -72,7 +72,7 @@ export function Overview() {
 
   return (
     <>
-      <PageHeader title="总览" subtitle="配置订阅状态、上游拉取与待处理事项"
+      <PageHeader title="总览"
         actions={<Link to="/profiles/new" className={buttonClass('primary')}><Plus size={16} />新建配置订阅</Link>} />
 
       <PageScroll>

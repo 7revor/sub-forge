@@ -26,13 +26,13 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
   // 设计稿「管理员 · 模板编辑器」：骨架表格（组 / 类型 / 成员 / 为空时 / 填充提示），点击行在下方展开编辑
   const grid = 'grid grid-cols-[24px_minmax(0,1.1fr)_minmax(0,0.6fr)_minmax(0,1.4fr)_88px_minmax(0,1fr)] items-center gap-3';
   return <Card bodyClass="overflow-x-auto pb-2"
-    title={`策略组骨架`} subtitle={`只含其他模板组和内置策略，不含节点，也不预设 filter。`}
+    title={`策略组骨架`}
     actions={<Button onClick={() => {
       const id = newId('g');
       onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [], whenEmpty: 'reject' }] });
       onSelect(id);
     }}>新增组</Button>}>
-    {!value.groups.length ? <div className="px-4 pb-2"><Empty title="还没有组" description="点击「新增组」建立策略组骨架。" /></div> : <div className="min-w-[760px]">
+    {!value.groups.length ? <div className="px-4 pb-2"><Empty title="还没有组" /></div> : <div className="min-w-[760px]">
       <div className={cx(grid, 'border-y border-line px-4 py-2 text-[12px] font-medium text-muted')}><span /><span>组</span><span>类型</span><span>成员（组 / 内置）</span><span>为空时</span><span>填充提示</span></div>
       <SortableList items={value.groups} getKey={(g) => g.id} onReorder={(groups) => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
         const error = report.some((r) => r.level === 'error' && r.where === `group:${g.id}`);
@@ -57,7 +57,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <Field label="icon（图标）">{(id) => <Input id={id} value={group.display?.icon ?? ''} onChange={(e) => update({ display: { ...group.display, icon: e.target.value } })} />}</Field>
         <ExtraFields value={group.extra ?? {}} onChange={(extra) => update({ extra })} />
         <h3 className="m-0 text-[14px] font-medium">成员</h3>
-        {!group.members.length && <Empty title="还没有成员" description="从下方选择其他模板组或内置策略。" />}
+        {!group.members.length && <Empty title="还没有成员" />}
         <SortableList items={group.members} onReorder={(members) => update({ members })} renderItem={(m, index, handle) => <div className="flex items-center gap-2 border-b border-line-2 py-1">
           {handle}<span className="min-w-0 flex-1 break-all text-[13px]">{memberLabel(m, groupName, (ref) => ref.id).text}</span>
           <Button size="sm" onClick={() => update({ members: group.members.filter((_, i) => i !== index) })}>删除</Button>

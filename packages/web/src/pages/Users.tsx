@@ -42,7 +42,7 @@ export function Users() {
 
   return (
     <>
-      <PageHeader title="用户" subtitle={`${list.length} 个用户。用户之间数据隔离；禁用或重置密码会让其所有登录立即失效。`}
+      <PageHeader title="用户" subtitle={`${list.length} 个用户 · 禁用或重置密码会退出该用户的所有登录。`}
         actions={<Button variant="primary" onClick={() => setCreating(true)}><Plus size={16} />创建用户</Button>} />
       <ErrorBox error={users.error ?? patch.error} />
       <PageScroll>
@@ -77,12 +77,12 @@ export function Users() {
               })}
             </tbody>
           </table>
-          {stats.data?.pending && <p className="mx-4 my-3 text-[12px] text-muted">配置订阅、订阅源与最近订阅请求的统计还没有接入服务端，暂时显示为「—」。</p>}
+          {stats.data?.pending && <p className="mx-4 my-3 text-[12px] text-muted">统计暂不可用。</p>}
         </Card>
 
         <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}
           actions={<Button onClick={() => { setShare({ doc: '', to: [] }); setSharing(true); }}>共享…</Button>}>
-          {shares.data?.pending && <div className="mb-3"><PendingNotice>共享模型还没有接入，「共享…」会被拒绝。</PendingNotice></div>}
+          {shares.data?.pending && <div className="mb-3"><PendingNotice>共享暂不可用。</PendingNotice></div>}
           <div className="flex flex-col">
             {(shares.data?.items ?? []).map((x) => (
               <div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
@@ -122,7 +122,7 @@ export function Users() {
           <legend className="mb-1.5 text-[12.5px] font-medium text-muted">共享给</legend>
           {list.filter((u) => u.id !== me?.id).map((u) => <label key={u.id} className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={share.to.includes(u.id)} onChange={(e) => setShare({ ...share, to: e.target.checked ? [...share.to, u.id] : share.to.filter((x) => x !== u.id) })} />{u.username}</label>)}
         </fieldset>
-        <span className="text-[12px] text-muted">被共享的用户只能在节点集里引用，看不到原始 URL，也不能修改处理链。</span>
+        <span className="text-[12px] text-muted">仅可引用，无法查看原始 URL 或修改处理链。</span>
         <ErrorBox error={addShare.error} />
       </Modal>
     </>

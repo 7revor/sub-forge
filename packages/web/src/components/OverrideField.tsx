@@ -13,7 +13,6 @@ export function OverrideForm({ groups, base, patch, onChange }: {
   // 预设没有值时，点击覆盖也要先展开输入，尚未输入则不向补丁写默认值。
   const [editing, setEditing] = useState<Set<string>>(() => new Set());
   return <div className="flex flex-col gap-4">
-    <p className="m-0 text-[13px] text-muted">只保存覆盖项；与预设深度合并，列表整体替换。</p>
     {groups.map((group) => <section key={group.title} data-section={group.title} className="rounded-[10px] border border-line bg-panel">
       <h3 className="m-0 border-b border-line-2 px-4.5 py-3.5 text-[14px] font-semibold">{group.title}</h3>
       <div className="flex flex-col">

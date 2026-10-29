@@ -10,7 +10,7 @@ import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, 
 export function System() {
   const qc = useQueryClient();
   const info = useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('GET', '/system') });
-  const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ pending?: boolean; repos: RuleRepo[] }>('GET', '/rule-repos') });
+  const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ pending?: boolean; repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
   const [draft, setDraft] = useState<SystemInfo>();
   const [allow, setAllow] = useState('');
   const [addingRepo, setAddingRepo] = useState(false);
@@ -20,6 +20,8 @@ export function System() {
   const backup = useMutation({ mutationFn: () => api('POST', '/system/backup') });
   const restore = useMutation({ mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
   const addRepo = useMutation({ mutationFn: () => api('POST', '/rule-repos', repoForm), onSuccess: () => { setAddingRepo(false); void qc.invalidateQueries({ queryKey: ['rule-repos'] }); } });
+  const refreshRepo = useMutation({ mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
+  const toggleRepo = useMutation({ mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
   const removeRepo = useMutation({ mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
 
   if (!draft) return info.error ? <ErrorBox error={info.error} /> : <div className="text-muted">加载中…</div>;
@@ -29,7 +31,7 @@ export function System() {
   return (
     <>
       <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
-      {info.data?.pending && <PendingNotice>系统设置接口还没有接入：这里显示的是空的默认值，保存、导出与恢复会被服务端拒绝。目前 SSRF 白名单与 mihomo 校验由环境变量 <span className="font-mono">SSRF_ALLOW</span>、<span className="font-mono">MIHOMO_BIN</span> 控制。</PendingNotice>}
+      {info.data?.pending && <PendingNotice>除内置规则仓库外，其余系统设置暂不可用。</PendingNotice>}
       <ErrorBox error={save.error} />
 
       <PageScroll>
@@ -61,7 +63,7 @@ export function System() {
                   <Badge>{verify.version ? `内置 mihomo ${verify.version}` : '未检测到 mihomo'}</Badge>
                   {verify.checks24h !== undefined && <Badge tone={verify.fails24h ? 'warn' : 'neutral'}>近 24 小时校验 {verify.checks24h} 次 · 失败 {verify.fails24h ?? 0} 次</Badge>}
                 </div>
-                <span className="text-[12px] leading-relaxed text-muted">服务端引用校验（dialer-proxy、规则目标、组成员）始终开启，不受此开关影响。</span>
+                <span className="text-[12px] leading-relaxed text-muted">引用校验始终开启。</span>
               </div>
             </Card>
           </div>
@@ -71,22 +73,24 @@ export function System() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col">
                   {(repos.data?.repos ?? []).map((r) => (
-                    <div key={r.id} className="flex items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
+                    <div key={r.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{r.name}</span><span className="truncate text-[12px] text-muted">{r.builtIn ? '内置' : r.url}{r.entries !== undefined ? ` · ${r.entries} 个规则` : ''}{r.builtAt ? ` · ${formatTime(r.builtAt).slice(5)} 建索引` : ''}</span></span>
-                      {r.error ? <Badge tone="err">{r.error}</Badge> : <Badge tone="ok">正常</Badge>}
+                      <Badge tone={r.error ? 'err' : r.builtAt ? 'ok' : 'neutral'}>{!r.enabled ? '已停用' : r.indexing ? '更新中…' : r.error ? r.error : r.builtAt ? '已索引' : '等待首次索引'}</Badge>
+                      <Button size="sm" disabled={!r.enabled || r.indexing || refreshRepo.isPending} onClick={() => refreshRepo.mutate(r.id)}>更新索引</Button>
+                      <Button size="sm" disabled={toggleRepo.isPending} onClick={() => toggleRepo.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button>
                       {!r.builtIn && <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${r.name}`} onClick={() => removeRepo.mutate(r.id)}><Trash2 size={14} /></Button>}
                     </div>
                   ))}
                   {!repos.data?.repos.length && <Empty title="还没有仓库索引" />}
                 </div>
-                <ErrorBox error={removeRepo.error} />
-                <Field label="GitHub 镜像地址" hint="用于在无法直连 GitHub 时拉取规则">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
+                <ErrorBox error={repos.error ?? removeRepo.error ?? refreshRepo.error ?? toggleRepo.error} />
+                <Field label="GitHub 镜像地址" hint="镜像设置暂不生效">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
               </div>
             </Card>
 
             <Card title="备份与恢复">
               <div className="flex flex-col gap-3">
-                <span className="text-[12.5px] leading-relaxed text-ink-2">导出全部配置为 JSON：用户、订阅源、处理链、规则、模板版本、配置订阅覆盖层。快照与渲染缓存不包含在内。敏感字段在导出文件中仍保持加密。</span>
+                <span className="text-[12.5px] leading-relaxed text-ink-2">导出 JSON 配置，不含快照和缓存；敏感字段保持加密。</span>
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => backup.mutate()} disabled={backup.isPending}>{backup.isPending ? '导出中…' : '导出备份'}</Button>
                   <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-[#d5d9e0] bg-panel px-3.5 text-[13.5px] font-medium hover:bg-ground">
