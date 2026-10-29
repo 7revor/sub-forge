@@ -74,12 +74,12 @@ export function Field({ label, hint, children, className }: { label: string; hin
 
 /** 页面剩余展示区；同级的标题、筛选和操作栏保持固定。 */
 export function PageScroll({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx('page-scroll -m-1 gap-5 p-1', className)}>{children}</div>;
+  return <div className="page-scroll"><div className={cx('page-scroll-content flex flex-col gap-5', className)}>{children}</div></div>;
 }
 
 export function Card({ title, subtitle, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; subtitle?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
-  return (
-    <section className={cx('rounded-[10px] border border-line bg-panel', scroll && 'scroll-card', className)}>
+  const panel = (
+    <section className={cx('rounded-[10px] border border-line bg-panel', className)}>
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-3.5 pb-4">
           <div className="flex min-w-0 flex-col gap-0.5">{typeof title === 'string' ? <h2 className="m-0 text-[15px] font-semibold">{title}</h2> : title}{subtitle && <span className="text-[12.5px] text-muted">{subtitle}</span>}</div>
@@ -92,6 +92,7 @@ export function Card({ title, subtitle, description, actions, children, classNam
       </div>
     </section>
   );
+  return scroll ? <PageScroll>{panel}</PageScroll> : panel;
 }
 
 type Tone = 'ok' | 'warn' | 'err' | 'accent' | 'neutral';

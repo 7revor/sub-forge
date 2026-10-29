@@ -74,86 +74,60 @@ body {
 
 /* 高度沿 flex 容器逐层传递；标题与操作区不收缩，只有内容区域滚动。 */
 .page-layout {
+  --page-gutter: 1rem;
+  --page-block-gutter: 1rem;
+  --page-content-width: 1280px;
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 1.25rem;
   min-height: 0;
   min-width: 0;
+  padding-block: var(--page-block-gutter);
   /* 此层仅负责排版，允许焦点轮廓和菜单伸入外侧留白。 */
   overflow: visible;
 }
 
+@media (min-width: 768px) {
+  .page-layout {
+    --page-gutter: 2.5rem;
+    --page-block-gutter: 1.75rem;
+  }
+}
+
+/* 页头与独立面板限宽，公共滚动 wrapper 铺满导航右侧。 */
+.page-layout > :not(.page-scroll) {
+  width: min(var(--page-content-width), calc(100% - 2 * var(--page-gutter)));
+  margin-inline: auto;
+}
+
 .page-layout > *,
-.page-scroll > * {
+.page-scroll-content > * {
   flex-shrink: 0;
 }
 
-.page-scroll,
-.scroll-card {
+.page-scroll {
   flex: 1 1 0%;
   min-height: 0;
   min-width: 0;
 }
 
-/* 滚动条按需出现，避免短表格和表单右侧常驻一条空白。 */
+/* 滚动区覆盖两侧留白并延伸到底部，滚动条位于右侧区域边缘。 */
 .page-scroll {
   /* 将 sr-only 等绝对定位后代也限制在滚动区内，避免撑大文档。 */
   position: relative;
-  display: flex;
-  flex-direction: column;
   overflow: auto;
   overscroll-behavior: contain;
+  margin-top: -4px;
+  margin-bottom: calc(-1 * var(--page-block-gutter));
+  padding: 4px var(--page-gutter) var(--page-block-gutter);
 }
 
-.scroll-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.scroll-card > :first-child:not(:last-child) {
-  flex-shrink: 0;
-}
-
-.scroll-card > :last-child {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
-.scroll-card thead {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--color-panel);
-}
-
-/* 独立表单卡片将滚动交给编辑器正文，模式切换始终可见。 */
-.scroll-card > :last-child:has(> .dual-editor) {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.scroll-card > :last-child > .dual-editor {
-  flex: 1;
-  min-height: 0;
-}
-
-.scroll-card .dual-editor > :not(.editor-content) {
-  flex-shrink: 0;
-}
-
-.scroll-card .dual-editor > .editor-content {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 4px;
-  margin: -4px;
+.page-scroll-content {
+  width: 100%;
+  max-width: var(--page-content-width);
+  min-width: 0;
+  margin-inline: auto;
 }
 
 /* 全局滚动条：透明轨道，浅色内容与深色导航分别提供滑块配色。 */
