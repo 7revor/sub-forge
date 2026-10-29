@@ -109,6 +109,17 @@ describe('文档增删改查', () => {
     expect(saved.json.item.proxies).toEqual([proxy]);
   });
 
+  it('本地节点不处理代理链：带前置字段时拒绝保存', async () => {
+    const { store, alice } = await twoUsers();
+    const proxy = { name: '节点 1', type: 'trojan', server: 'node.example.test', port: 443, password: 'p' };
+    for (const patch of [{ dialer: { kind: 'builtin', name: 'DIRECT' } }, { 'dialer-proxy': '中转' }, { 'underlying-proxy': '中转' }]) {
+      const res = await alice.post('/api/locals', { name: '分组', proxies: [{ ...proxy, ...patch }] });
+      expect(res.status).toBe(400);
+      expect(res.json.error).toMatch(/代理链/);
+    }
+    expect(store.list('local')).toEqual([]);
+  });
+
   it('被引用的文档不能删除，返回引用方', async () => {
     const { alice } = await twoUsers();
     const s = (await alice.post('/api/sources', remoteSource())).json.item.id;

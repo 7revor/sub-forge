@@ -12,11 +12,11 @@
 | 订阅源 · 处理链编辑器 `Source` + 补充 `Pipeline`、`PipelineForms` | `/sources/:id` | 步骤列表、参数区、diff 命中列、12 种处理器表单 |
 | 补充 `SourceFetch` | `/sources/:id` 的「拉取参数」 | 对话框：来源与拉取、快照历史、删除入口 |
 | 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles`、`/rulesets`、`/bundles` | 搜索、计数、空状态卡片；订阅源新建为对话框；每行「删除」「编辑」 |
-| 组合 `Collection` | `/collections/:id`、`/collections/:id/pipeline` | 成员表含「拉取失败时」 |
-| 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML、前置）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由 |
+| 组合 `Collection` | `/collections/:id` | 成员表含「拉取失败时」；成员表下方直接展开「组合自身的处理链」编辑器与逐步预览，被引用的配置订阅显示为头部徽章。2026-10-29 起 `/collections/:id/pipeline` 跳回详情页 |
+| 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由，同日去掉前置卡片与「前置」列，代理链只在 Profile「代理链」中设置 |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集「下发地址」显示路径模式 |
-| 规则集 `RuleSets` | `/rulesets/:id` | 解析结果、编辑来源对话框、输出预览、客户端改写、下载地址 |
+| 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：客户端改写、解析结果（仅本地文本规则集，远程与 mrs / srs 不显示）、输出预览，每块独占一行；编辑来源对话框（2026-10-29 移除「下载地址」卡片，实际地址见配置订阅预览） |
 | 规则包 `RuleBundle` | `/bundles/:id` | 本地规则集在浏览器解析出 behavior 与条数；远程规则集显示为未知 |
 | 规则仓库 `RuleRepo` | `/rule-repo` | 占位接口 |
 | 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish`、`/templates/manage` | 草稿在两页之间共用；发布页自动试渲染 |
@@ -42,6 +42,6 @@
 | 用户统计列 | 用户页「配置订阅 / 订阅源 / 最近订阅请求」 | `GET /api/users/stats` 返回空，显示「—」 |
 | 组合成员「拉取失败时」（COL-05） | 组合成员表 | 字段 `onFail` 随文档保存，渲染尚未读取，目前一律使用快照 |
 | 原样片段（BS-04） | 配置订阅「基础设置」 | 字段 `base.raw` 随文档保存，渲染尚未输出 |
-| 精确的下发地址 | 节点集「下发地址」、规则集「下载地址」 | 管理接口不返回，界面显示路径模式，实际地址以预览为准 |
+| 精确的下发地址 | 节点集「下发地址」 | 管理接口不返回，界面显示路径模式，实际地址以预览为准 |
 | Surge（M2） | 基础设置、预设、预览、规则客户端输出里的 Surge 切换 | 显示占位说明 |
 | 跨用户的引用方统计 | 预设「引用方」 | 列表接口只返回当前用户的配置订阅 |

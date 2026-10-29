@@ -11,54 +11,45 @@ const node: LocalProxy = {
   'reality-opts': { 'public-key': 'key', 'short-id': '0012', future: true },
   'ws-opts': { path: '/ws', headers: { Host: 'cdn.example.com', 'X-Test': 'keep' } },
   future: { list: [1, false, '值'], nested: { enabled: true } },
-  dialer: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'upstream' }, match: { exact: '前置节点' } } },
 };
 
 describe('节点 YAML 转换', () => {
-  it('错误类型返回表单时清空，保留 UUID、扩展字段和现有前置', () => {
-    const result = proxyFormFromYaml('name: 新名称\ntype: vless\nserver: {}\nport: wrong\nuuid: valid-uuid\ntls: wrong\nalpn: [h2, 123]\nfuture: { keep: true }', node);
-    expect(result.value).toEqual({ name: '新名称', type: 'vless', server: '', port: 0, uuid: 'valid-uuid', alpn: ['h2'], future: { keep: true }, dialer: node.dialer });
+  it('错误类型返回表单时清空，保留 UUID 和扩展字段', () => {
+    const result = proxyFormFromYaml('name: 新名称\ntype: vless\nserver: {}\nport: wrong\nuuid: valid-uuid\ntls: wrong\nalpn: [h2, 123]\nfuture: { keep: true }');
+    expect(result.value).toEqual({ name: '新名称', type: 'vless', server: '', port: 0, uuid: 'valid-uuid', alpn: ['h2'], future: { keep: true } });
     for (const key of ['server', 'port', 'tls', 'alpn[2]']) expect(result.notes.join()).toContain(key);
     expect(proxyFromYaml(proxyToYaml(result.value)).ok).toBe(false);
   });
 
   it('语法错误和未填写必填项不妨碍回表单，且不恢复旧字段', () => {
-    const result = proxyFormFromYaml('name: 保留名称\nserver: [\nuuid: keep-uuid\n', node);
-    expect(result.value).toEqual({ name: '保留名称', type: '', server: '', port: 0, uuid: 'keep-uuid', dialer: node.dialer });
+    const result = proxyFormFromYaml('name: 保留名称\nserver: [\nuuid: keep-uuid\n');
+    expect(result.value).toEqual({ name: '保留名称', type: '', server: '', port: 0, uuid: 'keep-uuid' });
     expect(result.notes.join()).toContain('server');
   });
 
   it('合法节点恢复后与原配置相等', () => {
-    expect(proxyFormFromYaml(proxyToYaml(node), node)).toEqual({ value: node, notes: [] });
+    expect(proxyFormFromYaml(proxyToYaml(node))).toEqual({ value: node, notes: [] });
   });
-  it('嵌套及未知字段往返不丢失，dialer 不导出且导入保留', () => {
-    const text = proxyToYaml(node);
-    expect(text).not.toContain('dialer:');
-    expect(proxyFromYaml(text, node)).toEqual({ ok: true, value: node });
-    const { dialer: _dialer, ...plain } = node;
-    expect(proxyFromYaml(text)).toEqual({ ok: true, value: plain });
+  it('嵌套及未知字段往返不丢失', () => {
+    expect(proxyFromYaml(proxyToYaml(node))).toEqual({ ok: true, value: node });
+    expect(groupFromYaml(groupToYaml([node]))).toEqual({ ok: true, value: [node] });
+    expect(groupFromYaml('proxies: []')).toEqual({ ok: true, value: [] });
   });
 
-  it('单节点改名保留前置，YAML 不能覆盖内部前置', () => {
-    const text = proxyToYaml({ ...node, name: '新名字' }) + 'dialer: malicious\n';
-    expect(proxyFromYaml(text, node)).toEqual({ ok: true, value: { ...node, name: '新名字' } });
-  });
-
-  it('分组重排按名称保留前置，新节点没有前置', () => {
-    const second = { ...node, name: '另一个', dialer: undefined };
-    const text = groupToYaml([second, node]);
-    expect(text).not.toContain('dialer:');
-    const result = groupFromYaml(text, [node]);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.error);
-    expect(result.value[0]).not.toHaveProperty('dialer');
-    expect(result.value[1]).toEqual(node);
-    expect(groupFromYaml('proxies: []', [node])).toEqual({ ok: true, value: [] });
+  it.each(['dialer: x', 'dialer-proxy: 中转', 'underlying-proxy: 中转'])('本地节点不处理代理链：%s 严格导入报错，回表单时忽略并提示', (line) => {
+    const text = proxyToYaml(node) + line + '\n';
+    const key = line.split(':')[0]!;
+    expect(proxyFromYaml(text)).toMatchObject({ ok: false, error: expect.stringContaining(key) });
+    expect(proxyDraftFromYaml(text)).toMatchObject({ ok: false });
+    expect(groupFromYaml(`proxies:\n  - { name: A, type: http, server: h, port: 1, ${line} }`)).toMatchObject({ ok: false, error: expect.stringContaining('代理链') });
+    const form = proxyFormFromYaml(text);
+    expect(form.value).toEqual(node);
+    expect(form.notes.join()).toContain(key);
   });
 
   it.each(['name', 'type', 'server', 'port'])('缺少 %s 时拒绝整个分组并报告序号', (key) => {
     const missing = Object.fromEntries(Object.entries(node).filter(([k]) => k !== key));
-    const result = groupFromYaml(groupToYaml([node, missing as LocalProxy]), []);
+    const result = groupFromYaml(groupToYaml([node, missing as LocalProxy]));
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining(`第 2 个节点`) });
     expect(result).toMatchObject({ error: expect.stringContaining(key) });
     expect(proxyFromYaml(proxyToYaml(missing as LocalProxy))).toMatchObject({ ok: false });
@@ -69,7 +60,7 @@ describe('节点 YAML 转换', () => {
   });
 
   it.each(['[]', 'null', 'proxies: {}', 'proxies:\n  - invalid'])('拒绝非法分组结构 %s', (text) => {
-    expect(groupFromYaml(text, [])).toMatchObject({ ok: false });
+    expect(groupFromYaml(text)).toMatchObject({ ok: false });
   });
 
   it('语法错误报告真实行号，重复键不能静默覆盖', () => {
@@ -100,24 +91,24 @@ describe('节点 YAML 草稿与表单切换', () => {
     for (const { value: type } of PROXY_TYPES) {
       const draft = { ...defaultsFor(type), name: '节点 1' };
       const text = proxyToYaml(draft);
-      expect(proxyDraftFromYaml(text, draft)).toEqual({ ok: true, value: draft });
+      expect(proxyDraftFromYaml(text)).toEqual({ ok: true, value: draft });
       expect(proxyFromYaml(text)).toMatchObject({ ok: false });
     }
   });
 
-  it('未填或删除的字段转为表单空值，其他已填写内容和前置均保留', () => {
-    const result = proxyDraftFromYaml('type: vless\nserver:\nuuid: new-uuid\nfuture: {nested: true}', node);
-    expect(result).toEqual({ ok: true, value: { name: '', type: 'vless', server: '', port: 0, uuid: 'new-uuid', future: { nested: true }, dialer: node.dialer } });
+  it('未填或删除的字段转为表单空值，其他已填写内容保留', () => {
+    const result = proxyDraftFromYaml('type: vless\nserver:\nuuid: new-uuid\nfuture: {nested: true}');
+    expect(result).toEqual({ ok: true, value: { name: '', type: 'vless', server: '', port: 0, uuid: 'new-uuid', future: { nested: true } } });
   });
 
   it('补齐草稿后，表单与严格导入得到相同节点', () => {
     const text = proxyToYaml(node);
-    expect(proxyDraftFromYaml(text, node)).toEqual(proxyFromYaml(text, node));
+    expect(proxyDraftFromYaml(text)).toEqual(proxyFromYaml(text));
   });
 
   it('语法错误、重复键和不能由表单表示的字段类型仍阻止切换', () => {
     for (const text of ['name: [', 'name: A\nname: B', '[]', 'server: {host: example.com}', 'port: "443"']) {
-      expect(proxyDraftFromYaml(text, node), text).toMatchObject({ ok: false });
+      expect(proxyDraftFromYaml(text), text).toMatchObject({ ok: false });
     }
   });
 });

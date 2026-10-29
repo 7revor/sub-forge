@@ -13,8 +13,6 @@ export type ProxyIR = {
   type: string;
   server: string;
   port: number;
-  /** 前置：渲染时转为 dialer-proxy / underlying-proxy */
-  dialer?: Target;
   /** 上游自带的 dialer-proxy / underlying-proxy 原文，由依赖解析处理（REF-04） */
   upstreamDialer?: string;
   /** 隐式字段，输出时剥离（SRC-10） */
@@ -63,13 +61,12 @@ export type LocalProxyGroup = {
   proxies: LocalProxy[];
 };
 
+/** 本地节点只录入节点信息；代理链统一在配置订阅的链规则中设置（REF-03） */
 export type LocalProxy = {
   name: string;
   type: string;
   server: string;
   port: number;
-  /** 前置（LOC-02） */
-  dialer?: Target;
   [k: string]: unknown;
 };
 

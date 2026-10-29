@@ -1,13 +1,13 @@
 // 编辑器用的预览接口：
 //   POST /api/sources/:id/refresh            立即拉取（SRC-03 快照）
 //   GET  /api/sources/:id/snapshots          快照历史（不含正文）
-//   POST /api/{sources,collections}/:id/pipeline-preview   处理链逐步预览（SRC-06），可带未保存的处理链
+//   POST /api/{sources,collections}/:id/pipeline-preview   处理链逐步预览（SRC-06），可带未保存的处理链（组合还可带未保存的成员）
 //   GET  /api/nodesets/:type/:id/nodes      已保存处理链之后的节点列表
 //   POST /api/rulesets/:id/preview           规则集按客户端 + 平台的最终输出（CR-05）
 
 import {
   composeRule, expandRuleSet, lowerRule, NodeSetResolver, parseContent, parseRuleSetContent, Report, runPipeline,
-  type Client, type NodeSetID, type OperatorStep, type Platform, type ProxyIR,
+  type Client, type Collection, type NodeSetID, type OperatorStep, type Platform, type ProxyIR,
 } from '@sub-forge/core';
 import { Hono, type Context } from 'hono';
 import type { RenderService } from '../render.ts';
@@ -71,19 +71,23 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
   /**
    * 处理链逐步预览：输入为订阅源解析结果（或组合合并后的结果），逐步执行请求体里的处理链草稿
    * （缺省用已保存的处理链），返回每一步之后的节点与改名 / 移除差异。
+   * 组合还可带成员草稿（缺省用已保存的成员），让详情页在保存前就能看到合并结果。
    */
   const pipelinePreview = (kind: 'source' | 'collection') => async (c: Context<ApiEnv>) => {
     const user = c.get('user');
-    const doc = own(kind, c.req.param('id') ?? '', user.id);
-    const body = await jsonBody<{ pipeline?: unknown }>(c);
-    let steps: OperatorStep[] = doc.pipeline;
-    if (body.pipeline !== undefined) {
-      // 借用保存前校验检查草稿处理链（正则、脚本权限）
-      steps = validateDoc(kind, { ...(doc as unknown as Record<string, unknown>), pipeline: body.pipeline }, doc.id, user, store).pipeline;
+    let doc = own(kind, c.req.param('id') ?? '', user.id);
+    const body = await jsonBody<{ pipeline?: unknown; members?: unknown }>(c);
+    if (body.pipeline !== undefined || (kind === 'collection' && body.members !== undefined)) {
+      // 借用保存前校验检查草稿（正则、脚本权限、成员引用与成环）
+      const patch = { pipeline: body.pipeline ?? doc.pipeline, ...(kind === 'collection' && body.members !== undefined ? { members: body.members } : {}) };
+      doc = validateDoc(kind, { ...(doc as unknown as Record<string, unknown>), ...patch }, doc.id, user, store);
     }
+    const steps: OperatorStep[] = doc.pipeline;
 
     const ref: NodeSetID = { type: kind, id: doc.id };
-    const loaded = await renderer.loadNodeSets([ref]);
+    const loaded = kind === 'collection'
+      ? await renderer.loadNodeSets((doc as Collection).members.map((m) => m.ref))
+      : await renderer.loadNodeSets([ref]);
     const report = new Report();
     let input: ProxyIR[];
     let failures: { line: string; reason: string }[] = [];
@@ -96,7 +100,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       }
     } else {
       // 组合：成员各自跑完处理链后合并，再逐步执行组合自身的处理链
-      const col = loaded.inputs.collections[doc.id]!;
+      const col = doc as Collection;
       const resolver = new NodeSetResolver({ ...loaded.inputs, collections: { ...loaded.inputs.collections, [doc.id]: { ...col, pipeline: [] } } }, report);
       input = resolver.resolve(ref);
     }

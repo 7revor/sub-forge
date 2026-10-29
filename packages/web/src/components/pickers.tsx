@@ -39,8 +39,8 @@ export function NodeSetSelect({ value, onChange, options, label, placeholder = '
 export type GroupOption = { id: string; name: string };
 
 /** 出口 / 前置选择：内置策略、组、或某个节点集里的单个节点（精确名称 / 正则） */
-export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = true, allowGroup = true, label }: {
-  value: Target; onChange: (t: Target) => void; groups: GroupOption[]; nodeSets: { ref: NodeSetID; name: string }[]; allowNode?: boolean; allowGroup?: boolean; label: string;
+export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = true, label }: {
+  value: Target; onChange: (t: Target) => void; groups: GroupOption[]; nodeSets: { ref: NodeSetID; name: string }[]; allowNode?: boolean; label: string;
 }) {
   const kind = value.kind;
   return (
@@ -51,7 +51,7 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
         else if (k === 'group') onChange({ kind: 'group', groupId: groups[0]?.id ?? '' });
         else onChange({ kind: 'node', ref: { nodeSet: nodeSets[0]?.ref ?? { type: 'source', id: '' }, match: { exact: '' }, fallback: { kind: 'builtin', name: 'REJECT' } } });
       }}>
-        <option value="group" disabled={!allowGroup}>策略组</option>
+        <option value="group">策略组</option>
         <option value="builtin">内置策略</option>
         {allowNode && <option value="node">单个节点</option>}
       </Select>
@@ -61,7 +61,7 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
         </Select>
       )}
       {value.kind === 'group' && (
-        <Select aria-label={label} className="w-auto min-w-40" disabled={!allowGroup} value={value.groupId} onChange={(e) => onChange({ kind: 'group', groupId: e.target.value })}>
+        <Select aria-label={label} className="w-auto min-w-40" value={value.groupId} onChange={(e) => onChange({ kind: 'group', groupId: e.target.value })}>
           {!groups.some((g) => g.id === value.groupId) && <option value={value.groupId}>（已不存在：{value.groupId}）</option>}
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </Select>
