@@ -1,3 +1,4 @@
+import { resolveProfileRouting } from '../template/routing.ts';
 import { sourceKey, sourceLabel, type RuleSetInputs } from '../rules/expand.ts';
 import { convertRuleDocuments, prepareRuleDocument, type RuleDocument } from '../rules/convert.ts';
 import { ruleSetDelivery } from '../rules/delivery.ts';
@@ -9,7 +10,7 @@ import { NodeSetResolver, nodeSetKey, type NodeSetInputs } from '../nodeset/reso
 import { Report } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
 import { isYamlRuleUrl, type Behavior } from '../rules/parse.ts';
-import { mergeTemplate, type EffectiveGroup } from '../template/merge.ts';
+import { type EffectiveGroup } from '../template/merge.ts';
 import type { GroupMember, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template } from '../types.ts';
 import { shortHash } from '../util/hash.ts';
 import { compileUserRegex, exactNameRegex } from '../util/regex.ts';
@@ -121,7 +122,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
   const { profile } = input;
   const report = new Report();
   const ctx: ClientCtx = input.platform ? { client: 'mihomo', platform: input.platform } : { client: 'mihomo' };
-  const eff = mergeTemplate(input.template, profile.overlay, report);
+  const eff = resolveProfileRouting(profile, input.template, report);
   const resolver = new NodeSetResolver(input.nodeSets, report);
 
   // ---------- 节点集 ----------

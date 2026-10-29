@@ -73,17 +73,147 @@
     {
       "id": "demo",
       "name": "演示订阅",
-      "template": { "id": "std", "follow": "latest" },
-      "base": { "presetId": "fakeip" },
-      "nodeSets": [{ "ref": { "type": "local", "id": "demo-a" }, "output": "provider" }],
-      "overlay": {
-        "groupPatches": {
-          "hk": { "addMembers": [{ "kind": "nodeset", "ref": { "type": "local", "id": "demo-a" } }], "set": { "filter": "HK" } }
+      "base": {
+        "presetId": "fakeip"
+      },
+      "nodeSets": [
+        {
+          "ref": {
+            "type": "local",
+            "id": "demo-a"
+          },
+          "output": "provider"
+        }
+      ],
+      "overlay": {},
+      "chains": [],
+      "refPolicy": {
+        "default": "wrap"
+      },
+      "revision": 1,
+      "routing": {
+        "mode": "independent",
+        "config": {
+          "groups": [
+            {
+              "id": "sel",
+              "name": "🚀 节点选择",
+              "type": "select",
+              "members": [
+                {
+                  "kind": "group",
+                  "groupId": "hk"
+                },
+                {
+                  "kind": "builtin",
+                  "name": "DIRECT"
+                }
+              ]
+            },
+            {
+              "id": "hk",
+              "name": "🇭🇰 香港",
+              "type": "url-test",
+              "members": [
+                {
+                  "kind": "nodeset",
+                  "ref": {
+                    "type": "local",
+                    "id": "demo-a"
+                  }
+                }
+              ],
+              "test": {
+                "url": "https://www.gstatic.com/generate_204",
+                "interval": 300
+              },
+              "filter": "HK"
+            },
+            {
+              "id": "ai",
+              "name": "🤖 AI 服务",
+              "type": "select",
+              "members": [],
+              "whenEmpty": "reject"
+            }
+          ],
+          "rules": [
+            {
+              "id": "r-direct",
+              "matcher": {
+                "kind": "rule",
+                "rule": {
+                  "type": "DOMAIN-SUFFIX",
+                  "value": "example.test"
+                }
+              },
+              "target": {
+                "kind": "builtin",
+                "name": "DIRECT"
+              }
+            },
+            {
+              "id": "r-ai",
+              "matcher": {
+                "kind": "ruleset",
+                "id": "ai"
+              },
+              "target": {
+                "kind": "group",
+                "groupId": "ai"
+              }
+            }
+          ],
+          "final": {
+            "kind": "group",
+            "groupId": "sel"
+          }
+        },
+        "initializedFrom": {
+          "templateId": "std",
+          "version": 1,
+          "name": "标准分流"
+        }
+      }
+    },
+    {
+      "id": "demo-bound",
+      "name": "绑定模板演示",
+      "base": {
+        "presetId": "fakeip"
+      },
+      "nodeSets": [
+        {
+          "ref": {
+            "type": "local",
+            "id": "demo-a"
+          },
+          "output": "provider"
+        }
+      ],
+      "overlay": {},
+      "chains": [],
+      "refPolicy": {
+        "default": "wrap"
+      },
+      "revision": 1,
+      "routing": {
+        "mode": "bound",
+        "templateId": "std",
+        "groupAdditions": {
+          "hk": [
+            {
+              "kind": "nodeset",
+              "ref": {
+                "type": "local",
+                "id": "demo-a"
+              }
+            }
+          ]
         }
       },
-      "chains": [],
-      "refPolicy": { "default": "wrap" }
+      "templateVersion": 1
     }
   ],
-  "tokens": [{ "token": "demo-token", "profileId": "demo", "label": "演示" }]
+  "tokens": [{"token": "demo-token", "profileId": "demo", "label": "演示"}, {"token": "demo-bound-token", "profileId": "demo-bound", "label": "绑定模板演示"}]
 }

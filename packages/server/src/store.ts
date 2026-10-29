@@ -1,3 +1,4 @@
+import { migrateProfile, profileTemplate } from './profile-routing.ts';
 // SQLite 存储。保存文档、快照与最近成功的配置版本；旧客户端按版本取兼容资源。
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
@@ -6,7 +7,7 @@ import { pageMeta, type PageOptions, type PageResult } from './pagination.ts';
 import { exactNameRegex, NodeSetResolver, type ChainRule, type LocalProxy, type Profile, type Target } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
-import type { DocKind, DocTypes, LocalDoc, RuleSetDoc, Seed, SourceDoc, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import type { DocKind, DocTypes, ProfileDoc, LocalDoc, RuleSetDoc, Seed, SourceDoc, TemplateVersionDoc, TokenDoc } from './docs.ts';
 import { normalizeSourceFetch, sourceUrl } from './source-url.ts';
 import { convertBundles, normalizeRuleSet, promoteRuleSetOverrides, retargetBundleRefs } from './legacy-rules.ts';
 
@@ -46,7 +47,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -65,6 +66,9 @@ CREATE TABLE IF NOT EXISTS docs (
   PRIMARY KEY (kind, id)
 );
 CREATE INDEX IF NOT EXISTS docs_owner ON docs (kind, owner);
+CREATE TABLE IF NOT EXISTS profile_migration_backups (
+  profile_id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS template_versions (
   template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL,
   PRIMARY KEY (template_id, version)
@@ -203,6 +207,17 @@ export class Store {
       if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'server_secrets'").get()) {
         this.db.prepare("DELETE FROM server_secrets WHERE name = 'github-index-token'").run();
         if (!this.db.prepare('SELECT 1 FROM server_secrets LIMIT 1').get()) this.db.exec('DROP TABLE server_secrets');
+      }
+      if (hasDocs && version < 16) {
+        for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
+          const previous = JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc;
+          if (previous.routing) continue;
+          const migrated = migrateProfile(previous, profileTemplate(previous, (id, v) => this.getTemplate(id, v)));
+          this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
+            .run(row.id, this.cipher.encrypt(JSON.stringify(previous)), this.now());
+          // 不触碰归属、更新时间、订阅链接、成功配置及历史资源。
+          this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(JSON.stringify(migrated)), row.id);
+        }
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
@@ -359,6 +374,11 @@ export class Store {
     }
   }
 
+  getProfileMigrationBackup(id: string): ProfileDoc | undefined {
+    const row = this.db.prepare('SELECT data FROM profile_migration_backups WHERE profile_id = ?').get(id) as { data: string } | undefined;
+    return row ? JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc : undefined;
+  }
+
   // ---------- 文档 ----------
 
   /** owner 为 null 表示系统级文档（预设等），只在新建时写入，更新时保持原归属 */
@@ -497,6 +517,7 @@ export class Store {
       this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM render_generations WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM access_log WHERE profile_id = ?').run(profileId);
+      this.db.prepare('DELETE FROM profile_migration_backups WHERE profile_id = ?').run(profileId);
     });
     tx();
   }
@@ -689,10 +710,15 @@ export class Store {
           .run((d as { id: string }).id, owner, this.cipher.encrypt(JSON.stringify(d)), this.now());
       }
       for (const d of seed.presets ?? []) this.put('preset', d);
-      for (const d of seed.profiles ?? []) this.put('profile', d, owner);
+
       for (const t of seed.templates ?? []) {
         this.db.prepare('DELETE FROM template_versions WHERE template_id = ? AND version = ?').run(t.id, t.version);
         this.putTemplateVersion(t);
+      }
+      for (const d of seed.profiles ?? []) {
+        const next = migrateProfile(d, profileTemplate(d, (id, v) => this.getTemplate(id, v)));
+        if (!d.routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)').run(d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
+        this.put('profile', next, owner);
       }
       for (const t of seed.tokens ?? []) this.putToken(t);
       // 旧种子里的本地内容订阅源同样转成本地节点组，本地节点上的前置同样转成链规则；旧格式规则集与规则包转成多来源规则集

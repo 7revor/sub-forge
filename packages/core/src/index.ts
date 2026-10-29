@@ -23,3 +23,5 @@ export * from './render/mihomo.ts';
 export * from './proxy/validateLocal.ts';
 
 export * from "./rules/convert.ts";
+
+export * from './template/routing.ts';
