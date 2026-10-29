@@ -67,7 +67,7 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}>
       <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">名称</span><Input autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} /></label>
       <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">订阅地址</span><Input className="font-mono" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} /></label>
-      <span className="text-[12px] leading-relaxed text-muted">更多地址、User-Agent、快照有效期在详情页的「拉取参数」里设置。创建后立即拉取一次，并打开编辑与预览。自己整理的节点请到 <Link to="/locals" onClick={onClose}>本地节点</Link> 粘贴导入。</span>
+      <span className="text-[12px] leading-relaxed text-muted">更多地址、User-Agent、快照有效期在详情页的「拉取参数」里设置。创建后立即拉取一次，并打开编辑与预览。自己整理的节点请到 <Link to="/locals" onClick={onClose}>本地节点</Link>，在新增节点的原始配置中粘贴。</span>
       <ErrorBox error={save.error} />
     </Modal>
   );

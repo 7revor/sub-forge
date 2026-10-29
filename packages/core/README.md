@@ -15,6 +15,8 @@
 
 地区旗帜处理器识别中文、英文地区名和常用代码；流量、到期等说明节点即使包含 `GB` 等字样也不添加旗帜。花云本地快照的 88 个地区节点和 2 个说明节点已用于回归核对。
 
+`parseClientProxyObject` 供本地原始配置导入使用：支持 VMess 分享 JSON、sing-box 常见出站，以及 Xray / V2Ray 的 VLESS、VMess、Trojan、Shadowsocks、HTTP、SOCKS5 出站。覆盖常用认证、TLS / Reality、WS / HTTPUpgrade / gRPC；未知字段、不支持的传输及多服务器 / 多账号配置明确报错，不静默丢弃。不会把客户端的路由、DNS 或策略组转换为节点，也不联网取订阅。
+
 ## 测试
 
 ```bash

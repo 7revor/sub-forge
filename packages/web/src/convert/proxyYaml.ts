@@ -1,4 +1,4 @@
-import { parseContent, type LocalProxy, type ParseResult } from '@sub-forge/core';
+import { parseClientProxyObject, parseContent, tryDecodeBase64, type LocalProxy } from '@sub-forge/core';
 import { isNode, LineCounter, parseDocument, stringify } from 'yaml';
 import type { RawResult } from '../components/DualEditor.tsx';
 import { isRecord } from '../components/schema.ts';
@@ -12,12 +12,56 @@ const CHAIN_HINT = '本地节点不处理代理链，请在配置订阅的「代
 export const proxyToYaml = (proxy: LocalProxy): string => stringify(proxy);
 export const groupToYaml = (proxies: LocalProxy[]): string => stringify({ proxies });
 
-/** 粘贴时实时解析；损坏的 YAML 显示诊断，不中断页面渲染。 */
-export function parseProxyImport(text: string): ParseResult {
+/** 完整节点替换当前草稿；字段片段返回 undefined，按普通文本插入。任何失败都不导入部分结果。 */
+export function proxyFromPaste(text: string): RawResult<LocalProxy> | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
   try {
-    return parseContent(text, { type: 'local', id: 'paste' });
+    const linkLike = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
+    const surgeLike = /^\s*\[Proxy\]\s*$/m.test(trimmed) || /^[^=\n]+=\s*[a-z0-9-]+\s*,/i.test(trimmed);
+    const doc = parseDocument(text);
+    const structured = linkLike || surgeLike ? undefined : doc.toJS({ maxAliasCount: 100 }) as unknown;
+    const isNodeObject = (value: unknown) => isRecord(value) && (
+      'protocol' in value ||
+      ('type' in value && ['name', 'server', 'port', 'server_port'].some((key) => key in value)) ||
+      ('add' in value && 'id' in value)
+    );
+    const nodeLike = isNodeObject(structured) || (isRecord(structured) && ('proxies' in structured || 'outbounds' in structured));
+    const listLike = Array.isArray(structured) && structured.some(isNodeObject);
+    const encoded = tryDecodeBase64(trimmed);
+    if (!linkLike && !surgeLike && doc.errors.length && /^\s*(?:-\s+)?(?:name|type|server|port|proxies|outbounds|protocol)\s*:/m.test(text)) throw doc.errors[0];
+    if (!nodeLike && !listLike && !linkLike && !surgeLike && !encoded?.includes('://')) return undefined;
+    if ((nodeLike || listLike) && doc.errors.length) throw doc.errors[0];
+    if (/^https?:\/\//i.test(trimmed) && !trimmed.includes('\n')) {
+      const url = new URL(trimmed);
+      const explicitPort = /^https?:\/\/(?:[^@\s]+@)?(?:\[[^\]]+\]|[^:/\s]+):\d+(?:[/#?]|$)/i.test(trimmed);
+      if (!explicitPort || (url.pathname && url.pathname !== '/') || url.search) throw new Error('网页或订阅地址请添加到「订阅源」；这里接收节点分享链接或节点配置');
+    }
+
+    let input = text;
+    if (nodeLike || listLike) {
+      const items = Array.isArray(structured) ? structured : isRecord(structured) && 'proxies' in structured ? structured.proxies : isRecord(structured) && 'outbounds' in structured ? structured.outbounds : [structured];
+      if (!Array.isArray(items)) throw new Error('proxies / outbounds 必须是节点列表');
+      if (items.length > 1) throw new Error(`识别到 ${items.length} 个节点，只允许单节点，请拆分后逐个添加`);
+      if (items.length === 0) throw new Error('配置中没有节点');
+      input = stringify(parseClientProxyObject(items[0]) ?? items[0]);
+    }
+    const parsed = parseContent(input, { type: 'local', id: 'paste' });
+    if (parsed.proxies.length + parsed.failures.length > 1) throw new Error('包含多个节点或多行无效内容，只允许单节点，请拆分后逐个添加');
+    if (parsed.failures.length) throw new Error(parsed.failures.map((f) => f.reason).join('；'));
+    if (parsed.proxies.length !== 1) throw new Error('未识别到节点，请粘贴受支持的单节点配置');
+    const { _source, _origName, _key, upstreamDialer, ...fields } = parsed.proxies[0]!;
+    const notes = ['已转换为 Mihomo YAML 并同步表单，保存后生效。'];
+    for (const key of CHAIN_KEYS) {
+      if (!(key in fields)) continue;
+      delete fields[key];
+      notes.push(`已忽略 ${key}：${CHAIN_HINT}`);
+    }
+    if (upstreamDialer) notes.push(`已忽略节点自带前置：${CHAIN_HINT}`);
+    if (!Number.isInteger(fields.port) || fields.port < 1 || fields.port > 65535) throw new Error('端口必须是 1–65535 的整数');
+    return { ok: true, value: validate(fields), notes };
   } catch (error) {
-    return { format: 'clash', proxies: [], failures: [{ line: 'Clash YAML', reason: error instanceof Error ? error.message : String(error) }] };
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 

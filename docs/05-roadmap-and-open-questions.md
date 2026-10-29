@@ -32,7 +32,7 @@ M0 明细（代码在 `packages/core`，本轮合并验证的 Docker 完整环�
 
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
-| 节点解析器 | ✅ | URI / Base64 / Clash YAML / Surge `[Proxy]`；ss、vmess、vless(reality)、trojan、hysteria2、tuic、anytls、socks5、http。2026-10-29 补齐单节点映射、裸列表、整体缩进 YAML 的识别及粘贴错误提示。**未复用 Sub-Store**，自行实现 |
+| 节点解析器 | ✅ | URI / Base64 / Clash YAML / Surge `[Proxy]`；ss、vmess、vless(reality)、trojan、hysteria2、tuic、anytls、socks5、http。2026-10-29 补齐单节点映射、裸列表、整体缩进 YAML 的识别；本地录入改为原始配置粘贴自动转换，支持常见客户端 JSON 并拒绝多节点。**未复用 Sub-Store**，自行实现 |
 | 处理链（P0 处理器） | ✅ | 逐步 trace、末尾去重兜底；2026-10-29 根据花云 90 个节点样本补齐地区旗帜并排除流量、到期说明节点；脚本处理器（SRC-08）未做，需沙箱 |
 | Collection | ✅ | 前后缀、环检测；详情页当页编辑处理链，预览带成员草稿（2026-10-29）；成员拉取失败策略（COL-05，P1）未做 |
 | 规则 IR 与解析 | ✅ | classical / DOMAIN-SET / 纯 CIDR / YAML payload，mrs 透传；规则集多来源合并去重、按 behavior 拆分（2026-10-29 规则包并入规则集）；逻辑规则（RS-04，P1）未做 |

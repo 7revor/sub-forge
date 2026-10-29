@@ -1,5 +1,5 @@
 // 本地节点（LOC-01）：与订阅源一致的三层页面——
-// /locals 分组列表 → /locals/:id 分组详情（节点表、粘贴导入、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（表单 / YAML）。
+// /locals 分组列表 → /locals/:id 分组详情（节点表、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（表单 / YAML）。
 // 本地节点只录入节点信息，不设置前置：代理链统一在配置订阅的「代理链」中配置（REF-03）。
 // 每个分组是一个节点集文档；节点子页直接保存整个分组。离开有未保存修改的页面前先确认。
 
@@ -12,7 +12,7 @@ import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../c
 import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, parseProxyImport, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
+import { groupFromYaml, groupToYaml, proxyFromPaste, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, DeleteDialog, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
@@ -91,33 +91,9 @@ export function LocalList() {
   );
 }
 
-function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () => void; onImport: (p: LocalProxy[]) => void }) {
-  const [text, setText] = useState('');
-  const parsed = text.trim() ? parseProxyImport(text) : undefined;
-  // 本地节点不处理代理链：节点自带的 dialer-proxy / underlying-proxy 不导入，并提示到配置订阅中设置
-  const proxies: LocalProxy[] = (parsed?.proxies ?? []).map(({ _source, _origName, _key, upstreamDialer, ...rest }) => rest as LocalProxy);
-  const dropped = (parsed?.proxies ?? []).filter((p) => p.upstreamDialer).length;
-  return (
-    <Modal title="粘贴导入节点" open={open} onClose={onClose} wide
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!proxies.length} onClick={() => { onImport(proxies); setText(''); onClose(); }}>导入 {proxies.length} 个节点</Button></>}>
-      <Field label="URI 列表、Base64、Clash YAML 或 Surge [Proxy] 行" hint="YAML 支持单个节点、节点列表或带 proxies 的完整配置。">
-        {(id) => <Textarea id={id} rows={8} className="font-mono text-[12.5px]" value={text} onChange={(e) => setText(e.target.value)} />}
-      </Field>
-      {parsed && <div className="flex flex-wrap gap-2">
-        <Badge tone={proxies.length ? 'ok' : 'neutral'}>识别为 {parsed.format} · {proxies.length} 个节点</Badge>
-        {parsed.failures.length > 0 && <Badge tone="err">{parsed.failures.length} 行无法解析</Badge>}
-        {dropped > 0 && <Badge tone="warn">{dropped} 个节点自带前置，不会导入</Badge>}
-      </div>}
-      {dropped > 0 && <span className="text-[12.5px] leading-relaxed text-muted">本地节点只保存节点信息。需要经中转连接时，请在配置订阅的「代理链」中添加链规则。</span>}
-      {parsed?.failures.length ? <ul className="m-0 pl-5 font-mono text-[12px] text-err">{parsed.failures.map((f, i) => <li key={i}>{f.line.slice(0, 60)} — {f.reason}</li>)}</ul> : null}
-    </Modal>
-  );
-}
-
 /** /locals/:id：分组详情，节点表的「编辑」「新增节点」进入节点子页 */
 export function LocalEdit() {
   const e = useDocEditor('locals', EMPTY);
-  const [pasting, setPasting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [groupText, setGroupText] = useState<string>();
   const [deletingNode, setDeletingNode] = useState<number>();
@@ -146,8 +122,8 @@ export function LocalEdit() {
 
       <Card bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
-        actions={<><Button size="sm" onClick={() => setPasting(true)}>粘贴导入</Button><Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link></>}>
-        {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增一个，或粘贴 URI / YAML 一次导入多个。" /></div> : (
+        actions={<Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link>}>
+        {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增节点后，可填写表单或在原始配置中粘贴单个节点。" /></div> : (
           <table className="w-full min-w-[620px] border-collapse">
             <thead><tr><th className={cx(th, 'px-3.5')}>名称</th><th className={cx(th, 'px-3.5')}>协议</th><th className={cx(th, 'px-3.5')}>服务器</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
             <tbody>
@@ -181,7 +157,6 @@ export function LocalEdit() {
         onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>
         节点会从分组「{d.name}」中移除并立即保存{e.dirty ? '；分组里其他未保存的修改也会一起保存' : ''}。
       </DeleteDialog>
-      <PasteModal open={pasting} onClose={() => setPasting(false)} onImport={(ps) => setProxies([...d.proxies, ...ps])} />
       <RenameDialog open={renaming} title="重命名分组" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
       <LeaveModal blocker={blocker} what={`分组「${d.name}」`} canSave pending={e.save.isPending} error={e.save.error}
         onSave={(done) => e.save.mutate(d, { onSuccess: done })} />
@@ -247,7 +222,7 @@ export function LocalNodeEdit() {
       <ErrorBox error={save.error} />
 
       <Card title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
-        <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={proxyDraftFromYaml} recoverForm={proxyFormFromYaml} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
+        <DualEditor key={`${g.id}-${index}`} onValidityChange={setRawValid} value={cur} onChange={setDraft} toRaw={proxyToYaml} fromRaw={proxyDraftFromYaml} recoverForm={proxyFormFromYaml} fromPaste={proxyFromPaste} rawLabel="节点 YAML" rawHint="粘贴单个节点的分享链接、YAML、JSON 或 Surge 配置，将自动转为 Mihomo YAML 并同步表单。多个节点请拆分添加。" renderForm={() => <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="名称" className="col-span-2">{(fid) => <Input id={fid} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>
             <Field label="协议">{(fid) => <Select id={fid} value={cur.type} onChange={(x) => changeType(x.target.value)}>
