@@ -1,3 +1,4 @@
+import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { LeaveDialog } from '../components/LeaveDialog.tsx';
 import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
@@ -19,7 +20,7 @@ import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
 import { groupFromYaml, groupToYaml, proxyFromPaste, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, DeleteDialog, ActionButtons } from '../components/DetailActions.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Select, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
@@ -118,7 +119,7 @@ export function LocalEdit() {
           if (groupResult?.ok) { setProxies(groupResult.value); setGroupText(undefined); }
         }}>应用到分组</Button></>}>
         <Field label="整个分组的 proxies 列表">
-          {(id) => <Textarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
+          {(id) => <YamlTextarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
         </Field>
         <ErrorBox error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
       </Modal>

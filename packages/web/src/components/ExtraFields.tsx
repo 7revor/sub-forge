@@ -1,3 +1,4 @@
+import { YamlTextarea } from './YamlTextarea.tsx';
 import { useState } from 'react';
 import { extraNameError, formatExtraValue, parseExtraValue } from './extraFields.ts';
 import { Button, ErrorBox, Input } from './ui.tsx';
@@ -20,7 +21,7 @@ function ValueRow({ name, value, onChange, onRename, onRemove }: {
             if (error) { setKeyError('请先修复字段值的解析错误'); return; }
             setKeyError(onRename(keyText.trim()));
           }} />
-        <Input aria-label={`${name} 的值`} className="font-mono" value={text} aria-invalid={!!error} onChange={(event) => {
+        <YamlTextarea rows={1} aria-label={`${name} 的值`} className="font-mono" value={text} aria-invalid={!!error} onChange={(event) => {
           const text = event.target.value;
           const parsed = parseExtraValue(text);
           setDraft({ source: value, text, error: parsed.ok ? undefined : parsed.error });
@@ -61,7 +62,7 @@ export function ExtraFields({ value, onChange, validateName }: {
         ))}
         <div className="flex items-center gap-2">
           <Input aria-label="新字段名称" placeholder="字段名称" value={key} onChange={(e) => setKey(e.target.value)} />
-          <Input aria-label="新字段值" placeholder="YAML 值" className="font-mono" value={text} onChange={(e) => setText(e.target.value)} />
+          <YamlTextarea rows={1} aria-label="新字段值" placeholder="YAML 值" className="font-mono" value={text} onChange={(e) => setText(e.target.value)} />
           <Button size="sm" onClick={() => {
             const name = key.trim();
             const error = extraNameError(value, name, undefined, validateName);
