@@ -89,7 +89,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `GET /api/users/stats` | 用户：每人的配置订阅数、订阅源数、最近订阅请求 |
 | `GET/POST /api/shares`、`DELETE /api/shares/:id` | 用户：共享订阅源 / 组合（SYS-06） |
-| `GET/PUT /api/system`、`POST /api/system/backup`、`POST /api/system/restore` | 系统：SSRF 白名单、mihomo 校验开关、GitHub 镜像、备份恢复 |
+| `GET/PUT /api/system`、`POST /api/system/backup`、`POST /api/system/restore` | 系统：SSRF 白名单、mihomo 校验开关、备份恢复 |
 
 订阅源保存格式为 `{ name, url, fetch?, pipeline? }`，`url` 必须是单个 HTTP(S) 地址。旧客户端的单元素 `urls` 可自动转换；空数组、多元素数组、非字符串地址以及同时提供 `url` / `urls` 均返回 400。读取只返回 `url`。多个来源应各建一个订阅源并加入组合。
 
@@ -148,7 +148,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - `POST /api/rule-repos/:id/refresh`：管理员触发，202 返回后通过列表轮询状态；同仓库并发任务合并。
 - `PATCH /api/rule-repos/:id`：管理员设置 `{ enabled: boolean }`，停用不删除索引或已导入的规则集。
 
-GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。仅索引 list/txt，默认导入文本后走已有托管流程。镜像、动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
+GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。仅索引 list/txt，默认导入文本后走已有托管流程。动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
 
 ### 自定义 GitHub 仓库
 

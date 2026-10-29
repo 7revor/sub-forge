@@ -369,3 +369,7 @@ SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使
 ## 2026-10-29 追加：按文件创建仓库关联
 
 `GET /api/rule-repos/files?repo=…&path=…` 直接读取索引，按 `(ref,path)` 去重，返回文件、分支与上游链接，不拉取 README 或内容。`POST /api/rule-repos/import` 新增 `file: {ref,path}`，与 `variant` 互斥；验证文件属于当前启用仓库的文本索引并有可解析内容后，只创建一个关联来源，保留输入格式与分支。原推荐组合接口供既有调用兼容使用。核心 IR、已存规则集与种子无需迁移。
+
+## 2026-10-29 追加：布局隔离
+
+登录页不复用业务页面的 page-scroll 容器；通用 Modal 使用 Portal 挂载到 body，以避免页面限宽选择器和祖先裁切影响遮罩。纯前端修复，领域模型、后端接口与示例种子不变。

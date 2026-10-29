@@ -67,6 +67,5 @@ export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?:
 export type SystemInfo = Pending & {
   ssrfAllow: { value: string; note?: string }[];
   verify: { enabled: boolean; version?: string; checks24h?: number; fails24h?: number } | null;
-  mirror: string;
   lastBackup: { at: number; size: number } | null;
 };
