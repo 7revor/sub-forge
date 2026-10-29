@@ -2,15 +2,15 @@
 
 设计稿：Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，共 30 张画板：原有 21 张，加上 2026-10-29 补画的 8 张（画布底部「补充设计：编辑细节、列表、对话框与账户」一行），用于前端已有、原画板没画的功能；同日本地节点拆为两张（`LocalNodes` 分组列表与详情、`LocalNodeEdit` 编辑节点）；同日规则包并入规则集，`RuleBundle` 画板换成 `RuleSetNew`（规则集列表与新建），张数不变。
 
-现状（2026-10-29）：`packages/web` 的所有页面都按画板实现。画板上有、服务端还不支持的功能，界面照样做出来，服务端先提供占位接口（`packages/server/src/api/pending.ts`）：读接口返回空数据并带 `pending: true`，页面显示「服务端尚未实现」提示；写接口返回 501。
+现状（2026-10-29）：`packages/web` 已实现画板对应页面，后续调整中的待同步项见下方清单。画板上有、服务端还不支持的功能，界面照样做出来，服务端先提供占位接口（`packages/server/src/api/pending.ts`）：读接口返回空数据并带 `pending: true`，页面显示「服务端尚未实现」提示；写接口返回 501。
 
 ## 画板 → 页面
 
 | 画板 | 路由 | 说明 |
 |---|---|---|
 | 总览 `Main` | `/` | 四项统计按访问日志与当前模板计算；待处理包括拉取失败、孤儿覆盖项、最近渲染告警、未加入节点集 |
-| 订阅源 · 处理链编辑器 `Source` + 补充 `Pipeline`、`PipelineForms` | `/sources/:id` | 步骤列表、参数区、diff 命中列、12 种处理器表单 |
-| 补充 `SourceFetch` | `/sources/:id` 的「拉取参数」 | 对话框：来源与拉取、快照历史、删除入口 |
+| 订阅源 · 处理链编辑器 `Source` + 补充 `Pipeline`、`PipelineForms` | `/sources/:id` | 基础设置下方为左右排列的步骤列表与总览 / 步骤参数预览；diff 命中列、12 种处理器表单 |
+| 补充 `SourceFetch` | `/sources/:id` 的「基础设置」 | 已改为详情页顶部内嵌卡片：单个 URL、名称与拉取选项，表单参考规则集来源设置，快照历史页内展开；删除入口位于页头。旧弹窗画板待同步，见 [13](13-design-canvas-sync.md) |
 | 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles` | 搜索、计数、空状态卡片；订阅源新建为对话框；每行「删除」「编辑」 |
 | 组合 `Collection` | `/collections/:id` | 成员表含「拉取失败时」；成员表下方直接展开「组合自身的处理链」编辑器与逐步预览，被引用的配置订阅显示为头部徽章。2026-10-29 起 `/collections/:id/pipeline` 跳回详情页 |
 | 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由，同日去掉前置卡片与「前置」列，代理链只在 Profile「代理链」中设置 |
@@ -29,6 +29,8 @@
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
 
 ## 设计稿待同步
+
+- 2026-10-29 订阅源：原「拉取参数」改为顶部「基础设置」，单 URL、Field / Input 对齐；下方处理链与总览保持左右结构。`Source` / `SourceFetch` / `Pipeline` / `Lists` 按 [待同步要求](13-design-canvas-sync.md) 更新；本轮按用户要求只记录待同步，不修改外部画布。
 
 - 2026-10-29 本地节点粘贴导入：前端补充提示「YAML 支持单个节点、节点列表或带 proxies 的完整配置。」，内核已补齐相应解析。外部 Claude Design 画布打开后要求登录，本轮未能更新 `LocalNodes` / `Dialogs` 画板；前端实际效果见 [验收截图](../research/verification/local-node-yaml-import-20261029/single-node-import.png)。
 - 模板入口与空状态：管理员只显示一个「模板」入口，普通用户不显示独立模板页；各页面的空状态统一白底虚线框。画布仍待同步，要求与参考截图见 [13 · 画布待同步](13-design-canvas-sync.md)。

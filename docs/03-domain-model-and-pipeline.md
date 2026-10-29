@@ -11,11 +11,13 @@
 
 ## 2. 领域模型
 
+订阅源从 2026-10-29 起只保存单个 `url`。接口和种子兼容旧版只含一个元素的 `urls`，统一转换为 `url`；多地址、空地址或同时提供两种字段均拒绝。数据库 v8 在事务内转换旧单地址文档，保留 ID、归属、更新时间、引用与快照；遇到意外多地址会回滚，不能自动截断。
+
 ```ts
 // ---------- 节点侧 ----------
 type Source = {
   id: ID; owner: UserID; name: string;
-  urls: string[];                // 可多个，按序合并；手写或粘贴的节点放在 LocalProxyGroup
+  url: string;                   // 一个 HTTP(S) URL；多个来源用 Collection，粘贴节点用 LocalProxyGroup
   fetch?: { ua?: string; timeoutMs?: number; ttlSec?: number; viaProxy?: string };
   pipeline: OperatorRef[];       // 处理链
 };
