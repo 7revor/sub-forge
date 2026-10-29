@@ -1,5 +1,6 @@
 // 规则集展开（docs/03 §3 ④、§6）：逐个来源解析并应用组级内容改写，再按 behavior 拆分、去重。
 
+import { rejectedRuleReport } from './diagnostics.ts';
 import type { Report } from '../report.ts';
 import type { ID, RuleIR, RuleSet, RuleSetSource } from '../types.ts';
 import { applyOverrides, lowerRule, type ClientCtx } from './client.ts';
@@ -45,7 +46,7 @@ export function expandSource(rs: RuleSet, src: RuleSetSource, inputs: RuleSetInp
     return { passthrough: false, rules: [] };
   }
   if (parsed.rejected.length) {
-    report.info('ruleset.rejected-lines', `${label}有 ${parsed.rejected.length} 行无法解析或不支持`, where);
+    report.items.push({ level: 'info', code: 'ruleset.rejected-lines', ...rejectedRuleReport(body, src, rs.sources.indexOf(src)), where });
   }
   const rules: RuleIR[] = [];
   for (const p of parsed.rules) {

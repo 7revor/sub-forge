@@ -27,7 +27,7 @@ AND,((DOMAIN,a.com),(DST-PORT,443))`;
     expect(r.rules.map((x) => x.rule)).toMatchSnapshot();
     expect(r.rejected.map((x) => [x.line, x.reason])).toEqual([
       [13, '不支持的规则类型 USER-AGENT'],
-      [14, '逻辑规则暂不支持（RS-04，P1）'],
+      [14, '暂不支持逻辑规则'],
     ]);
   });
 

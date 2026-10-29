@@ -28,3 +28,5 @@ export * from "./rules/convert.ts";
 
 export * from './rules/remote.ts';
 export * from './template/routing.ts';
+
+export * from './rules/diagnostics.ts';

@@ -10,6 +10,8 @@ export type ReportItem = {
   message: string;
   /** 定位信息：组 ID、规则 ID、节点集等 */
   where?: string;
+  /** 规则解析详情：只携带来源序号、源文件行号和原因，不重复 URL。 */
+  ruleIssues?: { source: number; line: number; kind: 'invalid' | 'unimplemented'; reason: string }[];
 };
 
 export class Report {
