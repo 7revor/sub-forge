@@ -6,7 +6,7 @@ import type { ReportItem } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
-import { api, ApiError, type ImpactEntry } from '../api.ts';
+import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
@@ -207,6 +207,8 @@ function TemplatePage({ id }: { id: string }) {
   const [changelog, setChangelog] = useState('');
   const [impact, setImpact] = useState<{ report: ReportItem[]; impact: ImpactEntry[] }>();
   const [confirmed, setConfirmed] = useState(false);
+  const users = useQuery({ queryKey: ['users'], enabled: tab === 'publish' && me.data?.role === 'admin', queryFn: () => api<{ users: User[] }>('GET', '/users').then((r) => r.users) });
+  const userName = (id: string | null) => (id ? users.data?.find((u) => u.id === id)?.username ?? id : '—');
 
   useEffect(() => {
     const t = tpl.data?.item;
@@ -310,9 +312,9 @@ function TemplatePage({ id }: { id: string }) {
                           <tr key={i.profileId}>
                             <td className={td}><Badge tone={i.level === 'error' ? 'err' : 'warn'}>{i.level === 'error' ? '阻断' : '警告'}</Badge></td>
                             <td className={cx(td, 'font-medium')}>{i.profileName}</td>
-                            <td className={cx(td, 'text-ink-2')}>{i.owner ?? '—'}</td>
+                            <td className={cx(td, 'text-ink-2')}>{userName(i.owner)}</td>
                             <td className={cx(td, 'text-[12.5px]')}>{i.issues.map((x) => x.message).join('；')}</td>
-                            <td className={td}><Link to={`/profiles/${i.profileId}/rules`} className="text-[12.5px] text-accent">跳转</Link></td>
+                            <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${i.profileId}/rules`} className="text-[12.5px] text-accent">跳转</Link></td>
                           </tr>
                         ))}
                       </tbody>
@@ -329,7 +331,7 @@ function TemplatePage({ id }: { id: string }) {
             <Field label="变更说明">{(fid) => <Textarea id={fid} rows={3} value={changelog} onChange={(e) => setChangelog(e.target.value)} />}</Field>
             {blocking.length > 0 && <label className="flex items-start gap-2.5 rounded-lg bg-err-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8f2a1f]">
               <input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-              我知道 {blocking.map((b) => `「${b.owner ? `${b.owner} / ` : ''}${b.profileName}」`).join('、')} 将渲染失败；它们会继续返回上一份成功结果，并在其页面提示。
+              我知道 {blocking.map((b) => `「${b.owner ? `${userName(b.owner)} / ` : ''}${b.profileName}」`).join('、')} 将渲染失败；它们会继续返回上一份成功结果，并在其页面提示。
             </label>}
             <ErrorBox error={publish.error && !(publish.error instanceof ApiError && publish.error.status === 409) ? publish.error : undefined} />
             <Button variant={blocking.length ? 'danger' : 'primary'} disabled={!canPublish || (!isNew && !changed)} onClick={() => publish.mutate(blocking.length > 0)}>
