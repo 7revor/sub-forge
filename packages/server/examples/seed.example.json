@@ -26,6 +26,8 @@
     { "id": "ai", "name": "AI 服务", "sources": [
       { "id": "main", "name": "常用 AI", "kind": "local", "format": "auto", "content": ".openai.com\n.anthropic.com\n.claude.ai\n" },
       { "id": "extra", "name": "补充", "kind": "local", "format": "classical", "content": "DOMAIN-SUFFIX,perplexity.ai\nDOMAIN-SUFFIX,claude.ai\n" }
+    ], "overrides": [
+      { "match": "DOMAIN-SUFFIX,perplexity.ai", "override": { "when": { "client": "surge", "platform": "ios" }, "action": { "replace": [{ "type": "DOMAIN-SUFFIX", "value": "perplexity.ai" }] } } }
     ] }
   ],
   "presets": [

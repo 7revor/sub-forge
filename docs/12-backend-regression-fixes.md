@@ -1,6 +1,6 @@
 # 12 · 后端六项问题修复与回归验证
 
-> 后续变更（2026-10-29）：订阅源现已收敛为单个 `url`，下文多 URL 行为与测试数量属于当时验收记录。当前用 `source-fetch-failure.test.ts` 覆盖单地址失败 / 快照 / last-good / 组合边界，`traffic-cache.test.ts` 覆盖多个单地址源的汇总，`source-url.test.ts` 覆盖接口、v8 迁移与旧种子兼容；不再支持同源多 URL。
+> 后续变更（2026-10-29）：订阅源现已收敛为单个 `url`，下文多 URL 行为与测试数量属于当时验收记录。当前用 `source-fetch-failure.test.ts` 覆盖单地址失败 / 快照 / last-good / 组合边界，`traffic-cache.test.ts` 覆盖多个单地址源的汇总，`source-url.test.ts` 覆盖接口、v9 迁移与旧种子兼容；不再支持同源多 URL。
 
 日期：2026-10-29。基线：`main@0137123`。工作分支：`codex/backend-six-fixes`。
 

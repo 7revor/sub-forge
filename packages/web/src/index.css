@@ -95,6 +95,7 @@ body {
   min-width: 0;
 }
 
+/* 滚动条按需出现，避免短表格和表单右侧常驻一条空白。 */
 .page-scroll {
   /* 将 sr-only 等绝对定位后代也限制在滚动区内，避免撑大文档。 */
   position: relative;
@@ -102,7 +103,6 @@ body {
   flex-direction: column;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .scroll-card {
@@ -121,7 +121,6 @@ body {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .scroll-card thead {
@@ -152,5 +151,56 @@ body {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+}
+
+/* 全局滚动条：透明轨道，浅色内容与深色导航分别提供滑块配色。 */
+:root {
+  --scrollbar-thumb: #b6bdc8;
+  --scrollbar-thumb-active: #8b93a1;
+}
+
+.nav-scroll {
+  --scrollbar-thumb: #3d434d;
+  --scrollbar-thumb-active: #5b6270;
+}
+
+/* 不支持自定义像素宽度的浏览器使用原生细滚动条。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*:hover,
+*:focus-within {
+  scrollbar-color: var(--scrollbar-thumb-active) transparent;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  /* 标准属性的非 auto 值会覆盖伪元素样式，需还原后才能精确设为 4px。 */
+  *,
+  *:hover,
+  *:focus-within {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--scrollbar-thumb);
+  }
+
+  *:hover::-webkit-scrollbar-thumb,
+  *:focus-within::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb-active);
+  }
 }

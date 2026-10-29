@@ -43,3 +43,5 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 - 逻辑规则 AND / OR / NOT（RS-04，P1）
 - Surge 输出（M2）
 - ssr、hysteria v1、wireguard、snell 的 URI 解析（这些协议目前只能通过 Clash YAML 导入）
+
+规则集客户端改写存放在 `RuleSet.overrides`：仅按规则内容精确匹配所有启用来源，不依赖来源选择或行号。先应用第一条客户端/平台匹配的改写，再合并去重、按 behavior 拆分；二进制透传内容不参与改写。来源级 `overrides` 只用于未能转换的历史数据兼容。

@@ -39,19 +39,28 @@ describe('订阅源单 URL 契约', () => {
     expect(h.store.list('source')).toEqual(before);
   });
 
-  it('v7 单地址迁移保留归属、时间、引用、快照，重启不重复改写', () => {
+  it.each([
+    { label: 'v7 原始数据', version: 7, sourceMigrated: false, rulesMigrated: false },
+    { label: 'v8 主分支规则已迁移', version: 8, sourceMigrated: false, rulesMigrated: true },
+    { label: 'v8 开发分支地址已迁移', version: 8, sourceMigrated: true, rulesMigrated: false },
+  ])('$label 升级到 v9 保留归属、时间、引用、快照，重启不重复改写', ({ version, sourceMigrated, rulesMigrated }) => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-single-url-')); dirs.push(dir);
     const file = join(dir, 'old.db');
     const cipher = new Cipher(randomBytes(32));
     const old = new Store(file, { cipher, now: () => 123 }); stores.push(old);
-    old.put('source', legacy as never, 'alice');
+    old.put('source', (sourceMigrated ? { id: legacy.id, name: legacy.name, url, pipeline: [], fetch: legacy.fetch } : legacy) as never, 'alice');
+    const override = { when: { client: 'mihomo' as const }, action: { drop: true as const } };
+    const groupOverride = { match: 'DOMAIN,example.test', override };
+    old.put('ruleset', { id: 'r', name: '规则', sources: [{ id: 'local', kind: 'local', format: 'classical', content: 'DOMAIN,example.test', ...(!rulesMigrated ? { overrides: [{ line: 1, override }] } : {}) }], ...(rulesMigrated ? { overrides: [groupOverride] } : {}) }, 'alice');
     old.put('collection', { id: 'c', name: '组合', members: [{ ref: { type: 'source', id: 's' } }], pipeline: [] }, 'alice');
     old.addSnapshot({ ownerKind: 'source', ownerId: 's', url, fetchedAt: 100, ok: true, body: '旧快照' });
-    old.db.pragma('user_version = 7'); old.close();
+    old.db.pragma(`user_version = ${version}`); old.close();
     const s = new Store(file, { cipher }); stores.push(s);
-    expect(s.db.pragma('user_version', { simple: true })).toBe(8);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(9);
     expect(s.getWithOwner('source', 's')).toMatchObject({ owner: 'alice', doc: { id: 's', url, fetch: legacy.fetch } });
     expect(s.get('source', 's')).not.toHaveProperty('urls');
+    expect(s.getWithOwner('ruleset', 'r')).toMatchObject({ owner: 'alice', doc: { overrides: [groupOverride] } });
+    expect(s.get('ruleset', 'r')!.sources[0]).not.toHaveProperty('overrides');
     expect(s.db.prepare("SELECT updated_at FROM docs WHERE kind = 'source'").get()).toEqual({ updated_at: 123 });
     expect(s.get('collection', 'c')!.members).toEqual([{ ref: { type: 'source', id: 's' } }]);
     expect(s.latestSnapshot('source', 's', url)?.body).toBe('旧快照');
@@ -60,19 +69,19 @@ describe('订阅源单 URL 契约', () => {
     expect(reopened.db.prepare('SELECT * FROM docs').all()).toEqual(rows);
   });
 
-  it('意外多地址数据迁移失败时整批回滚，保留原始地址', () => {
+  it.each([7, 8])('v%i 意外多地址数据迁移失败时整批回滚，保留原始地址', (version) => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-single-url-')); dirs.push(dir);
     const file = join(dir, 'old.db');
     const cipher = new Cipher(randomBytes(32));
     const old = new Store(file, { cipher }); stores.push(old);
     old.put('source', legacy as never);
     old.put('source', { ...legacy, id: 'multi', urls: [url, `${url}?v=2`] } as never);
-    old.db.pragma('user_version = 7');
+    old.db.pragma(`user_version = ${version}`);
     const rows = old.db.prepare('SELECT * FROM docs').all(); old.close();
     expect(() => new Store(file, { cipher })).toThrow(/只允许一个 URL/);
     const db = new Database(file);
     try {
-      expect(db.pragma('user_version', { simple: true })).toBe(7);
+      expect(db.pragma('user_version', { simple: true })).toBe(version);
       expect(db.prepare('SELECT * FROM docs').all()).toEqual(rows);
     } finally { db.close(); }
   });

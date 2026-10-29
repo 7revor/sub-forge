@@ -2,9 +2,9 @@
 // 深层结构（规则、组参数等）由渲染报告兜住，这里只拦截保存后必然无法使用的数据。
 
 import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID } from '@sub-forge/core';
-import type { DocKind, DocTypes } from '../docs.ts';
+import type { DocKind, DocTypes, RuleSetDoc } from '../docs.ts';
 import type { Store, User } from '../store.ts';
-import { normalizeRuleSet } from '../legacy-rules.ts';
+import { normalizeRuleSet, promoteRuleSetOverrides } from '../legacy-rules.ts';
 import { MIN_TTL_SEC } from '../snapshots.ts';
 import { sourceUrl } from '../source-url.ts';
 import { bad, isStr } from './common.ts';
@@ -15,6 +15,28 @@ const NODESET_KINDS = new Set(['source', 'collection', 'local']);
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isHttpUrl = (v: unknown) => { if (typeof v !== 'string') return false; try { const u = new URL(v); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; } };
+
+/** 组级改写只接受内容匹配；预览与保存共用校验，草稿不完整时返回可读错误。 */
+export function checkRuleSetOverrides(value: unknown): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) throw bad('客户端改写必须是数组');
+  const rule = (r: unknown): boolean => {
+    if (!isObj(r)) return false;
+    if (r.type === 'RAW') return ['mihomo', 'surge'].includes(r.client as string) && isStr(r.text);
+    if (['AND', 'OR', 'NOT'].includes(r.type as string)) return Array.isArray(r.children) && r.children.length > 0 && r.children.every(rule);
+    if (r.type === 'PROCESS') return ['name', 'path'].includes(r.kind as string) && ['exact', 'wildcard', 'regex'].includes(r.mode as string) && isStr(r.value);
+    if (r.type === 'NETWORK') return r.value === 'tcp' || r.value === 'udp';
+    return ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'SRC-IP-CIDR', 'GEOSITE', 'GEOIP', 'DST-PORT', 'SRC-PORT'].includes(r.type as string) && isStr(r.value);
+  };
+  value.forEach((item, i) => {
+    const at = `客户端改写第 ${i + 1} 条`;
+    if (!isObj(item) || !isStr(item.match) || item.line !== undefined) throw bad(`${at}：只支持规则内容匹配，请填写完整规则内容`);
+    const o = item.override;
+    if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge'].includes(o.when.client as string) || (o.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(o.when.platform as string))) throw bad(`${at}：客户端或平台不合法`);
+    const a = o.action;
+    if (!isObj(a) || !(a.drop === true && a.replace === undefined || a.drop === undefined && Array.isArray(a.replace) && a.replace.length > 0 && a.replace.every(rule))) throw bad(`${at}：请选择丢弃或填写完整的替换规则`);
+  });
+}
 
 function checkRegex(pattern: unknown, where: string, flags = ''): void {
   if (typeof pattern !== 'string') throw bad(`${where}：正则必须是字符串`);
@@ -164,9 +186,14 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
     }
     case 'ruleset': {
       // 兼容旧客户端的单一来源写法（kind / url / content 平铺）
-      if (doc.sources === undefined && doc.kind !== undefined) Object.assign(doc, normalizeRuleSet(doc), { id });
-      for (const k of ['kind', 'url', 'content', 'format', 'behavior', 'overrides', 'fetch']) delete doc[k];
+      if (doc.sources === undefined && doc.kind !== undefined) {
+        const normalized = normalizeRuleSet(doc);
+        delete doc.overrides;
+        Object.assign(doc, normalized, { id });
+      }
+      for (const k of ['kind', 'url', 'content', 'format', 'behavior', 'fetch']) delete doc[k];
       if (!Array.isArray(doc.sources)) throw bad('sources 必须是数组');
+      checkRuleSetOverrides(doc.overrides);
       if (doc.noResolve !== undefined && typeof doc.noResolve !== 'boolean') throw bad('noResolve 必须是布尔值');
       const ids = new Set<string>();
       (doc.sources as unknown[]).forEach((src, i) => {
@@ -184,6 +211,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (src.format === 'mrs' && src.behavior !== 'domain' && src.behavior !== 'ipcidr') throw bad(`${at}：mrs 需要声明 behavior 为 domain 或 ipcidr`);
         if (src.overrides !== undefined && !Array.isArray(src.overrides)) throw bad(`${at}：overrides 必须是数组`);
       });
+      Object.assign(doc, promoteRuleSetOverrides(doc as unknown as RuleSetDoc, (src) => src.url ? store.latestSnapshot('ruleset', id, src.url)?.body : undefined));
       break;
     }
     case 'preset': {
