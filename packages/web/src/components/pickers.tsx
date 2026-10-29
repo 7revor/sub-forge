@@ -39,8 +39,9 @@ export function NodeSetSelect({ value, onChange, options, label, placeholder = '
 export type GroupOption = { id: string; name: string };
 
 /** 出口 / 前置选择：内置策略、组、或某个节点集里的单个节点（精确名称 / 正则） */
-export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = true, allowGroup = true, label }: {
+export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = true, allowGroup = true, label, exclude }: {
   value: Target; onChange: (t: Target) => void; groups: GroupOption[]; nodeSets: { ref: NodeSetID; name: string }[]; allowNode?: boolean; allowGroup?: boolean; label: string;
+  exclude?: { nodeSet: NodeSetID; names: string[] };
 }) {
   const kind = value.kind;
   return (
@@ -67,7 +68,7 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
         </Select>
       )}
       {value.kind === 'node' && (
-        <NodePicker label={label} nodeSets={nodeSets} value={value.ref} onChange={(ref) => onChange({ ...value, ref })} />
+        <NodePicker label={label} nodeSets={nodeSets} exclude={exclude} value={value.ref} onChange={(ref) => onChange({ ...value, ref })} />
       )}
     </div>
   );
