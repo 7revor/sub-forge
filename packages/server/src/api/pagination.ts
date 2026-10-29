@@ -1,3 +1,4 @@
+import { normalizeNameSearch } from '@sub-forge/core';
 import type { PageOptions } from '../pagination.ts';
 import { HttpError } from './common.ts';
 
@@ -13,5 +14,5 @@ export function readPagination(query: Record<string, string>): PageOptions | und
     }
     return value;
   };
-  return { page: positiveInt('page', 1, Number.MAX_SAFE_INTEGER), pageSize: positiveInt('pageSize', 20, 100), q: (query.q ?? '').trim().toLowerCase() };
+  return { page: positiveInt('page', 1, Number.MAX_SAFE_INTEGER), pageSize: positiveInt('pageSize', 20, 100), q: normalizeNameSearch(query.q ?? '') };
 }

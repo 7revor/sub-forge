@@ -1,3 +1,4 @@
+import { matchesNameSearch } from '@sub-forge/core';
 import { NODE_SET_LABEL, sameNodeSet as same, nodeSetKey } from '../domain/nodeSet.ts';
 // 通用对话框（设计稿「对话框与危险操作」）：重命名、添加节点集。
 
@@ -27,7 +28,7 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<NodeSetID[]>([]);
   useEffect(() => { if (open) { setQ(''); setPicked([]); } }, [open]);
-  const shown = options.filter((o) => !q.trim() || o.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const shown = options.filter((o) => matchesNameSearch(o.name, q));
   return (
     <Modal title={title} open={open} onClose={onClose}
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); onClose(); }}>加入 {picked.length || ''} 个</Button></>}>

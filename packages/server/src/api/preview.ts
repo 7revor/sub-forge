@@ -5,7 +5,7 @@
 //   GET  /api/nodesets/:type/:id/nodes      已保存处理链之后的节点列表
 
 import {
-  NodeSetResolver, parseContent, Report, runPipeline,
+  matchesNameSearch, NodeSetResolver, parseContent, Report, runPipeline,
   type Collection, type NodeSetID, type OperatorStep, type ProxyIR,
 } from '@sub-forge/core';
 import { Hono, type Context } from 'hono';
@@ -37,12 +37,14 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
 
   app.get('/nodesets/:type/:id/nodes', async (c) => {
     const type = c.req.param('type');
+    const query = c.req.query('q') ?? '';
+    if (query.length > 200) throw bad('关键词最多 200 个字符');
     if (type !== 'source' && type !== 'collection' && type !== 'local') throw bad('type 只能是 source、collection 或 local');
     const doc = own(type, c.req.param('id'), c.get('user').id);
     const ref: NodeSetID = { type, id: doc.id };
     const loaded = await renderer.loadNodeSets([ref]);
     const report = new Report();
-    const nodes = new NodeSetResolver(loaded.inputs, report).resolve(ref);
+    const nodes = new NodeSetResolver(loaded.inputs, report).resolve(ref).filter(node => matchesNameSearch(node.name, query));
     return c.json({
       nodes: nodes.slice(0, MAX_NODE_LIST_SIZE).map(brief),
       total: nodes.length,

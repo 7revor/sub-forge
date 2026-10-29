@@ -1,8 +1,9 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
-import { parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
+import { matchesNameSearch, nameLikePattern, normalizeNameSearch, parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { GitRepoCache, type RepoCache } from './git-cache.ts';
+import { buildCatalog, type CatalogNode } from './catalog.ts';
 import { randomId } from '../crypto.ts';
 import { isIndexedRuleFile, parseCustomRepo, parseScans } from './generic.ts';
 import type { Store } from '../store.ts';
@@ -26,6 +27,8 @@ export class RuleRepoService {
     this.initializeDefinitions();
     this.upgradeTextIndex();
     this.upgradeLegacySources();
+    // 旧目录缓存缺少全量清单时，即使上游提交未变也补建一次。
+    this.store.db.exec('UPDATE rule_repos SET checked_at = NULL WHERE built_at IS NOT NULL AND id NOT IN (SELECT repo FROM rule_repo_catalog)');
   }
   private initializeDefinitions() {
     this.store.db.transaction(() => {
@@ -116,6 +119,20 @@ export class RuleRepoService {
       files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path) || a.ref.localeCompare(b.ref))
         .map(file => ({ ...file, url: rawUrl(definition, file), upstream: upstreamUrl(definition, file) })) };
   }
+  /** 只预览选中的目录文件，保留注释和空行，不解析 README 或聚合其他来源。 */
+  async filePreview(id: string, ref: string, path: string) {
+    const version = this.snapshotVersion(id);
+    const node = this.catalog(id).nodes.find(node => node.kind === 'file' && node.ref === ref && node.path === path);
+    if (!node || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中，请刷新后重试');
+    const definition = this.definition(id, true);
+    const row = this.rows().find(row => row.id === id)!;
+    const commit = (JSON.parse(row.revisions) as Record<string, string>)[ref];
+    const file: RepoFile = { ref, path, format: 'auto', ...(commit ? { commit } : {}) };
+    const content = await this.readFile(definition, file);
+    this.assertSnapshot(id, version);
+    return { repo: id, entry: node.entry, ref, path, name: path.split('/').at(-1)!, content,
+      url: rawUrl(definition, file), upstream: upstreamUrl(definition, file), license: definition.license };
+  }
   async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
     const find = () => {
       const entry = this.fileList(repo, path);
@@ -130,7 +147,7 @@ export class RuleRepoService {
     if (parsed.passthrough || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
     const current = find();
     if (JSON.stringify(current.file) !== JSON.stringify(file) || JSON.stringify(this.definition(repo, true)) !== JSON.stringify(definition)) throw new HttpError(409, '索引已更新，请重新选择文件');
-    return { name: current.entry.name, sources: [{ kind: 'remote' as const,
+    return { name: current.file.path.split('/').at(-1)!.replace(/\.[^.]+$/, ''), sources: [{ kind: 'remote' as const,
       name: `${this.definition(repo, true).name} · ${current.file.path}`, url: current.file.url, format: current.file.format, behavior: current.file.behavior,
       repository: { repo, entry: path, ref: current.file.ref, path: current.file.path },
     }] };
@@ -211,6 +228,7 @@ export class RuleRepoService {
       await this.cache.remove(id);
       this.store.db.transaction(() => {
         this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run(id);
+        this.store.db.prepare('DELETE FROM rule_repo_catalog WHERE repo = ?').run(id);
         this.store.db.prepare('DELETE FROM rule_repos WHERE id = ?').run(id);
       })();
       this.details.clear();
@@ -238,35 +256,53 @@ export class RuleRepoService {
   }
   search(q: string, repo: string | undefined, client: string | undefined, offset: number, limit: number) {
     if (repo) this.assertEnabled(repo);
-    const query = normalizeSearch(q);
+    const query = normalizeNameSearch(q);
     const rows = this.store.db.prepare(`SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo
-      WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?) AND instr(e.search_name, ?) > 0
-      ORDER BY CASE WHEN e.search_name = ? THEN 0 WHEN instr(e.search_name, ?) = 1 THEN 1 ELSE 2 END, e.search_name, e.repo, e.key`)
-      .all(repo ?? null, repo ?? null, query, query, query) as { data: string }[];
+      WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?) AND (search_fold(json_extract(e.data, '$.name')) LIKE ? ESCAPE '\\' OR search_fold(json_extract(e.data, '$.path')) LIKE ? ESCAPE '\\')
+      ORDER BY CASE WHEN search_fold(json_extract(e.data, '$.name')) = ? THEN 0 WHEN instr(search_fold(json_extract(e.data, '$.name')), ?) = 1 THEN 1 ELSE 2 END, e.search_name, e.repo, e.key`)
+      .all(repo ?? null, repo ?? null, nameLikePattern(q), nameLikePattern(q), query, query) as { data: string }[];
     const entries = rows.map(r => JSON.parse(r.data) as IndexedEntry).filter(e => !client || e.variants.some(v => (v.client === client || v.client === 'any')));
     return { items: entries.slice(offset, offset + limit).map(({ variants, ...e }) => ({ ...e, clients: [...new Set(variants.map(v => v.client))] })), total: entries.length, offset, limit };
   }
-  /** 文件视图独立于历史分组键；同路径的不同分支保留在右侧文件列表。 */
+  /** 文件视图独立于历史分组键，每个路径和分支均可直接选择。 */
   searchFiles(q: string, repo: string | undefined, client: string | undefined, offset: number, limit: number) {
     if (repo) this.assertEnabled(repo);
-    const query = normalizeSearch(q);
+    const query = normalizeNameSearch(q);
     const rows = this.store.db.prepare(`SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo
       WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?)`).all(repo ?? null, repo ?? null) as { data: string }[];
-    const files = new Map<string, { repo: string; path: string; name: string; filePath: string }>();
+    const files = new Map<string, { repo: string; path: string; name: string; filePath: string; ref: string; url: string }>();
+    const definitions = new Map<string, RepoDefinition>();
     for (const row of rows) {
       const entry = JSON.parse(row.data) as IndexedEntry;
+      const definition = definitions.get(entry.repo) ?? this.definition(entry.repo, true);
+      definitions.set(entry.repo, definition);
       for (const variant of entry.variants) {
         if (client && variant.client !== client && variant.client !== 'any') continue;
         for (const file of variant.files) {
-          if (!isIndexedRuleFile(file.path) || !normalizeSearch(file.path).includes(query)) continue;
-          const key = JSON.stringify([entry.repo, entry.path, file.path]);
-          if (!files.has(key)) files.set(key, { repo: entry.repo, path: entry.path, name: file.path.split('/').at(-1)!, filePath: file.path });
+          if (!isIndexedRuleFile(file.path) || !matchesNameSearch(file.path, query)) continue;
+          const key = JSON.stringify([entry.repo, entry.path, file.ref, file.path]);
+          if (!files.has(key)) files.set(key, { repo: entry.repo, path: entry.path, name: file.path.split('/').at(-1)!, filePath: file.path, ref: file.ref, url: rawUrl(definition, file) });
         }
       }
     }
-    const rank = (name: string) => normalizeSearch(name.replace(/\.[^.]+$/, '')) === query ? 0 : normalizeSearch(name).startsWith(query) ? 1 : 2;
-    const items = [...files.values()].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.repo.localeCompare(b.repo) || a.filePath.localeCompare(b.filePath));
+    const rank = (name: string) => normalizeNameSearch(name.replace(/\.[^.]+$/, '')) === query ? 0 : normalizeNameSearch(name).startsWith(query) ? 1 : 2;
+    const items = [...files.values()].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.repo.localeCompare(b.repo) || a.filePath.localeCompare(b.filePath) || a.ref.localeCompare(b.ref));
     return { items: items.slice(offset, offset + limit), total: items.length, offset, limit };
+  }
+  catalog(id: string, query = ''): { nodes: CatalogNode[]; complete: boolean } {
+    this.assertEnabled(id);
+    const saved = this.store.db.prepare('SELECT data FROM rule_repo_catalog WHERE repo = ?').get(id) as { data: string } | undefined;
+    if (saved) {
+      const rows = this.store.db.prepare(`SELECT n.value AS data FROM rule_repo_catalog c, json_each(c.data) n
+        WHERE c.repo = ? AND search_fold(json_extract(n.value, '$.path')) LIKE ? ESCAPE '\\'`).all(id, nameLikePattern(query)) as { data: string }[];
+      return { nodes: rows.map(row => JSON.parse(row.data) as CatalogNode), complete: true };
+    }
+    // 更新失败期间仍提供已有规则文件；不把旧缓存当作完整目录索引。
+    const rows = this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ?').all(id) as { data: string }[];
+    const entries = rows.map(row => JSON.parse(row.data) as IndexedEntry);
+    const trees: Record<string, string[]> = {};
+    for (const entry of entries) for (const variant of entry.variants) for (const file of variant.files) (trees[file.ref] ??= []).push(file.path);
+    return { nodes: buildCatalog(this.definition(id, true), trees, entries).filter(node => matchesNameSearch(node.path, query)), complete: false };
   }
   private entry(repo: string, path: string): IndexedEntry {
     this.assertEnabled(repo);
@@ -298,16 +334,18 @@ export class RuleRepoService {
       const previous = this.rows().find(r => r.id === id)!;
       const revisions = await this.cache.sync(repo);
       if (this.stopped) throw new Error('索引服务正在关闭');
-      if (previous.built_at === null || JSON.stringify(revisions) !== previous.revisions || previous.indexed_definition !== JSON.stringify(repo)
+      if (previous.built_at === null || !this.store.db.prepare('SELECT 1 FROM rule_repo_catalog WHERE repo = ?').get(id) || JSON.stringify(revisions) !== previous.revisions || previous.indexed_definition !== JSON.stringify(repo)
           || (this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ? LIMIT 1').get(id) as { data: string } | undefined)?.data.includes('"commit"') === false) {
         const trees: Record<string, string[]> = {};
         for (const ref of repo.refs) trees[ref] = await this.cache.files(repo, revisions[ref]!);
         const entries = buildEntries(repo, trees, revisions);
+        const catalog = buildCatalog(repo, trees, entries);
         if (this.stopped) throw new Error('索引服务正在关闭');
         this.store.db.transaction(() => {
           this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run(id);
           const insert = this.store.db.prepare('INSERT INTO rule_repo_entries (repo, key, search_name, data) VALUES (?, ?, ?, ?)');
           for (const entry of entries) insert.run(id, entry.path, normalizeSearch(entry.name), JSON.stringify(entry));
+          this.store.db.prepare('INSERT OR REPLACE INTO rule_repo_catalog (repo, data) VALUES (?, ?)').run(id, JSON.stringify(catalog));
           this.store.db.prepare('UPDATE rule_repos SET built_at = ?, revisions = ?, indexed_definition = ? WHERE id = ?').run(this.now(), JSON.stringify(revisions), JSON.stringify(repo), id);
         })();
         this.details.clear();

@@ -1,3 +1,4 @@
+import { matchesNameSearch } from '@sub-forge/core';
 import { ruleToLine } from '../../components/rule.ts';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { Notice } from '../../components/Notice.tsx';
@@ -128,7 +129,7 @@ export function TabRules() {
     <Card title="模板规则" subtitle="顺序与出口跟随模板更新" bodyClass="flex flex-col gap-4 px-4 pb-4">
       <Input aria-label="搜索规则" placeholder="搜索规则或出口" value={search} onChange={e => setSearch(e.target.value)} />
       <div className="divide-y divide-line-2">
-        {(template?.rules ?? []).filter(r => `${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`.toLowerCase().includes(search.toLowerCase())).map(r => <div key={r.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 py-3 text-[13px] sm:grid-cols-[auto_minmax(0,1fr)_minmax(80px,auto)]">
+        {(template?.rules ?? []).filter(r => matchesNameSearch(`${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`, search)).map(r => <div key={r.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 py-3 text-[13px] sm:grid-cols-[auto_minmax(0,1fr)_minmax(80px,auto)]">
           <Badge>模板</Badge>
           <span className="min-w-0 break-all font-mono leading-6">{label(r.matcher).text}</span>
           <span className="col-start-2 min-w-0 break-words text-ink-2 sm:col-start-auto sm:text-right">{targetLabel(r.target, groupName, nodeSetName)}</span>

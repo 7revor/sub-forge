@@ -278,3 +278,17 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 规则转换支持 `USER-AGENT`：来源读取计为已解析，POST 预览与 GET 下载对 Surge 输出有效规则，mihomo 保留客户端不支持注释；全部没有有效输出时 GET 仍返回 400。
 
 Stash：/sub/:token?target=stash&platform=ios 或 macos 输出完整订阅；UA 可自动识别。预览接口接受 client: stash，并返回可独立导入的 exportYaml。资源和历史版本按客户端/平台隔离；Mihomo 校验器不用于 Stash。预设 stash 与 base.stashPatch 独立保存，节点按快照内联。详见 docs/17-official-client-configuration-guides.md。
+
+### 2026-10-29：目录级联索引
+
+SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和提交同事务更新。仅记录扫描范围内目录及 list/txt；YAML、二进制、README.md 等不进入该缓存。目录由 Git 普通文件路径提取，符号链接与子模块沿用现有排除规则。原 include/exclude 和格式配置继续控制文件能否关联。缺少新缓存的旧仓库会在同提交下补建；更新失败保留旧目录，接口明确提示目录未完整。
+
+`GET /api/rule-options/catalog?scope=all|repository` 只返回当前用户可见本地规则集、启用仓库的平面节点，由前端组装目录。`POST /api/rule-options/resolve` 新选项携带 `file:{ref,path}`，仅关联该文件；旧无 file 请求保留兼容。目录读取不访问上游正文，创建/引用前重新校验文件成员资格。删除仓库时一并删除目录缓存。
+
+### 2026-10-29：全量名称筛选
+
+仓库目录接口支持 `q`，使用规范化后的 SQL LIKE 与转义参数筛选；匹配路径由前端恢复父级目录。加密文档仍在授权读取解密后执行等价的包含筛选，再分页。`GET /api/nodesets/:type/:id/nodes?q=...` 在完整已处理节点集筛选后截取响应上限，`total` 为筛选后的数量。`%`、`_` 和反斜线按字面匹配，不当作用户通配符。
+
+### 2026-10-29：仓库单文件正文预览
+
+`GET /api/rule-repos/file-preview?repo&ref&path` 只读取所选 list/txt 原文，按目录索引校验成员资格并使用索引 commit；响应含 content、name、entry（可关联时）、ref、path、url、upstream、license。仅登录用户可用；目录或伪造文件返回 400，停用仓库返回 404，上游读取异常返回 502，可重试。空文件、纯注释与无有效规则文本仍能预览；创建操作另行执行既有解析校验。预览不组合文件，不请求 README，也不写本地规则集。

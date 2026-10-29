@@ -63,7 +63,13 @@ export type Share = { id: string; kind: 'source' | 'collection'; docId: string; 
 export type RepoScan = { ref: string; directory: string; include: string[]; exclude: string[]; format: string; client: 'any' | 'mihomo' | 'surge'; groupBy: 'path' | 'directory' | 'stem'; readme: boolean; preferred: string[] };
 export type RuleRepo = { id: string; name: string; url: string; refs: string[]; scans: RepoScan[]; license: string; configRevision: string; pending: boolean; enabled: boolean; entries: number; builtAt?: number; checkedAt?: number; error?: string; indexing: boolean };
 export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
-export type RepoFileEntry = RepoEntry & { filePath: string };
+export type RepoFileEntry = RepoEntry & { filePath: string; ref: string; url: string };
+export type RepoFilePreview = { repo: string; entry?: string; ref: string; path: string; name: string; content: string; url: string; upstream: string; license: string };
+export type RuleCatalog = {
+  repositories: { id: string; name: string; complete: boolean; nodes: { kind: 'file' | 'directory'; ref: string; root: string; path: string; entry?: string }[] }[];
+  locals: { id: string; name: string; hint: string }[];
+  notices: string[];
+};
 export type RepoFileList = RepoEntry & { license?: string; url: string; files: { ref: string; path: string; url: string; upstream: string; format: string }[] };
 export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?: RejectedRuleDetail[]; license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };
 export type SystemInfo = Pending & {

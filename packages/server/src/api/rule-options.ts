@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import { stableHash, type RuleSetSource } from '@sub-forge/core';
+import { matchesNameSearch, normalizeNameSearch, stableHash, type RuleSetSource } from '@sub-forge/core';
 import type { RuleRepoService } from '../rule-repos/service.ts';
 import type { Store } from '../store.ts';
 import { repositoryMatcher } from '../ruleset-reference.ts';
 import { bad, HttpError, isStr, jsonBody, requireUser, type ApiEnv } from './common.ts';
 import { RefChecker } from './validate.ts';
 
-const normalize = (s: string) => s.normalize('NFKC').trim().toLowerCase();
+const normalize = normalizeNameSearch;
 
 /** 本地与已启用仓库合并排序、分页，避免客户端拼接两套分页时遗漏候选。 */
 export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
@@ -15,6 +15,22 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
   app.get('/rule-options/locals', c => {
     const refs = new RefChecker(store, c.get('user'));
     return c.json({ items: store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(({ id, name }) => ({ id, name })) });
+  });
+  app.get('/rule-options/catalog', c => {
+    const scope = c.req.query('scope') ?? 'all';
+    const query = c.req.query('q') ?? '';
+    if (query.length > 200) throw bad('关键词最多 200 个字符');
+    if (!['all', 'repository'].includes(scope)) throw bad('规则集作用域不合法');
+    const refs = new RefChecker(store, c.get('user'));
+    const notices: string[] = [];
+    const repositories = repos.list().filter(r => r.enabled).map(repo => {
+      const catalog = repos.catalog(repo.id, matchesNameSearch(repo.name, query) ? '' : query);
+      if (repo.error) notices.push(`${repo.name}：索引更新失败，保留已有目录`);
+      else if (!catalog.complete) notices.push(`${repo.name}：完整目录索引待更新`);
+      return { id: repo.id, name: repo.name, ...catalog };
+    }).filter(repo => !normalize(query) || matchesNameSearch(repo.name, query) || repo.nodes.length);
+    const locals = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id) && matchesNameSearch(rs.name, query)).map(rs => ({ id: rs.id, name: rs.name, hint: rs.note || `${rs.sources.length} 个来源` }));
+    return c.json({ repositories, locals, notices });
   });
   app.get('/rule-options/search', c => {
     const { q = '', offset = '0', limit = '30', scope = 'all' } = c.req.query();
@@ -26,8 +42,9 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
     const local = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(rs => ({
       key: JSON.stringify(['local', rs.id]), name: rs.name, label: `本地 · ${rs.name}`, hint: rs.note || `${rs.sources.length} 个来源`, search: `${rs.name} ${rs.note ?? ''}`,
     }));
-    const remote = repos.search('', undefined, undefined, 0, Number.MAX_SAFE_INTEGER).items.map(rs => ({
-      key: JSON.stringify(['repository', rs.repo, rs.path]), name: rs.name, label: rs.name, hint: `${names.get(rs.repo) ?? rs.repo} · ${rs.path}`, search: `${rs.name} ${rs.path} ${names.get(rs.repo) ?? rs.repo}`,
+    const remote = repos.searchFiles('', undefined, undefined, 0, Number.MAX_SAFE_INTEGER).items.map(rs => ({
+      key: JSON.stringify(['repository', rs.repo, rs.path, rs.ref, rs.filePath]), name: rs.name.replace(/\.[^.]+$/, ''), label: rs.name,
+      hint: `${names.get(rs.repo) ?? rs.repo} · ${rs.filePath} · 分支：${rs.ref}`, search: `${rs.name} ${rs.filePath} ${names.get(rs.repo) ?? rs.repo} ${rs.ref}`,
     }));
     const score = (name: string) => normalize(name) === query ? 0 : normalize(name).startsWith(query) ? 1 : 2;
     const matches = [...local, ...remote].filter(x => normalize(x.search).includes(query))
@@ -43,10 +60,16 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
       return c.json({ matcher: { kind: 'ruleset', id: body.id } });
     }
     if (body.source !== 'repository' || !isStr(body.repo) || !isStr(body.entry)) throw bad('请选择规则集');
+    let file: { ref: string; path: string } | undefined;
+    if (body.file !== undefined) {
+      const value = body.file as Record<string, unknown> | null;
+      if (!value || typeof value !== 'object' || !isStr(value.ref) || !isStr(value.path)) throw bad('file 必须包含 ref 和 path');
+      file = { ref: value.ref, path: value.path };
+    }
     try {
-      const result = await repos.linkedSources(body.repo, body.entry);
+      const result = file ? await repos.linkedFileSource(body.repo, body.entry, file) : await repos.linkedSources(body.repo, body.entry);
       const sources: RuleSetSource[] = result.sources.map(s => ({ ...s, id: `file-${stableHash(JSON.stringify(s.repository))}`, format: 'auto' }));
-      const name = `${repos.list().find(r => r.id === body.repo)?.name ?? body.repo} · ${result.name}`;
+      const name = `${repos.list().find(r => r.id === body.repo)?.name ?? body.repo} · ${file ? `${file.path} · ${file.ref}` : result.name}`;
       return c.json({ matcher: repositoryMatcher({ repo: body.repo, entry: body.entry, name, sources }) });
     } catch (error) {
       if (error instanceof HttpError) throw error;

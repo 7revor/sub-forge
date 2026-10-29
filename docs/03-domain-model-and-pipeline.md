@@ -456,7 +456,21 @@ SQLite v17 在事务中处理规则集、全部模板历史版本、独立订阅
 
 2026-10-29 绑定规则页的说明位置、搜索区间距及规则行对齐仅为前端样式修正，不更改数据模型、接口、种子或输出规则。
 
+## 2026-10-29：平面目录清单与级联选择
+
+SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`、`ref`、`root`、`path`，可关联文件另含历史索引 `entry`。仅保存目录与 list/txt 文件元数据，不读取规则正文，不在服务端创建嵌套树。它与规则条目、配置快照、提交版本在同一事务中替换，失败保留上次完整结果。旧库缺少目录缓存时标记待更新，同一提交也补建。
+
+`GET /api/rule-options/catalog?scope=all|repository` 返回当前用户可见本地规则集、启用仓库平面节点及索引提示。前端构造级联，叶子携带 `repo + entry + file(ref,path)`，`POST /api/rule-options/resolve` 校验并只返回该文件来源。历史聚合引用与示例种子的映射保留，不重新解释或改写旧模板、订阅；领域模型和渲染器沿用既有单文件来源结构。
+
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
 
 2026-10-29：Client 新增 stash；服务端 Target 支持 mihomo/stash，并用客户端和平台隔离缓存、last-good、结构版本与资源地址。Preset.stash 和 Profile.base.stashPatch 保存 Stash 原生基础设置。renderStash 共用依赖/环路/规则流水线，独立转换节点和组；节点按快照内联。Stash 预览另返回 exportYaml，将已转换的托管规则内嵌，支持草稿独立文件导出。详见 [17](17-official-client-configuration-guides.md)。
+
+## 2026-10-29：名称搜索谓词
+
+`normalizeNameSearch`/`matchesNameSearch` 统一大小写、全半角与首尾空白处理。公开仓库缓存使用 SQLite `search_fold(value) LIKE ? ESCAPE` 与转义参数；本地加密文档先按权限读取、解密后包含筛选，再分页。节点接口支持 `q`，先解析完整节点集、按名称筛选，再执行 5000 条响应上限。此处只改变搜索候选，不改变 NodeRef 精确匹配或规则正则语义。
+
+## 2026-10-29：按物理文件读取正文
+
+`GET /api/rule-repos/file-preview?repo&ref&path` 先检查启用仓库和平面目录成员资格，再按索引固定 commit 读取单个 list/txt 文件。返回原始 content、文件名、路径、分支、许可证与源链接，不解析 README、不合并同目录文件、不创建本地文档。读取结束重验索引快照；索引变化或仓库停用时拒绝返回过期内容。目录与名称查询仍走 SQLite，正文通过现有 Git 对象缓存按需读取。原有来源和规则领域结构不变。

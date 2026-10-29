@@ -87,3 +87,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 `USER-AGENT` 解析为独立 IR，保留大小写与通配值；Surge 正常输出，mihomo 按客户端不支持处理。来源解析诊断、客户端输出诊断分别计数。
 
 Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段生成 YAML。节点集按快照内联以保留筛选、代理链及空组 REJECT；Hysteria2 和延迟测试字段独立转换。exportStashConfig 将托管规则内嵌成可独立导入文件。官方依据见 docs/17-official-client-configuration-guides.md。
+
+### 2026-10-29：统一名称搜索工具
+
+`normalizeNameSearch`、`matchesNameSearch` 与 `nameLikePattern` 提供忽略大小写的字面包含匹配及 LIKE 参数转义，保留名称空格和标点。仅用于候选搜索，不改写节点精确匹配与处理链正则。

@@ -1,14 +1,17 @@
-import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
-// 上方管理仓库，下方搜索具体文本文件并创建关联规则集。
-
+// 目录和名称搜索读取数据库索引，右侧仅预览点击的文件正文。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
+import { RuleFileTree } from '../components/RuleFileTree.tsx';
+import { CodePreview } from '../components/CodePreview.tsx';
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
-import { api, type RepoFileEntry, type RepoFileList, type RuleRepo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
+import { api, type RuleCatalog, type RuleRepo, type RepoFilePreview } from '../api.ts';
+import { buildRuleCatalog, type RuleCatalogSelection } from '../domain/ruleCatalog.ts';
+import { Badge, Button, Empty, ErrorAlert, Input, PageHeader } from '../components/ui.tsx';
 
+type RepositoryFile = Extract<RuleCatalogSelection, { source: 'repository' }>;
 export function RuleRepoPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -16,104 +19,66 @@ export function RuleRepoPage() {
   const [params] = useSearchParams();
   const ruleset = params.get('ruleset');
   const [q, setQ] = useState(params.get('q') ?? '');
-  const debounced = useDebouncedValue(q.trim(), 300);
-  const [repo, setRepo] = useState<string>();
-  const [offset, setOffset] = useState(0);
-  const [sel, setSel] = useState<RepoFileEntry>();
+  const query = useDebouncedValue(q.trim(), 250);
+  const [selected, setSelected] = useState<RepositoryFile>();
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
+  const revision = repos.data?.repos.map(repo => `${repo.id}:${repo.builtAt}:${repo.enabled}`).join('|');
+  const catalog = useQuery({ queryKey: ['rule-repos', 'catalog', query, revision],
+    queryFn: () => api<RuleCatalog>('GET', `/rule-options/catalog?scope=repository&q=${encodeURIComponent(query)}`),
+  });
+  const pending = q.trim() !== query;
+  const tree = useMemo(() => catalog.data ? buildRuleCatalog(catalog.data) : [], [catalog.data]);
+  useEffect(() => { setSelected(undefined); }, [query]);
   useEffect(() => {
-    if (repos.data && repo && !repos.data.repos.some(r => r.id === repo && r.enabled)) setRepo(undefined);
-    if (repos.data && sel && !repos.data.repos.some(r => r.id === sel.repo && r.enabled)) setSel(undefined);
-  }, [repos.data, repo, sel]);
-  useEffect(() => { setOffset(0); setSel(undefined); }, [debounced, repo]);
-  const revision = repos.data?.repos.map(r => `${r.id}:${r.builtAt}:${r.enabled}`).join('|');
-  const search = useQuery({
-    queryKey: ['rule-repos', 'search', 'files', debounced, repo, offset, revision],
-    queryFn: () => api<{ items: RepoFileEntry[]; total: number }>('GET', `/rule-repos/search?view=files&q=${encodeURIComponent(debounced)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}&offset=${offset}`),
+    if (selected && repos.data && !repos.data.repos.some(repo => repo.id === selected.repo && repo.enabled)) setSelected(undefined);
+  }, [repos.data, selected]);
+  const preview = useQuery({ queryKey: ['rule-repos', 'file-preview', selected?.repo, selected?.file.ref, selected?.file.path, revision], enabled: !!selected, retry: false,
+    queryFn: () => api<{ item: RepoFilePreview }>('GET', `/rule-repos/file-preview?${new URLSearchParams({ repo: selected!.repo, ref: selected!.file.ref, path: selected!.file.path })}`).then(result => result.item),
   });
-  const detail = useQuery({
-    queryKey: ['rule-repos', 'files', sel?.repo, sel?.path, revision],
-    enabled: !!sel,
-    queryFn: () => api<{ item: RepoFileList }>('GET', `/rule-repos/files?repo=${encodeURIComponent(sel!.repo)}&path=${encodeURIComponent(sel!.path)}`).then((r) => r.item),
+  const create = useMutation({ meta: { successMessage: ruleset ? '规则文件已加入规则集' : '规则集已创建' },
+    mutationFn: (file: RepoFilePreview) => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: file.repo, path: file.entry, file: { ref: file.ref, path: file.path }, ...(ruleset ? { ruleset } : {}) }),
+    onSuccess: async result => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${result.item.id}`); },
   });
-  const use = useMutation({ meta: { successMessage: '规则文件已加入规则集' },
-    mutationFn: (file: { ref: string; path: string }) => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: sel!.repo, path: sel!.path, file, ...(ruleset ? { ruleset } : {}) }),
-    onSuccess: async (r) => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${r.item.id}`); },
-  });
-  const repoName = (id: string) => repos.data?.repos.find(r => r.id === id)?.name ?? id;
-  const items = search.data?.items ?? [];
-  const d = detail.data && { ...detail.data, files: detail.data.files.filter(f => f.path === sel?.filePath) };
-
-  return (
-    <>
-      <PageHeader title="规则仓库" />
-      <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} />
-      {ruleset && <div className="rounded-lg bg-accent-soft px-3 py-2.5 text-[13px] text-accent-ink">所选文件会作为仓库关联来源加入规则集。<Link to={`/rulesets/${ruleset}`} className="ml-1 text-accent">返回规则集</Link></div>}
-      <div className="flex flex-wrap items-center gap-3">
-        <Input aria-label="搜索规则" placeholder="搜索规则名或路径，如 telegram" className="h-10 max-w-[360px]" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div role="group" aria-label="仓库" className="flex flex-wrap gap-1.5">
-          {[{ id: undefined, name: '全部仓库' }, ...(repos.data?.repos.filter(r => r.enabled) ?? [])].map((r) => (
-            <button key={r.id ?? 'all'} type="button" aria-pressed={repo === r.id} onClick={() => setRepo(r.id)}
-              className={cx('h-9 shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3.5 text-[13px]', repo === r.id ? 'border-accent bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink-2 hover:bg-ground')}>{r.name}</button>
-          ))}
+  const select = (value: string) => {
+    const selection = JSON.parse(value) as RuleCatalogSelection;
+    if (selection.source !== 'repository') throw new Error('请选择仓库文件');
+    setSelected(selection); create.reset();
+  };
+  const file = preview.data;
+  const count = catalog.data?.repositories.reduce((total, repo) => total + repo.nodes.filter(node => node.kind === 'file').length, 0) ?? 0;
+  return <>
+    <PageHeader title="规则仓库" />
+    <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} />
+    {ruleset && <div className="text-[13px] text-muted">选择文件预览后可加入规则集。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-accent">返回规则集</Link></div>}
+    <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索名称或路径，忽略大小写" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
+    <ErrorAlert error={repos.error ?? catalog.error} />
+    {!!catalog.data?.notices.length && <div role="status" className="text-[12px] text-muted">{catalog.data.notices.join('；')}</div>}
+    <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(220px,1fr)_minmax(300px,1.4fr)] gap-5 overflow-y-auto lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+      <section aria-label="目录与文件" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
+        <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{pending || catalog.isFetching ? '搜索中…' : `目录 · ${count} 个文件`}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {!pending && !catalog.isPending && <RuleFileTree key={`${query}:${revision}`} options={tree} selected={selected ? JSON.stringify(selected) : undefined} expanded={!!query} onSelect={select} />}
+          {!pending && !catalog.isPending && !catalog.error && !tree.length && <div className="p-4"><Empty title={query ? '没有匹配的目录或文件' : '暂无可用目录索引'} /></div>}
         </div>
-      </div>
-      <ErrorAlert error={repos.error ?? search.error} />
-
-      <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(240px,1fr)_minmax(320px,1.5fr)] gap-5 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-          <section aria-label="搜索结果" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
-            <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{search.isFetching ? '搜索中…' : `${search.data?.total ?? 0} 个结果`}</div>
-            <div key={`${debounced}:${repo ?? ''}:${offset}`} aria-label="规则列表" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            {items.map((x) => {
-              const on = sel?.repo === x.repo && sel.path === x.path && sel.filePath === x.filePath;
-              return (
-                <button key={JSON.stringify([x.repo, x.path, x.filePath])} type="button" aria-current={on || undefined} onClick={() => { setSel(x); use.reset(); }}
-                  className={cx('flex w-full cursor-pointer items-center gap-3 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'hover:bg-ground')}>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="break-all text-[13.5px] font-medium">{x.name}</span><span className="break-all font-mono text-[12px] text-muted">{repoName(x.repo)} · {x.filePath}</span></span>
-                </button>
-              );
-            })}
-            {search.data && !items.length && !search.isFetching && !search.error && <div className="px-4 py-4"><Empty title={debounced ? `没有找到「${debounced}」` : '暂无可用索引，请等待首次更新或联系管理员'} /></div>}
+      </section>
+      <section aria-label="文件内容预览" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
+        {!selected ? <div className="p-5"><Empty title="选择左侧文件预览内容" /></div> : <>
+          <div className="flex shrink-0 flex-col gap-3 border-b border-line-2 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h2 className="m-0 break-all text-[17px] font-semibold">{selected.file.path.split('/').at(-1)}</h2>
+              <Badge>分支：{selected.file.ref}</Badge>
             </div>
-            {(search.data?.total ?? 0) > 50 && <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line-2 p-3">
-              <Button size="sm" disabled={offset === 0 || search.isFetching} onClick={() => setOffset(Math.max(0, offset - 50))}>上一页</Button>
-              <span className="text-[12px] text-muted">第 {Math.floor(offset / 50) + 1} 页</span>
-              <Button size="sm" disabled={offset + 50 >= (search.data?.total ?? 0) || search.isFetching} onClick={() => setOffset(offset + 50)}>下一页</Button>
+            <span className="break-all font-mono text-[12px] text-muted">{repos.data?.repos.find(repo => repo.id === selected.repo)?.name ?? selected.repo} · {selected.file.path}</span>
+            {file && !preview.isFetching && !preview.isError && <div className="flex flex-wrap items-center gap-3 text-[12px]">
+              <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-accent">打开原文件</a>
+              <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入规则集' : '新建规则集'}</Button>
             </div>}
-          </section>
-
-          <section key={sel ? `${sel.repo}:${sel.path}` : 'empty'} aria-label="详情" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain rounded-[10px] border border-line bg-panel px-4.5 py-4 [&>*]:shrink-0">
-            {!sel ? <Empty title="还没有选择规则" /> : <>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex flex-col gap-1">
-                  <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>
-                  <span className="break-all font-mono text-[12px] text-muted">{repoName(sel.repo)} · {sel.filePath}</span>
-                </div>
-                {d && <Badge>{d.files.length} 个文件</Badge>}
-              </div>
-              <ErrorAlert error={detail.error} />
-              {detail.isPending && <span className="text-[13px] text-muted">正在读取文件列表…</span>}
-              {d && <>
-                <div className="flex flex-wrap gap-2 text-[12.5px]">
-                  {d.license && <Badge>许可证 {d.license}</Badge>}
-                  <a href={d.url} target="_blank" rel="noreferrer" className="text-accent">上游仓库</a>
-                </div>
-                <Card title="文件列表" bodyClass="!p-0">
-                  <table className="w-full table-fixed border-collapse">
-                    <thead><tr><th className={th}>文件</th><th className={cx(th, 'w-36')}>操作</th></tr></thead>
-                    <tbody>{d.files.map(f => <tr key={JSON.stringify([f.ref, f.path])}>
-                      <td className={td}><a className="block break-all font-mono text-[12px] text-accent" href={f.url} target="_blank" rel="noreferrer">{f.path}</a><span className="break-all text-[11.5px] text-muted">分支：{f.ref}</span></td>
-                      <td className={td}><Button size="sm" variant="primary" disabled={use.isPending || detail.isFetching} onClick={() => use.mutate({ ref: f.ref, path: f.path })}>{use.isPending && use.variables?.ref === f.ref && use.variables.path === f.path ? '创建中…' : ruleset ? '加入规则集' : '新建规则集'}</Button></td>
-                    </tr>)}</tbody>
-                  </table>
-                  {!d.files.length && <div className="p-4"><Empty title="没有可用的文本文件" /></div>}
-                </Card>
-              </>}
-              <ErrorAlert error={use.error} />
-
-            </>}
-          </section>
-      </div>
-    </>
-  );
+            <ErrorAlert error={preview.error ?? create.error} />
+            {preview.isError && <Button size="sm" onClick={() => void preview.refetch()}>重试读取文件</Button>}
+          </div>
+          {preview.isFetching ? <div role="status" className="p-4 text-[13px] text-muted">正在读取文件内容…</div> : file && !preview.isError && <CodePreview label="文件正文" key={`${file.repo}:${file.ref}:${file.path}`} text={file.content} title={file.content ? '文件正文' : '文件正文（空文件）'} copyable fill className="nav-scroll rounded-none" bodyClassName="overscroll-contain p-4 whitespace-pre" />}
+        </>}
+      </section>
+    </div>
+  </>;
 }

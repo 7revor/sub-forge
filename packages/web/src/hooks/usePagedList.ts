@@ -1,4 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { normalizeNameSearch } from '@sub-forge/core';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { api } from '../api.ts';
@@ -17,9 +18,9 @@ export function usePagedList<K extends Kind | 'templates'>(kind: K) {
   const pageSize = PAGE_SIZES.includes(rawSize) ? rawSize : 20;
   const q = params.get('q') ?? '';
   const query = useQuery({
-    queryKey: [kind, 'page', { page, pageSize, q: q.trim() }],
+    queryKey: [kind, 'page', { page, pageSize, q: normalizeNameSearch(q) }],
     queryFn: () => api<PageResult<ListMap[K]>>('GET', `/${kind}?${new URLSearchParams({ page: String(page), pageSize: String(pageSize), q: q.trim() })}`),
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[2] as { q?: string } | undefined)?.q === normalizeNameSearch(q) ? previous : undefined,
   });
   const update = (patch: Record<string, string>, replace = false) => {
     setParams(previous => {

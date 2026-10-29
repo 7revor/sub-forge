@@ -257,6 +257,19 @@ describe('节点集最终节点列表', () => {
     expect(res.json.nodes[4999].name).toBe('节点-4999');
   });
 
+  it('名称在完整节点集合中忽略大小写模糊筛选，尾部节点不会因 5000 条截断而漏查', async () => {
+    const { alice, store } = await scenario();
+    try {
+      const names = [...Array.from({ length: 5000 }, (_, index) => `ordinary-${index}`), '尾部-ClAuDe-HK', 'literal_100%', 'literalX100Y'];
+      const proxies = names.map(name => ({ name, type: 'trojan', server: 'a.example.com', port: 443, password: 'pw' }));
+      const id = (await alice.post('/api/locals', { name: '完整名称筛选', proxies })).json.item.id;
+      const result = await alice.get(`/api/nodesets/local/${id}/nodes?q=claude`);
+      expect(result.json).toMatchObject({ total: 1, truncated: false, nodes: [{ name: '尾部-ClAuDe-HK' }] });
+      expect((await alice.get(`/api/nodesets/local/${id}/nodes?q=ClAuDe`)).json.nodes).toEqual(result.json.nodes);
+      expect((await alice.get(`/api/nodesets/local/${id}/nodes?q=${encodeURIComponent('_100%')}`)).json.nodes.map((node: { name: string }) => node.name)).toEqual(['literal_100%']);
+    } finally { store.close(); }
+  });
+
   it('单地址返回快照加载与解析报告，读取有效快照不重复拉取', async () => {
     let calls = 0;
     let fail = false;

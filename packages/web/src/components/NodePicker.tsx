@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import type { Builtin, NodeRef, NodeSetID } from '@sub-forge/core';
 import { useNodeList } from '../hooks.ts';
 import { resolveRef } from './nodeMatch.ts';
@@ -7,9 +8,10 @@ import { Combobox, Input, Segmented, Select } from './ui.tsx';
 export function NodePicker({ nodeSets, value, onChange, label }: {
   nodeSets: { ref: NodeSetID; name: string }[]; value: NodeRef; onChange: (ref: NodeRef) => void; label: string;
 }) {
-  const { data, isLoading, error } = useNodeList(value.nodeSet);
   const exact = 'exact' in value.match;
   const text = 'exact' in value.match ? value.match.exact : value.match.regex;
+  const query = useDebouncedValue(exact ? text : '', 200);
+  const { data, isLoading, error } = useNodeList(value.nodeSet, query);
   const result = resolveRef(data?.nodes ?? [], value.match);
   return (
     <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-2">
