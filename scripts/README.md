@@ -38,7 +38,9 @@
 
 已有 `web-local/` 等历史打包目录不删除，开发服务不使用它们。各工作树默认共用上述本地数据；同时运行不同工作树时须分别指定数据目录和端口。
 
-本地脚本固定使用数据库旁的 `secret.key`，不使用终端中的 `SUBFORGE_SECRET`；现有数据库缺少密钥时拒绝启动，不生成替代密钥。当前账号与密码继续使用；全新目录可在首次启动时设置 `SUBFORGE_ADMIN_USERNAME` 和 `SUBFORGE_ADMIN_PASSWORD`，脚本不会重置已有用户，详见 [服务端说明](../packages/server/README.md#本地)。
+本地脚本固定使用数据库旁的 `secret.key`，不使用终端中的 `SUBFORGE_SECRET`；现有数据库缺少密钥时拒绝启动，不生成替代密钥。
+
+通过 `start` 首次初始化空的 dev 数据库时，默认用户名为 **`admin`**、密码为 **`password`**。可以用 `SUBFORGE_ADMIN_USERNAME` 和 `SUBFORGE_ADMIN_PASSWORD` 覆盖；已有用户的密码不会在启动或热重载时重置。这两个默认值仅由本地开发脚本提供，直接运行服务端或 Docker 仍按 [服务端说明](../packages/server/README.md#本地) 配置账号。
 
 需要隔离实例或换端口时，启动与停止均传入同一个数据目录：
 

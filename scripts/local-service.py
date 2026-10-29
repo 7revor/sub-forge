@@ -171,6 +171,8 @@ class LocalService:
         api_url, url = f"http://127.0.0.1:{port}", f"http://127.0.0.1:{web_port}"
         for value in (port, web_port):
             with socket.socket() as probe:
+                # 与 Node 的监听行为一致，允许刚停止连接的 TIME_WAIT，不放过实际监听者。
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 try:
                     probe.bind(("127.0.0.1", value))
                 except OSError as error:
@@ -192,6 +194,9 @@ class LocalService:
         # 本地脚本始终使用数据库旁的密钥，避免终端遗留的密钥覆盖现有文件。
         env.pop("SUBFORGE_SECRET", None)
         env.pop("WEB_DIR", None)
+        # 仅本地开发入口提供初始账号；服务端只在数据库无用户时创建，不覆盖已有密码。
+        env.setdefault("SUBFORGE_ADMIN_USERNAME", "admin")
+        env.setdefault("SUBFORGE_ADMIN_PASSWORD", "password")
         env.update(HOST="127.0.0.1", PORT=str(port), PUBLIC_URL=url,
                    SUBFORGE_DB=str(database), SUBFORGE_API=api_url,
                    SUBFORGE_LOCAL_WEB_PORT=str(web_port), NODE_ENV="development")

@@ -1,5 +1,6 @@
 """在独立临时目录和空闲端口验证服务脚本，不接触现有用户数据。"""
 
+import http.cookiejar
 import json
 import os
 from pathlib import Path
@@ -27,6 +28,8 @@ class LocalServiceTests(unittest.TestCase):
                 self.web_port = web_probe.getsockname()[1]
         self.env = {**os.environ, "SUBFORGE_LOCAL_RUNTIME_DIR": str(self.runtime),
                     "SUBFORGE_LOCAL_PORT": str(self.port), "SUBFORGE_LOCAL_WEB_PORT": str(self.web_port)}
+        self.env.pop("SUBFORGE_ADMIN_USERNAME", None)
+        self.env.pop("SUBFORGE_ADMIN_PASSWORD", None)
         self.state_file = self.runtime / "service.json"
         self.good_state = None
 
@@ -121,6 +124,30 @@ class LocalServiceTests(unittest.TestCase):
                 if child.poll() is None:
                     child.terminate()
                     child.wait(timeout=35)
+
+    def test_dev默认账号且重启不覆盖已修改密码(self):
+        self.run_script("start")
+        self.good_state = self.state()
+        url = self.good_state["url"]
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+        def post(path, body):
+            request = urllib.request.Request(url + path, data=json.dumps(body).encode(), method="POST",
+                headers={"Content-Type": "application/json", "Origin": url})
+            with opener.open(request, timeout=5) as response:
+                self.assertEqual(response.status, 200)
+                return json.load(response)
+
+        user = post("/api/auth/login", {"username": "admin", "password": "password"})["user"]
+        self.assertEqual(user["role"], "admin")
+        post("/api/me/password", {"current": "password", "next": "local-changed-password"})
+        self.run_script("stop")
+        self.good_state = None
+        self.run_script("start")
+        self.good_state = self.state()
+        restarted = post("/api/auth/login", {"username": "admin", "password": "local-changed-password"})["user"]
+        self.assertEqual(restarted["id"], user["id"])
 
     def test_记录其他进程的PID不会误杀(self):
         process = subprocess.Popen([shutil.which("node"), "-e", "setInterval(() => {}, 1000)"])
