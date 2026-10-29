@@ -151,3 +151,9 @@ RuleSets 来源行、TemplateEditor 规则行、ProfileDetail 独立规则与绑
 2026-10-29 绑定规则页：移除前置规则的独立说明行；模板说明置于标题区，正文为 16px 间距的搜索、列表与 MATCH。规则匹配与出口分列对齐。后端、模型及种子无变化；外部画布待同步，见 docs/13。
 
 2026-10-29 RAW 合并复核：保留模板绑定 / 独立模式、远程 URL 引用与模板行去边框；独立规则仍用 RAW，绑定规则保持只读。新 routing.config.rules 与旧 overlay 共用 RAW 边界校验，默认 demo 保留旧 IR，客户端改写提供 RAW 示例。
+
+## 2026-10-29：目录级联选择变更
+
+实现范围：规则仓库页、模板系统规则集、订阅系统规则集、规则集来源关联。统一采用自绘级联 select；仓库页取消列表和右侧详情。后端只索引目录/list/txt，前端按扫描根相对路径组装层级，叶子绑定单文件和分支。服务端、前端及文档已实现；旧示例种子继续使用原映射，无数据迁移要求。
+
+设计画布同步未完成：使用 Codex 内置浏览器访问 CLAUDE.md 指定的 [Sub-Forge 设计画布](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，页面显示“Sign in to view this page”，当前无可编辑会话。没有绕过登录；该项仅登记为设计同步阻塞，不能宣称已修改画布。实际交互截图见 `research/verification/rule-cascader-20261029/`。

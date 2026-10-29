@@ -5,13 +5,15 @@ import type { RepoCache } from '../src/rule-repos/git-cache.ts';
 import { addUser, client, setupApp } from './helpers.ts';
 
 export async function setupRuleReferences() {
+  let paths = ['rule/Surge/Google/Google.list', 'rule/Surge/OpenAI/OpenAI.list'];
+  let commit = 'a'.repeat(40);
   let body = 'DOMAIN,google.example.test\nIP-CIDR,198.51.100.0/24';
   const calls: string[] = [];
   const env = setupApp({ fetcher: async url => { calls.push(url); return { status: 200, body }; } });
   const cache: RepoCache = {
     inspect: async () => ({ defaultBranch: 'master', branches: ['master', 'surge-rule-set', 'surge-domain-set'] }),
-    sync: async repo => Object.fromEntries(repo.refs.map(ref => [ref, 'a'.repeat(40)])),
-    files: async () => ['rule/Surge/Google/Google.list', 'rule/Surge/OpenAI/OpenAI.list'],
+    sync: async repo => Object.fromEntries(repo.refs.map(ref => [ref, commit])),
+    files: async () => paths,
     read: async () => body, remove: async () => {}, stop: async () => {},
   };
   const repos = new RuleRepoService(env.store, async () => ({ status: 200, body }), Date.now, cache);
@@ -27,5 +29,5 @@ export async function setupRuleReferences() {
   await admin.login('reference-admin');
   const resolve = async () => (await admin.post('/api/rule-options/resolve', { source: 'repository', repo: 'blackmatrix7', entry: 'Google' })).json.matcher;
   const stop = async () => { await repos.stop(); await env.snapshots.settled(); env.store.close(); };
-  return { ...env, app, repos, user, privateUser, admin, resolve, calls, stop, setBody: (next: string) => { body = next; } };
+  return { ...env, app, repos, user, privateUser, admin, resolve, calls, stop, setBody: (next: string) => { body = next; }, setPaths: (next: string[]) => { paths = next; commit = 'b'.repeat(40); } };
 }

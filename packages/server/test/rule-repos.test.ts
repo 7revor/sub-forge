@@ -198,7 +198,7 @@ describe('规则仓库接口', () => {
     await addUser(h.store, 'alice'); await c.login('alice'); h.fetcher.mockClear();
     const result = await c.get('/api/rule-repos/search?view=files&q=claude');
     expect(result.json.total).toBe(3);
-    expect(result.json.items).toEqual([
+    expect(result.json.items.map(({ ref, url, ...item }: { ref: string; url: string }) => item)).toEqual([
       { repo: 'blackmatrix7', path: 'Claude', name: 'Claude.list', filePath: 'rule/Clash/Claude/Claude.list' },
       { repo: 'blackmatrix7', path: 'rule/Surge/Claude/Claude.list', name: 'Claude.list', filePath: 'rule/Surge/Claude/Claude.list' },
       { repo: 'blackmatrix7', path: 'Claude', name: 'Claude_Domain.list', filePath: 'rule/Clash/Claude/Claude_Domain.list' },
@@ -207,7 +207,9 @@ describe('规则仓库接口', () => {
     expect((await c.get('/api/rule-repos/search?view=files&q=claude&client=surge')).json.total).toBe(1);
     expect((await c.get('/api/rule-repos/search?view=files&q=claude&offset=1&limit=1')).json.items).toEqual([result.json.items[1]]);
     const branches = await c.get('/api/rule-repos/search?view=files&repo=zydou&q=openai.txt');
-    expect(branches.json.total).toBe(1);
+    expect(branches.json.total).toBe(2);
+    expect(branches.json.items.map((item: { ref: string; url: string }) => item.ref)).toEqual(['surge-domain-set', 'surge-rule-set']);
+    expect(branches.json.items.every((item: { ref: string; url: string }) => item.url.includes(`/${item.ref}/openai.txt`))).toBe(true);
     expect((await c.get('/api/rule-repos/files?repo=zydou&path=openai')).json.item.files).toHaveLength(2);
     expect((await c.get('/api/rule-repos/search?q=claude')).json.total).toBe(2);
     expect((await c.get('/api/rule-repos/search?view=bad')).status).toBe(400);

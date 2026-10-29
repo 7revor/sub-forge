@@ -274,3 +274,9 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 
 
 2026-10-29 绑定规则页的说明与间距修正仅调整前端呈现，无服务端、数据库或种子变更。
+
+### 2026-10-29：目录级联索引
+
+SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和提交同事务更新。仅记录扫描范围内目录及 list/txt；YAML、二进制、README.md 等不进入该缓存。目录由 Git 普通文件路径提取，符号链接与子模块沿用现有排除规则。原 include/exclude 和格式配置继续控制文件能否关联。缺少新缓存的旧仓库会在同提交下补建；更新失败保留旧目录，接口明确提示目录未完整。
+
+`GET /api/rule-options/catalog?scope=all|repository` 只返回当前用户可见本地规则集、启用仓库的平面节点，由前端组装目录。`POST /api/rule-options/resolve` 新选项携带 `file:{ref,path}`，仅关联该文件；旧无 file 请求保留兼容。目录读取不访问上游正文，创建/引用前重新校验文件成员资格。删除仓库时一并删除目录缓存。

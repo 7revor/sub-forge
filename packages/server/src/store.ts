@@ -48,7 +48,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 17;
+const SCHEMA_VERSION = 18;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS rule_repo_meta (name TEXT PRIMARY KEY, value TEXT NOT
 CREATE TABLE IF NOT EXISTS rule_repo_entries (
   repo TEXT NOT NULL, key TEXT NOT NULL, search_name TEXT NOT NULL, data TEXT NOT NULL,
   PRIMARY KEY (repo, key)
+);
+CREATE TABLE IF NOT EXISTS rule_repo_catalog (
+  repo TEXT PRIMARY KEY, data TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS docs (
   kind TEXT NOT NULL, id TEXT NOT NULL, owner TEXT, data TEXT NOT NULL, updated_at INTEGER NOT NULL,
