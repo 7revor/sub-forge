@@ -55,6 +55,17 @@ Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步
 
 公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` 与删除确认 `DeleteDialog`）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
 
+公共展示与业务表单的复用边界：
+
+- `CopyButton` / `useClipboard`：等待剪贴板写入成功再反馈，失败显示原因；文本变化与卸载使旧反馈失效。
+- `CodePreview`、`Notice`、`NodeSetCount`、`SourceFetchStatus`、`Card subtitle`：统一预览、提示、节点计数、拉取状态与卡片标题说明。`ReportList` 可由调用方提供定位操作；模板版本列表复用 `template/VersionHistory`。
+- `GroupSettingsFields`、`MatcherEditor`、`OptionalBoolean`：模板与配置订阅共用字段；权限、继承和覆盖写入仍由页面负责。布尔值区分未设置、开启和关闭，数值 `0` 保留。规则匹配类型切换清理旧类型专属字段。
+- `NamedCreateDialog`：本地分组与预设共用名称校验、回车提交、重复提交保护和错误展示。`ExtraFields.validateName` 同时用于新增和重命名，调用方通过业务校验函数限制字段，不依赖 DOM 事件捕获。
+- `useLeaveGuard` / `LeaveDialog`：本地节点及预设有未保存修改或无效 YAML 时保护路由跳转与刷新；合法内容可以保存后离开，无效内容需继续编辑或明确放弃。Profile 保持仅无效 YAML 阻断的原策略。
+- `hooks/documentQueries` 集中定义 token、访问日志和快照查询；`usePipelinePreview` 供订阅源与组合使用；`useDebouncedValue` 复用普通值防抖。节点集标识、匹配项切换、拉取状态及删除错误归入 `domain/`，时间与流量格式化归入 `utils/format.ts`。
+
+本次抽取的验收范围与截图见 [公共组件验收记录](../../research/verification/shared-components-20261029/README.md)。
+
 ## 已知简化
 
 - 外部 YAML 没有稳定 ID 注释时，模板导入仍按组名 / 规则匹配项识别；同时删除注释并改名无法可靠识别原组，可能需要重新关联个人覆盖。
