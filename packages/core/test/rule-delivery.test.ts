@@ -41,7 +41,7 @@ describe('按内容识别与自动输出格式', () => {
     const f = fixture('payload: ["DOMAIN,example.com", "IP-CIDR,192.0.2.0/24,no-resolve"]');
     f.rs.sources.push({ id: 'local', kind: 'local', format: 'yaml', content: 'DOMAIN,example.com\nIP-CIDR,198.51.100.0/24,src' });
     const out = rendered(f.inputs);
-    expect(out.rulesets).toEqual({ 'rs_r_classical.list': { behavior: 'classical', text: 'DOMAIN,example.com\nIP-CIDR,192.0.2.0/24,no-resolve\nIP-CIDR,198.51.100.0/24,src\n' } });
+    expect(out.rulesets).toEqual({ 'rs_r_classical.list': { behavior: 'classical', text: 'DOMAIN,example.com\nIP-CIDR,192.0.2.0/24,no-resolve\n# [重复规则] DOMAIN,example.com\nIP-CIDR,198.51.100.0/24,src\n' } });
     expect(out.config['rule-providers']).toEqual({ rs_r_classical: { type: 'http', behavior: 'classical', format: 'text', interval: 86400, proxy: 'DIRECT', url: 'https://sub.test/r/rs_r_classical.list' } });
   });
 

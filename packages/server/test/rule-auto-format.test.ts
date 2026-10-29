@@ -68,11 +68,11 @@ describe('自动格式贯通预览、保存与下载', () => {
       ] };
       const merged = await c.post('/api/rulesets/preview', { ruleset });
       expect(merged.status).toBe(200);
-      expect(merged.json.lines).toEqual(['DOMAIN,good.test']);
-      expect(merged.json.sources[0]).toMatchObject({ ok: false, error: expect.stringContaining('无法解析') });
+      expect(merged.json.lines).toEqual([expect.stringContaining('# [输入格式有误'), 'DOMAIN,good.test']);
+      expect(merged.json.sources[0]).toMatchObject({ ok: true, rejected: 1, rejectedDetails: [expect.objectContaining({ reason: expect.stringContaining('输入格式有误') })] });
       const selected = await c.post('/api/rulesets/preview', { ruleset, source: 'bad' });
       expect(selected.status).toBe(200);
-      expect(selected.json).toMatchObject({ lines: [], error: expect.stringContaining('无法解析') });
+      expect(selected.json).toMatchObject({ lines: [expect.stringContaining('# [输入格式有误')] });
     } finally { await h.snapshots.settled(); h.store.close(); }
   });
 

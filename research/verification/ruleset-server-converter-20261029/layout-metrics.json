@@ -1,0 +1,20 @@
+{
+  "before": {
+    "height": 420,
+    "lines": 111,
+    "scroll": 720,
+    "y": 440
+  },
+  "during": {
+    "height": 420,
+    "lines": 111,
+    "scroll": 720,
+    "y": 440
+  },
+  "after": {
+    "height": 420,
+    "lines": 111,
+    "scroll": 720,
+    "y": 440
+  }
+}

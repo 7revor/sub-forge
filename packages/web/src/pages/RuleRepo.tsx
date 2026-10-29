@@ -54,7 +54,7 @@ export function RuleRepoPage() {
         <div role="group" aria-label="仓库" className="flex flex-wrap gap-1.5">
           {[{ id: undefined, name: '全部仓库' }, ...(repos.data?.repos.filter(r => r.enabled) ?? [])].map((r) => (
             <button key={r.id ?? 'all'} type="button" aria-pressed={repo === r.id} onClick={() => setRepo(r.id)}
-              className={cx('h-9 cursor-pointer rounded-full border px-3.5 text-[13px]', repo === r.id ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink-2 hover:bg-ground')}>{r.name}</button>
+              className={cx('h-9 shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3.5 text-[13px]', repo === r.id ? 'border-accent bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink-2 hover:bg-ground')}>{r.name}</button>
           ))}
         </div>
       </div>
@@ -103,7 +103,7 @@ export function RuleRepoPage() {
                   <table className="w-full table-fixed border-collapse">
                     <thead><tr><th className={th}>文件</th><th className={cx(th, 'w-36')}>操作</th></tr></thead>
                     <tbody>{d.files.map(f => <tr key={JSON.stringify([f.ref, f.path])}>
-                      <td className={td}><a className="block break-all font-mono text-[12px] text-accent" href={f.upstream} target="_blank" rel="noreferrer">{f.path}</a><span className="break-all text-[11.5px] text-muted">分支：{f.ref}</span></td>
+                      <td className={td}><a className="block break-all font-mono text-[12px] text-accent" href={f.url} target="_blank" rel="noreferrer">{f.path}</a><span className="break-all text-[11.5px] text-muted">分支：{f.ref}</span></td>
                       <td className={td}><Button size="sm" variant="primary" disabled={use.isPending || detail.isFetching} onClick={() => use.mutate({ ref: f.ref, path: f.path })}>{use.isPending && use.variables?.ref === f.ref && use.variables.path === f.path ? '创建中…' : ruleset ? '加入规则集' : '新建规则集'}</Button></td>
                     </tr>)}</tbody>
                   </table>

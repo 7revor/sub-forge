@@ -1,3 +1,4 @@
+import { ruleConversionRoutes } from './rule-conversion.ts';
 // 管理接口入口：/api/*。所有接口都返回 JSON；错误格式为 { error, details? }。
 
 import { nodeProbeRoutes } from './node-probe.ts';
@@ -52,6 +53,7 @@ export function createApi(deps: ApiDeps) {
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
   api.route('/', templateRoutes(deps.store, deps.renderer, deps.snapshots));
   api.route('/', profileRoutes(deps.store, deps.renderer, deps.publicUrl));
+  api.route('/', ruleConversionRoutes(deps.store, deps.snapshots));
   api.route('/', previewRoutes(deps.store, deps.renderer, deps.snapshots));
   api.route('/', docRoutes(deps.store));
   return api;

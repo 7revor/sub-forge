@@ -77,7 +77,9 @@ export class SnapshotService {
     const running = this.inflight.get(key);
     if (running) return running;
     const p = (async () => {
-      const fetchedAt = this.now();
+      // 同毫秒内重试相同正文会 touch 旧记录，时间必须晚于失败记录才能解除退避。
+      const previous = this.store.latestSnapshot(kind, id, url, false);
+      const fetchedAt = Math.max(this.now(), (previous?.fetchedAt ?? -1) + 1);
       try {
         const { format, ...fetchOpts } = opts;
         const res = await this.fetcher(url, fetchOpts);
@@ -99,8 +101,14 @@ export class SnapshotService {
     return p;
   }
 
-  async get(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions & { ttlSec: number }): Promise<SnapshotResult> {
+  async get(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions & { ttlSec: number }, policy: { waitForFresh?: boolean; refresh?: boolean } = {}): Promise<SnapshotResult> {
     const latest = this.store.latestSnapshot(kind, id, url);
+    const refreshed = async (): Promise<SnapshotResult> => {
+      const row = await this.refresh(kind, id, url, opts);
+      return row.ok ? { snapshot: row, stale: false } : { snapshot: latest, stale: !!latest, error: row.error };
+    };
+    // 编辑器显式重试绕过退避；仍复用同一在途请求和正式快照写入。
+    if (policy.refresh) return refreshed();
     const lastFailure = this.store.latestSnapshot(kind, id, url, false);
     const failure = lastFailure && !lastFailure.ok && (!latest || lastFailure.fetchedAt >= latest.fetchedAt) ? lastFailure : undefined;
     const ttlSec = Math.max(opts.ttlSec, MIN_TTL_SEC);
@@ -112,6 +120,7 @@ export class SnapshotService {
     }
     const stale = this.now() - latest.fetchedAt > ttlSec * 1000;
     if (stale && !backoff) {
+      if (policy.waitForFresh) return refreshed();
       const p = this.refresh(kind, id, url, opts);
       this.background.add(p);
       void p.finally(() => this.background.delete(p));
@@ -131,6 +140,16 @@ export class SnapshotService {
       return unusable ? { error: unusable } : { body: res.body };
     } catch (e) {
       return { error: (e as Error).message };
+    }
+  }
+
+  /** 编辑器读取原文：即使格式暂不支持也保留正文，诊断由解析层负责；不落正式快照。 */
+  async peekRuleContent(url: string, opts: FetchOptions = {}): Promise<{ body?: string; error?: string }> {
+    try {
+      const result = await this.fetcher(url, opts);
+      return { body: result.body };
+    } catch (cause) {
+      return { error: cause instanceof Error ? cause.message : String(cause) };
     }
   }
 

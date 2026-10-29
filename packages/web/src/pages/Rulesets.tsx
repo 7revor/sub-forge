@@ -1,18 +1,16 @@
 import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { RuleSetPicker } from '../components/RuleSetPicker.tsx';
-import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
-import { CodePreview } from '../components/CodePreview.tsx';
+import { useRulesetSources } from '../hooks/useRulesetSources.ts';
+import { RulesetPreview } from '../components/RulesetPreview.tsx';
 import { CopyButton } from '../components/CopyButton.tsx';
 import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { Client, Platform } from '@sub-forge/core';
 import { FileText, Globe, Link2, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { api, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
+import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
@@ -51,13 +49,6 @@ const newRemote = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'remote', f
 const EMPTY_RS: RuleSetDoc = { id: '', name: '', sources: [] };
 const sourceActionClass = buttonClass('default', 'md', 'w-full min-w-0 whitespace-normal max-sm:gap-1.5 max-sm:px-2 max-sm:text-[12px]');
 
-const TARGETS: { key: string; client: Client; platform?: Platform; label: string }[] = [
-  { key: 'mihomo', client: 'mihomo', label: 'mihomo' },
-  { key: 'mihomo-android', client: 'mihomo', platform: 'android', label: 'mihomo Android' },
-  { key: 'surge-macos', client: 'surge', platform: 'macos', label: 'Surge macOS' },
-  { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
-];
-
 function rulesetError(d: RuleSetDoc): string | undefined {
   if (!d.name.trim()) return '请填写名称。';
   if (!d.sources.length) return '至少添加一个来源。';
@@ -71,26 +62,15 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 /** 规则集（设计稿「规则集」）：来源 → 客户端改写（整个规则集）→ 输出预览，每块独占一行 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
-  const [target, setTarget] = useState('mihomo');
   const [selected, setSelected] = useState<string | undefined>();
-  const t = TARGETS.find((x) => x.key === target)!;
-  const draft = useDebouncedValue(e.draft, 400);
-  const preview = useQuery({
-    queryKey: ['ruleset-preview', e.isNew ? '' : e.id, target, selected, JSON.stringify(draft)],
-    enabled: !!draft && (!selected || draft.sources.some((s) => s.id === selected)),
-    queryFn: () => api<RulesetPreview>('POST', '/rulesets/preview', {
-      ...(e.isNew ? {} : { id: e.id }), ruleset: draft,
-      ...(selected ? { source: selected } : {}),
-      client: t.client, ...(t.platform ? { platform: t.platform } : {}),
-    }),
-  });
+  const sources = useRulesetSources(e.isNew ? undefined : e.id, e.draft, selected);
   if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const selectedSource = d.sources.find((s) => s.id === selected);
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
   const setSource = (id: string, p: Partial<RuleSetSourceDoc>) => set({ sources: d.sources.map((s) => (s.id === id ? { ...s, ...p } : s)) });
   const add = (src: RuleSetSourceDoc) => { set({ sources: [...d.sources, src] }); setSelected(src.id); };
-  const status = new Map((preview.data?.sources ?? []).map((s) => [s.id, s]));
+  const status = sources.statuses;
   const failing = d.sources.filter((s) => s.kind === 'remote' && status.get(s.id)?.error).length;
   const error = rulesetError(d);
 
@@ -127,7 +107,7 @@ export function RulesetEdit() {
           </div>
           {!!d.sources.length && (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
-              <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
+              <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={sources.loading.has(s.id)}
                 onSelect={() => setSelected(s.id === selected ? undefined : s.id)}
                 onChange={(p) => setSource(s.id, p)}
                 onDelete={() => { set({ sources: d.sources.filter((x) => x.id !== s.id) }); if (s.id === selected) setSelected(undefined); }} />
@@ -143,15 +123,8 @@ export function RulesetEdit() {
 
       <Card className="min-w-0" title={selectedSource ? `来源预览 · ${sourceLabel(selectedSource)}` : '合并结果（只读）'}
         actions={selectedSource && <Button onClick={() => setSelected(undefined)}>查看合并结果</Button>}>
-        <div className="flex flex-col gap-3">
-          <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
-            {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
-              className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
-          </div>
-          {preview.data?.stats && <MergedStats stats={preview.data.stats} />}
-          <PreviewBody preview={preview} />
-          {!!preview.data?.passthroughSources?.length && <span className="text-[12.5px] text-muted">另有 {preview.data.passthroughSources.map((p) => `「${p.name}」`).join('')}以透传方式单独输出。</span>}
-        </div>
+        <RulesetPreview key={e.id} inputs={sources.inputs} ready={sources.ready} sourceId={selected} sourceReading={sources.reading} onRefreshSources={sources.refresh}
+          overrides={d.overrides} noResolve={d.noResolve} sourceError={sources.error} sourceNames={Object.fromEntries(d.sources.map(s => [s.id, sourceLabel(s)]))} />
       </Card>
     </DetailShell>
   );
@@ -221,38 +194,6 @@ function SourceStatus({ src, status, loading }: { src: RuleSetSourceDoc; status?
   if (status.rules === undefined) return null;
   if (status.rejected) return <RejectedRulesPopover sourceName={sourceLabel(src)} status={status} />;
   return <Badge>{status.rules} 条</Badge>;
-}
-
-function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-3 gap-2">
-        {(['domain', 'classical', 'ipcidr'] as const).map((b) => <div key={b} className="flex flex-col gap-0.5 rounded-lg bg-ground p-2.5"><span className="font-mono text-[11.5px] text-muted">{b}</span><span className="text-xl font-semibold">{stats[b]}</span></div>)}
-      </div>
-      <span className="text-[12.5px] text-ink-2">来源与改写共 {stats.total} 条，去重 {stats.duplicates} 条，输出 {stats.total - stats.duplicates} 条</span>
-    </div>
-  );
-}
-
-function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
-  if (preview.error) return <ErrorAlert error={preview.error} />;
-  const p = preview.data;
-  if (!p) return <div className="text-[13px] text-muted">加载中…</div>;
-  if (p.delivery?.mode === 'unsupported') return <FieldError error={p.delivery.reason} />;
-  if (p.passthrough) return <Empty title="该来源为二进制透传" description="由客户端直接读取，无法在此展示文本规则。" />;
-  return (
-    <>
-      {p.delivery && <span className="text-[12.5px] text-muted">{p.delivery.mode === 'original'
-        ? `下载时使用原始来源 · ${p.delivery.format} / ${p.delivery.behavior}`
-        : '下载时转换为 .list · classical 文本'}</span>}
-      {p.error && <FieldError error={p.error} />}
-      {p.lines.length ? <CodePreview text={p.lines.join('\n')} loading={preview.isFetching} bodyClassName="min-h-[120px]" /> : <Empty title="没有可输出的规则" />}
-      <span className="text-[12px] text-muted">{p.total ?? p.lines.length} 行{(p.total ?? 0) > p.lines.length ? `（显示前 ${p.lines.length} 行）` : ''} · 降级 {p.notes?.length ?? 0} · 丢弃 {p.dropped.length} · 无法解析 {p.rejected.length}</span>
-      {[...(p.notes ?? []).map((n) => ['降级', n]), ...p.dropped.map((x) => ['丢弃', x.reason]), ...p.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].slice(0, 50).map(([k, v], i) => (
-        <div key={i} className="flex gap-2 text-[12.5px]"><Badge tone={k === '降级' ? 'accent' : k === '丢弃' ? 'err' : 'warn'}>{k}</Badge><span className="min-w-0 break-all">{v}</span></div>
-      ))}
-    </>
-  );
 }
 
 function LocalContentInput({ format, ...props }: React.ComponentProps<typeof YamlTextarea> & { format?: string }) {

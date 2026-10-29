@@ -1,3 +1,4 @@
+import type { RuleDocument } from './convert.ts';
 // 预览与实际下载共用输出决策，不能因直连而跳过合并、改写或规则级选项。
 import type { RuleSet, RuleEntry } from '../types.ts';
 import { composeRule, lowerRule, type ClientCtx } from './client.ts';
@@ -9,7 +10,7 @@ export type RuleSetDelivery =
   | { mode: 'managed'; format: 'text'; behavior: 'classical' }
   | { mode: 'unsupported'; reason: string };
 
-export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientCtx, options?: RuleEntry['options']): RuleSetDelivery {
+export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientCtx, options?: RuleEntry['options'], prepared?: ReadonlyMap<string, RuleDocument>): RuleSetDelivery {
   const managed: RuleSetDelivery = { mode: 'managed', format: 'text', behavior: 'classical' };
   const sources = rs.sources.filter(s => s.enabled !== false);
   const binary = sources.some(s => s.format === 'mrs' || s.format === 'srs');
@@ -28,7 +29,11 @@ export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientC
   }
   const body = inputs.snapshots[sourceKey(rs.id, src.id)];
   if (body === undefined) return managed;
-  const parsed = parseRuleSourceContent(body, src);
+  const document = prepared?.get(src.id);
+  const parsed = document ? {
+    passthrough: document.passthrough, format: document.format, behavior: document.behavior ?? 'classical',
+    rules: document.rows.flatMap(row => row.parsed ? [row.parsed] : []), rejected: document.diagnostics,
+  } : parseRuleSourceContent(body, src);
   if (parsed.passthrough || !parsed.rules.length || parsed.rejected.length) return managed;
   if (parsed.format === 'yaml' && ctx.client !== 'mihomo') return managed;
   if (parsed.behavior === 'ipcidr' && ctx.client !== 'mihomo') return managed;

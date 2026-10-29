@@ -62,7 +62,7 @@ describe('远程规则快照有效性', () => {
   it('部分行无法解析仍保留有效规则，并允许之后恢复正常更新', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test\nUNKNOWN,value');
     const before = await h.renderer.render('p', { client: 'mihomo' });
-    expect(before.ok && before.render.rulesets['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n');
+    expect(before.ok && before.render.rulesets['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n# [本系统暂未支持解析：不支持的规则类型 UNKNOWN] UNKNOWN,value\n');
     expect(before.report).toContainEqual(expect.objectContaining({ code: 'ruleset.rejected-lines' }));
     expect((await h.refresh('<html>error</html>')).ok).toBe(false);
     expect((await h.refresh('DOMAIN,recovered.example.test')).ok).toBe(true);
