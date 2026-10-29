@@ -12,9 +12,10 @@ import { useMe } from './hooks.ts';
 
 type NavItem = { to: string; label: string; admin?: boolean; end?: boolean };
 const NAV: { title?: string; items: NavItem[] }[] = [
-  { items: [{ to: '/', label: '总览' }, { to: '/profiles', label: '配置订阅' }] },
-  { title: '节点', items: [{ to: '/sources', label: '订阅源' }, { to: '/collections', label: '组合' }, { to: '/locals', label: '本地节点' }] },
-  { title: '规则', items: [{ to: '/rulesets', label: '规则集' }, { to: '/rule-repo', label: '规则仓库' }, { to: '/templates', label: '模板', admin: true, end: true }] },
+  { items: [{ to: '/', label: '总览' }, { to: '/profiles', label: '订阅' }] },
+  { title: '节点', items: [{ to: '/sources', label: '订阅' }, { to: '/locals', label: '本地' }, { to: '/collections', label: '组合' }] },
+  { title: '规则', items: [{ to: '/rule-repo', label: '规则仓库' }, { to: '/rulesets', label: '规则集增强' }] },
+  { title: '模板', items: [{ to: '/templates', label: '模板', admin: true, end: true }] },
   { title: '管理员', items: [{ to: '/presets', label: '基础设置预设', admin: true }, { to: '/users', label: '用户', admin: true }, { to: '/system', label: '系统', admin: true }] },
 ];
 
