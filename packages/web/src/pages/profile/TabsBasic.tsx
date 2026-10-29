@@ -224,8 +224,8 @@ export function TabNodeSets() {
       <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">已加入的节点集</h2><span className="text-[12.5px] text-muted">默认按源输出 provider，面板中可按源查看、分别更新。代理链和被引用的单个节点不用在这里添加，系统会自动解析。</span></div>}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="overflow-x-auto">
         {!draft.nodeSets.length ? <div className="px-4 pb-4 text-[13px] text-muted">还没有节点集。点击「添加节点集」选择订阅源、组合或本地节点组。</div> : (
-          <table className="w-full min-w-[640px] border-collapse">
-            <thead><tr><th className={th}>节点集</th><th className={th}>类型</th><th className={th}>节点</th><th className={th}>输出方式</th><th className={th}>备注</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
+          <table className="w-full min-w-[820px] border-collapse">
+            <thead><tr><th className={th}>节点集</th><th className={th}>类型</th><th className={th}>节点</th><th className={th}>输出方式</th><th className={th}>下发地址</th><th className={th}>备注</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
             <tbody>
               {draft.nodeSets.map((n, i) => (
                 <tr key={`${n.ref.type}:${n.ref.id}`}>
@@ -233,6 +233,7 @@ export function TabNodeSets() {
                   <td className={cx(td, 'text-ink-2')}>{NS_KIND[n.ref.type]}</td>
                   <td className={td}><NodeSetCount refId={n.ref} /></td>
                   <td className={td}><Segmented label="输出方式" size="sm" value={n.output} options={[{ value: 'provider', label: 'provider' }, { value: 'inline', label: 'inline' }]} onChange={(output) => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => (j === i ? { ...x, output } : x)) })} /></td>
+                  <td className={cx(td, 'font-mono text-[12px] text-muted')} title="实际地址带内容版本 ?v=，以「预览」中的配置为准">{n.output === 'inline' ? '内联，无单独地址' : `/p/<token>/${n.providerName ?? nodeSetName(n.ref)}`}</td>
                   <td className={cx(td, 'text-[12.5px] text-muted')}>{chained.has(`${n.ref.type}:${n.ref.id}`) ? '有链规则 · Profile 专属 provider' : '—'}</td>
                   <td className={cx(td, 'text-right')}><Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button></td>
                 </tr>

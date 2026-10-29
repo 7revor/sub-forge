@@ -62,6 +62,7 @@ export function PresetEdit() {
   const profiles = useList('profiles');
   const [rawValid, setRawValid] = useState(true);
   const [mode, setMode] = useState<EditorMode>('form');
+  const [client, setClient] = useState<'mihomo' | 'surge'>('mihomo');
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState(false);
   if (e.isNew) return <Navigate to="/presets" replace />;
@@ -96,19 +97,20 @@ export function PresetEdit() {
           <div className="flex flex-wrap items-center justify-between gap-2.5">
             <h2 className="m-0 text-[17px] font-semibold">{d.name}</h2>
             <div className="flex items-center gap-2">
-              <Segmented label="客户端" value="mihomo" options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge', disabled: true, title: 'Surge 段在 M2 提供' }]} onChange={() => {}} />
+              <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
               <DeleteMenu what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove}
                 extra={[{ label: '重命名…', onSelect: () => setRenaming(true) }]} />
             </div>
           </div>
-          {mode === 'form' && <div className="flex flex-wrap gap-1.5">
+          {client === 'surge' && <div className="rounded-lg border border-dashed border-[#d5d9e0] px-4 py-6 text-center text-[13px] text-muted">Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。</div>}
+          {client === 'mihomo' && mode === 'form' && <div className="flex flex-wrap gap-1.5">
             {mihomoBaseGroups.map((g) => <button key={g.title} type="button" onClick={() => jump(g.title)}
               className="cursor-pointer rounded-full border border-line bg-ground px-2.5 py-1 text-[12.5px] text-ink-2 hover:border-[#c5cad3]">{g.title}</button>)}
           </div>}
-          <DualEditor key={d.id} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
+          {client === 'mihomo' && <DualEditor key={d.id} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
             toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} onValidityChange={setRawValid} rawLabel="mihomo · YAML"
             renderForm={() => <SchemaForm groups={mihomoBaseGroups} value={baseToForm(d.mihomo)} extra
-              onChange={(value) => e.setDraft({ ...d, mihomo: baseFromForm(value, d.mihomo) })} />} />
+              onChange={(value) => e.setDraft({ ...d, mihomo: baseFromForm(value, d.mihomo) })} />} />}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-2 pt-3.5">
             <span className={cx('text-[12.5px]', rawValid ? 'text-ok' : 'text-err')}>{rawValid ? (dirty ? `有未发布的修改 · 当前 v${d.version}` : `已发布 v${d.version}`) : '请先修复 YAML 中的错误'}</span>
             <div className="flex gap-2">

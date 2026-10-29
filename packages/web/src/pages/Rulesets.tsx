@@ -146,6 +146,12 @@ export function RulesetEdit() {
         </div>
       )}
       {!e.isNew && <RulesetOverrides value={d.overrides ?? []} onChange={(overrides) => set({ overrides })} />}
+      {!e.isNew && <Card title="下载地址">
+        <div className="flex flex-col gap-2">
+          {[`/r/<token>/${d.name}?target=mihomo&behavior=${d.behavior ?? 'classical'}`, `/r/<token>/${d.name}?target=surge`].map((u) => <code key={u} className="truncate rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px]">{u}</code>)}
+          <span className="text-[12px] leading-relaxed text-muted">规则集随引用它的配置订阅下发，<span className="font-mono">&lt;token&gt;</span> 是该订阅链接的 token，实际地址以配置订阅「预览」为准。无改写且格式兼容时直接引用上游 URL（P1）；Surge 在 M2。</span>
+        </div>
+      </Card>}
       <Modal title="编辑来源" open={editing} onClose={() => setEditing(false)} wide footer={<Button variant="primary" onClick={() => setEditing(false)}>完成</Button>}>
         <SourceFields d={d} set={set} />
         <span className="text-[12px] text-muted">改动在页面右上角「保存」后生效。</span>
