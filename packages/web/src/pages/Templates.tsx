@@ -65,6 +65,37 @@ export function TemplateList() {
   );
 }
 
+/** 模板管理（管理员）：所有模板的列表，进入编辑器或新建 */
+export function TemplateManage() {
+  const list = useTemplates();
+  const profiles = useList('profiles');
+  return (
+    <>
+      <PageHeader title="模板管理" subtitle="发布新版本后，跟随最新的配置订阅在客户端下次刷新时采用新模板。发布前会逐个试渲染检查影响。"
+        actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
+      <ErrorBox error={list.error} />
+      <Card bodyClass="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse">
+          <thead><tr><th className={th}>模板</th><th className={th}>版本</th><th className={th}>策略组</th><th className={th}>规则</th><th className={th}>你的配置订阅在用</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
+          <tbody>
+            {(list.data ?? []).map((t) => (
+              <tr key={t.id}>
+                <td className={cx(td, 'font-medium')}><Link to={`/templates/${t.id}`} className="text-ink no-underline hover:text-accent">{t.name ?? t.id}</Link></td>
+                <td className={cx(td, 'font-mono')}>v{t.version}</td>
+                <td className={cx(td, 'font-mono')}>{t.groups.length}</td>
+                <td className={cx(td, 'font-mono')}>{t.rules.length}</td>
+                <td className={cx(td, 'font-mono')}>{(profiles.data ?? []).filter((p) => p.template?.id === t.id).length}</td>
+                <td className={cx(td, 'text-right whitespace-nowrap')}><Link to={`/templates/${t.id}`} className={buttonClass('default', 'sm')}>编辑</Link> <Link to={`/templates/${t.id}/publish`} className={buttonClass('default', 'sm')}>发布</Link></td>
+              </tr>
+            ))}
+            {!list.data?.length && <tr><td colSpan={6} className={cx(td, 'text-muted')}>还没有模板。</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+    </>
+  );
+}
+
 const RULE_PREVIEW = 8;
 
 /** 模板详情：头部卡片、策略组骨架、规则（默认显示前几条）、版本记录与对比 */
@@ -239,7 +270,7 @@ function TemplatePage({ id }: { id: string }) {
   const blocking = (impact?.impact ?? []).filter((i) => i.level === 'error');
   const warnings = (impact?.impact ?? []).filter((i) => i.level === 'warn');
   const canPublish = ready && !errors.length && !!name.trim() && !publish.isPending && (!blocking.length || confirmed);
-  const crumbs = <><Link to="/templates" className="text-muted no-underline">模板管理</Link> / {isNew ? '新建' : <Link to={`/templates/${id}`} className="text-muted no-underline">{t?.name ?? id}</Link>}{tab === 'publish' ? ' / 发布' : ''}</>;
+  const crumbs = <><Link to="/templates/manage" className="text-muted no-underline">模板管理</Link> / {isNew ? '新建' : <Link to={`/templates/${id}`} className="text-muted no-underline">{t?.name ?? id}</Link>}{tab === 'publish' ? ' / 发布' : ''}</>;
 
   if (tab === 'publish') {
     const diff = published ? templateDiff(published, body) : undefined;

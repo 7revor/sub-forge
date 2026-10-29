@@ -5,6 +5,7 @@ import type { RenderService } from '../render.ts';
 import type { SnapshotService } from '../snapshots.ts';
 import type { Store } from '../store.ts';
 import { authRoutes } from './auth.ts';
+import { pendingRoutes } from './pending.ts';
 import { docRoutes } from './docs.ts';
 import { previewRoutes } from './preview.ts';
 import { profileRoutes } from './profiles.ts';
@@ -33,6 +34,8 @@ export function createApi(deps: ApiDeps) {
   });
   api.use('*', csrfGuard(() => deps.allowedOrigins));
   api.use('*', sessionLoader(deps.store));
+  // 占位接口先于 /users/:id 等通配路由注册
+  api.route('/', pendingRoutes());
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
   api.route('/', templateRoutes(deps.store, deps.renderer));
   api.route('/', profileRoutes(deps.store, deps.renderer, deps.publicUrl));

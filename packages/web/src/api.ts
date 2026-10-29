@@ -44,3 +44,17 @@ export type DependencyEntry = { refKey: string; nodeSet: string; node: string; s
 export type ProfilePreview = { ok: boolean; yaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
 export type RulesetPreview = { passthrough: boolean; lines: string[]; dropped: { rule: string; reason: string }[]; notes?: string[]; rejected: { line: number; text: string; reason: string }[]; error?: string };
+
+// ---------- 服务端尚未实现的接口（读接口返回空数据并带 pending，写接口返回 501；见 docs/11） ----------
+export type Pending = { pending?: boolean };
+export type UserStats = Pending & { items: Record<string, { profiles: number; sources: number; lastRequestAt?: number }> };
+export type Share = { id: string; kind: 'source' | 'collection'; docId: string; name: string; to: string[] };
+export type RuleRepo = { id: string; name: string; url: string; builtIn: boolean; entries?: number; builtAt?: number; error?: string };
+export type RepoEntry = { repo: string; path: string; name: string; count: number; behavior?: string };
+export type RepoEntryDetail = RepoEntry & { license?: string; updatedAt?: number; variants: { client: string; file: string; how: string }[]; preview: string[] };
+export type SystemInfo = Pending & {
+  ssrfAllow: { value: string; note?: string }[];
+  verify: { enabled: boolean; version?: string; checks24h?: number; fails24h?: number } | null;
+  mirror: string;
+  lastBackup: { at: number; size: number } | null;
+};

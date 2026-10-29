@@ -215,3 +215,8 @@ export function formatBytes(n?: number): string {
   while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
   return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${u[i]}`;
 }
+
+/** 服务端尚未实现的功能：界面已就位，操作会被服务端拒绝（501） */
+export function PendingNotice({ children }: { children: ReactNode }) {
+  return <div role="note" className="rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-4 py-3 text-[12.5px] leading-relaxed text-muted"><b className="font-medium text-ink-2">服务端尚未实现：</b>{children}</div>;
+}

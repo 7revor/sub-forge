@@ -15,7 +15,9 @@ import { ProfileDetail } from './pages/profile/ProfileDetail.tsx';
 import { ProfileList, ProfileNew } from './pages/profile/ProfileList.tsx';
 import { BundleEdit, BundleList, RulesetEdit, RulesetList } from './pages/Rulesets.tsx';
 import { SourceEdit, SourceList } from './pages/Sources.tsx';
-import { TemplateEdit, TemplateList } from './pages/Templates.tsx';
+import { TemplateEdit, TemplateList, TemplateManage } from './pages/Templates.tsx';
+import { RuleRepoPage } from './pages/RuleRepo.tsx';
+import { System } from './pages/System.tsx';
 import { Users } from './pages/Users.tsx';
 
 const queryClient = new QueryClient({
@@ -47,7 +49,10 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="bundles" element={<BundleList />} />
       <Route path="bundles/:id" element={<BundleEdit />} />
       <Route path="templates" element={<TemplateList />} />
+      <Route path="templates/manage" element={<RequireAdmin><TemplateManage /></RequireAdmin>} />
       <Route path="templates/:id/:tab?" element={<TemplateEdit />} />
+      <Route path="rule-repo" element={<RuleRepoPage />} />
+      <Route path="system" element={<RequireAdmin><System /></RequireAdmin>} />
       <Route path="presets" element={<RequireAdmin><PresetList /></RequireAdmin>} />
       <Route path="presets/:id" element={<RequireAdmin><PresetEdit /></RequireAdmin>} />
       <Route path="users" element={<RequireAdmin><Users /></RequireAdmin>} />
