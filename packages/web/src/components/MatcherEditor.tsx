@@ -24,7 +24,7 @@ export function MatcherEditor({ value, onChange, rulesets, ruleValue, onRuleChan
   };
   return <>
     {!fixedKind && <Field label="匹配项类型">{(id) => <Select id={id} value={selectedKind} onChange={(event) => changeKind(event.target.value)}>
-      <option value="rule">单条规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
+      <option value="rule">静态规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
     </Select>}</Field>}
     {value.kind === 'rule' ? <RuleEditor value={ruleValue ?? value.rule} onChange={changeRule} />
       : value.remote ? <Field label="远程 URL">{id => <RemoteRulePicker id={id} value={value.remote!.url} label={value.remote!.url || '填写远程 URL'} onSelect={onChange} />}</Field>

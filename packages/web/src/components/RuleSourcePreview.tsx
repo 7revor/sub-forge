@@ -19,7 +19,7 @@ export function RuleSourcePreview({ matcher, onClose }: { matcher: Matcher; onCl
     {!single && preview.error ? <div className="flex flex-col items-start gap-3">
       <FieldError error={preview.error} /><Button size="sm" disabled={preview.isFetching} onClick={() => void preview.refetch()}>重新读取</Button>
     </div> : <>
-      <span className="break-all text-[12.5px] text-muted">{single ? '单条规则' : loading ? '正在读取规则源文件…' : `${preview.data!.sources > 1 ? `合并源文件 · ${preview.data!.sources} 个来源` : '源文件'} · ${preview.data!.name}`}</span>
+      <span className="break-all text-[12.5px] text-muted">{single ? '静态规则' : loading ? '正在读取规则源文件…' : `${preview.data!.sources > 1 ? `合并源文件 · ${preview.data!.sources} 个来源` : '源文件'} · ${preview.data!.name}`}</span>
       <CodePreview label="完整规则源文件" text={text} loading={loading} lineNumbers copyable={!loading} bodyClassName="h-[420px]" />
       {!loading && !text && <span className="text-[12.5px] text-muted">源文件为空</span>}
     </>}

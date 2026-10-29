@@ -1,4 +1,4 @@
-// 系统（设计稿「管理员 · 系统」）：SSRF 白名单、mihomo 配置校验、规则仓库、备份与恢复。
+// 系统（设计稿「管理员 · 系统」）：SSRF 白名单、mihomo 配置校验、规则集合、备份与恢复。
 // 服务端尚未实现：读接口返回空数据并带 pending，保存、导出、恢复返回 501。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,7 +25,7 @@ export function System() {
   return (
     <>
       <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
-      {info.data?.pending && <PendingNotice>系统设置暂不可用；仓库与索引请前往规则仓库管理。</PendingNotice>}
+      {info.data?.pending && <PendingNotice>系统设置暂不可用；仓库与索引请前往规则集合管理。</PendingNotice>}
       <ErrorAlert error={save.error} />
 
       <PageScroll>
@@ -63,9 +63,9 @@ export function System() {
           </div>
 
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
-            <Card title="规则仓库">
+            <Card title="规则集合">
               <div className="flex flex-col gap-3">
-                <Link to="/rule-repo" className="text-[13px] text-accent">前往规则仓库管理仓库与索引 →</Link>
+                <Link to="/rule-repo" className="text-[13px] text-accent">前往规则集合管理仓库与索引 →</Link>
               </div>
             </Card>
 

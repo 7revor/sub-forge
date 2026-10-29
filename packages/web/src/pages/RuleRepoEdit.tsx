@@ -13,7 +13,7 @@ export function RuleRepoEditorPage() {
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: !!id,
     refetchOnMount: 'always', refetchInterval: query => query.state.data?.repos.some(r => r.id === id && r.indexing) ? 3000 : false });
   if (id && (repos.isPending || repos.error || !repos.data?.repos.some(r => r.id === id))) return <>
-    <PageHeader title="编辑仓库" crumbs={<Link to={`/rule-repo${search}`} className="text-muted hover:text-accent">规则仓库</Link>} />
+    <PageHeader title="编辑仓库" crumbs={<Link to={`/rule-repo${search}`} className="text-muted hover:text-accent">规则集合</Link>} />
     {repos.error ? <ErrorAlert error={repos.error} /> : <div className="text-muted">{repos.isPending ? '加载中…' : '仓库不存在或已删除。'}</div>}
   </>;
   return <RepositoryForm key={id ?? 'new'} repo={repos.data?.repos.find(r => r.id === id)} />;
@@ -48,7 +48,7 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
   const updateLocation = (id: number, patch: Partial<RepoLocation>) => setLocations(locations.map(l => l.id === id ? { ...l, ...patch } : l));
   return <>
     <PageHeader title={repo ? '编辑仓库' : '新增仓库'} subtitle={repo?.name}
-      crumbs={<><Link to={back} className="text-muted hover:text-accent">规则仓库</Link> / {repo ? '编辑' : '新增'}</>}
+      crumbs={<><Link to={back} className="text-muted hover:text-accent">规则集合</Link> / {repo ? '编辑' : '新增'}</>}
       actions={<><Button disabled={save.isPending} onClick={() => navigate(back)}>返回列表</Button><Button variant="primary" disabled={!canSave} onClick={submit}>{save.isPending ? '保存中…' : repo ? (repo.enabled ? '保存并更新索引' : '保存配置') : '添加并建立索引'}</Button></>} />
     {blocker.state === 'blocked' && <section role="alert" aria-label="未保存修改" className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-panel p-3">
       <span className="text-[13px]">有未保存的修改，请选择如何离开。</span><div className="flex flex-wrap gap-2">
