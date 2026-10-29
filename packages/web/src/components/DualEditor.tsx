@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, ErrorBox, Textarea } from './ui.tsx';
+import { Button, ErrorBox, Segmented, Textarea } from './ui.tsx';
 
 export type EditorMode = 'form' | 'raw';
 export type RawResult<T> = { ok: true; value: T; notes?: string[] } | { ok: false; error: string; line?: number };
@@ -56,10 +56,10 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, raw
     onModeChange?.(next);
   };
   return <div className="flex flex-col gap-3">
-    <div className="flex items-center gap-2" role="group" aria-label="编辑视图">
-      <Button aria-pressed={current === 'form'} variant={current === 'form' ? 'primary' : 'default'} size="sm" disabled={current === 'raw' && !!error} title={error ? '请先修复原始配置中的错误' : undefined} onClick={() => changeMode('form')}>表单</Button>
-      <Button aria-pressed={current === 'raw'} variant={current === 'raw' ? 'primary' : 'default'} size="sm" onClick={() => changeMode('raw')}>原始配置</Button>
-    </div>
+    <Segmented label="编辑视图" size="sm" value={current} onChange={changeMode} options={[
+      { value: 'form', label: '表单', disabled: current === 'raw' && !!error, ...(error ? { title: '请先修复原始配置中的错误' } : {}) },
+      { value: 'raw', label: '原始配置' },
+    ]} />
     <ErrorBox error={rawError} />
     {current === 'form' ? renderForm() : <>
       <div className="flex items-center justify-between gap-2">

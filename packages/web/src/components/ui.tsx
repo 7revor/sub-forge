@@ -3,7 +3,27 @@
 import { useEffect, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { X } from 'lucide-react';
 
-export const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ');
+// 宽、高、字号类在同一元素上冲突时，以后传入的为准（Tailwind 按样式表顺序而非 class 顺序生效）
+const CONFLICT: [RegExp, string][] = [[/^w-/, 'w'], [/^h-/, 'h'], [/^text-(\[\d|xs$|sm$|base$|lg$|[2-9]?xl$)/, 'text-size']];
+const conflictKey = (c: string) => {
+  const i = c.lastIndexOf(':');
+  const util = c.slice(i + 1);
+  const hit = CONFLICT.find(([re]) => re.test(util));
+  return hit && c.slice(0, i + 1) + hit[1];
+};
+
+export const cx = (...xs: (string | false | null | undefined)[]) => {
+  const out: string[] = [];
+  const at = new Map<string, number>();
+  for (const c of xs.filter(Boolean).join(' ').split(/\s+/)) {
+    if (!c) continue;
+    const key = conflictKey(c);
+    if (key && at.has(key)) { out[at.get(key)!] = c; continue; }
+    if (key) at.set(key, out.length);
+    out.push(c);
+  }
+  return out.join(' ');
+};
 
 type BtnVariant = 'primary' | 'default' | 'danger' | 'ghost';
 const BTN: Record<BtnVariant, string> = {
@@ -81,16 +101,20 @@ export function Badge({ tone = 'neutral', children, className }: { tone?: Tone; 
   return <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] whitespace-nowrap', TONE[tone], className)}>{children}</span>;
 }
 
-export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+export function Segmented<T extends string>({ value, options, onChange, label, size = 'md' }: {
+  value: T; options: { value: T; label: string; disabled?: boolean; title?: string }[]; onChange: (v: T) => void; label: string; size?: 'sm' | 'md';
+}) {
   return (
-    <div role="group" aria-label={label} className="inline-flex rounded-lg bg-[#ebedf1] p-[3px]">
+    <div role="group" aria-label={label} className="inline-flex w-fit rounded-lg bg-[#ebedf1] p-[3px]">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           aria-pressed={o.value === value}
+          disabled={o.disabled}
+          title={o.title}
           onClick={() => onChange(o.value)}
-          className={cx('h-8 rounded-md px-3 text-[13px] cursor-pointer', o.value === value ? 'bg-panel font-medium shadow-[0_1px_2px_rgba(20,23,28,.08)]' : 'text-ink-2')}
+          className={cx('rounded-md px-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', size === 'sm' ? 'h-[30px] text-[12.5px]' : 'h-8 text-[13px]', o.value === value ? 'bg-panel font-medium shadow-[0_1px_2px_rgba(20,23,28,.08)]' : 'text-ink-2')}
         >
           {o.label}
         </button>
@@ -108,14 +132,17 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
-export function PageHeader({ title, crumbs, actions, children }: { title: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
+export function PageHeader({ title, subtitle, crumbs, actions, children }: { title: ReactNode; subtitle?: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
   return (
     <div className="flex flex-col gap-2.5">
       {crumbs && <div className="text-[12.5px] text-muted">{crumbs}</div>}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="m-0 text-2xl font-semibold tracking-tight">{title}</h1>
-          {children}
+      <div className={cx('flex flex-wrap justify-between gap-3', subtitle ? 'items-end' : 'items-center')}>
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="m-0 text-2xl font-semibold tracking-tight">{title}</h1>
+            {children}
+          </div>
+          {subtitle && <p className="m-0 text-[13.5px] text-muted">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>

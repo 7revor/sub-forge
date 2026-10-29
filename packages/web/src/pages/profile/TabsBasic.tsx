@@ -5,7 +5,7 @@ import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
 import { NodeSetSelect } from '../../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, formatTime, td, th } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
@@ -89,16 +89,16 @@ export function TabOverview() {
           <tbody>
             {(log.data ?? []).map((r, i) => (
               <tr key={i}>
-                <td className={`${td} font-mono text-[12.5px]`}>{formatTime(r.at)}</td>
-                <td className={`${td} font-medium`}>{r.client}{r.platform ? ` · ${r.platform}` : ''}</td>
-                <td className={`${td} max-w-[280px] truncate font-mono text-[12px] text-muted`}>{r.ua}</td>
+                <td className={cx(td, 'font-mono text-[12.5px]')}>{formatTime(r.at)}</td>
+                <td className={cx(td, 'font-medium')}>{r.client}{r.platform ? ` · ${r.platform}` : ''}</td>
+                <td className={cx(td, 'max-w-[280px] truncate font-mono text-[12px] text-muted')}>{r.ua}</td>
                 <td className={td}><Badge tone={r.status === 200 ? 'ok' : 'err'}>{r.status}</Badge></td>
-                <td className={`${td} font-mono text-[12.5px]`}>{r.ms} ms</td>
+                <td className={cx(td, 'font-mono text-[12.5px]')}>{r.ms} ms</td>
                 <td className={td}>{{ fresh: '新渲染', cache: '缓存', 'last-good': '上次成功结果', failed: '失败', unsupported: '不支持' }[r.source] ?? r.source}</td>
                 <td className={td}>{r.warnings ? <Badge tone="warn">{r.warnings}</Badge> : '0'}</td>
               </tr>
             ))}
-            {!log.data?.length && <tr><td className={`${td} text-muted`} colSpan={7}>还没有访问记录</td></tr>}
+            {!log.data?.length && <tr><td className={cx(td, 'text-muted')} colSpan={7}>还没有访问记录</td></tr>}
           </tbody>
         </table>
       </Card>
@@ -176,9 +176,9 @@ export function TabNodeSets() {
           <tbody>
             {draft.nodeSets.map((n, i) => (
               <tr key={`${n.ref.type}:${n.ref.id}`}>
-                <td className={`${td} font-medium`}>{nodeSetName(n.ref)} <span className="text-[12px] font-normal text-muted">{n.ref.type === 'source' ? '订阅源' : n.ref.type === 'collection' ? '组合' : '本地节点组'}</span></td>
+                <td className={cx(td, 'font-medium')}>{nodeSetName(n.ref)} <span className="text-[12px] font-normal text-muted">{n.ref.type === 'source' ? '订阅源' : n.ref.type === 'collection' ? '组合' : '本地节点组'}</span></td>
                 <td className={td}><Segmented label="输出方式" value={n.output} options={[{ value: 'provider', label: 'provider' }, { value: 'inline', label: 'inline' }]} onChange={(output) => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => (j === i ? { ...x, output } : x)) })} /></td>
-                <td className={`${td} text-right`}><Button size="sm" variant="ghost" aria-label="移除" onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button></td>
+                <td className={cx(td, 'text-right')}><Button size="sm" variant="ghost" aria-label="移除" onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button></td>
               </tr>
             ))}
           </tbody>

@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react';
 import { ExtraFields } from './ExtraFields.tsx';
 import { getPath, isRecord, otherFields, replaceOtherFields, setPath, type FieldGroup, type FieldSpec } from './schema.ts';
-import { Button, Card, Field, Input, Select, Textarea } from './ui.tsx';
+import { Button, Field, Input, Select, Textarea } from './ui.tsx';
 
-function FieldInput({ field, value, id, onChange }: {
+export function FieldInput({ field, value, id, onChange }: {
   field: FieldSpec; value: unknown; id: string; onChange: (value: unknown) => void;
 }) {
   if (field.type === 'bool' || field.type === 'enum') {
@@ -44,19 +45,27 @@ function FieldInput({ field, value, id, onChange }: {
     }} />;
 }
 
+/** 表单内的分区：嵌在卡片里使用，以分隔线区分，不再套一层卡片 */
+export function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="flex flex-col gap-3 border-t border-line-2 pt-3.5">
+    <h3 className="m-0 text-[13.5px] font-semibold">{title}</h3>
+    {children}
+  </section>;
+}
+
+export function SchemaField({ field, value, onChange }: { field: FieldSpec; value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) {
+  return <Field label={field.label} hint={[field.hint, field.clients?.join(' / ')].filter(Boolean).join(' · ')}>
+    {(id) => <FieldInput id={id} field={field} value={getPath(value, field.key)} onChange={(next) => onChange(setPath(value, field.key, next))} />}
+  </Field>;
+}
+
 export function SchemaForm({ groups, value, onChange, extra = false }: {
   groups: FieldGroup[]; value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void; extra?: boolean;
 }) {
   return <div className="flex flex-col gap-4">
-    {groups.map((group) => <Card key={group.title} title={group.title}>
-      <div className="flex flex-col gap-3">
-        {group.fields.filter((field) => !field.showIf || field.showIf(value)).map((field) => (
-          <Field key={field.key} label={field.label} hint={[field.hint, field.clients?.join(' / ')].filter(Boolean).join(' · ')}>
-            {(id) => <FieldInput id={id} field={field} value={getPath(value, field.key)} onChange={(next) => onChange(setPath(value, field.key, next))} />}
-          </Field>
-        ))}
-      </div>
-    </Card>)}
+    {groups.map((group) => <FormSection key={group.title} title={group.title}>
+      {group.fields.filter((field) => !field.showIf || field.showIf(value)).map((field) => <SchemaField key={field.key} field={field} value={value} onChange={onChange} />)}
+    </FormSection>)}
     {extra && <ExtraFields value={otherFields(value, groups)} onChange={(next) => onChange(replaceOtherFields(value, next, groups))} />}
   </div>;
 }

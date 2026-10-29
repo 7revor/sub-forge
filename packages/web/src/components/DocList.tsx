@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useList, type DocMap, type Kind } from '../hooks.ts';
-import { Card, Empty, ErrorBox, PageHeader, td, th } from './ui.tsx';
+import { Card, cx, Empty, ErrorBox, PageHeader, td, th } from './ui.tsx';
 import { DocActionLink, DocTableRow, docNameLinkClass } from './DocTableRow.tsx';
 
 export type Column<K extends Kind> = { header: string; cell: (d: DocMap[K]) => ReactNode; className?: string };
@@ -22,16 +22,16 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
       <Card bodyClass="overflow-x-auto">
         {list.isLoading ? <div className="p-4 text-muted">加载中…</div> : !list.data?.length ? <div className="p-4"><Empty>还没有内容。</Empty></div> : (
           <table className="w-full border-collapse">
-            <thead><tr>{columns.map((c) => <th key={c.header} className={th}>{c.header}</th>)}<th className={`${th} w-px text-right`}>操作</th></tr></thead>
+            <thead><tr>{columns.map((c) => <th key={c.header} className={th}>{c.header}</th>)}<th className={cx(th, 'w-px text-right')}>操作</th></tr></thead>
             <tbody>
               {list.data.map((d) => (
                 <DocTableRow key={d.id} to={`/${kind}/${d.id}`}>
                   {columns.map((c, i) => (
-                    <td key={c.header} className={`${td} ${c.className ?? ''}`}>
+                    <td key={c.header} className={cx(td, c.className)}>
                       {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}>{c.cell(d)}</Link> : c.cell(d)}
                     </td>
                   ))}
-                  <td className={`${td} text-right`}><DocActionLink to={`/${kind}/${d.id}`} name={d.name} /></td>
+                  <td className={cx(td, 'text-right')}><DocActionLink to={`/${kind}/${d.id}`} name={d.name} /></td>
                 </DocTableRow>
               ))}
             </tbody>
