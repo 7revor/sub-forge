@@ -3,6 +3,9 @@
 // - 有快照但已过期：先用旧快照，后台刷新；
 // - 从未拉取成功：只能同步拉取一次。
 // 同一 URL 的并发拉取合并为一次。拉取失败记入快照表（UI 标红），不抛出。
+// 拉取成功但内容与最近一份成功快照相同：只更新那一份的拉取时间，不新增，保留最近 N 份不同内容。
+// 拉取失败后，距上次失败不足 min(TTL, 5 分钟) 时不再重试，避免上游持续失败时每个订阅请求都去拉一次；
+// 手动刷新（refresh）不受此限制。TTL 最短 5 分钟（PRD 非功能需求），更短的旧数据按 5 分钟算。
 // 上游返回 2xx 但内容为空（或订阅源解析不出任何节点）同样记为失败：机场在 token 过期、
 // 限流时常这样返回，若当作成功快照，会顶掉上一份可用内容，订阅变成空的。
 
@@ -10,6 +13,9 @@ import { parseContent, stableHash } from '@sub-forge/core';
 import type { FetchOptions } from './docs.ts';
 import type { UpstreamFetcher } from './net/upstream.ts';
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
+
+export const MIN_TTL_SEC = 300;
+const FAILURE_RETRY_SEC = 300;
 
 export type SnapshotResult = { snapshot?: SnapshotRow; stale: boolean; error?: string };
 
@@ -43,8 +49,10 @@ export class SnapshotService {
         const res = await this.fetcher(url, opts);
         const unusable = unusableBody(kind, id, res.body);
         if (unusable) throw new Error(unusable);
-        const row = { ownerKind: kind, ownerId: id, url, fetchedAt, ok: true, status: res.status, body: res.body, hash: stableHash(res.body), ...(res.userinfo ? { userinfo: res.userinfo } : {}) };
-        this.store.addSnapshot(row);
+        const hash = stableHash(res.body);
+        const prev = this.store.latestSnapshot(kind, id, url);
+        if (prev?.hash === hash) this.store.touchSnapshot(prev.id, { fetchedAt, status: res.status, ...(res.userinfo ? { userinfo: res.userinfo } : {}) });
+        else this.store.addSnapshot({ ownerKind: kind, ownerId: id, url, fetchedAt, ok: true, status: res.status, body: res.body, hash, ...(res.userinfo ? { userinfo: res.userinfo } : {}) });
         return this.store.latestSnapshot(kind, id, url)!;
       } catch (e) {
         this.store.addSnapshot({ ownerKind: kind, ownerId: id, url, fetchedAt, ok: false, error: (e as Error).message });
@@ -59,19 +67,22 @@ export class SnapshotService {
 
   async get(kind: SnapshotOwner, id: string, url: string, opts: FetchOptions & { ttlSec: number }): Promise<SnapshotResult> {
     const latest = this.store.latestSnapshot(kind, id, url);
+    const lastFailure = this.store.latestSnapshot(kind, id, url, false);
+    const failure = lastFailure && !lastFailure.ok && (!latest || lastFailure.fetchedAt >= latest.fetchedAt) ? lastFailure : undefined;
+    const ttlSec = Math.max(opts.ttlSec, MIN_TTL_SEC);
+    const backoff = !!failure && this.now() - failure.fetchedAt < Math.min(ttlSec, FAILURE_RETRY_SEC) * 1000;
     if (!latest) {
+      if (backoff) return { stale: false, ...(failure!.error ? { error: failure!.error } : {}) };
       const row = await this.refresh(kind, id, url, opts);
       return row.ok ? { snapshot: row, stale: false } : { stale: false, ...(row.error ? { error: row.error } : {}) };
     }
-    const stale = this.now() - latest.fetchedAt > opts.ttlSec * 1000;
-    if (stale) {
+    const stale = this.now() - latest.fetchedAt > ttlSec * 1000;
+    if (stale && !backoff) {
       const p = this.refresh(kind, id, url, opts);
       this.background.add(p);
       void p.finally(() => this.background.delete(p));
     }
-    const lastFailure = this.store.latestSnapshot(kind, id, url, false);
-    const failedAfter = lastFailure && !lastFailure.ok && lastFailure.fetchedAt >= latest.fetchedAt ? lastFailure.error : undefined;
-    return { snapshot: latest, stale, ...(failedAfter ? { error: failedAfter } : {}) };
+    return { snapshot: latest, stale, ...(failure?.error ? { error: failure.error } : {}) };
   }
 
   /** 等待后台刷新全部结束（测试与优雅退出用） */
