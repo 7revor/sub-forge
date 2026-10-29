@@ -1,12 +1,12 @@
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
-// 上方管理仓库，下方搜索逻辑条目并按具体文本文件创建关联规则集。
+// 上方管理仓库，下方搜索具体文本文件并创建关联规则集。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
 import { useMe } from '../hooks.ts';
-import { api, type RepoEntry, type RepoFileList, type RuleRepo } from '../api.ts';
+import { api, type RepoFileEntry, type RepoFileList, type RuleRepo } from '../api.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
 
 export function RuleRepoPage() {
@@ -19,7 +19,7 @@ export function RuleRepoPage() {
   const debounced = useDebouncedValue(q.trim(), 300);
   const [repo, setRepo] = useState<string>();
   const [offset, setOffset] = useState(0);
-  const [sel, setSel] = useState<RepoEntry>();
+  const [sel, setSel] = useState<RepoFileEntry>();
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
   useEffect(() => {
     if (repos.data && repo && !repos.data.repos.some(r => r.id === repo && r.enabled)) setRepo(undefined);
@@ -28,8 +28,8 @@ export function RuleRepoPage() {
   useEffect(() => { setOffset(0); setSel(undefined); }, [debounced, repo]);
   const revision = repos.data?.repos.map(r => `${r.id}:${r.builtAt}:${r.enabled}`).join('|');
   const search = useQuery({
-    queryKey: ['rule-repos', 'search', debounced, repo, offset, revision],
-    queryFn: () => api<{ items: RepoEntry[]; total: number }>('GET', `/rule-repos/search?q=${encodeURIComponent(debounced)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}&offset=${offset}`),
+    queryKey: ['rule-repos', 'search', 'files', debounced, repo, offset, revision],
+    queryFn: () => api<{ items: RepoFileEntry[]; total: number }>('GET', `/rule-repos/search?view=files&q=${encodeURIComponent(debounced)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}&offset=${offset}`),
   });
   const detail = useQuery({
     queryKey: ['rule-repos', 'files', sel?.repo, sel?.path, revision],
@@ -42,7 +42,7 @@ export function RuleRepoPage() {
   });
   const repoName = (id: string) => repos.data?.repos.find(r => r.id === id)?.name ?? id;
   const items = search.data?.items ?? [];
-  const d = detail.data;
+  const d = detail.data && { ...detail.data, files: detail.data.files.filter(f => f.path === sel?.filePath) };
 
   return (
     <>
@@ -65,12 +65,11 @@ export function RuleRepoPage() {
             <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-muted">{search.isFetching ? '搜索中…' : `${search.data?.total ?? 0} 个结果`}</div>
             <div key={`${debounced}:${repo ?? ''}:${offset}`} aria-label="规则列表" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {items.map((x) => {
-              const on = sel?.repo === x.repo && sel.path === x.path;
+              const on = sel?.repo === x.repo && sel.path === x.path && sel.filePath === x.filePath;
               return (
-                <button key={`${x.repo}:${x.path}`} type="button" aria-current={on || undefined} onClick={() => { setSel(x); use.reset(); }}
+                <button key={JSON.stringify([x.repo, x.path, x.filePath])} type="button" aria-current={on || undefined} onClick={() => { setSel(x); use.reset(); }}
                   className={cx('flex w-full cursor-pointer items-center gap-3 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'hover:bg-ground')}>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{x.name}</span><span className="truncate font-mono text-[12px] text-muted">{x.path}</span></span>
-                  <span className="flex flex-col items-end gap-0.5"><span className="text-[11.5px] text-muted">{repoName(x.repo)}</span></span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="break-all text-[13.5px] font-medium">{x.name}</span><span className="break-all font-mono text-[12px] text-muted">{repoName(x.repo)} · {x.filePath}</span></span>
                 </button>
               );
             })}
@@ -88,7 +87,7 @@ export function RuleRepoPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-col gap-1">
                   <h2 className="m-0 text-[17px] font-semibold">{sel.name}</h2>
-                  <span className="font-mono text-[12px] text-muted">{repoName(sel.repo)} · {sel.path}</span>
+                  <span className="break-all font-mono text-[12px] text-muted">{repoName(sel.repo)} · {sel.filePath}</span>
                 </div>
                 {d && <Badge>{d.files.length} 个文件</Badge>}
               </div>

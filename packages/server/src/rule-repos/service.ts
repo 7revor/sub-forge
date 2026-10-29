@@ -246,6 +246,28 @@ export class RuleRepoService {
     const entries = rows.map(r => JSON.parse(r.data) as IndexedEntry).filter(e => !client || e.variants.some(v => (v.client === client || v.client === 'any')));
     return { items: entries.slice(offset, offset + limit).map(({ variants, ...e }) => ({ ...e, clients: [...new Set(variants.map(v => v.client))] })), total: entries.length, offset, limit };
   }
+  /** 文件视图独立于历史分组键；同路径的不同分支保留在右侧文件列表。 */
+  searchFiles(q: string, repo: string | undefined, client: string | undefined, offset: number, limit: number) {
+    if (repo) this.assertEnabled(repo);
+    const query = normalizeSearch(q);
+    const rows = this.store.db.prepare(`SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo
+      WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?)`).all(repo ?? null, repo ?? null) as { data: string }[];
+    const files = new Map<string, { repo: string; path: string; name: string; filePath: string }>();
+    for (const row of rows) {
+      const entry = JSON.parse(row.data) as IndexedEntry;
+      for (const variant of entry.variants) {
+        if (client && variant.client !== client && variant.client !== 'any') continue;
+        for (const file of variant.files) {
+          if (!isIndexedRuleFile(file.path) || !normalizeSearch(file.path).includes(query)) continue;
+          const key = JSON.stringify([entry.repo, entry.path, file.path]);
+          if (!files.has(key)) files.set(key, { repo: entry.repo, path: entry.path, name: file.path.split('/').at(-1)!, filePath: file.path });
+        }
+      }
+    }
+    const rank = (name: string) => normalizeSearch(name.replace(/\.[^.]+$/, '')) === query ? 0 : normalizeSearch(name).startsWith(query) ? 1 : 2;
+    const items = [...files.values()].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.repo.localeCompare(b.repo) || a.filePath.localeCompare(b.filePath));
+    return { items: items.slice(offset, offset + limit), total: items.length, offset, limit };
+  }
   private entry(repo: string, path: string): IndexedEntry {
     this.assertEnabled(repo);
     const row = this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ? AND key = ?').get(repo, path) as { data: string } | undefined;

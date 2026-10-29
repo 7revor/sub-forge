@@ -10,11 +10,12 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
   app.use('/rule-repos/*', requireUser);
   app.get('/rule-repos', requireUser, c => c.json({ repos: repos.list() }));
   app.get('/rule-repos/search', c => {
-    const { q = '', repo, client, offset = '0', limit = '50' } = c.req.query();
+    const { q = '', repo, client, view, offset = '0', limit = '50' } = c.req.query();
     if (q.length > 200) throw bad('关键词最多 200 个字符');
     if (client && client !== 'mihomo' && client !== 'surge') throw bad('客户端筛选不合法');
     if (!/^\d+$/.test(offset) || !/^\d+$/.test(limit) || !Number.isSafeInteger(Number(offset)) || Number(limit) < 1 || Number(limit) > 100) throw bad('分页参数不合法');
-    return c.json(repos.search(q, repo, client, Number(offset), Number(limit)));
+    if (view !== undefined && view !== 'files') throw bad('搜索视图不合法');
+    return c.json(view === 'files' ? repos.searchFiles(q, repo, client, Number(offset), Number(limit)) : repos.search(q, repo, client, Number(offset), Number(limit)));
   });
   app.get('/rule-repos/entry', async c => {
     const { repo, path } = c.req.query();
