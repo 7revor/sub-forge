@@ -1,4 +1,5 @@
-import { isMap, LineCounter, parseDocument, stringify } from 'yaml';
+import { isMap, LineCounter, stringify } from 'yaml';
+import { parseYamlDocument } from './yamlDocument.ts';
 import type { RawResult } from '../components/DualEditor.tsx';
 import { getPath, isRecord, setPath } from '../components/schema.ts';
 import { mihomoBaseGroups } from '../schemas/mihomoBase.ts';
@@ -31,7 +32,7 @@ export function baseFromYaml(text: string): RawResult<Record<string, unknown>> {
   const lineCounter = new LineCounter();
   let line = 1;
   try {
-    const doc = parseDocument(text, { lineCounter });
+    const doc = parseYamlDocument(text, { lineCounter });
     const error = doc.errors[0];
     if (error) return { ok: false, error: `YAML 解析失败：${error.message}`, line: error.linePos?.[0]?.line ?? 1 };
     if (doc.contents?.range) line = lineCounter.linePos(doc.contents.range[0]).line;

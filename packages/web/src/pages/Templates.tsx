@@ -260,7 +260,7 @@ function TemplatePage({ id }: { id: string }) {
               <Card title="① 模板自身" actions={<Badge tone={errors.length || parseErr ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : parseErr ? '校验失败' : ready ? '全部通过' : '校验中…'}</Badge>}>
                 <FieldError error={parseErr || (!rawValid ? '编辑器里的 YAML 有错误，请返回编辑器修复。' : undefined)} />
                 {own.length ? <TemplateReport items={own} onLocate={(where) => { setFocus({ where }); navigate(`/templates/${id}`); }} />
-                  : ready && <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px] text-ink-2">{['出口只指向模板组或内置策略', '组成员不含节点，也没有预设 filter', '组之间没有循环引用', 'YAML 可以生成并通过结构校验'].map((c) => <li key={c} className="flex gap-2"><span className="text-ok">✓</span>{c}</li>)}</ul>}
+                  : ready && <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px] text-ink-2">{['出口只指向模板组或内置策略', '组成员不含节点或节点集', '组之间没有循环引用', 'YAML 可以生成并通过结构校验'].map((c) => <li key={c} className="flex gap-2"><span className="text-ok">✓</span>{c}</li>)}</ul>}
               </Card>
               {!isNew && (
                 <Card title="② 对现有配置订阅的影响" bodyClass="overflow-x-auto"
@@ -361,7 +361,7 @@ function TemplatePage({ id }: { id: string }) {
           if (r.ok) { setBody(r.value); setImporting(undefined); notifySuccess('模板已导入，发布后生效'); }
           else alertError(r.error);
         }}>导入</Button></>}>
-        <Field label="mihomo 的 proxy-groups 与 rules（不含节点）" hint="导入会替换当前草稿的组与规则。">
+        <Field label="mihomo 的 proxy-groups 与 rules（不含节点）" hint="完整配置替换组与规则；策略组列表补入当前组，规则列表替换当前规则。">
           {(fid) => <YamlTextarea id={fid} rows={16} className="font-mono text-[12.5px]" spellCheck={false} value={importing ?? ''} onChange={(e) => setImporting(e.target.value)} />}
         </Field>
         {importing !== undefined && (() => { const r = templateFromYaml(importing, body, ctx); return r.ok ? null : <FieldError error={`第 ${r.line ?? 1} 行：${r.error}`} />; })()}

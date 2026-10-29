@@ -79,7 +79,11 @@ describe('模板校验', () => {
     expect(validateTemplate(TPL, inputs).items).toEqual([]);
   });
 
-  it('发现悬挂引用、环、节点、filter、重复名', () => {
+  it('模板可预设节点筛选条件，订阅填入节点集后生效', () => {
+    expect(validateTemplate({ ...TPL, groups: TPL.groups.map(group => ({ ...group, filter: '(?i)港|HK', excludeFilter: '到期', excludeType: 'direct' })) }, inputs).items).toEqual([]);
+  });
+
+  it('发现悬挂引用、环、节点、重复名', () => {
     const bad: Template = {
       ...TPL,
       groups: [
@@ -99,7 +103,6 @@ describe('模板校验', () => {
       'template.dangling-group',
       'template.dangling-ruleset',
       'template.duplicate-name',
-      'template.filter-in-template',
       'template.group-cycle',
       'template.node-in-template',
       'template.node-in-template',

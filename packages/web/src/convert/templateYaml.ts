@@ -1,6 +1,7 @@
 import { composeRule, lowerRule, parseRuleLine, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
 import { Document, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
 import { recoverYaml } from './recoverYaml.ts';
+import { parseYamlDocument } from './yamlDocument.ts';
 
 export type TemplateBody = Pick<Template, 'groups' | 'rules' | 'final'>;
 export type NamedRef = { id: string; name: string };
@@ -12,8 +13,9 @@ const testFields = {
   url: 'url', interval: 'interval', timeout: 'timeout', tolerance: 'tolerance',
   lazy: 'lazy', 'max-failed-times': 'maxFailedTimes', 'expected-status': 'expectedStatus',
 } as const;
-const knownFields = new Set(['name', 'type', 'proxies', 'strategy', 'hidden', 'icon', ...Object.keys(testFields)]);
-const nodeField = (key: string) => ['use', 'filter', 'exclude-filter', 'exclude-type'].includes(key) || key.startsWith('include-all');
+const filterFields = { filter: 'filter', 'exclude-filter': 'excludeFilter', 'exclude-type': 'excludeType' } as const;
+const knownFields = new Set(['name', 'type', 'proxies', 'strategy', 'hidden', 'icon', ...Object.keys(testFields), ...Object.keys(filterFields)]);
+const nodeField = (key: string) => key === 'use' || key.startsWith('include-all');
 const referenceField = 'x-sub-forge-rulesets';
 
 function rulesetAlias(m: Extract<Matcher, { kind: 'ruleset' }>, ctx: ConvertCtx): string {
@@ -55,6 +57,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
       if (g.test?.[key] !== undefined) out[yamlKey] = g.test[key];
     }
     if (g.strategy !== undefined) out.strategy = g.strategy;
+    for (const [yamlKey, key] of Object.entries(filterFields)) if (g[key] !== undefined) out[yamlKey] = g[key];
     if (g.display?.hidden !== undefined) out.hidden = g.display.hidden;
     if (g.display?.icon !== undefined) out.icon = g.display.icon;
     return { ...out, ...g.extra };
@@ -133,8 +136,34 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
   const lineCounter = new LineCounter();
   let line: number | undefined;
   try {
-    const recovered = recover ? recoverYaml(text) : undefined;
-    const doc = recovered?.doc ?? parseDocument(text, { lineCounter });
+    const fragment = isSeq(parseDocument(text).contents);
+    const recovered = recover ? recoverYaml(text, 'template') : undefined;
+    const doc = recovered?.doc ?? parseYamlDocument(text, { lineCounter }, 'template');
+    // 策略组列表作为片段补入，同名组替换；保留其余组，避免现有规则和 MATCH 悬空。
+    if (fragment && doc.has('proxy-groups') && !doc.has('rules')) {
+      const previous = parseDocument(templateToYaml(current, ctx));
+      const incoming = doc.get('proxy-groups', true);
+      const existing = previous.get('proxy-groups', true);
+      if (isSeq(incoming) && isSeq(existing)) {
+        const replacements = new Map(incoming.items.map(item => [isMap(item) ? item.get('name') : undefined, item]));
+        const consumed = new Set<unknown>();
+        incoming.items = [
+          ...existing.items.map(item => {
+            const replacement = replacements.get(isMap(item) ? item.get('name') : undefined);
+            if (replacement) consumed.add(replacement);
+            return replacement ?? item;
+          }),
+          ...incoming.items.filter(item => !consumed.has(item)),
+        ];
+      }
+      doc.set('rules', previous.get('rules', true));
+      if (previous.has(referenceField)) doc.set(referenceField, previous.get(referenceField, true));
+    }
+    if (fragment && doc.has('rules') && !doc.has('proxy-groups')) {
+      const previous = parseDocument(templateToYaml(current, ctx));
+      doc.set('proxy-groups', previous.get('proxy-groups', true));
+      if (previous.has(referenceField)) doc.set(referenceField, previous.get(referenceField, true));
+    }
     const notes: string[] = recovered?.notes ?? [];
     const attempt = (action: () => void) => {
       try { action(); }
@@ -209,6 +238,14 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         usedGroups.add(g.id);
         if (old?.whenEmpty !== undefined) g.whenEmpty = old.whenEmpty;
         if (old?.hint !== undefined) g.hint = old.hint;
+        for (const [yamlKey, key] of Object.entries(filterFields)) {
+          if (raw[yamlKey] === undefined) continue;
+          attempt(() => {
+            locate(node.get(yamlKey, true));
+            if (typeof raw[yamlKey] !== 'string') throw new Error(`组「${g.name}」的 ${yamlKey} 必须是字符串`);
+            g[key] = raw[yamlKey];
+          });
+        }
         const test: Record<string, unknown> = {};
         for (const [yamlKey, key] of Object.entries(testFields)) {
           if (raw[yamlKey] === undefined) continue;
