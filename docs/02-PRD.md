@@ -119,10 +119,10 @@
 | --- | --- | --- |
 | GRP-01 | 组类型：`select`、`url-test`、`fallback`、`load-balance`（Surge 映射见 [04](04-client-matrix.md)） | P0 |
 | GRP-02 | 成员类型：<br>① 内置策略（DIRECT / REJECT / REJECT-DROP / PASS）<br>② 其他策略组（mihomo `proxies` 写组名；Surge 写组名或 `include-other-group`）<br>③ 节点集整体（mihomo `use: [provider]`；Surge `policy-path` / `include-other-group`）<br>④ 单个节点引用（见 4.6 节点引用）<br>⑤ "全部节点"（mihomo `include-all` / `include-all-proxies` / `include-all-providers`；Surge `include-all-proxies`） | P0 |
-| GRP-03 | 组内过滤：`filter`、`exclude-filter`、`exclude-type`（mihomo）/ `policy-regex-filter`（Surge），UI 中实时显示命中的节点 | P0 |
+| GRP-03 | 组内过滤：`filter`、`exclude-filter`、`exclude-type`（mihomo）/ `policy-regex-filter`（Surge），`exclude-type` 使用可清空的多选下拉；预览、内联筛选和 provider 输出统一协议别名（如 ss → Shadowsocks），UI 中实时显示命中的节点 | P0 |
 | GRP-04 | 测速参数：`url`、`interval`、`timeout`、`tolerance`、`lazy`、`max-failed-times`、`expected-status`；负载均衡 `strategy`。Surge 的 `url`、`timeout` 语义与 mihomo 不同，按 [04 §2](04-client-matrix.md#2-策略组) 转换，无法表达的参数写入渲染报告 | P0 |
 | GRP-05 | 展示参数：`hidden`、`icon`（Surge 为 `icon-url`）；Surge `no-alert` | P1 |
-| GRP-06 | 其他：`disable-udp`、`interface-name`、`routing-mark`、`default-selected`、`empty-fallback` 等以"高级参数"KV 形式支持，并标注客户端适用范围 | P1 |
+| GRP-06 | 其他：`disable-udp`、`interface-name`、`routing-mark`、`default-selected` 等以"高级参数"KV 形式支持（空组固定 REJECT，不提供 empty-fallback 设置），并标注客户端适用范围 | P1 |
 | GRP-07 | 依赖图校验：组之间不能成环；被引用的组/节点不存在时阻止保存或标红 | P0 |
 | GRP-08 | 拖拽排序（组顺序即客户端面板顺序）；成员拖拽排序 | P0 |
 
@@ -230,10 +230,10 @@
 
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
-| TPL-01 | 模板中的组：可设置类型、测速参数、展示参数、为空时的行为（TPL-10）；成员**只能是**其他模板组或内置策略，组之间的嵌套关系属于模板、随模板同步（Q5）。**不能包含任何节点/节点集**；可预设 `filter`/`exclude-filter`/`exclude-type`，在 Profile 填入节点集后生效，并可在 Profile 中覆盖。模板和订阅策略组支持一次添加香港、美国、日本、新加坡四个隐藏的 select 地区组 | P0 |
+| TPL-01 | 模板中的组：可设置类型、测速参数、展示参数；空组固定拒绝（TPL-10）；成员**只能是**其他模板组或内置策略，组之间的嵌套关系属于模板、随模板同步（Q5）。**不能包含任何节点/节点集**；可预设 `filter`/`exclude-filter`/`exclude-type`，在 Profile 填入节点集后生效，并可在 Profile 中覆盖。模板和订阅策略组支持一次添加香港、美国、日本、新加坡四个隐藏的 select 地区组 | P0 |
 | TPL-02 | 模板中的规则：匹配项可为单条规则 / RuleSet（RuleBundle 已并入 RuleSet，2026-10-29）；**出口只能是模板组或内置策略** | P0 |
 | TPL-03 | 每个模板组可标注"填充提示"（如"建议放香港节点"、"建议放所有节点"），在 Profile 填充时展示（仅文字提示，不参与渲染） | P1 |
-| TPL-10 | **空组输出**：模板组在 Profile 中未填充任何成员时，照常输出为"空组"，并在渲染报告与 Profile 页提示。每个模板组声明**为空时**的行为：**拒绝（默认）**或直连。例如"🤖 AI 服务"保持拒绝，避免未填充时流量悄悄直连；"国内媒体"可设为直连。输出：拒绝 → mihomo `proxies: [REJECT]`、Surge `select, REJECT`；直连 → mihomo `proxies: [COMPATIBLE]`、Surge `select, DIRECT`（两个客户端都不接受无成员的组，必须写一个内置成员） | P0 |
+| TPL-10 | **空组固定拒绝（2026-10-29 修订）**：移除原「拒绝 / 直连」配置项，模板组和私有组统一 REJECT，历史 `whenEmpty: direct` 不再生效。生成时无成员则自动写入 `proxies: [REJECT]` 并告警；所有组自动输出 `empty-fallback: REJECT`，客户端加载或筛选 provider 后为空时直接拒绝。扩展字段不能覆盖这一固定策略。Mihomo v1.19.27+ 原生支持，用户无需设置；节点仍存在但测速失败不视为空组。Surge 仍未开放，不宣称同等兼容 | P0 |
 | TPL-04 | 模板元素（组、规则）具有**稳定 ID**；改名不影响已有 Profile 的覆盖层 | P0 |
 | TPL-05 | 模板版本：每次发布生成新版本号与变更说明；可查看版本间 diff | P0 |
 | TPL-06 | 订阅跟随策略：**跟随最新**（默认）/ 锁定某版本。跟随最新时模板发布即对所有订阅生效（订阅在渲染时合并模板，不复制） | P0 |
@@ -360,7 +360,7 @@
 
 | 一级导航 | 页面 | 主要内容 |
 | --- | --- | --- |
-| 模板 | 模板列表 / 编辑器 | 2026-10-29 合并原「模板管理」入口；仅管理员可见、可编辑与发布。组骨架、规则、为空时行为、填充提示；草稿实时校验（TPL-11）；版本 diff（TPL-05） |
+| 模板 | 模板列表 / 编辑器 | 2026-10-29 合并原「模板管理」入口；仅管理员可见、可编辑与发布。组骨架、规则、填充提示；空组固定拒绝且无配置项；草稿实时校验（TPL-11）；版本 diff（TPL-05） |
 |  | 发布 | 发布前校验与影响分析结果，按错误 / 警告分级，可跳转到具体 Profile（TPL-07、TPL-12） |
 | 预设 | 基础设置预设列表 / 详情 | 列表搜索、新建、删除和编辑；详情 mihomo / Surge 分段编辑、发布与引用方列表（BS-03） |
 | 规则仓库 | 仓库管理 | 启用 / 停用内置仓库、自定义仓库与适配器、索引状态与报告（REPO-01–06、REPO-08、R4） |

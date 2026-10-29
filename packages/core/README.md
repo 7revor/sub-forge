@@ -61,4 +61,6 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 2026-10-29 模板规则集行内编辑仅调整前端布局；RuleEntry 的 matcher、target、enabled、options.noResolve 与规则顺序保持原语义，核心渲染和示例种子不变。
 
+策略组空组固定拒绝：生成时无成员补 REJECT，所有组自动输出 `empty-fallback: REJECT`；历史 `whenEmpty: direct` 与扩展字段不能覆盖。`exclude-type` 统一解析 ss / Shadowsocks 等协议别名，使内联筛选与 provider 客户端行为一致。
+
 2026-10-29 规则集前端移除整组 no-resolve 配置入口；核心保留 `RuleSet.noResolve` 以兼容历史数据，规则本身和模板引用的选项处理不变。

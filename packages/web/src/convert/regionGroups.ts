@@ -12,7 +12,7 @@ export const REGION_GROUPS = [
 export function createRegionGroups(existing: Pick<GroupSpec, 'name'>[], nodeSet?: NodeSetID): GroupSpec[] {
   const names = new Set(existing.map(group => group.name));
   return REGION_GROUPS.filter(region => !names.has(region.name)).map(region => ({
-    id: newId('g'), ...region, type: 'select', whenEmpty: 'reject', display: { hidden: true },
+    id: newId('g'), ...region, type: 'select', display: { hidden: true },
     members: nodeSet ? [{ kind: 'nodeset', ref: { ...nodeSet } }] : [],
   }));
 }
