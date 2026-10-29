@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { GithubTokenSettings } from '../components/GithubTokenSettings.tsx';
 import { api, type SystemInfo } from '../api.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
@@ -26,7 +25,7 @@ export function System() {
   return (
     <>
       <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
-      {info.data?.pending && <PendingNotice>GitHub 索引认证可用，其余系统设置暂不可用。</PendingNotice>}
+      {info.data?.pending && <PendingNotice>系统设置暂不可用；仓库与索引请前往规则仓库管理。</PendingNotice>}
       <ErrorAlert error={save.error} />
 
       <PageScroll>
@@ -64,9 +63,8 @@ export function System() {
           </div>
 
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
-            <Card title="GitHub 索引认证">
+            <Card title="规则仓库">
               <div className="flex flex-col gap-3">
-                <GithubTokenSettings />
                 <Link to="/rule-repo" className="text-[13px] text-accent">前往规则仓库管理仓库与索引 →</Link>
               </div>
             </Card>

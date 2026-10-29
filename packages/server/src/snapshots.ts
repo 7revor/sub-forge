@@ -3,7 +3,7 @@
 // - 有快照但已过期：先用旧快照，后台刷新；
 // - 从未拉取成功：只能同步拉取一次。
 // 同一 URL 的并发拉取合并为一次。拉取失败记入快照表（UI 标红），不抛出。
-// 拉取成功但内容与最近一份成功快照相同：只更新那一份的拉取时间，不新增，保留最近 N 份不同内容。
+// 拉取成功且内容相同则只更新时间；订阅源只保留最近一次成功内容，规则集保留最近 5 份。
 // 拉取失败后，距上次失败不足 min(TTL, 5 分钟) 时不再重试，避免上游持续失败时每个订阅请求都去拉一次；
 // 手动刷新（refresh）不受此限制。TTL 最短 5 分钟（PRD 非功能需求），更短的旧数据按 5 分钟算。
 // 上游返回 2xx 但内容为空（或订阅源解析不出任何节点）同样记为失败：机场在 token 过期、
@@ -16,6 +16,7 @@ import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 
 export const MIN_TTL_SEC = 300;
 const FAILURE_RETRY_SEC = 300;
+const SOURCE_REQUEST_OPTIONS = { ua: DEFAULT_UA, timeoutMs: DEFAULT_TIMEOUT_MS };
 
 export type SnapshotResult = { snapshot?: SnapshotRow; stale: boolean; error?: string };
 export type SnapshotFetchOptions = FetchOptions & { format?: RuleSetFormat };
@@ -49,14 +50,14 @@ export class SnapshotService {
   ) {}
 
   /** 草稿拉取只保留短期内存缓存，不改正式快照；处理链编辑复用相同参数的内容。 */
-  previewSource(id: string, url: string, opts: FetchOptions = {}): Promise<{ body?: string; error?: string }> {
-    const key = JSON.stringify([id, url, opts.ua ?? DEFAULT_UA, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS]);
+  previewSource(id: string, url: string): Promise<{ body?: string; error?: string }> {
+    const key = JSON.stringify([id, url]);
     for (const [entry, value] of this.previews) if (this.now() - value.at >= 60_000) this.previews.delete(entry);
     const cached = this.previews.get(key);
     if (cached && this.now() - cached.at < 60_000) return cached.result;
     const result = (async () => {
       try {
-        const response = await this.fetcher(url, opts);
+        const response = await this.fetcher(url, SOURCE_REQUEST_OPTIONS);
         const error = unusableBody('source', id, response.body);
         return error ? { error } : { body: response.body };
       } catch (e) {
@@ -82,17 +83,16 @@ export class SnapshotService {
       const fetchedAt = Math.max(this.now(), (previous?.fetchedAt ?? -1) + 1);
       try {
         const { format, ...fetchOpts } = opts;
-        const res = await this.fetcher(url, fetchOpts);
+        const res = await this.fetcher(url, kind === 'source' ? SOURCE_REQUEST_OPTIONS : fetchOpts);
         const unusable = unusableBody(kind, id, res.body, format);
         if (unusable) throw new Error(unusable);
         const hash = stableHash(res.body);
         const prev = this.store.latestSnapshot(kind, id, url);
         if (prev?.hash === hash) this.store.touchSnapshot(prev.id, { fetchedAt, status: res.status, ...(res.userinfo ? { userinfo: res.userinfo } : {}) });
-        else this.store.addSnapshot({ ownerKind: kind, ownerId: id, url, fetchedAt, ok: true, status: res.status, body: res.body, hash, ...(res.userinfo ? { userinfo: res.userinfo } : {}) });
+        else return this.store.addSnapshot({ ownerKind: kind, ownerId: id, url, fetchedAt, ok: true, status: res.status, body: res.body, hash, ...(res.userinfo ? { userinfo: res.userinfo } : {}) });
         return this.store.latestSnapshot(kind, id, url)!;
       } catch (e) {
-        this.store.addSnapshot({ ownerKind: kind, ownerId: id, url, fetchedAt, ok: false, error: (e as Error).message });
-        return this.store.latestSnapshot(kind, id, url, false)!;
+        return this.store.addSnapshot({ ownerKind: kind, ownerId: id, url, fetchedAt, ok: false, error: (e as Error).message });
       } finally {
         this.inflight.delete(key);
       }

@@ -348,29 +348,27 @@ function TemplatePage({ id }: { id: string }) {
           </button>
         </li>)}
       </ol>
-      <div className="page-scroll !mb-0"><div className="page-scroll-content flex flex-col gap-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <Card bodyClass="p-4"><Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field></Card>
-          <Card title="模板自检" actions={<Badge tone={errors.length ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : ready ? '通过' : '待校验'}</Badge>}>
-            {(ready || report.length > 0) && <TemplateReport items={report} onLocate={(where) => { if (rawValid) setFocus({ where }); }} />}
-            {!ready && !parseErr && rawValid && <span className="text-[13px] text-muted">{name.trim() ? '修改后自动校验…' : '请填写模板名称'}</span>}
-          </Card>
+      <section className="list-panel" aria-label="模板编辑">
+        <div className="shrink-0 p-4">
+          <Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
         </div>
-        <ErrorAlert error={rulesets.error} />
-        <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} />
-        {!isNew && <details className="rounded-[10px] border border-line bg-panel p-4">
-          <summary className="cursor-pointer text-[13px] font-medium">版本记录</summary>
-          <div className="pt-3"><VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} /></div>
-        </details>}
-      </div></div>
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <span className="text-[13px] text-muted">第 {step + 1} 步，共 2 步</span>
-        <div className="flex gap-2">
-          <Button disabled={step === 0 || !rawValid} onClick={() => setStep(0)}>上一步</Button>
-          {step === 0 ? <Button variant="primary" disabled={!rawValid} onClick={() => setStep(1)}>下一步：规则</Button>
-            : <Button variant="primary" disabled={!rawValid || !name.trim()} onClick={() => navigate(isNew ? '/templates/new/publish' : `/templates/${id}/publish`)}>发布前校验</Button>}
+        <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain">
+          <ErrorAlert error={rulesets.error} />
+          <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} step={step} onStepChange={setStep} />
+          {!isNew && <details className="border-t border-line p-4">
+            <summary className="cursor-pointer text-[13px] font-medium">版本记录</summary>
+            <div className="pt-3"><VersionHistory versions={tpl.data!.versions} onCompare={setDiffVersion} /></div>
+          </details>}
         </div>
-      </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
+          <span className="text-[13px] text-muted">第 {step + 1} 步，共 2 步</span>
+          <div className="flex gap-2">
+            <Button disabled={step === 0 || !rawValid} onClick={() => setStep(0)}>上一步</Button>
+            {step === 0 ? <Button variant="primary" disabled={!rawValid} onClick={() => setStep(1)}>下一步：规则</Button>
+              : <Button variant="primary" disabled={!rawValid || !name.trim()} onClick={() => navigate(isNew ? '/templates/new/publish' : `/templates/${id}/publish`)}>发布前校验</Button>}
+          </div>
+        </div>
+      </section>
       {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
       <Modal title="从 YAML 导入" open={importing !== undefined} onClose={() => setImporting(undefined)} wide
         footer={<><Button onClick={() => setImporting(undefined)}>取消</Button><Button variant="primary" onClick={() => {

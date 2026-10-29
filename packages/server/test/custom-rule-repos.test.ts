@@ -21,14 +21,14 @@ function setup() {
       return { status: 200, body: JSON.stringify({ sha: revision, commit: { tree: { sha: 'b'.repeat(40) } } }) };
     }
     if (target.includes('/git/trees/')) return { status: 200, body: JSON.stringify({ truncated: false, tree: paths.map(path => ({ path, type: 'blob' })) }) };
-    if (target.startsWith('https://api.github.com/repos/')) return { status: 200, body: JSON.stringify({ private: false, default_branch: 'main' }) };
     return { status: 200, body };
   });
   const env = setupApp({ fetcher });
-  const service = new RuleRepoService(env.store, fetcher, Date.now, fixtureCache(fetcher));
+  const cache = fixtureCache(fetcher);
+  const service = new RuleRepoService(env.store, fetcher, Date.now, cache);
   const app = createApp({ ...env, ruleRepos: service });
   cleanups.push(async () => { await service.stop(); env.store.close(); });
-  return { ...env, app, service, fetcher, paths: (p: string[]) => { paths = p; revision = 'c'.repeat(40); }, body: (b: string) => { body = b; }, fail: () => { fail = true; } };
+  return { ...env, app, service, cache, fetcher, paths: (p: string[]) => { paths = p; revision = 'c'.repeat(40); }, body: (b: string) => { body = b; }, fail: () => { fail = true; } };
 }
 
 describe('自定义仓库配置与文件发现', () => {
@@ -64,13 +64,33 @@ describe('自定义仓库配置与文件发现', () => {
     await restarted.stop();
     await expect(h.service.addCustom({ url: 'https://github.com/7REVOR/PROXY-RULES' })).rejects.toMatchObject({ status: 409 });
   });
-  it('拒绝私有或无效元数据，并报告 GitHub HTTP 错误', async () => {
+  it('Git 无法匿名读取或没有分支时拒绝添加，不写入无效配置', async () => {
     const h = setup();
-    h.fetcher.mockResolvedValueOnce({ status: 200, body: JSON.stringify({ private: true, default_branch: 'main' }) });
+    vi.mocked(h.cache.inspect).mockRejectedValueOnce(new Error('仓库不存在或需要认证'));
+    await expect(h.service.addCustom({ url })).rejects.toMatchObject({ status: 502, message: expect.stringContaining('Git') });
+    vi.mocked(h.cache.inspect).mockResolvedValueOnce({ branches: [] });
     await expect(h.service.addCustom({ url })).rejects.toMatchObject({ status: 400 });
-    h.fetcher.mockResolvedValueOnce({ status: 404, body: '{}' });
-    await expect(h.service.addCustom({ url })).rejects.toMatchObject({ status: 502 });
     expect(h.service.list().filter(r => r.id.startsWith('custom-'))).toHaveLength(0);
+    expect(h.fetcher).not.toHaveBeenCalled();
+  });
+  it('通过 Git 识别默认分支，校验每个显式分支，不依赖 HTTP 元数据', async () => {
+    const h = setup();
+    vi.mocked(h.cache.inspect).mockResolvedValue({ defaultBranch: 'release/2026', branches: ['release/2026', 'stable'] });
+    const id = await h.service.addCustom({ url });
+    expect(h.service.definition(id)).toMatchObject({ refs: ['release/2026'], license: '见上游仓库许可证' });
+    expect(h.fetcher).not.toHaveBeenCalled();
+    await expect(h.service.addCustom({ url, ref: 'missing' })).rejects.toMatchObject({ status: 400, message: '仓库分支不存在：missing' });
+    vi.mocked(h.cache.inspect).mockResolvedValue({ branches: ['stable'] });
+    await expect(h.service.addCustom({ url })).rejects.toThrow('请手动填写分支');
+    const explicit = await h.service.addCustom({ url, ref: 'stable', license: '自定义许可证说明' });
+    expect(h.service.definition(explicit).license).toBe('自定义许可证说明');
+    const before = h.service.list().find(r => r.id === id)!;
+    await expect(h.service.update(id, { ...before, scans: [{ ...before.scans[0], ref: 'stable' }, { ...before.scans[0], ref: 'missing' }] })).rejects.toThrow('分支不存在');
+    expect(h.service.list().find(r => r.id === id)).toEqual(before);
+    vi.mocked(h.cache.inspect).mockRejectedValueOnce(new Error('连接失败'));
+    await expect(h.service.update(id, before)).rejects.toMatchObject({ status: 502 });
+    expect(h.service.list().find(r => r.id === id)).toEqual(before);
+    expect(h.fetcher).not.toHaveBeenCalled();
   });
   it('索引进行时不能删除，停用后无法搜索或导入', async () => {
     const h = setup(); const id = await h.service.addCustom({ url });

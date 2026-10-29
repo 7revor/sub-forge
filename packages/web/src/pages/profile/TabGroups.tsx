@@ -38,7 +38,7 @@ function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => voi
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-ground p-2.5">
+    <div className="flex flex-wrap items-start gap-2 rounded-lg bg-ground p-2.5">
       <Select aria-label="成员类型" className="w-auto" value={kind} onChange={(e) => setKind(e.target.value as GroupMember['kind'])}>
         <option value="nodeset">节点集</option>
         <option value="group">其他组</option>

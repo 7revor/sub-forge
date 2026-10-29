@@ -76,7 +76,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/profiles/:id/preview` | 预览配置、依赖节点与渲染报告；请求体可带未保存的 `profile` 草稿 |
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
 | `GET /api/profiles/:id/access-log` | 访问日志（保留 30 天） |
-| `POST /api/sources/:id/refresh`、`GET /api/sources/:id/snapshots` | 立即拉取、快照历史 |
+| `POST /api/sources/:id/refresh`、`GET /api/sources/:id/snapshots` | 立即拉取、最近成功内容与最新失败状态（不含正文） |
 | `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；订阅源还可带 `source: { url, fetch }`，组合还可带 `members`（按保存规则校验引用与成环） |
 | `GET /api/nodesets/:type/:id/nodes` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
 | `POST /api/rulesets/preview` | 规则集草稿按 `client` + `platform` 的输出，请求体 `{ ruleset, id?, source?, client, platform? }`：给出 `source` 时为该来源（含无法解析的行），否则为全部启用来源合并去重后的结果与 domain / classical / ipcidr 统计；两种预览均应用顶层 `overrides`（按规则内容精确匹配）；每个来源的拉取 / 解析状态一并返回，`rejected` 为完整计数，存在无法解析行时附带 `rejectedDetails`（行号、原文、原因，最多前 100 条），用于来源徽标的悬停与点击详情。`id` 为已保存的规则集时，已保存的远程地址读写它名下的快照；新建草稿与编辑中新填的地址只拉取、不写快照（同一地址 5 分钟内复用） |
@@ -97,7 +97,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 保存前校验：必填项、正则能否编译、远程地址协议、脚本编写权限、引用是否存在且属于当前用户（规则集还可以是管理员名下的公共规则集）、组合是否成环、规则集来源（id 唯一、远程地址协议、mrs 的 behavior）。深层结构问题由预览与渲染报告给出。
 
-订阅源基础设置中的拉取参数草稿与正式配置不同的时候，按草稿地址、User-Agent 和超时拉取并预览；结果只保留最多 16 组、60 秒的内存缓存，不写文档或正式快照。相同参数下调整处理链复用拉取结果；未修改参数时继续使用正式快照。草稿的单个地址失败时返回空节点和错误报告，不展示旧地址的节点。
+订阅源草稿地址与正式配置不同的时候，按草稿地址拉取并预览；UA 固定为 `clash.meta`，超时固定为 10 秒，旧请求中的自定义值会被忽略；结果只保留最多 16 组、60 秒的内存缓存，不写文档或正式快照。相同地址下调整处理链复用拉取结果；仅修改自动更新时间继续使用正式快照。草稿的单个地址失败时返回空节点和错误报告，不展示旧地址的节点。
 
 处理链的创建、更新和草稿预览统一检查每个处理器的数组、对象、标量类型、枚举及正则 flags。非法参数返回带步骤位置的 400，禁用步骤也须满足结构要求；空数组与空正则占位仍允许，脚本编写权限不变。
 
@@ -107,8 +107,8 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 ## 上游拉取
 
-- 订阅请求不等待上游：快照过期时先用旧快照渲染返回，后台刷新；只有从未拉取成功时才同步拉取。
-- 同一 URL 的并发拉取合并为一次；成功快照保留最近 5 份，失败只记录最新一条。
+- 订阅请求不等待上游：超过自动更新间隔后，下次读取先用旧内容返回并后台刷新；只有当前地址从未拉取成功时才同步拉取。默认 24 小时，最短 5 分钟；这不是独立定时任务。
+- 同一来源、同一 URL 的并发拉取合并为一次；每个订阅源仅保留最近一次成功内容及最新失败状态，换地址也不累积历史；规则集每个 URL 仍保留最近 5 份成功快照和最新失败记录。
 - 文本规则集写入成功快照前按声明格式解析：空响应、错误页面、损坏的 YAML 和完全没有可用规则的内容均记为失败，继续使用旧快照；部分行有效时保留有效规则并在报告中记录被忽略的行。二进制透传资源仍由客户端直接下载。
 - 旧库中已保存的无效远程规则快照也不能生成成功配置：使用最近成功配置回退，没有可回退配置时返回 503。有效规则经客户端覆盖主动全部丢弃不受此限制。
 - 订阅只拉取模板与个人覆盖合并后实际启用的规则依赖；禁用规则、失效锚点规则及规则集中停用的来源不会触发上游请求。
@@ -150,7 +150,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - `POST /api/rule-repos/:id/refresh`：管理员触发，202 返回后通过列表轮询状态；同仓库并发任务合并。
 - `PATCH /api/rule-repos/:id`：管理员设置 `{ enabled: boolean }`，停用不删除索引或已导入的规则集。
 
-GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。仅索引 list/txt，默认导入文本后走已有托管流程。动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
+仓库识别、分支检查与目录索引均使用匿名 HTTPS Git，不依赖 GitHub API。仅索引 list/txt；失败保留旧索引。完整行为见下方「规则仓库 Git 缓存与编辑」与 [08](../../docs/08-rule-repository-index.md)。示例种子保持离线可用。
 
 ### 自定义 GitHub 仓库
 
@@ -167,9 +167,9 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 
 所有仓库只索引 `.list` / `.txt`，任意 include 也不能放开 YAML、MRS、SRS 等后缀。zydou 只检查两个 Surge 文本分支。启动即清理旧缓存中的不支持变体，并使相关仓库同 commit 也重建；既有规则来源保留。自定义仓库旧 YAML 格式配置降为 auto，不改 include/exclude。手动远程 YAML 不受索引限制，预览报告 `conversion: yaml-to-list`，实际 provider 使用本服务文本 URL；已知 YAML 输入不得标为二进制透传。
 
-### GitHub 索引 Token
+### 移除 GitHub Token（2026-10-29）
 
-管理员通过 `GET/PUT/DELETE /api/rule-repos/github-token` 读取状态、保存或清除 Token；PUT body 为 `{ "token": "你的 Token" }`，响应只有 `configured`。SQLite v12 加密保存该服务凭据，不写入示例种子；下一次索引 API 请求立即生效。只向 HTTPS GitHub API 携带认证，跨源重定向永久移除。不会用于 raw 文件、一般订阅源或客户端输出；公开仓库限制不变。
+不再提供 GitHub Token 配置或 `GET/PUT/DELETE /api/rule-repos/github-token` 接口。SQLite v14 升级删除旧 `github-index-token`，清空后删除专用 `server_secrets` 表；若存在未知其他服务凭据则保留其记录和表。订阅令牌及业务文档不受影响。迁移使用 secure_delete 并截断 WAL；外部备份不在迁移范围内。
 
 ### 按单文件创建规则集
 
@@ -202,7 +202,11 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 默认每 24 小时同步；失败后 15 分钟重试；可手动更新。Git 操作有进程内串行队列、磁盘锁、120 秒超时和 32 MiB 输出上限；退出时取消并等待 Git 进程组。崩溃遗留锁在确认所属进程不存在后自动恢复。单个缓存目录不支持多个主机共享。删除仓库时删除其 Git 缓存，但保留已导入规则集。缓存不是用户配置备份：如需释放累计 Git 对象，可在停止服务后清空专用缓存目录，启动后手动更新仓库重建缓存；重建完成前文件预览可能不可用，SQLite 中的旧目录仍保留。
 
-Git 同步使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，也不继承全局 Git URL 重写及认证配置。Token 只用于添加/修改仓库时的 GitHub 元数据 API。无需 Token 即可同步已配置仓库，但网络仍需能访问 github.com。重命名/迁移的上游地址须编辑为当前地址。
+新增和修改仓库统一使用 `git ls-remote --symref` 读取远程 HEAD 与分支，留空分支按远程 HEAD 解析；所有指定分支均在保存前验证。仓库无提交、默认分支无法识别或指定分支不存在会明确报错，不写入配置。Git 失败返回 502；保存时需要访问 github.com，包括停用仓库的编辑。
+
+全流程使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，不继承全局 Git URL 重写及认证配置，不调用 GitHub API。重命名/迁移的上游地址须编辑为当前地址。Git 不提供平台许可证分类：同仓库保留已有说明，新仓库默认「见上游仓库许可证」，也可手动填写许可证说明。
+
+隔离浏览器验收：构建 web 后运行 `pnpm --filter @sub-forge/server exec tsx test/manual-git-repository-server.ts`，访问 `http://git-only.localhost:18744`。使用内存库、临时 Git 缓存和专用测试账号，允许真实匿名 Git、禁止全部 HTTP 上游请求；退出打印 HTTP 请求计数并清理缓存和进程。不得用于生产部署。
 
 ### 自动识别规则格式与下载策略（2026-10-29）
 
@@ -227,3 +231,9 @@ Git 同步使用匿名公开仓库 HTTPS，不读取或写入 GitHub Token，也
 2026-10-29 模板规则集行内编辑复用现有搜索/解析及模板自检、发布接口；客户端只替换 matcher，保持规则身份、顺序、出口、启用和 noResolve，服务端无需新接口或数据迁移。示例种子无需调整。
 
 策略组空组策略固定为 REJECT：服务端渲染自动补静态拒绝成员并写入 `empty-fallback: REJECT`，旧的 `whenEmpty: direct` 不再生效，无需迁移或客户端手工设置；最低 Mihomo 版本仍为 v1.19.27。
+
+2026-10-29 规则集前端移除整组 no-resolve 配置入口及列表列；接口继续接受并保留 `noResolve`，历史设置的保存、预览和渲染行为不变，无需迁移，示例种子无需调整。
+
+### 订阅源固定拉取设置（2026-10-29）
+
+SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文档归属和更新时间；订阅源历史压缩为最近一次成功及最新失败状态。规则集拉取设置和历史不受影响。服务层对正式拉取、草稿预览都强制使用默认 UA 与 10 秒超时，旧种子与保存接口也会规范化。节点只能内联输出或由本服务 `/p/…` 托管，不提供节点订阅地址透传；规则集仍按既有条件决定原格式透传或托管。

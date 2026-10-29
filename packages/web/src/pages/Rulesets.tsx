@@ -39,7 +39,6 @@ export function RulesetList() {
         { header: '名称', cell: (r) => r.name },
         { header: '备注', cell: (r) => <NoteCell note={r.note} /> },
         { header: '来源', cell: (r) => <span className="text-ink-2">{sourceSummary(r)}</span> },
-        { header: 'IP 类 no-resolve', cell: (r) => (r.noResolve ? '是' : '否') },
       ]} />
   );
 }
@@ -113,7 +112,6 @@ export function RulesetEdit() {
                 onDelete={() => { set({ sources: d.sources.filter((x) => x.id !== s.id) }); if (s.id === selected) setSelected(undefined); }} />
             )} />
           )}
-          <label className="flex items-center gap-2.5 text-[13px]"><input type="checkbox" className="h-[18px] w-[18px] accent-accent" checked={!!d.noResolve} onChange={(x) => set({ noResolve: x.target.checked || undefined })} />IP 类规则统一加 <span className="font-mono">no-resolve</span></label>
         </div>
       </Card>
 

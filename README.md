@@ -61,3 +61,6 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 规则仓库索引与搜索已接通（2026-10-29）：启动服务后自动索引两个内置 GitHub 仓库，可搜索、筛选、查看预览并把文本变体导入规则集；管理员可更新与启停。当前导入使用文本托管，完整范围与后续项见 [规则仓库说明](docs/08-rule-repository-index.md)。
 
 管理列表（订阅源、配置订阅、组合、本地节点、规则集、模板，以及基础设置预设）统一使用服务端分页与名称搜索，默认每页 20 条，可切换 10 / 20 / 50 / 100 条。列表高度随剩余空间自适应，搜索栏与分页器保持可见。接口兼容说明见 [服务端文档](packages/server/README.md#管理列表分页)。
+
+
+规则仓库新增、编辑和同步统一通过匿名 HTTPS Git 获取信息，不依赖 GitHub API，不再提供 GitHub Token 配置。升级到 SQLite v14 自动清理旧凭据，保留订阅令牌。验收见 [Git 仓库验收](docs/16-git-only-repositories-verification.md)。

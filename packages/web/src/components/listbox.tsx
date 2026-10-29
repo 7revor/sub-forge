@@ -331,7 +331,7 @@ export function AsyncSelect({ loadOptions, onChange, placeholder = '请选择', 
         </div>)}
       </div>
       {(loading || error || page.nextOffset !== undefined || !page.options.length) && <div role="status" className="flex min-h-12 shrink-0 items-center justify-center gap-2 border-t border-line-2 px-3 py-2 text-center text-[12px] text-muted">
-        {loading ? '加载中…' : error ? <><span>加载失败</span><button type="button" className="shrink-0 rounded-md px-2 py-1 text-accent-ink hover:bg-ground" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full cursor-pointer rounded-md py-1 text-accent-ink hover:bg-ground" onClick={() => void more()}>加载更多</button> : '没有匹配的规则'}
+        {loading ? '加载中…' : error ? <><span>加载失败</span><button type="button" className="shrink-0 rounded-md px-2 py-1 text-accent-ink hover:bg-ground" onClick={() => page.options.length ? void more() : setRetry(x => x + 1)}>重试</button></> : page.nextOffset !== undefined ? <button type="button" className="w-full cursor-pointer rounded-md py-1 text-accent-ink hover:bg-ground" onClick={() => void more()}>加载更多</button> : <Empty size="compact" title="没有匹配的规则" className="w-full" />}
       </div>}
     </div>, document.body)}
   </>;

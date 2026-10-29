@@ -18,7 +18,7 @@ vi.mock('node:child_process', async importOriginal => {
       child.stdout?.on('data', data => { const pid = Number(String(data).trim()); if (pid) transport.pids.push(pid); });
       return child;
     }
-    const rewritten = [...input!];
+    const rewritten = input!.map(arg => /^https:\/\/github\.com\//.test(arg) ? transport.url : arg);
     const index = rewritten.indexOf('remote.origin.url');
     if (index >= 0) rewritten[index + 1] = transport.url;
     return original.spawn(command, rewritten, { ...options, env: { ...options?.env, GIT_ALLOW_PROTOCOL: 'file' } });
@@ -44,6 +44,24 @@ async function fixture() {
   return { root, upstream, git, cache, repo, path };
 }
 describe('真实 Git 本地缓存', () => {
+  it('通过真实 Git 远程握手识别默认分支和所有分支，包括斜杠名称', async () => {
+    const h = await fixture();
+    h.git('branch', 'release/2026');
+    expect(await h.cache.inspect(h.repo)).toEqual({ defaultBranch: 'main', branches: ['main', 'other', 'release/2026'] });
+    h.git('symbolic-ref', 'HEAD', 'refs/heads/other');
+    expect((await h.cache.inspect(h.repo)).defaultBranch).toBe('other');
+    h.git('symbolic-ref', 'HEAD', 'refs/heads/missing');
+    expect(await h.cache.inspect(h.repo)).toEqual({ branches: ['main', 'other', 'release/2026'] });
+  });
+  it('空仓库没有可用分支，不存在的仓库明确报错', async () => {
+    const h = await fixture();
+    const empty = join(h.root, 'empty'); await mkdir(empty);
+    execFileSync('git', ['init', '--bare', '--quiet', empty]);
+    transport.url = `file://${empty}`;
+    expect(await h.cache.inspect(h.repo)).toEqual({ branches: [] });
+    transport.url = `file://${join(h.root, 'missing')}`;
+    await expect(h.cache.inspect(h.repo)).rejects.toThrow('Git 更新失败');
+  });
   it('浅克隆覆盖深层目录和全部配置分支，忽略符号链接，正文按固定提交读取', async () => {
     const h = await fixture();
     const versions = await h.cache.sync(h.repo);
@@ -69,12 +87,12 @@ describe('真实 Git 本地缓存', () => {
     await h.cache.remove(h.repo.id); expect(await readdir(join(h.root, 'cache'))).toEqual([]);
     expect(await h.cache.sync(h.repo)).toEqual(versions);
   });
-  it('服务停止时终止 Git 及其子进程，释放锁且不留下进程', async () => {
+  it.each(['sync', 'inspect'] as const)('%s 停止时终止 Git 及其子进程，释放锁且不留下进程', async operation => {
     const h = await fixture(); transport.hang = true; transport.pids = [];
-    const pending = h.cache.sync(h.repo); const rejected = expect(pending).rejects.toThrow('取消');
+    const pending = h.cache[operation](h.repo); const rejected = expect(pending).rejects.toThrow('取消');
     await vi.waitFor(() => expect(transport.pids.length).toBe(2));
     await h.cache.stop(); await rejected;
     for (const pid of transport.pids) await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
-    await expect(h.cache.sync(h.repo)).rejects.toThrow('已停止');
+    await expect(h.cache[operation](h.repo)).rejects.toThrow('已停止');
   });
 });

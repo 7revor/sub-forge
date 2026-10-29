@@ -7,7 +7,9 @@ import type { Collection, LocalProxyGroup, RuleSet, RuleSetSource, Source, Templ
 import { api, type User } from './api.ts';
 
 export type FetchOptions = { ua?: string; timeoutMs?: number; ttlSec?: number };
-export type SourceDoc = Source & { fetch?: FetchOptions };
+/** 节点订阅源仅配置自动更新间隔，拉取身份和超时固定。 */
+export type SourceFetchOptions = Pick<FetchOptions, 'ttlSec'>;
+export type SourceDoc = Source & { fetch?: SourceFetchOptions };
 export type RuleSetSourceDoc = RuleSetSource & { fetch?: FetchOptions };
 export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[] };
 export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown> };
@@ -77,5 +79,5 @@ export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined
 /** 订阅源的拉取状态：最近一次成功的快照、最近一次是否失败（与总览共用缓存） */
 export function useSourceFetchState(source: SourceDoc | undefined) {
   const snaps = useQuery(snapshotOptions(source?.id));
-  return { snaps, ...sourceFetchSummary(snaps.data ?? []) };
+  return { snaps, ...sourceFetchSummary(snaps.data ?? [], source?.url) };
 }

@@ -9,6 +9,7 @@ export async function setupRuleReferences() {
   const calls: string[] = [];
   const env = setupApp({ fetcher: async url => { calls.push(url); return { status: 200, body }; } });
   const cache: RepoCache = {
+    inspect: async () => ({ defaultBranch: 'master', branches: ['master', 'surge-rule-set', 'surge-domain-set'] }),
     sync: async repo => Object.fromEntries(repo.refs.map(ref => [ref, 'a'.repeat(40)])),
     files: async () => ['rule/Surge/Google/Google.list', 'rule/Surge/OpenAI/OpenAI.list'],
     read: async () => body, remove: async () => {}, stop: async () => {},

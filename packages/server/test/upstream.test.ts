@@ -74,27 +74,6 @@ describe('上游拉取', () => {
     await expect(f2('https://a.example.com/')).rejects.toThrow(/过大/);
   });
 
-  it('GitHub Token 仅发送到 HTTPS API，同源跳转保留，跨源或降级后永久移除', async () => {
-    for (const target of ['https://raw.githubusercontent.com/file', 'http://api.github.com/file', 'https://api.github.com:8443/file', 'https://api.github.com.evil.example/file']) {
-      const seen: (string | undefined)[] = [];
-      const f = createUpstreamFetcher({ allow: NONE, fetchImpl: async (_url, init) => {
-        seen.push(init.headers.authorization);
-        if (seen.length === 1) return respond(302, '', { location: '/same-origin' });
-        if (seen.length === 2) return respond(302, '', { location: target });
-        if (seen.length === 3) return respond(302, '', { location: 'https://api.github.com/back' });
-        return respond(200, '{}');
-      } });
-      await f('https://api.github.com/start', { githubToken: 'test_token' });
-      expect(seen).toEqual(['Bearer test_token', 'Bearer test_token', undefined, undefined]);
-    }
-    const f = createUpstreamFetcher({ allow: NONE, fetchImpl: async (_url, init) => {
-      expect(init.headers.authorization).toBeUndefined();
-      return respond(200, '{}');
-    } });
-    await f('https://raw.githubusercontent.com/file', { githubToken: 'test_token' });
-    await f('https://api.github.com/file');
-  });
-
   it('userinfo 解析忽略无效字段', () => {
     expect(parseUserinfo('upload=x; total=5; foo=1')).toEqual({ total: 5 });
     expect(parseUserinfo(null)).toBeUndefined();
@@ -183,8 +162,28 @@ describe('快照服务', () => {
     await svc.refresh('source', 's', 'u');
     advance(301_000);
     await svc.refresh('source', 's', 'u');
-    expect(store.countSnapshots('source', 's', 'u')).toEqual({ ok: 2, failed: 0 });
+    expect(store.countSnapshots('source', 's', 'u')).toEqual({ ok: 1, failed: 0 });
     expect(store.latestSnapshot('source', 's', 'u')!.body).toBe(node('v2'));
+  });
+
+  it('更换地址时旧请求较晚结束，返回自身结果且不覆盖更新的成功记录', async () => {
+    const store = new Store(':memory:');
+    let finish: (response: { status: number; body: string }) => void = () => { throw new Error('旧请求未开始'); };
+    let now = 1;
+    const svc = new SnapshotService(store, async (url, opts) => {
+      expect(opts).toEqual({ ua: 'clash.meta', timeoutMs: 10000 });
+      if (url === 'old') return new Promise(resolve => { finish = resolve; });
+      return { status: 200, body: node('new') };
+    }, () => now);
+    try {
+      const old = svc.refresh('source', 's', 'old', { ua: '旧 UA', timeoutMs: 1 });
+      now = 2;
+      await svc.refresh('source', 's', 'new');
+      finish({ status: 200, body: node('old') });
+      expect(await old).toMatchObject({ ok: true, url: 'old', body: node('old') });
+      expect(store.snapshotHistory('source', 's')).toHaveLength(1);
+      expect(store.latestSnapshot('source', 's', 'new')?.body).toBe(node('new'));
+    } finally { store.close(); }
   });
 
   it('无变动的刷新清除此前的失败提示', async () => {
