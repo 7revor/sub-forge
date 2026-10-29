@@ -240,6 +240,7 @@ export class RenderService {
     const report: ReportItem[] = [];
     for (const src of sources) {
       const bodies: string[] = [];
+      const failures: ReportItem[] = [];
       for (const url of src.urls ?? []) {
         const r = await this.snapshots.get('source', src.id, url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
         if (r.snapshot?.body !== undefined) {
@@ -247,9 +248,14 @@ export class RenderService {
           hashes.push(`${src.id}|${url}|${r.snapshot.hash}`);
           if (r.snapshot.userinfo) userinfo.set(src.id, r.snapshot.userinfo);
         }
-        if (r.error) report.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
+        if (r.error) failures.push({ level: 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
       }
-      if (bodies.length) inputs.snapshots[src.id] = bodies;
+      if (bodies.length) {
+        inputs.snapshots[src.id] = bodies;
+        // 同一源仍有可用内容（含成功快照）时允许部分输出；不改变组合成员整体不可用的策略。
+        for (const failure of failures) failure.level = 'warn';
+      }
+      report.push(...failures);
     }
     return { inputs, userinfo, hashes, report };
   }
