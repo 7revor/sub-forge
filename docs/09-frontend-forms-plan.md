@@ -101,7 +101,8 @@ P1 缺口（GRP-05/06、RL-04、RB-04、BS-04、系统设置页、SYS-06）放�
   - socks5 / http：username、password、tls
 
   另有公共分组：TLS（tls、servername / sni、skip-cert-verify、client-fingerprint、alpn）、传输（ws-opts / grpc-opts / h2-opts，按 network 显示）、通用（udp、tfo、ip-version）。
-- 原始配置：当前节点的 mihomo YAML。另外提供分组级的原始视图，即整个分组的 `proxies:` 列表，方便批量编辑。
+- 页面结构：`/locals` 分组列表 → `/locals/:id` 分组详情（节点表）→ `/locals/:id/nodes/:index` 节点编辑子页（`new` 为新增）。节点表单不再放在分组页右侧，子页保存即写回整个分组。
+- 原始配置：当前节点的 mihomo YAML（在节点子页）。另外提供分组级的原始视图，即整个分组的 `proxies:` 列表，方便批量编辑（在分组详情的「更多」菜单）。
 - 前置：策略组只存在于 Profile 中，本地节点组不属于任何 Profile，所以这里只能选单个节点（改用 `NodePicker`）。前置为组的需求在 Profile 的代理链里设置，界面上说明这一点，并提供跳转。
 
 ### 4.3 基础设置（BS-01 – 03）
