@@ -158,16 +158,20 @@ export class RuleRepoService {
     const scans = parseScans(body);
     if (this.stopped) throw new HttpError(409, '索引服务已停止');
     const current = this.rows().some(r => r.id === id) ? this.definition(id) : undefined;
-    let license = current?.license ?? '见上游仓库许可证';
-    if (!current || current.owner !== input.owner || current.repo !== input.repo || scans.some(s => !s.ref)) {
-      let metadata: { private: boolean; default_branch: string; license?: { spdx_id?: string } | null };
-      try { metadata = await this.json(`https://api.github.com/repos/${input.owner}/${input.repo}`); }
-      catch (error) { throw new HttpError(502, `无法读取公开 GitHub 仓库：${error instanceof Error ? error.message : String(error)}`); }
-      if (metadata.private !== false || typeof metadata.default_branch !== 'string' || !metadata.default_branch) throw bad('仅支持公开 GitHub 仓库，或上游仓库信息无效');
-      const defaultRef = parseCustomRepo({ url: body.url, ref: metadata.default_branch }).ref!;
-      for (const scan of scans) if (!scan.ref) scan.ref = defaultRef;
-      license = metadata.license?.spdx_id && metadata.license.spdx_id !== 'NOASSERTION' ? metadata.license.spdx_id : '见上游仓库许可证';
+    let remote;
+    try { remote = await this.cache.inspect({ id, owner: input.owner, repo: input.repo }); }
+    catch (error) { throw new HttpError(502, `无法通过 Git 读取公开仓库：${error instanceof Error ? error.message : String(error)}`); }
+    if (!remote.branches.length) throw bad('仓库没有可用分支，请先向上游提交内容');
+    for (const scan of scans) {
+      if (!scan.ref) {
+        if (!remote.defaultBranch) throw bad('无法识别仓库默认分支，请手动填写分支');
+        scan.ref = parseCustomRepo({ url: body.url, ref: remote.defaultBranch }).ref!;
+      }
+      if (!remote.branches.includes(scan.ref)) throw bad(`仓库分支不存在：${scan.ref}`);
     }
+    // Git 不提供托管平台的许可证分类；保留同仓库已有说明或使用上游提示。
+    const sameRepo = current?.owner.toLowerCase() === input.owner.toLowerCase() && current.repo.toLowerCase() === input.repo.toLowerCase();
+    let license = sameRepo ? current.license : '见上游仓库许可证';
     if (body.license !== undefined) {
       if (typeof body.license !== 'string' || body.license.length > 200 || /[\x00-\x1f]/.test(body.license)) throw bad('许可证需为不超过 200 字的文本');
       license = body.license;
@@ -247,12 +251,6 @@ export class RuleRepoService {
     const row = this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ? AND key = ?').get(repo, path) as { data: string } | undefined;
     if (!row) throw notFound('仓库规则');
     return JSON.parse(row.data) as IndexedEntry;
-  }
-  private async json<T>(url: string): Promise<T> {
-    const token = this.store.getGithubToken();
-    const response = await this.fetcher(url, { ua: 'Sub-Forge-rule-index', timeoutMs: 20_000, ...(token ? { githubToken: token } : {}) });
-    if (response.status !== 200) throw new Error(`GitHub 返回 HTTP ${response.status}`);
-    return JSON.parse(response.body) as T;
   }
   private async readFile(repo: RepoDefinition, file: RepoFile): Promise<string> {
     this.assertEnabled(repo.id);

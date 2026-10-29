@@ -74,7 +74,7 @@ export function RuleRepoPage() {
                 </button>
               );
             })}
-            {!items.length && !search.isFetching && <div className="px-4 py-4"><Empty title={debounced ? `没有找到「${debounced}」` : '暂无可用索引，请等待首次更新或联系管理员'} /></div>}
+            {search.data && !items.length && !search.isFetching && !search.error && <div className="px-4 py-4"><Empty title={debounced ? `没有找到「${debounced}」` : '暂无可用索引，请等待首次更新或联系管理员'} /></div>}
             </div>
             {(search.data?.total ?? 0) > 50 && <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line-2 p-3">
               <Button size="sm" disabled={offset === 0 || search.isFetching} onClick={() => setOffset(Math.max(0, offset - 50))}>上一页</Button>
