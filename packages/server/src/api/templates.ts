@@ -5,7 +5,7 @@ import { normalizeRulePresence } from '../rule-presence.ts';
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { ruleSetDelivery, parseRuleSourceContent, validateTemplate, sourceLabel, stableStringify, type ReportItem, type Template } from '@sub-forge/core';
+import { ruleSetDelivery, parseRuleSourceContent, rejectedRuleReport, validateTemplate, sourceLabel, stableStringify, type ReportItem, type Template } from '@sub-forge/core';
 import { readPagination } from './pagination.ts';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
@@ -79,7 +79,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
         continue;
       }
       const parsed = parseRuleSourceContent(content, src);
-      if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', message: `${label}有 ${parsed.rejected.length} 行无法解析或不支持`, where });
+      if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', ...rejectedRuleReport(content, src, rs.sources.indexOf(src)), where });
     }
   }
   // 保留资源诊断，同时提供可直接展开定位的规则行错误。

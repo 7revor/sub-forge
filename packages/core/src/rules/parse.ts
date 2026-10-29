@@ -12,7 +12,7 @@ export const DECODED_MRS_HEADER = '# sub-forge: decoded-mrs-v1';
 export class UnsupportedRuleError extends Error {}
 
 export type ParsedRule = { line: number; text: string; rule: RuleIR };
-export type RejectedRule = { line: number; text: string; reason: string };
+export type RejectedRule = { line: number; text: string; reason: string; kind: 'invalid' | 'unimplemented' };
 export type Behavior = 'domain' | 'ipcidr' | 'classical';
 
 export type RuleSetParseResult =
@@ -80,7 +80,7 @@ export function parseRuleLine(text: string): RuleIR {
     case 'AND':
     case 'OR':
     case 'NOT':
-      throw new UnsupportedRuleError('逻辑规则暂不支持（RS-04，P1）');
+      throw new UnsupportedRuleError('暂不支持逻辑规则');
     default: {
       const proc = PROCESS_TYPES[type];
       if (proc) return { type: 'PROCESS', ...proc, value };
@@ -162,7 +162,7 @@ export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto'
     try {
       rules.push({ ...e, rule: lineParser(e.text) });
     } catch (err) {
-      rejected.push({ ...e, reason: (err as Error).message });
+      rejected.push({ ...e, reason: (err as Error).message, kind: err instanceof UnsupportedRuleError ? 'unimplemented' : 'invalid' });
     }
   }
   return { passthrough: false, format: fmt === 'domain' ? 'domain-set' : fmt, rules, rejected, behavior, ...(fmt === 'yaml' ? { conversion: 'yaml-to-list' as const } : {}) };

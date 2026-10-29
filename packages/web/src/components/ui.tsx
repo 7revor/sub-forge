@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
+import type { ReportItem } from '@sub-forge/core';
 import { X } from 'lucide-react';
 
 export { ErrorAlert } from './FeedbackHost.tsx';
@@ -191,7 +192,7 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
 
 /** 渲染报告条目列表；定位入口保持为可键盘操作的按钮。 */
 export function ReportList({ items, onLocate, canLocate = () => true }: {
-  items: { level: 'error' | 'warn' | 'info'; code: string; message: string; where?: string }[];
+  items: ReportItem[];
   onLocate?: (where: string) => void; canLocate?: (where: string) => boolean;
 }) {
   if (!items.length) return <div className="text-[13px] text-ok">没有问题</div>;
@@ -200,6 +201,24 @@ export function ReportList({ items, onLocate, canLocate = () => true }: {
   return <ul className="m-0 flex list-none flex-col p-0">
     {items.map((item, index) => {
       const locate = !!onLocate && !!item.where && canLocate(item.where);
+      if (item.ruleIssues?.length) return <li key={index} className="border-b border-line-2 py-2.5 last:border-0">
+        <div className="flex flex-wrap items-center gap-2 text-[13px]">
+          <Badge tone={tone[item.level]}>{text[item.level]}</Badge><span>{item.message}</span>
+          {locate && <button type="button" className="cursor-pointer border-0 bg-transparent p-0 text-accent" onClick={() => onLocate!(item.where!)}>定位规则</button>}
+        </div>
+        <details className="mt-1 text-[12px]">
+          <summary className="w-fit cursor-pointer text-muted">查看详情</summary>
+          <div className="mt-2 max-h-64 overflow-auto overscroll-contain">
+            {(['unimplemented', 'invalid'] as const).map(kind => {
+              const issues = item.ruleIssues!.filter(issue => issue.kind === kind);
+              return issues.length > 0 && <div key={kind} className="mb-2 last:mb-0">
+                <strong>{kind === 'unimplemented' ? '类型不支持' : '写法有误'}</strong>
+                {issues.map((issue, i) => <div key={i} className="mt-1 break-words text-muted">来源 {issue.source} · 第 {issue.line} 行：{issue.reason}</div>)}
+              </div>;
+            })}
+          </div>
+        </details>
+      </li>;
       const content = <>
         <span className="flex items-center gap-2"><Badge tone={tone[item.level]}>{text[item.level]}</Badge><span className="font-mono text-[11.5px] text-muted">{item.code}</span></span>
         <span className="text-[13px] leading-relaxed">{item.message}</span>

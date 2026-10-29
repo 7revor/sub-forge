@@ -59,7 +59,7 @@ export function prepareRuleDocument(content: string, source: RuleSetSource): Rul
     for (const { p, valid } of entries) {
       if (valid && 'rule' in p) attach(p.line, p.text, { parsed: p });
       else if ('reason' in p) {
-        const diagnostic: RuleDiagnostic = { ...p, sourceId: source.id, kind: p.reason.includes('不支持') ? 'unimplemented' : 'invalid' };
+        const diagnostic: RuleDiagnostic = { ...p, sourceId: source.id, kind: p.kind };
         result.diagnostics.push(diagnostic);
         attach(p.line, p.text, { diagnostic });
       }
