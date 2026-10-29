@@ -19,16 +19,30 @@ PROCESS-NAME,/Applications/*/Slack.app/*
 PROCESS-PATH-WILDCARD,/usr/bin/*
 PROCESS-NAME-REGEX,(?i)^code$
 IP-ASN,AS62041
-USER-AGENT,Notion*
+UNKNOWN,Notion*
 AND,((DOMAIN,a.com),(DST-PORT,443))`;
     const r = parseRuleSetContent(text);
     if (r.passthrough) throw new Error('unexpected');
     expect(r.format).toBe('classical');
     expect(r.rules.map((x) => x.rule)).toMatchSnapshot();
     expect(r.rejected.map((x) => [x.line, x.reason])).toEqual([
-      [13, '不支持的规则类型 USER-AGENT'],
+      [13, '不支持的规则类型 UNKNOWN'],
       [14, '逻辑规则暂不支持（RS-04，P1）'],
     ]);
+  });
+
+  it('USER-AGENT 保留通配与大小写，只在 Surge 输出，文本往返不丢失', () => {
+    const text = 'USER-AGENT,PayPal?*';
+    const rule = parseRuleLine(text);
+    expect(rule).toEqual({ type: 'USER-AGENT', value: 'PayPal?*' });
+    expect(formatRuleLine(rule)).toBe(text);
+    for (const platform of ['macos', 'ios'] as const) {
+      expect(lowerRule(rule, { client: 'surge', platform })).toEqual({ kind: 'ok', text });
+    }
+    for (const platform of [undefined, 'android'] as const) {
+      expect(lowerRule(rule, { client: 'mihomo', platform })).toEqual({ kind: 'drop', reason: 'mihomo 不支持 USER-AGENT' });
+    }
+    expect(() => parseRuleLine('USER-AGENT,')).toThrow('缺少规则值');
   });
 
   it('自动识别 DOMAIN-SET、纯 CIDR、mihomo YAML payload', () => {

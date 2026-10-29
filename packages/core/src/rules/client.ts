@@ -71,6 +71,8 @@ const nr = (r: { noResolve?: boolean }) => (r.noResolve ? { noResolve: true } : 
 
 function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
+    case 'USER-AGENT':
+      return { kind: 'drop', reason: 'mihomo 不支持 USER-AGENT' };
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule), ...(rule.src ? { src: true } : {}) };
     case 'NETWORK':
@@ -91,7 +93,7 @@ function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
 
 function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
-    case 'DOMAIN': case 'DOMAIN-SUFFIX': case 'DOMAIN-KEYWORD': case 'DOMAIN-WILDCARD':
+    case 'DOMAIN': case 'DOMAIN-SUFFIX': case 'DOMAIN-KEYWORD': case 'DOMAIN-WILDCARD': case 'USER-AGENT':
       return { kind: 'ok', text: `${rule.type},${rule.value}` };
     case 'DOMAIN-REGEX':
       return { kind: 'drop', reason: 'Surge 不支持 DOMAIN-REGEX' };

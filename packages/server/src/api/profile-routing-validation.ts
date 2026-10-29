@@ -19,7 +19,7 @@ function checkPrependRule(value: unknown): void {
     return;
   }
   if (['AND', 'OR', 'NOT'].includes(value.type)) throw bad('前置逻辑规则请使用 RAW 文本编辑');
-  const types = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'GEOSITE', 'SRC-IP-CIDR', 'DST-PORT', 'SRC-PORT', 'NETWORK', 'PROCESS'];
+  const types = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'USER-AGENT', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'GEOSITE', 'SRC-IP-CIDR', 'DST-PORT', 'SRC-PORT', 'NETWORK', 'PROCESS'];
   if (!types.includes(value.type) || !isStr(value.value) || /[\r\n]/.test(value.value)) throw bad('前置规则类型或规则值不合法');
   if (value.type === 'NETWORK' && !['tcp', 'udp'].includes(value.value)) throw bad('NETWORK 只能是 tcp 或 udp');
   if (value.type === 'PROCESS' && (!['name', 'path'].includes(String(value.kind)) || !['exact', 'wildcard', 'regex'].includes(String(value.mode)))) throw bad('进程规则匹配方式不合法');

@@ -75,6 +75,7 @@ type RuleIR =
   | { type: 'IP-CIDR' | 'IP-CIDR6' | 'IP-ASN' | 'SRC-IP-CIDR'; value: string; noResolve?: boolean }
   | { type: 'GEOSITE' | 'GEOIP'; value: string; noResolve?: boolean }
   | { type: 'DST-PORT' | 'SRC-PORT'; value: string }
+  | { type: 'USER-AGENT'; value: string }       // Surge 专用；mihomo 输出为客户端不支持注释
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string } // 语义化
   | { type: 'AND' | 'OR' | 'NOT'; children: RuleIR[] }

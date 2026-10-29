@@ -83,3 +83,5 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 
 2026-10-29 绑定规则页的说明与间距修正不涉及内核数据或渲染变更。
+
+`USER-AGENT` 解析为独立 IR，保留大小写与通配值；Surge 正常输出，mihomo 按客户端不支持处理。来源解析诊断、客户端输出诊断分别计数。

@@ -31,7 +31,7 @@ export function checkRuleSetOverrides(value: unknown): void {
     if (['AND', 'OR', 'NOT'].includes(r.type as string)) return Array.isArray(r.children) && r.children.length > 0 && r.children.every(rule);
     if (r.type === 'PROCESS') return ['name', 'path'].includes(r.kind as string) && ['exact', 'wildcard', 'regex'].includes(r.mode as string) && isStr(r.value);
     if (r.type === 'NETWORK') return r.value === 'tcp' || r.value === 'udp';
-    return ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'SRC-IP-CIDR', 'GEOSITE', 'GEOIP', 'DST-PORT', 'SRC-PORT'].includes(r.type as string) && isStr(r.value);
+    return ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'USER-AGENT', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'SRC-IP-CIDR', 'GEOSITE', 'GEOIP', 'DST-PORT', 'SRC-PORT'].includes(r.type as string) && isStr(r.value);
   };
   value.forEach((item, i) => {
     const at = `客户端改写第 ${i + 1} 条`;

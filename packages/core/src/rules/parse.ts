@@ -59,6 +59,7 @@ export function parseRuleLine(text: string): RuleIR {
     case 'GEOIP':
       return { type, value, ...ipOptions };
     case 'GEOSITE':
+    case 'USER-AGENT':
       return { type, value };
     case 'DST-PORT':
     case 'DEST-PORT':

@@ -274,3 +274,5 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 
 
 2026-10-29 绑定规则页的说明与间距修正仅调整前端呈现，无服务端、数据库或种子变更。
+
+规则转换支持 `USER-AGENT`：来源读取计为已解析，POST 预览与 GET 下载对 Surge 输出有效规则，mihomo 保留客户端不支持注释；全部没有有效输出时 GET 仍返回 400。

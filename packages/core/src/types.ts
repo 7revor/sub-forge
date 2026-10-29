@@ -104,6 +104,7 @@ export type RuleIR =
   | { type: DomainRuleType; value: string }
   | { type: IpRuleType; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'GEOSITE'; value: string }
+  | { type: 'USER-AGENT'; value: string }
   | { type: 'GEOIP'; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'DST-PORT' | 'SRC-PORT'; value: string }
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }

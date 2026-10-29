@@ -100,11 +100,12 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
 }
 
 /**
- * 规则的 classical 文本（mihomo 写法，可被 parseRuleLine 读回）。
+ * 规则的 classical 文本（可被 parseRuleLine 读回，保留客户端专用规则）。
  * 用于把旧规则包里的单条规则迁移成本地来源。
  */
 export function formatRuleLine(rule: RuleIR): string {
   if (rule.type === 'RAW') return rule.text;
+  if (rule.type === 'USER-AGENT') return `${rule.type},${rule.value}`;
   const l = lowerRule(rule, { client: 'mihomo' });
   if (l.kind === 'drop') return `# ${l.reason}`;
   return [l.text, ...(l.noResolve ? ['no-resolve'] : []), ...(l.src ? ['src'] : [])].join(',');

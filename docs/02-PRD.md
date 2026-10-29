@@ -134,7 +134,7 @@
 | --- | --- | --- |
 | RS-01 | 来源：一个规则集可引用**多个**来源，每个来源是本地编辑的规则或远程 URL（带缓存与失败快照，同 SRC-02/03）；来源可排序、单独启用 / 停用（2026-10-29 起，取代原单一来源） | P0 |
 | RS-02 | 可解析格式：Surge/Clash classical 文本（`TYPE,value[,options]`）、Surge `DOMAIN-SET`、mihomo rule-provider YAML（`payload:`，behavior=classical/domain/ipcidr）、纯域名/纯 CIDR 文本；sing-box 源格式 JSON 为 P2；`mrs` / `srs` 二进制只做**透传**不解析 | P0 |
-| RS-03 | 解析后统一为规则中间表示（IR），记录无法解析/不支持的行 | P0 |
+| RS-03 | 解析后统一为规则中间表示（IR），记录无法解析/不支持的行；`USER-AGENT` 正常解析，仅 Surge 输出，mihomo 按客户端不支持处理（2026-10-29） | P0 |
 | RS-04 | 支持逻辑规则 `AND / OR / NOT`（作为单条规则） | P1 |
 | RS-05 | 规则集对外提供转换后的下载地址（按客户端/behavior 输出），供配置中的 rule-provider / RULE-SET 引用（2026-10-29：规则集页面不再单独展示下载地址，实际地址以配置订阅「预览」为准） | P0 |
 | RS-07 | 2026-10-29 首期已接通内置索引、名称搜索、筛选、预览与文本变体导入；动态变体引用、自定义仓库待实现。**内置规则仓库**：可搜索内置 GitHub 规则仓库（blackmatrix7、zydou 等）并直接引用，按客户端自动挑选变体，详见 [08](08-rule-repository-index.md) | P0 |
