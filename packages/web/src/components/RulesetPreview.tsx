@@ -62,7 +62,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
       {stats ? <>已解析 {stats.parsed} 条 · 未解析 {stats.rejected} 行 · 去重 {stats.duplicates} 条 · 有效输出 {stats.output} 条<br />改写移除 {stats.removed} 条 · 替换 {stats.replaced} 条 · 追加 {stats.appended} 条 · 客户端无法输出 {stats.unsupported} 条 · 降级 {stats.degraded} 条</> : '等待转换结果'}
     </div>
     <div className="flex min-h-8 flex-wrap items-center gap-2 text-[12px] text-muted" role="status">
-      {status ?? `${result?.lines.length ?? 0} 行（含注释和预留行）；切换客户端保留行位，YAML 和多条替换可通过来源行号定位。`}
+      {status ?? `${result?.lines.length ?? 0} 行`}
       {(preview.error || sourceError) ? <FieldError error={preview.error || sourceError} /> : null}
       {sourceError ? <Button size="sm" onClick={() => void onRefreshSources()} disabled={sourceReading}>重新读取来源</Button> : null}
       {preview.error && <Button size="sm" onClick={() => void preview.refetch()} disabled={!ready || !settled || preview.isFetching}>重新转换</Button>}
