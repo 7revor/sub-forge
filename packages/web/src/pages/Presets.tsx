@@ -32,7 +32,7 @@ export function PresetEdit() {
 
   return (
     <DetailShell listPath="/presets" listLabel="基础设置预设" isNew={e.isNew} name={d.name} dirty={e.dirty || !rawValid} saving={e.save.isPending} saveDisabled={!rawValid}
-      onSave={() => rawValid && e.submit((x) => ({ ...x, version: e.isNew ? 1 : x.version + 1 }))} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
+      onSave={() => rawValid && e.submit((x) => ({ ...x, version: e.isNew ? 1 : x.version + 1 }))} saveError={e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}>
       <p className="m-0 text-[13px] text-muted">Surge 段在 M2 提供</p>
       <Card title="预设">
         <div className="flex flex-col gap-3.5">

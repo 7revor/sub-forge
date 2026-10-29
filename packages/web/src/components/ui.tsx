@@ -164,15 +164,16 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
   if (!open) return null;
+  // 设计稿「对话框与危险操作」：标题 + 关闭、内容、灰底操作栏；宽度 560（表单）/ 720（粘贴、YAML）
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={cx('w-full rounded-xl bg-panel shadow-xl', wide ? 'max-w-3xl' : 'max-w-lg')}>
-        <div className="flex items-center justify-between border-b border-line-2 px-5 py-3.5">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={cx('flex w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
+        <div className="flex items-center justify-between gap-3 px-5 pt-[18px] pb-2">
           <h2 className="m-0 text-base font-semibold">{title}</h2>
-          <button type="button" aria-label="关闭" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-md hover:bg-ground cursor-pointer"><X size={16} /></button>
+          <button type="button" aria-label="关闭" onClick={onClose} className="grid h-8 w-8 cursor-pointer place-items-center rounded-md text-muted hover:bg-ground hover:text-ink"><X size={16} /></button>
         </div>
-        <div className="flex flex-col gap-3.5 px-5 py-4">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-line-2 px-5 py-3">{footer}</div>}
+        <div className="flex flex-col gap-3.5 px-5 pt-2 pb-[18px]">{children}</div>
+        {footer && <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-line-2 bg-[#fafbfc] px-5 py-3.5">{footer}</div>}
       </div>
     </div>
   );

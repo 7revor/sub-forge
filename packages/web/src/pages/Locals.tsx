@@ -68,7 +68,7 @@ export function LocalEdit() {
 
   return (
     <DetailShell listPath="/locals" listLabel="本地节点组" isNew={e.isNew} name={d.name} dirty={e.dirty || rawInvalid} saving={e.save.isPending} saveDisabled={rawInvalid}
-      onSave={() => { if (!rawInvalid) e.submit(); }} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
+      onSave={() => { if (!rawInvalid) e.submit(); }} saveError={e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}>
       <Card title="分组"><Field label="名称">{(id) => <Input id={id} value={d.name} onChange={(x) => e.setDraft({ ...d, name: x.target.value })} />}</Field></Card>
       <div className="flex flex-wrap items-start gap-5">
         <Card title="节点" className="min-w-0 flex-[1_1_320px]" bodyClass="px-4 pb-3"

@@ -22,8 +22,9 @@ export function useDocEditor<K extends Kind>(kind: K, empty: DocMap[K]) {
     if (isNew) delete body.id;
     save.mutate(body, { onSuccess: (item) => { if (isNew) navigate(`/${kind}/${(item as { id: string }).id}`, { replace: true }); } });
   };
-  const remove = (name: string) => {
-    if (!draft || !confirm(`删除「${name}」？`)) return;
+  /** 由 DetailShell 的确认对话框调用 */
+  const remove = () => {
+    if (!draft) return;
     del.mutate((draft as { id: string }).id, { onSuccess: () => navigate(`/${kind}`) });
   };
   return { id, isNew, doc, draft, setDraft, dirty, save, submit, del, remove };

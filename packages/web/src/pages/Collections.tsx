@@ -39,7 +39,7 @@ export function CollectionEdit() {
   const options = all.filter((n) => !(n.ref.type === 'collection' && n.ref.id === d.id));
   return (
     <DetailShell listPath="/collections" listLabel="组合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
-      onSave={() => e.submit()} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
+      onSave={() => e.submit()} saveError={e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}>
       <Card title="基本信息"><Field label="名称">{(id) => <Input id={id} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field></Card>
       <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">成员</h2><span className="text-[12.5px] text-muted">按顺序合并；前后缀等价于自动追加一个改名处理器，避免多源同名。组合之间不能成环。</span></div>}
         actions={<div className="flex gap-2"><div className="w-56"><NodeSetSelect label="要加入的成员" value={adding} options={options} onChange={setAdding} /></div>

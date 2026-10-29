@@ -56,7 +56,7 @@ export function RulesetEdit() {
 
   return (
     <DetailShell listPath="/rulesets" listLabel="规则集" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
-      onSave={() => { if (!overridesError) e.submit((x) => (x.kind === 'remote' ? { ...x, content: undefined } : { ...x, url: undefined })); }} saveError={overridesError ?? e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
+      onSave={() => { if (!overridesError) e.submit((x) => (x.kind === 'remote' ? { ...x, content: undefined } : { ...x, url: undefined })); }} saveError={overridesError ?? e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}>
       <div className="flex flex-wrap items-start gap-5">
         <Card title="来源" className="min-w-0 flex-[999_1_520px]">
           <div className="flex flex-col gap-3.5">
@@ -181,7 +181,7 @@ export function BundleEdit() {
 
   return (
     <DetailShell listPath="/bundles" listLabel="规则包" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
-      onSave={() => e.submit()} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
+      onSave={() => e.submit()} saveError={e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}>
       <Card title="基本信息">
         <div className="flex flex-wrap items-end gap-5">
           <Field label="名称" className="min-w-64 flex-1">{(id) => <Input id={id} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
