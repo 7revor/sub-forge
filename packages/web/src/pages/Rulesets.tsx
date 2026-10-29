@@ -16,7 +16,7 @@ import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, FieldError, Field, Input, Switch, Textarea, buttonClass, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, FieldError, Field, Input, Textarea, buttonClass, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
@@ -141,7 +141,6 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
   src: RuleSetSourceDoc; handle: ReactNode; active: boolean; status?: RulesetSourceStatus; loading: boolean;
   onSelect: () => void; onChange: (p: Partial<RuleSetSourceDoc>) => void; onDelete: () => void;
 }) {
-  const on = src.enabled !== false;
   const label = sourceLabel(src);
   const editingUrl = active && src.kind === 'remote' && !src.repository;
   const title = editingUrl ? src.name?.trim() || '远程地址' : label;
@@ -151,7 +150,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
     ? [!editingUrl && src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${detected}`].filter(Boolean).join(' · ')
     : `本地 · ${detected} · ${lines} 行`;
   return (
-    <div className={cx('my-2 rounded-lg border', active ? 'border-accent bg-[#f8faff]' : 'border-line', !on && 'opacity-60')}>
+    <div className={cx('my-2 rounded-lg border', active ? 'border-accent bg-[#f8faff]' : 'border-line')}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 pr-3 pl-2">
         {handle}
         <button type="button" aria-pressed={active} onClick={onSelect} className="flex min-w-0 flex-[1_1_260px] cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left">
@@ -165,7 +164,6 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
         </button>
         {src.kind === 'remote' && src.repository && src.url && <CopyButton text={src.url} size="sm" variant="ghost" aria-label={`复制关联地址 ${label}`}>复制地址</CopyButton>}
         <SourceStatus src={src} status={status} loading={loading} />
-        <Switch label={`启用 ${label}`} checked={on} onChange={(v) => onChange({ enabled: v ? undefined : false })} />
         <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${label}`} onClick={onDelete}><Trash2 size={14} /></Button>
       </div>
       {active && (

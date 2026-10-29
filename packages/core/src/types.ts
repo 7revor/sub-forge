@@ -109,7 +109,7 @@ export type RuleIR =
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string }
   | { type: 'AND' | 'OR' | 'NOT'; children: RuleIR[] }
-  | { type: 'RAW'; client: Client; text: string };
+  | { type: 'RAW'; client?: Client; text: string }; // 不指定 client 时按目标客户端原样输出，兼容旧的客户端专用 RAW
 
 export type ClientOverride = {
   when: { client: Client; platform?: Platform };
@@ -135,6 +135,7 @@ export type RuleSetSource = {
   behavior?: 'domain' | 'ipcidr' | 'classical';
   /** 仅兼容旧数据；新改写统一存放在 RuleSet.overrides，按规则内容定位 */
   overrides?: { line?: number; match?: string; override: ClientOverride }[];
+  /** @deprecated 仅兼容旧输入；保存或迁移时移除停用来源并清除此字段。 */
   enabled?: boolean;
 };
 
@@ -207,6 +208,7 @@ export type RuleEntry = {
   matcher: Matcher;
   target: Target;
   options?: { noResolve?: boolean; src?: boolean };
+  /** @deprecated 仅兼容旧输入；规则以存在与否决定生效。 */
   enabled?: boolean;
 };
 
@@ -245,7 +247,11 @@ export type ProfileNodeSet = { ref: NodeSetID; output: 'provider' | 'inline'; pr
 
 export type RoutingConfig = Pick<Template, 'groups' | 'rules' | 'final'>;
 export type ProfileRouting =
-  | { mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]> }
+  | {
+    mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]>;
+    /** 按显示顺序优先于全部模板规则，仅允许单条匹配。 */
+    prependRules?: RuleEntry[];
+  }
   | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version: number; name?: string } };
 
 export type Profile = {

@@ -4,6 +4,7 @@
 import { usesClashDomains } from './remote.ts';
 import { parse as parseYaml } from 'yaml';
 import type { Client, RuleIR, RuleSetFormat, RuleSetSource } from '../types.ts';
+import { rawRuleParts } from './raw.ts';
 
 // 二进制读取层在解码文本前写入此标记，防止把转换后正文误判为可直连的原始 URL。
 export const DECODED_MRS_HEADER = '# sub-forge: decoded-mrs-v1';
@@ -180,7 +181,15 @@ export function ruleKey(rule: RuleIR, client?: Client): string {
     case 'PROCESS': return `PROCESS|${rule.kind}|${rule.mode}|${client === 'mihomo' && rule.mode === 'wildcard' ? rule.value.toLowerCase() : rule.value}`;
     case 'DOMAIN-WILDCARD': return `${rule.type}|${client === 'mihomo' ? rule.value.toLowerCase() : rule.value}`;
     case 'AND': case 'OR': case 'NOT': return `${rule.type}|${rule.children.map(child => ruleKey(child, client)).join(';')}`;
-    case 'RAW': return `RAW|${rule.client}|${rule.text}`;
+    case 'RAW': {
+      if (client === 'mihomo' && (!rule.client || rule.client === client)) {
+        const match = /^(PROCESS-(NAME|PATH)-WILDCARD|DOMAIN-WILDCARD)\s*,\s*(.+)$/i.exec(rawRuleParts(rule.text).text);
+        if (match) return match[2]
+          ? `PROCESS|${match[2].toLowerCase()}|wildcard|${match[3]!.toLowerCase()}`
+          : `DOMAIN-WILDCARD|${match[3]!.toLowerCase()}`;
+      }
+      return `RAW|${rule.client ?? '*'}|${rule.text}`;
+    }
     default: return `${rule.type}|${rule.value}`;
   }
 }

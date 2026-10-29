@@ -10,10 +10,10 @@ describe('匹配类型切换', () => {
   it('切回规则时清空规则集引用，重复选择不会重置草稿', () => {
     const set: Matcher = { kind: 'ruleset', id: 'rs_test' };
     expect(changeMatcherKind(set, 'ruleset')).toBe(set);
-    expect(changeMatcherKind(set, 'rule')).toEqual({ kind: 'rule', rule: { type: 'DOMAIN', value: '' } });
+    expect(changeMatcherKind(set, 'rule')).toEqual({ kind: 'rule', rule: { type: 'RAW', text: '' } });
   });
 });
 
 it('从远程 URL 切换到单条规则时移除引用字段', () => {
-  expect(changeMatcherKind({kind:'ruleset',id:'remote:test',remote:{url:'https://example.test/rules'}},'rule')).toEqual({kind:'rule',rule:{type:'DOMAIN',value:''}});
+  expect(changeMatcherKind({kind:'ruleset',id:'remote:test',remote:{url:'https://example.test/rules'}},'rule')).toEqual({kind:'rule',rule:{type:'RAW',text:''}});
 });

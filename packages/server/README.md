@@ -241,6 +241,9 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 
 2026-10-29 规则转换：合并预览及实际订阅资源对 mihomo wildcard 按小写键去重，保留首条原文；存在重复 wildcard 的远程文本和 YAML 自动返回托管资源，下载与合并预览一致。单来源原文预览仍保留全部行，接口及保存数据无需迁移。
 
+
+2026-10-29：订阅私有规则、规则集改写和模板发布均接受 `{ type: "RAW", text: "完整匹配原文" }`，client 可省略，旧客户端专用 RAW 继续兼容。接口校验空白 / 多行 RAW；未知单行规则类型可原样保存。出口仍由 RuleEntry.target 配置，no-resolve / src 由输出层置于出口后。种子改写示例采用 RAW，既有 demo 单条规则保留原表示；旧 IR 编辑后写 RAW，无批量数据迁移。
+
 ## 模板关系与旧数据升级（数据库 v16）
 
 新订阅保存 `routing.mode = bound | independent`、空 `overlay` 与 `revision`。绑定只允许模板 ID 和 `groupAdditions`，保存须带 GET 返回的 `templateVersion`；独立保存完整 groups/rules/final，初始化来源仅作说明。旧的 template/overlay 创建请求与种子会自动转换，新模式 PUT 不允许回退为旧形状。
@@ -260,3 +263,14 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 订阅 ID、归属、链接、基础设置、节点源、代理链及 last-good/版本资源保留；迁移前后有效分流配置必须一致。历史孤儿项原本不生效，留在备份与诊断中。缺失模板版本或旧合并错误会中止整批迁移，不能靠丢弃配置继续启动；修复旧库后再试。回退旧程序应恢复升级前整库及对应密钥，单份 Profile 备份不等于数据库降级工具。
 
 示例种子保留原 `demo` 的筛选配置及 `demo-token`，将其完整展开为独立模式；另有 `demo-bound` / `demo-bound-token` 演示纯成员绑定。
+
+
+绑定订阅的 `routing.prependRules` 可选，保存与草稿预览只接受单条规则，检查规则内容、出口归属与节点集成员。模板发布检查前置引用，引用组删除或规则 ID 冲突不允许 force；转换为独立配置保留前置规则，重新绑定显式映射组出口。现有绑定订阅无新增迁移。内置浏览器隔离验收入口：`pnpm exec tsx test/manual-prepend-rules-server.ts`，结束后用 SIGINT/SIGTERM 关闭。
+
+
+### 规则存在即生效（SQLite v17）
+
+保存、自检、预览及发布共用规则清理：旧 enabled:false 条目移除，其余清除标记。v17 在事务中处理规则集、模板全部版本、独立订阅与绑定前置规则，保持有效输出、归属、更新时间、链接和历史资源。旧种子导入执行同一清理，旧备份不修改。示例移除默认停用的 YAML/仓库来源。隔离浏览器入口为 `pnpm exec tsx test/manual-rule-presence-server.ts`，完成后关闭服务。
+
+
+2026-10-29 绑定规则页的说明与间距修正仅调整前端呈现，无服务端、数据库或种子变更。

@@ -1,9 +1,9 @@
-import type { ReportItem, RuleIR } from '@sub-forge/core';
+import { rawRuleError, type ReportItem, type RuleIR } from '@sub-forge/core';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
 
 export function incompleteRule(rule: RuleIR): boolean {
   if ('value' in rule) return !rule.value.trim();
-  if (rule.type === 'RAW') return !rule.text.trim();
+  if (rule.type === 'RAW') return !!rawRuleError(rule.text);
   return !rule.children.length || rule.children.some(incompleteRule);
 }
 

@@ -1,15 +1,15 @@
-import type { Matcher, ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
+import { withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Button, Empty, Switch, buttonClass, cx } from '../../components/ui.tsx';
+import { Button, Empty, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
 
-const columns = 'grid grid-cols-[36px_minmax(0,1fr)] gap-x-3 sm:grid-cols-[44px_minmax(0,1fr)_172px_88px] sm:gap-x-5';
+const columns = 'grid grid-cols-[36px_minmax(0,1fr)] gap-x-3 sm:grid-cols-[44px_minmax(0,1fr)_172px_32px] sm:gap-x-5';
 const editClass = 'inline-flex min-h-8 shrink-0 cursor-pointer items-center rounded px-1 text-[12px] font-medium text-accent-ink hover:bg-accent-soft';
 
 function summary(matcher: Matcher, ctx: ConvertCtx) {
@@ -30,12 +30,11 @@ function RuleFields({ rule, onChange, ctx, report }: {
   const refs = ctx.rulesets;
   const changeRule = (next: RuleIR) => {
     if (matcher.kind !== 'rule') return;
-    const ip = 'noResolve' in next || ['IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'SRC-IP-CIDR'].includes(next.type);
-    onChange({ ...rule, matcher: { ...matcher, rule: next }, ...(ip && rule.options?.noResolve !== undefined ? { options: { ...rule.options, noResolve: false } } : {}) });
+    const { noResolve: _noResolve, src: _src, ...options } = rule.options ?? {};
+    onChange({ ...rule, matcher: { ...matcher, rule: next }, ...(rule.options ? { options } : {}) });
   };
-  // 历史数据可能把 IP 规则的 no-resolve 放在 options 中，统一交给 RuleEditor 编辑。
-  const ir = matcher.kind === 'rule' && rule.options?.noResolve && ['IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'SRC-IP-CIDR'].includes(matcher.rule.type)
-    ? { ...matcher.rule, noResolve: true } : matcher.kind === 'rule' ? matcher.rule : undefined;
+  // 旧选项合并到 RAW 回显，编辑后从独立 options 移除，避免删除文本选项后又被补回。
+  const ir = matcher.kind === 'rule' ? withIpOptions(matcher.rule, rule.options ?? {}) : undefined;
   return <div className="flex flex-col gap-3">
     <ItemIssues report={report} where={`rule:${rule.id}`} />
     <MatcherEditor fixedKind value={matcher} rulesets={refs} ruleValue={ir} onRuleChange={changeRule} onChange={(matcher) => onChange({ ...rule, matcher })} />
@@ -63,14 +62,14 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         <span className="text-[12px] text-muted">自上而下匹配，拖动调整顺序。</span>
       </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="添加规则">
-        <Button size="sm" aria-label="添加单条规则" onClick={() => add({ kind: 'rule', rule: { type: 'DOMAIN', value: '' } })}><Plus size={14} aria-hidden />单条规则</Button>
+        <Button size="sm" aria-label="添加单条规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} aria-hidden />单条规则</Button>
         <RemoteRulePicker label="远程 URL" ariaLabel="引用远程 URL" triggerClassName={buttonClass('default', 'sm')} onSelect={add} />
         <RuleSetPicker label="系统规则集" ariaLabel="引用系统规则集" onSelect={add} triggerClassName={buttonClass('default', 'sm')} />
       </div>
     </div>
     <div className="min-w-0">
       {!value.rules.length && <Empty className="py-6" title="没有规则" />}
-      {!!value.rules.length && <div className={`${columns} hidden border-b border-line pb-2 sm:grid text-[12px] text-muted`}><span>顺序</span><span>匹配规则</span><span>出口</span><span>启用</span></div>}
+      {!!value.rules.length && <div className={`${columns} hidden border-b border-line pb-2 sm:grid text-[12px] text-muted`}><span>顺序</span><span>匹配规则</span><span>出口</span><span>操作</span></div>}
         <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
           const error = report.some((r) => r.level === 'error' && r.where === `rule:${rule.id}`);
           const text = summary(rule.matcher, ctx);
@@ -81,8 +80,8 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
               <div className="min-w-0">
                 <div className="flex min-h-9 items-center gap-2">
                   {rule.matcher.kind === 'rule' ? <button type="button" aria-expanded={expanded} onClick={() => onSelect(expanded ? undefined : rule.id)}
-                    className={cx('min-w-0 cursor-pointer rounded text-left font-medium break-all hover:text-accent-ink', rule.enabled === false ? 'text-muted' : 'text-ink', error && 'text-err')}>{text.title}</button>
-                    : <span className={cx('min-w-0 truncate font-medium', rule.enabled === false ? 'text-muted' : 'text-ink')} title={text.title}>{text.title}</span>}
+                    className={cx('min-w-0 cursor-pointer rounded text-left font-medium break-all text-ink hover:text-accent-ink', error && 'text-err')}>{text.title || '填写规则内容'}</button>
+                    : <span className="min-w-0 truncate font-medium text-ink" title={text.title}>{text.title}</span>}
                   {rule.matcher.kind === 'ruleset' ? rule.matcher.remote
                     ? <RemoteRulePicker value={rule.matcher.remote.url} label="编辑" ariaLabel={`编辑第 ${i + 1} 条远程规则`} triggerClassName={editClass} onSelect={matcher => update({ ...rule, matcher })} />
                     : <RuleSetPicker label="更换" ariaLabel={`更换第 ${i + 1} 条规则集`} triggerClassName={editClass} onSelect={matcher => update({ ...rule, matcher })} />
@@ -102,9 +101,8 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
                   </label>}
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5">
-                  <span className="text-[12px] text-muted sm:hidden">启用</span>
+                  <span className="text-[12px] text-muted sm:hidden">操作</span>
                   <div className="flex h-[38px] items-center gap-3">
-                    <Switch label={`启用第 ${i + 1} 条规则`} checked={rule.enabled !== false} onChange={(enabled) => update({ ...rule, enabled })} />
                     <button type="button" title={`删除第 ${i + 1} 条规则`} aria-label={`删除第 ${i + 1} 条规则`} className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted hover:bg-err-soft hover:text-err" onClick={() => { onChange({ ...value, rules: value.rules.filter((r) => r.id !== rule.id) }); if (selected === rule.id) onSelect(undefined); }}><Trash2 size={16} aria-hidden /></button>
                   </div>
                 </div>

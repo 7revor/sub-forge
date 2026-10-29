@@ -78,7 +78,7 @@ type RuleIR =
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string } // 语义化
   | { type: 'AND' | 'OR' | 'NOT'; children: RuleIR[] }
-  | { type: 'RAW'; client: Client; text: string };   // 逃生通道：只对指定客户端原样输出
+  | { type: 'RAW'; client?: Client; text: string };  // 单条原文；未指定客户端时按目标客户端原样输出，旧 client 限制继续生效
 
 type ClientOverride = {
   when: { client: Client; platform?: Platform };
@@ -413,6 +413,9 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 2026-10-29：ruleKey 增加可选目标客户端；仅 mihomo 的进程 wildcard 与 DOMAIN-WILDCARD 对值执行 toLowerCase 后生成去重键，不改写 RuleIR 或来源内容。convertRuleDocuments 与 expandRuleSet 共用该键，替换及追加也参与；重复项保留来源行位并写为注释。单来源原文预览继续保留重复行。ruleSetDelivery 检测远程 wildcard 重复并强制托管（含 YAML），让实际下载与合并预览一致。客户端未指定时维持原有大小写敏感键，仓库索引计数不变。
 
+
+2026-10-29 RAW 为单条编辑的默认表示，text 保存完整匹配原文，不含出口；client 改为可选，不设置时在目标客户端原样输出，设置时保留旧的客户端专用语义。新建与编辑写入 RAW；已有结构化 IR 不做批量迁移。RAW 不受 parseRuleLine 的类型枚举限制，不进行客户端方言翻译，语法由目标客户端解释。末尾 no-resolve / src 在 Lowering 中拆成选项，由 composeRule 在出口之后输出，避免重复；旧 RuleEntry 选项在表单回显时合入文本，编辑后移除独立副本。RAW wildcard 与结构化 wildcard 共用 mihomo 大小写去重键。空白及多行 RAW 不允许保存 / 发布或输出。模板 YAML 识别既有 RAW 并保留原文、稳定 ID 和覆盖；未知语法回落为 RAW，已支持的既有 IR 导入逻辑继续兼容。
+
 ## 2026-10-29：订阅分流所有权与数据库 v16
 
 ```ts
@@ -432,3 +435,22 @@ type ProfileRouting =
 `POST /api/profiles/routing/convert` 接受订阅草稿、目标 mode、模板版本与组映射，返回草稿和变更清单，不写库。绑定转独立保留完整有效配置；重新绑定替换模板负责的结构、规则和最终出口，仅迁移显式映射的成员与代理链/节点回退引用。不迁移使用 null 明确表达，仍被引用的组不能丢弃。最终 PUT 使用 revision 原子保存，模板版本过期拒绝。发布前试渲染所有绑定订阅，检查过程中的并发改动拒绝发布。
 
 `profile-migration-plan` 通过 SQLite backup 在临时一致性副本上迁移，源库只读；输出订阅名称、目标模式、原因及诊断，不包含完整配置或令牌。操作步骤见 server README。
+
+
+### 2026-10-29：绑定模式前置规则扩展
+
+`ProfileRouting` 的 `bound` 分支增加可选 `prependRules: RuleEntry[]`，按显示顺序保存，只允许 `matcher.kind: rule`，不携带锚点，不修改模板。缺省等同空数组，已有绑定订阅无需数据库迁移。有效规则为 `prependRules + template.rules`；禁用项保留顺序但不输出，最终出口仍为 `template.final`。编辑器通过倒序 top 锚点兼容旧覆盖层视图，保存仅写 routing。
+
+前置节点出口共用 `resolveTarget / nameForNode`：默认 wrap 生成精确过滤的隐藏组，copy 复制到顶层，inline 内联节点集；与代理链重复引用时复用依赖。保存及草稿预览检查出口归属、节点集已加入订阅、匹配项和规则 ID；规则 ID 不得与模板或其他前置规则冲突。模板发布检查全部前置出口（含禁用项、节点兜底组），删除所引用组或引入冲突 ID 时不可强制发布。绑定转独立会将前置规则完整固化，绑定间转换映射前置出口及兜底组。
+
+规则出口也会生成包装组与本地副本，因此代理链的成环与跳数检查在全部规则出口解析完成后执行，确保 `include-all-proxies` 等动态成员纳入新增副本。
+
+
+### 2026-10-29：移除规则启停状态（SQLite v17）
+
+`RuleEntry.enabled` 与 `RuleSetSource.enabled` 仅保留旧输入兼容。规则集保存、模板自检/发布、订阅保存/预览和种子导入将 `enabled:false` 的规则或来源移除，其他项清除 enabled 字段；同时清理仓库文件映射中的来源标记。当前数据以数组成员决定生效，不再持久化启停。
+
+SQLite v17 在事务中处理规则集、全部模板历史版本、独立订阅规则和绑定订阅前置规则；先展开仍存在的旧覆盖层，再移除停用项，避免锚点丢失。文档归属、更新时间、模板版本号、订阅链接及历史渲染资源保持原值。旧备份保持原文。既有运行时兼容读取不影响新数据的规范化。旧 YAML 的 disabled 注释按删除对应规则导入，导出不再写该注释或启用字段。
+
+
+2026-10-29 绑定规则页的说明位置、搜索区间距及规则行对齐仅为前端样式修正，不更改数据模型、接口、种子或输出规则。

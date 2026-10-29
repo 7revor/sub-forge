@@ -303,9 +303,6 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     for (const n of matched) setDialer(set, n, via);
   }
 
-  // ---------- 链环与跳数（REF-09）----------
-  checkChains(sets, groups, wrappers, wrapperNode, copies, providerOverride, report);
-
   // ---------- 规则 ----------
   const ruleLines: string[] = [];
   const ruleProviders: Record<string, Record<string, unknown>> = {};
@@ -381,6 +378,9 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
   }
   const finalName = resolveTarget(eff.final, 'final') ?? 'DIRECT';
   ruleLines.push(`MATCH,${finalName}`);
+
+  // 规则出口也可能新增节点副本或包装组，全部解析后再检查 include-all 等动态成员的链环。
+  checkChains(sets, groups, wrappers, wrapperNode, copies, providerOverride, report);
 
   // ---------- 输出 ----------
   const inlineProxies = [...[...sets.values()].filter((s) => s.output === 'inline').flatMap((s) => s.nodes), ...copies.map((c) => ({ ...c.node, name: c.name }))].map(stripNode);

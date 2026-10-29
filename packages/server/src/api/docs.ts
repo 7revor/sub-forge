@@ -1,3 +1,4 @@
+import { normalizeRulePresence } from '../rule-presence.ts';
 import { migrateProfile, profileTemplate } from '../profile-routing.ts';
 import type { ProfileDoc } from '../docs.ts';
 // 文档增删改查：订阅源、组合、本地节点组、规则集、配置订阅（按用户隔离），基础设置预设（管理员维护，所有人可读）。
@@ -56,6 +57,7 @@ export function docRoutes(store: Store) {
       const body = await jsonBody(c);
       let doc = validateDoc(kind, body, randomId(9), user, store);
       if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), revision: 1, migration: undefined };
+      doc = normalizeRulePresence(kind, doc);
       store.put(kind, doc, shared ? null : user.id);
       return c.json({ item: doc }, 201);
     });
@@ -71,6 +73,7 @@ export function docRoutes(store: Store) {
       if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.revision !== (current.doc as ProfileDoc).revision) throw new HttpError(409, '订阅已被其他编辑更新，请重新加载后保存');
       let doc = validateDoc(kind, body, id, user, store);
       if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), revision: ((current.doc as ProfileDoc).revision ?? 0) + 1, migration: (current.doc as ProfileDoc).migration };
+      doc = normalizeRulePresence(kind, doc);
       store.put(kind, doc, shared ? null : user.id);
       return c.json({ item: doc });
     });

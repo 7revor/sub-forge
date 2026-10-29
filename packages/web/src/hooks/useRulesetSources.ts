@@ -11,7 +11,6 @@ export function useRulesetSources(id: string | undefined, draft: RuleSetDoc | un
   const queryClient = useQueryClient();
   const results = useQueries({ queries: sources.map(source => ({
     ...rulesetSourceQuery(id, source),
-    enabled: source.enabled !== false || source.id === selected,
   })) });
   const state = rulesetSourceState(sources, results, selected);
   const previous = useRef(new Map<string, RulesetSourceStatus>());
@@ -22,7 +21,7 @@ export function useRulesetSources(id: string | undefined, draft: RuleSetDoc | un
   const statuses = new Map(sources.map((s, i) => [s.id, results[i]!.error ? { id: s.id, ok: false, error: results[i]!.error!.message } : results[i]!.data?.status ?? previous.current.get(s.id)]));
   const loading = new Set(sources.filter((_, i) => results[i]!.isFetching).map(s => s.id));
   // 防抖尚未追上时不要用旧正文配合新设置发送转换请求。
-  const current = JSON.stringify(sources.map(s => [sourceReadInput(s), s.enabled])) === JSON.stringify((draft?.sources ?? []).map(s => [sourceReadInput(s), s.enabled]));
+  const current = JSON.stringify(sources.map(s => sourceReadInput(s))) === JSON.stringify((draft?.sources ?? []).map(s => sourceReadInput(s)));
   return {
     statuses, loading, ready: !!draft && current && state.ready, reading: !current || state.reading,
     refresh: async () => {
@@ -31,7 +30,7 @@ export function useRulesetSources(id: string | undefined, draft: RuleSetDoc | un
       await Promise.allSettled(state.required.map(i => queryClient.fetchQuery(rulesetSourceQuery(id, sources[i]!, true))));
     },
     inputs: (draft?.sources ?? []).map(source => ({
-      source: { id: source.id, kind: source.kind, format: source.format, url: source.url, repository: source.repository, fetch: source.fetch, behavior: source.behavior, enabled: source.enabled, overrides: source.overrides },
+      source: { id: source.id, kind: source.kind, format: source.format, url: source.url, repository: source.repository, fetch: source.fetch, behavior: source.behavior, overrides: source.overrides },
       content: results[sources.findIndex(s => s.id === source.id)]?.data?.content,
     })),
     error: state.error,

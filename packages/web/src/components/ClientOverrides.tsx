@@ -1,15 +1,15 @@
 import type { ReactNode } from 'react';
-import type { ClientOverride, Platform, RuleIR } from '@sub-forge/core';
+import { rawRuleError, type ClientOverride, type Platform, type RuleIR } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { RuleEditor } from './RuleEditor.tsx';
-import { emptyRule } from './rule.ts';
+import { rawRuleFromText } from './rule.ts';
 import { SortableList } from './SortableList.tsx';
 import { Button, FieldError, Field, Select, cx } from './ui.tsx';
 
 export function ruleInputError(rule: RuleIR | undefined): string | undefined {
-  if (!rule) return '请选择规则类型并填写规则值。';
+  if (!rule) return '请填写 RAW 规则。';
   if ('value' in rule) return rule.value.trim() ? undefined : '请填写规则值。';
-  if (rule.type === 'RAW') return rule.text.trim() ? undefined : '请填写原样规则。';
+  if (rule.type === 'RAW') return rawRuleError(rule.text);
   return !rule.children.length || rule.children.some((child) => ruleInputError(child)) ? '请填写完整的逻辑规则。' : undefined;
 }
 
@@ -23,7 +23,7 @@ export function clientOverridesError(overrides: ClientOverride[]): string | unde
   return undefined;
 }
 
-export const newClientOverride = (): ClientOverride => ({ when: { client: 'mihomo' }, action: { replace: [emptyRule('DOMAIN')] } });
+export const newClientOverride = (): ClientOverride => ({ when: { client: 'mihomo' }, action: { replace: [rawRuleFromText('')] } });
 
 export function ClientOverrides({ value, onChange, single = false, allowAppend = false, matchInput, leading, trailing }: {
   value: ClientOverride[]; onChange: (value: ClientOverride[]) => void; single?: boolean; allowAppend?: boolean; matchInput?: ReactNode;
@@ -42,7 +42,7 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
           <Field label="改写类型" className="col-span-full sm:col-span-1">{(id) => <Select id={id} value={action} onChange={(event) => {
               const next = event.target.value;
               if (next === action) return;
-              update(index, { ...override, action: next === 'drop' ? { drop: true } : next === 'append' ? { append: replacements ?? [emptyRule('DOMAIN')] } : { replace: replacements ?? [emptyRule('DOMAIN')] } });
+              update(index, { ...override, action: next === 'drop' ? { drop: true } : next === 'append' ? { append: replacements ?? [rawRuleFromText('')] } : { replace: replacements ?? [rawRuleFromText('')] } });
             }}><option value="replace">替换</option><option value="drop">丢弃</option>{allowAppend && <option value="append">追加</option>}</Select>}</Field>
           <Field label="客户端">{(id) => <Select id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
             <option value="mihomo">mihomo</option><option value="surge">Surge</option>
@@ -59,14 +59,13 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
       {replacements && <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2 pl-8">
           <span className="text-[12.5px] font-medium text-muted">{action === 'append' ? '追加规则' : '替换为'}</span>
-          <Button size="sm" variant="ghost" onClick={() => setRules([...replacements, emptyRule('DOMAIN')])}><Plus size={14} />添加{ruleLabel}规则</Button>
+          <Button size="sm" variant="ghost" onClick={() => setRules([...replacements, rawRuleFromText('')])}><Plus size={14} />添加{ruleLabel}规则</Button>
         </div>
         <div className="flex flex-col gap-3 pl-8">
           {replacements.map((rule, i) => <div key={i} className="flex items-start gap-2">
-            <div className="min-w-0 flex-1"><RuleEditor compact value={rule}
-              onChange={(next) => setRules(replacements.map((item, j) => j === i ? next : item))}
-              onIncomplete={(next) => setRules(replacements.map((item, j) => j === i ? next : item))} /></div>
-            <Button size="sm" variant="ghost" className="mt-6" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
+            <div className="min-w-0 flex-1"><RuleEditor value={rule}
+              onChange={(next) => setRules(replacements.map((item, j) => j === i ? next : item))} /></div>
+            <Button size="sm" variant="ghost" className="mt-[3px]" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
               onClick={() => setRules(replacements.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
           </div>)}
         </div>
