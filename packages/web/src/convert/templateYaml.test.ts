@@ -47,6 +47,28 @@ function imported(text: string, current = empty, context = ctx) {
 }
 
 describe('模板与 mihomo YAML 双向转换', () => {
+  it.each([
+    'IN-TYPE,SOCKS/HTTP', 'AND,((DOMAIN,a.test),(NETWORK,tcp))',
+    'DOMAIN-REGEX,^(a, b)$', 'IP-SUFFIX,8.8.8.8/24,no-resolve,src',
+  ])('RAW 表单与 YAML 往返保留原文、稳定 ID、出口和选项：%s', text => {
+    const body: TemplateBody = { ...empty, rules: [{ id: 'raw', matcher: { kind: 'rule', rule: { type: 'RAW', text } }, target: direct }] };
+    const yaml = templateToYaml(body, ctx);
+    const output = parse(yaml).rules[0] as string;
+    if (text.endsWith(',no-resolve,src')) expect(output).toBe('IP-SUFFIX,8.8.8.8/24,DIRECT,no-resolve,src');
+    else expect(output).toBe(`${text},DIRECT`);
+    expect(imported(yaml, body).value.rules[0]).toEqual(body.rules[0]);
+    const changed = imported(yaml.replace(',DIRECT', ',REJECT'), body).value.rules[0]!;
+    expect(changed.id).toBe('raw');
+    expect(changed.matcher).toEqual(body.rules[0]!.matcher);
+    expect(changed.target).toEqual({ kind: 'builtin', name: 'REJECT' });
+  });
+  it('未知单条语法从 YAML 导入为 RAW，不因现有类型枚举而丢弃', () => {
+    const result = imported('rules: ["IN-TYPE,SOCKS/HTTP,DIRECT", "AND,((DOMAIN,a.test),(NETWORK,tcp)),DIRECT", "MATCH,DIRECT"]');
+    expect(result.value.rules.map(rule => rule.matcher)).toEqual([
+      { kind: 'rule', rule: { type: 'RAW', text: 'IN-TYPE,SOCKS/HTTP' } },
+      { kind: 'rule', rule: { type: 'RAW', text: 'AND,((DOMAIN,a.test),(NETWORK,tcp))' } },
+    ]);
+  });
   it('空组行为固定，原始配置不再保留可覆盖的 empty-fallback', () => {
     const body = fixture();
     body.groups[0]!.extra = { ...body.groups[0]!.extra, 'empty-fallback': 'DIRECT' };
@@ -92,7 +114,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
   it('返回表单按字段清理策略组，并跳过坏规则、保留其他规则的身份', () => {
     const body = fixture();
     const yaml = templateToYaml(body, ctx).replace('interval: 300', 'interval: wrong')
-      .replace('hidden: true', 'hidden: wrong').replace('DOMAIN,disabled.example,DIRECT', 'UNKNOWN,disabled.example,DIRECT')
+      .replace('hidden: true', 'hidden: wrong').replace('DOMAIN,disabled.example,DIRECT', 'DOMAIN,,DIRECT')
       .replace('自动测速', '新的测速组').replaceAll('自动测速', '新的测速组');
     const result = templateFormFromYaml(yaml, body, ctx);
     expect(result.value.groups[1]).toMatchObject({ id: 'g_url', name: '新的测速组', test: { timeout: 5000 }, display: {} });
@@ -100,7 +122,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     expect(result.value.groups[1]!.display).not.toHaveProperty('hidden');
     expect(result.value.rules.map((rule) => rule.id)).toEqual(body.rules.slice(1).map((rule) => rule.id));
     expect(result.value.rules[0]!.enabled).toBe(true);
-    for (const key of ['interval', 'hidden', 'UNKNOWN']) expect(result.notes.join()).toContain(key);
+    for (const key of ['interval', 'hidden', '缺少规则值']) expect(result.notes.join()).toContain(key);
   });
 
   it('组必填项和列表内容错误也能返回表单，保留可编辑字段', () => {
@@ -223,7 +245,7 @@ rules:
     ['未知组类型', 'proxy-groups:\n  - name: 代理\n    type: relay\nrules: []', '类型「relay」不受支持'],
     ['节点出口', 'rules:\n  - DOMAIN,example.com,香港节点', '第 1 条规则「DOMAIN,example.com,香港节点」'],
     ['不存在的规则集', 'rules:\n  - RULE-SET,不存在,DIRECT', '规则集「不存在」不存在'],
-    ['规则解析失败', 'rules:\n  - UNKNOWN,example.com,DIRECT', '第 1 条规则「UNKNOWN,example.com,DIRECT」'],
+    ['规则缺少值', 'rules:\n  - DOMAIN,,DIRECT', '第 1 条规则「DOMAIN,,DIRECT」'],
   ])('%s 返回中文错误和行号', (_name, yaml, error) => {
     const result = templateFromYaml(yaml, empty, ctx);
     expect(result.ok).toBe(false);

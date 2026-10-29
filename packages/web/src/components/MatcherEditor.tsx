@@ -19,7 +19,7 @@ export function MatcherEditor({ value, onChange, rulesets, ruleValue, onRuleChan
     {!fixedKind && <Field label="匹配项类型">{(id) => <Select id={id} value={value.kind} onChange={(event) => onChange(changeMatcherKind(value, event.target.value as Matcher['kind']))}>
       <option value="rule">单条规则</option><option value="ruleset">规则集</option>
     </Select>}</Field>}
-    {value.kind === 'rule' ? <RuleEditor value={ruleValue ?? value.rule} onChange={changeRule} onIncomplete={changeRule} />
+    {value.kind === 'rule' ? <RuleEditor value={ruleValue ?? value.rule} onChange={changeRule} />
       : <Field label="规则集">{(id) => <>
         {value.id && <span className="break-all text-[13px]">{value.repository?.name ?? `本地 · ${rulesets.find(item => item.id === value.id)?.name ?? `${value.id}（当前不可用）`}`}</span>}
         <RuleSetPicker key={value.id} id={id} label={value.id ? '更换规则集' : '选择规则集'} onSelect={onChange} />

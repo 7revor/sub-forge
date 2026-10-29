@@ -1,6 +1,7 @@
 // 按客户端的规则改写与降级（CR-01 / CR-02，docs/04 §3）。
 
 import type { Client, ClientOverride, Platform, RuleIR } from '../types.ts';
+import { rawRuleError, rawRuleParts } from './raw.ts';
 
 export type ClientCtx = { client: Client; platform?: Platform };
 
@@ -16,8 +17,13 @@ export function composeRule(l: { text: string; noResolve?: boolean; src?: boolea
   return `${l.text}${target === undefined ? '' : `,${target}`}${l.noResolve ? ',no-resolve' : ''}${l.src ? ',src' : ''}`;
 }
 
-/** IP 选项只影响目标 IP 规则；不能把域名规则转成来源 IP 匹配。 */
+/** 结构化选项仅作用于目标 IP；RAW 合并原文选项，由目标客户端解释。 */
 export function withIpOptions(rule: RuleIR, options: { noResolve?: boolean; src?: boolean }): RuleIR {
+  if (rule.type === 'RAW' && (options.noResolve || options.src)) {
+    if (rawRuleError(rule.text)) return rule;
+    const parts = rawRuleParts(rule.text);
+    return { ...rule, text: composeRule({ ...parts, ...(options.noResolve ? { noResolve: true } : {}), ...(options.src ? { src: true } : {}) }) };
+  }
   if (rule.type !== 'IP-CIDR' && rule.type !== 'IP-CIDR6' && rule.type !== 'IP-ASN' && rule.type !== 'GEOIP') return rule;
   return { ...rule, ...(options.noResolve ? { noResolve: true } : {}), ...(options.src ? { src: true } : {}) };
 }
@@ -77,7 +83,7 @@ function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'AND': case 'OR': case 'NOT':
       return { kind: 'drop', reason: '逻辑规则暂不支持（P1）' };
     case 'RAW':
-      return rule.client === ctx.client ? { kind: 'ok', text: rule.text } : { kind: 'drop', reason: `原样规则仅对 ${rule.client} 输出` };
+      return lowerRaw(rule, ctx);
     default:
       return { kind: 'ok', text: `${rule.type},${rule.value}` };
   }
@@ -116,8 +122,14 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'AND': case 'OR': case 'NOT':
       return { kind: 'drop', reason: '逻辑规则暂不支持（P1）' };
     case 'RAW':
-      return rule.client === ctx.client ? { kind: 'ok', text: rule.text } : { kind: 'drop', reason: `原样规则仅对 ${rule.client} 输出` };
+      return lowerRaw(rule, ctx);
   }
+}
+
+function lowerRaw(rule: Extract<RuleIR, { type: 'RAW' }>, ctx: ClientCtx): LoweredRule {
+  if (rule.client && rule.client !== ctx.client) return { kind: 'drop', reason: `原样规则仅对 ${rule.client} 输出` };
+  const error = rawRuleError(rule.text);
+  return error ? { kind: 'drop', reason: error } : { kind: 'ok', ...rawRuleParts(rule.text) };
 }
 
 /** 规则匹配部分（不含出口）的客户端写法 */

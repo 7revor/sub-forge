@@ -1,8 +1,9 @@
+import { ruleToLine } from '../../components/rule.ts';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { Notice } from '../../components/Notice.tsx';
 // 模板规则只改启用和出口；私有规则支持拖拽、匹配项及客户端覆盖编辑。
 
-import type { Matcher, RuleEntry, RuleIR, Target } from '@sub-forge/core';
+import { withIpOptions, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
@@ -14,12 +15,7 @@ import { useProfile } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
 
 export function ruleText(r: RuleIR): string {
-  switch (r.type) {
-    case 'PROCESS': return `进程 ${r.kind === 'name' ? '名称' : '路径'} · ${{ exact: '精确', wildcard: '通配', regex: '正则' }[r.mode]} · ${r.value}`;
-    case 'AND': case 'OR': case 'NOT': return `${r.type}(…)`;
-    case 'RAW': return `${r.client} 原样：${r.text}`;
-    default: return `${r.type},${r.value}${'noResolve' in r && r.noResolve ? ',no-resolve' : ''}`;
-  }
+  return ruleToLine(r);
 }
 
 function useMatcherLabel() {
@@ -40,15 +36,21 @@ function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (v
   const rulesets = useRuleSetRefs().data ?? [];
   const matcher = value.matcher;
   return <div className="flex flex-col gap-3.5">
-    <MatcherEditor value={matcher} rulesets={rulesets} onChange={(matcher) => onChange({ ...value, matcher })} />
+    <MatcherEditor value={matcher} rulesets={rulesets}
+      ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, value.options ?? {}) : undefined}
+      onRuleChange={(rule) => {
+        if (matcher.kind !== 'rule') return;
+        const { noResolve: _noResolve, src: _src, ...options } = value.options ?? {};
+        onChange({ ...value, matcher: { ...matcher, rule }, ...(value.options ? { options } : {}) });
+      }} onChange={(matcher) => onChange({ ...value, matcher })} />
     <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
-    <div className="flex flex-wrap gap-5">
+    {matcher.kind === 'ruleset' && <div className="flex flex-wrap gap-5">
       <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 no-resolve" checked={value.options?.noResolve === true}
         onChange={(noResolve) => onChange({ ...value, options: { ...value.options, noResolve } })} />no-resolve</label>
       <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={value.options?.src === true}
         onChange={(src) => onChange({ ...value, options: { ...value.options, src } })} />src</label>
-    </div>
+    </div>}
     {matcher.kind === 'rule' && <details>
       <summary className="cursor-pointer text-[13px] font-medium">客户端覆盖（{matcher.overrides?.length ?? 0} 条）</summary>
       <div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={(overrides) => onChange({ ...value, matcher: { ...matcher, overrides } })} /></div>
@@ -59,7 +61,7 @@ function PrivateRuleFields({ value, onChange }: { value: RuleEntry; onChange: (v
 function ExtraRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (anchor: ExtraRule['anchor'], rule: RuleEntry) => void }) {
   const { template } = useProfile();
   const [anchor, setAnchor] = useState('top');
-  const [rule, setRule] = useState<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'DIRECT' }, enabled: true }));
+  const [rule, setRule] = useState<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' }, enabled: true }));
   const error = privateRuleError(rule);
   return <Modal title="插入私有规则" open onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
     const position: ExtraRule['anchor'] = anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };

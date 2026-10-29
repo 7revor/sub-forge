@@ -10,6 +10,6 @@ describe('匹配类型切换', () => {
   it('切回规则时清空规则集引用，重复选择不会重置草稿', () => {
     const set: Matcher = { kind: 'ruleset', id: 'rs_test' };
     expect(changeMatcherKind(set, 'ruleset')).toBe(set);
-    expect(changeMatcherKind(set, 'rule')).toEqual({ kind: 'rule', rule: { type: 'DOMAIN', value: '' } });
+    expect(changeMatcherKind(set, 'rule')).toEqual({ kind: 'rule', rule: { type: 'RAW', text: '' } });
   });
 });

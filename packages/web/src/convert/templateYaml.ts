@@ -1,4 +1,4 @@
-import { composeRule, lowerRule, parseRuleLine, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
+import { composeRule, lowerRule, parseRuleLine, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
 import { Document, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
 import { recoverYaml } from './recoverYaml.ts';
 import { parseYamlDocument } from './yamlDocument.ts';
@@ -95,10 +95,11 @@ function matcherKey(m: Matcher): string {
 
 function restoreRule(matcher: Matcher, old: RuleEntry | undefined, noResolve: boolean, src: boolean): Pick<RuleEntry, 'matcher' | 'options'> {
   const options = { ...old?.options };
-  const keepSrcInRule = old?.matcher.kind === 'rule' && 'src' in old.matcher.rule && old.options?.src === undefined;
+  const oldRaw = old?.matcher.kind === 'rule' && old.matcher.rule.type === 'RAW' ? rawRuleParts(old.matcher.rule.text) : undefined;
+  const keepSrcInRule = old?.matcher.kind === 'rule' && ('src' in old.matcher.rule || oldRaw?.src) && old.options?.src === undefined;
   if (!keepSrcInRule && (src || old?.options?.src !== undefined)) options.src = src;
-  const oldNoResolve = old?.options?.noResolve || (old?.matcher.kind === 'rule' && 'noResolve' in old.matcher.rule && old.matcher.rule.noResolve) || false;
-  const oldSrc = old?.options?.src || (old?.matcher.kind === 'rule' && 'src' in old.matcher.rule && old.matcher.rule.src) || false;
+  const oldNoResolve = old?.options?.noResolve || oldRaw?.noResolve || (old?.matcher.kind === 'rule' && 'noResolve' in old.matcher.rule && old.matcher.rule.noResolve) || false;
+  const oldSrc = old?.options?.src || oldRaw?.src || (old?.matcher.kind === 'rule' && 'src' in old.matcher.rule && old.matcher.rule.src) || false;
   if (old && matcherKey(old.matcher) === matcherKey(matcher) && oldNoResolve === noResolve && oldSrc === src) {
     // YAML 无法区分选项来自 IR 还是 RuleEntry，也不承载客户端覆盖，按原表示保留。
     matcher = old.matcher;
@@ -338,7 +339,8 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       }
       const original = node.value;
       try {
-        const parts = original.split(',').map((part) => part.trim());
+        const rawParts = original.split(',');
+        const parts = rawParts.map((part) => part.trim());
         const type = parts[0]!.toUpperCase();
         let targetIndex = parts.length - 1;
         while (targetIndex > 0 && ['no-resolve', 'src'].includes(parts[targetIndex]!.toLowerCase())) targetIndex--;
@@ -350,12 +352,14 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         const target = resolve(parts[targetIndex]!);
         if (!target) throw new Error(`出口「${parts[targetIndex]}」不是本片段中的模板组或内置策略，不能使用节点名`);
         const matchingParts = parts.filter((_, i) => i !== targetIndex);
-        const flags = matchingParts.slice(['MATCH', 'FINAL'].includes(type) ? 1 : 2).map((part) => part.toLowerCase());
-        if (flags.some((flag) => !['no-resolve', 'src'].includes(flag))) throw new Error('规则包含多余字段或不支持的选项');
+        const matchingText = rawParts.filter((_, i) => i !== targetIndex).join(',').trim();
+        const flags = parts.slice(targetIndex + 1).map(part => part.toLowerCase());
         if (['MATCH', 'FINAL'].includes(type)) {
           final = target;
           continue;
         }
+        const tagged = identity(node, 'rule', index === 0 ? ruleNodes : undefined);
+        const byId = current.rules.find((r) => r.id === tagged);
         let matcher: Matcher;
         if (type === 'RULE-SET') {
           const name = parts[1]!;
@@ -367,11 +371,19 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
           else if (ruleset) matcher = { kind: 'ruleset', id: ruleset.id };
           else throw new Error(`规则集「${name}」不存在`);
         } else {
-          matcher = { kind: 'rule', rule: parseRuleLine(matchingParts.join(',')) };
+          if (byId?.matcher.kind === 'rule' && byId.matcher.rule.type === 'RAW') {
+            matcher = { kind: 'rule', rule: { ...byId.matcher.rule, text: matchingText } };
+          } else {
+            try { matcher = { kind: 'rule', rule: parseRuleLine(matchingParts.join(',')) }; }
+            catch (error) {
+              if (!(error instanceof UnsupportedRuleError)) throw error;
+              // 未纳入 IR 的语法原样保留，不因表单/YAML 切换丢失自定义规则。
+              matcher = { kind: 'rule', rule: { type: 'RAW', text: matchingText } };
+            }
+          }
         }
+        if (!(matcher.kind === 'rule' && matcher.rule.type === 'RAW') && matchingParts.slice(2).some(part => !['no-resolve', 'src'].includes(part.toLowerCase()))) throw new Error('规则包含多余字段或不支持的选项');
         const key = matcherKey(matcher);
-        const tagged = identity(node, 'rule', index === 0 ? ruleNodes : undefined);
-        const byId = current.rules.find((r) => r.id === tagged);
         if (byId && used.has(byId.id)) {
           if (!recover) throw new Error('重复使用同一个稳定 ID，请删除复制项的 sub-forge-rule 注释后再导入');
           notes.push(`第 ${index + 1} 条规则已忽略重复的身份注释`);

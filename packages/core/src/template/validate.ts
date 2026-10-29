@@ -2,8 +2,9 @@
 
 import { Report } from '../report.ts';
 import type { RuleSetInputs } from '../rules/expand.ts';
-import type { GroupMember, Target, Template } from '../types.ts';
+import type { GroupMember, RuleIR, Target, Template } from '../types.ts';
 import { findGroupCycles } from './merge.ts';
+import { rawRuleError } from '../rules/raw.ts';
 
 export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rulesets'>): Report {
   const report = new Report();
@@ -37,11 +38,26 @@ export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rules
   for (const c of findGroupCycles(t.groups)) report.error('template.group-cycle', `组之间成环：${c.join(' → ')}`);
 
   const ruleIds = new Set<string>();
+  const checkRule = (rule: RuleIR, where: string) => {
+    if (rule.type === 'RAW') {
+      if (typeof rule.text !== 'string') { report.error('template.invalid-raw-rule', 'RAW 内容必须是字符串', where); return; }
+      const error = rawRuleError(rule.text);
+      if (error) report.error('template.invalid-raw-rule', error, where);
+      if (rule.client !== undefined && !['mihomo', 'surge'].includes(rule.client)) report.error('template.invalid-raw-client', 'RAW 客户端不合法', where);
+    } else if (rule.type === 'AND' || rule.type === 'OR' || rule.type === 'NOT') rule.children.forEach(child => checkRule(child, where));
+  };
   for (const r of t.rules) {
     const where = `rule:${r.id}`;
     if (ruleIds.has(r.id)) report.error('template.duplicate-id', `规则 ID ${r.id} 重复`, where);
     ruleIds.add(r.id);
     checkTarget(r.target, where);
+    if (r.matcher.kind === 'rule') {
+      checkRule(r.matcher.rule, where);
+      r.matcher.overrides?.forEach(({ action }) => {
+        if ('replace' in action) action.replace.forEach(rule => checkRule(rule, where));
+        else if ('append' in action) action.append.forEach(rule => checkRule(rule, where));
+      });
+    }
     if (!rules) continue;
     if (r.matcher.kind === 'ruleset' && !rules.rulesets[r.matcher.id]) report.error('template.dangling-ruleset', `规则集 ${r.matcher.id} 不存在`, where);
   }

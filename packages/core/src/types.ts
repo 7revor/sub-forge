@@ -109,7 +109,7 @@ export type RuleIR =
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string }
   | { type: 'AND' | 'OR' | 'NOT'; children: RuleIR[] }
-  | { type: 'RAW'; client: Client; text: string };
+  | { type: 'RAW'; client?: Client; text: string }; // 不指定 client 时按目标客户端原样输出，兼容旧的客户端专用 RAW
 
 export type ClientOverride = {
   when: { client: Client; platform?: Platform };
