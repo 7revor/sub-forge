@@ -11,6 +11,13 @@ const fixture = (): TemplateBody => ({
 });
 
 describe('模板版本对比', () => {
+  it('未使用的来源改动和顺序变化也列入发布差异', () => {
+    const before = { ...fixture(), ruleProviders: [{ name: 'a', url: 'https://example.test/a' }, { name: 'b', url: 'https://example.test/b' }] };
+    const after = { ...before, ruleProviders: [...before.ruleProviders].reverse() };
+    expect(templateDiff(before, after).ruleProviders).toEqual({ before: before.ruleProviders, after: after.ruleProviders });
+    expect(templateDiff(fixture(), { ...fixture(), ruleProviders: [] }).ruleProviders).toBeUndefined();
+  });
+
   it('新增组和规则，不把后续条目的位置偏移误判成移动', () => {
     const before = fixture();
     const after = structuredClone(before);

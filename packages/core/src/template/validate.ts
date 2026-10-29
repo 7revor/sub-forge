@@ -5,9 +5,24 @@ import type { RuleSetInputs } from '../rules/expand.ts';
 import type { GroupMember, RuleIR, Target, Template } from '../types.ts';
 import { findGroupCycles } from './merge.ts';
 import { rawRuleError } from '../rules/raw.ts';
+import { normalizeRuleUrl } from '../rules/remote.ts';
 
 export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rulesets'>): Report {
   const report = new Report();
+  if (t.ruleProviders !== undefined) {
+    const providerNames = new Set<string>();
+    if (!Array.isArray(t.ruleProviders)) report.error('template.invalid-provider', '远程规则来源必须是列表');
+    else for (const p of t.ruleProviders) {
+      try {
+        if (!p || typeof p.name !== 'string' || !p.name.trim() || p.name.includes(',')) throw new Error('远程规则来源名称不能为空或包含逗号');
+        if (providerNames.has(p.name)) throw new Error(`远程规则来源「${p.name}」重复`);
+        providerNames.add(p.name);
+        normalizeRuleUrl(p.url);
+      } catch (error) {
+        report.error('template.invalid-provider', error instanceof Error ? error.message : String(error));
+      }
+    }
+  }
   const ids = new Map<string, number>();
   const names = new Map<string, number>();
   for (const g of t.groups) {

@@ -10,6 +10,7 @@ export type EntityDiff<T> = {
 export type TemplateChanges = {
   groups: EntityDiff<GroupSpec>; rules: EntityDiff<RuleEntry>;
   final?: { before: TemplateBody['final']; after: TemplateBody['final'] };
+  ruleProviders?: { before: TemplateBody['ruleProviders']; after: TemplateBody['ruleProviders'] };
 };
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -52,5 +53,6 @@ export function templateDiff(before: TemplateBody, after: TemplateBody): Templat
   return {
     groups: entities(before.groups, after.groups), rules: entities(before.rules, after.rules),
     ...(equal(before.final, after.final) ? {} : { final: { before: before.final, after: after.final } }),
+    ...(equal(before.ruleProviders ?? [], after.ruleProviders ?? []) ? {} : { ruleProviders: { before: before.ruleProviders, after: after.ruleProviders } }),
   };
 }
