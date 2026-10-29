@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { useDeleteDoc, useList, type DocMap, type Kind } from '../hooks.ts';
 import { Button, buttonClass, Card, cx, Empty, ErrorBox, Input, PageHeader, PageScroll, td, th } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
-import { DeleteDialog } from './MoreMenu.tsx';
+import { DeleteDialog } from './DetailActions.tsx';
 
 export type Column<K extends Kind> = { header: string; cell: (d: DocMap[K]) => ReactNode; className?: string };
 

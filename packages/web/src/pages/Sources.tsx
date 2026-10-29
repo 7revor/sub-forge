@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api, type PipelinePreview } from '../api.ts';
 import { DocList } from '../components/DocList.tsx';
-import { DeleteDialog } from '../components/MoreMenu.tsx';
+import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { Badge, Button, Card, DraftInput, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useNodeList, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';

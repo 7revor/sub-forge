@@ -110,7 +110,7 @@ export function RulesetEdit() {
       }}
       saveError={(showError && error) || e.save.error}
       onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
-      moreItems={[{ label: '重命名…', onSelect: () => setRenaming(true) }]}
+      actionItems={[{ label: '重命名', onSelect: () => setRenaming(true) }]}
       badges={!e.isNew && <>
         <Badge>{sourceSummary(d)}</Badge>
         {failing > 0 && <Badge tone="err">{failing} 个来源拉取失败</Badge>}
