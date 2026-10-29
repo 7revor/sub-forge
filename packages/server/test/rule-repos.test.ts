@@ -26,7 +26,7 @@ function setup() {
     if (url.includes('/commits/')) return { status: 200, body: JSON.stringify({ sha: commit, commit: { tree: { sha: treeSha } } }) };
     if (url.includes('/git/trees/')) return { status: 200, body: JSON.stringify({ sha: treeSha, truncated: false, tree: (url.includes('/zydou/') ? ['openai.yml', 'openai.mrs', 'openai.txt', 'openai@ads.txt', 'openai@ads .txt', 'openai@-cn.txt'] : paths).map(path => ({ path, sha, type: 'blob' })) }) };
     if (url.endsWith('README.md')) return { status: 200, body: readme };
-    return { status: 200, body: url.includes('_Domain') ? '.example.com\n' : 'DOMAIN,chatgpt.com\n' };
+    return { status: 200, body: (url.includes('_Domain') || url.includes('/surge-domain-set/')) ? '.example.com\n' : 'DOMAIN,chatgpt.com\n' };
   });
   const env = setupApp({ fetcher });
   const service = new RuleRepoService(env.store, fetcher, () => 1_700_000_000_000);
@@ -188,6 +188,55 @@ describe('规则仓库索引', () => {
 });
 
 describe('规则仓库接口', () => {
+  it('文件列表只读索引并按分支与路径去重，不请求推荐组合或内容', async () => {
+    const h = setup(); const c = client(h.app);
+    expect((await c.get('/api/rule-repos/files?repo=zydou&path=openai')).status).toBe(401);
+    await addUser(h.store, 'alice'); await c.login('alice'); await h.service.refresh('zydou');
+    const row = h.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo=? AND key=?').get('zydou', 'openai') as { data: string };
+    const entry = JSON.parse(row.data); entry.variants.push(entry.variants[0]);
+    h.store.db.prepare('UPDATE rule_repo_entries SET data=? WHERE repo=? AND key=?').run(JSON.stringify(entry), 'zydou', 'openai');
+    h.fetcher.mockClear();
+    const result = await c.get('/api/rule-repos/files?repo=zydou&path=openai');
+    expect(result.status).toBe(200);
+    expect(result.json.item.files.map((f: { ref: string; path: string }) => [f.ref, f.path])).toEqual([
+      ['surge-domain-set', 'openai.txt'], ['surge-rule-set', 'openai.txt'],
+    ]);
+    expect(result.json.item.variants).toBeUndefined();
+    expect(h.fetcher).not.toHaveBeenCalled();
+  });
+  it('按文件新建只关联选中来源，不受 README 组合影响，加入已有规则集时去重', async () => {
+    const h = setup(); await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
+    await h.service.refresh('blackmatrix7'); h.fail('README'); h.fetcher.mockClear();
+    const body = { repo: 'blackmatrix7', path: 'China', file: { ref: 'master', path: 'rule/Surge/China/China_Domain.list' } };
+    const result = await c.post('/api/rule-repos/import', body);
+    expect(result.status).toBe(201); expect(result.json.item.sources).toHaveLength(1);
+    expect(result.json.item.sources[0]).toMatchObject({ format: 'domain-set', repository: { repo: body.repo, entry: body.path, ...body.file } });
+    expect(h.fetcher.mock.calls.map(([url]) => url)).toEqual(['https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/China/China_Domain.list']);
+    const added = await c.post('/api/rule-repos/import', { ...body, ruleset: result.json.item.id });
+    expect(added.status).toBe(200); expect(added.json.item.sources).toHaveLength(1);
+  });
+  it('同路径不同分支创建对应文件；伪造文件、混用参数、上游失败均不落库', async () => {
+    const h = setup(); await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice'); await h.service.refresh('zydou');
+    for (const ref of ['surge-rule-set', 'surge-domain-set']) {
+      const result = await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file: { ref, path: 'openai.txt' } });
+      expect(result.status).toBe(201);
+      expect(result.json.item.sources).toHaveLength(1);
+      expect(result.json.item.sources[0].repository.ref).toBe(ref);
+      expect(result.json.item.sources[0].format).toBe(ref === 'surge-rule-set' ? 'classical' : 'domain-set');
+    }
+    const before = h.store.list('ruleset').length;
+    for (const file of [null, {}, { ref: 'clash', path: 'openai.yml' }, { ref: 'main', path: 'openai.txt' }, { ref: 'surge-rule-set', path: 'https://example.com/custom.list' }]) {
+      expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file })).status).toBe(400);
+    }
+    const file = { ref: 'surge-rule-set', path: 'openai.txt' };
+    expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file, variant: 'anything' })).status).toBe(400);
+    h.fail('openai.txt');
+    expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file })).status).toBe(502);
+    expect(h.store.list('ruleset')).toHaveLength(before);
+    h.service.setEnabled('zydou', false);
+    expect((await c.get('/api/rule-repos/files?repo=zydou&path=openai')).status).toBe(404);
+    expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file })).status).toBe(404);
+  });
   it('读接口要求登录、管理接口要求管理员、校验参数', async () => {
     const h = setup(); const c = client(h.app);
     expect((await c.get('/api/rule-repos')).status).toBe(401);

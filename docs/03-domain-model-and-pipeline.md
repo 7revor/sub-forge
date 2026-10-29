@@ -365,3 +365,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 ## 2026-10-29 追加：索引凭据
 
 SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使用现有 Cipher 加密保存，与规则集、索引文件及用户订阅 Token 分离。管理员接口 `GET/PUT/DELETE /api/rule-repos/github-token` 仅返回 `{ configured: boolean }`，PUT 接受 `{ token: string }`。每次 GitHub API 请求读取最新凭据，不向 raw 文件请求或转换输出传播，跨源（包括 HTTP 降级）重定向后永久剥离认证头。种子导入不携带该服务凭据，示例种子保持不变。
+
+## 2026-10-29 追加：按文件创建仓库关联
+
+`GET /api/rule-repos/files?repo=…&path=…` 直接读取索引，按 `(ref,path)` 去重，返回文件、分支与上游链接，不拉取 README 或内容。`POST /api/rule-repos/import` 新增 `file: {ref,path}`，与 `variant` 互斥；验证文件属于当前启用仓库的文本索引并有可解析内容后，只创建一个关联来源，保留输入格式与分支。原推荐组合接口供既有调用兼容使用。核心 IR、已存规则集与种子无需迁移。

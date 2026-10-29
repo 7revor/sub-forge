@@ -36,6 +36,11 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
       throw new HttpError(502, `规则详情拉取失败：${error instanceof Error ? error.message : String(error)}`);
     }
   });
+  app.get('/rule-repos/files', c => {
+    const { repo, path } = c.req.query();
+    if (!repo || !path) throw bad('缺少 repo 或 path');
+    return c.json({ item: repos.fileList(repo, path) });
+  });
   app.post('/rule-repos', requireAdmin, async c => {
     const id = await repos.addCustom(await jsonBody(c));
     void repos.refresh(id);
@@ -74,6 +79,13 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
     if (!isStr(body.repo) || !isStr(body.path)) throw bad('缺少 repo 或 path');
     if (body.variant !== undefined && !isStr(body.variant)) throw bad('variant 必须是字符串');
     if (body.ruleset !== undefined && !isStr(body.ruleset)) throw bad('ruleset 必须是字符串');
+    let file: { ref: string; path: string } | undefined;
+    if (body.file !== undefined) {
+      const value = body.file as Record<string, unknown> | null;
+      if (!value || typeof value !== 'object' || !isStr(value.ref) || !isStr(value.path)) throw bad('file 必须包含 ref 和 path');
+      if (body.variant !== undefined) throw bad('file 与 variant 不可同时指定');
+      file = { ref: value.ref, path: value.path };
+    }
     const user = c.get('user');
     // 网络请求前校验归属，写入时再次读取最新版本，避免覆盖拉取期间的编辑。
     const loadTarget = () => {
@@ -84,10 +96,10 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
     };
     loadTarget();
     let entry;
-    try { entry = await repos.linkedSources(body.repo, body.path, body.variant as string | undefined); }
+    try { entry = file ? await repos.linkedFileSource(body.repo, body.path, file) : await repos.linkedSources(body.repo, body.path, body.variant as string | undefined); }
     catch (error) {
       if (error instanceof HttpError) throw error;
-      throw new HttpError(502, `规则使用说明拉取失败：${error instanceof Error ? error.message : String(error)}`);
+      throw new HttpError(502, `规则文件读取失败：${error instanceof Error ? error.message : String(error)}`);
     }
     const target = loadTarget();
     const sources = [...(target?.sources ?? [])];

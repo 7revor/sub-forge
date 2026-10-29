@@ -168,3 +168,7 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 ### GitHub 索引 Token
 
 管理员通过 `GET/PUT/DELETE /api/rule-repos/github-token` 读取状态、保存或清除 Token；PUT body 为 `{ "token": "你的 Token" }`，响应只有 `configured`。SQLite v12 加密保存该服务凭据，不写入示例种子；下一次索引 API 请求立即生效。只向 HTTPS GitHub API 携带认证，跨源重定向永久移除。不会用于 raw 文件、一般订阅源或客户端输出；公开仓库限制不变。
+
+### 按单文件创建规则集
+
+`GET /api/rule-repos/files` 按 `repo` 与条目 `path` 返回去重的文本文件清单，不访问上游。`POST /api/rule-repos/import` 可传 `file: { ref, path }`，只创建该文件的仓库关联来源；不得与 `variant` 同传。创建前检查索引成员资格、启用状态及实际文本内容，已有规则集继续校验归属并按 URL 去重。

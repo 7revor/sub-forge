@@ -208,3 +208,9 @@ type VariantPolicy = { prefer?: 'smallest' | 'no-resolve' | 'classical'; perClie
 Token 只发送到 `https://api.github.com`，不会发送到 raw 文件地址、镜像、其他域名或 HTTP 降级地址。数据库加密保存，读取接口只返回配置状态，示例种子不保存 Token。
 
 GitHub 官方说明匿名请求通常每小时 60 次，个人认证请求通常每小时 5000 次；其他限制仍可能生效：[REST API 限额](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)。
+
+## 首页按文件操作（2026-10-29）
+
+仓库区位于首页上方，管理员可添加、删除自定义仓库、启停、刷新索引和配置 Token；内置仓库保留停用操作。系统页不再重复展示仓库列表。
+
+下方搜索保留条目名、路径、仓库筛选和分页，去除客户端筛选。左侧列表与右侧详情独立滚动。右侧只显示按分支和路径去重后的文件列表，去除客户端、方式、推荐变体下拉和推荐内容预览。每行「新建规则集」仅导入选中 `.list`/`.txt` 文件并保存仓库关联；同路径不同分支分别显示，不能互相替代。原 `/entry` 与无 file 的 `/import` 保持兼容供现有关联选择器使用。

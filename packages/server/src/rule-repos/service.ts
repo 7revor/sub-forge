@@ -81,6 +81,36 @@ export class RuleRepoService {
       repository: { repo, entry: path, ref: file.ref, path: file.path },
     })) };
   }
+  /** 首页按物理文件展示；不读取 README，不将多个文件组合为一个变体。 */
+  fileList(repo: string, path: string) {
+    const entry = this.entry(repo, path);
+    const definition = this.definition(repo);
+    const files = new Map<string, RepoFile>();
+    for (const file of entry.variants.flatMap(v => v.files)) {
+      if (isIndexedRuleFile(file.path) && !['yaml', 'mrs', 'srs'].includes(file.format)) files.set(JSON.stringify([file.ref, file.path]), file);
+    }
+    return { repo, path, name: entry.name, license: definition.license, url: `https://github.com/${definition.owner}/${definition.repo}`,
+      files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path) || a.ref.localeCompare(b.ref))
+        .map(file => ({ ...file, url: rawUrl(definition, file), upstream: upstreamUrl(definition, file) })) };
+  }
+  async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
+    const find = () => {
+      const entry = this.fileList(repo, path);
+      const file = entry.files.find(f => f.ref === selected.ref && f.path === selected.path);
+      if (!file) throw bad('所选文件不在当前文本索引中，请刷新后重试');
+      return { entry, file };
+    };
+    const { file } = find();
+    const response = await this.fetcher(file.url, { timeoutMs: 20_000 });
+    if (response.status !== 200) throw new Error(`规则文件拉取失败：HTTP ${response.status}`);
+    const parsed = parseRuleSetContent(response.body, file.format, file.behavior);
+    if (parsed.passthrough || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
+    const current = find();
+    return { name: current.entry.name, sources: [{ kind: 'remote' as const,
+      name: `${this.definition(repo).name} · ${current.file.path}`, url: current.file.url, format: current.file.format, behavior: current.file.behavior,
+      repository: { repo, entry: path, ref: current.file.ref, path: current.file.path },
+    }] };
+  }
   definition(id: string): RepoDefinition {
     const row = this.store.db.prepare('SELECT definition FROM rule_repos WHERE id = ?').get(id) as { definition: string | null } | undefined;
     const repo = row?.definition ? JSON.parse(row.definition) as RepoDefinition : BUILTIN_REPOS.find(r => r.id === id);

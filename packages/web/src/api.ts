@@ -62,6 +62,7 @@ export type Share = { id: string; kind: 'source' | 'collection'; docId: string; 
 export type CustomRepoConfig = { ref?: string; directory?: string; include?: string[]; exclude?: string[]; format?: string };
 export type RuleRepo = CustomRepoConfig & { id: string; name: string; url: string; builtIn: boolean; enabled: boolean; entries: number; builtAt?: number; checkedAt?: number; error?: string; indexing: boolean };
 export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
+export type RepoFileList = RepoEntry & { license?: string; url: string; files: { ref: string; path: string; url: string; upstream: string; format: string }[] };
 export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?: RejectedRuleDetail[]; license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };
 export type SystemInfo = Pending & {
   ssrfAllow: { value: string; note?: string }[];
