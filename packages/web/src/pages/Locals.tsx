@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
+import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { TargetPicker, useNodeSetNames } from '../components/pickers.tsx';
@@ -90,14 +90,14 @@ export function LocalEdit() {
         {cur && (
           <Card title={`编辑 · ${cur.name}`} className="min-w-0 flex-[999_1_480px]" actions={<Button size="sm" variant="danger" disabled={rawInvalid} onClick={() => { setProxies(d.proxies.filter((_, i) => i !== sel)); setSel(Math.max(0, sel - 1)); }}><Trash2 size={14} />删除节点</Button>}>
             <div className="flex flex-col gap-4">
-            <DualEditor key={sel} onValidityChange={setRawValid} value={cur} onChange={replace} toRaw={proxyToYaml} fromRaw={(text) => proxyDraftFromYaml(text, cur)} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
+            <DualEditor key={sel} onValidityChange={setRawValid} value={cur} onChange={replace} toRaw={proxyToYaml} fromRaw={(text) => proxyDraftFromYaml(text, cur)} recoverForm={(text) => proxyFormFromYaml(text, cur)} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="名称" className="col-span-2">{(id) => <Input id={id} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>
                 <Field label="协议">{(id) => <Select id={id} value={cur.type} onChange={(x) => changeType(x.target.value)}>
                   {!PROXY_TYPES.some((type) => type.value === cur.type) && <option value={cur.type}>{cur.type}</option>}
                   {PROXY_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                 </Select>}</Field>
-                <Field label="端口">{(id) => <Input id={id} type="number" value={cur.port} onChange={(x) => update({ port: Number(x.target.value) })} />}</Field>
+                <Field label="端口">{(id) => <Input id={id} type="number" value={cur.port || ''} onChange={(x) => update({ port: Number(x.target.value) })} />}</Field>
                 <Field label="服务器" className="col-span-2">{(id) => <Input id={id} className="font-mono" value={cur.server} onChange={(x) => update({ server: x.target.value })} />}</Field>
               </div>
               <SchemaForm groups={schemaFor(cur.type)} extra

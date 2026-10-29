@@ -3,15 +3,18 @@ import { Button, ErrorBox, Textarea } from './ui.tsx';
 
 export type EditorMode = 'form' | 'raw';
 export type RawResult<T> = { ok: true; value: T; notes?: string[] } | { ok: false; error: string; line?: number };
+export type FormRecovery<T> = { value: T; notes: string[] };
 
 /** toRaw 可能因数据本身无法表达而抛错（如模板引用了已删除的组），转成可展示的错误 */
 function tryRaw<T>(toRaw: (value: T) => string, value: T): { text: string } | { error: string } {
   try { return { text: toRaw(value) }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 }
 
-export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rawLabel = '原始配置', mode, onModeChange, onValidityChange }: {
+export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, recoverForm, rawLabel = '原始配置', mode, onModeChange, onValidityChange }: {
   value: T; onChange: (value: T) => void; renderForm: () => ReactNode;
   toRaw: (value: T) => string; fromRaw: (text: string) => RawResult<T>;
+  /** 返回表单时过滤错误字段，不以保存校验阻止切换。 */
+  recoverForm: (text: string) => FormRecovery<T>;
   rawLabel?: string; mode?: EditorMode; onModeChange?: (mode: EditorMode) => void;
   /** 让外层保存按钮同步阻止提交尚未解析成功的原始配置。 */
   onValidityChange?: (valid: boolean) => void;
@@ -46,7 +49,13 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, raw
   const error = !result.ok ? `${result.line !== undefined ? `第 ${result.line} 行：` : ''}${result.error}` : '';
   useEffect(() => { onValidityChange?.(current !== 'raw' || result.ok); }, [current, result.ok, onValidityChange]);
   const changeMode = (next: EditorMode) => {
-    if (next === 'form' && error) return;
+    if (next === current) return;
+    if (next === 'form') {
+      const recovered = recoverForm(text);
+      setResult({ ok: true, ...recovered });
+      onChange(recovered.value);
+      onValidityChange?.(true);
+    }
     if (next === 'raw') {
       const raw = tryRaw(toRaw, value);
       if ('error' in raw) { setRawError(`无法生成${rawLabel}：${raw.error}`); return; }
@@ -57,10 +66,14 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, raw
   };
   return <div className="flex flex-col gap-3">
     <div className="flex items-center gap-2" role="group" aria-label="编辑视图">
-      <Button aria-pressed={current === 'form'} variant={current === 'form' ? 'primary' : 'default'} size="sm" disabled={current === 'raw' && !!error} title={error ? '请先修复原始配置中的错误' : undefined} onClick={() => changeMode('form')}>表单</Button>
+      <Button aria-pressed={current === 'form'} variant={current === 'form' ? 'primary' : 'default'} size="sm" onClick={() => changeMode('form')}>表单</Button>
       <Button aria-pressed={current === 'raw'} variant={current === 'raw' ? 'primary' : 'default'} size="sm" onClick={() => changeMode('raw')}>原始配置</Button>
     </div>
     <ErrorBox error={rawError} />
+    {current === 'form' && result.ok && !!result.notes?.length && <div role="status" className="text-[13px] text-muted">
+      已返回表单，保留可识别的有效字段：
+      <ul className="m-0 pl-5">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
+    </div>}
     {current === 'form' ? renderForm() : <>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13px] text-muted">{rawLabel}</span>
@@ -86,7 +99,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, raw
           onChange(parsed.value);
         }
       }} />
-      <ErrorBox error={error && `${error}；修复后才能切回表单。`} />
+      <ErrorBox error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
       {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[13px] text-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
       {copyMessage && <span role="status" className="text-[12px] text-muted">{copyMessage}</span>}
     </>}

@@ -1,5 +1,27 @@
 import { isMap, LineCounter, parseDocument, stringify } from 'yaml';
 import type { RawResult } from '../components/DualEditor.tsx';
+import { getPath, isRecord, setPath } from '../components/schema.ts';
+import { mihomoBaseGroups } from '../schemas/mihomoBase.ts';
+import { recoverFields, recoverYaml } from './recoverYaml.ts';
+
+export function baseFormFromYaml(text: string) {
+  const recovered = recoverYaml(text);
+  const notes = recovered.notes;
+  let value = recoverFields(recovered.value, mihomoBaseGroups, notes);
+  const path = 'dns.nameserver-policy';
+  const policy = getPath(value, path);
+  if (isRecord(policy)) value = setPath(value, path, Object.fromEntries(Object.entries(policy).flatMap<[string, unknown]>(([key, item]) => {
+    if (typeof item === 'string') return [[key, item]];
+    if (Array.isArray(item)) return [[key, item.filter((server, index) => {
+      if (typeof server === 'string') return true;
+      notes.push(`已忽略 ${path}.${key}[${index + 1}]：需要字符串`);
+      return false;
+    })]];
+    notes.push(`已忽略 ${path}.${key}：需要字符串或字符串列表`);
+    return [];
+  })));
+  return { value, notes };
+}
 
 export function baseToYaml(obj: Record<string, unknown>): string {
   return stringify(obj, { lineWidth: 0 });

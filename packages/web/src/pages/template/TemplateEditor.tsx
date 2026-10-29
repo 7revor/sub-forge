@@ -1,10 +1,9 @@
 import type { ReportItem } from '@sub-forge/core';
 import { useEffect, useState } from 'react';
 import { DualEditor, type EditorMode } from '../../components/DualEditor.tsx';
-import { templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
+import { templateFormFromYaml, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { TemplateGroupsEditor } from './TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from './TemplateRulesEditor.tsx';
-import { draftIssues } from './model.ts';
 
 export function TemplateEditor({ value, onChange, ctx, report, focus, onValidityChange }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; ctx: ConvertCtx; report: ReportItem[];
@@ -28,11 +27,8 @@ export function TemplateEditor({ value, onChange, ctx, report, focus, onValidity
     return () => cancelAnimationFrame(frame);
   }, [focus, group, rule, mode]);
   return <DualEditor value={value} onChange={onChange} rawLabel="mihomo YAML" mode={mode} onModeChange={setMode} onValidityChange={onValidityChange}
-    toRaw={(body) => {
-      const issues = draftIssues(body);
-      if (issues.length) throw new Error(issues.map((item) => item.message).join('；'));
-      return templateToYaml(body, ctx);
-    }} fromRaw={(text) => templateFromYaml(text, value, ctx)} renderForm={() => <>
+    toRaw={(body) => templateToYaml(body, ctx)} fromRaw={(text) => templateFromYaml(text, value, ctx)}
+    recoverForm={(text) => templateFormFromYaml(text, value, ctx)} renderForm={() => <>
       <TemplateGroupsEditor value={value} onChange={onChange} selected={group} onSelect={setGroup} report={report} />
       <TemplateRulesEditor value={value} onChange={onChange} selected={rule} onSelect={setRule} ctx={ctx} report={report} />
     </>} />;

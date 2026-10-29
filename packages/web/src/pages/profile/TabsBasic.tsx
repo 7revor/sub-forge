@@ -10,7 +10,7 @@ import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
 import { SchemaForm } from '../../components/SchemaForm.tsx';
-import { baseFromYaml, baseToYaml } from '../../convert/baseYaml.ts';
+import { baseFormFromYaml, baseFromYaml, baseToYaml } from '../../convert/baseYaml.ts';
 import { baseFromForm, baseToForm, mihomoBaseGroups } from '../../schemas/mihomoBase.ts';
 import { useProfile } from './context.ts';
 import { TemplateCard } from './TemplateCard.tsx';
@@ -139,7 +139,7 @@ export function TabBase() {
         <Card title={mode === 'preset' ? '覆盖项（mihomo）' : 'mihomo 基础设置'} className="min-w-0 flex-[999_1_520px]">
           <div className="flex flex-col gap-3">
             <DualEditor key={`${draft.id}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
-              toRaw={baseToYaml} fromRaw={baseFromYaml} rawLabel={mode === 'preset' ? '覆盖项 YAML' : 'mihomo YAML'}
+              toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} rawLabel={mode === 'preset' ? '覆盖项 YAML' : 'mihomo YAML'}
               renderForm={() => mode === 'preset'
                 ? <OverrideForm groups={mihomoBaseGroups} base={baseToForm(preset?.mihomo ?? {})} patch={baseToForm(patch)}
                     onChange={(value) => changePatch(baseFromForm(value, patch, preset?.mihomo))} />

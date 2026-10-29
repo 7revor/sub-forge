@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useBeforeUnload, useBlocker } from 'react-router';
 import { Button, ErrorBox } from '../../components/ui.tsx';
 
-/** 无效原始文本尚未写入草稿，保存/导航都必须等用户修复或明确放弃。 */
+/** 无效原始文本尚未完整写入草稿，先返回表单恢复有效字段、修复原文或明确放弃。 */
 export function ProfileEditGuard({ valid, onDiscard }: { valid: boolean; onDiscard: () => void }) {
   const blocker = useBlocker(!valid);
   useBeforeUnload(useCallback((event) => {
@@ -10,7 +10,7 @@ export function ProfileEditGuard({ valid, onDiscard }: { valid: boolean; onDisca
   }, [valid]));
   if (valid) return null;
   return <div className="flex flex-col gap-2" role="alert">
-    <ErrorBox error="基础设置中的 YAML 尚有错误，请修复或放弃修改后再保存。" />
+    <ErrorBox error="基础设置中的 YAML 尚有错误，可返回表单保留有效字段，或修复原文后保存。" />
     {blocker.state === 'blocked' && <div className="flex flex-wrap items-center gap-2">
       <span className="text-[13px]">离开会丢失未保存的内容。</span>
       <Button onClick={() => blocker.reset()}>留在页面修复</Button>

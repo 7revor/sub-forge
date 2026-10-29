@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { baseFromYaml, baseToYaml } from './baseYaml.ts';
+import { baseFormFromYaml, baseFromYaml, baseToYaml } from './baseYaml.ts';
 
 describe('基础设置 YAML', () => {
+  it('回表单过滤已知字段的错误类型及列表坏项，保留有效值与未知扩展', () => {
+    const result = baseFormFromYaml(`mode: rule
+mixed-port: wrong
+allow-lan: "true"
+tun: invalid
+dns:
+  enable: true
+  nameserver: [system, 123, {bad: true}]
+  nameserver-policy:
+    valid: [1.1.1.1, 123]
+    single: system
+    wrong: false
+future: {preserve: true}
+`);
+    expect(result.value).toEqual({ mode: 'rule', dns: { enable: true, nameserver: ['system'], 'nameserver-policy': { valid: ['1.1.1.1'], single: 'system' } }, future: { preserve: true } });
+    for (const key of ['mixed-port', 'allow-lan', 'tun', 'dns.nameserver[2]', 'dns.nameserver-policy.wrong']) expect(result.notes.join()).toContain(key);
+  });
+
+  it('回表单不因嵌套 YAML 语法错误丢弃其他有效配置', () => {
+    expect(baseFormFromYaml('mode: global\ndns:\n  enable: true\n  nameserver: [\n').value).toEqual({ mode: 'global', dns: { enable: true } });
+  });
   it('往返保留嵌套映射、列表、空值和未知字段', () => {
     const value = { 'allow-lan': false, dns: { enable: true, 'enhanced-mode': 'fake-ip', nameserver: ['https://dns.example/dns-query'], 'nameserver-policy': { '+.example': ['1.1.1.1', '8.8.8.8'], single: 'system' } }, sniffer: { sniff: { TLS: { ports: [443] } } }, custom: { empty: {}, list: [], nil: null, zero: 0 } };
     expect(baseFromYaml(baseToYaml(value))).toEqual({ ok: true, value });

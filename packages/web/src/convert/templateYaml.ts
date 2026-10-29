@@ -1,5 +1,6 @@
 import { composeRule, lowerRule, parseRuleLine, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
 import { Document, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
+import { recoverYaml } from './recoverYaml.ts';
 
 export type TemplateBody = Pick<Template, 'groups' | 'rules' | 'final'>;
 export type NamedRef = { id: string; name: string };
@@ -106,86 +107,140 @@ function restoreRule(matcher: Matcher, old: RuleEntry | undefined, noResolve: bo
   return { matcher, ...(old?.options !== undefined || Object.keys(options).length ? { options } : {}) };
 }
 
-export function templateFromYaml(text: string, current: TemplateBody, ctx: ConvertCtx):
+export function templateFromYaml(text: string, current: TemplateBody, ctx: ConvertCtx) {
+  return readTemplate(text, current, ctx, false);
+}
+
+export function templateFormFromYaml(text: string, current: TemplateBody, ctx: ConvertCtx) {
+  const result = readTemplate(text, current, ctx, true);
+  return result.ok ? { value: result.value, notes: result.notes } : {
+    value: { groups: [], rules: [], final: { kind: 'builtin', name: 'REJECT' } } as TemplateBody,
+    notes: [`${result.error}；没有可恢复的模板内容，出口已设为 REJECT`],
+  };
+}
+
+function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, recover: boolean):
   | { ok: true; value: TemplateBody; notes: string[] }
   | { ok: false; error: string; line?: number } {
   const lineCounter = new LineCounter();
   let line: number | undefined;
   try {
-    const doc = parseDocument(text, { lineCounter });
+    const recovered = recover ? recoverYaml(text) : undefined;
+    const doc = recovered?.doc ?? parseDocument(text, { lineCounter });
+    const notes: string[] = recovered?.notes ?? [];
+    const attempt = (action: () => void) => {
+      try { action(); }
+      catch (error) {
+        if (!recover) throw error;
+        notes.push(`已忽略错误内容：${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
     const parseError = doc.errors[0];
     if (parseError) return { ok: false, error: `YAML 解析失败：${parseError.message}`, line: parseError.linePos?.[0]?.line };
     const locate = (node: unknown) => { line = isNode(node) && node.range ? lineCounter.linePos(node.range[0]).line : undefined; };
     const identity = (node: unknown, kind: 'group' | 'rule', parent?: unknown): string | undefined => {
       const comments = [isNode(node) ? node.commentBefore : undefined, isNode(node) ? node.comment : undefined, isNode(parent) ? parent.commentBefore : undefined];
       const match = comments.filter(Boolean).join('\n').match(new RegExp(`^\\s*sub-forge-${kind}:\\s*(\\S+)\\s*$`, 'm'));
-      return match ? decodeURIComponent(match[1]!) : undefined;
+      if (!match) return undefined;
+      try { return decodeURIComponent(match[1]!); }
+      catch (error) {
+        if (!recover) throw error;
+        notes.push(`已忽略无效的 ${kind} 身份注释：${error instanceof Error ? error.message : String(error)}`);
+        return undefined;
+      }
     };
     locate(doc.contents);
     if (!isMap(doc.contents)) throw new Error('YAML 顶层必须是对象');
-    const notes: string[] = [];
     const ignored = doc.contents.items.map((p) => String(p.key)).filter((key) => !['proxy-groups', 'rules'].includes(key));
     if (ignored.length) notes.push(`已忽略：${ignored.join('、')}（仅导入 proxy-groups 和 rules）`);
     const groupNodes = doc.get('proxy-groups', true);
     locate(groupNodes);
-    if (groupNodes !== undefined && !isSeq(groupNodes)) throw new Error('proxy-groups 必须是列表');
+    attempt(() => { if (groupNodes !== undefined && !isSeq(groupNodes)) throw new Error('proxy-groups 必须是列表'); });
     const names = new Map<string, string>();
     const groups: GroupSpec[] = [];
     const usedGroups = new Set<string>();
+    const groupByNode = new Map<unknown, GroupSpec>();
     for (const [index, node] of (isSeq(groupNodes) ? groupNodes.items : []).entries()) {
-      locate(node);
-      if (!isMap(node)) throw new Error('策略组必须是对象');
-      const raw = node.toJSON() as Record<string, unknown>;
-      if (typeof raw.name !== 'string' || !raw.name.trim()) throw new Error('策略组缺少有效名称');
-      if (names.has(raw.name)) throw new Error(`策略组名称「${raw.name}」重复`);
-      locate(node.get('type', true) ?? node);
-      if (typeof raw.type !== 'string' || !groupTypes.has(raw.type)) throw new Error(`组「${raw.name}」的类型「${String(raw.type)}」不受支持`);
-      const tagged = identity(node, 'group', index === 0 ? groupNodes : undefined);
-      const old = current.groups.find((g) => g.id === tagged) ?? current.groups.find((g) => g.name === raw.name);
-      if (old && usedGroups.has(old.id)) throw new Error(`组「${raw.name}」重复使用同一个稳定 ID，请删除复制项的 sub-forge-group 注释后再导入`);
-      const g: GroupSpec = { id: old?.id ?? newId('g'), name: raw.name, type: raw.type as GroupSpec['type'], members: [] };
-      usedGroups.add(g.id);
-      if (old?.whenEmpty !== undefined) g.whenEmpty = old.whenEmpty;
-      if (old?.hint !== undefined) g.hint = old.hint;
-      const test: Record<string, unknown> = {};
-      for (const [yamlKey, key] of Object.entries(testFields)) {
-        if (raw[yamlKey] === undefined) continue;
-        locate(node.get(yamlKey, true));
-        if (key === 'expectedStatus' && typeof raw[yamlKey] === 'number') {
-          test[key] = String(raw[yamlKey]);
-          continue;
+      attempt(() => {
+        locate(node);
+        if (!isMap(node)) throw new Error('策略组必须是对象');
+        const raw = node.toJSON() as Record<string, unknown>;
+        if (typeof raw.name !== 'string' || !raw.name.trim()) {
+          if (!recover) throw new Error('策略组缺少有效名称');
+          notes.push(`第 ${index + 1} 个策略组缺少有效名称，名称已留空`);
+          raw.name = '';
         }
-        const expected = key === 'lazy' ? 'boolean' : ['url', 'expectedStatus'].includes(key) ? 'string' : 'number';
-        if (typeof raw[yamlKey] !== expected) throw new Error(`组「${g.name}」的 ${yamlKey} 必须是${expected === 'boolean' ? '布尔值' : expected === 'string' ? '字符串' : '数字'}`);
-        test[key] = raw[yamlKey];
-      }
-      if (Object.keys(test).length || old?.test !== undefined) g.test = test;
-      if (raw.strategy !== undefined) {
-        locate(node.get('strategy', true));
-        if (!['consistent-hashing', 'round-robin', 'sticky-sessions'].includes(String(raw.strategy))) throw new Error(`组「${g.name}」的 strategy 不受支持`);
-        g.strategy = raw.strategy as GroupSpec['strategy'];
-      }
-      if (raw.hidden !== undefined || raw.icon !== undefined || old?.display !== undefined) {
-        g.display = {};
-        if (raw.hidden !== undefined) {
-          locate(node.get('hidden', true));
-          if (typeof raw.hidden !== 'boolean') throw new Error(`组「${g.name}」的 hidden 必须是布尔值`);
-          g.display.hidden = raw.hidden;
+        if (names.has(raw.name as string)) {
+          if (!recover) throw new Error(`策略组名称「${raw.name}」重复`);
+          notes.push(`第 ${index + 1} 个策略组名称「${raw.name}」重复，重复名称已清空`);
+          raw.name = '';
         }
-        if (raw.icon !== undefined) {
-          locate(node.get('icon', true));
-          if (typeof raw.icon !== 'string') throw new Error(`组「${g.name}」的 icon 必须是字符串`);
-          g.display.icon = raw.icon;
+        locate(node.get('type', true) ?? node);
+        if (typeof raw.type !== 'string' || !groupTypes.has(raw.type)) {
+          if (!recover) throw new Error(`组「${raw.name}」的类型「${String(raw.type)}」不受支持`);
+          notes.push(`组「${raw.name}」的类型无效，已使用默认类型 select`);
+          raw.type = 'select';
         }
-      }
-      const extra: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(raw)) {
-        if (nodeField(key)) notes.push(`组「${g.name}」已忽略节点相关字段：${key}`);
-        else if (!knownFields.has(key)) Object.defineProperty(extra, key, { value, enumerable: true, configurable: true, writable: true });
-      }
-      if (Object.keys(extra).length || old?.extra !== undefined) g.extra = extra;
-      names.set(g.name, g.id);
-      groups.push(g);
+        const tagged = identity(node, 'group', index === 0 ? groupNodes : undefined);
+        let old = current.groups.find((g) => g.id === tagged) ?? current.groups.find((g) => g.name === raw.name);
+        if (old && usedGroups.has(old.id)) {
+          if (!recover) throw new Error(`组「${raw.name}」重复使用同一个稳定 ID，请删除复制项的 sub-forge-group 注释后再导入`);
+          notes.push(`组「${raw.name}」已忽略重复的身份注释，分配新的 ID`);
+          old = undefined;
+        }
+        const g: GroupSpec = { id: old?.id ?? newId('g'), name: raw.name as string, type: raw.type as GroupSpec['type'], members: [] };
+        usedGroups.add(g.id);
+        if (old?.whenEmpty !== undefined) g.whenEmpty = old.whenEmpty;
+        if (old?.hint !== undefined) g.hint = old.hint;
+        const test: Record<string, unknown> = {};
+        for (const [yamlKey, key] of Object.entries(testFields)) {
+          if (raw[yamlKey] === undefined) continue;
+          attempt(() => {
+            locate(node.get(yamlKey, true));
+            if (key === 'expectedStatus' && typeof raw[yamlKey] === 'number') {
+              test[key] = String(raw[yamlKey]);
+              return;
+            }
+            const expected = key === 'lazy' ? 'boolean' : ['url', 'expectedStatus'].includes(key) ? 'string' : 'number';
+            if (typeof raw[yamlKey] !== expected) throw new Error(`组「${g.name}」的 ${yamlKey} 必须是${expected === 'boolean' ? '布尔值' : expected === 'string' ? '字符串' : '数字'}`);
+            test[key] = raw[yamlKey];
+          });
+        }
+        if (Object.keys(test).length || old?.test !== undefined) g.test = test;
+        if (raw.strategy !== undefined) {
+          attempt(() => {
+            locate(node.get('strategy', true));
+            if (typeof raw.strategy !== 'string' || !['consistent-hashing', 'round-robin', 'sticky-sessions'].includes(raw.strategy)) throw new Error(`组「${g.name}」的 strategy 不受支持`);
+            g.strategy = raw.strategy as GroupSpec['strategy'];
+          });
+        }
+        if (raw.hidden !== undefined || raw.icon !== undefined || old?.display !== undefined) {
+          g.display = {};
+          if (raw.hidden !== undefined) {
+            attempt(() => {
+              locate(node.get('hidden', true));
+              if (typeof raw.hidden !== 'boolean') throw new Error(`组「${g.name}」的 hidden 必须是布尔值`);
+              g.display!.hidden = raw.hidden;
+            });
+          }
+          if (raw.icon !== undefined) {
+            attempt(() => {
+              locate(node.get('icon', true));
+              if (typeof raw.icon !== 'string') throw new Error(`组「${g.name}」的 icon 必须是字符串`);
+              g.display!.icon = raw.icon;
+            });
+          }
+        }
+        const extra: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(raw)) {
+          if (nodeField(key)) notes.push(`组「${g.name}」已忽略节点相关字段：${key}`);
+          else if (!knownFields.has(key)) Object.defineProperty(extra, key, { value, enumerable: true, configurable: true, writable: true });
+        }
+        if (Object.keys(extra).length || old?.extra !== undefined) g.extra = extra;
+        if (g.name.trim()) names.set(g.name, g.id);
+        groups.push(g);
+        groupByNode.set(node, g);
+      });
     }
     const resolve = (name: string): Exclude<Target, { kind: 'node' }> | undefined => {
       const groupId = names.get(name);
@@ -193,29 +248,39 @@ export function templateFromYaml(text: string, current: TemplateBody, ctx: Conve
       if (builtins.has(name)) return { kind: 'builtin', name: name as Builtin };
       return undefined;
     };
-    if (isSeq(groupNodes)) groupNodes.items.forEach((node, i) => {
+    if (isSeq(groupNodes)) groupNodes.items.forEach((node) => {
       if (!isMap(node)) return;
+      const group = groupByNode.get(node);
+      if (!group) return;
       const proxies = node.get('proxies', true);
       locate(proxies);
       if (proxies === undefined) return;
-      if (!isSeq(proxies)) throw new Error(`组「${groups[i]!.name}」的 proxies 必须是列表`);
+      if (!isSeq(proxies)) {
+        attempt(() => { throw new Error(`组「${group.name}」的 proxies 必须是列表`); });
+        return;
+      }
       for (const member of proxies.items) {
-        locate(member);
-        if (!isScalar(member) || typeof member.value !== 'string') throw new Error(`组「${groups[i]!.name}」的成员必须是名称字符串`);
-        const target = resolve(member.value);
-        if (target) groups[i]!.members.push(target);
-        else notes.push(`组「${groups[i]!.name}」已忽略节点成员：${member.value}`);
+        attempt(() => {
+          locate(member);
+          if (!isScalar(member) || typeof member.value !== 'string') throw new Error(`组「${group.name}」的成员必须是名称字符串`);
+          const target = resolve(member.value);
+          if (target) group.members.push(target);
+          else notes.push(`组「${group.name}」已忽略节点成员：${member.value}`);
+        });
       }
     });
     const ruleNodes = doc.get('rules', true);
     locate(ruleNodes);
-    if (ruleNodes !== undefined && !isSeq(ruleNodes)) throw new Error('rules 必须是列表');
+    attempt(() => { if (ruleNodes !== undefined && !isSeq(ruleNodes)) throw new Error('rules 必须是列表'); });
     const rules: RuleEntry[] = [];
     const used = new Set<string>();
     let final: Target | undefined;
     for (const [index, node] of (isSeq(ruleNodes) ? ruleNodes.items : []).entries()) {
       locate(node);
-      if (!isScalar(node) || typeof node.value !== 'string') throw new Error(`第 ${index + 1} 条规则必须是字符串`);
+      if (!isScalar(node) || typeof node.value !== 'string') {
+        attempt(() => { throw new Error(`第 ${index + 1} 条规则必须是字符串`); });
+        continue;
+      }
       const original = node.value;
       try {
         const parts = original.split(',').map((part) => part.trim());
@@ -250,8 +315,11 @@ export function templateFromYaml(text: string, current: TemplateBody, ctx: Conve
         const key = matcherKey(matcher);
         const tagged = identity(node, 'rule', index === 0 ? ruleNodes : undefined);
         const byId = current.rules.find((r) => r.id === tagged);
-        if (byId && used.has(byId.id)) throw new Error('重复使用同一个稳定 ID，请删除复制项的 sub-forge-rule 注释后再导入');
-        const old = byId ?? current.rules.find((r) => !used.has(r.id) && matcherKey(r.matcher) === key);
+        if (byId && used.has(byId.id)) {
+          if (!recover) throw new Error('重复使用同一个稳定 ID，请删除复制项的 sub-forge-rule 注释后再导入');
+          notes.push(`第 ${index + 1} 条规则已忽略重复的身份注释`);
+        }
+        const old = (byId && !used.has(byId.id) ? byId : undefined) ?? current.rules.find((r) => !used.has(r.id) && matcherKey(r.matcher) === key);
         if (old) used.add(old.id);
         const r: RuleEntry = { id: old?.id ?? newId('r'), ...restoreRule(matcher, old, flags.includes('no-resolve'), flags.includes('src')), target };
         // 第一项的前置注释可能归在 YAMLSeq 上，而非 Scalar 上。
@@ -260,10 +328,18 @@ export function templateFromYaml(text: string, current: TemplateBody, ctx: Conve
         else if (old?.enabled !== undefined) r.enabled = true;
         rules.push(r);
       } catch (err) {
-        throw new Error(`第 ${index + 1} 条规则「${original}」：${err instanceof Error ? err.message : String(err)}`);
+        const message = `第 ${index + 1} 条规则「${original}」：${err instanceof Error ? err.message : String(err)}`;
+        if (!recover) throw new Error(message);
+        notes.push(`已忽略 ${message}`);
       }
     }
-    if (final === undefined) notes.push('未找到 MATCH / FINAL，已沿用当前模板的 final 出口');
+    if (final === undefined) {
+      const previousFinal = current.final;
+      if (recover && previousFinal.kind === 'group' && !groups.some((group) => group.id === previousFinal.groupId)) {
+        final = { kind: 'builtin', name: 'REJECT' };
+        notes.push('未找到有效的 MATCH / FINAL，原出口组已不存在，出口已设为 REJECT');
+      } else notes.push('未找到 MATCH / FINAL，已沿用当前模板的 final 出口');
+    }
     return { ok: true, value: { groups, rules, final: final ?? current.final }, notes };
   } catch (err) {
     return { ok: false, error: `模板 YAML 导入失败：${err instanceof Error ? err.message : String(err)}`, ...(line === undefined ? {} : { line }) };

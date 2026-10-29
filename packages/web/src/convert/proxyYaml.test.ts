@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import snapshots from '../../../core/test/__snapshots__/proxy-parse.test.ts.snap?raw';
 import { getPath, otherFields, setPath } from '../components/schema.ts';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
+import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFormFromYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
 
 const node: LocalProxy = {
   name: '测试节点', type: 'vless', server: 'example.com', port: 443, uuid: 'uuid', tls: true,
@@ -15,6 +15,22 @@ const node: LocalProxy = {
 };
 
 describe('节点 YAML 转换', () => {
+  it('错误类型返回表单时清空，保留 UUID、扩展字段和现有前置', () => {
+    const result = proxyFormFromYaml('name: 新名称\ntype: vless\nserver: {}\nport: wrong\nuuid: valid-uuid\ntls: wrong\nalpn: [h2, 123]\nfuture: { keep: true }', node);
+    expect(result.value).toEqual({ name: '新名称', type: 'vless', server: '', port: 0, uuid: 'valid-uuid', alpn: ['h2'], future: { keep: true }, dialer: node.dialer });
+    for (const key of ['server', 'port', 'tls', 'alpn[2]']) expect(result.notes.join()).toContain(key);
+    expect(proxyFromYaml(proxyToYaml(result.value)).ok).toBe(false);
+  });
+
+  it('语法错误和未填写必填项不妨碍回表单，且不恢复旧字段', () => {
+    const result = proxyFormFromYaml('name: 保留名称\nserver: [\nuuid: keep-uuid\n', node);
+    expect(result.value).toEqual({ name: '保留名称', type: '', server: '', port: 0, uuid: 'keep-uuid', dialer: node.dialer });
+    expect(result.notes.join()).toContain('server');
+  });
+
+  it('合法节点恢复后与原配置相等', () => {
+    expect(proxyFormFromYaml(proxyToYaml(node), node)).toEqual({ value: node, notes: [] });
+  });
   it('嵌套及未知字段往返不丢失，dialer 不导出且导入保留', () => {
     const text = proxyToYaml(node);
     expect(text).not.toContain('dialer:');

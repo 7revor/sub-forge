@@ -2,10 +2,29 @@ import type { LocalProxy } from '@sub-forge/core';
 import { isNode, LineCounter, parseDocument, stringify } from 'yaml';
 import type { RawResult } from '../components/DualEditor.tsx';
 import { isRecord } from '../components/schema.ts';
+import { schemaFor } from '../schemas/proxy.ts';
+import { recoverFields, recoverYaml } from './recoverYaml.ts';
 
 const withoutDialer = ({ dialer: _dialer, ...proxy }: LocalProxy) => proxy;
 export const proxyToYaml = (proxy: LocalProxy): string => stringify(withoutDialer(proxy));
 export const groupToYaml = (proxies: LocalProxy[]): string => stringify({ proxies: proxies.map(withoutDialer) });
+
+export function proxyFormFromYaml(text: string, current?: LocalProxy) {
+  const recovered = recoverYaml(text);
+  const notes = recovered.notes;
+  const value = { ...recovered.value };
+  for (const key of ['name', 'type', 'server']) {
+    if (typeof value[key] === 'string') continue;
+    if (value[key] != null) notes.push(`已忽略 ${key}：需要字符串`);
+    value[key] = '';
+  }
+  if (typeof value.port !== 'number' || !Number.isInteger(value.port) || value.port < 1 || value.port > 65535) {
+    if (value.port != null && value.port !== 0) notes.push('已忽略 port：需要 1–65535 的整数');
+    value.port = 0;
+  }
+  const fields = recoverFields(value, schemaFor(value.type as string), notes);
+  return { value: validate(fields, current, true), notes };
+}
 
 function validate(value: unknown, current?: LocalProxy, draft = false): LocalProxy {
   if (!isRecord(value)) throw new Error('节点必须是 YAML 映射');

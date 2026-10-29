@@ -1,7 +1,7 @@
 import { validateTemplate, type RuleEntry } from '@sub-forge/core';
 import { describe, expect, it, vi } from 'vitest';
 import { parse, stringify } from 'yaml';
-import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from './templateYaml';
+import { newId, templateFormFromYaml, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from './templateYaml';
 
 const ctx: ConvertCtx = {
   rulesets: [{ id: 'rs_ads', name: '广告规则' }],
@@ -48,6 +48,42 @@ function imported(text: string, current = empty, context = ctx) {
 }
 
 describe('模板与 mihomo YAML 双向转换', () => {
+  it('恢复正常模板时仍保留稳定 ID、覆盖和禁用状态', () => {
+    const body = fixture();
+    expect(templateFormFromYaml(templateToYaml(body, ctx), body, ctx)).toEqual({ value: body, notes: [] });
+  });
+
+  it('返回表单按字段清理策略组，并跳过坏规则、保留其他规则的身份', () => {
+    const body = fixture();
+    const yaml = templateToYaml(body, ctx).replace('interval: 300', 'interval: wrong')
+      .replace('hidden: true', 'hidden: wrong').replace('DOMAIN,disabled.example,DIRECT', 'UNKNOWN,disabled.example,DIRECT')
+      .replace('自动测速', '新的测速组').replaceAll('自动测速', '新的测速组');
+    const result = templateFormFromYaml(yaml, body, ctx);
+    expect(result.value.groups[1]).toMatchObject({ id: 'g_url', name: '新的测速组', test: { timeout: 5000 }, display: {} });
+    expect(result.value.groups[1]!.test).not.toHaveProperty('interval');
+    expect(result.value.groups[1]!.display).not.toHaveProperty('hidden');
+    expect(result.value.rules.map((rule) => rule.id)).toEqual(body.rules.slice(1).map((rule) => rule.id));
+    expect(result.value.rules[0]!.enabled).toBe(true);
+    for (const key of ['interval', 'hidden', 'UNKNOWN']) expect(result.notes.join()).toContain(key);
+  });
+
+  it('组必填项和列表内容错误也能返回表单，保留可编辑字段', () => {
+    const result = templateFormFromYaml('proxy-groups:\n  - {name: 123, type: wrong, icon: good.png, strategy: [round-robin], proxies: [DIRECT, 123]}\nrules: [123, "DOMAIN,example.com,DIRECT", "MATCH,REJECT"]', empty, ctx);
+    expect(result.value.groups[0]).toMatchObject({ name: '', type: 'select', display: { icon: 'good.png' }, members: [direct] });
+    expect(result.value.groups[0]).not.toHaveProperty('strategy');
+    expect(result.value.rules).toHaveLength(1);
+    expect(result.value.final).toEqual({ kind: 'builtin', name: 'REJECT' });
+    expect(result.notes.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('语法错误不影响其他字段，失去出口组时明确恢复为 REJECT', () => {
+    const body = fixture();
+    const result = templateFormFromYaml('proxy-groups: [\nrules:\n  - DOMAIN,example.com,DIRECT\n', body, ctx);
+    expect(result.value.groups).toEqual([]);
+    expect(result.value.rules).toHaveLength(1);
+    expect(result.value.final).toEqual({ kind: 'builtin', name: 'REJECT' });
+    expect(result.notes.join()).toContain('原出口组已不存在');
+  });
   it('完整模板往返后深度相等，保留 ID、非 YAML 字段及禁用状态', () => {
     const t = fixture();
     const snapshot = structuredClone(t);
