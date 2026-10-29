@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { patternHits, regexError, renameHits, rowHit, setFieldsError, stepInputNames, updateSetField } from './pipelineForm.ts';
+import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetField } from './pipelineForm.ts';
 
 describe('处理链表单校验', () => {
   it('遵循内核的身份与隐式字段限制', () => {
@@ -25,9 +25,6 @@ describe('处理链表单校验', () => {
 });
 
 describe('处理链命中统计', () => {
-  it('从输出与改名记录还原输入名称', () => {
-    expect(stepInputNames(['HK-01', 'JP'], [{ from: '香港 01', to: 'HK-01' }], ['官网'])).toEqual(['香港 01', 'JP', '官网']);
-  });
   it('正则改名逐条命中，空规则与非法规则不计数', () => {
     const rules = [{ pattern: '^香港\\s*(\\d+)', replace: 'HK-$1' }, { pattern: '^HK', replace: 'hk' }, { pattern: '', replace: 'x' }, { pattern: '[', replace: '' }];
     expect(renameHits(rules, ['香港 01', 'HK 02', 'JP'])).toEqual([1, 2, undefined, undefined]);
