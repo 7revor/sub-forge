@@ -61,14 +61,15 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
           <span className="text-[12.5px] font-medium text-muted">{action === 'append' ? '追加规则' : '替换为'}</span>
           <Button size="sm" variant="ghost" onClick={() => setRules([...replacements, emptyRule('DOMAIN')])}><Plus size={14} />添加{ruleLabel}规则</Button>
         </div>
-        <SortableList items={replacements} onReorder={setRules}
-          renderItem={(rule, i, handle) => <div className={cx('flex items-start gap-2', i > 0 && 'pt-3')}>
-            <div className="pt-6">{handle}</div><div className="min-w-0 flex-1"><RuleEditor compact value={rule}
+        <div className="flex flex-col gap-3 pl-8">
+          {replacements.map((rule, i) => <div key={i} className="flex items-start gap-2">
+            <div className="min-w-0 flex-1"><RuleEditor compact value={rule}
               onChange={(next) => setRules(replacements.map((item, j) => j === i ? next : item))}
               onIncomplete={(next) => setRules(replacements.map((item, j) => j === i ? next : item))} /></div>
             <Button size="sm" variant="ghost" className="mt-6" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
               onClick={() => setRules(replacements.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
-          </div>} />
+          </div>)}
+        </div>
       </div>}
     </div>;
   };

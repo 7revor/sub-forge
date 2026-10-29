@@ -37,7 +37,7 @@ export function RuleEditor({ value, onChange, onIncomplete, compact = false }: {
     </Select>}</Field>
     {readonly ? <div className="min-w-0 rounded-lg bg-ground p-3 text-[13px]">
       <pre className="m-0 whitespace-pre-wrap break-all font-mono">{ruleToLine(rule)}</pre>
-      <p className="mb-0 text-muted">请用粘贴整行编辑</p>
+      <p className="mb-0 text-muted">{compact ? '保留原有规则；选择其他类型可重新编辑。' : '请用粘贴整行编辑'}</p>
     </div> : rule && 'value' in rule && <>
       {rule.type === 'PROCESS' && <div className={compact ? 'col-span-full row-start-2 flex flex-wrap gap-2' : 'flex flex-wrap gap-2'}>
         <Segmented label="进程匹配字段" value={rule.kind} options={[{ value: 'name', label: '名称' }, { value: 'path', label: '路径' }]} onChange={(kind) => edit({ ...rule, kind })} />
@@ -55,9 +55,6 @@ export function RuleEditor({ value, onChange, onIncomplete, compact = false }: {
         }} /><span className="text-[13px]">no-resolve</span>
       </div>}
     </>}
-    {compact ? <details className="col-span-full" open={readonly || undefined}>
-      <summary className="w-fit cursor-pointer text-[12px] text-muted hover:text-ink">粘贴整行</summary>
-      <div className="mt-3">{pasteInput}</div>
-    </details> : pasteInput}
+    {!compact && pasteInput}
   </div>;
 }
