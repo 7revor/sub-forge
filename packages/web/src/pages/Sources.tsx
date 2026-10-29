@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api, type PipelinePreview } from '../api.ts';
 import { DocList } from '../components/DocList.tsx';
-import { DeleteDialog, MoreMenu } from '../components/MoreMenu.tsx';
+import { DeleteDialog } from '../components/MoreMenu.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { Badge, Button, ErrorBox, Input, Modal, PageHeader, Segmented, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useNodeList, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
@@ -30,13 +30,14 @@ function SourceLast({ source }: { source: SourceDoc }) {
 }
 
 const urlsText = (s: SourceDoc) => `${s.urls.length} 个地址`;
+const SOURCE_DELETE_BODY = '处理链和全部快照会一起删除，无法恢复。';
 
 export function SourceList() {
   const location = useLocation();
   const [creating, setCreating] = useState(!!(location.state as { create?: boolean } | null)?.create);
   return (
     <>
-      <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={() => setCreating(true)}
+      <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={() => setCreating(true)} deleteBody={SOURCE_DELETE_BODY}
         intro="节点来源：机场的订阅地址。改名、过滤、排序都写在处理链里；自己整理的节点放在「本地节点」。"
         empty="添加机场的订阅地址，之后在处理链里改名、过滤、排序。自己整理的节点请放到「本地节点」。"
         columns={[
@@ -199,8 +200,8 @@ export function SourceEdit() {
         actions={<>
           <Button onClick={() => setFetchOpen(true)}>拉取参数</Button>
           <Button onClick={() => refresh.mutate()} disabled={refresh.isPending}><RefreshCw size={15} />{refresh.isPending ? '拉取中…' : '立即拉取'}</Button>
-          <MoreMenu items={[{ label: '删除…', danger: true, onSelect: openDelete }]} />
           <Button variant="primary" onClick={submit} disabled={save.isPending || !dirty}>{save.isPending ? '保存中…' : dirty ? '保存处理链' : '已保存'}</Button>
+          <Button variant="danger" onClick={openDelete}>删除</Button>
         </>}>
         <Badge>{doc.data ? urlsText(doc.data) : ''}</Badge>
         {state.snaps.data && (state.lastOk
@@ -219,7 +220,7 @@ export function SourceEdit() {
       <FetchDialog open={fetchOpen} draft={draft} set={set} onClose={() => setFetchOpen(false)} onDelete={openDelete} />
       <DeleteDialog open={deleting} title={`删除订阅源「${draft.name}」？`} error={del.error} pending={del.isPending}
         onClose={() => setDeleting(false)} onConfirm={() => del.mutate(draft.id, { onSuccess: () => navigate('/sources') })}>
-        处理链和全部快照会一起删除，无法恢复。
+        {SOURCE_DELETE_BODY}
       </DeleteDialog>
     </>
   );

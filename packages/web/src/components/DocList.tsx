@@ -1,16 +1,17 @@
 // 文档列表页（设计稿「列表页 · 订阅源与新建」）：标题 + 说明 + 新建按钮，表格卡片顶部带搜索与计数；
-// 空列表统一用虚线卡片：一句话说明 + 新建按钮。
+// 空列表统一用虚线卡片：一句话说明 + 新建按钮。每行操作为「删除」「编辑」，删除先弹确认。
 
 import { Plus } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { useList, type DocMap, type Kind } from '../hooks.ts';
+import { useDeleteDoc, useList, type DocMap, type Kind } from '../hooks.ts';
 import { Button, buttonClass, Card, cx, ErrorBox, Input, PageHeader, td, th } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
+import { DeleteDialog } from './MoreMenu.tsx';
 
 export type Column<K extends Kind> = { header: string; cell: (d: DocMap[K]) => ReactNode; className?: string };
 
-export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate = true, noun, onCreate, empty }: {
+export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate = true, noun, onCreate, empty, deleteBody }: {
   kind: K; title: string; columns: Column<K>[]; intro?: ReactNode; canCreate?: boolean;
   /** 「新建 X」「搜索 X」里的对象名，默认用标题 */
   noun?: string;
@@ -18,8 +19,12 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
   onCreate?: () => void;
   /** 空列表卡片里的说明 */
   empty?: ReactNode;
+  /** 删除确认对话框里的说明，与详情页一致 */
+  deleteBody?: ReactNode;
 }) {
   const list = useList(kind);
+  const del = useDeleteDoc(kind);
+  const [deleting, setDeleting] = useState<DocMap[K]>();
   const [q, setQ] = useState('');
   const name = noun ?? title;
   const createButton = (size: 'sm' | 'md', variant: 'primary' | 'default') => onCreate
@@ -49,7 +54,10 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                       {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}>{c.cell(d)}</Link> : c.cell(d)}
                     </td>
                   ))}
-                  <td className={cx(td, 'text-right')}><DocActionLink to={`/${kind}/${d.id}`} name={d.name} /></td>
+                  <td className={cx(td, 'text-right whitespace-nowrap')}>
+                    <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} className="mr-2" onClick={() => { del.reset(); setDeleting(d); }}>删除</Button>
+                    <DocActionLink to={`/${kind}/${d.id}`} name={d.name} />
+                  </td>
                 </DocTableRow>
               ))}
               {!rows.length && <tr><td className={cx(td, 'text-muted')} colSpan={columns.length + 1}>没有名称包含「{q.trim()}」的{name}</td></tr>}
@@ -57,6 +65,10 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
           </table>
         </Card>
       )}
+      <DeleteDialog open={!!deleting} title={`删除${name}「${deleting?.name ?? ''}」？`} error={del.error} pending={del.isPending}
+        onClose={() => setDeleting(undefined)} onConfirm={() => { if (deleting) del.mutate(deleting.id, { onSuccess: () => setDeleting(undefined) }); }}>
+        {deleteBody ?? '删除后无法恢复。'}
+      </DeleteDialog>
     </>
   );
 }
