@@ -1,13 +1,14 @@
 // 组合：有序引用多个节点集，成员可加前后缀；成员各自跑完处理链后合并，再跑组合自身的处理链（COL-01–04）。
 
 import type { Collection, NodeSetID } from '@sub-forge/core';
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
+import { SortableList } from '../components/SortableList.tsx';
 import { NodeSetSelect, useNodeSetNames } from '../components/pickers.tsx';
-import { Button, Card, Empty, ErrorBox, Field, Input, td, th } from '../components/ui.tsx';
+import { Button, Card, Empty, ErrorBox, Field, Input, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { usePipelinePreview } from './Sources.tsx';
 
@@ -22,6 +23,9 @@ export function CollectionList() {
   );
 }
 
+// 成员行：拖动手柄、名称、前缀、后缀、移除
+const GRID = 'grid grid-cols-[24px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_32px] items-center gap-3 px-4';
+
 const EMPTY: Collection = { id: '', name: '', members: [], pipeline: [] };
 
 export function CollectionEdit() {
@@ -33,13 +37,6 @@ export function CollectionEdit() {
   const d = e.draft;
   const set = (p: Partial<Collection>) => e.setDraft({ ...d, ...p });
   const options = all.filter((n) => !(n.ref.type === 'collection' && n.ref.id === d.id));
-  const move = (i: number, dir: -1 | 1) => {
-    const m = [...d.members];
-    const [x] = m.splice(i, 1);
-    m.splice(i + dir, 0, x!);
-    set({ members: m });
-  };
-
   return (
     <DetailShell listPath="/collections" listLabel="组合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
       onSave={() => e.submit()} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
@@ -49,23 +46,18 @@ export function CollectionEdit() {
           <Button disabled={!adding} onClick={() => { if (adding) { set({ members: [...d.members, { ref: adding }] }); setAdding(undefined); } }}><Plus size={15} />加入</Button></div>}
         bodyClass="overflow-x-auto">
         {!d.members.length ? <div className="px-4 pb-4"><Empty>还没有成员。</Empty></div> : (
-          <table className="w-full min-w-[640px] border-collapse">
-            <thead><tr><th className={th}>顺序</th><th className={th}>成员</th><th className={th}>前缀</th><th className={th}>后缀</th><th className={th} /></tr></thead>
-            <tbody>
-              {d.members.map((m, i) => (
-                <tr key={`${m.ref.type}:${m.ref.id}:${i}`}>
-                  <td className={td}><div className="flex gap-1">
-                    <Button size="sm" variant="ghost" aria-label="上移" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={14} /></Button>
-                    <Button size="sm" variant="ghost" aria-label="下移" disabled={i === d.members.length - 1} onClick={() => move(i, 1)}><ArrowDown size={14} /></Button>
-                  </div></td>
-                  <td className={`${td} font-medium`}>{nameOf(m.ref)}</td>
-                  <td className={td}><Input aria-label="前缀" className="h-9 font-mono" value={m.prefix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, prefix: x.target.value || undefined } : y)) })} /></td>
-                  <td className={td}><Input aria-label="后缀" className="h-9 font-mono" value={m.suffix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, suffix: x.target.value || undefined } : y)) })} /></td>
-                  <td className={`${td} text-right`}><Button size="sm" variant="ghost" aria-label="移除成员" onClick={() => set({ members: d.members.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="min-w-[640px]">
+            <div className={cx(GRID, 'border-b border-line py-2.5 text-[12px] font-medium text-muted')}><span /><span>成员</span><span>前缀</span><span>后缀</span><span /></div>
+            <SortableList items={d.members} onReorder={(members) => set({ members })} renderItem={(m, i, handle) => (
+              <div className={cx(GRID, 'border-b border-line-2 py-2')}>
+                {handle}
+                <span className="truncate text-[13px] font-medium">{nameOf(m.ref)}</span>
+                <Input aria-label="前缀" className="h-9 font-mono" value={m.prefix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, prefix: x.target.value || undefined } : y)) })} />
+                <Input aria-label="后缀" className="h-9 font-mono" value={m.suffix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, suffix: x.target.value || undefined } : y)) })} />
+                <Button size="sm" variant="ghost" aria-label="移除成员" onClick={() => set({ members: d.members.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
+              </div>
+            )} />
+          </div>
         )}
       </Card>
       {e.isNew ? <Card title="组合自身的处理链"><p className="m-0 text-[13px] text-muted">保存后即可编辑处理链并逐步预览。</p></Card> : (

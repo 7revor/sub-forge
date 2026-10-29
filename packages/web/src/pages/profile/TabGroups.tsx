@@ -128,7 +128,7 @@ export function TabGroups() {
               const n = totalMembers(x);
               const current = x.origin === 'template' ? { ...x, ...draft.overlay.groupPatches?.[x.id]?.set } : x;
               return (
-                <div className={cx('flex items-center gap-1 border-t border-line-2 pl-2', x.id === g?.id ? 'bg-accent-soft' : 'bg-panel hover:bg-ground')}>
+                <div className={cx('flex items-center gap-1 border-t border-line-2 px-2', x.id === g?.id ? 'bg-accent-soft' : 'bg-panel hover:bg-ground')}>
                   {handle}
                   <button type="button" onClick={() => setSelectedId(x.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-2.5 text-left">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
