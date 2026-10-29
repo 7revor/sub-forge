@@ -43,7 +43,7 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 
 本地试用订阅服务见 [packages/server](packages/server/README.md#运行)。
 
-macOS 一键开发：双击 [start-local.command](scripts/start-local.command) 启动 Vite 前端热更新与后端源码监听，访问 `http://127.0.0.1:5173`；双击 [stop-local.command](scripts/stop-local.command) 同时停止两者。启动不打包，停止保留数据库和密钥；使用方法与数据位置见 [本地脚本说明](scripts/README.md)。
+本地开发：运行 [start](scripts/start)（`./scripts/start`）启动 Vite 前端热更新与后端源码监听，访问 `http://127.0.0.1:5173`；运行 [stop](scripts/stop)（`./scripts/stop`）同时停止两者。启动不打包，停止保留数据库和密钥；使用方法与数据位置见 [本地脚本说明](scripts/README.md)。
 
 ## 许可证
 

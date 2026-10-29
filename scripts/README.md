@@ -1,10 +1,10 @@
 # 本地开发服务一键启动与停止
 
-macOS 在 Finder 双击 `start-local.command` 启动，双击 `stop-local.command` 停止。也可以在终端执行：
+启动和停止入口分别为无扩展名的可执行脚本 `start`、`stop`。在仓库目录执行：
 
 ```bash
-./scripts/start-local.command
-./scripts/stop-local.command
+./scripts/start
+./scripts/stop
 ```
 
 脚本可以从任意工作目录运行，启动**脚本所在工作树的源码**，不会切换分支。主目录中的脚本运行主目录代码；独立 worktree 中的脚本运行该 worktree 的代码。
@@ -43,8 +43,8 @@ macOS 在 Finder 双击 `start-local.command` 启动，双击 `stop-local.comman
 需要隔离实例或换端口时，启动与停止均传入同一个数据目录：
 
 ```bash
-SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo SUBFORGE_LOCAL_PORT=18080 SUBFORGE_LOCAL_WEB_PORT=15173 ./scripts/start-local.command
-SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo ./scripts/stop-local.command
+SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo SUBFORGE_LOCAL_PORT=18080 SUBFORGE_LOCAL_WEB_PORT=15173 ./scripts/start
+SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo ./scripts/stop
 ```
 
 ## 验证脚本

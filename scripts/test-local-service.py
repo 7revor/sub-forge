@@ -31,7 +31,7 @@ class LocalServiceTests(unittest.TestCase):
         self.good_state = None
 
     def run_script(self, action, expected=0):
-        result = subprocess.run([str(SCRIPTS / f"{action}-local.command")], env=self.env,
+        result = subprocess.run([str(SCRIPTS / action)], env=self.env,
                                 text=True, capture_output=True, timeout=90)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         return result.stdout + result.stderr
@@ -104,7 +104,7 @@ class LocalServiceTests(unittest.TestCase):
         self.assertTrue((self.runtime / "secret.key").is_file())
 
     def test_同时启动仅生成一个实例(self):
-        args = [str(SCRIPTS / "start-local.command")]
+        args = [str(SCRIPTS / "start")]
         children = [subprocess.Popen(args, env=self.env, text=True, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT) for _ in range(2)]
         outputs = []
