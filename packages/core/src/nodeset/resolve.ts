@@ -102,12 +102,7 @@ export class NodeSetResolver {
     const where = `local:${id}`;
     if (!grp) { this.report.error('nodeset.missing', `本地节点组不存在`, where); return []; }
     const ref: NodeSetID = { type: 'local', id };
-    const nodes = grp.proxies.map((p) => {
-      const { dialer, ...raw } = p;
-      const n = finalizeProxy(raw, ref);
-      if (dialer) n.dialer = dialer;
-      return n;
-    });
+    const nodes = grp.proxies.map((p) => finalizeProxy(p, ref));
     return this.pipeline(where, nodes, []);
   }
 }
