@@ -2,7 +2,7 @@ import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
-// 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展开查看快照历史。
+// 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展示最近拉取状态。
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
@@ -13,7 +13,7 @@ import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
-import { Badge, Button, Card, DraftInput, Empty, ErrorAlert, Field, Input, Modal, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, Modal, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
 function SourceState({ source }: { source: SourceDoc }) {
@@ -26,7 +26,7 @@ function SourceLast({ source }: { source: SourceDoc }) {
   return <span className="text-ink-2">{s.lastOk ? formatTime(s.lastOk.fetchedAt).slice(5) : '—'}</span>;
 }
 
-const SOURCE_DELETE_BODY = '处理链和全部快照会一起删除，无法恢复。';
+const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢复。';
 
 export function SourceList() {
   const location = useLocation();
@@ -69,48 +69,24 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
   );
 }
 
-/** 基础设置与快照历史在详情页直接编辑，和处理链共用页面草稿。 */
-function BasicSettings({ draft, set, state }: {
-  draft: SourceDoc; set: (patch: Partial<SourceDoc>) => void; state: ReturnType<typeof useSourceFetchState>;
+/** 基础设置和处理链共用页面草稿。 */
+function BasicSettings({ draft, set }: {
+  draft: SourceDoc; set: (patch: Partial<SourceDoc>) => void;
 }) {
-  const setFetch = (patch: Partial<NonNullable<SourceDoc['fetch']>>) => {
-    const next = { ...draft.fetch, ...patch };
-    for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] === undefined) delete next[k];
-    set({ fetch: Object.keys(next).length ? next : undefined });
-  };
-  const num = (v: string, scale: number) => (v.trim() && Number.isFinite(Number(v)) ? Math.round(Number(v) * scale) : undefined);
   return (
     <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] items-start gap-3">
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
+        <Field label="名称" className="min-w-0 sm:col-span-2">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
+        <Field label="自动更新时间（小时）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min={5 / 60} step="any" className="font-mono" inputMode="decimal" placeholder="24" value={draft.fetch?.ttlSec === undefined ? '' : String(draft.fetch.ttlSec / 3600)} onCommit={(value) => {
+          const ttlSec = value.trim() && Number.isFinite(Number(value)) ? Math.round(Number(value) * 3600) : undefined;
+          set({ fetch: ttlSec === undefined ? undefined : { ttlSec } });
+        }} />}</Field>
         <Field label="订阅地址" className="col-span-full min-w-0">{(id) =>
           <Input id={id} type="url" className="font-mono" placeholder="https://" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
-        <Field label="名称" className="min-w-0">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
-        <Field label="User-Agent" className="min-w-0">{(id) => <Input id={id} className="font-mono" placeholder="clash.meta" value={draft.fetch?.ua ?? ''} onChange={(e) => setFetch({ ua: e.target.value || undefined })} />}</Field>
-        <Field label="快照有效期（小时）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min={5 / 60} step="any" className="font-mono" inputMode="decimal" placeholder="24" value={draft.fetch?.ttlSec === undefined ? '' : String(draft.fetch.ttlSec / 3600)} onCommit={(value) => setFetch({ ttlSec: num(value, 3600) })} />}</Field>
-        <Field label="超时（秒）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min="0.001" step="any" className="font-mono" inputMode="decimal" placeholder="10" value={draft.fetch?.timeoutMs === undefined ? '' : String(draft.fetch.timeoutMs / 1000)} onCommit={(value) => setFetch({ timeoutMs: num(value, 1000) })} />}</Field>
       </div>
       <NoteField value={draft.note} onChange={(note) => set({ note })} />
-      <p className="m-0 text-[12px] leading-relaxed text-muted">快照有效期最短 5 分钟。</p>
-      <details className="min-w-0 border-t border-line pt-3">
-        <summary className="cursor-pointer text-[13px] font-medium">快照历史 · {state.snaps.data?.length ?? 0}</summary>
-        <ErrorAlert error={state.snaps.error} />
-        <div className="mt-2 overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead><tr><th className={th}>时间</th><th className={th}>地址</th><th className={th}>结果</th></tr></thead>
-            <tbody>
-              {(state.snaps.data ?? []).map((s) => (
-                <tr key={s.id}>
-                  <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{formatTime(s.fetchedAt).slice(5)}</td>
-                  <td className={cx(td, 'max-w-[280px] truncate font-mono text-[12px] text-muted')}>{s.url}</td>
-                  <td className={td}>{s.ok ? <Badge tone="ok">成功</Badge> : <Badge tone="err">{s.error ?? '失败'}</Badge>}</td>
-                </tr>
-              ))}
-              {!state.snaps.data?.length && !state.snaps.error && <tr><td className={td} colSpan={3}>{state.snaps.isLoading ? <span className="text-muted">加载中…</span> : <Empty title="还没有拉取过" />}</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </details>
+      <p className="m-0 text-[12px] leading-relaxed text-muted">默认 24 小时，最短 5 分钟。超过间隔后，下次读取时后台更新；失败时继续使用上次成功内容。</p>
     </Card>
   );
 }
@@ -174,19 +150,20 @@ export function SourceEdit() {
           <Button variant="danger" onClick={openDelete}>删除</Button>
         </>}>
         {state.snaps.data && (state.lastOk
-          ? <Badge tone={state.failing ? 'err' : 'ok'}>{state.failing ? '最近一次拉取失败 · 使用快照' : `${formatTime(state.lastOk.fetchedAt).slice(11)} 拉取成功`} · 快照 {state.okCount} 份</Badge>
-          : <Badge tone={state.snaps.data.length ? 'err' : 'neutral'}>{state.snaps.data.length ? '拉取失败 · 没有可用快照' : '还没有拉取过'}</Badge>)}
+          ? <Badge tone={state.failing ? 'err' : 'ok'}>{state.failing ? '最近一次拉取失败 · 使用上次成功内容' : `${formatTime(state.lastOk.fetchedAt).slice(11)} 拉取成功`}</Badge>
+          : <Badge tone={state.failing ? 'err' : 'neutral'}>{state.failing ? '拉取失败 · 没有可用内容' : '还没有拉取过'}</Badge>)}
         {u?.total ? <Badge>{formatBytes((u.upload ?? 0) + (u.download ?? 0))} / {formatBytes(u.total)}{u.expire ? ` · ${formatTime(u.expire * 1000).slice(0, 10)} 到期` : ''}</Badge> : null}
         {dirty && <Badge tone="warn">有未保存的修改</Badge>}
       </PageHeader>
       <ErrorAlert error={save.error} />
       <ErrorAlert error={refresh.error} />
+      <ErrorAlert error={state.snaps.error} />
 
       <PageScroll>
         {preview.data?.report.filter((r) => r.level === 'error' || r.level === 'warn').map((r, i) => (
           <div key={i} role="status" className={cx('rounded-lg px-3 py-2 text-[13px]', r.level === 'error' ? 'bg-err-soft text-err' : 'bg-warn-soft text-warn')}>{r.message}</div>
         ))}
-        <BasicSettings draft={draft} set={set} state={state} />
+        <BasicSettings draft={draft} set={set} />
         <PipelineEditor steps={draft.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}
           loading={preview.isFetching} {...(preview.error ? { previewError: (preview.error as Error).message } : {})} />
 
