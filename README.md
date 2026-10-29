@@ -24,6 +24,7 @@
 | [docs/08-rule-repository-index.md](docs/08-rule-repository-index.md) | 新需求：内置规则仓库的搜索、索引与引用 |
 | [docs/09-frontend-forms-plan.md](docs/09-frontend-forms-plan.md) | 前端表单化改造方案：可视化表单 + 原始配置双模式、分期 |
 | [docs/10-m1-stabilization.md](docs/10-m1-stabilization.md) | M1 稳定化修复、订阅资源版本与模板更新策略、验收记录 |
+| [docs/11-design-coverage.md](docs/11-design-coverage.md) | 前端页面与设计稿的逐页对照，服务端待实现的功能 |
 
 ## 状态
 
@@ -32,7 +33,7 @@
 已完成 [M1 稳定化验收](docs/10-m1-stabilization.md)：Docker 内 377 项通过、2 项原有用例跳过，并完成内置浏览器验收。跟随最新模板的订阅会在客户端下次刷新主订阅时采用新模板；主配置与节点 / 规则资源按结构版本配套，兼容的远程内容仍可独立刷新。修复已合入 main，本地服务使用主分支；尚未部署到生产环境。
 
 - 需求：PRD v0.2，待决问题已暂定（[07 §8](docs/07-verification-checklist.md#8-决策记录)）；剩余需要 GUI / 真机 / 国内网络的采集项见 [07 §7.1](docs/07-verification-checklist.md#71-剩余采集项)，结果与暂定决策冲突时再修订。实测用例见 [research/verification](research/verification/README.md)。
-- 设计：前端页面设计稿（21 张画板）在 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库；链接默认仅所有者可见，需要在页面的 Share 菜单中分享给他人。
+- 设计：前端页面设计稿（29 张画板，前端按画板实现，对照见 [docs/11](docs/11-design-coverage.md)）在 Claude Design 画布 [Sub-Forge 前端页面设计](https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd)，未纳入仓库；链接默认仅所有者可见，需要在页面的 Share 菜单中分享给他人。
 
 ```bash
 pnpm install

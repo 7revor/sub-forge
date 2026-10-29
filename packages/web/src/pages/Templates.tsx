@@ -5,12 +5,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReportItem } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { api, ApiError, type ImpactEntry } from '../api.ts';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
+import { api, ApiError, type ImpactEntry, type User } from '../api.ts';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
 import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
-import { newId, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
+import { newId, templateFromYaml, templateToYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
+import { templateDiff } from '../convert/templateDiff.ts';
 import { TemplateEditor } from './template/TemplateEditor.tsx';
 import { TemplateDiff } from './template/TemplateDiff.tsx';
 import { matcherLabel, TemplateReport } from './template/TemplateFields.tsx';
@@ -60,6 +61,37 @@ export function TemplateList() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+/** 模板管理（管理员）：所有模板的列表，进入编辑器或新建 */
+export function TemplateManage() {
+  const list = useTemplates();
+  const profiles = useList('profiles');
+  return (
+    <>
+      <PageHeader title="模板管理" subtitle="发布新版本后，跟随最新的配置订阅在客户端下次刷新时采用新模板。发布前会逐个试渲染检查影响。"
+        actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
+      <ErrorBox error={list.error} />
+      <Card bodyClass="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse">
+          <thead><tr><th className={th}>模板</th><th className={th}>版本</th><th className={th}>策略组</th><th className={th}>规则</th><th className={th}>你的配置订阅在用</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
+          <tbody>
+            {(list.data ?? []).map((t) => (
+              <tr key={t.id}>
+                <td className={cx(td, 'font-medium')}><Link to={`/templates/${t.id}`} className="text-ink no-underline hover:text-accent">{t.name ?? t.id}</Link></td>
+                <td className={cx(td, 'font-mono')}>v{t.version}</td>
+                <td className={cx(td, 'font-mono')}>{t.groups.length}</td>
+                <td className={cx(td, 'font-mono')}>{t.rules.length}</td>
+                <td className={cx(td, 'font-mono')}>{(profiles.data ?? []).filter((p) => p.template?.id === t.id).length}</td>
+                <td className={cx(td, 'text-right whitespace-nowrap')}><Link to={`/templates/${t.id}`} className={buttonClass('default', 'sm')}>编辑</Link> <Link to={`/templates/${t.id}/publish`} className={buttonClass('default', 'sm')}>发布</Link></td>
+              </tr>
+            ))}
+            {!list.data?.length && <tr><td colSpan={6} className={cx(td, 'text-muted')}>还没有模板。</td></tr>}
+          </tbody>
+        </table>
+      </Card>
     </>
   );
 }
@@ -153,24 +185,30 @@ export function TemplateEdit() {
   return <TemplatePage key={id} id={id} />;
 }
 
+/** 管理员编辑模板（设计稿「管理员 · 模板编辑器」）与发布前校验（「管理员 · 模板发布前校验」）；草稿在两页之间共用 */
 function TemplatePage({ id }: { id: string }) {
   const isNew = id === 'new';
+  const { tab } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const isAdmin = useMe().data?.role === 'admin';
-  const tpl = useQuery({ queryKey: ['template', id], enabled: !isNew, queryFn: () => api<{ item: TemplateDoc; versions: { version: number; changelog?: string; createdAt: number }[] }>('GET', `/templates/${id}`) });
-  const [mode, setMode] = useState<'view' | 'edit'>(isNew ? 'edit' : 'view');
+  const me = useMe();
+  const isAdmin = me.data?.role === 'admin';
+  const tpl = useQuery({ queryKey: ['template', id], enabled: !isNew, queryFn: () => api<TemplateDetailData>('GET', `/templates/${id}`) });
   const [name, setName] = useState('');
   const [body, setBody] = useState<TemplateBody>(skeleton);
   const [rawValid, setRawValid] = useState(true);
   const [validation, setValidation] = useState<{ body: TemplateBody; name: string; report: ReportItem[]; error?: string }>();
   const [focus, setFocus] = useState<{ where: string }>();
+  const [diffVersion, setDiffVersion] = useState<number>();
+  const [importing, setImporting] = useState<string>();
   const rulesets = useList('rulesets');
   const bundles = useList('bundles');
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })), bundles: (bundles.data ?? []).map(({ id, name }) => ({ id, name })) };
   const [changelog, setChangelog] = useState('');
   const [impact, setImpact] = useState<{ report: ReportItem[]; impact: ImpactEntry[] }>();
-  const [confirmForce, setConfirmForce] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const users = useQuery({ queryKey: ['users'], enabled: tab === 'publish' && me.data?.role === 'admin', queryFn: () => api<{ users: User[] }>('GET', '/users').then((r) => r.users) });
+  const userName = (id: string | null) => (id ? users.data?.find((u) => u.id === id)?.username ?? id : '—');
 
   useEffect(() => {
     const t = tpl.data?.item;
@@ -192,7 +230,7 @@ function TemplatePage({ id }: { id: string }) {
 
   // 保留 500ms 防抖；忽略过期响应，防止旧草稿的结果覆盖当前校验。
   useEffect(() => {
-    if (mode !== 'edit' || !isAdmin || !rawValid || !name.trim()) return;
+    if (!isAdmin || !rawValid || !name.trim()) return;
     let active = true;
     const timer = setTimeout(() => {
       api<{ report: ReportItem[] }>('POST', '/templates/validate', { ...body, name }).then(
@@ -201,93 +239,163 @@ function TemplatePage({ id }: { id: string }) {
       );
     }, 500);
     return () => { active = false; clearTimeout(timer); };
-  }, [body, name, mode, isAdmin, rawValid]);
+  }, [body, name, isAdmin, rawValid]);
 
-  useEffect(() => { setImpact(undefined); setConfirmForce(false); }, [body, name]);
+  useEffect(() => { setImpact(undefined); setConfirmed(false); }, [body, name]);
 
   const checkImpact = useMutation({
     mutationFn: () => api<{ report: ReportItem[]; impact: ImpactEntry[] }>('POST', `/templates/${id}/impact`, draft()),
     onSuccess: setImpact,
   });
+  // 进入发布页且草稿就绪时自动试渲染一次
+  useEffect(() => { if (tab === 'publish' && !isNew && ready && !errors.length && !impact && !checkImpact.isPending) checkImpact.mutate(); }, [tab, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const publish = useMutation({
     mutationFn: (force: boolean) => api<{ item: TemplateDoc; impact: ImpactEntry[] }>('POST', `/templates/${id}/publish`, { ...draft(), changelog, force }),
     onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ['templates'] });
       void qc.invalidateQueries({ queryKey: ['template'] });
-      setConfirmForce(false);
       setImpact(undefined);
       setChangelog('');
-      setMode('view');
-      if (isNew) navigate(`/templates/${r.item.id}`, { replace: true });
+      navigate(`/templates?id=${encodeURIComponent(r.item.id)}`);
     },
     onError: (e) => {
-      if (e instanceof ApiError && e.status === 409) {
-        setImpact(e.details as { report: ReportItem[]; impact: ImpactEntry[] });
-        setConfirmForce(true);
-      }
+      if (e instanceof ApiError && e.status === 409) setImpact(e.details as { report: ReportItem[]; impact: ImpactEntry[] });
     },
   });
 
+  if (me.data && !isAdmin) return <Navigate to={isNew ? '/templates' : `/templates?id=${encodeURIComponent(id)}`} replace />;
   if (!isNew && !tpl.data) return tpl.error ? <ErrorBox error={tpl.error} /> : <div className="text-muted">加载中…</div>;
   const t = tpl.data?.item;
+  const published: TemplateBody | undefined = t && { groups: t.groups, rules: t.rules, final: t.final };
+  const changed = !published || JSON.stringify(published) !== JSON.stringify(body) || (t?.name ?? '') !== name;
+  const nextVersion = (t?.version ?? 0) + 1;
   const blocking = (impact?.impact ?? []).filter((i) => i.level === 'error');
+  const warnings = (impact?.impact ?? []).filter((i) => i.level === 'warn');
+  const canPublish = ready && !errors.length && !!name.trim() && !publish.isPending && (!blocking.length || confirmed);
+  const crumbs = <><Link to="/templates/manage" className="text-muted no-underline">模板管理</Link> / {isNew ? '新建' : <Link to={`/templates/${id}`} className="text-muted no-underline">{t?.name ?? id}</Link>}{tab === 'publish' ? ' / 发布' : ''}</>;
+
+  if (tab === 'publish') {
+    const diff = published ? templateDiff(published, body) : undefined;
+    const lines: [string, string][] = diff ? [
+      ...diff.groups.added.map((g) => ['+', `新增组「${g.name}」`] as [string, string]),
+      ...diff.groups.removed.map((g) => ['−', `移除组「${g.name}」`] as [string, string]),
+      ...diff.groups.modified.map((g) => ['~', `修改组「${g.after.name}」：${g.fields.map((f) => f.field).join('、')}`] as [string, string]),
+      ...diff.rules.added.map((r) => ['+', `新增规则 ${matcherLabel(r.matcher, ctx)}`] as [string, string]),
+      ...diff.rules.removed.map((r) => ['−', `移除规则 ${matcherLabel(r.matcher, ctx)}`] as [string, string]),
+      ...diff.rules.modified.map((r) => ['~', `修改规则 ${matcherLabel(r.after.matcher, ctx)}`] as [string, string]),
+      ...(diff.groups.moved.length || diff.rules.moved.length ? [['~', `调整顺序：${diff.groups.moved.length} 个组、${diff.rules.moved.length} 条规则`] as [string, string]] : []),
+      ...(diff.final ? [['~', '修改 MATCH 出口'] as [string, string]] : []),
+    ] : body.groups.map((g) => ['+', `新增组「${g.name}」`] as [string, string]);
+    const own = report.filter((r) => r.level !== 'info');
+    return (
+      <>
+        <PageHeader crumbs={crumbs} title={isNew ? `创建 v1 · ${name || '新模板'}` : `发布 v${nextVersion} · ${name}`}
+          subtitle={isNew ? '创建后，用户就能在新建配置订阅时选择这个模板。' : '发布后对「跟随最新」的配置订阅立即生效，订阅方无需确认。以下结果来自逐个试渲染。'} />
+        <div className="flex flex-wrap items-start gap-5">
+          <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
+            <Card title="① 模板自身" actions={<Badge tone={errors.length || parseErr ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : parseErr ? '校验失败' : ready ? '全部通过' : '校验中…'}</Badge>}>
+              <ErrorBox error={parseErr || (!rawValid ? '编辑器里的 YAML 有错误，请返回编辑器修复。' : undefined)} />
+              {own.length ? <TemplateReport items={own} onLocate={(where) => { setFocus({ where }); navigate(`/templates/${id}`); }} />
+                : ready && <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px] text-ink-2">{['出口只指向模板组或内置策略', '组成员不含节点，也没有预设 filter', '组之间没有循环引用', 'YAML 可以生成并通过结构校验'].map((c) => <li key={c} className="flex gap-2"><span className="text-ok">✓</span>{c}</li>)}</ul>}
+            </Card>
+            {!isNew && (
+              <Card title="② 对现有配置订阅的影响" bodyClass="overflow-x-auto"
+                actions={impact ? <div className="flex gap-2"><Badge tone={blocking.length ? 'err' : 'neutral'}>{blocking.length} 个阻断</Badge><Badge tone={warnings.length ? 'warn' : 'neutral'}>{warnings.length} 个警告</Badge></div>
+                  : <Button size="sm" disabled={!ready || errors.length > 0 || checkImpact.isPending} onClick={() => checkImpact.mutate()}>{checkImpact.isPending ? '试渲染中…' : '试渲染'}</Button>}>
+                <ErrorBox error={checkImpact.error} />
+                {!impact ? <div className="px-4 pb-4 text-[13px] text-muted">{checkImpact.isPending ? '正在对跟随最新版本的配置订阅逐个试渲染…' : '模板自检通过后自动试渲染。'}</div>
+                  : !impact.impact.length ? <div className="px-4 pb-4 text-[13px] text-ok">所有跟随最新版本的配置订阅都不受影响。</div> : (
+                    <table className="w-full min-w-[640px] border-collapse">
+                      <thead><tr><th className={th}>级别</th><th className={th}>配置订阅</th><th className={th}>用户</th><th className={th}>问题</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
+                      <tbody>
+                        {impact.impact.map((i) => (
+                          <tr key={i.profileId}>
+                            <td className={td}><Badge tone={i.level === 'error' ? 'err' : 'warn'}>{i.level === 'error' ? '阻断' : '警告'}</Badge></td>
+                            <td className={cx(td, 'font-medium')}>{i.profileName}</td>
+                            <td className={cx(td, 'text-ink-2')}>{userName(i.owner)}</td>
+                            <td className={cx(td, 'text-[12.5px]')}>{i.issues.map((x) => x.message).join('；')}</td>
+                            <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${i.profileId}/rules`} className="text-[12.5px] text-accent">跳转</Link></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+              </Card>
+            )}
+          </div>
+          <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-3.5 rounded-[10px] border border-line bg-panel px-4 py-4">
+            <h2 className="m-0 text-[15px] font-semibold">{isNew ? 'v1 内容' : `v${t!.version} → v${nextVersion} 变更`}</h2>
+            {lines.length ? <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+              {lines.map(([op, text], i) => <li key={i} className="flex gap-2 text-[13px]"><span className={cx('w-3 shrink-0 font-mono font-semibold', op === '+' ? 'text-ok' : op === '−' ? 'text-err' : 'text-accent')}>{op}</span><span className="min-w-0 break-all">{text}</span></li>)}
+            </ul> : <span className="text-[13px] text-muted">与 v{t?.version} 相同，没有需要发布的变更。</span>}
+            <Field label="变更说明">{(fid) => <Textarea id={fid} rows={3} value={changelog} onChange={(e) => setChangelog(e.target.value)} />}</Field>
+            {blocking.length > 0 && <label className="flex items-start gap-2.5 rounded-lg bg-err-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8f2a1f]">
+              <input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+              我知道 {blocking.map((b) => `「${b.owner ? `${userName(b.owner)} / ` : ''}${b.profileName}」`).join('、')} 将渲染失败；它们会继续返回上一份成功结果，并在其页面提示。
+            </label>}
+            <ErrorBox error={publish.error && !(publish.error instanceof ApiError && publish.error.status === 409) ? publish.error : undefined} />
+            <Button variant={blocking.length ? 'danger' : 'primary'} disabled={!canPublish || (!isNew && !changed)} onClick={() => publish.mutate(blocking.length > 0)}>
+              {publish.isPending ? '发布中…' : isNew ? '创建 v1' : blocking.length ? (confirmed ? `强制发布 v${nextVersion}` : '存在阻断项，确认后才能发布') : `发布 v${nextVersion}`}
+            </Button>
+            <Link to={isNew ? '/templates/new' : `/templates/${id}`} className={buttonClass()}>返回编辑器</Link>
+          </aside>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
-      <PageHeader crumbs={<><Link to="/templates" className="text-muted no-underline">模板</Link> / {isNew ? '新建' : t?.name ?? id}</>}
-        title={isNew ? '新建模板' : t?.name ?? id}
-        actions={isAdmin && !isNew && <Segmented label="模式" value={mode} options={[{ value: 'view', label: '查看' }, { value: 'edit', label: '编辑新版本' }]} onChange={(next) => { if (rawValid) setMode(next); }} />}>
-        {t && <Badge tone="accent">v{t.version}</Badge>}
+      <PageHeader crumbs={crumbs} title={isNew ? '新建模板' : name || t?.name || id}
+        actions={<>
+          <Button disabled={!rawValid} onClick={() => setImporting(templateToYaml(body, ctx))}>从 YAML 导入</Button>
+          <Link to={isNew ? '/templates/new/publish' : `/templates/${id}/publish`} className={buttonClass('primary')}>发布前校验</Link>
+        </>}>
+        <Badge tone="accent">{isNew ? '新模板 · 未发布' : changed ? `草稿 · 基于 v${t!.version} · 未发布` : `已发布 v${t!.version}`}</Badge>
       </PageHeader>
-
-      {mode === 'view' && t && <TemplateDetail id={id} />}
-
-      {mode === 'edit' && isAdmin && (
-        <div className="flex flex-wrap items-start gap-5">
-          <Card title="编辑" className="min-w-0 flex-[999_1_560px]">
-            <div className="flex flex-col gap-3.5">
-              <Field label="名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
-              <ErrorBox error={rulesets.error || bundles.error} />
-              <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} />
-            </div>
-          </Card>
-          <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-4">
-            <Card title="模板自检" actions={<Badge tone={errors.length ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : ready ? '通过' : '待校验'}</Badge>}>
-              <ErrorBox error={parseErr || (!rawValid ? '请先修复原始配置中的错误，再定位或发布。' : undefined)} />
-              {(ready || report.length > 0) && <TemplateReport items={report} onLocate={(where) => { if (rawValid) setFocus({ where }); }} />}
-              {!ready && !parseErr && rawValid && <span className="text-[13px] text-muted">{name.trim() ? '修改后自动校验…' : '请填写模板名称'}</span>}
-            </Card>
-            <Card title="发布">
-              <div className="flex flex-col gap-3">
-                <Field label="变更说明">{(fid) => <Textarea id={fid} rows={3} value={changelog} onChange={(e) => setChangelog(e.target.value)} />}</Field>
-                {!isNew && <Button onClick={() => checkImpact.mutate()} disabled={!ready || errors.length > 0 || checkImpact.isPending}>{checkImpact.isPending ? '分析中…' : '分析对现有配置订阅的影响'}</Button>}
-                {impact && (
-                  impact.impact.length === 0 ? <span className="text-[13px] text-ok">所有跟随最新版本的配置订阅都不受影响。</span> : (
-                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                      {impact.impact.map((i) => (
-                        <li key={i.profileId} className="flex flex-col gap-1 rounded-lg border border-line p-2.5">
-                          <span className="flex items-center gap-2"><Badge tone={i.level === 'error' ? 'err' : 'warn'}>{i.level === 'error' ? '阻断' : '警告'}</Badge><Link to={`/profiles/${i.profileId}`} className="font-medium text-accent no-underline hover:underline">{i.profileName}</Link></span>
-                          {i.issues.map((x, k) => <span key={k} className="text-[12.5px] text-ink-2">{x.message}</span>)}
-                        </li>
-                      ))}
-                    </ul>
-                  )
-                )}
-                <ErrorBox error={checkImpact.error} />
-                <ErrorBox error={publish.error && !(publish.error instanceof ApiError && publish.error.status === 409) ? publish.error : undefined} />
-                <Button variant="primary" onClick={() => publish.mutate(false)} disabled={!ready || errors.length > 0 || !name.trim() || publish.isPending}>
-                  {publish.isPending ? '发布中…' : isNew ? '创建 v1' : `发布 v${(t?.version ?? 0) + 1}`}
-                </Button>
-              </div>
-            </Card>
-          </div>
+      {(errors.length > 0 || parseErr) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-err-soft px-4 py-3 text-[13px] text-[#8f2a1f]">
+          <span><b>草稿校验：{errors.length || 1} 个错误。</b>{errors[0]?.message ?? parseErr}修复前不能发布。</span>
+          {errors[0]?.where && <Button size="sm" onClick={() => setFocus({ where: errors[0]!.where! })}>定位</Button>}
         </div>
       )}
+      <div className="flex flex-wrap items-start gap-5">
+        <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-5">
+          <Card title="名称"><Field label="模板名称">{(fid) => <Input id={fid} value={name} onChange={(e) => setName(e.target.value)} />}</Field></Card>
+          <ErrorBox error={rulesets.error || bundles.error} />
+          <TemplateEditor value={body} onChange={setBody} ctx={ctx} report={report} focus={focus} onValidityChange={setRawValid} />
+        </div>
+        <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
+          <Card title="版本">
+            {isNew ? <span className="text-[13px] text-muted">还没有发布过。</span> : (
+              <ul className="m-0 flex list-none flex-col p-0">
+                {tpl.data!.versions.map((v) => (
+                  <li key={v.version} className="flex flex-col gap-1 border-t border-line-2 py-2.5 first:border-0 first:pt-0">
+                    <span className="flex justify-between text-[13px]"><span className="font-mono font-semibold">v{v.version}</span><span className="text-[12px] text-muted">{formatTime(v.createdAt).slice(5)}</span></span>
+                    <span className="text-[12.5px] text-ink-2">{v.changelog ?? '—'}</span>
+                    {v.version > 1 && <button type="button" className="w-fit cursor-pointer text-[12.5px] text-accent" onClick={() => setDiffVersion(v.version)}>与上一版 diff</button>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card title="模板自检" actions={<Badge tone={errors.length ? 'err' : ready ? 'ok' : 'neutral'}>{errors.length ? `${errors.length} 个错误` : ready ? '通过' : '待校验'}</Badge>}>
+            {(ready || report.length > 0) && <TemplateReport items={report} onLocate={(where) => { if (rawValid) setFocus({ where }); }} />}
+            {!ready && !parseErr && rawValid && <span className="text-[13px] text-muted">{name.trim() ? '修改后自动校验…' : '请填写模板名称'}</span>}
+          </Card>
+        </aside>
+      </div>
 
-      <Modal title="存在阻断项" open={confirmForce} onClose={() => setConfirmForce(false)}
-        footer={<><Button onClick={() => setConfirmForce(false)}>返回修改</Button><Button variant="danger" onClick={() => publish.mutate(true)} disabled={!ready || errors.length > 0 || publish.isPending}>强制发布</Button></>}>
-        <p className="m-0 text-[13.5px] leading-relaxed">{blocking.length} 个配置订阅会在新版本下渲染失败。强制发布后，这些订阅会继续返回上一份成功结果，并在其页面提示。</p>
-        <ul className="m-0 pl-5 text-[13px]">{blocking.map((b) => <li key={b.profileId}><Link to={`/profiles/${b.profileId}`} className="text-accent">{b.profileName}</Link>：{b.issues.map((x) => x.message).join('；')}</li>)}</ul>
+      {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
+      <Modal title="从 YAML 导入" open={importing !== undefined} onClose={() => setImporting(undefined)} wide
+        footer={<><Button onClick={() => setImporting(undefined)}>取消</Button><Button variant="primary" onClick={() => {
+          const r = templateFromYaml(importing ?? '', body, ctx);
+          if (r.ok) { setBody(r.value); setImporting(undefined); }
+        }}>导入</Button></>}>
+        <Field label="mihomo 的 proxy-groups 与 rules（不含节点）" hint="导入会替换当前草稿的组与规则；发布前不会影响任何配置订阅。">
+          {(fid) => <Textarea id={fid} rows={16} className="font-mono text-[12.5px]" spellCheck={false} value={importing ?? ''} onChange={(e) => setImporting(e.target.value)} />}
+        </Field>
+        {importing !== undefined && (() => { const r = templateFromYaml(importing, body, ctx); return r.ok ? null : <ErrorBox error={`第 ${r.line ?? 1} 行：${r.error}`} />; })()}
       </Modal>
     </>
   );

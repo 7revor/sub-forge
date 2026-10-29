@@ -78,6 +78,17 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `GET /api/nodesets/:type/:id/nodes` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
 | `POST /api/rulesets/:id/preview` | 规则集按 `client` + `platform` 的最终输出 |
 
+### 占位接口（前端已有界面，服务端待实现）
+
+定义在 `src/api/pending.ts`。读接口返回空数据并带 `pending: true`，写接口一律 501。
+
+| 地址 | 前端页面 |
+| --- | --- |
+| `GET /api/users/stats` | 用户：每人的配置订阅数、订阅源数、最近订阅请求 |
+| `GET/POST /api/shares`、`DELETE /api/shares/:id` | 用户：共享订阅源 / 组合（SYS-06） |
+| `GET /api/rule-repos`、`GET /api/rule-repos/search`、`GET /api/rule-repos/entry`、`POST /api/rule-repos/import`、`POST /api/rule-repos`、`DELETE /api/rule-repos/:id` | 规则仓库（RS-07，见 docs/08）与系统页的仓库管理 |
+| `GET/PUT /api/system`、`POST /api/system/backup`、`POST /api/system/restore` | 系统：SSRF 白名单、mihomo 校验开关、GitHub 镜像、备份恢复 |
+
 保存前校验：必填项、正则能否编译、远程地址协议、脚本编写权限、引用是否存在且属于当前用户（规则集还可以是管理员名下的公共规则集）、组合是否成环、规则包层数。深层结构问题由预览与渲染报告给出。
 
 ## 上游拉取
@@ -105,4 +116,5 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - 存储用 better-sqlite3 直接读写 JSON 文档，没有用 05 建议的 Drizzle ORM：文档结构仍在频繁变化，暂不需要关系模型。
 - 模板草稿只保存在前端，服务端只保存已发布的版本；编辑时用 `validate` 接口即时校验。
 - 管理员共享订阅源 / 组合给指定用户（SYS-06）、模板可见性（TPL-08）尚未实现：目前模板对所有人可见，管理员名下的规则集可被所有人引用。
-- 订阅源有多个 URL 且部分从未拉取成功时，只用成功的部分渲染；所有 URL 都失败时整个 Profile 渲染失败（成员级失败策略 COL-05 尚未实现）。
+- 订阅源有多个 URL 且部分从未拉取成功时，只用成功的部分渲染；所有 URL 都失败时整个 Profile 渲染失败（成员级失败策略 COL-05 尚未实现：前端可设置组合成员的 `onFail` 并随文档保存，渲染尚未读取）。
+- 配置订阅基础设置的原样片段（`base.raw`，BS-04）随文档保存，渲染尚未输出。

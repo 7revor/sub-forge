@@ -3,7 +3,7 @@
 import { useMutation } from '@tanstack/react-query';
 import type { ChainRule, Platform, RefStrategy } from '@sub-forge/core';
 import { ArrowRight, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { NodeSetSelect, TargetPicker, targetLabel } from '../../components/pickers.tsx';
@@ -130,18 +130,31 @@ export function TabChains() {
 const PLATFORMS: { value: Platform | 'any'; label: string }[] = [{ value: 'any', label: '不区分' }, { value: 'macos', label: 'macOS' }, { value: 'windows', label: 'Windows' }, { value: 'android', label: 'Android' }, { value: 'linux', label: 'Linux' }];
 
 export function TabPreview() {
+  const { draft } = useProfile();
   const preview = usePreview();
   const [platform, setPlatform] = useState<Platform | 'any'>('any');
   const report = preview.data?.report ?? [];
   const count = (l: string) => report.filter((r) => r.level === l).length;
+  // 打开标签或切换平台时自动渲染当前草稿
+  useEffect(() => { preview.mutate(platform === 'any' ? undefined : platform); }, [platform]); // eslint-disable-line react-hooks/exhaustive-deps
+  const exportFile = () => {
+    const yaml = preview.data?.yaml;
+    if (!yaml) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([yaml], { type: 'text/yaml' }));
+    a.download = `${draft.name || 'config'}.yaml`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented label="客户端" value="mihomo" options={[{ value: 'mihomo', label: 'mihomo' }]} onChange={() => {}} />
+        <Segmented label="客户端" value="mihomo" options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge', disabled: true, title: 'Surge 在 M2 提供' }]} onChange={() => {}} />
         <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">平台
           <Select className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
-        <Button variant="primary" onClick={() => preview.mutate(platform === 'any' ? undefined : platform)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '渲染预览'}</Button>
+        <Button onClick={() => preview.mutate(platform === 'any' ? undefined : platform)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
+        <Button onClick={exportFile} disabled={!preview.data?.yaml}>导出文件</Button>
         <span className="text-[12.5px] text-muted">用当前草稿（含未保存的修改）渲染，不影响已下发的订阅。Surge 在 M2。</span>
       </div>
       <ErrorBox error={preview.error} />

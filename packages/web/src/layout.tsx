@@ -9,12 +9,12 @@ import { LogoMark } from './components/LogoMark.tsx';
 import { cx } from './components/ui.tsx';
 import { useMe } from './hooks.ts';
 
-type NavItem = { to: string; label: string; admin?: boolean };
+type NavItem = { to: string; label: string; admin?: boolean; end?: boolean };
 const NAV: { title?: string; items: NavItem[] }[] = [
   { items: [{ to: '/', label: '总览' }, { to: '/profiles', label: '配置订阅' }] },
   { title: '节点', items: [{ to: '/sources', label: '订阅源' }, { to: '/collections', label: '组合' }, { to: '/locals', label: '本地节点' }] },
-  { title: '规则', items: [{ to: '/rulesets', label: '规则集' }, { to: '/bundles', label: '规则包' }, { to: '/templates', label: '模板' }] },
-  { title: '管理员', items: [{ to: '/presets', label: '基础设置预设', admin: true }, { to: '/users', label: '用户', admin: true }] },
+  { title: '规则', items: [{ to: '/rulesets', label: '规则集' }, { to: '/bundles', label: '规则包' }, { to: '/rule-repo', label: '规则仓库' }, { to: '/templates', label: '模板', end: true }] },
+  { title: '管理员', items: [{ to: '/templates/manage', label: '模板管理', admin: true }, { to: '/presets', label: '基础设置预设', admin: true }, { to: '/users', label: '用户', admin: true }, { to: '/system', label: '系统', admin: true }] },
 ];
 
 function Logo() {
@@ -68,7 +68,7 @@ export function AppLayout() {
             <div key={i} className="flex flex-col gap-0.5">
               {g.title && <div className="px-2.5 pt-1.5 pb-1 text-[11px] tracking-[.08em] text-faint">{g.title}</div>}
               {items.map((it) => (
-                <NavLink key={it.to} to={it.to} end={it.to === '/'}
+                <NavLink key={it.to} to={it.to} end={it.to === '/' || it.end}
                   className={({ isActive }) => cx('block rounded-md px-2.5 py-2.5 text-[13.5px] leading-5 no-underline', isActive ? 'bg-nav-active font-medium text-white' : 'text-nav-text hover:bg-nav-hover hover:text-white')}>
                   {it.label}
                 </NavLink>
