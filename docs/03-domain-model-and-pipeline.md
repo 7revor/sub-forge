@@ -458,3 +458,5 @@ SQLite v17 在事务中处理规则集、全部模板历史版本、独立订阅
 
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
+
+2026-10-29：Client 新增 stash；服务端 Target 支持 mihomo/stash，并用客户端和平台隔离缓存、last-good、结构版本与资源地址。Preset.stash 和 Profile.base.stashPatch 保存 Stash 原生基础设置。renderStash 共用依赖/环路/规则流水线，独立转换节点和组；节点按快照内联。Stash 预览另返回 exportYaml，将已转换的托管规则内嵌，支持草稿独立文件导出。详见 [17](17-official-client-configuration-guides.md)。

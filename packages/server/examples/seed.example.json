@@ -35,6 +35,7 @@
       "id": "fakeip",
       "name": "fake-ip 推荐",
       "version": 1,
+      "stash": { "mode": "rule", "log-level": "warning", "dns": { "nameserver": ["https://doh.pub/dns-query"] } },
       "mihomo": {
         "mixed-port": 7890,
         "mode": "rule",

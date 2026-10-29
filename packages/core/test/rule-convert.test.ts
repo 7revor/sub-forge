@@ -3,7 +3,7 @@ import { convertRuleDocuments, prepareRuleDocument, type RuleConversion } from '
 import type { ClientCtx } from '../src/rules/client.ts';
 import type { RuleSet } from '../src/types.ts';
 
-const targets: ClientCtx[] = [{ client: 'mihomo' }, { client: 'mihomo', platform: 'android' }, { client: 'surge', platform: 'macos' }, { client: 'surge', platform: 'ios' }];
+const targets: ClientCtx[] = [{ client: 'mihomo' }, { client: 'mihomo', platform: 'android' }, { client: 'surge', platform: 'macos' }, { client: 'surge', platform: 'ios' }, { client: 'stash', platform: 'macos' }, { client: 'stash', platform: 'ios' }];
 const source = (content: string) => ({ id: 'a', kind: 'local' as const, format: 'auto' as const, content });
 function convert(rs: RuleSet, ctx: ClientCtx, sourceId?: string) {
   return convertRuleDocuments(rs, new Map(rs.sources.map(s => [s.id, prepareRuleDocument(s.content ?? '', s)])), ctx, { sourceId });

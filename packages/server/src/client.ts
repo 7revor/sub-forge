@@ -13,7 +13,7 @@ function platformFromUa(ua: string): Platform | undefined {
   if (hit) return hit;
   if (/android|ClashMetaForAndroid/i.test(ua)) return 'android';
   if (/iPhone|iPad|\biOS\b/i.test(ua)) return 'ios';
-  if (/Macintosh|Mac OS|\bMac\b|darwin/i.test(ua)) return 'macos';
+  if (/Macintosh|macOS|Mac OS|\bMac\b|darwin/i.test(ua)) return 'macos';
   if (/Windows|win32|win64/i.test(ua)) return 'windows';
   if (/Linux/i.test(ua)) return 'linux';
   return undefined;
@@ -23,11 +23,12 @@ export function detectClient(ua: string, query: { target?: string | undefined; p
   const qp = query.platform?.toLowerCase();
   const paramPlatform = PLATFORMS.find((p) => p === qp);
   const t = query.target?.toLowerCase();
-  if (t === 'surge' || t === 'mihomo' || t === 'clash' || t === 'clash.meta') {
-    const client: Client = t === 'surge' ? 'surge' : 'mihomo';
+  if (t === 'stash' || t === 'surge' || t === 'mihomo' || t === 'clash' || t === 'clash.meta') {
+    const client: Client = t === 'surge' || t === 'stash' ? t : 'mihomo';
     const platform = paramPlatform ?? platformFromUa(ua);
     return platform ? { client, platform, by: 'param' } : { client, by: 'param' };
   }
+  if (/stash/i.test(ua)) return { client: 'stash', platform: paramPlatform ?? platformFromUa(ua) ?? 'ios', by: 'ua' };
   if (/surge/i.test(ua)) {
     const platform = paramPlatform ?? (/iOS|iPhone|iPad/i.test(ua) ? 'ios' : 'macos');
     return { client: 'surge', platform, by: 'ua' };

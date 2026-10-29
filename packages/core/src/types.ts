@@ -94,7 +94,9 @@ export type Target =
 
 // ---------- 规则侧 ----------
 
-export type Client = 'mihomo' | 'surge';
+export const CLIENTS = ['mihomo', 'surge', 'stash'] as const;
+export type Client = typeof CLIENTS[number];
+export type YamlClient = Extract<Client, 'mihomo' | 'stash'>;
 export type Platform = 'android' | 'macos' | 'windows' | 'ios' | 'linux';
 
 export type DomainRuleType = 'DOMAIN' | 'DOMAIN-SUFFIX' | 'DOMAIN-KEYWORD' | 'DOMAIN-WILDCARD' | 'DOMAIN-REGEX';

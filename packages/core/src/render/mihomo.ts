@@ -11,9 +11,10 @@ import { Report } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
 import { isYamlRuleUrl, type Behavior } from '../rules/parse.ts';
 import { type EffectiveGroup } from '../template/merge.ts';
-import type { GroupMember, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template } from '../types.ts';
+import type { GroupMember, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template, YamlClient } from '../types.ts';
 import { shortHash } from '../util/hash.ts';
 import { compileUserRegex, exactNameRegex } from '../util/regex.ts';
+import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
@@ -74,22 +75,34 @@ class InlineRestart extends Error {
   constructor(readonly nodeSetKey: string) { super(`inline ${nodeSetKey}`); }
 }
 
+const stashOriginalName = Symbol('stashOriginalName');
+type RenderNode = ProxyIR & { [stashOriginalName]?: string };
+
 type NS = {
   key: string;
   ref: NodeSetID;
   output: 'provider' | 'inline';
+  requestedOutput: 'provider' | 'inline';
   providerName: string;
   /** 本次渲染的节点副本，可以写入 dialer-proxy */
-  nodes: ProxyIR[];
+  nodes: RenderNode[];
 };
 
 type MihomoGroup = Record<string, unknown> & { name: string; proxies?: string[]; use?: string[] };
 
 export function renderMihomo(input: RenderInput): MihomoRenderResult {
+  return renderYaml(input, 'mihomo');
+}
+
+export function renderStash(input: RenderInput): MihomoRenderResult {
+  return renderYaml(input, 'stash');
+}
+
+function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult {
   const forced = new Set<string>();
   for (;;) {
     try {
-      return renderOnce(input, forced);
+      return renderOnce(input, forced, client);
     } catch (e) {
       if (!(e instanceof InlineRestart)) throw e;
       if (forced.has(e.nodeSetKey)) throw new Error(`依赖解析未收敛：${e.nodeSetKey}`);
@@ -103,11 +116,14 @@ function displayName(ref: NodeSetID, inputs: NodeSetInputs): string {
   return src?.name ?? ref.id;
 }
 
-function filterNodes(nodes: ProxyIR[], f: { filter?: string; excludeFilter?: string; excludeType?: string }): ProxyIR[] {
+function filterNodes(nodes: RenderNode[], f: { filter?: string; excludeFilter?: string; excludeType?: string }): ProxyIR[] {
   const inc = f.filter ? compileUserRegex(f.filter) : undefined;
   const exc = f.excludeFilter ? compileUserRegex(f.excludeFilter) : undefined;
   const types = excludedAdapterTypes(f.excludeType);
-  return nodes.filter((n) => (!inc || inc.test(n.name)) && (!exc || !exc.test(n.name)) && !isExcludedAdapter(n.type, types));
+  return nodes.filter((n) => {
+    const name = n[stashOriginalName] ?? n.name;
+    return (!inc || inc.test(name)) && (!exc || !exc.test(name)) && !isExcludedAdapter(n.type, types);
+  });
 }
 
 function stripNode(n: ProxyIR): Record<string, unknown> {
@@ -119,10 +135,14 @@ function stripNode(n: ProxyIR): Record<string, unknown> {
   return out;
 }
 
-function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRenderResult {
+function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlClient): MihomoRenderResult {
   const { profile } = input;
   const report = new Report();
-  const ctx: ClientCtx = input.platform ? { client: 'mihomo', platform: input.platform } : { client: 'mihomo' };
+  const ctx: ClientCtx = { client, ...(input.platform ? { platform: input.platform } : {}) };
+  if (client === 'stash' && input.platform && input.platform !== 'ios' && input.platform !== 'macos') report.error('stash.platform', 'Stash 输出仅支持 iOS 或 macOS 平台');
+  if (client === 'stash' && profile.nodeSets.some(s => s.output === 'provider')) {
+    report.info('stash.nodes-inline', 'Stash 节点集按快照内联输出，随主订阅刷新更新，以保留筛选、代理链及空组拒绝语义');
+  }
   const eff = resolveProfileRouting(profile, input.template, report);
   const resolver = new NodeSetResolver(input.nodeSets, report);
 
@@ -137,8 +157,9 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     providerNames.add(providerName);
     sets.set(key, {
       key, ref: ps.ref, providerName,
-      output: forcedInline.has(key) ? 'inline' : ps.output,
-      nodes: resolver.resolve(ps.ref).map((n) => ({ ...n })),
+      output: client === 'stash' || forcedInline.has(key) ? 'inline' : ps.output,
+      requestedOutput: ps.output,
+      nodes: resolver.resolve(ps.ref).map((n) => client === 'stash' ? stashProxy(n, report) : ({ ...n })),
     });
   }
 
@@ -151,6 +172,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
         const orig = n.name;
         let i = 2;
         while (topNames.has(`${orig} ${i}`)) i++;
+        if (client === 'stash') n[stashOriginalName] = orig;
         n.name = `${orig} ${i}`;
         report.warn('inline.name-conflict', `内联节点「${orig}」与其他节点集重名，已改为「${n.name}」`, s.key);
       }
@@ -174,8 +196,8 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     const set = sets.get(nodeSetKey(ref.nodeSet));
     if (!set) { report.error('ref.nodeset-not-in-profile', `引用的节点集 ${nodeSetKey(ref.nodeSet)} 未加入本 Profile`, where); return undefined; }
     const node = 'exact' in ref.match
-      ? set.nodes.find((n) => n.name === (ref.match as { exact: string }).exact)
-      : (() => { const re = compileUserRegex((ref.match as { regex: string }).regex); return set.nodes.find((n) => re.test(n.name)); })();
+      ? set.nodes.find((n) => (client === 'stash' ? n[stashOriginalName] ?? n.name : n.name) === (ref.match as { exact: string }).exact)
+      : (() => { const re = compileUserRegex((ref.match as { regex: string }).regex); return set.nodes.find((n) => re.test((client === 'stash' ? n[stashOriginalName] : undefined) ?? n.name)); })();
     return node ? { set, node } : undefined;
   };
 
@@ -240,6 +262,12 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
         if (s.output === 'provider') use.push(s.providerName);
         else proxies.push(...filterNodes(s.nodes, filterSpec).map((n) => n.name)); // 内联节点不受 filter 约束，服务端预过滤
       } else {
+        if (client === 'stash') {
+          for (const s of sets.values()) if (m.scope === 'all' || (m.scope === 'providers' ? s.requestedOutput === 'provider' : s.requestedOutput === 'inline')) {
+            proxies.push(...filterNodes(s.nodes, filterSpec).map(n => n.name));
+          }
+          continue;
+        }
         out[m.scope === 'all' ? 'include-all' : m.scope === 'proxies' ? 'include-all-proxies' : 'include-all-providers'] = true;
       }
     }
@@ -271,7 +299,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     if (g.display?.hidden) out.hidden = true;
     if (g.display?.icon) out.icon = g.display.icon;
     // 运行时筛空同样拒绝；放在扩展字段之后，防止历史配置覆盖固定策略。
-    return { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
+    return client === 'stash' ? stashGroup(out, g, report) as MihomoGroup : { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
   };
   const groups = eff.groups.map(lowerGroup);
 
@@ -372,7 +400,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
       }
       if (!converted.lines.length) continue;
       rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', ...(m.remote ? { remoteUrl: m.remote.url } : {}) };
-      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
+      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
     }
     ruleLines.push(`RULE-SET,${key},${target}`);
   }
@@ -399,6 +427,10 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
   }
 
   const allGroups = [...groups, ...wrappers];
+  if (client === 'stash') {
+    stashBenchmarks(allGroups, inlineProxies, eff.groups, report);
+    for (const node of inlineProxies) if (node['dialer-proxy'] && node['interface-name']) report.error('stash.dialer-interface', 'Stash 的 dialer-proxy 与 interface-name 不能同时配置', `proxy:${String(node.name)}`);
+  }
   validateReferences(allGroups, inlineProxies, providers, providerOverride, proxyProviders, report);
 
   const config: Record<string, unknown> = { ...(input.base ?? {}), proxies: inlineProxies };
@@ -406,6 +438,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
   config['proxy-groups'] = allGroups;
   if (Object.keys(ruleProviders).length) config['rule-providers'] = ruleProviders;
   config.rules = ruleLines;
+  if (client === 'stash') for (const provider of Object.values(ruleProviders)) delete provider.type;
 
   return {
     config,

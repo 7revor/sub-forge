@@ -47,7 +47,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 | 地址 | 内容 |
 | --- | --- |
-| `GET /sub/:token` | 主配置。`?target=mihomo\|surge&platform=...` 优先于 UA；Surge 暂返回 501 |
+| `GET /sub/:token` | 主配置。`?target=mihomo\|surge\|stash&platform=...` 优先于 UA；Surge 暂返回 501 |
 | `GET /p/:token/:key` | Profile 专属 provider 内容 |
 | `GET /r/:token/:key` | 转换后的规则集 |
 | `GET /healthz` | 健康检查 |
@@ -276,3 +276,5 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 2026-10-29 绑定规则页的说明与间距修正仅调整前端呈现，无服务端、数据库或种子变更。
 
 规则转换支持 `USER-AGENT`：来源读取计为已解析，POST 预览与 GET 下载对 Surge 输出有效规则，mihomo 保留客户端不支持注释；全部没有有效输出时 GET 仍返回 400。
+
+Stash：/sub/:token?target=stash&platform=ios 或 macos 输出完整订阅；UA 可自动识别。预览接口接受 client: stash，并返回可独立导入的 exportYaml。资源和历史版本按客户端/平台隔离；Mihomo 校验器不用于 Stash。预设 stash 与 base.stashPatch 独立保存，节点按快照内联。详见 docs/17-official-client-configuration-guides.md。

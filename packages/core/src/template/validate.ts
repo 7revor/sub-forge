@@ -43,7 +43,7 @@ export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rules
       if (typeof rule.text !== 'string') { report.error('template.invalid-raw-rule', 'RAW 内容必须是字符串', where); return; }
       const error = rawRuleError(rule.text);
       if (error) report.error('template.invalid-raw-rule', error, where);
-      if (rule.client !== undefined && !['mihomo', 'surge'].includes(rule.client)) report.error('template.invalid-raw-client', 'RAW 客户端不合法', where);
+      if (rule.client !== undefined && !['mihomo', 'surge', 'stash'].includes(rule.client)) report.error('template.invalid-raw-client', 'RAW 客户端不合法', where);
     } else if (rule.type === 'AND' || rule.type === 'OR' || rule.type === 'NOT') rule.children.forEach(child => checkRule(child, where));
   };
   for (const r of t.rules) {

@@ -23,7 +23,7 @@ export type LocalDoc = LocalProxyGroup;
 export type TemplateVersionDoc = Template & { name?: string };
 
 /** 基础设置预设（BS-03），Surge 段仅存储，暂不参与渲染 */
-export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; surge?: { general?: Record<string, unknown>; host?: Record<string, string> } };
+export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; stash?: Record<string, unknown>; surge?: { general?: Record<string, unknown>; host?: Record<string, string> } };
 
 export type ProfileDoc = Profile & {
   revision?: number;
@@ -32,7 +32,7 @@ export type ProfileDoc = Profile & {
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
   template?: { id: string; follow: 'latest' | { pinned: number } };
   /** 不设置表示不输出基础设置（使用客户端默认） */
-  base?: { presetId?: string; patch?: Record<string, unknown> };
+  base?: { presetId?: string; patch?: Record<string, unknown>; stashPatch?: Record<string, unknown> };
   /** 订阅更新间隔（秒），写入 profile-update-interval，默认 86400（OUT-01 / OUT-02） */
   updateIntervalSec?: number;
   /** subscription-userinfo 的来源（SRC-05） */

@@ -222,3 +222,5 @@
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
 
 USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayPal*` 应计为已解析；Surge macOS / iOS 显示有效行，mihomo / Android 显示“当前客户端无法输出：mihomo 不支持 USER-AGENT”的注释。保留现有布局与诊断区域。本轮未修改外部画布。
+
+2026-10-29 Stash 待同步画板：规则集预览增加 Stash macOS / iOS，客户端改写下拉增加 Stash；Profile 预览增加 Stash 与 iOS/macOS 平台、节点快照内联及文件内嵌规则说明；概览增加复制 Stash 链接；预设/基础设置增加 Stash 分区。Stash 使用自身的 YAML 表单和覆盖，不沿用 Mihomo 字段目录。外部画布本轮未修改。
