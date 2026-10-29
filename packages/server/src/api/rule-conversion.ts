@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { remoteRuleMatcher, type ClientCtx, type Platform } from '@sub-forge/core';
+import { checkRuleSetReference, resolveRuleSetReference, type RuleSetMatcher } from '../ruleset-reference.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../docs.ts';
 import type { SnapshotService } from '../snapshots.ts';
 import type { RenderService } from '../render.ts';
@@ -9,7 +10,7 @@ import type { Store } from '../store.ts';
 import { RuleConverter, type ConversionInput } from '../rule-converter.ts';
 import { RuleSourceService } from '../rule-source.ts';
 import { bad, HttpError, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
-import { checkFetch, checkRepositorySource, checkRuleSetOverrides } from './validate.ts';
+import { checkFetch, checkRepositorySource, checkRuleSetOverrides, RefChecker } from './validate.ts';
 
 const formats = ['auto', 'classical', 'domain', 'domain-set', 'ipcidr', 'yaml', 'mrs', 'srs'];
 function source(value: unknown): RuleSetSourceDoc {
@@ -39,7 +40,7 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
   const app = new Hono<ApiEnv>();
   const converter = new RuleConverter();
   const getter = new RuleSourceService(snapshots, converter);
-  for (const path of ['/rulesets/preview', '/rulesets/source', '/rules/convert', '/rulesets/:id/sources/:source/content']) {
+  for (const path of ['/rulesets/preview', '/rulesets/source', '/rules/convert', '/rules/matcher-source', '/rulesets/:id/sources/:source/content']) {
     app.use(path, (c, next) => path === '/rules/convert' && c.req.method === 'GET' && c.req.query('token') ? next() : requireUser(c, next));
     app.use(path, bodyLimit({ maxSize: 16 * 1024 * 1024 }));
   }
@@ -50,6 +51,25 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
     if (!row || row.owner !== userId) throw notFound('规则集');
     return row.doc;
   };
+  // 模板中的规则引用预览完整源文件，不转换、不裁剪，也不应用客户端改写。
+  app.post('/rules/matcher-source', async c => {
+    const body = await jsonBody(c);
+    const matcher = body.matcher as RuleSetMatcher | undefined;
+    if (!matcher || typeof matcher !== 'object' || matcher.kind !== 'ruleset') throw bad('请选择规则集');
+    checkRuleSetReference(matcher, store);
+    const user = c.get('user');
+    if (!matcher.remote && !matcher.repository && !new RefChecker(store, user).ruleVisible(matcher.id)) throw notFound('规则集');
+    const ruleset = resolveRuleSetReference(matcher, store);
+    if (!ruleset) throw notFound('规则集');
+    const sources = ruleset.sources.filter(s => s.enabled !== false);
+    if (sources.some(s => ['mrs', 'srs'].includes(s.format))) throw bad('二进制规则无法展示文本源文件');
+    const loaded = await Promise.all(sources.map(async src => {
+      const result = await getter.get(user.id, src);
+      if (!result.status.ok || result.content === undefined) throw new HttpError(502, result.status.error ?? '规则源文件读取失败');
+      return result.content;
+    }));
+    return c.json({ name: ruleset.name, content: loaded.join('\n'), sources: sources.length });
+  });
   app.get('/rulesets/:id/sources/:source/content', async c => {
     const saved = own(c.req.param('id'), c.get('user').id)!;
     const src = saved.sources.find(s => s.id === c.req.param('source'));
