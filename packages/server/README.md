@@ -26,6 +26,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 ```
 
 - 以非 root 用户运行；数据库与密钥文件 `secret.key`（0600）放在 `/data`，备份时两者一起备份，丢了密钥就无法解密数据。
+- 最终运行镜像在构建时通过 apt 安装 `git` 和 `ca-certificates`，宿主机无需安装 Git，容器启动时无需安装软件。可运行 `docker run --rm --entrypoint git sub-forge --version` 检查。默认 Git 缓存位于 `/data/rule-repo-cache`，上述 `/data` 卷会一并持久化；自定义 `SUBFORGE_REPO_CACHE` 时须保证该目录可由容器的 node 用户写入并单独挂载。
 - 首次启动且没有用户时按 `SUBFORGE_ADMIN_*` 创建管理员，之后可以去掉这两个变量。
 - 对外请放在 HTTPS 反向代理之后；`PUBLIC_URL` 为 https 时会话 cookie 带 `Secure`。
 
