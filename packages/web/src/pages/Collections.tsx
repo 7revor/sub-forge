@@ -58,7 +58,7 @@ export function CollectionEdit() {
   const usedBy = (profiles.data ?? []).filter((p) => p.nodeSets.some((n) => n.ref.type === 'collection' && n.ref.id === d.id));
   return (
     <DetailShell {...shell} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
-      moreItems={[{ label: '重命名…', onSelect: () => setRenaming(true) }]}
+      actionItems={[{ label: '重命名', onSelect: () => setRenaming(true) }]}
       badges={<>
         <Badge>{d.members.length} 个成员{preview.data ? ` · 合并后 ${preview.data.input} 个节点` : ''}</Badge>
         {!e.isNew && <Badge>被配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-accent">{p.name}</Link></span>) : '还没有'}</Badge>}

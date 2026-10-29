@@ -4,7 +4,7 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
-import { DeleteAction, MoreMenu } from '../components/MoreMenu.tsx';
+import { DeleteAction, ActionButtons } from '../components/DetailActions.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { Button, Card, Empty, ErrorBox, Input, Modal, PageHeader, PageScroll, Segmented, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
@@ -102,9 +102,9 @@ export function PresetEdit() {
           <section className="flex min-w-0 flex-[999_1_520px] flex-col gap-3.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-2.5">
               <h2 className="m-0 text-[17px] font-semibold">{d.name}</h2>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
-                <MoreMenu items={[{ label: '重命名…', onSelect: () => setRenaming(true) }]} />
+                <ActionButtons items={[{ label: '重命名', onSelect: () => setRenaming(true) }]} />
                 <DeleteAction what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove} />
               </div>
             </div>

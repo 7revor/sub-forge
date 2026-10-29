@@ -13,7 +13,7 @@ import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
 import { groupFromYaml, groupToYaml, parseProxyImport, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
-import { DeleteAction, DeleteDialog, MoreMenu } from '../components/MoreMenu.tsx';
+import { DeleteAction, DeleteDialog, ActionButtons } from '../components/DetailActions.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Select, Textarea, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
@@ -134,7 +134,7 @@ export function LocalEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / {e.doc.data?.name}</>}
         title={d.name || '未命名'}
         actions={<>
-          <MoreMenu items={[{ label: '重命名分组…', onSelect: () => setRenaming(true) }, { label: '分组 YAML…', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
+          <ActionButtons items={[{ label: '重命名分组', onSelect: () => setRenaming(true) }, { label: '分组 YAML', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
           <Button variant="primary" onClick={() => e.submit()} disabled={e.save.isPending || !e.dirty}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
           <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
             onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })} />

@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
-import { DeleteAction, MoreMenu } from '../../components/MoreMenu.tsx';
+import { DeleteAction } from '../../components/DetailActions.tsx';
 import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
 import { Badge, Button, buttonClass, ErrorBox, Modal, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
 import { TemplateCard } from './TemplateCard.tsx';
@@ -55,10 +55,10 @@ export function ProfileDetail() {
         <PageHeader crumbs={<><Link to="/profiles" className="text-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
           actions={<>
             {dirty && <Button onClick={discard}>放弃修改</Button>}
-            {!dirty && tab === 'overview' && <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>}
+            <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
             {!dirty && tab !== 'overview' && <Button onClick={copyLink} disabled={!firstUrl} title={firstUrl ? undefined : '先在「概览」新增订阅链接'}>{copied ? '已复制' : '复制订阅链接'}</Button>}
             {tab !== 'preview' && !dirty && ['overview', 'groups', 'rules', 'chains'].includes(tab) && <Link to={`/profiles/${id}/preview`} className={buttonClass('primary')}>预览配置</Link>}
-            <MoreMenu items={[{ label: '更换模板…', onSelect: () => setTplOpen(true) }, { label: '复制一份', onSelect: duplicate }]} />
+            <Button onClick={() => setTplOpen(true)}>更换模板</Button>
             {(dirty || !['overview', 'preview'].includes(tab)) && <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>}
             <DeleteAction what="配置订阅" name={draft.name} body="它的所有订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
               onReset={del.reset} onDelete={() => del.mutate(draft.id, { onSuccess: () => navigate('/profiles') })} />
