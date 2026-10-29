@@ -47,7 +47,7 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 
 Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步骤跳转；返回表单恢复有效字段后解除拦截，也可直接修复原文或明确放弃。节点与预设不会把无效原文显示为“已保存”。模板 YAML 导出使用 `sub-forge-group` / `sub-forge-rule` 注释保留稳定 ID，因此改名或改匹配内容仍能关联已有个人覆盖。返回表单时无效组字段被清理、坏规则被忽略；无效组类型使用默认 select；原 final 引用的组不存在时改为 REJECT 并提示。复制组或规则时建议删除复制项的 ID 注释；恢复解析会忽略重复注释并保证 ID 唯一。
 
-公共组件在 `src/components/`：`MoreMenu`（「更多」菜单、删除按钮 `DeleteAction` 与删除确认 `DeleteDialog`）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
+公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`MoreMenu`（「更多」菜单、删除按钮 `DeleteAction` 与删除确认 `DeleteDialog`）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
 
 ## 已知简化
 

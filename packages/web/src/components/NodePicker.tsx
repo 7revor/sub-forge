@@ -1,14 +1,12 @@
 import type { Builtin, NodeRef, NodeSetID } from '@sub-forge/core';
-import { useId } from 'react';
 import { useNodeList } from '../hooks.ts';
 import { resolveRef } from './nodeMatch.ts';
 import { NodeSetSelect } from './pickers.tsx';
-import { Input, Segmented, Select } from './ui.tsx';
+import { Combobox, Input, Segmented, Select } from './ui.tsx';
 
 export function NodePicker({ nodeSets, value, onChange, label }: {
   nodeSets: { ref: NodeSetID; name: string }[]; value: NodeRef; onChange: (ref: NodeRef) => void; label: string;
 }) {
-  const listId = useId();
   const { data, isLoading, error } = useNodeList(value.nodeSet);
   const exact = 'exact' in value.match;
   const text = 'exact' in value.match ? value.match.exact : value.match.regex;
@@ -18,10 +16,13 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
       <div className="w-auto min-w-44"><NodeSetSelect label={`${label}所在节点集`} value={value.nodeSet} options={nodeSets} onChange={(nodeSet) => onChange({ ...value, nodeSet })} /></div>
       <Segmented label={`${label}匹配方式`} value={exact ? 'exact' : 'regex'} options={[{ value: 'exact', label: '精确' }, { value: 'regex', label: '正则' }]}
         onChange={(mode) => onChange({ ...value, match: mode === 'exact' ? { exact: text } : { regex: text } })} />
-      <Input aria-label={`${label}${exact ? '节点名称' : '节点正则'}`} className="w-auto min-w-44 font-mono" list={exact ? listId : undefined}
-        placeholder={exact ? '搜索或输入节点名称（处理链之后）' : '节点名称正则，支持 (?i)'} value={text}
-        onChange={(e) => onChange({ ...value, match: exact ? { exact: e.target.value } : { regex: e.target.value } })} />
-      {exact && <datalist id={listId}>{(data?.nodes ?? []).map((n, i) => <option key={i} value={n.name}>{n.type} · {n.server}:{n.port}</option>)}</datalist>}
+      {exact
+        ? <Combobox aria-label={`${label}节点名称`} className="w-auto min-w-44 flex-1 font-mono" placeholder="搜索或输入节点名称（处理链之后）" value={text}
+            options={(data?.nodes ?? []).map((n) => ({ value: n.name, hint: `${n.type} · ${n.server}:${n.port}` }))}
+            empty={isLoading ? '节点列表加载中…' : text ? '没有匹配的节点，可直接使用输入的名称' : '节点集中没有节点'}
+            onChange={(v) => onChange({ ...value, match: { exact: v } })} />
+        : <Input aria-label={`${label}节点正则`} className="w-auto min-w-44 font-mono" placeholder="节点名称正则，支持 (?i)" value={text}
+            onChange={(e) => onChange({ ...value, match: { regex: e.target.value } })} />}
       <span className="text-[12px] text-muted">找不到时</span>
       <Select aria-label={`${label}兜底`} className="w-auto" value={value.fallback === 'error' || !value.fallback ? 'error' : value.fallback.kind === 'builtin' ? value.fallback.name : 'error'}
         onChange={(e) => onChange({ ...value, fallback: e.target.value === 'error' ? 'error' : { kind: 'builtin', name: e.target.value as Builtin } })}>
