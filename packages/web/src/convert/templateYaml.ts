@@ -1,9 +1,9 @@
 import { composeRule, lowerRule, parseRuleLine, remoteRuleMatcher, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
-import { Document, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
+import { Document, isAlias, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
 import { recoverYaml } from './recoverYaml.ts';
 import { parseYamlDocument } from './yamlDocument.ts';
 
-export type TemplateBody = Pick<Template, 'groups' | 'rules' | 'final'>;
+export type TemplateBody = Pick<Template, 'groups' | 'rules' | 'final' | 'ruleProviders'>;
 export type NamedRef = { id: string; name: string };
 export type ConvertCtx = { rulesets: NamedRef[] };
 
@@ -64,16 +64,23 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     const { 'empty-fallback': _emptyFallback, ...extra } = g.extra ?? {};
     return { ...out, ...extra };
   });
+  const providerAlias = (r: RuleEntry) => {
+    const m = r.matcher;
+    if (m.kind !== 'ruleset') return '';
+    const provider = m.remote && t.ruleProviders?.find(p => p.name === r.providerName && p.url === m.remote!.url);
+    return provider ? provider.name : rulesetAlias(m, ctx);
+  };
   const lines = t.rules.map((r) => {
     const m = r.matcher;
     const lowered = m.kind === 'rule' ? lowerMatcher(m) : {
-      text: `RULE-SET,${rulesetAlias(m, ctx)}`,
+      text: `RULE-SET,${providerAlias(r)}`,
     };
     return composeRule({ ...lowered, src: ('src' in lowered && lowered.src) || r.options?.src }, targetName(r.target, t.groups));
   });
   lines.push(`MATCH,${targetName(t.final, t.groups)}`);
-  const references = Object.fromEntries(t.rules.flatMap(r => r.matcher.kind === 'ruleset' ? [[rulesetAlias(r.matcher, ctx), r.matcher]] : []));
-  const doc = new Document({ 'proxy-groups': groups, rules: lines, ...(Object.keys(references).length ? { [referenceField]: references } : {}) });
+  const references = Object.fromEntries(t.rules.flatMap(r => r.matcher.kind === 'ruleset' ? [[providerAlias(r), r.matcher]] : []));
+  const providers = new Map((t.ruleProviders ?? []).map(p => [p.name, { type: 'http', url: p.url }]));
+  const doc = new Document({ 'proxy-groups': groups, ...(t.ruleProviders?.length ? { 'rule-providers': providers } : {}), rules: lines, ...(Object.keys(references).length ? { [referenceField]: references } : {}) });
   const groupNodes = doc.get('proxy-groups', true);
   if (isSeq(groupNodes)) t.groups.forEach((g, i) => {
     const item = groupNodes.items[i];
@@ -136,7 +143,11 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
     const providerOnly = isMap(originalDoc.contents) && originalDoc.has('rule-providers') && !originalDoc.has('proxy-groups') && !originalDoc.has('rules');
     const fragment = isSeq(originalDoc.contents);
     const recovered = recover ? recoverYaml(text, 'template') : undefined;
-    const doc = recovered?.doc ?? parseYamlDocument(text, { lineCounter }, 'template');
+    const doc = recovered?.doc ?? parseYamlDocument(text, { lineCounter, merge: true }, 'template');
+    // 独立列表片段沿用已有来源定义，完整配置则以输入内容为准。
+    if (fragment && current.ruleProviders?.length) {
+      doc.set('rule-providers', doc.createNode(new Map(current.ruleProviders.map(p => [p.name, { url: p.url }]))));
+    }
     // 策略组列表作为片段补入，同名组替换；保留其余组，避免现有规则和 MATCH 悬空。
     if (fragment && doc.has('proxy-groups') && !doc.has('rules')) {
       const previous = parseDocument(templateToYaml(current, ctx));
@@ -205,21 +216,35 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         referenceMap.set(alias, remote);
       } else referenceMap.set(alias, m);
     }
-    const providers = doc.get('rule-providers', true);
+    // 仅展开需要读取的别名；普通节点保留原始注释、稳定 ID 和行号。
+    const expand = (node: unknown) => isAlias(node) ? doc.createNode(node.toJS(doc, { maxAliasCount: 100 })) : node;
+    const providers = expand(doc.get('rule-providers', true));
+    const ruleProviders: NonNullable<TemplateBody['ruleProviders']> = providerOnly ? [...(current.ruleProviders ?? [])] : [];
     const external = new Map<string, Extract<Matcher, { kind: 'ruleset' }>>();
     attempt(() => { if (providers !== undefined && !isMap(providers)) throw new Error('rule-providers 必须是对象'); });
     if (isMap(providers)) for (const item of providers.items) attempt(() => {
+      locate(item.value);
       const name = String(item.key);
-      if (!isMap(item.value) || typeof item.value.get('url') !== 'string') throw new Error(`规则来源「${name}」缺少远程 URL`);
-      const matcher = remoteRuleMatcher(item.value.get('url') as string);
+      if (!name.trim() || name.includes(',')) throw new Error('规则来源名称不能为空或包含逗号');
+      const value = expand(item.value);
+      const raw = isMap(value) ? value.toJS(doc, { maxAliasCount: 100 }) as Record<string, unknown> : undefined;
+      if (!raw || typeof raw.url !== 'string') throw new Error(`规则来源「${name}」缺少远程 URL`);
+      const matcher = remoteRuleMatcher(raw.url);
+      const mapped = referenceMap.get(name);
+      if (mapped?.remote && mapped.remote.url !== matcher.remote!.url) throw new Error(`规则来源「${name}」的 URL 与 ${referenceField} 中的引用不一致，请同步修改或移除该引用映射`);
       // 显式的系统引用映射优先；普通 Clash provider 仅提取 URL。
       if (!referenceMap.has(name)) referenceMap.set(name, matcher);
       external.set(name, matcher);
+      const provider = { name, url: matcher.remote!.url };
+      const previous = ruleProviders.findIndex(p => p.name === name);
+      if (previous < 0) ruleProviders.push(provider);
+      else ruleProviders[previous] = provider;
     });
     if (external.size) notes.push(`已读取 ${external.size} 个远程规则 URL，格式自动识别，输出为 LIST`);
     const ignored = doc.contents.items.map((p) => String(p.key)).filter((key) => !['proxy-groups', 'rules', 'rule-providers', referenceField].includes(key));
     if (ignored.length) notes.push(`已忽略：${ignored.join('、')}（仅导入 proxy-groups、rules 和 rule-providers 的 URL）`);
-    const groupNodes = doc.get('proxy-groups', true);
+    const groupNodes = expand(doc.get('proxy-groups', true));
+    if (isSeq(groupNodes)) groupNodes.items = groupNodes.items.map(node => expand(node) as typeof node);
     locate(groupNodes);
     attempt(() => { if (groupNodes !== undefined && !isSeq(groupNodes)) throw new Error('proxy-groups 必须是列表'); });
     const names = new Map<string, string>();
@@ -230,7 +255,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       attempt(() => {
         locate(node);
         if (!isMap(node)) throw new Error('策略组必须是对象');
-        const raw = node.toJSON() as Record<string, unknown>;
+        const raw = node.toJS(doc, { maxAliasCount: 100 }) as Record<string, unknown>;
         if (typeof raw.name !== 'string' || !raw.name.trim()) {
           if (!recover) throw new Error('策略组缺少有效名称');
           notes.push(`第 ${index + 1} 个策略组缺少有效名称，名称已留空`);
@@ -308,7 +333,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         const extra: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(raw)) {
           if (nodeField(key)) notes.push(`组「${g.name}」已忽略节点相关字段：${key}`);
-          else if (!knownFields.has(key)) Object.defineProperty(extra, key, { value, enumerable: true, configurable: true, writable: true });
+          else if (key !== '<<' && !knownFields.has(key)) Object.defineProperty(extra, key, { value, enumerable: true, configurable: true, writable: true });
         }
         if (Object.keys(extra).length || old?.extra !== undefined) g.extra = extra;
         if (g.name.trim()) names.set(g.name, g.id);
@@ -326,7 +351,8 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       if (!isMap(node)) return;
       const group = groupByNode.get(node);
       if (!group) return;
-      const proxies = node.get('proxies', true);
+      const raw = node.toJS(doc, { maxAliasCount: 100 }) as Record<string, unknown>;
+      const proxies = expand(node.get('proxies', true)) ?? (raw.proxies === undefined ? undefined : doc.createNode(raw.proxies));
       locate(proxies);
       if (proxies === undefined) return;
       if (!isSeq(proxies)) {
@@ -343,7 +369,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         });
       }
     });
-    const ruleNodes = doc.get('rules', true);
+    const ruleNodes = expand(doc.get('rules', true));
     locate(ruleNodes);
     attempt(() => { if (ruleNodes !== undefined && !isSeq(ruleNodes)) throw new Error('rules 必须是列表'); });
     const rules: RuleEntry[] = [];
@@ -371,7 +397,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
           continue;
         }
         const target = resolve(parts[targetIndex]!);
-        if (!target) throw new Error(`出口「${parts[targetIndex]}」不是本片段中的模板组或内置策略，不能使用节点名`);
+        if (!target) throw new Error(`出口「${parts[targetIndex]}」未在 proxy-groups 中定义，也不是内置策略；请先补齐同名策略组或更正组名（模板规则不能直接引用单个节点）`);
         const matchingParts = parts.filter((_, i) => i !== targetIndex);
         const matchingText = rawParts.filter((_, i) => i !== targetIndex).join(',').trim();
         const flags = parts.slice(targetIndex + 1).map(part => part.toLowerCase());
@@ -412,6 +438,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         const old = (byId && !used.has(byId.id) ? byId : undefined) ?? current.rules.find((r) => !used.has(r.id) && matcherKey(r.matcher) === key);
         if (old) used.add(old.id);
         const r: RuleEntry = { id: old?.id ?? newId('r'), ...restoreRule(matcher, old, flags.includes('no-resolve'), flags.includes('src')), target };
+        if (type === 'RULE-SET' && matcher.kind === 'ruleset' && ruleProviders.some(p => p.name === parts[1] && p.url === matcher.remote?.url)) r.providerName = parts[1]!;
         rules.push(r);
       } catch (err) {
         const message = `第 ${index + 1} 条规则「${original}」：${err instanceof Error ? err.message : String(err)}`;
@@ -420,12 +447,14 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       }
     }
     if (providerOnly) {
-      for (const matcher of external.values()) {
+      for (const [name, matcher] of external) {
         if (rules.some(rule => matcherKey(rule.matcher) === matcherKey(matcher))) continue;
-        rules.push({ id: newId('r'), matcher, target: { kind: 'builtin', name: 'REJECT' } });
+        rules.push({ id: newId('r'), matcher, providerName: name, target: { kind: 'builtin', name: 'REJECT' } });
       }
       if (external.size) notes.push('远程规则已补入当前模板，新规则出口默认为 REJECT，请按需调整');
     }
+    const unused = ruleProviders.filter(p => !rules.some(r => r.matcher.kind === 'ruleset' && r.matcher.remote?.url === p.url));
+    if (unused.length) notes.push(`已保留 ${unused.length} 个未引用的远程规则来源：${unused.map(p => p.name).join('、')}；未添加分流规则`);
     if (final === undefined) {
       const previousFinal = current.final;
       if (recover && previousFinal.kind === 'group' && !groups.some((group) => group.id === previousFinal.groupId)) {
@@ -433,7 +462,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         notes.push('未找到有效的 MATCH / FINAL，原出口组已不存在，出口已设为 REJECT');
       } else notes.push('未找到 MATCH / FINAL，已沿用当前模板的 final 出口');
     }
-    return { ok: true, value: { groups, rules, final: final ?? current.final }, notes };
+    return { ok: true, value: { groups, rules, final: final ?? current.final, ...(ruleProviders.length ? { ruleProviders } : {}) }, notes };
   } catch (err) {
     return { ok: false, error: `模板 YAML 导入失败：${err instanceof Error ? err.message : String(err)}`, ...(line === undefined ? {} : { line }) };
   }

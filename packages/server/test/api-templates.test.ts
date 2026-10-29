@@ -40,6 +40,27 @@ async function scenario() {
 }
 
 describe('模板', () => {
+  it('发布和重新读取保留来源顺序，未引用来源不拉取也不生成规则', async () => {
+    const { admin, rs, store } = await scenario();
+    try {
+      const ruleProviders = [
+        { name: 'google', url: 'https://example.test/unused-google.list' },
+        { name: 'lan', url: 'https://example.test/unused-lan.list' },
+      ];
+      const saved = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders });
+      expect(saved.status).toBe(201);
+      const id = saved.json.item.id;
+      expect(saved.json.item.ruleProviders).toEqual(ruleProviders);
+      expect((await admin.get(`/api/templates/${id}`)).json.item.ruleProviders).toEqual(ruleProviders);
+      expect((await admin.get(`/api/templates/${id}/versions/1`)).json.item.rules).toEqual(TEMPLATE(rs).rules);
+      for (const invalid of [[{ name: 'file', url: 'file:///tmp/rules' }], [ruleProviders[0], ruleProviders[0]], {}]) {
+        const result = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders: invalid });
+        expect(result.status).toBe(400);
+        expect(result.json.details.report[0].code).toBe('template.invalid-provider');
+      }
+    } finally { store.close(); }
+  });
+
   it('管理员发布新模板，所有人可读；普通用户不能发布', async () => {
     const { alice, published, tplId, rs } = await scenario();
     expect(published.status).toBe(201);

@@ -51,6 +51,7 @@ export function TemplateDiff({ id, version, ctx, onClose }: { id: string; versio
       <Changes label="组" diff={diff.groups} before={data.before} after={data.after} nameOf={(g) => g.name} ctx={ctx} />
       <Changes label="规则" diff={diff.rules} before={data.before} after={data.after} nameOf={(r) => matcherLabel(r.matcher, ctx)} ctx={ctx} />
       <div className="text-[13px]">MATCH / final：{diff.final ? `${target(diff.final.before, data.before)} → ${target(diff.final.after, data.after)}` : '无变化'}</div>
+      {diff.ruleProviders && <div className="text-[13px]">远程规则来源（按顺序）：<pre className="whitespace-pre-wrap break-all">{stringify(diff.ruleProviders.before ?? [])}→{'\n'}{stringify(diff.ruleProviders.after ?? [])}</pre></div>}
     </>}
   </Modal>;
 }

@@ -207,6 +207,8 @@ export type RuleEntry = {
   id: ID;
   matcher: Matcher;
   target: Target;
+  /** YAML 来源名称；仅用于模板往返，实际规则身份仍由 matcher 决定。 */
+  providerName?: string;
   options?: {
     /** @deprecated 忽略此字段；no-resolve 仅从规则原文读取。 */
     noResolve?: boolean;
@@ -223,6 +225,8 @@ export type Template = {
   groups: GroupSpec[];
   rules: RuleEntry[];
   final: Target;
+  /** 按导入顺序保存远程来源，包括尚未被规则引用的定义；不自动生成规则。 */
+  ruleProviders?: { name: string; url: string }[];
 };
 
 // ---------- 订阅 ----------
