@@ -2,14 +2,14 @@
 
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { DeleteMenu } from './MoreMenu.tsx';
+import { DeleteMenu, MoreMenu, type MoreItem } from './MoreMenu.tsx';
 import { Badge, Button, ErrorBox, PageHeader } from './ui.tsx';
 
-export function DetailShell({ listPath, listLabel, isNew, name, dirty, saving, saveDisabled = false, onSave, saveError, onDelete, deleteError, deleting, onDeleteReset, deleteBody, canEdit = true, extraActions, badges, children }: {
+export function DetailShell({ listPath, listLabel, isNew, name, dirty, saving, saveDisabled = false, onSave, saveError, onDelete, deleteError, deleting, onDeleteReset, deleteBody, canEdit = true, extraActions, moreItems = [], badges, children }: {
   listPath: string; listLabel: string; isNew: boolean; name: string; dirty: boolean; saving: boolean;
   saveDisabled?: boolean;
   onSave: () => void; saveError: unknown; onDelete?: () => void; deleteError?: unknown; deleting?: boolean; onDeleteReset?: () => void; deleteBody?: ReactNode; canEdit?: boolean;
-  extraActions?: ReactNode; badges?: ReactNode; children: ReactNode;
+  extraActions?: ReactNode; moreItems?: MoreItem[]; badges?: ReactNode; children: ReactNode;
 }) {
   return (
     <>
@@ -17,7 +17,8 @@ export function DetailShell({ listPath, listLabel, isNew, name, dirty, saving, s
         title={isNew ? `新建${listLabel}` : name || '未命名'}
         actions={<>
           {extraActions}
-          {!isNew && onDelete && canEdit && <DeleteMenu what={listLabel} name={name} body={deleteBody} error={deleteError} {...(deleting === undefined ? {} : { pending: deleting })} {...(onDeleteReset ? { onReset: onDeleteReset } : {})} onDelete={onDelete} />}
+          {!isNew && canEdit && !onDelete && moreItems.length > 0 && <MoreMenu items={moreItems} />}
+          {!isNew && onDelete && canEdit && <DeleteMenu what={listLabel} name={name} body={deleteBody} error={deleteError} extra={moreItems} {...(deleting === undefined ? {} : { pending: deleting })} {...(onDeleteReset ? { onReset: onDeleteReset } : {})} onDelete={onDelete} />}
           {canEdit && <Button variant="primary" onClick={onSave} disabled={saving || saveDisabled || !dirty}>{saving ? '保存中…' : dirty ? '保存' : '已保存'}</Button>}
         </>}>
         {badges}

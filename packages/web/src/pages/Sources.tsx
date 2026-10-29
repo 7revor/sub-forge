@@ -15,7 +15,7 @@ import { useDeleteDoc, useDoc, useNodeList, useSaveDoc, useSourceFetchState, typ
 
 function SourceNodes({ source }: { source: SourceDoc }) {
   const nodes = useNodeList({ type: 'source', id: source.id });
-  return <span className="font-mono text-[13px]">{nodes.data ? nodes.data.nodes.length : '—'}</span>;
+  return <span className="font-mono text-[13px]">{nodes.data ? nodes.data.total : '—'}</span>;
 }
 
 function SourceState({ source }: { source: SourceDoc }) {
