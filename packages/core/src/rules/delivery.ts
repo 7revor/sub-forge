@@ -23,7 +23,7 @@ export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientC
   const fetch = 'fetch' in src ? src.fetch as { ua?: string } | undefined : undefined;
   if (fetch?.ua) return binary ? { mode: 'unsupported', reason: '二进制规则无法使用服务端自定义拉取设置' } : managed;
   if (binary) {
-    return ctx.client === 'mihomo' && src.format === 'mrs' && (src.behavior === 'domain' || src.behavior === 'ipcidr')
+    return (ctx.client === 'mihomo' || ctx.client === 'stash') && src.format === 'mrs' && (src.behavior === 'domain' || src.behavior === 'ipcidr')
       ? { mode: 'original', format: 'mrs', behavior: src.behavior, url: src.url }
       : { mode: 'unsupported', reason: '目标客户端不支持该二进制规则，无法转换为 LIST' };
   }
@@ -45,11 +45,11 @@ export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientC
       seen.add(key);
     }
   }
-  if (parsed.format === 'yaml' && ctx.client !== 'mihomo') return managed;
-  if (parsed.behavior === 'ipcidr' && ctx.client !== 'mihomo') return managed;
+  if (parsed.format === 'yaml' && ctx.client === 'surge') return managed;
+  if (parsed.behavior === 'ipcidr' && ctx.client === 'surge') return managed;
   // DOMAIN-SET 的前导点在 Clash 中语义不同；纯域名可以直接引用，其余必须转换。
   if (parsed.behavior === 'domain') {
-    if (ctx.client === 'mihomo' && parsed.format !== 'yaml' && src.format !== 'domain' && !src.repository?.path.startsWith('rule/Clash/') && parsed.rules.some(p => p.text.startsWith('.'))) return managed;
+    if (ctx.client !== 'surge' && parsed.format !== 'yaml' && src.format !== 'domain' && !src.repository?.path.startsWith('rule/Clash/') && parsed.rules.some(p => p.text.startsWith('.'))) return managed;
     if (ctx.client === 'surge' && parsed.rules.some(p => p.text.startsWith('+.') || p.rule.type === 'DOMAIN-WILDCARD')) return managed;
   } else if (parsed.behavior === 'classical') {
     // 需要别名翻译、平台降级或丢弃的内容不能原样下发。

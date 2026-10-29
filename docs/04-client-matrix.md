@@ -142,3 +142,5 @@ URL 参数 `?target=&platform=` 优先于 UA。各客户端 UA 原文 ⏳（07 S
 
 
 2026-10-29 表单中的单条规则统一 RAW；上表的类型映射仍用于既有结构化 IR 与来源转换。未限定客户端的 RAW 在目标客户端原样输出，不作类型降级或方言翻译；旧 client 限定仍生效。RAW 末尾 no-resolve / src 放在出口后输出；mihomo 的 RAW wildcard 延用 lowercase 去重。
+
+2026-10-29 Stash 已接入：主订阅、规则转换和独立文件导出支持 iOS/macOS；保留 USER-AGENT、DOMAIN-REGEX、GEOSITE、NETWORK 等规则，进程规则仅 macOS。节点集按快照内联；Hysteria2 认证与带宽、节点级延迟测试、空组拒绝、代理链互斥约束按 Stash 官方语法适配。未适配参数报告错误，不把 Mihomo 配置直接当作 Stash 配置。Loon 本轮仅登记官方资料，完整边界及来源见 [17](17-official-client-configuration-guides.md)。

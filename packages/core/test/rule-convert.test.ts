@@ -3,7 +3,7 @@ import { convertRuleDocuments, prepareRuleDocument, type RuleConversion } from '
 import type { ClientCtx } from '../src/rules/client.ts';
 import type { RuleSet } from '../src/types.ts';
 
-const targets: ClientCtx[] = [{ client: 'mihomo' }, { client: 'mihomo', platform: 'android' }, { client: 'surge', platform: 'macos' }, { client: 'surge', platform: 'ios' }];
+const targets: ClientCtx[] = [{ client: 'mihomo' }, { client: 'mihomo', platform: 'android' }, { client: 'surge', platform: 'macos' }, { client: 'surge', platform: 'ios' }, { client: 'stash', platform: 'macos' }, { client: 'stash', platform: 'ios' }];
 const source = (content: string) => ({ id: 'a', kind: 'local' as const, format: 'auto' as const, content });
 function convert(rs: RuleSet, ctx: ClientCtx, sourceId?: string) {
   return convertRuleDocuments(rs, new Map(rs.sources.map(s => [s.id, prepareRuleDocument(s.content ?? '', s)])), ctx, { sourceId });
@@ -39,8 +39,28 @@ describe('保留行位的通用规则转换', () => {
     ]);
   });
 
+  it.each(['USER-AGENT,PayPal*', 'payload: ["USER-AGENT,PayPal*"]'])('USER-AGENT 来源正常解析，按客户端输出并保持行位：%s', content => {
+    const src = source(content);
+    const doc = prepareRuleDocument(content, src);
+    expect(doc.parsed).toBe(1);
+    expect(doc.diagnostics).toEqual([]);
+    const results = targets.map(ctx => convert({ id: 'r', name: '', sources: [src] }, ctx));
+    for (const [i, result] of results.entries()) {
+      expect(result.stats).toMatchObject({ parsed: 1, rejected: 0, output: i < 2 ? 0 : 1, unsupported: i < 2 ? 1 : 0 });
+      expect(result.origins).toEqual(results[0]!.origins);
+      if (i < 2) {
+        expect(active(result)).toEqual([]);
+        expect(result.lines.join('\n')).toContain('# [当前客户端无法输出：mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*');
+        expect(result.diagnostics).toMatchObject([{ kind: 'client', line: 1 }]);
+      } else {
+        expect(active(result)).toEqual(['USER-AGENT,PayPal*']);
+        expect(result.diagnostics).toEqual([]);
+      }
+    }
+  });
+
   it('四个客户端保留原注释、空行、未解析、重复和不兼容规则的位置', () => {
-    const rs: RuleSet = { id: 'r', name: '', sources: [source('# 标题\n\nDOMAIN,a.test\nUSER-AGENT,x*\nDOMAIN,\nPROCESS-NAME,Example\nDOMAIN,a.test\nDOMAIN,last.test\n')] };
+    const rs: RuleSet = { id: 'r', name: '', sources: [source('# 标题\n\nDOMAIN,a.test\nUNKNOWN,x*\nDOMAIN,\nPROCESS-NAME,Example\nDOMAIN,a.test\nDOMAIN,last.test\n')] };
     const results = targets.map(t => convert(rs, t));
     expect(new Set(results.map(r => r.lines.length))).toEqual(new Set([8]));
     for (const r of results) {
@@ -80,7 +100,7 @@ describe('保留行位的通用规则转换', () => {
   });
 
   it('YAML 保留结构注释和原物理行定位，流式 YAML 按逻辑条目展开', () => {
-    for (const content of ["payload:\n  - DOMAIN,a.test\n  - PROCESS-NAME,App\n  - USER-AGENT,x*\n", 'payload: ["DOMAIN,a.test", "PROCESS-NAME,App", "USER-AGENT,x*"]']) {
+    for (const content of ["payload:\n  - DOMAIN,a.test\n  - PROCESS-NAME,App\n  - UNKNOWN,x*\n", 'payload: ["DOMAIN,a.test", "PROCESS-NAME,App", "UNKNOWN,x*"]']) {
       const rs: RuleSet = { id: 'r', name: '', sources: [source(content)] };
       const results = targets.map(t => convert(rs, t));
       expect(new Set(results.map(r => r.lines.length)).size).toBe(1);
@@ -106,9 +126,9 @@ describe('保留行位的通用规则转换', () => {
     expect(r.lines.at(-1)).toBe('DOMAIN,d5099.test');
   });
   it.each([
-    '# 标题\nDOMAIN,a.test\nPROCESS-NAME,App\nUSER-AGENT,x*\nDOMAIN,a.test\nDOMAIN,',
-    'payload:\n  - DOMAIN,a.test\n  - PROCESS-NAME,App\n  - USER-AGENT,x*',
-    'payload: ["DOMAIN,a.test", "USER-AGENT,x*", "PROCESS-NAME,App"]',
+    '# 标题\nDOMAIN,a.test\nPROCESS-NAME,App\nUNKNOWN,x*\nDOMAIN,a.test\nDOMAIN,',
+    'payload:\n  - DOMAIN,a.test\n  - PROCESS-NAME,App\n  - UNKNOWN,x*',
+    'payload: ["DOMAIN,a.test", "UNKNOWN,x*", "PROCESS-NAME,App"]',
   ])('不同替换宽度下四客户端的全部来源映射与行数稳定：%s', content => {
     for (let width = 1; width <= 8; width++) {
       const rs: RuleSet = { id: 'r', name: '', sources: [source(content)], overrides: [

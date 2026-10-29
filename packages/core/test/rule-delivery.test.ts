@@ -13,6 +13,27 @@ const rendered = (inputs: RuleSetInputs) => renderMihomo({
 });
 
 describe('按内容识别与自动输出格式', () => {
+  it('含 USER-AGENT 的远程文本仅 Surge 可直连，mihomo 必须过滤后托管', () => {
+    const f = fixture('DOMAIN,paypal.com\nUSER-AGENT,PayPal*');
+    expect(f.decide().mode).toBe('managed');
+    const text = Object.values(rendered(f.inputs).rulesets)[0]!.text;
+    expect(text.split('\n').filter(line => line && !line.startsWith('#'))).toEqual(['DOMAIN,paypal.com']);
+    expect(text).toContain('# [当前客户端无法输出：mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*');
+    expect(ruleSetDelivery(f.rs, f.inputs, { client: 'surge', platform: 'ios' }).mode).toBe('original');
+  });
+
+  it('Stash 的 YAML、CIDR 和 MRS 可按官方格式直连，客户端不支持行仍强制托管', () => {
+    for (const body of ['payload: ["DOMAIN,paypal.test", "USER-AGENT,PayPal*"]', '192.0.2.0/24']) {
+      const f = fixture(body);
+      expect(ruleSetDelivery(f.rs, f.inputs, { client: 'stash', platform: 'ios' }).mode).toBe('original');
+    }
+    const process = fixture('USER-AGENT,PayPal*\nPROCESS-NAME,Example');
+    expect(ruleSetDelivery(process.rs, process.inputs, { client: 'stash', platform: 'ios' }).mode).toBe('managed');
+    const binary = fixture('');
+    binary.rs.sources[0]!.format = 'mrs'; binary.rs.sources[0]!.behavior = 'domain';
+    expect(ruleSetDelivery(binary.rs, binary.inputs, { client: 'stash' })).toMatchObject({ mode: 'original', format: 'mrs', behavior: 'domain' });
+  });
+
   it.each(['text', 'yaml'])('远程 %s 的 wildcard 大小写重复必须托管去重，唯一规则仍可透传', format => {
     const lines = ['PROCESS-PATH-WILDCARD,/Apps/*', 'PROCESS-PATH-WILDCARD,/apps/*'];
     const f = fixture(format === 'yaml' ? `payload: ${JSON.stringify(lines)}` : lines.join('\n'));

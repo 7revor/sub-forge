@@ -15,12 +15,15 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
   app.route('/', profileConversionRoutes(store));
   // 静态路径先注册；新建草稿不绑定任何已保存的 Profile。
   app.post('/profiles/preview', requireUser, async (c) => {
-    const body = await jsonBody<{ profile?: unknown; platform?: unknown }>(c);
+    const body = await jsonBody<{ profile?: unknown; client?: unknown; platform?: unknown }>(c);
     if (!body.profile || typeof body.profile !== 'object' || Array.isArray(body.profile)) throw bad('profile 必须是对象');
+    const client = body.client ?? 'mihomo';
+    if (client !== 'mihomo' && client !== 'stash') throw bad('目前支持 mihomo 与 Stash 预览');
     const platform = PLATFORMS.find((x) => x === body.platform);
     if (body.platform !== undefined && !platform) throw bad('platform 不合法');
+    if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') throw bad('Stash 平台仅支持 ios 或 macos');
     const draft = validateDoc('profile', body.profile as Record<string, unknown>, '', c.get('user'), store);
-    const res = await renderer.previewDraft(draft, platform ? { client: 'mihomo', platform } : { client: 'mihomo' });
+    const res = await renderer.previewDraft(draft, { client, ...(platform ? { platform } : {}) });
     return c.json(res.yaml ? { ...res, yaml: res.yaml.replaceAll(TOKEN_PLACEHOLDER, '{token}') } : res);
   });
   app.use('/profiles/:id/*', requireUser);
@@ -71,12 +74,14 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
   app.post('/profiles/:id/preview', async (c) => {
     const p = own(c.req.param('id'), c.get('user').id);
     const body = await jsonBody<{ platform?: unknown; client?: unknown; profile?: unknown }>(c);
-    if (body.client !== undefined && body.client !== 'mihomo') throw bad('目前只支持 mihomo 预览（Surge 在 M2）');
+    const client = body.client ?? 'mihomo';
+    if (client !== 'mihomo' && client !== 'stash') throw bad('目前支持 mihomo 与 Stash 预览');
     const platform = PLATFORMS.find((x) => x === body.platform);
     if (body.platform !== undefined && !platform) throw bad('platform 不合法');
+    if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') throw bad('Stash 平台仅支持 ios 或 macos');
     // 草稿同样要做归属校验，否则可以借预览读到别人的节点集
     const draft = body.profile && typeof body.profile === 'object' ? validateDoc('profile', body.profile as Record<string, unknown>, p.id, c.get('user'), store) : undefined;
-    const res = await renderer.preview(p.id, platform ? { client: 'mihomo', platform } : { client: 'mihomo' }, draft ? { profile: draft } : {});
+    const res = await renderer.preview(p.id, { client, ...(platform ? { platform } : {}) }, draft ? { profile: draft } : {});
     // 预览与具体订阅链接无关，地址里的 token 位置显示为 {token}
     return c.json(res.yaml ? { ...res, yaml: res.yaml.replaceAll(TOKEN_PLACEHOLDER, '{token}') } : res);
   });

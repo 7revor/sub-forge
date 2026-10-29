@@ -23,13 +23,13 @@ async function setup() {
 describe('模板自身的规则可用性检查', () => {
   it('混合失败按原因分类，保留源文件行号且不重复链接', async () => {
     const h = await setup();
-    h.respond('# 注释\nDOMAIN,valid.test\nUSER-AGENT,Example*\nDOMAIN,\nAND,((DOMAIN,a.test),(DST-PORT,443))');
+    h.respond('# 注释\nDOMAIN,valid.test\nUNKNOWN,Example*\nDOMAIN,\nAND,((DOMAIN,a.test),(DST-PORT,443))');
     const res = await h.admin.post('/api/templates/validate', h.template);
     expect(res.status).toBe(200);
     const issue = res.json.report.find((r: { where: string; code: string }) => r.where === 'rule:rule' && r.code === 'template.ruleset-rejected-lines');
     expect(issue.message).toBe('类型不支持：2 行 · 写法有误：1 行');
     expect(issue.ruleIssues).toEqual([
-      { source: 1, line: 3, kind: 'unimplemented', reason: '不支持的规则类型 USER-AGENT' },
+      { source: 1, line: 3, kind: 'unimplemented', reason: '不支持的规则类型 UNKNOWN' },
       { source: 1, line: 4, kind: 'invalid', reason: '缺少规则值' },
       { source: 1, line: 5, kind: 'unimplemented', reason: '暂不支持逻辑规则' },
     ]);

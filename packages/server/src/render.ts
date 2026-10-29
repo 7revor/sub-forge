@@ -5,7 +5,7 @@ import { profileTemplate } from './profile-routing.ts';
 
 import { createHash } from 'node:crypto';
 import {
-  resolveProfileRouting, Report, renderMihomo, sourceKey, sourceLabel, stableHash, stableStringify,
+  resolveProfileRouting, Report, renderMihomo, renderStash, exportStashConfig, sourceKey, sourceLabel, stableHash, stableStringify,
   type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -16,7 +16,7 @@ import { resolveRuleSetReference } from './ruleset-reference.ts';
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
 const GENERATION_PLACEHOLDER = '__SF_GENERATION__';
 
-export type Target = { client: 'mihomo'; platform?: Platform };
+export type Target = { client: 'mihomo' | 'stash'; platform?: Platform };
 
 /** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
 export type StoredRender = {
@@ -70,7 +70,7 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
 
 type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
 
-export type PreviewOutcome = { ok: boolean; yaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
+export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
 
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
@@ -107,6 +107,7 @@ export class RenderService {
     if (!/^[0-9a-f]{8}$/.test(version) || providerKey === undefined) return undefined;
     const path = `/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(providerKey)}?v=${version}`;
     // 旧 provider 地址没有 platform，需在该 Profile 已保存的客户端版本中按内容哈希恢复。
+    if (target.client !== 'mihomo') return undefined;
     const candidates: Target[] = [target, { client: 'mihomo' }, ...(['android', 'macos', 'windows', 'ios', 'linux'] as const).map(platform => ({ client: 'mihomo' as const, platform }))];
     for (const candidate of candidates) {
       this.preserveLegacy(profileId, candidate);
@@ -137,7 +138,7 @@ export class RenderService {
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
       return a.result
-        ? { ok: !a.failure, yaml: a.result.yaml, dependencies: a.result.dependencies, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
+        ? { ok: !a.failure, yaml: a.result.yaml, ...(target.client === 'stash' && !a.failure ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
         : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
@@ -177,7 +178,9 @@ export class RenderService {
 
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
     if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    const base = profile.base ? deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
+    const base = profile.base ? target.client === 'stash'
+      ? deepMerge(preset?.stash ?? {}, profile.base.stashPatch ?? {})
+      : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const key = stableHash(stableStringify({
@@ -197,8 +200,8 @@ export class RenderService {
     }
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
-    const qs = target.platform ? `&platform=${target.platform}` : '';
-    const result = renderMihomo({
+    const qs = `${target.client === 'stash' ? '&target=stash' : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
+    const result = (target.client === 'stash' ? renderStash : renderMihomo)({
       profile, nodeSets, rules,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
@@ -225,7 +228,7 @@ export class RenderService {
     })).digest('hex').slice(0, 32);
     result.yaml = result.yaml.replaceAll(GENERATION_PLACEHOLDER, generation);
 
-    if (this.opts.verify) {
+    if (this.opts.verify && target.client === 'mihomo') {
       const v = await this.opts.verify(result.yaml.replaceAll(TOKEN_PLACEHOLDER, 'verify'));
       if (!v.ok) {
         report.push({ level: 'error', code: 'verify.mihomo', message: `mihomo -t 校验失败：${v.output.trim().split('\n').slice(-3).join(' ')}` });

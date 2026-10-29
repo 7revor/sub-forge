@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addUser, client, setupApp } from './helpers.ts';
 
-const content = '# 规则\nDOMAIN,a.test\nUSER-AGENT,x*\nPROCESS-NAME,Example\nDOMAIN,last.test';
+const content = '# 规则\nDOMAIN,a.test\nUNKNOWN,x*\nPROCESS-NAME,Example\nDOMAIN,last.test';
 const remote = { id: 'a', kind: 'remote', format: 'auto', url: 'https://rules.example.test/list' };
 async function scenario() {
   const calls: { url: string; ua?: string }[] = [];
@@ -12,6 +12,32 @@ async function scenario() {
   return { ...env, alice, bob, calls };
 }
 describe('来源获取与服务端转换分离', () => {
+  it('USER-AGENT 来源统计正常，四客户端转换和 GET 下载按能力输出', async () => {
+    const env = setupApp({ fetcher: async () => ({ status: 200, body: 'USER-AGENT,PayPal*' }) });
+    try {
+      await addUser(env.store, 'alice'); const alice = client(env.app); await alice.login('alice');
+      const loaded = await alice.post('/api/rulesets/source', { source: remote });
+      expect(loaded.status).toBe(200);
+      expect(loaded.json.status).toMatchObject({ rules: 1, rejected: 0 });
+      for (const [target, platform] of [['mihomo', undefined], ['mihomo', 'android'], ['surge', 'macos'], ['surge', 'ios']]) {
+        const result = await alice.post('/api/rules/convert', { inputs: [{ source: remote, content: loaded.json.content }], client: target, platform });
+        expect(result.status).toBe(200);
+        expect(result.json.stats).toMatchObject({ parsed: 1, rejected: 0, output: target === 'surge' ? 1 : 0, unsupported: target === 'surge' ? 0 : 1 });
+        expect(result.json.lines).toEqual(target === 'surge' ? ['USER-AGENT,PayPal*'] : ['# [当前客户端无法输出：mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*']);
+        const downloaded = await alice.get(`/api/rules/convert?url=${encodeURIComponent(remote.url)}&target=${target}${platform ? `&platform=${platform}` : ''}`);
+        expect(downloaded.status).toBe(target === 'surge' ? 200 : 400);
+        if (target === 'surge') {
+          expect(downloaded.text).toBe('USER-AGENT,PayPal*\n');
+          expect(downloaded.headers.get('x-rule-count')).toBe('1');
+          expect(downloaded.headers.get('x-rule-rejected')).toBe('0');
+        }
+      }
+      const overridden = await alice.post('/api/rules/convert', { inputs: [{ source: remote, content: loaded.json.content }], client: 'surge', overrides: [{ override: { when: { client: 'surge' }, action: { append: [{ type: 'USER-AGENT', value: 'Other*' }] } } }] });
+      expect(overridden.status).toBe(200);
+      expect(overridden.json.lines).toEqual(['USER-AGENT,PayPal*', 'USER-AGENT,Other*']);
+    } finally { await env.snapshots.settled(); env.store.close(); }
+  });
+
   it('客户端转换不拉取上游，未解析诊断与客户端诊断独立，来源按读取参数缓存', async () => {
     const { alice, calls } = await scenario();
     const loaded = await alice.post('/api/rulesets/source', { source: remote });
@@ -57,11 +83,11 @@ describe('来源获取与服务端转换分离', () => {
     expect((await alice.post('/api/rules/convert', { inputs: [{ source: remote }], client: 'mihomo', overrides: [{ override: {} }] })).status).toBe(400);
   });
   it('纯未支持或畸形远程原文仍返回，来源诊断不因客户端改变', async () => {
-    const env = setupApp({ fetcher: async () => ({ status: 200, body: 'USER-AGENT,x*\nDOMAIN,' }) });
+    const env = setupApp({ fetcher: async () => ({ status: 200, body: 'UNKNOWN,x*\nDOMAIN,' }) });
     try {
       await addUser(env.store, 'alice'); const alice = client(env.app); await alice.login('alice');
       const loaded = await alice.post('/api/rulesets/source', { source: remote });
-      expect(loaded.json.content).toBe('USER-AGENT,x*\nDOMAIN,');
+      expect(loaded.json.content).toBe('UNKNOWN,x*\nDOMAIN,');
       expect(loaded.json.status).toMatchObject({ rules: 0, rejected: 2 });
       const result = await alice.post('/api/rules/convert', { inputs: [{ source: remote, content: loaded.json.content }], client: 'surge', platform: 'ios' });
       expect(result.json.lines).toHaveLength(2);

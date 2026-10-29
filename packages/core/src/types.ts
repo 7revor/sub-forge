@@ -94,7 +94,9 @@ export type Target =
 
 // ---------- 规则侧 ----------
 
-export type Client = 'mihomo' | 'surge';
+export const CLIENTS = ['mihomo', 'surge', 'stash'] as const;
+export type Client = typeof CLIENTS[number];
+export type YamlClient = Extract<Client, 'mihomo' | 'stash'>;
 export type Platform = 'android' | 'macos' | 'windows' | 'ios' | 'linux';
 
 export type DomainRuleType = 'DOMAIN' | 'DOMAIN-SUFFIX' | 'DOMAIN-KEYWORD' | 'DOMAIN-WILDCARD' | 'DOMAIN-REGEX';
@@ -104,6 +106,7 @@ export type RuleIR =
   | { type: DomainRuleType; value: string }
   | { type: IpRuleType; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'GEOSITE'; value: string }
+  | { type: 'USER-AGENT'; value: string }
   | { type: 'GEOIP'; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'DST-PORT' | 'SRC-PORT'; value: string }
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }

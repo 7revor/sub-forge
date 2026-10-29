@@ -14,6 +14,8 @@ const TARGETS: { key: string; client: Client; platform?: Platform; label: string
   { key: 'mihomo-android', client: 'mihomo', platform: 'android', label: 'mihomo Android' },
   { key: 'surge-macos', client: 'surge', platform: 'macos', label: 'Surge macOS' },
   { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
+  { key: 'stash-macos', client: 'stash', platform: 'macos', label: 'Stash macOS' },
+  { key: 'stash-ios', client: 'stash', platform: 'ios', label: 'Stash iOS' },
 ];
 /** 客户端选择自控；转换由服务器完成。整个更新周期保持文本区域挂载。 */
 export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError, sourceNames, sourceReading, onRefreshSources }: {

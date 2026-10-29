@@ -188,3 +188,7 @@ Docker 验证中发现并修复的问题：
 
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
+
+2026-10-29：USER-AGENT 已接通来源解析、结构化规则校验、文本往返及四客户端转换。Surge macOS / iOS 正常输出；mihomo / Android 注释并记录客户端不支持，来源不再误报未解析。GET 下载及远程原文直连判定沿用相同能力检查。
+
+2026-10-29 Stash 完整导出已接入：UA / target 识别、草稿及已保存预览、独立 YAML 文件、主订阅、规则下载、版本及 last-good 隔离、Stash 基础设置编辑与链接复制。节点随主订阅更新，暂采用快照内联而不生成 Stash 节点 provider。Surge 主订阅与 Loon 代码适配仍未实现；四客户端官方指引见 [17](17-official-client-configuration-guides.md)。

@@ -27,17 +27,17 @@ export function checkRuleSetOverrides(value: unknown): void {
   if (!Array.isArray(value)) throw bad('客户端改写必须是数组');
   const rule = (r: unknown): boolean => {
     if (!isObj(r)) return false;
-    if (r.type === 'RAW') return (r.client === undefined || ['mihomo', 'surge'].includes(r.client as string)) && typeof r.text === 'string' && !rawRuleError(r.text);
+    if (r.type === 'RAW') return (r.client === undefined || ['mihomo', 'surge', 'stash'].includes(r.client as string)) && typeof r.text === 'string' && !rawRuleError(r.text);
     if (['AND', 'OR', 'NOT'].includes(r.type as string)) return Array.isArray(r.children) && r.children.length > 0 && r.children.every(rule);
     if (r.type === 'PROCESS') return ['name', 'path'].includes(r.kind as string) && ['exact', 'wildcard', 'regex'].includes(r.mode as string) && isStr(r.value);
     if (r.type === 'NETWORK') return r.value === 'tcp' || r.value === 'udp';
-    return ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'SRC-IP-CIDR', 'GEOSITE', 'GEOIP', 'DST-PORT', 'SRC-PORT'].includes(r.type as string) && isStr(r.value);
+    return ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'USER-AGENT', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'SRC-IP-CIDR', 'GEOSITE', 'GEOIP', 'DST-PORT', 'SRC-PORT'].includes(r.type as string) && isStr(r.value);
   };
   value.forEach((item, i) => {
     const at = `客户端改写第 ${i + 1} 条`;
     if (!isObj(item) || item.line !== undefined) throw bad(`${at}：只支持规则内容匹配，请填写完整规则内容`);
     const o = item.override;
-    if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge'].includes(o.when.client as string) || (o.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(o.when.platform as string))) throw bad(`${at}：客户端或平台不合法`);
+    if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge', 'stash'].includes(o.when.client as string) || (o.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(o.when.platform as string))) throw bad(`${at}：客户端或平台不合法`);
     const a = o.action;
     if (!isObj(a) || !(
       a.drop === true && a.replace === undefined && a.append === undefined ||
@@ -60,7 +60,7 @@ function checkRawRules(value: unknown, where: string): void {
   if (Array.isArray(value)) { value.forEach(item => checkRawRules(item, where)); return; }
   if (!isObj(value)) return;
   if (value.type === 'RAW') {
-    if (value.client !== undefined && !['mihomo', 'surge'].includes(value.client as string)) throw bad(`${where}：RAW 客户端不合法`);
+    if (value.client !== undefined && !['mihomo', 'surge', 'stash'].includes(value.client as string)) throw bad(`${where}：RAW 客户端不合法`);
     if (typeof value.text !== 'string') throw bad(`${where}：RAW 内容必须是字符串`);
     const error = rawRuleError(value.text);
     if (error) throw bad(`${where}：${error}`);
@@ -271,6 +271,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
     }
     case 'preset': {
       if (!isObj(doc.mihomo)) throw bad('mihomo 段必须是对象');
+      if (doc.stash !== undefined && !isObj(doc.stash)) throw bad('stash 段必须是对象');
       if (doc.surge !== undefined) {
         if (!isObj(doc.surge)) throw bad('surge 段必须是对象');
         if (doc.surge.general !== undefined && !isObj(doc.surge.general)) throw bad('surge.general 必须是对象');
@@ -290,6 +291,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         const f = doc.template.follow;
         if (f !== 'latest' && !(isObj(f) && typeof f.pinned === 'number' && store.getTemplate(doc.template.id, f.pinned))) throw bad('模板版本不存在');
       }
+      if (doc.base !== undefined && (!isObj(doc.base) || doc.base.stashPatch !== undefined && !isObj(doc.base.stashPatch))) throw bad('基础设置及 stashPatch 必须是对象');
       if (doc.base !== undefined && isObj(doc.base) && doc.base.presetId !== undefined && !store.get('preset', String(doc.base.presetId))) throw bad('基础设置预设不存在');
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];

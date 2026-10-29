@@ -10,7 +10,7 @@ import { Hono, type Context } from 'hono';
 import type { Platform } from '@sub-forge/core';
 import { createApi, type ApiDeps } from './api/index.ts';
 import { detectClient } from './client.ts';
-import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService } from './render.ts';
+import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService, type Target } from './render.ts';
 import type { Store, TrafficInfo } from './store.ts';
 
 const DEFAULT_INTERVAL_SEC = 86400;
@@ -85,12 +85,15 @@ export function createApp(deps: AppDeps) {
       source: outcome ? (outcome.ok ? outcome.source : 'failed') : 'unsupported',
     });
 
+    if (detected.client === 'stash' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
+      log(400); return c.text('Stash 平台仅支持 ios 或 macos', 400);
+    }
     if (detected.client === 'surge') {
       log(501);
       return c.text('Surge 输出尚未实现（M2）。如需 mihomo 配置，请在链接后加 ?target=mihomo', 501);
     }
 
-    const outcome = await renderer.render(t.profileId, detected.platform ? { client: 'mihomo', platform: detected.platform } : { client: 'mihomo' });
+    const outcome = await renderer.render(t.profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
     if (!outcome.ok) {
       log(503, outcome);
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
@@ -113,7 +116,10 @@ export function createApp(deps: AppDeps) {
     if (!t) return notFound(c);
     const qp = c.req.query('platform');
     const platform = PLATFORMS.find((p) => p === qp);
-    const target = platform ? { client: 'mihomo' as const, platform } : { client: 'mihomo' as const };
+    const client = c.req.query('target') ?? 'mihomo';
+    if (client !== 'mihomo' && client !== 'stash') return notFound(c);
+    if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
+    const target: Target = { client, ...(platform ? { platform } : {}) };
     const version = c.req.query('v');
     const key = c.req.param('key')!;
     const retained = version ? renderer.getVersion(t.profileId, target, version, kind === 'providers' ? key : undefined) : undefined;

@@ -13,13 +13,13 @@ const builtins = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']);
 function checkPrependRule(value: unknown): void {
   if (!obj(value) || !isStr(value.type)) throw bad('前置规则格式错误');
   if (value.type === 'RAW') {
-    if (value.client !== undefined && !['mihomo', 'surge'].includes(String(value.client))) throw bad('前置 RAW 规则客户端不合法');
+    if (value.client !== undefined && !['mihomo', 'surge', 'stash'].includes(String(value.client))) throw bad('前置 RAW 规则客户端不合法');
     const error = typeof value.text === 'string' ? rawRuleError(value.text) : 'RAW 内容必须是字符串';
     if (error) throw bad(`前置规则：${error}`);
     return;
   }
   if (['AND', 'OR', 'NOT'].includes(value.type)) throw bad('前置逻辑规则请使用 RAW 文本编辑');
-  const types = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'GEOSITE', 'SRC-IP-CIDR', 'DST-PORT', 'SRC-PORT', 'NETWORK', 'PROCESS'];
+  const types = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'DOMAIN-REGEX', 'USER-AGENT', 'IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP', 'GEOSITE', 'SRC-IP-CIDR', 'DST-PORT', 'SRC-PORT', 'NETWORK', 'PROCESS'];
   if (!types.includes(value.type) || !isStr(value.value) || /[\r\n]/.test(value.value)) throw bad('前置规则类型或规则值不合法');
   if (value.type === 'NETWORK' && !['tcp', 'udp'].includes(value.value)) throw bad('NETWORK 只能是 tcp 或 udp');
   if (value.type === 'PROCESS' && (!['name', 'path'].includes(String(value.kind)) || !['exact', 'wildcard', 'regex'].includes(String(value.mode)))) throw bad('进程规则匹配方式不合法');
@@ -50,7 +50,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
         if (rule.matcher.overrides !== undefined) {
           if (!Array.isArray(rule.matcher.overrides)) throw bad('客户端覆盖必须是数组');
           for (const override of rule.matcher.overrides) {
-            if (!obj(override) || !obj(override.when) || !['mihomo', 'surge'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
+            if (!obj(override) || !obj(override.when) || !['mihomo', 'surge', 'stash'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
             if (override.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(String(override.when.platform))) throw bad('客户端覆盖平台不合法');
             const action = override.action;
             if (Object.keys(action).length !== 1) throw bad('客户端覆盖只能指定一个动作');

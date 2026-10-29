@@ -23,7 +23,7 @@
     }
   ],
   "rulesets": [
-    { "id": "ai", "name": "AI 服务", "note": "本地定制示例；模板中以本地前缀显示，可与 GitHub 规则集平级引用", "sources": [
+    { "id": "ai", "name": "AI 服务", "note": "本地定制示例；模板中以本地前缀显示，可与 GitHub 规则集平级引用；可添加 USER-AGENT,ChatGPT*，仅 Surge 输出，mihomo 保留为不支持注释", "sources": [
       { "id": "main", "name": "常用 AI", "kind": "local", "format": "auto", "content": ".openai.com\n.anthropic.com\n.claude.ai\n" },
       { "id": "extra", "name": "补充", "kind": "local", "format": "classical", "content": "DOMAIN-SUFFIX,perplexity.ai\nDOMAIN-SUFFIX,claude.ai\n" }
     ], "overrides": [
@@ -35,6 +35,7 @@
       "id": "fakeip",
       "name": "fake-ip 推荐",
       "version": 1,
+      "stash": { "mode": "rule", "log-level": "warning", "dns": { "nameserver": ["https://doh.pub/dns-query"] } },
       "mihomo": {
         "mixed-port": 7890,
         "mode": "rule",

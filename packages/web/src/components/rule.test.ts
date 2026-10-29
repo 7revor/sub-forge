@@ -13,6 +13,7 @@ const rules: RuleIR[] = [
   { type: 'IP-ASN', value: '64512' },
   { type: 'SRC-IP-CIDR', value: '192.0.2.0/24' },
   { type: 'GEOSITE', value: 'cn' },
+  { type: 'USER-AGENT', value: 'PayPal?*' },
   { type: 'GEOIP', value: 'cn' },
   { type: 'DST-PORT', value: '443' },
   { type: 'SRC-PORT', value: '1024-65535' },

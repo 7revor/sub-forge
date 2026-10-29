@@ -71,6 +71,8 @@ const nr = (r: { noResolve?: boolean }) => (r.noResolve ? { noResolve: true } : 
 
 function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
+    case 'USER-AGENT':
+      return { kind: 'drop', reason: 'mihomo 不支持 USER-AGENT' };
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule), ...(rule.src ? { src: true } : {}) };
     case 'NETWORK':
@@ -91,7 +93,7 @@ function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
 
 function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
-    case 'DOMAIN': case 'DOMAIN-SUFFIX': case 'DOMAIN-KEYWORD': case 'DOMAIN-WILDCARD':
+    case 'DOMAIN': case 'DOMAIN-SUFFIX': case 'DOMAIN-KEYWORD': case 'DOMAIN-WILDCARD': case 'USER-AGENT':
       return { kind: 'ok', text: `${rule.type},${rule.value}` };
     case 'DOMAIN-REGEX':
       return { kind: 'drop', reason: 'Surge 不支持 DOMAIN-REGEX' };
@@ -126,6 +128,35 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   }
 }
 
+function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
+  switch (rule.type) {
+    case 'RAW': return lowerRaw(rule, ctx);
+    case 'AND': case 'OR': case 'NOT':
+      return { kind: 'drop', reason: '逻辑规则暂不支持（P1）' };
+    case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
+      if (rule.src) return rule.type === 'IP-CIDR' || rule.type === 'IP-CIDR6'
+        ? { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'src 转换为 Stash 的 SRC-IP（需 iOS 3.7 / macOS 4.4 或更新版本）' }
+        : { kind: 'drop', reason: `Stash 无法表达 ${rule.type} 的 src 选项，请设置客户端覆盖` };
+      return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
+    case 'SRC-IP-CIDR':
+      return { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'Stash SRC-IP 需要 iOS 3.7 / macOS 4.4 或更新版本' };
+    case 'SRC-PORT':
+      return { kind: 'ok', text: `SRC-PORT,${rule.value}`, note: 'Stash SRC-PORT 需要 iOS 3.7 / macOS 4.4 或更新版本' };
+    case 'PROCESS': {
+      if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Stash 进程规则仅支持 macOS，请明确选择 macOS 平台' };
+      if (rule.kind === 'path') return rule.mode === 'exact'
+        ? { kind: 'ok', text: `PROCESS-PATH,${rule.value}` }
+        : { kind: 'drop', reason: 'Stash 未提供进程路径通配或正则规则，请设置客户端覆盖' };
+      if (rule.mode !== 'regex') return { kind: 'ok', text: `PROCESS-NAME,${rule.value}` };
+      const wildcard = regexToWildcard(rule.value);
+      return wildcard === undefined
+        ? { kind: 'drop', reason: `进程正则 ${rule.value} 无法转为 Stash 通配` }
+        : { kind: 'ok', text: `PROCESS-NAME,${wildcard}`, note: `进程正则 ${rule.value} 降级为通配 ${wildcard}` };
+    }
+    default: return { kind: 'ok', text: `${rule.type},${rule.value}` };
+  }
+}
+
 function lowerRaw(rule: Extract<RuleIR, { type: 'RAW' }>, ctx: ClientCtx): LoweredRule {
   if (rule.client && rule.client !== ctx.client) return { kind: 'drop', reason: `原样规则仅对 ${rule.client} 输出` };
   const error = rawRuleError(rule.text);
@@ -134,5 +165,9 @@ function lowerRaw(rule: Extract<RuleIR, { type: 'RAW' }>, ctx: ClientCtx): Lower
 
 /** 规则匹配部分（不含出口）的客户端写法 */
 export function lowerRule(rule: RuleIR, ctx: ClientCtx): LoweredRule {
-  return ctx.client === 'mihomo' ? lowerMihomo(rule, ctx) : lowerSurge(rule, ctx);
+  switch (ctx.client) {
+    case 'mihomo': return lowerMihomo(rule, ctx);
+    case 'surge': return lowerSurge(rule, ctx);
+    case 'stash': return lowerStash(rule, ctx);
+  }
 }

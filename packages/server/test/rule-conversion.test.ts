@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { addUser, client, setupApp } from './helpers.ts';
 
-const body = 'payload:\n  - DOMAIN,example.com\n  - IP-CIDR,10.0.0.0/8,no-resolve\n  - DOMAIN-KEYWORD,example\n  - USER-AGENT,Unsupported*';
+const body = 'payload:\n  - DOMAIN,example.com\n  - IP-CIDR,10.0.0.0/8,no-resolve\n  - DOMAIN-KEYWORD,example\n  - UNKNOWN,Unsupported*';
 describe('远程 YAML 转换为托管 LIST', () => {
   it.each(['auto', 'yaml'] as const)('%s 输入预览、保存、实际 provider 均为托管文本，保留无法转换行诊断', async format => {
     const h = setupApp({ fetcher: async () => ({ status: 200, body }) });
@@ -28,7 +28,7 @@ describe('远程 YAML 转换为托管 LIST', () => {
       expect(rendered.render.yaml).not.toContain(source.url);
       expect(Object.values(rendered.render.rulesets).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
       expect(Object.values(rendered.render.rulesets).join('')).toContain('# [YAML 原文] payload:');
-      expect(Object.values(rendered.render.rulesets).join('')).toContain('USER-AGENT,Unsupported*');
+      expect(Object.values(rendered.render.rulesets).join('')).toContain('UNKNOWN,Unsupported*');
       expect((await c.get(`/api/rulesets/${id}`)).json.item.sources[0].url).toBe(source.url);
     } finally { h.store.close(); }
   });

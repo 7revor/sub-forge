@@ -1,14 +1,14 @@
 import { isMap, LineCounter, stringify } from 'yaml';
 import { parseYamlDocument } from './yamlDocument.ts';
 import type { RawResult } from '../components/DualEditor.tsx';
-import { getPath, isRecord, setPath } from '../components/schema.ts';
+import { getPath, isRecord, setPath, type FieldGroup } from '../components/schema.ts';
 import { mihomoBaseGroups } from '../schemas/mihomoBase.ts';
 import { recoverFields, recoverYaml } from './recoverYaml.ts';
 
-export function baseFormFromYaml(text: string) {
+export function baseFormFromYaml(text: string, groups: FieldGroup[] = mihomoBaseGroups) {
   const recovered = recoverYaml(text);
   const notes = recovered.notes;
-  let value = recoverFields(recovered.value, mihomoBaseGroups, notes);
+  let value = recoverFields(recovered.value, groups, notes);
   const path = 'dns.nameserver-policy';
   const policy = getPath(value, path);
   if (isRecord(policy)) value = setPath(value, path, Object.fromEntries(Object.entries(policy).flatMap<[string, unknown]>(([key, item]) => {
