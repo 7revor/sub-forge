@@ -164,20 +164,21 @@ function StepForm({ step, onChange }: { step: OperatorStep; onChange: (s: Operat
       return (
         <div className="flex flex-col gap-2">
           <span className="text-[12.5px] font-medium text-muted">正则链（按顺序执行，替换支持 $1）</span>
-          {step.rules.map((r, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="w-5 font-mono text-[12px] text-muted">{i + 1}</span>
-              <div className="min-w-0 flex-1">
-                <Input aria-label={`规则 ${i + 1} 正则`} className="font-mono" placeholder="正则表达式" value={r.pattern}
-                  aria-invalid={!!regexError(r.pattern, (r.flags ?? '').replace('g', '') + 'g')}
-                  onChange={(e) => onChange({ ...step, rules: step.rules.map((x, j) => (j === i ? { ...x, pattern: e.target.value } : x)) })} />
-                <div role="status" className="text-[12px] text-err">{regexError(r.pattern, (r.flags ?? '').replace('g', '') + 'g')}</div>
+          {step.rules.map((r, i) => {
+            const error = r.pattern ? regexError(r.pattern, (r.flags ?? '').replace('g', '') + 'g') : '匹配正则未填写，这条规则不会生效';
+            const setRule = (patch: Partial<typeof r>) => onChange({ ...step, rules: step.rules.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+            return <div key={i} className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="w-5 shrink-0 font-mono text-[12px] text-muted">{i + 1}</span>
+                <Input aria-label={`规则 ${i + 1} 匹配正则`} className="min-w-0 flex-1 font-mono" placeholder="^香港\s*(\d+).*$" value={r.pattern}
+                  aria-invalid={!!r.pattern && !!error} onChange={(e) => setRule({ pattern: e.target.value })} />
+                <span aria-hidden="true" className="shrink-0 text-faint">→</span>
+                <Input aria-label={`规则 ${i + 1} 替换为`} className="min-w-0 flex-1 font-mono" placeholder="HK-$1" value={r.replace} onChange={(e) => setRule({ replace: e.target.value })} />
+                <Button variant="ghost" size="sm" aria-label={`删除规则 ${i + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
               </div>
-              <span aria-hidden="true" className="text-faint">→</span>
-              <Input aria-label={`规则 ${i + 1} 替换为`} className="font-mono" placeholder="HK-$1" value={r.replace} onChange={(e) => onChange({ ...step, rules: step.rules.map((x, j) => (j === i ? { ...x, replace: e.target.value } : x)) })} />
-              <Button variant="ghost" size="sm" aria-label={`删除规则 ${i + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
-            </div>
-          ))}
+              {error && <div role="status" className={cx('pl-7 text-[12px]', r.pattern ? 'text-err' : 'text-muted')}>{error}</div>}
+            </div>;
+          })}
           <div><Button size="sm" onClick={() => onChange({ ...step, rules: [...step.rules, { pattern: '', replace: '' }] })}><Plus size={14} />添加规则</Button></div>
         </div>
       );

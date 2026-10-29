@@ -50,13 +50,17 @@ export function dedupeNames(nodes: ProxyIR[]): ProxyIR[] {
   });
 }
 
+/** 未填写的规则（空正则）不生效：空正则会匹配每个字符间隙，改名时会把替换内容插满整个名称 */
+const filled = (pattern: string) => pattern !== '';
+
 /** 对 `set` 处理器开放的字段：不允许改身份字段与隐式字段 */
 const PROTECTED_FIELDS = new Set(['name', 'type', 'server', 'port']);
 
 export function applyOperator(op: Operator, nodes: ProxyIR[]): ProxyIR[] {
   switch (op.op) {
     case 'filter.regex': {
-      const regs = op.patterns.map((p) => compileUserRegex(p));
+      const regs = op.patterns.filter(filled).map((p) => compileUserRegex(p));
+      if (!regs.length) return nodes;
       return nodes.filter((n) => anyMatch(regs, n.name) === op.keep);
     }
     case 'filter.type': {
@@ -64,15 +68,15 @@ export function applyOperator(op: Operator, nodes: ProxyIR[]): ProxyIR[] {
       return nodes.filter((n) => types.has(n.type.toLowerCase()) === op.keep);
     }
     case 'filter.useless': {
-      const regs = (op.patterns ?? DEFAULT_USELESS_PATTERNS).map((p) => compileUserRegex(p));
+      const regs = (op.patterns ?? DEFAULT_USELESS_PATTERNS).filter(filled).map((p) => compileUserRegex(p));
       return nodes.filter((n) => !anyMatch(regs, n.name));
     }
     case 'rename.regex': {
-      const rules = op.rules.map((r) => ({ re: compileUserRegex(r.pattern, (r.flags ?? '').replace('g', '') + 'g'), replace: r.replace }));
+      const rules = op.rules.filter((r) => filled(r.pattern)).map((r) => ({ re: compileUserRegex(r.pattern, (r.flags ?? '').replace('g', '') + 'g'), replace: r.replace }));
       return nodes.map((n) => rename(n, tidy(rules.reduce((name, r) => name.replace(r.re, r.replace), n.name))));
     }
     case 'rename.delete': {
-      const regs = op.patterns.map((p) => compileUserRegex(p, 'g'));
+      const regs = op.patterns.filter(filled).map((p) => compileUserRegex(p, 'g'));
       return nodes.map((n) => rename(n, tidy(regs.reduce((name, r) => name.replace(r, ''), n.name))));
     }
     case 'rename.affix':
@@ -84,7 +88,7 @@ export function applyOperator(op: Operator, nodes: ProxyIR[]): ProxyIR[] {
       return [...nodes].sort((a, b) => sign * naturalCompare(a.name, b.name));
     }
     case 'sort.regex': {
-      const regs = op.patterns.map((p) => compileUserRegex(p));
+      const regs = op.patterns.filter(filled).map((p) => compileUserRegex(p));
       const rank = (n: ProxyIR) => { const i = regs.findIndex((r) => r.test(n.name)); return i < 0 ? regs.length : i; };
       return [...nodes].sort((a, b) => rank(a) - rank(b));
     }
