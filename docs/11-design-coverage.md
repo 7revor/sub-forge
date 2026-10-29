@@ -13,7 +13,7 @@
 | 补充 `SourceFetch` | `/sources/:id` 的「拉取参数」 | 对话框：来源与拉取、快照历史、删除入口 |
 | 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles`、`/rulesets`、`/bundles` | 搜索、计数、空状态卡片；订阅源新建为对话框；每行「删除」「编辑」 |
 | 组合 `Collection` | `/collections/:id`、`/collections/:id/pipeline` | 成员表含「拉取失败时」 |
-| 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML、前置）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由 |
+| 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML、前置）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由；同日前置节点集允许选本组（只排除节点自己），节点名称改为组件库 `Combobox` |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集「下发地址」显示路径模式 |
 | 规则集 `RuleSets` | `/rulesets/:id` | 解析结果、编辑来源对话框、输出预览、客户端改写、下载地址 |
@@ -27,6 +27,10 @@
 | 补充 `Dialogs` | 全部详情页 | 头部「更多」菜单与最右侧的独立删除按钮、删除确认、各类对话框、表单 / YAML 双视图、离开前保存（2026-10-29 删除从「更多」菜单移出） |
 | 补充 `Login`、`Account` | `/login`、`/account` | — |
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
+
+## 下拉组件
+
+2026-10-29 起，前端所有下拉都使用组件库 `components/listbox.tsx`：`Select`（单选，可分组、可带一行说明）和 `Combobox`（可输入，候选项按输入筛选，用于节点名称这类允许填列表之外值的场景），不再使用浏览器原生 `<select>` 弹层和 `<datalist>`。画板里的下拉按同一样式绘制：38 px 触发框 + 右侧箭头，展开后为白底圆角弹层，选中项强调色，分组标题为小号灰字。规则写在仓库 `CLAUDE.md`。
 
 ## 后端待实现
 
