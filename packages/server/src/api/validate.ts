@@ -1,7 +1,7 @@
 // 保存前的校验：结构必填项、正则能否编译、引用是否存在且属于当前用户、组合是否成环。
 // 深层结构（规则、组参数等）由渲染报告兜住，这里只拦截保存后必然无法使用的数据。
 
-import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID, type Target } from '@sub-forge/core';
+import { compileUserRegex, findCollectionCycles, type Collection, type NodeSetID } from '@sub-forge/core';
 import type { DocKind, DocTypes } from '../docs.ts';
 import type { Store, User } from '../store.ts';
 import { MIN_TTL_SEC } from '../snapshots.ts';
@@ -150,7 +150,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       (doc.proxies as unknown[]).forEach((p, i) => {
         const port = isObj(p) ? Number(p.port) : NaN;
         if (!isObj(p) || !isStr(p.name) || !isStr(p.type) || !isStr(p.server) || !(port > 0 && port < 65536)) throw bad(`节点 ${i + 1} 缺少 name / type / server / port`);
-        if (p.dialer !== undefined) refs.target(p.dialer as Target, `节点「${p.name}」的前置`);
+        // 本地节点只录入节点信息，代理链统一在配置订阅的链规则中设置
+        for (const key of ['dialer', 'dialer-proxy', 'underlying-proxy']) {
+          if (p[key] !== undefined) throw bad(`节点「${p.name}」不能设置 ${key}：本地节点不处理代理链，请在配置订阅的「代理链」中添加链规则`);
+        }
       });
       break;
     }

@@ -109,7 +109,7 @@ function filterNodes(nodes: ProxyIR[], f: { filter?: string; excludeFilter?: str
 function stripNode(n: ProxyIR): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(n)) {
-    if (k.startsWith('_') || k === 'dialer' || k === 'upstreamDialer') continue;
+    if (k.startsWith('_') || k === 'upstreamDialer') continue;
     out[k] = v;
   }
   return out;
@@ -284,10 +284,6 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
         const via = target ? nameForNode(set, target, where) : topNames.has(n.upstreamDialer) || groups.some((g) => g.name === n.upstreamDialer) ? n.upstreamDialer : undefined;
         if (via) setDialer(set, n, via);
         else report.error('ref.upstream-dialer-missing', `节点「${n.name}」自带的前置「${n.upstreamDialer}」找不到，拒绝发布缺少前置的配置`, where);
-      }
-      if (n.dialer) {
-        const via = resolveTarget(n.dialer, `node:${set.key}:${n.name}`);
-        if (via) setDialer(set, n, via);
       }
     }
   }

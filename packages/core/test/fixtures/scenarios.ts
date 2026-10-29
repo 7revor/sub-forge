@@ -10,7 +10,7 @@ export const NODESETS: NodeSetInputs = {
   sources: { L: src('L', '落地'), T: src('T', '中转'), S: src('S', '家宽'), A: src('A', '机场 A') },
   collections: {},
   locals: {
-    self: { id: 'self', name: '自建', proxies: [{ name: '自建 SG-01', type: 'trojan', server: 'sg', port: 443, password: 'p', dialer: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'T' }, match: { exact: '🇭🇰 IPLC-01' } } } }] },
+    self: { id: 'self', name: '自建', proxies: [{ name: '自建 SG-01', type: 'trojan', server: 'sg', port: 443, password: 'p' }] },
   },
   snapshots: {
     L: [[trojan('L-01', 'l1'), trojan('L-02', 'l2'), trojan('L-JP', 'l3')].join('\n')],

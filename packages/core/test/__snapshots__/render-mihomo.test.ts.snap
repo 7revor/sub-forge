@@ -7,7 +7,6 @@ exports[`校验 > 同一输入输出完全相同（快照） 1`] = `
     server: sg
     port: 443
     password: p
-    dialer-proxy: __ref_T_d4357ad2
 proxy-providers:
   落地:
     type: http
@@ -43,13 +42,6 @@ proxy-groups:
     type: select
     proxies:
       - COMPATIBLE
-  - name: __ref_T_d4357ad2
-    type: select
-    use:
-      - 中转
-    filter: ^🇭🇰 IPLC-01$
-    hidden: true
-    empty-fallback: REJECT
 rule-providers:
   b_fin_domain:
     type: http

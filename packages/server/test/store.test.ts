@@ -105,13 +105,41 @@ describe('加密与迁移', () => {
     expect(s.get('source', 'L')).toBeUndefined();
     expect(s.get('source', 'R')!.name).toBe('远程');
     expect(s.getWithOwner('local', 'L')).toMatchObject({ owner: 'u1', doc: { id: 'L', name: '手写', proxies: [
-      { name: 'A·香港 01', type: 'trojan', server: 'hk.test', port: 443, password: 'p', 'dialer-proxy': 'A·中转' },
+      { name: 'A·香港 01', type: 'trojan', server: 'hk.test', port: 443, password: 'p' },
       { name: 'A·中转', type: 'socks5', server: 'relay.test', port: 1080 },
     ] } });
     expect(s.get('collection', 'c')!.members.map((m) => m.ref)).toEqual([{ type: 'local', id: 'L' }, { type: 'source', id: 'R' }]);
     const p = s.get('profile', 'p')!;
     expect(p.nodeSets[0]!.ref).toEqual({ type: 'local', id: 'L' });
     expect(p.chains[0]!.landing.nodeSet).toEqual({ type: 'local', id: 'L' });
+    // 上游自带的前置随后（v6）转成链规则
+    expect(p.chains[1]).toMatchObject({ landing: { nodeSet: { type: 'local', id: 'L' }, filter: '^A·香港 01$' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'L' }, match: { exact: 'A·中转' } } } });
+    s.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('v5 的本地节点前置迁移为直接使用该分组的配置订阅中的链规则', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-mig-'));
+    const file = join(dir, 'v5.db');
+    const cipher = new Cipher(randomBytes(32));
+    const old = new Store(file, { cipher });
+    const via = { kind: 'node', ref: { nodeSet: { type: 'source', id: 'T' }, match: { exact: 'HK.IPLC' } } };
+    old.put('local', { id: 'self', name: '自建', proxies: [
+      { name: 'SG (1)', type: 'trojan', server: 'sg', port: 443, password: 'p', dialer: via },
+      { name: 'JP', type: 'trojan', server: 'jp', port: 443, password: 'p', 'dialer-proxy': '别处的组' },
+      { name: 'US', type: 'trojan', server: 'us', port: 443, password: 'p' },
+    ] } as never, 'u1');
+    old.put('collection', { id: 'c', name: 'C', members: [{ ref: { type: 'local', id: 'self' } }], pipeline: [] }, 'u1');
+    const base = { overlay: {}, refPolicy: { default: 'wrap' } };
+    old.put('profile', { id: 'direct', name: '直接', nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }], chains: [], ...base } as never, 'u1');
+    old.put('profile', { id: 'via-col', name: '经组合', nodeSets: [{ ref: { type: 'collection', id: 'c' }, output: 'inline' }], chains: [], ...base } as never, 'u1');
+    old.db.pragma('user_version = 5');
+    old.close();
+
+    const s = new Store(file, { cipher });
+    expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
+    expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
+    expect(s.get('profile', 'via-col')!.chains).toEqual([]);
     s.close();
     rmSync(dir, { recursive: true, force: true });
   });
