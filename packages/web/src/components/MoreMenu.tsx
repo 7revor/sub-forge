@@ -43,7 +43,7 @@ export function DeleteDialog({ open, title, children, error, pending, onClose, o
   const reason = deleteErrorText(error);
   return (
     <Modal title={title} open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button className="border-err bg-err text-white hover:bg-[#912018]" disabled={pending || !!reason} onClick={onConfirm}>{pending ? '删除中…' : '删除'}</Button></>}>
+      footer={<><Button onClick={onClose}>取消</Button><Button variant="danger-solid" disabled={pending || !!reason} onClick={onConfirm}>{pending ? '删除中…' : '删除'}</Button></>}>
       {children && <div className="text-[13.5px] leading-relaxed">{children}</div>}
       {reason && <div role="alert" className="rounded-lg bg-err-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8f2a1f]"><b>还不能删除：</b>{reason}</div>}
     </Modal>

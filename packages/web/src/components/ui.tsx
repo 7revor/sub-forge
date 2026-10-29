@@ -7,11 +7,12 @@ export { cx } from './cx.ts';
 export { Select, Combobox, type SelectProps, type ComboOption } from './listbox.tsx';
 import { cx } from './cx.ts';
 
-type BtnVariant = 'primary' | 'default' | 'danger' | 'ghost';
+type BtnVariant = 'primary' | 'default' | 'danger' | 'danger-solid' | 'ghost';
 const BTN: Record<BtnVariant, string> = {
   primary: 'bg-accent border-accent text-white hover:bg-accent-strong',
   default: 'bg-panel border-[#d5d9e0] text-ink hover:bg-ground',
   danger: 'bg-panel border-[#f0b5ae] text-err hover:bg-err-soft',
+  'danger-solid': 'bg-err border-err text-white hover:bg-[#912018]',
   ghost: 'bg-transparent border-transparent text-ink-2 hover:bg-ground',
 };
 
