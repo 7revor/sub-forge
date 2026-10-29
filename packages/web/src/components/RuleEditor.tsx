@@ -1,8 +1,8 @@
 import { alertError, notifySuccess } from '../feedback.ts';
 import { parseRuleLine, type RuleIR } from '@sub-forge/core';
 import { useState } from 'react';
-import { emptyRule, RULE_TYPE_GROUPS, ruleToLine } from './rule.ts';
-import { Button, Field, Input, Segmented, Select, Switch } from './ui.tsx';
+import { emptyRule, RULE_TYPE_GROUPS, ruleToLine, ruleTypeValue, type RuleTypeOption } from './rule.ts';
+import { Button, Field, Input, Select, Switch } from './ui.tsx';
 
 export function RuleEditor({ value, onChange, onIncomplete, compact = false }: {
   value: RuleIR | undefined; onChange: (rule: RuleIR) => void;
@@ -29,8 +29,12 @@ export function RuleEditor({ value, onChange, onIncomplete, compact = false }: {
       } catch (error) { alertError(error); }
     }}>解析</Button>
   </div>}</Field>;
-  return <div className={compact ? 'grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,200px)_minmax(0,1fr)]' : 'flex flex-col gap-3'}>
-    <Field label="规则类型">{(id) => <Select id={id} value={rule?.type ?? ''} onChange={(e) => { if (e.target.value) edit(emptyRule(e.target.value as RuleIR['type'])); }}>
+  return <div className={compact ? 'grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,260px)_minmax(0,1fr)]' : 'flex flex-col gap-3'}>
+    <Field label="规则类型">{(id) => <Select id={id} value={ruleTypeValue(rule)} onChange={(e) => {
+      if (!e.target.value) return;
+      const next = emptyRule(e.target.value as RuleTypeOption);
+      edit(rule?.type === 'PROCESS' && next.type === 'PROCESS' ? { ...next, value: rule.value } : next);
+    }}>
       <option value="">请选择类型</option>
       {RULE_TYPE_GROUPS.map((group) => <optgroup key={group.label} label={group.label}>{group.types.map((type) => <option key={type} value={type}>{type}</option>)}</optgroup>)}
       {readonly && <option value={rule.type}>{rule.type}</option>}
@@ -39,10 +43,6 @@ export function RuleEditor({ value, onChange, onIncomplete, compact = false }: {
       <pre className="m-0 whitespace-pre-wrap break-all font-mono">{ruleToLine(rule)}</pre>
       <p className="mb-0 text-muted">{compact ? '保留原有规则；选择其他类型可重新编辑。' : '请用粘贴整行编辑'}</p>
     </div> : rule && 'value' in rule && <>
-      {rule.type === 'PROCESS' && <div className={compact ? 'col-span-full row-start-2 flex flex-wrap gap-2' : 'flex flex-wrap gap-2'}>
-        <Segmented label="进程匹配字段" value={rule.kind} options={[{ value: 'name', label: '名称' }, { value: 'path', label: '路径' }]} onChange={(kind) => edit({ ...rule, kind })} />
-        <Segmented label="进程匹配方式" value={rule.mode} options={[{ value: 'exact', label: '精确' }, { value: 'wildcard', label: '通配' }, { value: 'regex', label: '正则' }]} onChange={(mode) => edit({ ...rule, mode })} />
-      </div>}
       <Field label="规则值" className={compact ? 'sm:col-start-2 sm:row-start-1' : undefined}>{(id) => rule.type === 'NETWORK'
         ? <Select id={id} value={rule.value} onChange={(e) => edit({ ...rule, value: e.target.value as 'tcp' | 'udp' })}><option value="tcp">tcp</option><option value="udp">udp</option></Select>
         : <Input id={id} className="font-mono" value={rule.value} onChange={(e) => edit({ ...rule, value: e.target.value })} />}</Field>

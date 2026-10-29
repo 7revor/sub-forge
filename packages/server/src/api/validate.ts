@@ -290,7 +290,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
           if (m.kind === 'ruleset') {
             const prior = store.get('profile', id)?.overlay.extraRules?.find(r => r.rule.id === (er as { rule: { id: string } }).rule.id)?.rule.matcher;
             checkRuleSetReference(m as RuleSetMatcher, store, prior?.kind === 'ruleset' ? prior : undefined);
-            if (!isStr(m.id) || (!m.repository && !refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
+            if (!isStr(m.id) || (!m.repository && !m.remote && !refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
           }
         });
       }

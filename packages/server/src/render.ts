@@ -25,6 +25,7 @@ export type StoredRender = {
   yaml: string;
   providers: Record<string, string>;
   rulesets: Record<string, string>;
+  remoteRuleUrls?: Record<string, string>;
   userinfo?: TrafficInfo;
   warnings: number;
 };
@@ -204,7 +205,7 @@ export class RenderService {
       ...(base ? { base } : {}),
       urls: {
         provider: (k, v) => `${publicUrl}/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}&h=${v}${qs}`,
-        ruleset: (k) => `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}${qs}`,
+        ruleset: (k, url) => url ? `${publicUrl}/api/rules/convert?url=${encodeURIComponent(url)}&token=${TOKEN_PLACEHOLDER}&key=${encodeURIComponent(k)}&v=${GENERATION_PLACEHOLDER}${qs}` : `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}${qs}`,
       },
     });
     const report = [...pre, ...result.report.items];
@@ -237,6 +238,7 @@ export class RenderService {
       yaml: result.yaml,
       providers: Object.fromEntries(Object.entries(result.providers).map(([k, p]) => [k, p.yaml])),
       rulesets: Object.fromEntries(Object.entries(result.rulesets).map(([k, r]) => [k, r.text])),
+      remoteRuleUrls: Object.fromEntries(Object.entries(result.rulesets).flatMap(([k, r]) => r.remoteUrl ? [[k, r.remoteUrl]] : [])),
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };

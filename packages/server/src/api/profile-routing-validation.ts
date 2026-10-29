@@ -111,7 +111,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
       const prior = priorRules.find(p => p.id === rule.id)?.matcher;
       if (r.mode === 'independent') {
         checkRuleSetReference(rule.matcher, store, prior?.kind === 'ruleset' ? prior : undefined);
-        if (!rule.matcher.repository && !refs.ruleVisible(rule.matcher.id)) throw bad(`规则 ${rule.id}：规则集不存在`);
+        if (!rule.matcher.repository && !rule.matcher.remote && !refs.ruleVisible(rule.matcher.id)) throw bad(`规则 ${rule.id}：规则集不存在`);
       }
     } else if (rule.matcher.kind !== 'rule' || !obj(rule.matcher.rule) || !isStr(rule.matcher.rule.type)) throw bad(`规则 ${rule.id}：匹配项不合法`);
   }

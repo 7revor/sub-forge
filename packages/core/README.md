@@ -65,6 +65,9 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 2026-10-29 规则集前端移除整组 no-resolve 配置入口；核心保留 `RuleSet.noResolve` 以兼容历史数据，规则本身和模板引用的选项处理不变。
 
+
+2026-10-29：mihomo 转换时，PROCESS-NAME-WILDCARD / PROCESS-PATH-WILDCARD / DOMAIN-WILDCARD 按 lowercase 值去重，保留首条原始写法及行位；名称与路径不混合，精确、正则与 Surge 保持原行为。合并转换与展开共用去重键；来源原文预览保留重复行。远程文件存在 wildcard 重复时触发托管 LIST，避免原文件直连绕过去重。
+
 ## 订阅分流模式
 
 `Profile.routing` 包含 `bound`（最新模板 + 按稳定组 ID 追加成员）和 `independent`（完整 groups/rules/final）两类。渲染统一调用 `resolveProfileRouting`；绑定组失效或合并成环为错误，独立配置不依赖模板。`routingConfig` 展开有效配置，`profileEditorOverlay` 仅为现有编辑器提供视图，不能作为第二份配置持久化。历史 `overlay` 入口用于旧数据迁移与兼容测试。

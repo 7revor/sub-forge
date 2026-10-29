@@ -20,7 +20,7 @@ export type UrlBuilder = {
   /** Profile 专属 provider 地址（/p/:token/:key?v=） */
   provider(nodeSetKey: string, version: string): string;
   /** 转换后的规则集地址（/r/:token/:key） */
-  ruleset(key: string): string;
+  ruleset(key: string, remoteUrl?: string): string;
 };
 
 export type RenderInput = {
@@ -46,7 +46,7 @@ export type DependencyEntry = {
 };
 
 export type ProviderOutput = { name: string; version: string; yaml: string };
-export type RulesetOutput = { behavior: Behavior; text: string };
+export type RulesetOutput = { behavior: Behavior; text: string; remoteUrl?: string };
 
 export type MihomoRenderResult = {
   config: Record<string, unknown>;
@@ -349,7 +349,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
       }
       if (document.diagnostics.length) report.info('ruleset.rejected-lines', `${label}有 ${document.diagnostics.length} 行无法解析`, where);
     }
-    const delivery = ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
+    const delivery = m.remote ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
     if (delivery.mode === 'unsupported') {
       report.error('ruleset.conversion-unavailable', delivery.reason, where);
       continue;
@@ -366,9 +366,13 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     if (!rulesets[file]) {
       const converted = convertRuleDocuments(rs, documents, ctx, { ipOptions: r.options });
       for (const diagnostic of converted.diagnostics) report.info(`rule.${diagnostic.kind}`, diagnostic.reason, where);
+      if (m.remote && !converted.stats.output) {
+        report.error('ruleset.empty-conversion', '远程规则没有可供目标客户端使用的输出', where);
+        continue;
+      }
       if (!converted.lines.length) continue;
-      rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n' };
-      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
+      rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', ...(m.remote ? { remoteUrl: m.remote.url } : {}) };
+      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: RULESET_INTERVAL, proxy: FETCH_VIA };
     }
     ruleLines.push(`RULE-SET,${key},${target}`);
   }

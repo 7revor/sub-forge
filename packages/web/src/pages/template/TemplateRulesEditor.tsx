@@ -2,6 +2,7 @@ import type { Matcher, ReportItem, RuleEntry, RuleIR } from '@sub-forge/core';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Button, Empty, Switch, buttonClass, cx } from '../../components/ui.tsx';
+import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, matcherLabel, TemplateTargetSelect } from './TemplateFields.tsx';
@@ -44,7 +45,8 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       </div>
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => add({ kind: 'rule', rule: { type: 'DOMAIN', value: '' } })}>添加单条规则</Button>
-        <RuleSetPicker onSelect={add} triggerClassName={buttonClass()} />
+        <RemoteRulePicker onSelect={add} />
+        <RuleSetPicker label="引用系统规则集" onSelect={add} triggerClassName={buttonClass()} />
       </div>
     </div>
     <div className="overflow-x-auto px-4 pb-4">
@@ -53,11 +55,11 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         <div className={`${columns} hidden border-b border-line px-2 py-2 sm:grid text-[12px] text-muted`}><span>序号</span><span>匹配项</span><span>出口</span><span>no-resolve</span><span>操作</span></div>
         <SortableList items={value.rules} getKey={(r) => r.id} onReorder={(rules) => onChange({ ...value, rules })} renderItem={(rule, i, handle) => {
           const error = report.some((r) => r.level === 'error' && r.where === `rule:${rule.id}`);
-          return <div id={`template-rule-${rule.id}`} className={cx('my-1 overflow-hidden rounded-lg border', error ? 'border-err bg-err-soft' : 'border-line bg-panel')}>
+          return <div id={`template-rule-${rule.id}`} className={cx('my-1 overflow-hidden rounded-lg', error && 'bg-err-soft')}>
             <div className={cx(columns, 'p-2 text-[13px]', rule.matcher.kind === 'rule' && 'cursor-pointer')} onClick={() => { if (rule.matcher.kind === 'rule') onSelect(selected === rule.id ? undefined : rule.id); }}>
               <span className="flex items-center" onClick={(e) => e.stopPropagation()}>{handle}{i + 1}</span>
               {rule.matcher.kind === 'ruleset' ? <div className="min-w-0">
-                <RuleSetPicker label={matcherLabel(rule.matcher, ctx)} ariaLabel={`更换第 ${i + 1} 条规则集`} onSelect={(matcher) => update({ ...rule, matcher })} />
+                {rule.matcher.remote ? <RemoteRulePicker value={rule.matcher.remote.url} label={`远程 · ${rule.matcher.remote.url}`} onSelect={matcher => update({ ...rule, matcher })} /> : <RuleSetPicker label={matcherLabel(rule.matcher, ctx)} ariaLabel={`更换第 ${i + 1} 条规则集`} onSelect={(matcher) => update({ ...rule, matcher })} />}
               </div> : <button type="button" aria-expanded={selected === rule.id} className={cx('min-w-0 cursor-pointer break-all text-left font-mono', error && 'text-err')}>{matcherLabel(rule.matcher, ctx)}</button>}
               <div className="col-start-2 row-start-2 min-w-0 sm:col-auto sm:row-auto" onClick={(e) => e.stopPropagation()}><TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={rule.target} groups={value.groups} onChange={(target) => update({ ...rule, target })} /></div>
               <div className={cx('col-start-2 row-start-3 sm:col-auto sm:row-auto', rule.matcher.kind !== 'ruleset' && 'hidden sm:block')} onClick={(e) => e.stopPropagation()}>

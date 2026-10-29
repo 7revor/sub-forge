@@ -1,13 +1,14 @@
 // 来源获取与无 I/O 转换分别提供接口，客户端切换不会读取上游。
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import type { ClientCtx } from '@sub-forge/core';
+import { remoteRuleMatcher, type ClientCtx, type Platform } from '@sub-forge/core';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../docs.ts';
 import type { SnapshotService } from '../snapshots.ts';
+import type { RenderService } from '../render.ts';
 import type { Store } from '../store.ts';
 import { RuleConverter, type ConversionInput } from '../rule-converter.ts';
 import { RuleSourceService } from '../rule-source.ts';
-import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
+import { bad, HttpError, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
 import { checkFetch, checkRepositorySource, checkRuleSetOverrides } from './validate.ts';
 
 const formats = ['auto', 'classical', 'domain', 'domain-set', 'ipcidr', 'yaml', 'mrs', 'srs'];
@@ -34,12 +35,12 @@ function source(value: unknown): RuleSetSourceDoc {
   }
   return s;
 }
-export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
+export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, renderer: RenderService) {
   const app = new Hono<ApiEnv>();
   const converter = new RuleConverter();
   const getter = new RuleSourceService(snapshots, converter);
   for (const path of ['/rulesets/preview', '/rulesets/source', '/rules/convert', '/rulesets/:id/sources/:source/content']) {
-    app.use(path, requireUser);
+    app.use(path, (c, next) => path === '/rules/convert' && c.req.method === 'GET' && c.req.query('token') ? next() : requireUser(c, next));
     app.use(path, bodyLimit({ maxSize: 16 * 1024 * 1024 }));
   }
   const own = (id: unknown, userId: string): RuleSetDoc | undefined => {
@@ -87,6 +88,48 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
       dropped: result.diagnostics.filter(d => d.kind === 'client').map(d => ({ rule: d.text, reason: d.reason })),
       notes: result.diagnostics.filter(d => d.kind === 'degraded').map(d => d.reason),
     });
+  });
+  // GET 供 URL 嵌套下载使用；登录会话可转换任意外部 URL，订阅 token 只允许自己的已生成资源。
+  app.get('/rules/convert', async c => {
+    let matcher: ReturnType<typeof remoteRuleMatcher>;
+    try { matcher = remoteRuleMatcher(c.req.query('url') ?? ''); }
+    catch (error) { throw bad(error instanceof Error ? error.message : String(error)); }
+    const url = matcher.remote!.url;
+    const client = c.req.query('target') ?? 'mihomo';
+    const platform = c.req.query('platform');
+    if (!['mihomo', 'surge'].includes(client) || (platform && !['android', 'macos', 'windows', 'ios', 'linux'].includes(platform))) throw bad('客户端或平台不合法');
+    if (c.req.query('format') && c.req.query('format') !== 'list') throw bad('URL 转换仅输出 list');
+    c.header('cache-control', 'no-store');
+    c.header('x-content-type-options', 'nosniff');
+    const send = (body: string) => {
+      c.header('content-disposition', 'attachment; filename="rules.list"');
+      return c.text(body);
+    };
+    const token = c.req.query('token');
+    if (token) {
+      const active = store.getActiveToken(token);
+      if (!active || client !== 'mihomo') throw notFound();
+      const key = c.req.query('key');
+      const version = c.req.query('v');
+      if (!key || !version) throw bad('订阅转换链接缺少资源键或版本');
+      const target = { client: 'mihomo' as const, ...(platform ? { platform: platform as Platform } : {}) };
+      const retained = renderer.getVersion(active.profileId, target, version);
+      // 在发起任何刷新之前检查 URL 与版本归属，防止把订阅链接用成任意地址代理。
+      if (!retained || retained.remoteRuleUrls?.[key] !== url) throw notFound();
+      await renderer.render(active.profileId, target);
+      const selected = renderer.getVersion(active.profileId, target, version) ?? retained;
+      const body = selected.rulesets[key];
+      if (selected.remoteRuleUrls?.[key] !== url || body === undefined) throw notFound();
+      return send(body);
+    }
+    const src: RuleSetSourceDoc = { id: 'remote', kind: 'remote', url, format: 'auto' };
+    const loaded = await getter.get(c.get('user').id, src);
+    if (loaded.content === undefined || loaded.status.error) throw new HttpError(502, loaded.status.error ?? '远程规则读取失败');
+    const converted = converter.convert([{ source: src, content: loaded.content }], {}, { client, platform } as ClientCtx);
+    if (!converted.stats.output) throw bad('远程来源没有可转换的规则', converted.diagnostics.slice(0, 20));
+    c.header('x-rule-count', String(converted.stats.output));
+    c.header('x-rule-rejected', String(converted.stats.rejected + converted.stats.unsupported));
+    return send(converted.lines.join('\n') + '\n');
   });
   app.post('/rules/convert', async c => {
     const body = await jsonBody<{ inputs?: unknown; overrides?: RuleSetDoc['overrides']; noResolve?: boolean; client?: string; platform?: string; sourceId?: string }>(c);

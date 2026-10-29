@@ -33,7 +33,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
       const old = prior?.rules.find(r => r.matcher.kind === 'ruleset' && r.matcher.id === matcher.id)?.matcher;
       checkRuleSetReference(rule.matcher, store, old?.kind === 'ruleset' ? old : undefined);
       // 无归属种子保持兼容；有归属的本地规则必须符合公共/本人可见性。
-      if (!matcher.repository && store.getWithOwner('ruleset', matcher.id)?.owner && !new RefChecker(store, user).ruleVisible(matcher.id)) throw bad('本地规则集不可用');
+      if (!matcher.repository && !matcher.remote && store.getWithOwner('ruleset', matcher.id)?.owner && !new RefChecker(store, user).ruleVisible(matcher.id)) throw bad('本地规则集不可用');
       const rs = resolveRuleSetReference(rule.matcher, store);
       if (rs) rulesets[rs.id] = rs;
     } catch (error) {

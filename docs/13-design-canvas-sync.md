@@ -171,6 +171,15 @@
 - [ ] 仅整条改写保留一个排序手柄；内部替换 / 追加规则不提供排序，按添加顺序排列，保留增删。此项覆盖上方目标规则排序与整行解析的旧方案。
 - [ ] 移除内部手柄后，目标字段仍与条件字段左对齐。接口、种子、领域模型无需修改。
 
+
+### 进程具体类型与 wildcard 去重（2026-10-29）
+
+- [ ] 规则集客户端改写与私有规则编辑器直接选择 PROCESS-NAME / PROCESS-PATH / PROCESS-NAME-WILDCARD / PROCESS-PATH-WILDCARD / PROCESS-NAME-REGEX / PROCESS-PATH-REGEX，移除所有进程二次分类按钮。
+- [ ] 宽屏类型列 260 px，保证完整类型名可见；窄屏类型和值分行，已有进程规则不丢值。
+- [ ] 合并预览示例中，仅大小写不同的 mihomo wildcard 保留首条，重复位置显示注释，统计增加去重数；切换 Surge 保留大小写差异。来源原文预览维持全部行。
+
+外部画布沿用待登录同步事项，截图与验证见 research/verification/process-rule-types-20261029/。IR、示例种子与 API 保存结构不变。
+
 ## 2026-10-29：模板绑定与独立配置（待同步）
 
 本轮通过内置浏览器实查目标画布，仍显示「Sign in to view this page」，未能编辑。以本轮代码与 [验收截图](../research/verification/profile-template-modes-20261029/README.md) 为同步依据：

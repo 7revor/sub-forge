@@ -2,7 +2,7 @@ import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { Notice } from '../../components/Notice.tsx';
 import { OptionalBoolean } from '../../components/OptionalBoolean.tsx';
-// 策略组：填充模板组（只能加成员、调整类型与测速参数，不能删除、改名或隐藏，PRF-09），管理私有组。
+// 策略组：绑定模式只补充成员；独立模式维护完整组配置。
 
 import type { Builtin, GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
 import { Lock, Plus, Trash2 } from 'lucide-react';

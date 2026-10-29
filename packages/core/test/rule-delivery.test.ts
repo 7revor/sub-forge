@@ -13,6 +13,17 @@ const rendered = (inputs: RuleSetInputs) => renderMihomo({
 });
 
 describe('按内容识别与自动输出格式', () => {
+  it.each(['text', 'yaml'])('远程 %s 的 wildcard 大小写重复必须托管去重，唯一规则仍可透传', format => {
+    const lines = ['PROCESS-PATH-WILDCARD,/Apps/*', 'PROCESS-PATH-WILDCARD,/apps/*'];
+    const f = fixture(format === 'yaml' ? `payload: ${JSON.stringify(lines)}` : lines.join('\n'));
+    expect(f.decide().mode).toBe('managed');
+    const text = Object.values(rendered(f.inputs).rulesets)[0]!.text;
+    expect(text.split('\n').filter(line => line && !line.startsWith('#'))).toEqual([lines[0]]);
+    expect(text).toContain(`# [重复规则] ${lines[1]}`);
+    expect(ruleSetDelivery(f.rs, f.inputs, { client: 'surge', platform: 'macos' }).mode).toBe('managed'); // Surge 需要翻译进程类型
+    expect(fixture(lines[0]!).decide().mode).toBe('original');
+  });
+
   it.each([
     ['DOMAIN,example.com', 'classical', 'text', 'classical'],
     ['example.com\n+.example.net', 'domain-set', 'text', 'domain'],
