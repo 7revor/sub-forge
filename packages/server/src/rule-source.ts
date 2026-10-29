@@ -4,7 +4,7 @@ import type { SnapshotService } from './snapshots.ts';
 import { RuleConverter } from './rule-converter.ts';
 
 export class RuleSourceService {
-  private readonly drafts = new Map<string, { at: number; value: Promise<{ body?: string; error?: string }> }>();
+  private readonly drafts = new Map<string, { at?: number; value: Promise<{ body?: string; error?: string }> }>();
   private active = 0;
   private readonly waiting: (() => void)[] = [];
   private async limited<T>(read: () => Promise<T>): Promise<T> {
@@ -14,38 +14,41 @@ export class RuleSourceService {
     finally { const next = this.waiting.shift(); if (next) next(); else this.active--; }
   }
   constructor(private readonly snapshots: SnapshotService, private readonly converter: RuleConverter) {}
-  async get(userId: string, source: RuleSetSourceDoc, saved?: RuleSetDoc) {
+  async get(userId: string, source: RuleSetSourceDoc, saved?: RuleSetDoc, refresh = false) {
     let content = source.kind === 'local' ? source.content ?? '' : undefined;
     let error: string | undefined;
     let fetchedAt: number | undefined;
+    let stale = false;
     const passthrough = ['mrs', 'srs'].includes(source.format);
     if (source.kind === 'remote' && !passthrough) {
       const prior = saved?.sources.find(s => s.kind === 'remote' && s.url === source.url && JSON.stringify(s.fetch ?? {}) === JSON.stringify(source.fetch ?? {}));
       if (saved && prior) {
-        const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ttlSec: 86400, ...source.fetch, format: source.format }));
-        content = result.snapshot?.body; fetchedAt = result.snapshot?.fetchedAt; error = result.error;
-        if (content === undefined && error) {
-          const raw = await this.limited(() => this.snapshots.peekRuleContent(source.url!, source.fetch));
-          content = raw.body;
-          if (content !== undefined) error = undefined;
-        }
+        const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ttlSec: 86400, ...source.fetch, format: source.format }, { waitForFresh: true, refresh }));
+        content = result.snapshot?.body; fetchedAt = result.snapshot?.fetchedAt; error = result.error; stale = result.stale;
       } else {
         const key = JSON.stringify([userId, source.url, source.format, source.fetch ?? {}]);
         const now = Date.now();
-        for (const [k, v] of this.drafts) if (now - v.at >= 60_000) this.drafts.delete(k);
+        for (const [k, v] of this.drafts) if (v.at !== undefined && now - v.at >= 60_000) this.drafts.delete(k);
         let hit = this.drafts.get(key);
+        if (refresh && hit?.at !== undefined) hit = undefined;
         if (!hit) {
-          hit = { at: now, value: this.limited(() => this.snapshots.peekRuleContent(source.url!, source.fetch)) };
+          hit = { value: this.limited(() => this.snapshots.peekRuleContent(source.url!, source.fetch)) };
           this.drafts.set(key, hit);
           while (this.drafts.size > 32) this.drafts.delete(this.drafts.keys().next().value!);
         }
-        const result = await hit.value; content = result.body; error = result.error;
+        const result = await hit.value;
+        // 失败不进入缓存；并发重试复用在途请求，成功后从完成时起计算 TTL。
+        if (this.drafts.get(key) === hit) {
+          if (result.error) this.drafts.delete(key);
+          else hit.at ??= Date.now();
+        }
+        content = result.body; error = result.error;
       }
     }
     const parsed = content !== undefined || passthrough ? this.converter.prepare(content ?? '', source) : undefined;
     return {
       content,
-      status: { id: source.id, ok: !error && (content !== undefined || passthrough), error, fetchedAt, ...(passthrough ? { passthrough: true } : {}),
+      status: { id: source.id, ok: !error && (content !== undefined || passthrough), error, fetchedAt, stale, ...(passthrough ? { passthrough: true } : {}),
         conversion: parsed?.format === 'yaml' ? 'yaml-to-list' : undefined,
         format: parsed?.format, behavior: parsed?.behavior, rules: parsed?.parsed,
         rejected: parsed?.diagnostics.length, rejectedDetails: parsed?.diagnostics.length ? parsed.diagnostics.slice(0, 100).map(({ line, text, reason }) => ({ line, text, reason })) : undefined },

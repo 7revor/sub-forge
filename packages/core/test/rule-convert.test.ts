@@ -77,4 +77,24 @@ describe('保留行位的通用规则转换', () => {
     expect(r.lines).toHaveLength(5100);
     expect(r.lines.at(-1)).toBe('DOMAIN,d5099.test');
   });
+  it.each([
+    '# 标题\nDOMAIN,a.test\nPROCESS-NAME,App\nUSER-AGENT,x*\nDOMAIN,a.test\nDOMAIN,',
+    'payload:\n  - DOMAIN,a.test\n  - PROCESS-NAME,App\n  - USER-AGENT,x*',
+    'payload: ["DOMAIN,a.test", "USER-AGENT,x*", "PROCESS-NAME,App"]',
+  ])('不同替换宽度下四客户端的全部来源映射与行数稳定：%s', content => {
+    for (let width = 1; width <= 8; width++) {
+      const rs: RuleSet = { id: 'r', name: '', sources: [source(content)], overrides: [
+        { match: 'DOMAIN,a.test', override: { when: { client: 'surge' }, action: {
+          replace: Array.from({ length: width }, (_, i) => ({ type: 'DOMAIN' as const, value: `r${i}.test` })),
+        } } },
+        { override: { when: { client: 'mihomo' }, action: { append: [{ type: 'DOMAIN', value: 'append.test' }] } } },
+      ] };
+      const results = targets.map(t => convert(rs, t));
+      for (const r of results) {
+        expect(r.origins).toEqual(results[0]!.origins);
+        expect(r.lines).toHaveLength(results[0]!.lines.length);
+      }
+    }
+  });
+
 });

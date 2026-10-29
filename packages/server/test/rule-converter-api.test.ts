@@ -50,7 +50,7 @@ describe('来源获取与服务端转换分离', () => {
     const { alice, calls } = await scenario();
     const loaded = await alice.post('/api/rulesets/source', { source: { id: 'a', kind: 'local', format: 'auto', content: 'payload: [' } });
     expect(loaded.status).toBe(200); expect(loaded.json.status.rejected).toBe(1);
-    expect((await alice.post('/api/rules/convert', { inputs: [{ source: remote }], client: 'mihomo' })).status).toBe(200);
+    expect((await alice.post('/api/rules/convert', { inputs: [{ source: remote }], client: 'mihomo' })).status).toBe(400);
     expect(calls).toHaveLength(0);
     expect((await alice.post('/api/rules/convert', { inputs: [{ source: remote }], client: 'bad' })).status).toBe(400);
     expect((await alice.post('/api/rules/convert', { inputs: [{ source: remote }, { source: remote }], client: 'mihomo' })).status).toBe(400);

@@ -57,11 +57,12 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
   });
   // 草稿包含未保存的正文和参数，因此使用 POST；与 GET 共用 getter。
   app.post('/rulesets/source', async c => {
-    const body = await jsonBody<{ id?: unknown; source?: unknown }>(c);
+    const body = await jsonBody<{ id?: unknown; source?: unknown; refresh?: unknown }>(c);
     const saved = own(body.id, c.get('user').id);
+    if (body.refresh !== undefined && typeof body.refresh !== 'boolean') throw bad('refresh 必须是布尔值');
     const src = source(body.source);
     checkRepositorySource(src, saved?.sources.find(s => s.id === src.id), store, '来源');
-    return c.json(await getter.get(c.get('user').id, src, saved));
+    return c.json(await getter.get(c.get('user').id, src, saved, body.refresh === true));
   });
   // 兼容旧调用方：仅编排 getter 与 converter，不再维护第二套解析/转换实现。
   app.post('/rulesets/preview', async c => {
@@ -101,6 +102,7 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
       return { source: src, content: i.content };
     });
     if (body.sourceId !== undefined && !ids.has(body.sourceId)) throw bad('预览来源不存在');
+    if (inputs.some(i => (body.sourceId ? i.source.id === body.sourceId : i.source.enabled !== false) && !['mrs', 'srs'].includes(i.source.format) && i.content === undefined)) throw bad('来源正文尚未读取成功，请先重新读取来源');
     return c.json(converter.convert(inputs, { overrides: body.overrides, noResolve: body.noResolve }, { client: body.client, platform: body.platform } as ClientCtx, body.sourceId));
   });
   return app;

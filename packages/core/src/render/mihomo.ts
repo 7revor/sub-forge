@@ -1,5 +1,5 @@
-import { sourceKey } from '../rules/expand.ts';
-import { convertRuleDocuments, prepareRuleDocument } from '../rules/convert.ts';
+import { sourceKey, sourceLabel, type RuleSetInputs } from '../rules/expand.ts';
+import { convertRuleDocuments, prepareRuleDocument, type RuleDocument } from '../rules/convert.ts';
 import { ruleSetDelivery } from '../rules/delivery.ts';
 // mihomo 渲染（docs/03 §3 ②–⑥、§4）：模板合并 → 节点集 → 依赖解析 → 规则展开 → 引用校验 → YAML。
 // 纯函数：所有外部数据（快照、模板、规则集）由调用方传入。
@@ -8,8 +8,7 @@ import { stringify } from 'yaml';
 import { NodeSetResolver, nodeSetKey, type NodeSetInputs } from '../nodeset/resolve.ts';
 import { Report } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
-import { expandRuleSet, type RuleSetInputs } from '../rules/expand.ts';
-import type { Behavior } from '../rules/parse.ts';
+import { isYamlRuleUrl, type Behavior } from '../rules/parse.ts';
 import { mergeTemplate, type EffectiveGroup } from '../template/merge.ts';
 import type { GroupMember, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template } from '../types.ts';
 import { shortHash } from '../util/hash.ts';
@@ -328,10 +327,31 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     }
     // 不同规则级选项可能改变 classical 正文或 CIDR 分段，不能共用同名 provider。
     const base = `rs_${safeId(m.id)}${r.options?.noResolve ? '_nr' : ''}${r.options?.src ? '_src' : ''}`;
-    expandRuleSet(m.id, input.rules, ctx, report);
     const rs = input.rules.rulesets[m.id];
-    if (!rs) continue;
-    const delivery = ruleSetDelivery(rs, input.rules, ctx, r.options);
+    if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${m.id}`); continue; }
+    // 只解析一次：校验、输出方式判断和正文转换共用容错文档。
+    const documents = new Map<string, RuleDocument>();
+    for (const src of rs.sources.filter(s => s.enabled !== false)) {
+      const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
+      const binary = src.format === 'mrs' || src.format === 'srs';
+      if (binary && isYamlRuleUrl(src.url)) {
+        report.error('ruleset.conversion-requires-managed', `${label}的 YAML 规则只能转换为 LIST 托管，不能透传`, where);
+        continue;
+      }
+      const content = src.kind === 'local' ? src.content ?? '' : input.rules.snapshots[sourceKey(rs.id, src.id)];
+      if (content === undefined && !binary) {
+        report.error('ruleset.no-snapshot', `${label}没有可用快照`, where);
+        continue;
+      }
+      const document = prepareRuleDocument(content ?? '', src);
+      documents.set(src.id, document);
+      // 保留远程错误页面保护，不能把失败响应当作空分流配置下发。
+      if (src.kind === 'remote' && !document.passthrough && !document.parsed) {
+        report.error('ruleset.invalid-content', `${label}的远程快照没有可用规则，请重新拉取`, where);
+      }
+      if (document.diagnostics.length) report.info('ruleset.rejected-lines', `${label}有 ${document.diagnostics.length} 行无法解析`, where);
+    }
+    const delivery = ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
     if (delivery.mode === 'unsupported') {
       report.error('ruleset.conversion-unavailable', delivery.reason, where);
       continue;
@@ -346,10 +366,6 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>): MihomoRender
     const key = `${base}_classical`;
     const file = `${key}.list`;
     if (!rulesets[file]) {
-      const documents = new Map(rs.sources.filter(s => s.enabled !== false).map(s => {
-        const content = s.kind === 'local' ? s.content ?? '' : input.rules.snapshots[sourceKey(rs.id, s.id)] ?? '';
-        return [s.id, prepareRuleDocument(content, s)] as const;
-      }));
       const converted = convertRuleDocuments(rs, documents, ctx, { ipOptions: r.options });
       for (const diagnostic of converted.diagnostics) report.info(`rule.${diagnostic.kind}`, diagnostic.reason, where);
       if (!converted.lines.length) continue;
