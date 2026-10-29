@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Menu, X } from 'lucide-react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { api, onUnauthorized } from './api.ts';
+import { LogoMark } from './components/LogoMark.tsx';
 import { cx } from './components/ui.tsx';
 import { useMe } from './hooks.ts';
 
@@ -19,7 +20,7 @@ const NAV: { title?: string; items: NavItem[] }[] = [
 function Logo() {
   return (
     <div className="flex items-center gap-2.5 px-2.5 pt-1 pb-2">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8FA8F0" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M3 6h12M3 12h8M3 18h5" /><circle cx="17" cy="15" r="4" /></svg>
+      <LogoMark size={24} />
       <span className="font-mono text-[15px] font-semibold text-white">sub-forge</span>
     </div>
   );
