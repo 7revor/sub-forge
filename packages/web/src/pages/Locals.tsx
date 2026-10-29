@@ -2,7 +2,7 @@
 // /locals 分组列表 → /locals/:id 分组详情（节点表、粘贴导入、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（表单 / YAML 与前置）。
 // 每个分组是一个节点集文档；节点子页直接保存整个分组。离开有未保存修改的页面前先确认。
 
-import { parseContent, type LocalProxy, type LocalProxyGroup, type Target } from '@sub-forge/core';
+import type { LocalProxy, LocalProxyGroup, Target } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useBeforeUnload, useBlocker, useLocation, useNavigate, useParams, type Blocker, type NavigateOptions } from 'react-router';
@@ -11,7 +11,7 @@ import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../c
 import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
+import { groupFromYaml, groupToYaml, parseProxyImport, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteDialog, DeleteMenu, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { TargetPicker, useNodeSetNames } from '../components/pickers.tsx';
@@ -92,12 +92,12 @@ export function LocalList() {
 
 function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () => void; onImport: (p: LocalProxy[]) => void }) {
   const [text, setText] = useState('');
-  const parsed = text.trim() ? parseContent(text, { type: 'local', id: 'paste' }) : undefined;
+  const parsed = text.trim() ? parseProxyImport(text) : undefined;
   const proxies: LocalProxy[] = (parsed?.proxies ?? []).map(({ _source, _origName, _key, upstreamDialer, ...rest }) => rest as LocalProxy);
   return (
     <Modal title="粘贴导入节点" open={open} onClose={onClose} wide
       footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!proxies.length} onClick={() => { onImport(proxies); setText(''); onClose(); }}>导入 {proxies.length} 个节点</Button></>}>
-      <Field label="URI 列表、Base64、Clash YAML 或 Surge [Proxy] 行">
+      <Field label="URI 列表、Base64、Clash YAML 或 Surge [Proxy] 行" hint="YAML 支持单个节点、节点列表或带 proxies 的完整配置。">
         {(id) => <Textarea id={id} rows={8} className="font-mono text-[12.5px]" value={text} onChange={(e) => setText(e.target.value)} />}
       </Field>
       {parsed && <div className="flex flex-wrap gap-2">

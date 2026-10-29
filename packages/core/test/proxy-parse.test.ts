@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { stringify } from 'yaml';
 import { encodeBase64 } from '../src/util/base64.ts';
 import { parseContent } from '../src/proxy/parse.ts';
 import { proxyKey } from '../src/proxy/key.ts';
@@ -38,6 +39,45 @@ describe('URI 列表', () => {
 });
 
 describe('Clash YAML', () => {
+  const reality = {
+    name: '🇺🇸 Reality 测试', server: 'us.example.com', port: 443, type: 'vless',
+    uuid: '00000000-0000-4000-8000-000000000001', tls: true, flow: 'xtls-rprx-vision',
+    'reality-opts': { 'public-key': 'test-public-key', 'short-id': '01234567' },
+    servername: 'www.example.com', 'client-fingerprint': 'chrome', network: 'tcp', udp: true,
+  };
+
+  it.each([
+    ['单节点映射', stringify(reality)],
+    ['整体缩进的单节点映射', stringify(reality).split('\n').map((line) => `    ${line}`).join('\n')],
+    ['带注释的节点列表', `# 本地节点\n${stringify([reality])}`],
+    ['proxies 外层', stringify({ proxies: [reality] })],
+    ['行内单节点映射', JSON.stringify(reality)],
+    ['行内节点列表', JSON.stringify([reality])],
+    ['行内 proxies 外层', JSON.stringify({ proxies: [reality] })],
+  ])('识别%s，完整保留 Reality 字段', (_name, text) => {
+    const r = parseContent(text, { type: 'local', id: 'paste' });
+    expect(r.format).toBe('clash');
+    expect(r.failures).toEqual([]);
+    expect(r.proxies.map(strip)).toEqual([reality]);
+  });
+
+  it('裸节点列表逐项校验，坏节点不影响其余节点', () => {
+    const r = parseContent(stringify([reality, { name: '缺少服务器', type: 'vless' }, { ...reality, name: '第二个节点' }]), SRC);
+    expect(r.format).toBe('clash');
+    expect(r.proxies.map((p) => p.name)).toEqual([reality.name, '第二个节点']);
+    expect(r.failures).toEqual([{ line: JSON.stringify({ name: '缺少服务器', type: 'vless' }), reason: '缺少 name / type / server / port' }]);
+  });
+
+  it.each([
+    'name: [未闭合\ntype: vless',
+    '- name: [未闭合\n  type: vless',
+    'proxies:\n  - name: [未闭合',
+    'name: 重复\nname: 键\ntype: vless',
+    'proxies: 不是列表',
+  ])('拒绝无效 YAML，保留订阅解析的失败行为：%s', (text) => {
+    expect(() => parseContent(text, SRC)).toThrow();
+  });
+
   it('保留字段，剥离 dialer-proxy 为 upstreamDialer', () => {
     const text = `
 proxies:

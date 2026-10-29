@@ -28,6 +28,10 @@
 | 补充 `Login`、`Account` | `/login`、`/account` | — |
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
 
+## 设计稿待同步
+
+- 2026-10-29 本地节点粘贴导入：前端补充提示「YAML 支持单个节点、节点列表或带 proxies 的完整配置。」，内核已补齐相应解析。外部 Claude Design 画布打开后要求登录，本轮未能更新 `LocalNodes` / `Dialogs` 画板；前端实际效果见 [验收截图](../research/verification/local-node-yaml-import-20261029/single-node-import.png)。
+
 ## 后端待实现
 
 | 功能 | 前端 | 服务端现状 |

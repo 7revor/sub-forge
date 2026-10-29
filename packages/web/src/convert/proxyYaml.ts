@@ -1,4 +1,4 @@
-import type { LocalProxy } from '@sub-forge/core';
+import { parseContent, type LocalProxy, type ParseResult } from '@sub-forge/core';
 import { isNode, LineCounter, parseDocument, stringify } from 'yaml';
 import type { RawResult } from '../components/DualEditor.tsx';
 import { isRecord } from '../components/schema.ts';
@@ -8,6 +8,15 @@ import { recoverFields, recoverYaml } from './recoverYaml.ts';
 const withoutDialer = ({ dialer: _dialer, ...proxy }: LocalProxy) => proxy;
 export const proxyToYaml = (proxy: LocalProxy): string => stringify(withoutDialer(proxy));
 export const groupToYaml = (proxies: LocalProxy[]): string => stringify({ proxies: proxies.map(withoutDialer) });
+
+/** 粘贴时实时解析；损坏的 YAML 显示诊断，不中断页面渲染。 */
+export function parseProxyImport(text: string): ParseResult {
+  try {
+    return parseContent(text, { type: 'local', id: 'paste' });
+  } catch (error) {
+    return { format: 'clash', proxies: [], failures: [{ line: 'Clash YAML', reason: error instanceof Error ? error.message : String(error) }] };
+  }
+}
 
 export function proxyFormFromYaml(text: string, current?: LocalProxy) {
   const recovered = recoverYaml(text);

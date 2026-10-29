@@ -1,0 +1,82 @@
+Browser tab: 2, Title: "Sub Forge", URL: "http://127.0.0.1:18871/locals/h3zkjl4mPF-2".
+1 AXWebArea Sub Forge, URL: 127.0.0.1:18871/locals/h3zkjl4mPF-2
+	2 container root
+		3 container 主导航
+			4 text Sub Forge
+			5 link Description: 总览, Value: 127.0.0.1:18871/
+			6 link Description: 配置订阅, Value: 127.0.0.1:18871/profiles
+			7 text 节点
+			8 link Description: 订阅源, Value: 127.0.0.1:18871/sources
+			9 link Description: 组合, Value: 127.0.0.1:18871/collections
+			10 link Description: 本地节点, Value: 127.0.0.1:18871/locals
+			11 text 规则
+			12 link Description: 规则集, Value: 127.0.0.1:18871/rulesets
+			13 link Description: 规则包, Value: 127.0.0.1:18871/bundles
+			14 link Description: 规则仓库, Value: 127.0.0.1:18871/rule-repo
+			15 link Description: 模板, Value: 127.0.0.1:18871/templates
+			16 text 管理员
+			17 link Description: 模板管理, Value: 127.0.0.1:18871/templates/manage
+			18 link Description: 基础设置预设, Value: 127.0.0.1:18871/presets
+			19 link Description: 用户, Value: 127.0.0.1:18871/users
+			20 link Description: 系统, Value: 127.0.0.1:18871/system
+			21 link Description: import-test · 管理员, Value: 127.0.0.1:18871/account
+			22 button 退出登录
+		23 container
+			24 link Description: 本地节点, Value: 127.0.0.1:18871/locals
+			25 text  /  YAML 导入验收
+			26 heading YAML 导入验收, Value: 1
+				27 text YAML 导入验收
+			28 text 3  个节点
+			29 pop up button (collapsed) Description: 更多操作, Secondary Actions: Expand
+			30 button (disabled) 已保存
+			31 heading 节点, Value: 2
+				32 text 节点
+			33 button 粘贴导入
+			34 link Description: 新增节点, Value: 127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/new
+			35 table
+				36 row
+					37 cell
+						38 text 名称
+					39 cell
+						40 text 协议
+					41 cell
+						42 text 服务器
+					43 cell
+						44 text 前置
+					45 cell
+						46 text 操作
+				47 row
+					48 cell
+						49 link Description: 🇺🇸 Reality 测试, Value: 127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/0
+					50 cell
+						51 text vless
+					52 cell
+						53 text us.example.com : 443
+					54 cell
+						55 text —
+					56 cell
+						57 link Description: 编辑 🇺🇸 Reality 测试, Value: 127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/0
+				58 row
+					59 cell
+						60 link Description: 列表 A, Value: 127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/1
+					61 cell
+						62 text trojan
+					63 cell
+						64 text a.example.com : 443
+					65 cell
+						66 text —
+					67 cell
+						68 link Description: 编辑 列表 A, Value: 127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/1
+				69 row
+					70 cell
+						71 link Description: 列表 B, Value: 127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/2
+					72 cell
+						73 text trojan
+					74 cell
+						75 text b.example.com : 443
+					76 cell
+						77 text —
+					78 cell
+						79 link Description: 编辑 列表 B, Value: 127.0.0.1:18871/locals/h3zkjl4mPF-2/nodes/2
+
+The focused UI element is 1 AXWebArea Sub Forge, URL: 127.0.0.1:18871/locals/h3zkjl4mPF-2
