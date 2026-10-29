@@ -60,3 +60,5 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 模板的 `ruleset` 匹配项支持可选 `repository` 文件映射。调用方在渲染前将本地与仓库引用统一为 `RuleSetInputs`；内核继续按同一规则管线处理，不负责访问 GitHub。没有 repository 的旧 ID 引用保持兼容。
 
 2026-10-29 模板规则集行内编辑仅调整前端布局；RuleEntry 的 matcher、target、enabled、options.noResolve 与规则顺序保持原语义，核心渲染和示例种子不变。
+
+策略组空组固定拒绝：生成时无成员补 REJECT，所有组自动输出 `empty-fallback: REJECT`；历史 `whenEmpty: direct` 与扩展字段不能覆盖。`exclude-type` 统一解析 ss / Shadowsocks 等协议别名，使内联筛选与 provider 客户端行为一致。

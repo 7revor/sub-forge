@@ -16,9 +16,26 @@ const base = (group: GroupSpec, output: 'provider' | 'inline' = 'provider'): Ren
 const group = (patch: Partial<GroupSpec> = {}): GroupSpec => ({ id: 'g', name: '前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'source', id: 's' } }], filter: '^前置$', ...patch });
 
 describe('代理链的失败保护与真实成员展开', () => {
-  it.each(['reject', 'direct'] as const)('动态策略组始终声明为空时 %s', whenEmpty => {
+  it.each(['reject', 'direct'] as const)('历史配置 %s 也统一拒绝动态空组', whenEmpty => {
     const r = renderMihomo(base(group({ filter: '^不存在$', whenEmpty })));
-    expect(r.config['proxy-groups']).toEqual([expect.objectContaining({ 'empty-fallback': whenEmpty === 'reject' ? 'REJECT' : 'COMPATIBLE' })]);
+    expect(r.config['proxy-groups']).toEqual([expect.objectContaining({ 'empty-fallback': 'REJECT' })]);
+  });
+
+  it.each(['select', 'url-test', 'fallback', 'load-balance'] as const)('%s 静态空组拒绝，历史值和扩展字段不能改为直连', type => {
+    const input = base(group({ type, members: [], whenEmpty: 'direct', extra: { 'empty-fallback': 'DIRECT' } }));
+    input.profile.chains = [];
+    const result = renderMihomo(input);
+    expect(result.config['proxy-groups']).toEqual([expect.objectContaining({ proxies: ['REJECT'], 'empty-fallback': 'REJECT' })]);
+    expect(result.report.byCode('group.empty')).toHaveLength(1);
+  });
+
+  it('内联节点和 provider 使用同一套协议别名，输出 Mihomo Adapter Type', () => {
+    const input = base(group({ filter: undefined, excludeType: 'ss|HTTP' }));
+    input.profile.chains = [];
+    input.nodeSets.snapshots.s = ['proxies:\n- {name: SS节点, type: ss, server: example.test, port: 443, cipher: aes-128-gcm, password: test}\n- {name: HTTP节点, type: http, server: example.test, port: 80}\n'];
+    expect(renderMihomo(input).config['proxy-groups']).toEqual([expect.objectContaining({ 'exclude-type': 'Shadowsocks|Http', 'empty-fallback': 'REJECT' })]);
+    input.profile.nodeSets[0]!.output = 'inline';
+    expect(renderMihomo(input).config['proxy-groups']).toEqual([expect.objectContaining({ proxies: ['REJECT'], 'empty-fallback': 'REJECT' })]);
   });
 
   it('同源前置过滤掉落地后不误报环', () => {
