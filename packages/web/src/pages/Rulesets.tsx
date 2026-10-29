@@ -16,7 +16,7 @@ import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, buttonClass, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
@@ -50,8 +50,8 @@ export function RulesetList() {
 
 const newLocal = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'local', format: 'auto', content: '' });
 const newRemote = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'remote', format: 'auto', url: '' });
-const FIRST_SOURCE = 'src_first';
-const EMPTY_RS: RuleSetDoc = { id: '', name: '', sources: [{ ...newLocal(), id: FIRST_SOURCE }] };
+const EMPTY_RS: RuleSetDoc = { id: '', name: '', sources: [] };
+const sourceActionClass = buttonClass('default', 'md', 'w-full min-w-0 whitespace-normal max-sm:gap-1.5 max-sm:px-2 max-sm:text-[12px]');
 
 const TARGETS: { key: string; client: Client; platform?: Platform; label: string }[] = [
   { key: 'mihomo', client: 'mihomo', label: 'mihomo' },
@@ -75,7 +75,7 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
-  const [selected, setSelected] = useState<string | undefined>(() => (e.isNew ? FIRST_SOURCE : undefined));
+  const [selected, setSelected] = useState<string | undefined>();
   const [showError, setShowError] = useState(false);
   const t = TARGETS.find((x) => x.key === target)!;
   const draft = useDebouncedValue(e.draft, 400);
@@ -115,20 +115,21 @@ export function RulesetEdit() {
         <Field label="名称">{(id) => <Input id={id} autoFocus={e.isNew} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
         <NoteField value={d.note} onChange={(note) => set({ note })} />
       </Card>
-      <Card title="来源" actions={<>
-        <Button className="h-9" onClick={() => add(newRemote())}><Globe size={15} />添加远程地址</Button>
-        <Button className="h-9" onClick={() => add(newLocal())}><FileText size={15} />添加本地规则</Button>
-      </>}>
+      <Card title="来源">
         <div className="flex flex-col gap-4">
-          <RepositoryPicker key={d.id} onAdd={sources => {
-            e.setDraft(current => {
-              if (!current || current.id !== d.id) return current;
-              const added = sources.filter(s => !current.sources.some(existing => existing.url === s.url));
-              return { ...current, sources: [...current.sources, ...added] };
-            });
-            setSelected(d.sources.find(s => s.url === sources[0]?.url)?.id ?? sources[0]?.id);
-          }} />
-          {!d.sources.length ? <Empty title="还没有来源" /> : (
+          <div role="group" aria-label="添加规则来源" className="grid grid-cols-3 gap-2">
+            <RepositoryPicker key={d.id} onAdd={sources => {
+              e.setDraft(current => {
+                if (!current || current.id !== d.id) return current;
+                const added = sources.filter(s => !current.sources.some(existing => existing.url === s.url));
+                return { ...current, sources: [...current.sources, ...added] };
+              });
+              setSelected(d.sources.find(s => s.url === sources[0]?.url)?.id ?? sources[0]?.id);
+            }} />
+            <button type="button" className={sourceActionClass} onClick={() => add(newRemote())}><Globe size={15} className="hidden shrink-0 sm:block" />添加远程地址</button>
+            <button type="button" className={sourceActionClass} onClick={() => add(newLocal())}><FileText size={15} className="hidden shrink-0 sm:block" />添加本地规则</button>
+          </div>
+          {!!d.sources.length && (
             <SortableList items={d.sources} getKey={(s) => s.id} onReorder={(sources) => set({ sources })} renderItem={(s, _i, handle) => (
               <SourceRow src={s} handle={handle} active={s.id === selected} status={status.get(s.id)} loading={preview.isFetching}
                 onSelect={() => setSelected(s.id === selected ? undefined : s.id)}
@@ -173,21 +174,20 @@ function RepositoryPicker({ onAdd }: { onAdd: (sources: RuleSetSourceDoc[]) => v
   const [error, setError] = useState<unknown>();
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  return <div className="flex flex-col gap-2">
-    <div className="flex items-center gap-2"><Link2 size={16} className="shrink-0 text-accent-ink" />
-      <AsyncSelect aria-label="关联仓库规则" placeholder={busy ? '正在解析关联…' : '关联仓库规则…'} disabled={busy} loadOptions={loadRepositoryOptions}
-        onChange={async value => {
-          setBusy(true); setError(undefined);
-          try {
-            const [repo, path] = JSON.parse(value) as [string, string];
-            const result = await api<{ sources: RuleSetSourceDoc[] }>('POST', '/rule-repos/resolve', { repo, path });
-            if (alive.current) onAdd(result.sources);
-          } catch (e) { if (alive.current) setError(e); }
-          finally { if (alive.current) setBusy(false); }
-        }} />
-    </div>
-    <ErrorBox error={error} />
-  </div>;
+  return <>
+    <AsyncSelect aria-label="关联仓库规则" placeholder={busy ? '正在关联…' : '关联仓库规则'} disabled={busy} loadOptions={loadRepositoryOptions}
+      triggerClassName={sourceActionClass} triggerIcon={<Link2 size={15} className="hidden shrink-0 sm:block" />}
+      onChange={async value => {
+        setBusy(true); setError(undefined);
+        try {
+          const [repo, path] = JSON.parse(value) as [string, string];
+          const result = await api<{ sources: RuleSetSourceDoc[] }>('POST', '/rule-repos/resolve', { repo, path });
+          if (alive.current) onAdd(result.sources);
+        } catch (e) { if (alive.current) setError(e); }
+        finally { if (alive.current) setBusy(false); }
+      }} />
+    {error != null && <div className="order-last col-span-full"><ErrorBox error={error} /></div>}
+  </>;
 }
 
 function SourceRow({ src, handle, active, status, loading, onSelect, onChange, onDelete }: {
