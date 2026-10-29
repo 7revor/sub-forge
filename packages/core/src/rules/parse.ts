@@ -86,6 +86,8 @@ export function parseRuleLine(text: string): RuleIR {
 
 /** 纯域名行（Surge DOMAIN-SET / mihomo domain behavior） */
 export function parseDomainLine(text: string): RuleIR {
+  // 域名列表不能把 HTML、JSON 或错误说明当成域名；保留通配符、国际化域名与内网单标签。
+  if (!/^(?:\+\.)?\.?[\p{L}\p{N}_*?-]+(?:\.[\p{L}\p{N}_*?-]+)*\.?$/u.test(text)) throw new Error('不是有效的域名规则');
   if (text.startsWith('+.')) return { type: 'DOMAIN-SUFFIX', value: text.slice(2) };
   // Surge DOMAIN-SET 的 `.x` 含 x 本身；mihomo 的 `.x` 只含子域。统一按后缀处理，偏宽松
   if (text.startsWith('.')) return { type: 'DOMAIN-SUFFIX', value: text.slice(1) };
@@ -124,7 +126,9 @@ export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto'
   let lineParser: (t: string) => RuleIR;
   if (fmt === 'yaml') {
     const doc = parseYaml(text) as { payload?: unknown[] } | null;
-    const payload = (doc?.payload ?? []).map(String);
+    if (!doc || !Array.isArray(doc.payload)) throw new Error('规则 YAML 需要 payload 数组');
+    if (!doc.payload.every((item) => typeof item === 'string')) throw new Error('规则 YAML 的 payload 条目必须是字符串');
+    const payload = doc.payload as string[];
     const behavior = yamlBehavior ?? behaviorOfYaml(payload);
     entries = payload.map((t, i) => ({ line: i + 1, text: t.trim() }));
     lineParser = behavior === 'domain' ? parseDomainLine : behavior === 'ipcidr' ? parseCidrLine : parseRuleLine;

@@ -146,7 +146,7 @@ describe('快照服务', () => {
     expect(store.countSnapshots('source', 's', 'u')).toEqual({ ok: 1, failed: 1 }); // 失败记录只保留最近一条
   });
 
-  it('规则集只拒绝空内容', async () => {
+  it('规则集可以保存有效的文本规则', async () => {
     const { svc } = setup(['DOMAIN,a.com']);
     expect((await svc.get('ruleset', 'r', 'u', { ttlSec: 60 })).snapshot!.body).toBe('DOMAIN,a.com');
   });

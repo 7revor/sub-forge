@@ -6,7 +6,7 @@
 // 上游返回 2xx 但内容为空（或订阅源解析不出任何节点）同样记为失败：机场在 token 过期、
 // 限流时常这样返回，若当作成功快照，会顶掉上一份可用内容，订阅变成空的。
 
-import { parseContent, stableHash } from '@sub-forge/core';
+import { parseContent, parseRuleSetContent, stableHash, type RuleSetFormat } from '@sub-forge/core';
 import type { FetchOptions } from './docs.ts';
 import type { UpstreamFetcher } from './net/upstream.ts';
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
@@ -14,9 +14,17 @@ import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 export type SnapshotResult = { snapshot?: SnapshotRow; stale: boolean; error?: string };
 
 /** 内容不可用时返回原因；可用返回 undefined */
-export function unusableBody(kind: SnapshotOwner, id: string, body: string): string | undefined {
+export function unusableBody(kind: SnapshotOwner, id: string, body: string, format: RuleSetFormat = 'auto'): string | undefined {
   if (!body.trim()) return '上游返回了空内容';
-  if (kind !== 'source') return undefined;
+  if (kind === 'ruleset') {
+    try {
+      const parsed = parseRuleSetContent(body, format);
+      if (parsed.passthrough || parsed.rules.length) return undefined;
+      return `上游内容中没有可用规则（${parsed.rejected.length} 行无法解析）`;
+    } catch (e) {
+      return `规则集内容无法解析：${(e as Error).message}`;
+    }
+  }
   const parsed = parseContent(body, { type: 'source', id });
   if (parsed.proxies.length) return undefined;
   return parsed.failures.length ? `上游内容中没有可用节点（${parsed.failures.length} 行无法解析）` : '上游内容中没有可用节点';
@@ -41,7 +49,7 @@ export class SnapshotService {
       const fetchedAt = this.now();
       try {
         const res = await this.fetcher(url, opts);
-        const unusable = unusableBody(kind, id, res.body);
+        const unusable = unusableBody(kind, id, res.body, kind === 'ruleset' ? this.store.get('ruleset', id)?.format : undefined);
         if (unusable) throw new Error(unusable);
         const row = { ownerKind: kind, ownerId: id, url, fetchedAt, ok: true, status: res.status, body: res.body, hash: stableHash(res.body), ...(res.userinfo ? { userinfo: res.userinfo } : {}) };
         this.store.addSnapshot(row);
