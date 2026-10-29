@@ -268,9 +268,9 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
   return (
     <div className="flex flex-wrap items-start gap-5">
-      <Card title="处理链" className="min-w-0 flex-[1_1_380px]" bodyClass="pb-2"
+      <Card title="处理链" className="min-w-0 flex-[1_1_380px]" bodyClass="px-4 pb-2"
         actions={<span className="text-[12.5px] text-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>}>
-        {steps.length === 0 && <div className="px-1 pb-3"><Empty>还没有处理步骤，节点会原样输出。</Empty></div>}
+        {steps.length === 0 && <div className="pb-3"><Empty>还没有处理步骤，节点会原样输出。</Empty></div>}
         <div className="-mx-4">
           <SortableList items={steps.map((step, i) => ({ step, id: keys[i]! }))} getKey={(item) => item.id}
             onReorder={(items, { to }) => {

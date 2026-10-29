@@ -71,11 +71,11 @@ export function LocalEdit() {
       onSave={() => { if (!rawInvalid) e.submit(); }} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
       <Card title="分组"><Field label="名称">{(id) => <Input id={id} value={d.name} onChange={(x) => e.setDraft({ ...d, name: x.target.value })} />}</Field></Card>
       <div className="flex flex-wrap items-start gap-5">
-        <Card title="节点" className="min-w-0 flex-[1_1_320px]" bodyClass="pb-3"
+        <Card title="节点" className="min-w-0 flex-[1_1_320px]" bodyClass="px-4 pb-3"
           actions={<><Button size="sm" disabled={rawInvalid} onClick={() => setGroupText(groupToYaml(d.proxies))}>分组 YAML</Button><Button size="sm" disabled={rawInvalid} onClick={() => setPasting(true)}>粘贴导入</Button>
             <Button size="sm" disabled={rawInvalid} onClick={() => { setProxies([...d.proxies, { ...defaultsFor('trojan'), name: `节点 ${d.proxies.length + 1}` }]); setSel(d.proxies.length); }}><Plus size={14} />新增</Button></>}>
           {!d.proxies.length ? <Empty>还没有节点。</Empty> : (
-            <ul className="-mx-4 m-0 list-none p-0">
+            <ul className="-mx-4 my-0 list-none p-0">
               {d.proxies.map((p, i) => (
                 <li key={i}>
                   <button type="button" disabled={rawInvalid} onClick={() => setSel(i)} className={cx('flex w-full cursor-pointer items-center gap-2.5 border-t border-line-2 px-4 py-2.5 text-left', i === sel ? 'bg-accent-soft' : 'hover:bg-ground')}>
