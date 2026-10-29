@@ -116,7 +116,9 @@ body {
 .page-scroll {
   /* 将 sr-only 等绝对定位后代也限制在滚动区内，避免撑大文档。 */
   position: relative;
-  overflow: auto;
+  /* 纵向滚动条常驻，避免内容增减时反复出现、隐藏并挤动布局。 */
+  overflow-x: auto;
+  overflow-y: scroll;
   overscroll-behavior: contain;
   margin-top: -4px;
   margin-bottom: calc(-1 * var(--page-block-gutter));
