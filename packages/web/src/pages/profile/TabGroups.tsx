@@ -14,6 +14,7 @@ import { SortableList } from '../../components/SortableList.tsx';
 import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
+import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
 type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'whenEmpty' | 'display' | 'extra'>;
 
@@ -55,7 +56,10 @@ function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => voi
 }
 
 export function TabGroups() {
-  const { draft, groups, template, patchOverlay, groupName, nodeSetName } = useProfile();
+  const { draft, groups, template, patchOverlay, groupName, nodeSetName, profileNodeSets } = useProfile();
+  const [regionSource, setRegionSource] = useState<NodeSetID>();
+  const regionNodeSet = profileNodeSets.find(option => option.ref.type === regionSource?.type && option.ref.id === regionSource.id)
+    ?? profileNodeSets.find(option => option.name === 'FlowerCloud') ?? profileNodeSets[0];
   const [selectedId, setSelectedId] = useState<string | undefined>(groups[0]?.id);
   const [previewSelection, setPreviewSelection] = useState<{ groupId: string; key: string }>();
   const templateIds = (template?.groups ?? []).map((group) => group.id);
@@ -90,6 +94,21 @@ export function TabGroups() {
     const id = `g_${Date.now().toString(36)}`;
     patchOverlay((o) => ({ ...o, extraGroups: [...(o.extraGroups ?? []), { group: { id, name: '新的组', type: 'select', members: [] } }] }));
     setSelectedId(id);
+  };
+  const addRegions = () => {
+    const added = createRegionGroups(groups, regionNodeSet?.ref);
+    const inherited = groups.filter(group => group.origin === 'template' && REGION_GROUPS.some(region => region.name === group.name));
+    patchOverlay(o => {
+      const groupPatches = { ...o.groupPatches };
+      if (regionNodeSet) for (const group of inherited) {
+        const previous = groupPatches[group.id] ?? {};
+        const members = [...group.members, ...(previous.addMembers ?? [])];
+        if (members.some(member => member.kind === 'nodeset' && member.ref.type === regionNodeSet.ref.type && member.ref.id === regionNodeSet.ref.id)) continue;
+        groupPatches[group.id] = { ...previous, addMembers: [...(previous.addMembers ?? []), { kind: 'nodeset', ref: { ...regionNodeSet.ref } }] };
+      }
+      return { ...o, groupPatches, extraGroups: [...(o.extraGroups ?? []), ...added.map(group => ({ group }))] };
+    });
+    setSelectedId(added[0]?.id ?? inherited[0]?.id);
   };
   const removePrivate = () => {
     if (!g || g.origin !== 'profile') return;
@@ -133,7 +152,11 @@ export function TabGroups() {
               );
             }} /></div>
           {!groups.length && <Empty title="没有组" />}
-          <div className="-mx-4 mt-4 border-t border-line-2 px-4 pt-2.5"><Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button></div>
+          <div className="-mx-4 mt-4 flex flex-col gap-2 border-t border-line-2 px-4 pt-2.5">
+            <NodeSetSelect label="地区节点来源" value={regionNodeSet?.ref} options={profileNodeSets} onChange={setRegionSource} placeholder="先在「节点集」中加入" />
+            <Button onClick={addRegions}><Plus size={15} />添加地区节点</Button>
+            <Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button>
+          </div>
         </Card>
 
         {g && eff && (

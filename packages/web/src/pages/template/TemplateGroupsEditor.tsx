@@ -6,6 +6,7 @@ import { Button, Card, Empty, Field, Input, Segmented, Switch, cx } from '../../
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
+import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
 export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report }: {
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string) => void; report: ReportItem[];
@@ -23,11 +24,15 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
     onChange(removeGroup(value, id));
   };
   return <Card title={`策略组（${value.groups.length}）`} bodyClass="border-t border-line"
-    actions={<Button onClick={() => {
+    actions={<div className="flex flex-wrap gap-2"><Button disabled={REGION_GROUPS.every(region => value.groups.some(group => group.name === region.name))} onClick={() => {
+      const added = createRegionGroups(value.groups);
+      onChange({ ...value, groups: [...value.groups, ...added] });
+      if (added[0]) onSelect(added[0].id);
+    }}>添加地区节点</Button><Button onClick={() => {
       const id = newId('g');
       onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [], whenEmpty: 'reject' }] });
       onSelect(id);
-    }}>新增组</Button>}>
+    }}>新增组</Button></div>}>
     {!group ? <div className="p-4"><Empty title="还没有组" /></div> : <div className="grid min-w-0 md:grid-cols-[240px_minmax(0,1fr)]">
       <nav aria-label="策略组列表" className="min-w-0 border-b border-line p-3 md:border-r md:border-b-0">
         <SortableList items={value.groups} getKey={(g) => g.id} onReorder={(groups) => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
@@ -50,6 +55,11 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
           <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">为空时</span><Segmented label="为空时" value={group.whenEmpty ?? 'reject'} options={[{ value: 'reject', label: '拒绝' }, { value: 'direct', label: '直连' }]} onChange={(whenEmpty) => update({ whenEmpty })} /></div>
           <div className="flex h-[38px] items-center gap-2"><Switch label="隐藏策略组" checked={group.display?.hidden ?? false} onChange={(hidden) => update({ display: { ...group.display, hidden } })} /><span className="text-[13px]">隐藏策略组</span></div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="filter（保留）" hint="订阅填入节点集后生效">{(id) => <Input id={id} className="font-mono" value={group.filter ?? ''} onChange={(event) => update({ filter: event.target.value || undefined })} />}</Field>
+          <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={group.excludeFilter ?? ''} onChange={(event) => update({ excludeFilter: event.target.value || undefined })} />}</Field>
+          <Field label="exclude-type">{(id) => <Input id={id} className="font-mono" value={group.excludeType ?? ''} onChange={(event) => update({ excludeType: event.target.value || undefined })} />}</Field>
         </div>
         <section className="flex min-w-0 flex-col gap-3 border-t border-line pt-4" aria-label="策略组成员">
           <div className="flex items-center justify-between"><h3 className="m-0 text-[14px] font-semibold">成员</h3><span className="text-[12px] text-muted">{group.members.length} 个</span></div>
