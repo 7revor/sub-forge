@@ -45,7 +45,7 @@ export type ProfilePreview = { ok: boolean; yaml?: string; dependencies?: Depend
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
 export type RejectedRuleDetail = { line: number; text: string; reason: string };
 /** 规则集预览中每个来源的拉取 / 解析状态；不支持的行最多返回前 100 条详情 */
-export type RulesetSourceStatus = { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRuleDetail[] };
+export type RulesetSourceStatus = { conversion?: 'yaml-to-list'; id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRuleDetail[] };
 export type RulesetPreview = {
   sources: RulesetSourceStatus[];
   passthrough: boolean; lines: string[]; total?: number;
@@ -62,6 +62,7 @@ export type Share = { id: string; kind: 'source' | 'collection'; docId: string; 
 export type CustomRepoConfig = { ref?: string; directory?: string; include?: string[]; exclude?: string[]; format?: string };
 export type RuleRepo = CustomRepoConfig & { id: string; name: string; url: string; builtIn: boolean; enabled: boolean; entries: number; builtAt?: number; checkedAt?: number; error?: string; indexing: boolean };
 export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
+export type RepoFileList = RepoEntry & { license?: string; url: string; files: { ref: string; path: string; url: string; upstream: string; format: string }[] };
 export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?: RejectedRuleDetail[]; license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };
 export type SystemInfo = Pending & {
   ssrfAllow: { value: string; note?: string }[];

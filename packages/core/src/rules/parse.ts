@@ -11,7 +11,7 @@ export type RejectedRule = { line: number; text: string; reason: string };
 export type Behavior = 'domain' | 'ipcidr' | 'classical';
 
 export type RuleSetParseResult =
-  | { passthrough: false; format: Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>; rules: ParsedRule[]; rejected: RejectedRule[] }
+  | { passthrough: false; format: Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>; rules: ParsedRule[]; rejected: RejectedRule[]; conversion?: 'yaml-to-list' }
   | { passthrough: true; format: 'mrs' | 'srs' };
 
 const PROCESS_TYPES: Record<string, { kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex' }> = {
@@ -102,8 +102,16 @@ export function parseCidrLine(text: string): RuleIR {
 
 type TextFormat = Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>;
 
+/** URL 扩展名只用于禁止把已知 YAML 地址标成二进制透传；自动解析仍依据实际内容。 */
+export function isYamlRuleUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try { return /\.ya?ml$/i.test(new URL(url).pathname); } catch { return false; }
+}
+
+const hasYamlPayload = (text: string) => /^\s*(?:payload|"payload"|'payload')\s*:/m.test(text) || /^\s*\{\s*["']?payload["']?\s*:/.test(text);
+
 function detectFormat(text: string): TextFormat {
-  if (/^\s*payload\s*:/m.test(text)) return 'yaml';
+  if (hasYamlPayload(text)) return 'yaml';
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#') && !l.startsWith('//'));
   if (lines.length && lines.every((l) => /^[0-9a-f:.]+\/\d+$/i.test(l))) return 'ipcidr';
   if (lines.length && lines.every((l) => !l.includes(','))) return 'domain-set';
@@ -117,7 +125,10 @@ function behaviorOfYaml(items: string[]): Behavior {
 }
 
 export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto', yamlBehavior?: Behavior): RuleSetParseResult {
-  if (format === 'mrs' || format === 'srs') return { passthrough: true, format };
+  if (format === 'mrs' || format === 'srs') {
+    if (hasYamlPayload(text)) throw new Error('YAML 规则需要自动转换为 LIST 并托管，不能透传');
+    return { passthrough: true, format };
+  }
   const fmt: TextFormat = format === 'auto' ? detectFormat(text) : format;
   const rules: ParsedRule[] = [];
   const rejected: RejectedRule[] = [];
@@ -145,7 +156,7 @@ export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto'
       rejected.push({ ...e, reason: (err as Error).message });
     }
   }
-  return { passthrough: false, format: fmt === 'domain' ? 'domain-set' : fmt, rules, rejected };
+  return { passthrough: false, format: fmt === 'domain' ? 'domain-set' : fmt, rules, rejected, ...(fmt === 'yaml' ? { conversion: 'yaml-to-list' as const } : {}) };
 }
 
 /** 规则在规则包拆分时归入的 behavior（docs/03 §6） */

@@ -13,20 +13,20 @@ import { createApp } from '../src/app.ts';
 
 const sha = 'a'.repeat(40);
 const treeSha = 'b'.repeat(40);
-const readme = '#### 使用说明\n- China.yaml，请使用 behavior: "classical"。\n- China_Domain.yaml，请使用 behavior: "domain"。\n#### 配置建议\n- China.yaml、China_Domain.yaml 共同使用。\n#### 规则链接\n';
+const readme = '#### 使用说明\n- China.list，请使用 behavior: "classical"。\n- China_Domain.list，请使用 behavior: "domain"。\n#### 配置建议\n- China.list、China_Domain.list 共同使用。\n#### 规则链接\n';
 const envs: { service: RuleRepoService; store: ReturnType<typeof setupApp>['store'] }[] = [];
 afterEach(async () => { for (const env of envs.splice(0)) { await env.service.stop(); env.store.close(); } });
 
 function setup() {
   let commit = sha;
   let failRef = '';
-  let paths = ['rule/Clash/China/China.yaml', 'rule/Clash/China/China_Domain.yaml', "rule/Clash/Assassin'sCreed/Odyssey/Odyssey.yaml", 'rule/Clash/OpenAI/OpenAI.yaml', 'rule/Surge/OpenAI/OpenAI.list', 'rule/Clash/OpenAI/README.md'];
+  let paths = ['rule/Surge/China/China.list', 'rule/Surge/China/China_Domain.list', "rule/Surge/Assassin'sCreed/Odyssey/Odyssey.list", 'rule/Surge/OpenAI/OpenAI.yaml', 'rule/Surge/OpenAI/OpenAI.list', 'rule/Surge/OpenAI/README.md'];
   const fetcher = vi.fn<UpstreamFetcher>(async url => {
     if (failRef && url.includes(failRef)) throw new Error('模拟上游失败');
     if (url.includes('/commits/')) return { status: 200, body: JSON.stringify({ sha: commit, commit: { tree: { sha: treeSha } } }) };
     if (url.includes('/git/trees/')) return { status: 200, body: JSON.stringify({ sha: treeSha, truncated: false, tree: (url.includes('/zydou/') ? ['openai.yml', 'openai.mrs', 'openai.txt', 'openai@ads.txt', 'openai@ads .txt', 'openai@-cn.txt'] : paths).map(path => ({ path, sha, type: 'blob' })) }) };
     if (url.endsWith('README.md')) return { status: 200, body: readme };
-    return { status: 200, body: url.includes('_Domain') || url.includes('/clash/') ? 'payload:\n  - +.example.com\n' : url.endsWith('.yaml') ? 'payload:\n  - DOMAIN,chatgpt.com\n' : 'DOMAIN,chatgpt.com\n' };
+    return { status: 200, body: (url.includes('_Domain') || url.includes('/surge-domain-set/')) ? '.example.com\n' : 'DOMAIN,chatgpt.com\n' };
   });
   const env = setupApp({ fetcher });
   const service = new RuleRepoService(env.store, fetcher, () => 1_700_000_000_000);
@@ -37,11 +37,18 @@ function setup() {
 
 describe('规则仓库适配器', () => {
   it('按完整目录分组，忽略非规则；按 README 组合互补文件', () => {
-    const entries = buildEntries(BUILTIN_REPOS[0]!, { master: ['rule/Clash/China/China.yaml', 'rule/Clash/China/China_Domain.yaml', 'rule/Clash/China/README.md', 'rule/Clash/Parent/Child/Child.yaml'] });
+    const entries = buildEntries(BUILTIN_REPOS[0]!, { master: ['rule/Surge/China/China.list', 'rule/Surge/China/China_Domain.list', 'rule/Surge/China/README.md', 'rule/Surge/Parent/Child/Child.list'] });
     expect(entries.map(e => e.path)).toEqual(['China', 'Parent/Child']);
     const china = entries[0]!;
-    applyReadme(china, 'mihomo', readme);
+    applyReadme(china, 'surge', readme);
     expect(china.variants.find(v => v.recommended)?.files.map(f => f.behavior)).toEqual(['classical', 'domain']);
+  });
+  it('所有适配器仅接受 list/txt，Clash YAML 与二进制不进入索引', () => {
+    const black = buildEntries(BUILTIN_REPOS[0]!, { master: ['rule/Clash/OnlyYaml/OnlyYaml.yaml', 'rule/Clash/OnlyYml/OnlyYml.yml', 'rule/Surge/OpenAI/OpenAI.list', 'rule/Clash/Text/Text.txt', 'rule/Surge/Binary/Binary.mrs'] });
+    expect(black.map(e => e.path)).toEqual(['OpenAI', 'Text']);
+    const zy = buildEntries(BUILTIN_REPOS[1]!, { clash: ['only.yml'], mrs: ['only.mrs'], 'surge-rule-set': ['openai.txt', 'bad.yaml', 'bad.json', 'bad.srs'] });
+    expect(zy.map(e => e.path)).toEqual(['openai']);
+    expect(BUILTIN_REPOS[1]!.refs).toEqual(['surge-rule-set', 'surge-domain-set']);
   });
   it('保留尾空格的互补文件，过滤错误属性，正确编码特殊字符', () => {
     const entries = buildEntries(BUILTIN_REPOS[1]!, { 'surge-rule-set': ['openai@ads .txt', 'openai@ads.txt', 'openai@-cn.txt', 'README.md'] });
@@ -76,6 +83,24 @@ describe('规则仓库索引', () => {
       for (const file of readdirSync(dir)) unlinkSync(join(dir, file));
       rmdirSync(dir);
     }
+  });
+  it('启动清理旧索引且同 commit 重建；已保存的 YAML 来源与文本关联不改动', async () => {
+    const h = setup(); await h.service.refresh('blackmatrix7');
+    const legacy = { repo: 'blackmatrix7', path: 'Legacy', name: 'Legacy', variants: [{ id: 'yaml', client: 'mihomo', files: [{ path: 'rule/Clash/Legacy/Legacy.yaml', ref: 'master', format: 'yaml' }] }] };
+    h.store.db.prepare('INSERT INTO rule_repo_entries (repo,key,search_name,data) VALUES (?,?,?,?)').run('blackmatrix7','Legacy','legacy',JSON.stringify(legacy));
+    const entry = h.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo=? AND key=?').get('blackmatrix7','OpenAI') as { data: string };
+    const mixed = JSON.parse(entry.data); mixed.variants.push(legacy.variants[0]);
+    h.store.db.prepare('UPDATE rule_repo_entries SET data=? WHERE repo=? AND key=?').run(JSON.stringify(mixed),'blackmatrix7','OpenAI');
+    const doc = { id: 'legacy-yaml', name: '已保存 YAML', sources: [{ id: 'yaml', kind: 'remote' as const, format: 'yaml' as const, url: 'https://example.com/rules.yaml', repository: { repo: 'blackmatrix7', entry: 'Legacy', ref: 'master', path: 'rule/Clash/Legacy/Legacy.yaml' } }] };
+    h.store.put('ruleset', doc, 'alice'); h.fetcher.mockClear();
+    const restart = new RuleRepoService(h.store, h.fetcher);
+    expect(restart.search('Legacy',undefined,undefined,0,50).total).toBe(0);
+    expect((await restart.resolvedEntry('blackmatrix7','OpenAI')).variants.every(v=>v.files.every(f=>/\.(list|txt)$/.test(f.path)))).toBe(true);
+    expect(h.store.get('ruleset','legacy-yaml')).toEqual(doc);
+    await restart.refresh('blackmatrix7');
+    expect(h.fetcher.mock.calls.some(c=>c[0].includes('/git/trees/'))).toBe(true);
+    expect(restart.search('Legacy',undefined,undefined,0,50).total).toBe(0);
+    await restart.stop();
   });
   it('启动自动索引，每日检查，停止后不再运行定时任务', async () => {
     vi.useFakeTimers();
@@ -144,7 +169,7 @@ describe('规则仓库索引', () => {
       if (url.includes('/commits/')) return { status: 200, body: JSON.stringify({ sha, commit: { tree: { sha: treeSha } } }) };
       const recursive = url.endsWith('?recursive=1');
       const root = url.includes(treeSha);
-      return { status: 200, body: JSON.stringify({ sha: treeSha, truncated: root && recursive, tree: root ? [{ type: 'tree', path: 'rule', sha: 'sub' }] : [{ type: 'blob', path: 'Clash/OpenAI/OpenAI.yaml' }, { type: 'blob', mode: '120000', path: 'Clash/Link/Link.yaml' }] }) };
+      return { status: 200, body: JSON.stringify({ sha: treeSha, truncated: root && recursive, tree: root ? [{ type: 'tree', path: 'rule', sha: 'sub' }] : [{ type: 'blob', path: 'Surge/OpenAI/OpenAI.list' }, { type: 'blob', mode: '120000', path: 'Surge/Link/Link.list' }] }) };
     });
     await h.service.refresh('blackmatrix7');
     expect(h.service.search('', undefined, undefined, 0, 50).items.map(e => e.path)).toEqual(['OpenAI']);
@@ -152,7 +177,7 @@ describe('规则仓库索引', () => {
   });
   it('详情预览只取文本；失败可重试，成功统计去重条数', async () => {
     const h = setup(); await h.service.refresh('blackmatrix7');
-    h.fail('China.yaml');
+    h.fail('China.list');
     expect((await h.service.detail('blackmatrix7', 'China')).previewError).toContain('模拟上游失败');
     h.fail('');
     const detail = await h.service.detail('blackmatrix7', 'China');
@@ -163,6 +188,55 @@ describe('规则仓库索引', () => {
 });
 
 describe('规则仓库接口', () => {
+  it('文件列表只读索引并按分支与路径去重，不请求推荐组合或内容', async () => {
+    const h = setup(); const c = client(h.app);
+    expect((await c.get('/api/rule-repos/files?repo=zydou&path=openai')).status).toBe(401);
+    await addUser(h.store, 'alice'); await c.login('alice'); await h.service.refresh('zydou');
+    const row = h.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo=? AND key=?').get('zydou', 'openai') as { data: string };
+    const entry = JSON.parse(row.data); entry.variants.push(entry.variants[0]);
+    h.store.db.prepare('UPDATE rule_repo_entries SET data=? WHERE repo=? AND key=?').run(JSON.stringify(entry), 'zydou', 'openai');
+    h.fetcher.mockClear();
+    const result = await c.get('/api/rule-repos/files?repo=zydou&path=openai');
+    expect(result.status).toBe(200);
+    expect(result.json.item.files.map((f: { ref: string; path: string }) => [f.ref, f.path])).toEqual([
+      ['surge-domain-set', 'openai.txt'], ['surge-rule-set', 'openai.txt'],
+    ]);
+    expect(result.json.item.variants).toBeUndefined();
+    expect(h.fetcher).not.toHaveBeenCalled();
+  });
+  it('按文件新建只关联选中来源，不受 README 组合影响，加入已有规则集时去重', async () => {
+    const h = setup(); await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
+    await h.service.refresh('blackmatrix7'); h.fail('README'); h.fetcher.mockClear();
+    const body = { repo: 'blackmatrix7', path: 'China', file: { ref: 'master', path: 'rule/Surge/China/China_Domain.list' } };
+    const result = await c.post('/api/rule-repos/import', body);
+    expect(result.status).toBe(201); expect(result.json.item.sources).toHaveLength(1);
+    expect(result.json.item.sources[0]).toMatchObject({ format: 'domain-set', repository: { repo: body.repo, entry: body.path, ...body.file } });
+    expect(h.fetcher.mock.calls.map(([url]) => url)).toEqual(['https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/China/China_Domain.list']);
+    const added = await c.post('/api/rule-repos/import', { ...body, ruleset: result.json.item.id });
+    expect(added.status).toBe(200); expect(added.json.item.sources).toHaveLength(1);
+  });
+  it('同路径不同分支创建对应文件；伪造文件、混用参数、上游失败均不落库', async () => {
+    const h = setup(); await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice'); await h.service.refresh('zydou');
+    for (const ref of ['surge-rule-set', 'surge-domain-set']) {
+      const result = await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file: { ref, path: 'openai.txt' } });
+      expect(result.status).toBe(201);
+      expect(result.json.item.sources).toHaveLength(1);
+      expect(result.json.item.sources[0].repository.ref).toBe(ref);
+      expect(result.json.item.sources[0].format).toBe(ref === 'surge-rule-set' ? 'classical' : 'domain-set');
+    }
+    const before = h.store.list('ruleset').length;
+    for (const file of [null, {}, { ref: 'clash', path: 'openai.yml' }, { ref: 'main', path: 'openai.txt' }, { ref: 'surge-rule-set', path: 'https://example.com/custom.list' }]) {
+      expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file })).status).toBe(400);
+    }
+    const file = { ref: 'surge-rule-set', path: 'openai.txt' };
+    expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file, variant: 'anything' })).status).toBe(400);
+    h.fail('openai.txt');
+    expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file })).status).toBe(502);
+    expect(h.store.list('ruleset')).toHaveLength(before);
+    h.service.setEnabled('zydou', false);
+    expect((await c.get('/api/rule-repos/files?repo=zydou&path=openai')).status).toBe(404);
+    expect((await c.post('/api/rule-repos/import', { repo: 'zydou', path: 'openai', file })).status).toBe(404);
+  });
   it('读接口要求登录、管理接口要求管理员、校验参数', async () => {
     const h = setup(); const c = client(h.app);
     expect((await c.get('/api/rule-repos')).status).toBe(401);

@@ -43,6 +43,14 @@ AND,((DOMAIN,a.com),(DST-PORT,443))`;
     expect(pick(cls)).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'x.com' }, { type: 'IP-CIDR', value: '1.0.0.0/8', noResolve: true }]);
   });
 
+  it('带引号或流式 YAML payload 自动转换，不能作为二进制透传', () => {
+    for (const body of ['"payload": ["+.example.com"]', '{payload: ["+.example.com"]}']) {
+      const parsed = parseRuleSetContent(body);
+      expect(parsed).toMatchObject({ passthrough: false, conversion: 'yaml-to-list', rules: [{ rule: { type: 'DOMAIN-SUFFIX', value: 'example.com' } }] });
+      expect(() => parseRuleSetContent(body, 'mrs')).toThrow('不能透传');
+    }
+  });
+
   it('mrs / srs 透传不解析', () => {
     expect(parseRuleSetContent('', 'mrs')).toEqual({ passthrough: true, format: 'mrs' });
   });

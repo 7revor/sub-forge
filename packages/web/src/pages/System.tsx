@@ -2,27 +2,22 @@
 // 服务端尚未实现：读接口返回空数据并带 pending，保存、导出、恢复返回 501。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { CustomRepoDialog } from '../components/CustomRepoDialog.tsx';
-import { api, type RuleRepo, type SystemInfo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
+import { Link } from 'react-router';
+import { GithubTokenSettings } from '../components/GithubTokenSettings.tsx';
+import { api, type SystemInfo } from '../api.ts';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
 export function System() {
   const qc = useQueryClient();
   const info = useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('GET', '/system') });
-  const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ pending?: boolean; repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
   const [draft, setDraft] = useState<SystemInfo>();
   const [allow, setAllow] = useState('');
-  const [addingRepo, setAddingRepo] = useState(false);
-  const [deletingRepo, setDeletingRepo] = useState<RuleRepo>();
   useEffect(() => { if (info.data) setDraft(info.data); }, [info.data]);
   const save = useMutation({ mutationFn: (body: SystemInfo) => api('PUT', '/system', body), onSuccess: () => qc.invalidateQueries({ queryKey: ['system'] }) });
   const backup = useMutation({ mutationFn: () => api('POST', '/system/backup') });
   const restore = useMutation({ mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
-  const refreshRepo = useMutation({ mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
-  const toggleRepo = useMutation({ mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: () => qc.invalidateQueries({ queryKey: ['rule-repos'] }) });
-  const removeRepo = useMutation({ mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => { setDeletingRepo(undefined); return qc.invalidateQueries({ queryKey: ['rule-repos'] }); } });
 
   if (!draft) return info.error ? <ErrorBox error={info.error} /> : <div className="text-muted">加载中…</div>;
   const dirty = JSON.stringify(draft) !== JSON.stringify(info.data);
@@ -31,7 +26,7 @@ export function System() {
   return (
     <>
       <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
-      {info.data?.pending && <PendingNotice>除规则仓库管理外，其余系统设置暂不可用。</PendingNotice>}
+      {info.data?.pending && <PendingNotice>GitHub 索引认证可用，其余系统设置暂不可用。</PendingNotice>}
       <ErrorBox error={save.error} />
 
       <PageScroll>
@@ -69,21 +64,10 @@ export function System() {
           </div>
 
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
-            <Card title="规则仓库" actions={<Button onClick={() => setAddingRepo(true)}><Plus size={15} />添加自定义仓库</Button>}>
+            <Card title="GitHub 索引认证">
               <div className="flex flex-col gap-3">
-                <div className="flex flex-col">
-                  {(repos.data?.repos ?? []).map((r) => (
-                    <div key={r.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="text-[13.5px] font-medium">{r.name}</span><span className="truncate text-[12px] text-muted">{r.builtIn ? '内置' : `${r.url} · ${r.ref ?? ''} · ${r.directory || '根目录'}`}{r.entries !== undefined ? ` · ${r.entries} 个规则` : ''}{r.builtAt ? ` · ${formatTime(r.builtAt).slice(5)} 建索引` : ''}</span></span>
-                      <Badge tone={r.error ? 'err' : r.builtAt ? 'ok' : 'neutral'}>{!r.enabled ? '已停用' : r.indexing ? '更新中…' : r.error ? r.error : r.builtAt ? '已索引' : '等待首次索引'}</Badge>
-                      <Button size="sm" disabled={!r.enabled || r.indexing || refreshRepo.isPending} onClick={() => refreshRepo.mutate(r.id)}>更新索引</Button>
-                      <Button size="sm" disabled={toggleRepo.isPending} onClick={() => toggleRepo.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button>
-                      {!r.builtIn && <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${r.name}`} disabled={r.indexing || removeRepo.isPending} onClick={() => { removeRepo.reset(); setDeletingRepo(r); }}><Trash2 size={14} /></Button>}
-                    </div>
-                  ))}
-                  {!repos.data?.repos.length && <Empty title="还没有仓库索引" />}
-                </div>
-                <ErrorBox error={repos.error ?? removeRepo.error ?? refreshRepo.error ?? toggleRepo.error} />
+                <GithubTokenSettings />
+                <Link to="/rule-repo" className="text-[13px] text-accent">前往规则仓库管理仓库与索引 →</Link>
                 <Field label="GitHub 镜像地址" hint="镜像设置暂不生效">{(id) => <Input id={id} className="font-mono" placeholder="https://[MIRROR]/" value={draft.mirror} onChange={(e) => setDraft({ ...draft, mirror: e.target.value })} />}</Field>
               </div>
             </Card>
@@ -105,12 +89,7 @@ export function System() {
         </div>
 
       </PageScroll>
-      <CustomRepoDialog open={addingRepo} onClose={() => setAddingRepo(false)} />
-      <Modal title="删除自定义仓库" open={!!deletingRepo} onClose={() => { if (!removeRepo.isPending) setDeletingRepo(undefined); }}
-        footer={<><Button disabled={removeRepo.isPending} onClick={() => setDeletingRepo(undefined)}>取消</Button><Button variant="danger" disabled={removeRepo.isPending} onClick={() => deletingRepo && removeRepo.mutate(deletingRepo.id)}>{removeRepo.isPending ? '删除中…' : '删除'}</Button></>}>
-        <p className="m-0 text-[13px]">删除「{deletingRepo?.name}」及其索引？已导入的规则集会保留。</p>
-        <ErrorBox error={removeRepo.error} />
-      </Modal>
+
     </>
   );
 }

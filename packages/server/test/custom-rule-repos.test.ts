@@ -34,21 +34,32 @@ describe('自定义仓库配置与文件发现', () => {
   it('按完整路径保留不同目录和扩展名，以目录相对 glob 筛选', () => {
     const options = parseCustomRepo({ url, directory: 'rules/', include: ['**/*.list', '*.yaml'], exclude: ['skip/**'] });
     const entries = buildEntries({ id: 'custom', name: '自定义', owner: options.owner, repo: options.repo, refs: ['main'], license: '', adapter: 'generic', options }, { main: ['rules/a.list', 'rules/sub/a.list', 'rules/a.yaml', 'rules/skip/a.list', 'rules/README.list', 'rules/a.js', 'other/a.list'] });
-    expect(entries.map(e => e.path).sort()).toEqual(['rules/a.list', 'rules/a.yaml', 'rules/sub/a.list']);
+    expect(entries.map(e => e.path).sort()).toEqual(['rules/a.list', 'rules/sub/a.list']);
     expect(entries.every(e => e.variants.length === 1 && e.variants[0]?.files.length === 1)).toBe(true);
   });
-  it.each([{ url: 'http://github.com/a/b' }, { url: 'https://evil.test/a/b' }, { url: url + '/tree/main' }, { url: 'https://user:pass@github.com/a/b' }, { directory: '/' }, { directory: '../a' }, { include: [' ../a'] }, { include: [] }, { include: ['[a].list'] }, { ref: '../main' }, { format: 'mrs' }])('拒绝错误配置 %j', config => {
+  it.each([{ url: 'http://github.com/a/b' }, { url: 'https://evil.test/a/b' }, { url: url + '/tree/main' }, { url: 'https://user:pass@github.com/a/b' }, { directory: '/' }, { directory: '../a' }, { include: [' ../a'] }, { include: [] }, { include: ['[a].list'] }, { ref: '../main' }, { format: 'mrs' }, { format: 'yaml' }])('拒绝错误配置 %j', config => {
     expect(() => parseCustomRepo({ url, ...config })).toThrow();
+  });
+  it('宽泛 include 也不能索引 YAML/二进制，旧 YAML 仓库配置升级为自动识别', async () => {
+    const h = setup(); const id = await h.service.addCustom({ url, include: ['**/*'] });
+    h.paths(['a.list','a.txt','a.yaml','a.yml','a.mrs','a.srs','a.json']);
+    await h.service.refresh(id);
+    expect(h.service.search('',id,undefined,0,50).items.map(e=>e.path)).toEqual(['a.list','a.txt']);
+    const def = h.service.definition(id); def.options!.format = 'yaml';
+    h.store.db.prepare('UPDATE rule_repos SET definition=? WHERE id=?').run(JSON.stringify(def),id);
+    const restart = new RuleRepoService(h.store,h.fetcher);
+    expect(restart.definition(id).options!.format).toBe('auto');
+    await restart.stop();
   });
   it('默认分支、规范 URL、持久配置与客户端筛选', async () => {
     const h = setup();
     const id = await h.service.addCustom({ url: url + '.git/' });
     await h.service.refresh(id);
-    expect(h.service.list().find(r => r.id === id)).toMatchObject({ ref: 'main', entries: 3, builtIn: false });
-    expect(h.service.search('ai', id, 'surge', 0, 50).total).toBe(3);
+    expect(h.service.list().find(r => r.id === id)).toMatchObject({ ref: 'main', entries: 2, builtIn: false });
+    expect(h.service.search('ai', id, 'surge', 0, 50).total).toBe(2);
     const restarted = new RuleRepoService(h.store, h.fetcher);
     expect(restarted.definition(id).options?.format).toBe('auto');
-    expect(restarted.search('', id, 'mihomo', 0, 50).total).toBe(3);
+    expect(restarted.search('', id, 'mihomo', 0, 50).total).toBe(2);
     await restarted.stop();
     await expect(h.service.addCustom({ url: 'https://github.com/7REVOR/PROXY-RULES' })).rejects.toMatchObject({ status: 409 });
   });
@@ -73,7 +84,7 @@ describe('自定义仓库配置与文件发现', () => {
   it('失败保留索引，空匹配成功清空索引', async () => {
     const h = setup(); const id = await h.service.addCustom({ url });
     await h.service.refresh(id); h.fail(); await h.service.refresh(id);
-    expect(h.service.search('', id, undefined, 0, 50).total).toBe(3);
+    expect(h.service.search('', id, undefined, 0, 50).total).toBe(2);
     expect(h.service.list().find(r => r.id === id)?.error).toContain('测试网络故障');
     const other = setup(); const next = await other.service.addCustom({ url });
     await other.service.refresh(next); other.paths([]); await other.service.refresh(next);

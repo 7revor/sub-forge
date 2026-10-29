@@ -3,8 +3,8 @@ import { bad } from '../api/common.ts';
 
 export type GenericOptions = { directory: string; include: string[]; exclude: string[]; format: RuleSetFormat };
 export type CustomRepoInput = GenericOptions & { name: string; owner: string; repo: string; ref?: string };
-const FORMATS = new Set(['auto', 'classical', 'domain-set', 'ipcidr', 'yaml']);
-const DEFAULT_INCLUDE = ['**/*.list', '**/*.txt', '**/*.yaml', '**/*.yml'];
+const FORMATS = new Set(['auto', 'classical', 'domain-set', 'ipcidr']);
+const DEFAULT_INCLUDE = ['**/*.list', '**/*.txt'];
 
 /** 仅支持路径通配符 *、**、?；不执行仓库脚本或用户正则。 */
 export function pathGlob(pattern: string): RegExp {
@@ -22,12 +22,14 @@ export function pathGlob(pattern: string): RegExp {
   return new RegExp(out + '$');
 }
 
+export const isIndexedRuleFile = (path: string): boolean => /\.(list|txt)$/i.test(path);
+
 export function matchesGeneric(path: string, options: GenericOptions): boolean {
   const prefix = options.directory ? options.directory + '/' : '';
   if (!path.startsWith(prefix)) return false;
   const relative = path.slice(prefix.length);
   // 本期仅托管文本规则；扩展名只是候选筛选，内容在预览和导入时校验。
-  if (!/\.(list|txt|ya?ml)$/i.test(relative) || /^(?:readme|license|licence|changelog)(?:\.|$)/i.test(relative.split('/').at(-1)!)) return false;
+  if (!isIndexedRuleFile(relative) || /^(?:readme|license|licence|changelog)(?:\.|$)/i.test(relative.split('/').at(-1)!)) return false;
   return options.include.some(p => pathGlob(p).test(relative)) && !options.exclude.some(p => pathGlob(p).test(relative));
 }
 
@@ -63,6 +65,6 @@ export function parseCustomRepo(body: Record<string, unknown>): CustomRepoInput 
     });
   };
   const format = body.format ?? 'auto';
-  if (typeof format !== 'string' || !FORMATS.has(format)) throw bad('请选择自动识别、classical、域名列表、CIDR 或 YAML 格式');
+  if (typeof format !== 'string' || !FORMATS.has(format)) throw bad('请选择自动识别、classical、域名列表或 CIDR 格式');
   return { name, owner, repo, ...(ref ? { ref } : {}), directory, include: patterns('include', DEFAULT_INCLUDE), exclude: patterns('exclude', []), format: format as RuleSetFormat };
 }

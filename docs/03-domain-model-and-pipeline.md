@@ -355,3 +355,17 @@ SQLite v11 的 `rule_repos.definition` 为可空 JSON：`id/name/owner/repo/refs
 `RuleSetSource` 新增可选 `repository: { repo, entry, ref, path }`，内部仍为 `kind: remote`，继续走既有快照与解析合并。URL 从索引文件推导，不按客户端动态切换变体；格式与缓存仍可配置。新增关联校验启用仓库和索引文件，既有来源禁止修改 URL、移除或替换标识；允许删除来源后重新关联。仓库停用或上游删文件后，既有来源仍可保存其他设置。
 
 服务初始化及索引更新后，旧来源仅在名称严格为 `仓库 ID · 文件路径` 且完整 URL 命中索引时补齐标识并持久化，保留归属。旧数据未记录导入来源，完全仿照旧命名的自定义来源无法区分；已改地址或不同名称的自定义来源保持原样。无须新增数据库表或版本。
+
+### 2026-10-29：索引文件与输入格式分离
+
+仓库候选扩展名固定为 list/txt，自定义路径通配符不能扩大范围。zydou 仅读取 surge-rule-set 与 surge-domain-set；blackmatrix7 不再索引 YAML。服务初始化过滤旧缓存中的不支持变体（多文件变体整体过滤），删除空条目，清空受影响仓库的 revisions 与 checked_at，从而在 commit 不变时也重新构建；既有 RuleSetSource 文档不改动。旧自定义仓库 `format: yaml` 改为 auto，保留用户路径筛选。
+
+RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML 解析结果增加可选 `conversion: yaml-to-list`，预览来源状态透出同名字段，前端展示转换托管标记。输入先解析为 IR，应用改写，再分桶输出 LIST 文本；不是把 YAML URL 直接下发。保存/预览拒绝把 YAML 地址或同 URL 的既有 yaml 输入标记为 mrs/srs；内核也阻止已知 YAML 地址被透传。原生二进制透传不承担转换功能。
+
+## 2026-10-29 追加：索引凭据
+
+SQLite schema v12 新增 `server_secrets(name,value)`；`github-index-token` 使用现有 Cipher 加密保存，与规则集、索引文件及用户订阅 Token 分离。管理员接口 `GET/PUT/DELETE /api/rule-repos/github-token` 仅返回 `{ configured: boolean }`，PUT 接受 `{ token: string }`。每次 GitHub API 请求读取最新凭据，不向 raw 文件请求或转换输出传播，跨源（包括 HTTP 降级）重定向后永久剥离认证头。种子导入不携带该服务凭据，示例种子保持不变。
+
+## 2026-10-29 追加：按文件创建仓库关联
+
+`GET /api/rule-repos/files?repo=…&path=…` 直接读取索引，按 `(ref,path)` 去重，返回文件、分支与上游链接，不拉取 README 或内容。`POST /api/rule-repos/import` 新增 `file: {ref,path}`，与 `variant` 互斥；验证文件属于当前启用仓库的文本索引并有可解析内容后，只创建一个关联来源，保留输入格式与分支。原推荐组合接口供既有调用兼容使用。核心 IR、已存规则集与种子无需迁移。

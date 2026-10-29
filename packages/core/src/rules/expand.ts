@@ -3,7 +3,7 @@
 import type { Report } from '../report.ts';
 import type { ID, RuleIR, RuleSet, RuleSetSource } from '../types.ts';
 import { applyOverrides, lowerRule, withIpOptions, type ClientCtx } from './client.ts';
-import { behaviorOf, parseRuleSetContent, ruleKey, type Behavior } from './parse.ts';
+import { behaviorOf, isYamlRuleUrl, parseRuleSetContent, ruleKey, type Behavior } from './parse.ts';
 
 export type RuleSetInputs = {
   rulesets: Record<ID, RuleSet>;
@@ -26,6 +26,10 @@ export function expandSource(rs: RuleSet, src: RuleSetSource, inputs: RuleSetInp
   const where = `ruleset:${rs.id}`;
   const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
   const body = src.kind === 'local' ? src.content ?? '' : inputs.snapshots[sourceKey(rs.id, src.id)];
+  if ((src.format === 'mrs' || src.format === 'srs') && isYamlRuleUrl(src.url)) {
+    report.error('ruleset.conversion-requires-managed', `${label}的 YAML 规则只能转换为 LIST 托管，不能透传`, where);
+    return { passthrough: false, rules: [] };
+  }
   const passthrough = (format: 'mrs' | 'srs'): ExpandedSource => (src.url ? { passthrough: true, format, url: src.url } : { passthrough: true, format });
   if (body === undefined) {
     if (src.format === 'mrs' || src.format === 'srs') return passthrough(src.format);

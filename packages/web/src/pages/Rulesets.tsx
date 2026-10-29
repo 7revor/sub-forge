@@ -7,7 +7,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { Client, Platform, RuleSetFormat } from '@sub-forge/core';
+import { isYamlRuleUrl, type Client, type Platform, type RuleSetFormat } from '@sub-forge/core';
 import { FileText, Globe, Link2, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type RepoEntry, type RulesetPreview, type RulesetSourceStatus } from '../api.ts';
@@ -23,9 +23,9 @@ import { newId } from '../convert/templateYaml.ts';
 
 const FORMATS: { value: RuleSetFormat; label: string }[] = [
   { value: 'auto', label: '自动识别' }, { value: 'classical', label: 'classical 文本' }, { value: 'domain-set', label: 'Surge DOMAIN-SET' },
-  { value: 'ipcidr', label: '纯 CIDR' }, { value: 'yaml', label: 'mihomo YAML payload' }, { value: 'mrs', label: 'mrs（透传）' },
+  { value: 'ipcidr', label: '纯 CIDR' }, { value: 'yaml', label: 'YAML → LIST（仅托管）' }, { value: 'mrs', label: 'mrs（透传）' },
 ];
-const FORMAT_TEXT: Record<string, string> = { auto: '自动识别', classical: 'classical', 'domain-set': 'DOMAIN-SET', domain: 'DOMAIN-SET', ipcidr: 'CIDR', yaml: 'YAML payload', mrs: 'mrs', srs: 'srs' };
+const FORMAT_TEXT: Record<string, string> = { auto: '自动识别', classical: 'classical', 'domain-set': 'DOMAIN-SET', domain: 'DOMAIN-SET', ipcidr: 'CIDR', yaml: 'YAML → LIST · 托管', mrs: 'mrs', srs: 'srs' };
 const isPassthrough = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
 const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : '本地规则');
 
@@ -213,6 +213,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
             <span className="truncate text-[12px] text-muted">{sub}</span>
           </span>
         </button>
+        {status?.conversion === 'yaml-to-list' && <Badge tone="accent">YAML → LIST · 托管</Badge>}
         <SourceStatus src={src} status={status} loading={loading} />
         <Switch label={`启用 ${label}`} checked={on} onChange={(v) => onChange({ enabled: v ? undefined : false })} />
         <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${label}`} onClick={onDelete}><Trash2 size={14} /></Button>
@@ -220,7 +221,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
       {active && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
           {src.kind === 'remote' && <Field label={src.repository ? '关联地址（只读）' : '地址'} className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} readOnly={!!src.repository} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
-          <Field label="格式">{(id) => <Select id={id} value={src.format} onChange={(x) => onChange({ format: x.target.value as RuleSetFormat })}>{FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
+          <Field label="输入格式" hint={src.kind === 'remote' ? '自动识别支持 YAML payload，转换为 LIST 后仅托管输出。' : undefined}>{(id) => <Select id={id} value={src.format} onChange={(x) => onChange({ format: x.target.value as RuleSetFormat })}>{FORMATS.filter(f => f.value !== 'mrs' || !(isYamlRuleUrl(src.url) || src.format === 'yaml' || status?.conversion === 'yaml-to-list')).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
           {src.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={src.behavior ?? ''} onChange={(x) => onChange({ behavior: (x.target.value || undefined) as 'domain' | 'ipcidr' | undefined })}><option value="">请选择</option><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
           {src.kind === 'remote' && <Field label="缓存（小时）">{(id) => <Input id={id} type="number" min={1} step={1} value={Math.round((src.fetch?.ttlSec ?? 86400) / 3600)} onChange={(x) => {
             const h = Number(x.target.value);

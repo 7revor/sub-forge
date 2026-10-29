@@ -189,7 +189,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const rs: RuleSetDoc = { id: savedId ?? 'draft', name: typeof draft.name === 'string' && draft.name ? draft.name : '未命名', sources: draft.sources, ...(draft.overrides ? { overrides: draft.overrides } : {}), ...(draft.noResolve ? { noResolve: true } : {}) };
 
     const snapshotsIn: Record<string, string> = {};
-    const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRule[] }[] = [];
+    const status: { id: string; ok: boolean; error?: string; fetchedAt?: number; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRule[]; conversion?: 'yaml-to-list' }[] = [];
     for (const src of rs.sources) {
       if (!src || typeof src !== 'object' || typeof src.id !== 'string') throw bad('来源格式错误');
       checkRepositorySource(src, saved?.sources.find(s => s.id === src.id), store, '来源');
@@ -215,7 +215,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       status.push({
         id: src.id, ok: !error && (passthrough || content !== undefined),
         ...(error ? { error } : {}), ...(fetchedAt ? { fetchedAt } : {}), ...(passthrough ? { passthrough: true } : {}),
-        ...(parsed && !parsed.passthrough ? { rules: parsed.rules.length, rejected: parsed.rejected.length, ...(parsed.rejected.length ? { rejectedDetails: parsed.rejected.slice(0, 100) } : {}) } : {}),
+        ...(parsed && !parsed.passthrough ? { rules: parsed.rules.length, rejected: parsed.rejected.length, ...(parsed.conversion ? { conversion: parsed.conversion } : {}), ...(parsed.rejected.length ? { rejectedDetails: parsed.rejected.slice(0, 100) } : {}) } : {}),
       });
     }
     const inputs = { rulesets: { [rs.id]: rs }, snapshots: snapshotsIn };

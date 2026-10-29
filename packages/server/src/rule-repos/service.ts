@@ -1,7 +1,7 @@
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
 import { parseRuleSetContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { randomId } from '../crypto.ts';
-import { parseCustomRepo } from './generic.ts';
+import { isIndexedRuleFile, parseCustomRepo } from './generic.ts';
 import type { Store } from '../store.ts';
 import type { UpstreamFetcher } from '../net/upstream.ts';
 import { HttpError, bad, notFound } from '../api/common.ts';
@@ -19,7 +19,32 @@ export class RuleRepoService {
   constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now) {
     const insert = store.db.prepare('INSERT OR IGNORE INTO rule_repos (id) VALUES (?)');
     for (const repo of BUILTIN_REPOS) insert.run(repo.id);
+    this.upgradeTextIndex();
     this.upgradeLegacySources();
+  }
+  /** 只清理索引缓存，不修改已保存来源；上游 commit 不变也会重新建立受影响仓库的索引。 */
+  private upgradeTextIndex() {
+    this.store.db.transaction(() => {
+      const affected = new Set<string>();
+      for (const row of this.rows()) {
+        if (!row.definition) continue;
+        const def = JSON.parse(row.definition) as RepoDefinition;
+        if (def.options?.format === 'yaml') {
+          def.options.format = 'auto';
+          this.store.db.prepare('UPDATE rule_repos SET definition = ? WHERE id = ?').run(JSON.stringify(def), row.id);
+          affected.add(row.id);
+        }
+      }
+      for (const row of this.store.db.prepare('SELECT repo, key, data FROM rule_repo_entries').all() as { repo: string; key: string; data: string }[]) {
+        const entry = JSON.parse(row.data) as IndexedEntry;
+        const variants = entry.variants.filter(v => v.files.length && v.files.every(f => isIndexedRuleFile(f.path) && !['yaml', 'mrs', 'srs'].includes(f.format)));
+        if (variants.length === entry.variants.length) continue;
+        affected.add(row.repo);
+        if (!variants.length) this.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ? AND key = ?').run(row.repo, row.key);
+        else this.store.db.prepare('UPDATE rule_repo_entries SET data = ? WHERE repo = ? AND key = ?').run(JSON.stringify({ ...entry, variants }), row.repo, row.key);
+      }
+      for (const id of affected) this.store.db.prepare("UPDATE rule_repos SET revisions = '{}', checked_at = NULL WHERE id = ?").run(id);
+    })();
   }
   /** 旧导入没有标识：仅匹配旧导入器生成的名称和完整 URL，不将一般自定义地址升级。 */
   private upgradeLegacySources() {
@@ -55,6 +80,36 @@ export class RuleRepoService {
       format: file.format, behavior: file.behavior,
       repository: { repo, entry: path, ref: file.ref, path: file.path },
     })) };
+  }
+  /** 首页按物理文件展示；不读取 README，不将多个文件组合为一个变体。 */
+  fileList(repo: string, path: string) {
+    const entry = this.entry(repo, path);
+    const definition = this.definition(repo);
+    const files = new Map<string, RepoFile>();
+    for (const file of entry.variants.flatMap(v => v.files)) {
+      if (isIndexedRuleFile(file.path) && !['yaml', 'mrs', 'srs'].includes(file.format)) files.set(JSON.stringify([file.ref, file.path]), file);
+    }
+    return { repo, path, name: entry.name, license: definition.license, url: `https://github.com/${definition.owner}/${definition.repo}`,
+      files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path) || a.ref.localeCompare(b.ref))
+        .map(file => ({ ...file, url: rawUrl(definition, file), upstream: upstreamUrl(definition, file) })) };
+  }
+  async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
+    const find = () => {
+      const entry = this.fileList(repo, path);
+      const file = entry.files.find(f => f.ref === selected.ref && f.path === selected.path);
+      if (!file) throw bad('所选文件不在当前文本索引中，请刷新后重试');
+      return { entry, file };
+    };
+    const { file } = find();
+    const response = await this.fetcher(file.url, { timeoutMs: 20_000 });
+    if (response.status !== 200) throw new Error(`规则文件拉取失败：HTTP ${response.status}`);
+    const parsed = parseRuleSetContent(response.body, file.format, file.behavior);
+    if (parsed.passthrough || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
+    const current = find();
+    return { name: current.entry.name, sources: [{ kind: 'remote' as const,
+      name: `${this.definition(repo).name} · ${current.file.path}`, url: current.file.url, format: current.file.format, behavior: current.file.behavior,
+      repository: { repo, entry: path, ref: current.file.ref, path: current.file.path },
+    }] };
   }
   definition(id: string): RepoDefinition {
     const row = this.store.db.prepare('SELECT definition FROM rule_repos WHERE id = ?').get(id) as { definition: string | null } | undefined;
@@ -133,7 +188,8 @@ export class RuleRepoService {
     return JSON.parse(row.data) as IndexedEntry;
   }
   private async json<T>(url: string): Promise<T> {
-    const response = await this.fetcher(url, { ua: 'Sub-Forge-rule-index', timeoutMs: 20_000 });
+    const token = this.store.getGithubToken();
+    const response = await this.fetcher(url, { ua: 'Sub-Forge-rule-index', timeoutMs: 20_000, ...(token ? { githubToken: token } : {}) });
     if (response.status !== 200) throw new Error(`GitHub 返回 HTTP ${response.status}`);
     return JSON.parse(response.body) as T;
   }
@@ -227,7 +283,7 @@ export class RuleRepoService {
   private formatDetail(entry: IndexedEntry, preview: string[], count: number | undefined, previewError?: string, rejectedDetails: { line: number; text: string; reason: string }[] = [], rejected = 0) {
     const repo = this.definition(entry.repo);
     return { ...entry, count, license: repo.license, url: `https://github.com/${repo.owner}/${repo.repo}`, preview, previewError, rejected, rejectedDetails,
-      variants: entry.variants.map(v => ({ ...v, file: v.files.map(f => f.path).join(' + '), how: v.files.some(f => f.format === 'mrs') ? '二进制（仅展示）' : '文本托管',
+      variants: entry.variants.map(v => ({ ...v, file: v.files.map(f => f.path).join(' + '), how: '文本托管',
         files: v.files.map(f => ({ ...f, url: rawUrl(repo, f), upstream: upstreamUrl(repo, f) })) })) };
   }
   async resolvedEntry(id: string, path: string): Promise<IndexedEntry> {
@@ -281,9 +337,9 @@ export class RuleRepoService {
     return job;
   }
   importVariant(entry: IndexedEntry, variantId?: string) {
-    const text = entry.variants.filter(v => v.files.every(f => f.format !== 'mrs' && f.format !== 'srs'));
+    const text = entry.variants.filter(v => v.files.length && v.files.every(f => isIndexedRuleFile(f.path) && !['yaml', 'mrs', 'srs'].includes(f.format)));
     const variant = variantId ? text.find(v => v.id === variantId) : text.find(v => v.client === 'mihomo' && v.recommended) ?? text.find(v => v.recommended) ?? text[0];
-    if (!variant) throw bad('请选择可托管的文本变体，二进制文件暂不支持导入');
+    if (!variant) throw bad('请选择 .list 或 .txt 文本变体');
     return variant;
   }
 }

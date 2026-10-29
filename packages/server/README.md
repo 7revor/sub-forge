@@ -148,7 +148,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - `POST /api/rule-repos/:id/refresh`：管理员触发，202 返回后通过列表轮询状态；同仓库并发任务合并。
 - `PATCH /api/rule-repos/:id`：管理员设置 `{ enabled: boolean }`，停用不删除索引或已导入的规则集。
 
-GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。mrs 只显示不导入，默认导入文本后走已有托管流程。镜像、动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
+GitHub 请求使用现有受限上游拉取器，逐次超时 20 秒；递归树截断会按目录补读，不保存残缺索引。当前使用公共 GitHub API，限流会显示失败且保留旧数据。仅索引 list/txt，默认导入文本后走已有托管流程。镜像、动态引用及来源注释输出仍待实现，详见 [08](../../docs/08-rule-repository-index.md)。示例种子保持原有离线数据，无需修改。
 
 ### 自定义 GitHub 仓库
 
@@ -160,6 +160,18 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 ### 仓库关联来源
 
 `POST /api/rule-repos/resolve` 接收 `{ repo, path, variant? }`，返回 `{ name, sources }`（含来源 ID、repository 标识与规范 URL），仅解析、不保存规则集。导入接口同样保留关联标识；新建/保存和草稿预览均拒绝伪造或修改关联地址、移除既有关联标识。旧导入按名称与完整 URL 精确命中索引后补齐标识。示例种子附带默认停用且不被配置引用的关联示例，不触发额外远程拉取。
+
+### 2026-10-29：仅文本索引
+
+所有仓库只索引 `.list` / `.txt`，任意 include 也不能放开 YAML、MRS、SRS 等后缀。zydou 只检查两个 Surge 文本分支。启动即清理旧缓存中的不支持变体，并使相关仓库同 commit 也重建；既有规则来源保留。自定义仓库旧 YAML 格式配置降为 auto，不改 include/exclude。手动远程 YAML 不受索引限制，预览报告 `conversion: yaml-to-list`，实际 provider 使用本服务文本 URL；已知 YAML 输入不得标为二进制透传。
+
+### GitHub 索引 Token
+
+管理员通过 `GET/PUT/DELETE /api/rule-repos/github-token` 读取状态、保存或清除 Token；PUT body 为 `{ "token": "你的 Token" }`，响应只有 `configured`。SQLite v12 加密保存该服务凭据，不写入示例种子；下一次索引 API 请求立即生效。只向 HTTPS GitHub API 携带认证，跨源重定向永久移除。不会用于 raw 文件、一般订阅源或客户端输出；公开仓库限制不变。
+
+### 按单文件创建规则集
+
+`GET /api/rule-repos/files` 按 `repo` 与条目 `path` 返回去重的文本文件清单，不访问上游。`POST /api/rule-repos/import` 可传 `file: { ref, path }`，只创建该文件的仓库关联来源；不得与 `variant` 同传。创建前检查索引成员资格、启用状态及实际文本内容，已有规则集继续校验归属并按 URL 去重。
 
 ### 本地节点连通性测试
 
@@ -174,3 +186,4 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 - 原始内核日志不返回客户端，避免错误信息泄漏凭据。配置基础校验通过不等于连通性成功，测试失败不阻止保存。
 
 实现依据：[Mihomo 代理延迟 API](https://wiki.metacubex.one/api/#proxiesproxies_namedelay)、[Unix socket 控制器](https://wiki.metacubex.one/config/general/#外部控制-api)。
+

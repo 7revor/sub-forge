@@ -23,6 +23,9 @@
     }
   ],
   "rulesets": [
+    { "id": "yaml-managed-example", "name": "远程 YAML 转 LIST 示例（默认停用）", "sources": [
+      { "id": "yaml", "kind": "remote", "format": "auto", "url": "https://example.com/rules.yaml", "enabled": false }
+    ] },
     { "id": "repo-link-example", "name": "仓库关联示例（默认停用）", "sources": [
       { "id": "wise", "kind": "remote", "name": "zydou · wise.txt", "enabled": false,
         "url": "https://raw.githubusercontent.com/zydou/domain-list-community-converter/surge-domain-set/wise.txt",
