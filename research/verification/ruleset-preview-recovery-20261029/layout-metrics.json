@@ -1,0 +1,57 @@
+[
+  {
+    "stage": "Surge iOS",
+    "busy": "false",
+    "first": "DOMAIN,one.test",
+    "height": 420,
+    "pageScroll": 1465.5,
+    "process": "# [当前客户端无法输出：Surge iOS 不支持进程规则] PROCESS-NAME,Example",
+    "rows": 99,
+    "scroll": 1404.5,
+    "y": 872.5
+  },
+  {
+    "stage": "切换中",
+    "busy": "true",
+    "first": "DOMAIN,one.test",
+    "height": 420,
+    "pageScroll": 1465.5,
+    "process": "# [当前客户端无法输出：Surge iOS 不支持进程规则] PROCESS-NAME,Example",
+    "rows": 99,
+    "scroll": 1404.5,
+    "y": 872.5
+  },
+  {
+    "stage": "mihomo Android",
+    "busy": "false",
+    "first": "DOMAIN,first.test",
+    "height": 420,
+    "pageScroll": 1465.5,
+    "process": "PROCESS-NAME,Example",
+    "rows": 99,
+    "scroll": 1404.5,
+    "y": 872.5
+  },
+  {
+    "stage": "HTTP 失败保留结果",
+    "busy": "true",
+    "first": "DOMAIN,first.test",
+    "height": 420,
+    "pageScroll": 1465.5,
+    "process": "PROCESS-NAME,Example",
+    "rows": 99,
+    "scroll": 1404.5,
+    "y": 880
+  },
+  {
+    "stage": "HTTP 重试恢复",
+    "busy": "false",
+    "first": "DOMAIN,first.test",
+    "height": 420,
+    "pageScroll": 1963.5,
+    "process": "PROCESS-NAME,Example",
+    "rows": 99,
+    "scroll": 1404.5,
+    "y": 374.5
+  }
+]

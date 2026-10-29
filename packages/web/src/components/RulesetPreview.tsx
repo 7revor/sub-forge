@@ -16,9 +16,9 @@ const TARGETS: { key: string; client: Client; platform?: Platform; label: string
   { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
 ];
 /** 客户端选择自控；转换由服务器完成。整个更新周期保持文本区域挂载。 */
-export function RulesetPreview({ inputs, ready, sourceId, overrides, noResolve, sourceError, sourceNames }: {
+export function RulesetPreview({ inputs, ready, sourceId, overrides, noResolve, sourceError, sourceNames, sourceReading, onRefreshSources }: {
   inputs: ReturnType<typeof useRulesetSources>['inputs']; ready: boolean; sourceId?: string;
-  overrides: RuleSetDoc['overrides']; noResolve?: boolean; sourceError?: unknown; sourceNames: Record<string, string>;
+  overrides: RuleSetDoc['overrides']; noResolve?: boolean; sourceError?: unknown; sourceNames: Record<string, string>; sourceReading: boolean; onRefreshSources: () => Promise<void>;
 }) {
   const [target, setTarget] = useState('mihomo');
   const t = TARGETS.find(x => x.key === target)!;
@@ -38,7 +38,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, noResolve, 
   useEffect(() => { if (preview.data && !preview.isPlaceholderData) last.current = { sourceId, target, result: preview.data }; }, [preview.data, preview.isPlaceholderData, sourceId, target]);
   const pending = !ready || !settled || preview.isFetching;
   const result = preview.data ?? (last.current?.sourceId === sourceId ? last.current?.result : undefined);
-  const old = pending || preview.isPlaceholderData || !!preview.error;
+  const old = pending || preview.isPlaceholderData || !!preview.error || !!sourceError;
   const stats = result?.stats;
   const previousLabel = TARGETS.find(x => x.key === last.current?.target)?.label;
   const diagnostic = result?.diagnostics.filter(d => ['client', 'degraded', 'override'].includes(d.kind)) ?? [];
@@ -48,12 +48,14 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, noResolve, 
         className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
     </div>
     <div className="flex min-h-8 flex-wrap items-center gap-2 text-[12.5px] text-muted" role="status">
-      {pending ? result ? `正在更新，暂显示上次${previousLabel ? ` ${previousLabel}` : ''}结果…` : '正在加载规则…'
+      {sourceError && !sourceReading ? result ? '来源读取失败，暂显示上次结果。' : '来源读取失败，尚无可用预览。'
+        : pending ? result ? `正在更新，暂显示上次${previousLabel ? ` ${previousLabel}` : ''}结果…` : '正在加载规则…'
         : preview.error ? `更新失败，暂显示上次${previousLabel ? ` ${previousLabel} ` : ''}结果。`
         : result?.delivery.mode === 'unsupported' ? result.delivery.reason
         : result?.passthrough ? '二进制来源由客户端读取，无法展示文本。'
         : result?.delivery.mode === 'original' ? `下载时使用原始来源 · ${result.delivery.format} / ${result.delivery.behavior}` : '下载时输出 .list；未生效规则保留为注释。'}
       {(preview.error || sourceError) ? <FieldError error={preview.error || sourceError} /> : null}
+      <Button size="sm" onClick={() => void onRefreshSources()} disabled={sourceReading}>{sourceError ? '重新读取来源' : '刷新来源'}</Button>
       {preview.error && <Button size="sm" onClick={() => void preview.refetch()} disabled={!ready || !settled || preview.isFetching}>重新转换</Button>}
     </div>
     <div className="grid grid-cols-3 gap-2">

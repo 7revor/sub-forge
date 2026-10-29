@@ -122,7 +122,7 @@ export function RulesetEdit() {
 
       <Card className="min-w-0" title={selectedSource ? `来源预览 · ${sourceLabel(selectedSource)}` : '合并结果（只读）'}
         actions={selectedSource && <Button onClick={() => setSelected(undefined)}>查看合并结果</Button>}>
-        <RulesetPreview key={e.id} inputs={sources.inputs} ready={sources.ready} sourceId={selected}
+        <RulesetPreview key={e.id} inputs={sources.inputs} ready={sources.ready} sourceId={selected} sourceReading={sources.reading} onRefreshSources={sources.refresh}
           overrides={d.overrides} noResolve={d.noResolve} sourceError={sources.error} sourceNames={Object.fromEntries(d.sources.map(s => [s.id, sourceLabel(s)]))} />
       </Card>
     </DetailShell>
