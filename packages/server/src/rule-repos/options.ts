@@ -22,6 +22,7 @@ export function findRuleFile(db: Store['db'], repo: string, ref: string, path: s
 type LocalOption = { id: string; name: string; hint: string };
 type Option = { value: string; label: string; hint: string; disabled: boolean };
 export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query: string, offset: number, limit: number) {
+  // 仓库名与分支仅作来源说明，避免 domain 中的 ai 等公共片段命中整库。
   const sql = `${filesSql}, named AS (
     SELECT f.*, json_extract(r.definition, '$.name') AS repoName,
       substr(path, length(rtrim(path, replace(path, '/', ''))) + 1) AS label
@@ -31,7 +32,7 @@ export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query:
       'file', json_object('ref', ref, 'path', path)) AS value, label,
       repoName || ' · ' || path || ' · 分支：' || ref || CASE WHEN entry IS NULL THEN ' · 不可关联' ELSE '' END AS hint,
       substr(label, 1, length(label) - CASE WHEN lower(label) LIKE '%.list' THEN 5 ELSE 4 END) AS name,
-      repoName || ' ' || path || ' ' || ref AS searchable, entry IS NULL AS disabled
+      path AS searchable, entry IS NULL AS disabled
     FROM named
     UNION ALL
     SELECT json_object('source', 'local', 'id', json_extract(value, '$.id')),

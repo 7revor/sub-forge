@@ -254,3 +254,5 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 - RuleRepo 左侧替换为相同平铺文件列表，右侧保留文件原文预览。
 
 参考 [最新验收截图](../research/verification/rule-options-flat-20261029/README.md)。
+
+2026-10-29 待同步文案修正：TemplateEdit、ProfileRules、RuleSets 与 RuleRepo 的搜索框使用「搜索文件名或路径」。搜索 `ai` 的示例应展示 AI/OpenAI 或实际路径含 ai 的文件，不得因仓库名 v2fly-domain-list 展示 36kr.txt 等无关文件。外部画布受已核实的登录限制，未编辑。

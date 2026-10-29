@@ -307,3 +307,5 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 当前接口：`GET /api/rule-options/search?scope=all|repository&q=&offset=0&limit=30`，默认 30、上限 100，返回 `{items,total,offset,limit,nextOffset?,notices}`。items 包含 value（JSON 编码的 local 或 repository 单文件选择）、label（文件名）、hint（仓库名 · 原始路径 · 分支）、disabled。本地候选先按权限读取；仓库文件和本地候选统一由 SQLite 筛选、排序、分页。缺失缓存时从已有文件变体在 SQL 中回退，不在应用层读取全部文件。
 
 移除 `/rule-options/catalog` 及目录树查询；新文件缓存不再生成目录节点，兼容旧缓存并在下次更新替换。正文预览只查询所选文件。单文件 resolve、历史引用和种子格式不变。隔离浏览器验收：`pnpm exec tsx test/manual-rule-options-server.ts`，使用内存数据和模拟 Git，结束后停止该进程。
+
+2026-10-29：`/api/rule-options/search` 的仓库文件搜索仅匹配完整 path（包含文件名），仓库名与分支仅展示，不参与匹配。可避免 `ai` 命中仓库名 `domain` 导致整库出现；分页、大小写规范化、权限与文件身份保持不变。

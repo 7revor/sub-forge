@@ -46,7 +46,7 @@ export function RuleRepoPage() {
     <PageHeader title="规则仓库" />
     <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} />
     {ruleset && <div className="text-[13px] text-muted">选择文件预览后可加入规则集。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-accent">返回规则集</Link></div>}
-    <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索文件名、仓库或路径" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
+    <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
     <ErrorAlert error={repos.error} />
     <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(220px,1fr)_minmax(300px,1.4fr)] gap-5 overflow-y-auto lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
       <section aria-label="规则文件" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">

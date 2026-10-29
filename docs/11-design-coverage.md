@@ -198,3 +198,5 @@ RuleSets 来源行、TemplateEditor 规则行、ProfileDetail 独立规则与绑
 TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两行平铺列表，移除目录节点、缩进和展开按钮；RuleRepo 左侧共用列表，保留右侧正文预览。第一行文件名，第二行仓库名 · 完整 path · 分支；长文本单行省略，悬停显示完整内容。下方固定加载数量和加载更多／重试状态。
 
 前端与后端已同步，领域模型及种子无需变化。外部 Claude Design 画布仍受本会话已核实的登录限制，未能编辑；docs/13 登记具体替代方案。[验收截图](../research/verification/rule-options-flat-20261029/README.md)作为本轮设计同步依据。
+
+2026-10-29 搜索范围修正：三处来源选择器及 RuleRepo 搜索框提示统一为「搜索文件名或路径」。前后端已同步，第二行来源说明与两行布局不变。外部设计画布仍受已核实的登录限制，文案更新记录于 docs/13。

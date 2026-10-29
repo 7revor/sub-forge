@@ -269,7 +269,7 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
       className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
-      <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="搜索规则文件" placeholder="搜索文件名、仓库或路径" value={query}
+      <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query}
         className={fieldCls} onChange={event => setQuery(event.target.value)}
         onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); popup.current?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus(); } }} /></div>
       {query !== debounced ? <div role="status" className="p-4 text-[13px] text-muted">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { close(); onChange(value); }} />}
