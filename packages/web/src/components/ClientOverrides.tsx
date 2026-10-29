@@ -65,7 +65,7 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
           {replacements.map((rule, i) => <div key={i} className="flex items-start gap-2">
             <div className="min-w-0 flex-1"><RuleEditor value={rule}
               onChange={(next) => setRules(replacements.map((item, j) => j === i ? next : item))} /></div>
-            <Button size="sm" variant="ghost" className="mt-6" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
+            <Button size="sm" variant="ghost" className="mt-[3px]" aria-label={`删除${ruleLabel}规则 ${i + 1}`} disabled={replacements.length === 1}
               onClick={() => setRules(replacements.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
           </div>)}
         </div>
