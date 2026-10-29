@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
-import { deleteErrorText } from '../../components/DocList.tsx';
+import { DeleteMenu } from '../../components/MoreMenu.tsx';
 import { Badge, Button, ErrorBox, PageHeader, cx } from '../../components/ui.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
@@ -38,6 +38,8 @@ export function ProfileDetail() {
         <PageHeader crumbs={<><Link to="/profiles" className="text-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
           actions={<>
             {dirty && <Button onClick={discard}>放弃修改</Button>}
+            <DeleteMenu what="配置订阅" name={draft.name} body="它的所有订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
+              onReset={del.reset} onDelete={() => del.mutate(draft.id, { onSuccess: () => navigate('/profiles') })} />
             <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
           </>}>
           {draft.template && <Badge tone="accent">模板 {template.data?.name ?? draft.template.id} v{template.data?.version ?? '?'} · {draft.template.follow === 'latest' ? '跟随最新' : '锁定'}</Badge>}
@@ -63,12 +65,6 @@ export function ProfileDetail() {
       {tab === 'chains' && <TabChains />}
       {tab === 'preview' && <TabPreview />}
 
-      {tab === 'overview' && (
-        <div className="flex flex-col items-start gap-2">
-          <Button variant="danger" onClick={() => { if (confirm(`删除配置订阅「${draft.name}」？它的所有订阅链接会立即失效。`)) del.mutate(draft.id, { onSuccess: () => navigate('/profiles') }); }}>删除配置订阅</Button>
-          {del.error && <ErrorBox error={deleteErrorText(del.error)} />}
-        </div>
-      )}
     </ProfileContext.Provider>
   );
 }

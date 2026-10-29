@@ -39,7 +39,7 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="profiles/new" element={<ProfileNew />} />
       <Route path="profiles/:id/:tab?" element={<ProfileDetail />} />
       <Route path="collections" element={<CollectionList />} />
-      <Route path="collections/:id" element={<CollectionEdit />} />
+      <Route path="collections/:id/:tab?" element={<CollectionEdit />} />
       <Route path="locals" element={<LocalList />} />
       <Route path="locals/:id" element={<LocalEdit />} />
       <Route path="rulesets" element={<RulesetList />} />

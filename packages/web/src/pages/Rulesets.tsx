@@ -1,16 +1,17 @@
 // 规则集：本地 / 远程，按客户端与平台预览最终输出（RS-01–03、CR-05）；规则包：两层组合，只配一个出口（RB-01–05）。
 
 import { useQuery } from '@tanstack/react-query';
-import type { Client, Platform, RuleBundle, RuleIR, RuleSetFormat } from '@sub-forge/core';
+import { parseRuleSetContent, type Client, type Platform, type RuleBundle, type RuleIR, type RuleSetFormat } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { api, type RulesetPreview } from '../api.ts';
 import { ClientOverrides, clientOverridesError, newClientOverride, ruleInputError } from '../components/ClientOverrides.tsx';
 import { RuleEditor } from '../components/RuleEditor.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, Switch, Textarea, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Segmented, Select, Switch, Textarea, cx, td, th } from '../components/ui.tsx';
+import { RenameDialog } from '../components/dialogs.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useList, type RuleSetDoc } from '../hooks.ts';
 import { ruleText } from './profile/TabRules.tsx';
@@ -22,7 +23,7 @@ const FORMATS: { value: RuleSetFormat; label: string }[] = [
 
 export function RulesetList() {
   return (
-    <DocList kind="rulesets" title="规则集" intro="一组匹配条件（不含出口）。解析成统一的中间表示后按客户端输出；管理员名下的规则集可被所有人引用。"
+    <DocList kind="rulesets" title="规则集" empty="一组匹配条件，可以来自远程地址或手写，在配置订阅的规则里配上出口。" intro="一组匹配条件（不含出口）。解析成统一的中间表示后按客户端输出；管理员名下的规则集可被所有人引用。"
       columns={[
         { header: '名称', cell: (r) => r.name },
         { header: '来源', cell: (r) => <Badge>{r.kind === 'remote' ? '远程' : '本地'}</Badge> },
@@ -39,9 +40,31 @@ const TARGETS: { key: string; client: Client; platform?: Platform; label: string
   { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
 ];
 
+function SourceFields({ d, set, autoFocusName }: { d: RuleSetDoc; set: (p: Partial<RuleSetDoc>) => void; autoFocusName?: boolean }) {
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+        <Field label="名称">{(id) => <Input id={id} autoFocus={autoFocusName} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
+        <Field label="格式">{(id) => <Select id={id} value={d.format} onChange={(x) => set({ format: x.target.value as RuleSetFormat })}>{FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
+        {d.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={d.behavior ?? 'domain'} onChange={(x) => set({ behavior: x.target.value as 'domain' | 'ipcidr' })}><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
+      </div>
+      <Segmented label="来源" value={d.kind} options={[{ value: 'local', label: '本地编辑' }, { value: 'remote', label: '远程地址' }]} onChange={(kind) => set({ kind })} />
+      {d.kind === 'remote'
+        ? <Field label="地址" hint="带缓存与失败快照，默认 24 小时刷新">{(id) => <Input id={id} className="font-mono" placeholder="https://" value={d.url ?? ''} onChange={(x) => set({ url: x.target.value })} />}</Field>
+        : <Field label="内容" hint="每行一条，如 DOMAIN-SUFFIX,example.com；也可以是纯域名或纯 CIDR">{(id) => <Textarea id={id} rows={14} className="font-mono text-[12.5px]" value={d.content ?? ''} onChange={(x) => set({ content: x.target.value })} />}</Field>}
+    </div>
+  );
+}
+
+const FORMAT_TEXT: Record<string, string> = { auto: '自动识别', classical: 'classical', 'domain-set': 'DOMAIN-SET', domain: 'DOMAIN-SET', ipcidr: 'CIDR', yaml: 'YAML payload', mrs: 'mrs', srs: 'srs' };
+
+/** 规则集（设计稿「规则集」）：解析结果表 + 输出预览，来源在「编辑来源」对话框里改，行级改写在下方 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
+  const [editing, setEditing] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [q, setQ] = useState('');
   const t = TARGETS.find((x) => x.key === target)!;
   const saved = !e.isNew && !e.dirty;
   const preview = useQuery({
@@ -49,50 +72,84 @@ export function RulesetEdit() {
     enabled: saved,
     queryFn: () => api<RulesetPreview>('POST', `/rulesets/${e.id}/preview`, { client: t.client, ...(t.platform ? { platform: t.platform } : {}) }),
   });
+  const parsed = useMemo(() => (e.draft?.kind === 'local' ? parseRuleSetContent(e.draft.content ?? '', e.draft.format, e.draft.behavior) : undefined), [e.draft?.kind, e.draft?.content, e.draft?.format, e.draft?.behavior]);
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
   const overridesError = rulesetOverridesError(d.overrides ?? []);
+  const rows = parsed && !parsed.passthrough
+    ? [...parsed.rules.map((r) => ({ line: r.line, text: r.text, ir: ruleText(r.rule), reason: undefined as string | undefined })), ...parsed.rejected.map((r) => ({ line: r.line, text: r.text, ir: '—', reason: r.reason }))].sort((x, y) => x.line - y.line)
+    : [];
+  const shown = rows.filter((r) => !q.trim() || r.text.toLowerCase().includes(q.trim().toLowerCase()));
+  const rejectedCount = parsed && !parsed.passthrough ? parsed.rejected.length : preview.data?.rejected.length;
 
   return (
     <DetailShell listPath="/rulesets" listLabel="规则集" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
-      onSave={() => { if (!overridesError) e.submit((x) => (x.kind === 'remote' ? { ...x, content: undefined } : { ...x, url: undefined })); }} saveError={overridesError ?? e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
-      <div className="flex flex-wrap items-start gap-5">
-        <Card title="来源" className="min-w-0 flex-[999_1_520px]">
-          <div className="flex flex-col gap-3.5">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-              <Field label="名称">{(id) => <Input id={id} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
-              <Field label="格式">{(id) => <Select id={id} value={d.format} onChange={(x) => set({ format: x.target.value as RuleSetFormat })}>{FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</Select>}</Field>
-              {d.format === 'mrs' && <Field label="behavior" hint="mrs 无法解析，必须声明">{(id) => <Select id={id} value={d.behavior ?? 'domain'} onChange={(x) => set({ behavior: x.target.value as 'domain' | 'ipcidr' })}><option value="domain">domain</option><option value="ipcidr">ipcidr</option></Select>}</Field>}
-            </div>
-            <Segmented label="来源" value={d.kind} options={[{ value: 'local', label: '本地编辑' }, { value: 'remote', label: '远程地址' }]} onChange={(kind) => set({ kind })} />
-            {d.kind === 'remote'
-              ? <Field label="地址" hint="带缓存与失败快照，默认 24 小时刷新">{(id) => <Input id={id} className="font-mono" value={d.url ?? ''} onChange={(x) => set({ url: x.target.value })} />}</Field>
-              : <Field label="内容" hint="每行一条，如 DOMAIN-SUFFIX,example.com；也可以是纯域名或纯 CIDR">{(id) => <Textarea id={id} rows={14} className="font-mono text-[12.5px]" value={d.content ?? ''} onChange={(x) => set({ content: x.target.value })} />}</Field>}
-          </div>
-        </Card>
-        <Card title="输出预览" className="min-w-0 flex-[1_1_360px]">
-          <div className="flex flex-col gap-3">
-            <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
-              {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
-                className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
-            </div>
-            {!saved ? <Empty>保存后预览。</Empty> : preview.error ? <ErrorBox error={preview.error} /> : preview.data && (
-              preview.data.passthrough ? <p className="m-0 text-[13px] text-muted">mrs / srs 二进制规则集只做透传，不解析。</p> : (
-                <>
-                  {preview.data.error && <ErrorBox error={`拉取失败：${preview.data.error}`} />}
-                  <pre className="m-0 max-h-80 overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7]">{preview.data.lines.join('\n') || '（空）'}</pre>
-                  <span className="text-[12px] text-muted">{preview.data.lines.length} 行 · 降级 {preview.data.notes?.length ?? 0} · 丢弃 {preview.data.dropped.length} · 无法解析 {preview.data.rejected.length}</span>
-                  {[...(preview.data.notes ?? []).map((n) => ['降级', n]), ...preview.data.dropped.map((x) => ['丢弃', x.reason]), ...preview.data.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].map(([k, v], i) => (
-                    <div key={i} className="flex gap-2 text-[12.5px]"><Badge tone={k === '降级' ? 'accent' : k === '丢弃' ? 'err' : 'warn'}>{k}</Badge><span className="min-w-0 break-all">{v}</span></div>
+      onSave={() => { if (!overridesError) e.submit((x) => (x.kind === 'remote' ? { ...x, content: undefined } : { ...x, url: undefined })); }} saveError={overridesError ?? e.save.error}
+      onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
+      moreItems={[{ label: '重命名…', onSelect: () => setRenaming(true) }]}
+      extraActions={!e.isNew && <Button onClick={() => setEditing(true)}>编辑来源</Button>}
+      badges={!e.isNew && <>
+        <Badge>{d.kind === 'remote' ? '远程' : '本地'} · {FORMAT_TEXT[parsed && !parsed.passthrough ? parsed.format : d.format] ?? d.format}</Badge>
+        {d.kind === 'remote' && <Badge>缓存 {Math.round((d.fetch?.ttlSec ?? 86400) / 3600)} 小时</Badge>}
+        {d.kind === 'remote' && preview.data && <Badge tone={preview.data.error ? 'err' : 'ok'}>{preview.data.error ? '拉取失败' : '拉取成功'}</Badge>}
+        {parsed && !parsed.passthrough && <Badge tone={parsed.rejected.length ? 'warn' : 'neutral'}>解析 {parsed.rules.length} 行{parsed.rejected.length ? ` · 不支持 ${parsed.rejected.length} 行` : ''}</Badge>}
+      </>}>
+      {e.isNew ? <Card title="来源"><SourceFields d={d} set={set} autoFocusName /></Card> : (
+        <div className="flex flex-wrap items-start gap-5">
+          <Card className="min-w-0 flex-[999_1_520px]" bodyClass="overflow-x-auto"
+            title={<h2 className="m-0 text-[15px] font-semibold">解析结果</h2>}
+            actions={d.kind === 'local' && !parsed?.passthrough && <Input aria-label="搜索规则" placeholder="搜索" className="h-9 w-[200px]" value={q} onChange={(x) => setQ(x.target.value)} />}>
+            {d.kind === 'remote' || parsed?.passthrough ? (
+              <div className="px-4 pb-4 text-[13px] leading-relaxed text-muted">
+                {parsed?.passthrough || d.format === 'mrs' || d.format === 'srs' ? 'mrs / srs 二进制规则集只做透传，不解析。' : `远程内容在拉取后解析，最终输出见右侧「输出预览」${rejectedCount ? `；有 ${rejectedCount} 行不支持` : ''}。`}
+              </div>
+            ) : (
+              <table className="w-full min-w-[560px] border-collapse">
+                <thead><tr><th className={cx(th, 'w-12')}>#</th><th className={th}>原始行</th><th className={th}>中间表示</th><th className={th}>状态</th></tr></thead>
+                <tbody>
+                  {shown.slice(0, 300).map((r) => (
+                    <tr key={r.line}>
+                      <td className={cx(td, 'font-mono text-[12px] text-muted')}>{r.line}</td>
+                      <td className={cx(td, 'font-mono text-[12.5px] break-all')}>{r.text}</td>
+                      <td className={cx(td, 'font-mono text-[12px] text-ink-2 break-all')}>{r.ir}</td>
+                      <td className={td}>{r.reason ? <Badge tone="warn">{r.reason}</Badge> : <Badge tone="ok">正常</Badge>}</td>
+                    </tr>
                   ))}
-                </>
-              )
+                  {!shown.length && <tr><td colSpan={4} className={cx(td, 'text-muted')}>{rows.length ? `没有包含「${q.trim()}」的行` : '内容为空。点击「编辑来源」填写规则。'}</td></tr>}
+                </tbody>
+              </table>
             )}
-          </div>
-        </Card>
-      </div>
-      <RulesetOverrides value={d.overrides ?? []} onChange={(overrides) => set({ overrides })} />
+            {shown.length > 300 && <div className="px-4 py-2.5 text-[12.5px] text-muted">显示前 300 行，共 {shown.length} 行</div>}
+          </Card>
+          <Card title="输出预览" className="min-w-0 flex-[1_1_360px]">
+            <div className="flex flex-col gap-3">
+              <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
+                {TARGETS.map((x) => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
+                  className={cx('h-[34px] cursor-pointer rounded-full border px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
+              </div>
+              {!saved ? <Empty>保存后预览。</Empty> : preview.error ? <ErrorBox error={preview.error} /> : preview.data && (
+                preview.data.passthrough ? <p className="m-0 text-[13px] text-muted">mrs / srs 二进制规则集只做透传，不解析。</p> : (
+                  <>
+                    {preview.data.error && <ErrorBox error={`拉取失败：${preview.data.error}`} />}
+                    <pre className="m-0 max-h-80 overflow-auto rounded-lg bg-nav p-3 font-mono text-[12px] leading-[1.7] text-[#dde1e7]">{preview.data.lines.join('\n') || '（空）'}</pre>
+                    <span className="text-[12px] text-muted">{preview.data.lines.length} 行 · 降级 {preview.data.notes?.length ?? 0} · 丢弃 {preview.data.dropped.length} · 无法解析 {preview.data.rejected.length}</span>
+                    {[...(preview.data.notes ?? []).map((n) => ['降级', n]), ...preview.data.dropped.map((x) => ['丢弃', x.reason]), ...preview.data.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].map(([k, v], i) => (
+                      <div key={i} className="flex gap-2 text-[12.5px]"><Badge tone={k === '降级' ? 'accent' : k === '丢弃' ? 'err' : 'warn'}>{k}</Badge><span className="min-w-0 break-all">{v}</span></div>
+                    ))}
+                  </>
+                )
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
+      {!e.isNew && <RulesetOverrides value={d.overrides ?? []} onChange={(overrides) => set({ overrides })} />}
+      <Modal title="编辑来源" open={editing} onClose={() => setEditing(false)} wide footer={<Button variant="primary" onClick={() => setEditing(false)}>完成</Button>}>
+        <SourceFields d={d} set={set} />
+        <span className="text-[12px] text-muted">改动在页面右上角「保存」后生效。</span>
+      </Modal>
+      <RenameDialog open={renaming} title="重命名规则集" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => set({ name })} />
     </DetailShell>
   );
 }
@@ -112,7 +169,7 @@ function rulesetOverridesError(value: LineOverride[]): string | undefined {
 
 function RulesetOverrides({ value, onChange }: { value: LineOverride[]; onChange: (value: LineOverride[]) => void }) {
   const update = (index: number, item: LineOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
-  return <Card title="行级客户端覆盖" actions={<Button onClick={() => onChange([...value, { line: 1, override: newClientOverride() }])}><Plus size={15} />添加行级覆盖</Button>}>
+  return <Card title="客户端改写" actions={<Button onClick={() => onChange([...value, { line: 1, override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
     <p className="mt-0 text-[12.5px] text-muted">按解析后的行号（从 1 开始）或原文精确匹配定位。同一行命中第一条客户端与平台匹配的覆盖，可拖拽调整优先级；mrs / srs 透传格式不应用行级覆盖。</p>
     {!value.length ? <Empty>没有行级覆盖。</Empty> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => {
       const mode = item.match !== undefined && item.line === undefined ? 'match' : 'line';
@@ -145,7 +202,7 @@ function RulesetOverrides({ value, onChange }: { value: LineOverride[]; onChange
 
 export function BundleList() {
   return (
-    <DocList kind="bundles" title="规则包" intro="多个规则集或单条规则打包成一项，只配一个出口；输出时按 domain → classical → ipcidr 拆分（最多两层）。"
+    <DocList kind="bundles" title="规则包" empty="把多个规则集或单条规则打包，在规则列表里只占一行、只配一个出口。" intro="多个规则集或单条规则打包成一项，只配一个出口；输出时按 domain → classical → ipcidr 拆分（最多两层）。"
       columns={[
         { header: '名称', cell: (b) => b.name },
         { header: '子项', cell: (b) => <span className="font-mono">{b.items.length} 项 · 启用中 {b.items.filter((item) => item.enabled !== false).length} 项</span> },
@@ -181,7 +238,7 @@ export function BundleEdit() {
 
   return (
     <DetailShell listPath="/bundles" listLabel="规则包" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
-      onSave={() => e.submit()} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
+      onSave={() => e.submit()} saveError={e.save.error} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}>
       <Card title="基本信息">
         <div className="flex flex-wrap items-end gap-5">
           <Field label="名称" className="min-w-64 flex-1">{(id) => <Input id={id} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>

@@ -4,9 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
-import { NodeSetSelect } from '../../components/pickers.tsx';
+import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
-import { useList } from '../../hooks.ts';
+import { useList, useNodeList, type ProfileDoc } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
 import { SchemaForm } from '../../components/SchemaForm.tsx';
@@ -158,32 +158,51 @@ export function TabBase() {
   );
 }
 
+const NS_KIND = { source: '订阅源', collection: '组合', local: '本地节点组' } as const;
+
+function NodeSetCount({ refId }: { refId: ProfileDoc['nodeSets'][number]['ref'] }) {
+  const nodes = useNodeList(refId);
+  return <span className="font-mono text-[12.5px]">{nodes.data ? nodes.data.total : '—'}</span>;
+}
+
+/** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
 export function TabNodeSets() {
   const { draft, setDraft, allNodeSets, nodeSetName } = useProfile();
-  const available = allNodeSets.filter((n) => !draft.nodeSets.some((p) => p.ref.type === n.ref.type && p.ref.id === n.ref.id));
-  const [adding, setAdding] = useState<typeof available[number]['ref']>();
+  const [adding, setAdding] = useState(false);
+  const chained = new Set(draft.chains.map((c) => `${c.landing.nodeSet.type}:${c.landing.nodeSet.id}`));
 
   return (
-    <Card title="已加入的节点集" bodyClass="overflow-x-auto"
-      actions={<div className="flex gap-2">
-        <div className="w-56"><NodeSetSelect label="要加入的节点集" value={adding} options={available} onChange={setAdding} placeholder={available.length ? '选择节点集' : '没有可加入的'} /></div>
-        <Button disabled={!adding} onClick={() => { if (adding) { setDraft({ ...draft, nodeSets: [...draft.nodeSets, { ref: adding, output: 'provider' }] }); setAdding(undefined); } }}><Plus size={15} />加入</Button>
-      </div>}>
-      <p className="mx-4 mt-0 mb-3 text-[12.5px] text-muted">默认按源输出 provider，面板中可按源查看、分别更新；inline 会展开到 proxies。代理链和被引用的单个节点不用在这里添加，系统会自动解析。</p>
-      {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty>还没有节点集。</Empty></div> : (
-        <table className="w-full border-collapse">
-          <thead><tr><th className={th}>节点集</th><th className={th}>输出方式</th><th className={th} /></tr></thead>
-          <tbody>
-            {draft.nodeSets.map((n, i) => (
-              <tr key={`${n.ref.type}:${n.ref.id}`}>
-                <td className={cx(td, 'font-medium')}>{nodeSetName(n.ref)} <span className="text-[12px] font-normal text-muted">{n.ref.type === 'source' ? '订阅源' : n.ref.type === 'collection' ? '组合' : '本地节点组'}</span></td>
-                <td className={td}><Segmented label="输出方式" value={n.output} options={[{ value: 'provider', label: 'provider' }, { value: 'inline', label: 'inline' }]} onChange={(output) => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => (j === i ? { ...x, output } : x)) })} /></td>
-                <td className={cx(td, 'text-right')}><Button size="sm" variant="ghost" aria-label="移除" onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </Card>
+    <>
+      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">已加入的节点集</h2><span className="text-[12.5px] text-muted">默认按源输出 provider，面板中可按源查看、分别更新。代理链和被引用的单个节点不用在这里添加，系统会自动解析。</span></div>}
+        actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="overflow-x-auto">
+        {!draft.nodeSets.length ? <div className="px-4 pb-4 text-[13px] text-muted">还没有节点集。点击「添加节点集」选择订阅源、组合或本地节点组。</div> : (
+          <table className="w-full min-w-[640px] border-collapse">
+            <thead><tr><th className={th}>节点集</th><th className={th}>类型</th><th className={th}>节点</th><th className={th}>输出方式</th><th className={th}>备注</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
+            <tbody>
+              {draft.nodeSets.map((n, i) => (
+                <tr key={`${n.ref.type}:${n.ref.id}`}>
+                  <td className={cx(td, 'font-medium')}>{nodeSetName(n.ref)}</td>
+                  <td className={cx(td, 'text-ink-2')}>{NS_KIND[n.ref.type]}</td>
+                  <td className={td}><NodeSetCount refId={n.ref} /></td>
+                  <td className={td}><Segmented label="输出方式" size="sm" value={n.output} options={[{ value: 'provider', label: 'provider' }, { value: 'inline', label: 'inline' }]} onChange={(output) => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => (j === i ? { ...x, output } : x)) })} /></td>
+                  <td className={cx(td, 'text-[12.5px] text-muted')}>{chained.has(`${n.ref.type}:${n.ref.id}`) ? '有链规则 · Profile 专属 provider' : '—'}</td>
+                  <td className={cx(td, 'text-right')}><Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
+        {[
+          ['provider（默认）', 'mihomo 输出 proxy-providers，不写 path；Surge 输出 policy-path。地址带内容版本 ?v=，链配置变了地址也会变。'],
+          ['inline', '展开到 proxies / [Proxy]。适合节点少、不需要单独更新的本地节点组。'],
+          ['Profile 专属 provider', '节点集上有链规则时，它的 provider 内容为本配置订阅单独生成，并注入 dialer-proxy。'],
+        ].map(([t, d]) => <div key={t} className="flex flex-col gap-1 rounded-[10px] border border-line bg-panel px-4 py-3"><span className="font-mono text-[13px] font-semibold">{t}</span><span className="text-[12.5px] leading-relaxed text-muted">{d}</span></div>)}
+      </div>
+      <NodeSetPickerDialog open={adding} options={allNodeSets} added={draft.nodeSets.map((n) => n.ref)} onClose={() => setAdding(false)}
+        onAdd={(refs) => setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...refs.map((ref) => ({ ref, output: 'provider' as const }))] })}
+        hint="新加入的节点集默认以 provider 输出，可在表格里改成 inline。" />
+    </>
   );
 }

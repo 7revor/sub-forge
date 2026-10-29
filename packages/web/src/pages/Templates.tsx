@@ -1,15 +1,14 @@
-// 模板：所有人可浏览（组骨架、规则、版本记录）；管理员编辑并发布新版本。
+// 模板：所有人在列表页浏览（组骨架、规则、版本记录）；管理员在详情页编辑并发布新版本。
 // 表单与 mihomo YAML 共用草稿，修改后即时校验（TPL-11）；发布前分析影响（TPL-07）。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReportItem } from '@sub-forge/core';
 import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
-import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { memberLabel, targetLabel } from '../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Segmented, Textarea, formatTime, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe, useTemplates, type TemplateDoc } from '../hooks.ts';
 import { newId, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
 import { TemplateEditor } from './template/TemplateEditor.tsx';
@@ -17,32 +16,126 @@ import { TemplateDiff } from './template/TemplateDiff.tsx';
 import { matcherLabel, TemplateReport } from './template/TemplateFields.tsx';
 import { draftIssues } from './template/model.ts';
 
+type TemplateDetailData = { item: TemplateDoc; versions: { version: number; changelog?: string; createdAt: number }[] };
+
+/** 模板浏览（设计稿「模板 · 普通用户浏览」）：左侧模板列表，右侧选中模板的骨架、规则与版本 */
 export function TemplateList() {
   const list = useTemplates();
   const isAdmin = useMe().data?.role === 'admin';
+  const [params, setParams] = useSearchParams();
+  const profiles = useList('profiles');
+  const sel = list.data?.find((t) => t.id === params.get('id')) ?? list.data?.[0];
+  const inUse = (id: string) => (profiles.data ?? []).filter((p) => p.template?.id === id).length;
   return (
     <>
-      <PageHeader title="模板" actions={isAdmin && <Link to="/templates/new" className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-[14px] font-medium text-white no-underline hover:bg-accent-strong"><Plus size={16} />新建模板</Link>} />
-      <p className="m-0 -mt-2 text-[13.5px] text-muted">模板只包含分流：策略组骨架 + 规则 + 二者的关联。配置订阅跟随最新版本时，客户端下次刷新主订阅会自动采用新模板。</p>
+      <PageHeader title="模板" subtitle="管理员维护的分流骨架：策略组和规则，不含节点。配置订阅选择一个模板，再填充自己的节点。"
+        actions={isAdmin && <Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
       <ErrorBox error={list.error} />
-      <Card bodyClass="overflow-x-auto">
-        {!list.data?.length ? <div className="p-4"><Empty>还没有模板。</Empty></div> : (
-          <table className="w-full border-collapse">
-            <thead><tr><th className={th}>名称</th><th className={th}>版本</th><th className={th}>组</th><th className={th}>规则</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
-            <tbody>
-              {list.data.map((t) => (
-                <DocTableRow key={t.id} to={`/templates/${t.id}`}>
-                  <td className={td}><Link to={`/templates/${t.id}`} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
-                  <td className={cx(td, 'font-mono')}>v{t.version}</td>
-                  <td className={cx(td, 'font-mono')}>{t.groups.length}</td>
-                  <td className={cx(td, 'font-mono')}>{t.rules.length}</td>
-                  <td className={cx(td, 'text-right')}><DocActionLink to={`/templates/${t.id}`} name={t.name ?? t.id} viewOnly /></td>
-                </DocTableRow>
-              ))}
-            </tbody>
-          </table>
-        )}
+      {list.isLoading ? <div className="text-muted">加载中…</div> : !list.data?.length ? (
+        <section className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-[#d5d9e0] bg-panel px-7 py-7 text-center">
+          <span className="text-[14px] font-semibold">还没有模板</span>
+          <span className="max-w-[420px] text-[12.5px] leading-relaxed text-muted">{isAdmin ? '新建一个模板：定义策略组骨架和规则，用户的配置订阅会以它为基础。' : '管理员还没有发布模板。'}</span>
+        </section>
+      ) : (
+        <div className="flex flex-wrap items-start gap-5">
+          <nav aria-label="模板列表" className="min-w-0 flex-[1_1_260px] overflow-hidden rounded-[10px] border border-line bg-panel py-1.5">
+            {list.data.map((t) => {
+              const on = t.id === sel?.id;
+              const n = inUse(t.id);
+              return (
+                <button key={t.id} type="button" aria-current={on || undefined} onClick={() => setParams({ id: t.id }, { replace: true })}
+                  className={cx('flex w-full cursor-pointer flex-col gap-1 border-b border-line-2 px-4 py-3 text-left last:border-0', on ? 'bg-[#f5f8ff]' : 'bg-panel hover:bg-ground')}>
+                  <span className="flex justify-between gap-2"><span className="text-[13.5px] font-semibold">{t.name ?? t.id}</span><span className="font-mono text-[12px] text-muted">v{t.version}</span></span>
+                  <span className="text-[12px] text-muted">{t.groups.length} 个策略组 · {t.rules.length} 条规则</span>
+                  <span className="text-[12px] text-ink-2">{n ? `你有 ${n} 个配置订阅在用` : '未使用'}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
+            {sel && <TemplateDetail key={sel.id} id={sel.id} inUse={inUse(sel.id)} actions={<>
+              {isAdmin && <Link to={`/templates/${sel.id}`} className={buttonClass()}>编辑新版本</Link>}
+              <Link to={`/profiles/new?template=${encodeURIComponent(sel.id)}`} className={buttonClass('primary')}>用这个模板新建配置订阅</Link>
+            </>} />}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+const RULE_PREVIEW = 8;
+
+/** 模板详情：头部卡片、策略组骨架、规则（默认显示前几条）、版本记录与对比 */
+function TemplateDetail({ id, inUse, actions }: { id: string; inUse?: number; actions?: ReactNode }) {
+  const tpl = useQuery({ queryKey: ['template', id], queryFn: () => api<TemplateDetailData>('GET', `/templates/${id}`) });
+  const rulesets = useList('rulesets');
+  const bundles = useList('bundles');
+  const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })), bundles: (bundles.data ?? []).map(({ id, name }) => ({ id, name })) };
+  const [allRules, setAllRules] = useState(false);
+  const [diffVersion, setDiffVersion] = useState<number>();
+  if (!tpl.data) return tpl.error ? <ErrorBox error={tpl.error} /> : <div className="text-muted">加载中…</div>;
+  const { item: t, versions } = tpl.data;
+  const groupName = (gid: string) => t.groups.find((g) => g.id === gid)?.name ?? gid;
+  const nsName = () => '';
+  const published = versions.find((v) => v.version === t.version)?.createdAt;
+  const rules = allRules ? t.rules : t.rules.slice(0, RULE_PREVIEW);
+  const emptyText = (g: TemplateDoc['groups'][number]) => (g.whenEmpty === 'direct' ? 'DIRECT' : '拒绝');
+  return (
+    <>
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-panel px-4.5 py-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="m-0 text-[17px] font-semibold">{t.name ?? t.id} <span className="font-mono text-[13px] font-medium text-muted">v{t.version}</span></h2>
+          <span className="text-[12.5px] text-muted">{t.groups.length} 个策略组 · {t.rules.length} 条规则{published ? ` · 发布于 ${formatTime(published).slice(5, 10)}` : ''}{inUse !== undefined ? ` · 你有 ${inUse} 个配置订阅在用` : ''}</span>
+        </div>
+        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      </section>
+      <Card title="策略组骨架" actions={<span className="text-[12.5px] text-muted">节点由你在配置订阅里填充</span>} bodyClass="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead><tr><th className={th}>组</th><th className={th}>类型</th><th className={th}>成员（组 / 内置）</th><th className={th}>为空时</th><th className={th}>填充提示</th></tr></thead>
+          <tbody>
+            {t.groups.map((g) => (
+              <tr key={g.id}>
+                <td className={cx(td, 'font-medium whitespace-nowrap')}>{g.name}</td>
+                <td className={cx(td, 'font-mono text-[12.5px]')}>{g.type}</td>
+                <td className={cx(td, 'text-[12.5px] text-ink-2')}>{g.members.map((m) => memberLabel(m, groupName, nsName).text).join(' · ') || '—'}</td>
+                <td className={cx(td, 'text-ink-2 whitespace-nowrap')}>{emptyText(g)}</td>
+                <td className={cx(td, 'text-muted')}>{g.hint ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </Card>
+      <div className="flex flex-wrap items-start gap-5">
+        <Card title="规则" className="min-w-0 flex-[999_1_420px]" actions={<span className="text-[12.5px] text-muted">{t.rules.length} 条{!allRules && t.rules.length > RULE_PREVIEW ? ` · 显示前 ${RULE_PREVIEW} 条` : ''}</span>} bodyClass="pb-1">
+          {rules.map((r, i) => (
+            <div key={r.id} className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
+              <span className="font-mono text-[12px] text-muted">{i + 1}</span>
+              <span className="truncate font-mono text-[12.5px]">{matcherLabel(r.matcher, ctx)}</span>
+              <span aria-hidden="true" className="text-faint">→</span>
+              <span className="truncate">{targetLabel(r.target, groupName, nsName)}</span>
+            </div>
+          ))}
+          {(allRules || t.rules.length <= RULE_PREVIEW) && (
+            <div className="grid grid-cols-[28px_minmax(0,1.4fr)_16px_minmax(0,0.8fr)] items-center gap-2 border-t border-line-2 px-4 py-2.5 text-[13px]">
+              <span className="font-mono text-[12px] text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="text-faint">→</span><span>{targetLabel(t.final, groupName, nsName)}</span>
+            </div>
+          )}
+          {t.rules.length > RULE_PREVIEW && <div className="border-t border-line-2 px-4 py-2.5"><button type="button" className="cursor-pointer text-[13px] text-accent" onClick={() => setAllRules(!allRules)}>{allRules ? '收起' : `展开全部 ${t.rules.length} 条`}</button></div>}
+        </Card>
+        <Card title="版本记录" className="min-w-0 flex-[1_1_260px]">
+          <ul className="m-0 flex list-none flex-col p-0">
+            {versions.map((v) => (
+              <li key={v.version} className="flex flex-col gap-1 border-t border-line-2 py-2.5 first:border-0 first:pt-0">
+                <span className="flex justify-between text-[13px]"><span className="font-mono font-semibold">v{v.version}</span><span className="text-[12px] text-muted">{formatTime(v.createdAt).slice(5, 10)}</span></span>
+                <span className="text-[12.5px] leading-relaxed text-ink-2">{v.changelog ?? '—'}</span>
+                {v.version > 1 && <button type="button" className="w-fit cursor-pointer text-[12.5px] text-accent" onClick={() => setDiffVersion(v.version)}>与上一版对比</button>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+      {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
     </>
   );
 }
@@ -53,45 +146,6 @@ function skeleton(): TemplateBody {
     groups: [{ id, name: '🚀 节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }], hint: '建议放所有节点', whenEmpty: 'reject' }],
     rules: [], final: { kind: 'group', groupId: id },
   };
-}
-
-function TemplateView({ t, ctx }: { t: TemplateDoc; ctx: ConvertCtx }) {
-  const groupName = (id: string) => t.groups.find((g) => g.id === id)?.name ?? id;
-  const nsName = () => '';
-  return (
-    <div className="flex flex-wrap items-start gap-5">
-      <Card title="策略组骨架" className="min-w-0 flex-[1_1_420px]" bodyClass="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead><tr><th className={th}>组</th><th className={th}>类型</th><th className={th}>成员</th><th className={th}>为空时</th></tr></thead>
-          <tbody>
-            {t.groups.map((g) => (
-              <tr key={g.id}>
-                <td className={td}><div className="flex flex-col gap-0.5"><span className="font-medium">{g.name}</span>{g.hint && <span className="text-[12px] text-muted">{g.hint}</span>}</div></td>
-                <td className={cx(td, 'font-mono text-[12.5px]')}>{g.type}</td>
-                <td className={cx(td, 'text-[12.5px] text-ink-2')}>{g.members.map((m) => memberLabel(m, groupName, nsName).text).join(' · ') || '—'}</td>
-                <td className={td}><Badge tone={g.whenEmpty === 'direct' ? 'accent' : 'err'}>{g.whenEmpty === 'direct' ? '直连' : '拒绝'}</Badge></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      <Card title="规则" className="min-w-0 flex-[1_1_420px]" bodyClass="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead><tr><th className={th}>#</th><th className={th}>匹配项</th><th className={th}>出口</th></tr></thead>
-          <tbody>
-            {t.rules.map((r, i) => (
-              <tr key={r.id}>
-                <td className={cx(td, 'font-mono text-muted')}>{i + 1}</td>
-                <td className={cx(td, 'font-mono text-[12.5px]')}>{matcherLabel(r.matcher, ctx)}</td>
-                <td className={td}>{targetLabel(r.target, groupName, nsName)}</td>
-              </tr>
-            ))}
-            <tr><td className={cx(td, 'font-mono text-muted')}>—</td><td className={cx(td, 'font-mono')}>MATCH</td><td className={td}>{targetLabel(t.final, groupName, nsName)}</td></tr>
-          </tbody>
-        </table>
-      </Card>
-    </div>
-  );
 }
 
 export function TemplateEdit() {
@@ -111,7 +165,6 @@ function TemplatePage({ id }: { id: string }) {
   const [rawValid, setRawValid] = useState(true);
   const [validation, setValidation] = useState<{ body: TemplateBody; name: string; report: ReportItem[]; error?: string }>();
   const [focus, setFocus] = useState<{ where: string }>();
-  const [diffVersion, setDiffVersion] = useState<number>();
   const rulesets = useList('rulesets');
   const bundles = useList('bundles');
   const ctx: ConvertCtx = { rulesets: (rulesets.data ?? []).map(({ id, name }) => ({ id, name })), bundles: (bundles.data ?? []).map(({ id, name }) => ({ id, name })) };
@@ -187,21 +240,7 @@ function TemplatePage({ id }: { id: string }) {
         {t && <Badge tone="accent">v{t.version}</Badge>}
       </PageHeader>
 
-      {mode === 'view' && t && (
-        <>
-          <TemplateView t={t} ctx={ctx} />
-          <Card title="版本记录">
-            <ul className="m-0 flex list-none flex-col p-0">
-              {tpl.data!.versions.map((v) => (
-                <li key={v.version} className="flex flex-wrap items-baseline gap-3 border-t border-line-2 py-2.5 first:border-0">
-                  <span className="font-mono font-semibold">v{v.version}</span><span className="text-[12px] text-muted">{formatTime(v.createdAt)}</span><span className="text-[13px]">{v.changelog ?? '—'}</span>
-                  {v.version > 1 && <Button size="sm" onClick={() => setDiffVersion(v.version)}>与上一版对比</Button>}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </>
-      )}
+      {mode === 'view' && t && <TemplateDetail id={id} />}
 
       {mode === 'edit' && isAdmin && (
         <div className="flex flex-wrap items-start gap-5">
@@ -244,8 +283,6 @@ function TemplatePage({ id }: { id: string }) {
           </div>
         </div>
       )}
-
-      {diffVersion !== undefined && <TemplateDiff id={id} version={diffVersion} ctx={ctx} onClose={() => setDiffVersion(undefined)} />}
 
       <Modal title="存在阻断项" open={confirmForce} onClose={() => setConfirmForce(false)}
         footer={<><Button onClick={() => setConfirmForce(false)}>返回修改</Button><Button variant="danger" onClick={() => publish.mutate(true)} disabled={!ready || errors.length > 0 || publish.isPending}>强制发布</Button></>}>

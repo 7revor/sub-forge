@@ -69,6 +69,17 @@ describe('处理链执行', () => {
     expect(r.trace[1]!.error).toMatch(/非法正则/);
   });
 
+  it('未填写的空正则不生效', () => {
+    const input = nodes(trojan('HK 01', 'a'), trojan('US 02', 'b'));
+    const r = runPipeline(input, [
+      { op: 'rename.regex', rules: [{ pattern: '', replace: 'aa' }, { pattern: '^HK', replace: 'HK-' }] },
+      { op: 'filter.regex', patterns: [''], keep: true },
+      { op: 'rename.delete', patterns: [''] },
+      { op: 'sort.regex', patterns: ['', 'US'] },
+    ]);
+    expect(r.nodes.map((n) => n.name)).toEqual(['US 02', 'HK- 01']);
+  });
+
   it('末尾自动去重兜底，名称唯一', () => {
     const input = nodes(trojan('HK', 'a'), trojan('HK', 'b'), trojan('HK 2', 'c'));
     const r = runPipeline(input, []);
