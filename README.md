@@ -43,6 +43,8 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 
 本地试用订阅服务见 [packages/server](packages/server/README.md#运行)。
 
+macOS 一键启动 / 停止：双击 [start-local.command](scripts/start-local.command) 或 [stop-local.command](scripts/stop-local.command)。启动会构建当前主目录的前端并在后台运行服务，停止会保留数据库和密钥；使用方法与数据位置见 [本地脚本说明](scripts/README.md)。
+
 ## 许可证
 
 [AGPL-3.0](LICENSE)。部分协议解析代码将复用自 [Sub-Store](https://github.com/sub-store-org/Sub-Store)（AGPL-3.0）。
