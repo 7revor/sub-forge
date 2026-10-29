@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
-import { DeleteMenu } from '../../components/MoreMenu.tsx';
+import { DeleteAction, MoreMenu } from '../../components/MoreMenu.tsx';
 import { api, type AccessLogRow, type TokenItem } from '../../api.ts';
 import { Badge, Button, buttonClass, ErrorBox, Modal, PageHeader, cx } from '../../components/ui.tsx';
 import { TemplateCard } from './TemplateCard.tsx';
@@ -58,10 +58,10 @@ export function ProfileDetail() {
             {!dirty && tab === 'overview' && <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>}
             {!dirty && tab !== 'overview' && <Button onClick={copyLink} disabled={!firstUrl} title={firstUrl ? undefined : '先在「概览」新增订阅链接'}>{copied ? '已复制' : '复制订阅链接'}</Button>}
             {tab !== 'preview' && !dirty && ['overview', 'groups', 'rules', 'chains'].includes(tab) && <Link to={`/profiles/${id}/preview`} className={buttonClass('primary')}>预览配置</Link>}
-            <DeleteMenu what="配置订阅" name={draft.name} body="它的所有订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
-              onReset={del.reset} onDelete={() => del.mutate(draft.id, { onSuccess: () => navigate('/profiles') })}
-              extra={[{ label: '更换模板…', onSelect: () => setTplOpen(true) }, { label: '复制一份', onSelect: duplicate }]} />
+            <MoreMenu items={[{ label: '更换模板…', onSelect: () => setTplOpen(true) }, { label: '复制一份', onSelect: duplicate }]} />
             {(dirty || !['overview', 'preview'].includes(tab)) && <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>}
+            <DeleteAction what="配置订阅" name={draft.name} body="它的所有订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
+              onReset={del.reset} onDelete={() => del.mutate(draft.id, { onSuccess: () => navigate('/profiles') })} />
           </>}>
           <button type="button" onClick={() => setTplOpen(true)} className="cursor-pointer rounded-full bg-accent-soft px-2.5 py-1 text-[12.5px] text-accent-ink hover:underline">
             {draft.template ? `模板 ${template.data?.name ?? draft.template.id} v${template.data?.version ?? '?'} · ${draft.template.follow === 'latest' ? '跟随最新' : '锁定版本'}` : '不使用模板'}

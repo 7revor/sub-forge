@@ -11,7 +11,7 @@
 | 总览 `Main` | `/` | 四项统计按访问日志与当前模板计算；待处理包括拉取失败、孤儿覆盖项、最近渲染告警、未加入节点集 |
 | 订阅源 · 处理链编辑器 `Source` + 补充 `Pipeline`、`PipelineForms` | `/sources/:id` | 步骤列表、参数区、diff 命中列、12 种处理器表单 |
 | 补充 `SourceFetch` | `/sources/:id` 的「拉取参数」 | 对话框：来源与拉取、快照历史、删除入口 |
-| 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles`、`/rulesets`、`/bundles` | 搜索、计数、空状态卡片；订阅源新建为对话框 |
+| 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles`、`/rulesets`、`/bundles` | 搜索、计数、空状态卡片；订阅源新建为对话框；每行「删除」「编辑」 |
 | 组合 `Collection` | `/collections/:id`、`/collections/:id/pipeline` | 成员表含「拉取失败时」 |
 | 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML、前置）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由 |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
@@ -24,7 +24,7 @@
 | 基础设置预设 `Presets` | `/presets/:id` | 单页；Surge 段为 M2 占位说明 |
 | 用户 `Users` | `/users` | 统计列与共享走占位接口 |
 | 系统 `System` | `/system` | 占位接口 |
-| 补充 `Dialogs` | 全部详情页 | 「更多」菜单 + 删除确认、各类对话框、表单 / YAML 双视图、离开前保存 |
+| 补充 `Dialogs` | 全部详情页 | 头部「更多」菜单与最右侧的独立删除按钮、删除确认、各类对话框、表单 / YAML 双视图、离开前保存（2026-10-29 删除从「更多」菜单移出） |
 | 补充 `Login`、`Account` | `/login`、`/account` | — |
 | 手机 · 订阅链接 `Mobile` | 各页窄屏 | 390 px 下逐路由检查，页面本身无横向滚动，宽表格在自身容器内滚动 |
 

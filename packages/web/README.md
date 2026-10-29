@@ -33,7 +33,7 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 | `/users`、`/system` | 管理员：用户（统计列、脚本权限、共享的订阅源与组合）；系统（SSRF 白名单、mihomo 校验、规则仓库、备份恢复，服务端待实现） |
 | `/login`、`/account` | 登录、账户（修改密码） |
 
-删除统一走详情页右上角「更多」菜单 → 确认对话框，被引用时对话框里列出引用方。对话框的结构与宽度见 `components/ui.tsx` 的 `Modal`。
+删除是独立按钮：详情页在头部操作区最右侧（保存之后），列表每行在「编辑」左侧；点击后弹确认对话框，被引用时对话框里列出引用方。「更多」菜单只放重命名、复制等非危险操作。对话框的结构与宽度见 `components/ui.tsx` 的 `Modal`。
 
 ## 服务端尚未实现的功能
 
@@ -47,7 +47,7 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 
 Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步骤跳转；返回表单恢复有效字段后解除拦截，也可直接修复原文或明确放弃。节点与预设不会把无效原文显示为“已保存”。模板 YAML 导出使用 `sub-forge-group` / `sub-forge-rule` 注释保留稳定 ID，因此改名或改匹配内容仍能关联已有个人覆盖。返回表单时无效组字段被清理、坏规则被忽略；无效组类型使用默认 select；原 final 引用的组不存在时改为 REJECT 并提示。复制组或规则时建议删除复制项的 ID 注释；恢复解析会忽略重复注释并保证 ID 唯一。
 
-公共组件在 `src/components/`：`MoreMenu`（「更多」菜单与删除确认）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
+公共组件在 `src/components/`：`MoreMenu`（「更多」菜单、删除按钮 `DeleteAction` 与删除确认 `DeleteDialog`）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
 
 ## 已知简化
 

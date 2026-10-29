@@ -4,7 +4,7 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
-import { DeleteMenu } from '../components/MoreMenu.tsx';
+import { DeleteAction, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { Button, Card, ErrorBox, Input, Modal, PageHeader, Segmented, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
@@ -98,8 +98,8 @@ export function PresetEdit() {
             <h2 className="m-0 text-[17px] font-semibold">{d.name}</h2>
             <div className="flex items-center gap-2">
               <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }]} onChange={setClient} />
-              <DeleteMenu what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove}
-                extra={[{ label: '重命名…', onSelect: () => setRenaming(true) }]} />
+              <MoreMenu items={[{ label: '重命名…', onSelect: () => setRenaming(true) }]} />
+              <DeleteAction what="预设" name={d.name} body="引用它的配置订阅需要先改用其他预设或自定义。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset} onDelete={e.remove} />
             </div>
           </div>
           {client === 'surge' && <div className="rounded-lg border border-dashed border-[#d5d9e0] px-4 py-6 text-center text-[13px] text-muted">Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。</div>}

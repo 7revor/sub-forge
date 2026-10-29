@@ -12,7 +12,7 @@ import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
 import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFormFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
-import { DeleteDialog, DeleteMenu, MoreMenu } from '../components/MoreMenu.tsx';
+import { DeleteAction, DeleteDialog, MoreMenu } from '../components/MoreMenu.tsx';
 import { RenameDialog } from '../components/dialogs.tsx';
 import { TargetPicker, useNodeSetNames } from '../components/pickers.tsx';
 import { Badge, Button, buttonClass, Card, ErrorBox, Field, Input, Modal, PageHeader, Select, Switch, Textarea, cx, td, th } from '../components/ui.tsx';
@@ -72,12 +72,14 @@ function NewGroupModal({ open, onClose }: { open: boolean; onClose: () => void }
 
 const typesText = (g: LocalProxyGroup) => [...new Set(g.proxies.map((p) => p.type))].join(' / ') || '—';
 
+const GROUP_DELETE_BODY = '分组里的节点会一起删除；引用它的配置订阅需要先移除。';
+
 /** /locals：分组列表，与订阅源列表同一形态 */
 export function LocalList() {
   const [creating, setCreating] = useState(false);
   return (
     <>
-      <DocList kind="locals" title="本地节点" noun="分组" onCreate={() => setCreating(true)} intro={INTRO}
+      <DocList kind="locals" title="本地节点" noun="分组" onCreate={() => setCreating(true)} intro={INTRO} deleteBody={GROUP_DELETE_BODY}
         empty="自建、中转等手写节点按分组管理，每个分组都能单独加入配置订阅。"
         columns={[
           { header: '名称', cell: (g) => g.name },
@@ -124,6 +126,7 @@ export function LocalEdit() {
   const [pasting, setPasting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [groupText, setGroupText] = useState<string>();
+  const [deletingNode, setDeletingNode] = useState<number>();
   const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew);
   if (e.isNew) return <Navigate to="/locals" replace />;
   if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
@@ -137,10 +140,10 @@ export function LocalEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / {e.doc.data?.name}</>}
         title={d.name || '未命名'}
         actions={<>
-          <DeleteMenu what="分组" name={d.name} body="分组里的节点会一起删除；引用它的配置订阅需要先移除。" error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
-            onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })}
-            extra={[{ label: '重命名分组…', onSelect: () => setRenaming(true) }, { label: '分组 YAML…', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
+          <MoreMenu items={[{ label: '重命名分组…', onSelect: () => setRenaming(true) }, { label: '分组 YAML…', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
           <Button variant="primary" onClick={() => e.submit()} disabled={e.save.isPending || !e.dirty}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
+          <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
+            onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })} />
         </>}>
         <Badge>{d.proxies.length} 个节点</Badge>
         {e.dirty && <Badge tone="warn">有未保存的修改</Badge>}
@@ -160,7 +163,10 @@ export function LocalEdit() {
                   <td className={cx(td, 'px-3.5 py-3')}><span className="rounded bg-[#ebedf1] px-1.5 py-0.5 font-mono text-[12px]">{p.type}</span></td>
                   <td className={cx(td, 'px-3.5 py-3 font-mono text-[12.5px] text-ink-2')}>{p.server}:{p.port}</td>
                   <td className={cx(td, 'px-3.5 py-3 text-[12.5px]')}>{dialerText(p, nameOf)}</td>
-                  <td className={cx(td, 'text-right')}><DocActionLink to={nodePath(i)} name={p.name} /></td>
+                  <td className={cx(td, 'text-right whitespace-nowrap')}>
+                    <Button size="sm" variant="danger" aria-label={`删除 ${p.name}`} className="mr-2" onClick={() => { e.save.reset(); setDeletingNode(i); }}>删除</Button>
+                    <DocActionLink to={nodePath(i)} name={p.name} />
+                  </td>
                 </DocTableRow>
               ))}
             </tbody>
@@ -177,6 +183,11 @@ export function LocalEdit() {
         </Field>
         <ErrorBox error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
       </Modal>
+      <DeleteDialog open={deletingNode !== undefined} title={`删除节点「${deletingNode === undefined ? '' : d.proxies[deletingNode]?.name ?? ''}」？`} error={e.save.error} pending={e.save.isPending}
+        onClose={() => setDeletingNode(undefined)}
+        onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>
+        节点会从分组「{d.name}」中移除并立即保存{e.dirty ? '；分组里其他未保存的修改也会一起保存' : ''}。
+      </DeleteDialog>
       <PasteModal open={pasting} onClose={() => setPasting(false)} onImport={(ps) => setProxies([...d.proxies, ...ps])} />
       <RenameDialog open={renaming} title="重命名分组" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
       <LeaveModal blocker={blocker} what={`分组「${d.name}」`} canSave pending={e.save.isPending} error={e.save.error}
@@ -236,8 +247,8 @@ export function LocalNodeEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / <Link to={groupPath} className={crumbLink}>{g.name}</Link> / {isNew ? '新增节点' : base?.name}</>}
         title={isNew ? '新增节点' : cur.name || '未命名'}
         actions={<>
-          {!isNew && <MoreMenu items={[{ label: '删除节点…', danger: true, onSelect: () => { save.reset(); setDeleting(true); } }]} />}
           <Button variant="primary" onClick={() => persist()} disabled={save.isPending || !rawValid || !(dirty || isNew)}>{save.isPending ? '保存中…' : isNew ? '添加到分组' : dirty ? '保存节点' : '已保存'}</Button>
+          {!isNew && <Button variant="danger" onClick={() => { save.reset(); setDeleting(true); }}>删除</Button>}
         </>}>
         <Badge>分组 · {g.name}</Badge>
         {!isNew && dirty && <Badge tone="warn">有未保存的修改</Badge>}

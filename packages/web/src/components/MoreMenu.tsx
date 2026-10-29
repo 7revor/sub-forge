@@ -1,4 +1,4 @@
-// 详情页右上角的「更多」菜单与删除确认（设计稿「对话框与危险操作」）：删除不在页面底部放红色按钮。
+// 详情页右上角的「更多」菜单与删除确认（设计稿「对话框与危险操作」）：删除是头部最右侧的独立按钮，不放进「更多」菜单，也不在页面底部放红色按钮。
 
 import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -50,13 +50,13 @@ export function DeleteDialog({ open, title, children, error, pending, onClose, o
   );
 }
 
-/** 「更多」菜单 + 删除确认的组合，供详情页头部使用 */
-export function DeleteMenu({ what, name, body, error, pending, onDelete, onReset, extra = [] }: {
-  what: string; name: string; body?: ReactNode; error?: unknown; pending?: boolean; onDelete: () => void; onReset?: () => void; extra?: MoreItem[];
+/** 详情页头部的独立「删除」按钮 + 删除确认 */
+export function DeleteAction({ what, name, body, error, pending, onDelete, onReset }: {
+  what: string; name: string; body?: ReactNode; error?: unknown; pending?: boolean; onDelete: () => void; onReset?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return <>
-    <MoreMenu items={[...extra, { label: '删除…', danger: true, onSelect: () => { onReset?.(); setOpen(true); } }]} />
+    <Button variant="danger" onClick={() => { onReset?.(); setOpen(true); }}>删除</Button>
     <DeleteDialog open={open} title={`删除${what}「${name}」？`} error={error} pending={pending} onClose={() => setOpen(false)} onConfirm={onDelete}>
       {body ?? '删除后无法恢复。'}
     </DeleteDialog>
