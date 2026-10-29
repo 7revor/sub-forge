@@ -1,7 +1,8 @@
 import type { GroupSpec, ReportItem } from '@sub-forge/core';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
+import { DeleteDialog } from '../../components/DetailActions.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Button, Card, Empty, Field, Input, Modal, Switch, cx } from '../../components/ui.tsx';
@@ -11,21 +12,22 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
-const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_32px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_32px]';
+const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_64px]';
 
 export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; report: ReportItem[];
 }) {
-  const [deleting, setDeleting] = useState(false);
+  const [deleting, setDeleting] = useState<string>();
+  const deletingGroup = value.groups.find(g => g.id === deleting);
   const group = value.groups.find(g => g.id === selected);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (patch: Partial<GroupSpec>) => {
     if (group) onChange({ ...value, groups: value.groups.map(g => g.id === group.id ? { ...g, ...patch } : g) });
   };
-  const close = () => { onSelect(undefined); setDeleting(false); };
-  const references = group ? value.groups.filter(g => g.id !== group.id && g.members.some(m => m.kind === 'group' && m.groupId === group.id)).length : 0;
-  const rules = group ? value.rules.filter(r => r.target.kind === 'group' && r.target.groupId === group.id).length : 0;
-  const final = group && value.final.kind === 'group' && value.final.groupId === group.id;
+  const close = () => { onSelect(undefined); setDeleting(undefined); };
+  const references = deletingGroup ? value.groups.filter(g => g.id !== deletingGroup.id && g.members.some(m => m.kind === 'group' && m.groupId === deletingGroup.id)).length : 0;
+  const rules = deletingGroup ? value.rules.filter(r => r.target.kind === 'group' && r.target.groupId === deletingGroup.id).length : 0;
+  const final = deletingGroup && value.final.kind === 'group' && value.final.groupId === deletingGroup.id;
   return <>
     <Card title="策略组" subtitle={`${value.groups.length} 个`} bodyClass="pb-1" actions={<>
       <Button size="sm" disabled={REGION_GROUPS.every(region => value.groups.some(g => g.name === region.name))} onClick={() => {
@@ -48,12 +50,15 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left font-medium', error && 'text-err')}>{g.name || '未命名组'}{g.display?.hidden && <span className="ml-2 text-[11px] font-normal text-muted">已隐藏</span>}</span>
             <span className="font-mono text-[12px]">{g.type.toUpperCase()}</span>
             <span className="col-span-3 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-auto sm:row-start-auto" title={members}>{members}</span>
-            <Button size="sm" variant="ghost" className="col-start-4 row-start-1 px-2 sm:col-start-5" aria-label={`编辑策略组「${g.name}」`} onClick={() => onSelect(g.id)}><Pencil size={14} /></Button>
+            <div className="col-start-4 row-start-1 flex gap-1 sm:col-start-5">
+              <Button size="sm" variant="ghost" className="px-1.5" aria-label={`编辑策略组「${g.name}」`} onClick={() => onSelect(g.id)}><Pencil size={14} /></Button>
+              <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除策略组「${g.name}」`} onClick={() => setDeleting(g.id)}><Trash2 size={14} /></Button>
+            </div>
           </div>;
         }} />
       </>}
     </Card>
-    <Modal title={group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'} open={!!group} onClose={close} placement="right"
+    <Modal title={group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'} open={!!group && !deletingGroup} onClose={close} placement="right"
       footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={close}>完成</Button></>}>
       {group && <>
         <ItemIssues report={report} where={`group:${group.id}`} />
@@ -78,11 +83,17 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             </div>} />
           </div>}
         </section>
-        {deleting ? <div className="flex flex-col gap-3 rounded-lg bg-err-soft p-3 text-[13px]">
-          <span>删除此组会移除 {references} 个组内的引用，将 {rules} 条规则{final ? '和 MATCH' : ''}的出口改为 REJECT。</span>
-          <div className="flex gap-2"><Button size="sm" variant="danger" onClick={() => { onChange(removeGroup(value, group.id)); close(); }}>确认删除</Button><Button size="sm" onClick={() => setDeleting(false)}>取消</Button></div>
-        </div> : <div className="pt-2"><Button variant="danger" size="sm" onClick={() => setDeleting(true)}>删除组</Button></div>}
+        <div className="pt-2"><Button variant="danger" size="sm" onClick={() => setDeleting(group.id)}>删除组</Button></div>
       </>}
     </Modal>
+    <DeleteDialog open={!!deletingGroup} title={`删除策略组「${deletingGroup?.name || '未命名组'}」？`} onClose={() => setDeleting(undefined)} onConfirm={() => {
+      if (!deletingGroup) return;
+      onChange(removeGroup(value, deletingGroup.id));
+      if (selected === deletingGroup.id) onSelect(undefined);
+      setDeleting(undefined);
+    }}>
+      <p className="mt-0">删除此组会移除 {references} 个组内的引用，将 {rules} 条规则{final ? '和 MATCH' : ''}的出口改为 REJECT。</p>
+      <p className="mb-0 text-muted">保存模板后生效。</p>
+    </DeleteDialog>
   </>;
 }
