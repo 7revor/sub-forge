@@ -111,7 +111,6 @@ export function TabRules() {
 
   if (bound) return <>
     <Card title="前置规则" actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加前置规则</Button>}>
-      <p className="mt-0 text-[13px] text-muted">按顺序优先于全部模板规则匹配。</p>
       {!prependRules.length ? <Empty title="没有前置规则" /> : <SortableList items={prependRules} getKey={rule => rule.id}
         onReorder={prependRules => patchOverlay(o => ({ ...o, extraRules: [...prependRules].reverse().map(rule => ({ anchor: 'top', rule })) }))}
         renderItem={(rule, index, handle) => <div className="border-t border-line-2">
@@ -125,13 +124,18 @@ export function TabRules() {
           {editing === rule.id && <PrivateRuleEdit single key={rule.id} rule={rule} onApply={value => setExtra(rule.id, () => value)} onClose={() => setEditing(undefined)} />}
         </div>} />}
     </Card>
-    <Card title="规则（由模板维护）">
+    <Card title="模板规则" subtitle="顺序与出口跟随模板更新" bodyClass="flex flex-col gap-4 px-4 pb-4">
       <Input aria-label="搜索规则" placeholder="搜索规则或出口" value={search} onChange={e => setSearch(e.target.value)} />
-      <p className="text-[13px] text-muted">规则顺序和出口跟随模板。需要修改时，请在「模板与模式」中转为独立配置。</p>
-      {(template?.rules ?? []).filter(r => `${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`.toLowerCase().includes(search.toLowerCase())).map(r => <div key={r.id} className="flex flex-wrap gap-3 border-t border-line py-3 text-[13px]">
-        <Badge>模板</Badge><span className="min-w-0 flex-1 break-all font-mono">{label(r.matcher).text}</span><span>{targetLabel(r.target, groupName, nodeSetName)}</span>
-      </div>)}
-      <div className="border-t border-line pt-3 text-[13px]">MATCH → {targetLabel(final, groupName, nodeSetName)}</div>
+      <div className="divide-y divide-line-2">
+        {(template?.rules ?? []).filter(r => `${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`.toLowerCase().includes(search.toLowerCase())).map(r => <div key={r.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 py-3 text-[13px] sm:grid-cols-[auto_minmax(0,1fr)_minmax(80px,auto)]">
+          <Badge>模板</Badge>
+          <span className="min-w-0 break-all font-mono leading-6">{label(r.matcher).text}</span>
+          <span className="col-start-2 min-w-0 break-words text-ink-2 sm:col-start-auto sm:text-right">{targetLabel(r.target, groupName, nodeSetName)}</span>
+        </div>)}
+      </div>
+      <div className="flex items-start justify-between gap-4 border-t border-line-2 pt-4 text-[13px]">
+        <span className="font-mono">MATCH</span><span className="min-w-0 break-words text-right text-ink-2">{targetLabel(final, groupName, nodeSetName)}</span>
+      </div>
     </Card>
     {adding && <ExtraRuleModal prepend onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay(o => ({ ...o, extraRules: [{ anchor, rule }, ...(o.extraRules ?? [])] }))} />}
   </>;

@@ -195,3 +195,6 @@
 此项取代此前规则启停设计：RuleSets 来源行删除启用开关；TemplateEditor 删除启用列并回收列宽；ProfileDetail 的独立规则和绑定前置规则删除启用开关、停用样式和停用标签。保留排序、出口、删除及 no-resolve/src 选项。界面存在的每一项都会生效。旧停用项按用户确认移除。
 
 外部画布本会话已核实要求登录，未更新。同步参考 `research/verification/rule-presence-20261029/` 中规则集、模板、绑定及独立订阅截图。
+
+
+2026-10-29 绑定规则页间距待同步：前置区不再绘制重复说明；模板区标题为「模板规则」，副说明「顺序与出口跟随模板更新」。搜索框、列表、MATCH 分开留白，规则与出口按列对齐。修正后的实际截图见 `research/verification/subscription-rule-spacing-20261029/after.png`；外部画布沿用本会话已核实的登录限制，未修改。

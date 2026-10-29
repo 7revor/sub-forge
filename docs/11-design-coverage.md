@@ -139,3 +139,6 @@ ProfileNew、Profile 详情与 Lists/Main 显示「绑定模板 / 独立配置�
 ### 2026-10-29：规则取消启用开关
 
 RuleSets 来源行、TemplateEditor 规则行、ProfileDetail 独立规则与绑定前置规则不再展示启用 Switch、启用列或停用样式。存在即参与输出，删除即移除；no-resolve、src 等规则选项仍可编辑。后端保存规范化与 v17 迁移已接通，无待实现接口。外部画布沿用本会话已核实的登录限制，待同步项见 docs/13；浏览器截图见 `research/verification/rule-presence-20261029/`。
+
+
+2026-10-29 绑定规则页：移除前置规则的独立说明行；模板说明置于标题区，正文为 16px 间距的搜索、列表与 MATCH。规则匹配与出口分列对齐。后端、模型及种子无变化；外部画布待同步，见 docs/13。

@@ -265,3 +265,6 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 ### 规则存在即生效（SQLite v17）
 
 保存、自检、预览及发布共用规则清理：旧 enabled:false 条目移除，其余清除标记。v17 在事务中处理规则集、模板全部版本、独立订阅与绑定前置规则，保持有效输出、归属、更新时间、链接和历史资源。旧种子导入执行同一清理，旧备份不修改。示例移除默认停用的 YAML/仓库来源。隔离浏览器入口为 `pnpm exec tsx test/manual-rule-presence-server.ts`，完成后关闭服务。
+
+
+2026-10-29 绑定规则页的说明与间距修正仅调整前端呈现，无服务端、数据库或种子变更。
