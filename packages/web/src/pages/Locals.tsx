@@ -91,18 +91,33 @@ export function LocalList() {
   );
 }
 
-function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () => void; onImport: (p: LocalProxy[]) => void }) {
+function PasteModal({ open, onClose, onImport, pending, error, dirty }: {
+  open: boolean; onClose: () => void; onImport: (p: LocalProxy[], done: (saved: boolean) => void) => void;
+  pending: boolean; error: unknown; dirty: boolean;
+}) {
   const [text, setText] = useState('');
+  const submitting = useRef(false);
   const parsed = text.trim() ? parseProxyImport(text) : undefined;
   // 本地节点不处理代理链：节点自带的 dialer-proxy / underlying-proxy 不导入，并提示到配置订阅中设置
   const proxies: LocalProxy[] = (parsed?.proxies ?? []).map(({ _source, _origName, _key, upstreamDialer, ...rest }) => rest as LocalProxy);
   const dropped = (parsed?.proxies ?? []).filter((p) => p.upstreamDialer).length;
+  const close = () => { if (!pending && !submitting.current) onClose(); };
+  const submit = () => {
+    if (!proxies.length || pending || submitting.current) return;
+    // 先同步锁住提交与关闭，覆盖状态重绘之前紧接着发生的点击 / Esc。
+    submitting.current = true;
+    onImport(proxies, (saved) => {
+      submitting.current = false;
+      if (saved) { setText(''); onClose(); }
+    });
+  };
   return (
-    <Modal title="粘贴导入节点" open={open} onClose={onClose} wide
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!proxies.length} onClick={() => { onImport(proxies); setText(''); onClose(); }}>导入 {proxies.length} 个节点</Button></>}>
+    <Modal title="粘贴导入节点" open={open} onClose={close} wide
+      footer={<><Button disabled={pending} onClick={close}>取消</Button><Button variant="primary" disabled={!proxies.length || pending} onClick={submit}>{pending ? '保存中…' : `导入并保存 ${proxies.length} 个节点`}</Button></>}>
       <Field label="URI 列表、Base64、Clash YAML 或 Surge [Proxy] 行" hint="YAML 支持单个节点、节点列表或带 proxies 的完整配置。">
-        {(id) => <Textarea id={id} rows={8} className="font-mono text-[12.5px]" value={text} onChange={(e) => setText(e.target.value)} />}
+        {(id) => <Textarea id={id} rows={8} className="font-mono text-[12.5px]" disabled={pending} value={text} onChange={(e) => setText(e.target.value)} />}
       </Field>
+      <span className="text-[12.5px] text-muted">导入后立即保存分组{dirty ? '，分组里其他未保存的修改也会一起保存' : ''}。</span>
       {parsed && <div className="flex flex-wrap gap-2">
         <Badge tone={proxies.length ? 'ok' : 'neutral'}>识别为 {parsed.format} · {proxies.length} 个节点</Badge>
         {parsed.failures.length > 0 && <Badge tone="err">{parsed.failures.length} 行无法解析</Badge>}
@@ -110,6 +125,7 @@ function PasteModal({ open, onClose, onImport }: { open: boolean; onClose: () =>
       </div>}
       {dropped > 0 && <span className="text-[12.5px] leading-relaxed text-muted">本地节点只保存节点信息。需要经中转连接时，请在配置订阅的「代理链」中添加链规则。</span>}
       {parsed?.failures.length ? <ul className="m-0 pl-5 font-mono text-[12px] text-err">{parsed.failures.map((f, i) => <li key={i}>{f.line.slice(0, 60)} — {f.reason}</li>)}</ul> : null}
+      <ErrorBox error={error} />
     </Modal>
   );
 }
@@ -146,7 +162,7 @@ export function LocalEdit() {
 
       <Card bodyClass="overflow-x-auto"
         title={<h2 className="m-0 text-[15px] font-semibold">节点</h2>}
-        actions={<><Button size="sm" onClick={() => setPasting(true)}>粘贴导入</Button><Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link></>}>
+        actions={<><Button size="sm" disabled={e.save.isPending} onClick={() => { e.save.reset(); setPasting(true); }}>粘贴导入</Button><Link to={nodePath('new')} className={buttonClass('default', 'sm')}><Plus size={14} />新增节点</Link></>}>
         {!d.proxies.length ? <div className="px-4 pb-4"><Empty title="这个分组还没有节点" description="新增一个，或粘贴 URI / YAML 一次导入多个。" /></div> : (
           <table className="w-full min-w-[620px] border-collapse">
             <thead><tr><th className={cx(th, 'px-3.5')}>名称</th><th className={cx(th, 'px-3.5')}>协议</th><th className={cx(th, 'px-3.5')}>服务器</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
@@ -181,7 +197,10 @@ export function LocalEdit() {
         onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>
         节点会从分组「{d.name}」中移除并立即保存{e.dirty ? '；分组里其他未保存的修改也会一起保存' : ''}。
       </DeleteDialog>
-      <PasteModal open={pasting} onClose={() => setPasting(false)} onImport={(ps) => setProxies([...d.proxies, ...ps])} />
+      <PasteModal open={pasting} onClose={() => setPasting(false)} pending={e.save.isPending} error={e.save.error} dirty={e.dirty}
+        onImport={(ps, done) => e.save.mutate({ ...d, proxies: [...d.proxies, ...ps] }, {
+          onSuccess: (item) => { e.setDraft(item); done(true); }, onError: () => done(false),
+        })} />
       <RenameDialog open={renaming} title="重命名分组" name={d.name} onClose={() => setRenaming(false)} onRename={(name) => e.setDraft({ ...d, name })} />
       <LeaveModal blocker={blocker} what={`分组「${d.name}」`} canSave pending={e.save.isPending} error={e.save.error}
         onSave={(done) => e.save.mutate(d, { onSuccess: done })} />
