@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { DualEditor } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, proxyFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
+import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { TargetPicker, useNodeSetNames } from '../components/pickers.tsx';
@@ -67,7 +67,7 @@ export function LocalEdit() {
   };
 
   return (
-    <DetailShell listPath="/locals" listLabel="本地节点组" isNew={e.isNew} name={d.name} dirty={e.dirty && !rawInvalid} saving={e.save.isPending}
+    <DetailShell listPath="/locals" listLabel="本地节点组" isNew={e.isNew} name={d.name} dirty={e.dirty || rawInvalid} saving={e.save.isPending} saveDisabled={rawInvalid}
       onSave={() => { if (!rawInvalid) e.submit(); }} saveError={e.save.error} onDelete={() => e.remove(d.name)} deleteError={e.del.error}>
       <Card title="分组"><Field label="名称">{(id) => <Input id={id} value={d.name} onChange={(x) => e.setDraft({ ...d, name: x.target.value })} />}</Field></Card>
       <div className="flex flex-wrap items-start gap-5">
@@ -90,7 +90,7 @@ export function LocalEdit() {
         {cur && (
           <Card title={`编辑 · ${cur.name}`} className="min-w-0 flex-[999_1_480px]" actions={<Button size="sm" variant="danger" disabled={rawInvalid} onClick={() => { setProxies(d.proxies.filter((_, i) => i !== sel)); setSel(Math.max(0, sel - 1)); }}><Trash2 size={14} />删除节点</Button>}>
             <div className="flex flex-col gap-4">
-            <DualEditor key={sel} onValidityChange={setRawValid} value={cur} onChange={replace} toRaw={proxyToYaml} fromRaw={(text) => proxyFromYaml(text, cur)} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
+            <DualEditor key={sel} onValidityChange={setRawValid} value={cur} onChange={replace} toRaw={proxyToYaml} fromRaw={(text) => proxyDraftFromYaml(text, cur)} rawLabel="节点 YAML" renderForm={() => <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="名称" className="col-span-2">{(id) => <Input id={id} value={cur.name} onChange={(x) => update({ name: x.target.value })} />}</Field>
                 <Field label="协议">{(id) => <Select id={id} value={cur.type} onChange={(x) => changeType(x.target.value)}>

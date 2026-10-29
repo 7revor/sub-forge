@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import snapshots from '../../../core/test/__snapshots__/proxy-parse.test.ts.snap?raw';
 import { getPath, otherFields, setPath } from '../components/schema.ts';
 import { defaultsFor, PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { groupFromYaml, groupToYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
+import { groupFromYaml, groupToYaml, proxyDraftFromYaml, proxyFromYaml, proxyToYaml } from './proxyYaml.ts';
 
 const node: LocalProxy = {
   name: '测试节点', type: 'vless', server: 'example.com', port: 443, uuid: 'uuid', tls: true,
@@ -76,6 +76,33 @@ describe('节点 YAML 转换', () => {
     const result = proxyFromYaml(proxyToYaml(value as LocalProxy));
     expect(result).toEqual({ ok: true, value });
     expect(getPath(value, 'reality-opts.short-id')).toBe('0012');
+  });
+});
+
+describe('节点 YAML 草稿与表单切换', () => {
+  it('所有协议的未完成默认节点都可返回表单，严格导入仍拒绝空服务器', () => {
+    for (const { value: type } of PROXY_TYPES) {
+      const draft = { ...defaultsFor(type), name: '节点 1' };
+      const text = proxyToYaml(draft);
+      expect(proxyDraftFromYaml(text, draft)).toEqual({ ok: true, value: draft });
+      expect(proxyFromYaml(text)).toMatchObject({ ok: false });
+    }
+  });
+
+  it('未填或删除的字段转为表单空值，其他已填写内容和前置均保留', () => {
+    const result = proxyDraftFromYaml('type: vless\nserver:\nuuid: new-uuid\nfuture: {nested: true}', node);
+    expect(result).toEqual({ ok: true, value: { name: '', type: 'vless', server: '', port: 0, uuid: 'new-uuid', future: { nested: true }, dialer: node.dialer } });
+  });
+
+  it('补齐草稿后，表单与严格导入得到相同节点', () => {
+    const text = proxyToYaml(node);
+    expect(proxyDraftFromYaml(text, node)).toEqual(proxyFromYaml(text, node));
+  });
+
+  it('语法错误、重复键和不能由表单表示的字段类型仍阻止切换', () => {
+    for (const text of ['name: [', 'name: A\nname: B', '[]', 'server: {host: example.com}', 'port: "443"']) {
+      expect(proxyDraftFromYaml(text, node), text).toMatchObject({ ok: false });
+    }
   });
 });
 

@@ -92,6 +92,20 @@ describe('文档增删改查', () => {
     expect(res.json.error).toMatch(/成环/);
   });
 
+  it('本地节点草稿缺少必填项时拒绝保存，补齐后可保存', async () => {
+    const { store, alice } = await twoUsers();
+    const proxy = { name: '节点 1', type: 'vless', server: 'node.example.test', port: 443, uuid: 'test-uuid' };
+    for (const patch of [{ name: '' }, { type: '' }, { server: '' }, { port: 0 }]) {
+      const res = await alice.post('/api/locals', { name: '未完成分组', proxies: [{ ...proxy, ...patch }] });
+      expect(res.status).toBe(400);
+      expect(res.json.error).toContain('节点 1 缺少');
+    }
+    expect(store.list('local')).toEqual([]);
+    const saved = await alice.post('/api/locals', { name: '完整分组', proxies: [proxy] });
+    expect(saved.status).toBe(201);
+    expect(saved.json.item.proxies).toEqual([proxy]);
+  });
+
   it('被引用的文档不能删除，返回引用方', async () => {
     const { alice } = await twoUsers();
     const s = (await alice.post('/api/sources', localSource())).json.item.id;

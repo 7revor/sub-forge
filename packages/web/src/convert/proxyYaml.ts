@@ -7,13 +7,15 @@ const withoutDialer = ({ dialer: _dialer, ...proxy }: LocalProxy) => proxy;
 export const proxyToYaml = (proxy: LocalProxy): string => stringify(withoutDialer(proxy));
 export const groupToYaml = (proxies: LocalProxy[]): string => stringify({ proxies: proxies.map(withoutDialer) });
 
-function validate(value: unknown, current?: LocalProxy): LocalProxy {
+function validate(value: unknown, current?: LocalProxy, draft = false): LocalProxy {
   if (!isRecord(value)) throw new Error('节点必须是 YAML 映射');
+  // 编辑草稿允许未填写必填项；补为表单可表示的空值，不恢复已被用户删除的旧值。
+  const fields = draft ? { ...value, name: value.name ?? '', type: value.type ?? '', server: value.server ?? '', port: value.port ?? 0 } : value;
   for (const key of ['name', 'type', 'server']) {
-    if (typeof value[key] !== 'string' || !value[key].trim()) throw new Error(`缺少或无效的 ${key}（需要非空字符串）`);
+    if (typeof fields[key] !== 'string' || (!draft && !fields[key].trim())) throw new Error(`缺少或无效的 ${key}（需要${draft ? '' : '非空'}字符串）`);
   }
-  if (typeof value.port !== 'number' || !Number.isFinite(value.port)) throw new Error('缺少或无效的 port（需要数字）');
-  const { dialer: _dialer, ...rest } = value;
+  if (typeof fields.port !== 'number' || !Number.isFinite(fields.port)) throw new Error('缺少或无效的 port（需要数字）');
+  const { dialer: _dialer, ...rest } = fields;
   return { ...rest, ...(current?.dialer ? { dialer: current.dialer } : {}) } as LocalProxy;
 }
 
@@ -41,6 +43,14 @@ function read<T>(text: string, group: boolean, convert: (value: unknown, line: (
 export function proxyFromYaml(text: string, current?: LocalProxy): RawResult<LocalProxy> {
   return read(text, false, (value, line) => {
     try { return validate(value, current); }
+    catch (error) { throw new ProxyYamlError(error instanceof Error ? error.message : String(error), line(0)); }
+  });
+}
+
+/** 单节点编辑只要求结构能被表单表示，必填项在保存时由服务端校验。批量导入仍使用严格校验。 */
+export function proxyDraftFromYaml(text: string, current?: LocalProxy): RawResult<LocalProxy> {
+  return read(text, false, (value, line) => {
+    try { return validate(value, current, true); }
     catch (error) { throw new ProxyYamlError(error instanceof Error ? error.message : String(error), line(0)); }
   });
 }
