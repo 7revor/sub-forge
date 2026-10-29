@@ -16,7 +16,7 @@
 | 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML、前置）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由 |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集「下发地址」显示路径模式 |
-| 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：客户端改写、解析结果、输出预览，每块独占一行；编辑来源对话框（2026-10-29 移除「下载地址」卡片，实际地址见配置订阅预览） |
+| 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：客户端改写、解析结果（仅本地文本规则集，远程与 mrs / srs 不显示）、输出预览，每块独占一行；编辑来源对话框（2026-10-29 移除「下载地址」卡片，实际地址见配置订阅预览） |
 | 规则包 `RuleBundle` | `/bundles/:id` | 本地规则集在浏览器解析出 behavior 与条数；远程规则集显示为未知 |
 | 规则仓库 `RuleRepo` | `/rule-repo` | 占位接口 |
 | 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish`、`/templates/manage` | 草稿在两页之间共用；发布页自动试渲染 |

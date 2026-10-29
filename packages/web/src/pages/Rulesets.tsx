@@ -59,7 +59,7 @@ function SourceFields({ d, set, autoFocusName }: { d: RuleSetDoc; set: (p: Parti
 
 const FORMAT_TEXT: Record<string, string> = { auto: '自动识别', classical: 'classical', 'domain-set': 'DOMAIN-SET', domain: 'DOMAIN-SET', ipcidr: 'CIDR', yaml: 'YAML payload', mrs: 'mrs', srs: 'srs' };
 
-/** 规则集（设计稿「规则集」）：自上而下为客户端改写、解析结果、输出预览，每块独占一行；来源在「编辑来源」对话框里改 */
+/** 规则集（设计稿「规则集」）：自上而下为客户端改写、解析结果（仅本地文本规则集）、输出预览，每块独占一行；来源在「编辑来源」对话框里改 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
@@ -82,7 +82,6 @@ export function RulesetEdit() {
     ? [...parsed.rules.map((r) => ({ line: r.line, text: r.text, ir: ruleText(r.rule), reason: undefined as string | undefined })), ...parsed.rejected.map((r) => ({ line: r.line, text: r.text, ir: '—', reason: r.reason }))].sort((x, y) => x.line - y.line)
     : [];
   const shown = rows.filter((r) => !q.trim() || r.text.toLowerCase().includes(q.trim().toLowerCase()));
-  const rejectedCount = parsed && !parsed.passthrough ? parsed.rejected.length : preview.data?.rejected.length;
 
   return (
     <DetailShell listPath="/rulesets" listLabel="规则集" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
@@ -99,31 +98,25 @@ export function RulesetEdit() {
       {e.isNew ? <Card title="来源"><SourceFields d={d} set={set} autoFocusName /></Card> : (
         <>
           <RulesetOverrides value={d.overrides ?? []} onChange={(overrides) => set({ overrides })} />
-          <Card className="min-w-0" bodyClass="overflow-x-auto"
+          {d.kind === 'local' && !parsed?.passthrough && <Card className="min-w-0" bodyClass="overflow-x-auto"
             title={<h2 className="m-0 text-[15px] font-semibold">解析结果</h2>}
-            actions={d.kind === 'local' && !parsed?.passthrough && <Input aria-label="搜索规则" placeholder="搜索" className="h-9 w-[200px]" value={q} onChange={(x) => setQ(x.target.value)} />}>
-            {d.kind === 'remote' || parsed?.passthrough ? (
-              <div className="px-4 pb-4 text-[13px] leading-relaxed text-muted">
-                {parsed?.passthrough || d.format === 'mrs' || d.format === 'srs' ? 'mrs / srs 二进制规则集只做透传，不解析。' : `远程内容在拉取后解析，最终输出见下方「输出预览」${rejectedCount ? `；有 ${rejectedCount} 行不支持` : ''}。`}
-              </div>
-            ) : (
-              <table className="w-full min-w-[560px] border-collapse">
-                <thead><tr><th className={cx(th, 'w-12')}>#</th><th className={th}>原始行</th><th className={th}>中间表示</th><th className={th}>状态</th></tr></thead>
-                <tbody>
-                  {shown.slice(0, 300).map((r) => (
-                    <tr key={r.line}>
-                      <td className={cx(td, 'font-mono text-[12px] text-muted')}>{r.line}</td>
-                      <td className={cx(td, 'font-mono text-[12.5px] break-all')}>{r.text}</td>
-                      <td className={cx(td, 'font-mono text-[12px] text-ink-2 break-all')}>{r.ir}</td>
-                      <td className={td}>{r.reason ? <Badge tone="warn">{r.reason}</Badge> : <Badge tone="ok">正常</Badge>}</td>
-                    </tr>
-                  ))}
-                  {!shown.length && <tr><td colSpan={4} className={cx(td, 'text-muted')}>{rows.length ? `没有包含「${q.trim()}」的行` : '内容为空。点击「编辑来源」填写规则。'}</td></tr>}
-                </tbody>
-              </table>
-            )}
+            actions={<Input aria-label="搜索规则" placeholder="搜索" className="h-9 w-[200px]" value={q} onChange={(x) => setQ(x.target.value)} />}>
+            <table className="w-full min-w-[560px] border-collapse">
+              <thead><tr><th className={cx(th, 'w-12')}>#</th><th className={th}>原始行</th><th className={th}>中间表示</th><th className={th}>状态</th></tr></thead>
+              <tbody>
+                {shown.slice(0, 300).map((r) => (
+                  <tr key={r.line}>
+                    <td className={cx(td, 'font-mono text-[12px] text-muted')}>{r.line}</td>
+                    <td className={cx(td, 'font-mono text-[12.5px] break-all')}>{r.text}</td>
+                    <td className={cx(td, 'font-mono text-[12px] text-ink-2 break-all')}>{r.ir}</td>
+                    <td className={td}>{r.reason ? <Badge tone="warn">{r.reason}</Badge> : <Badge tone="ok">正常</Badge>}</td>
+                  </tr>
+                ))}
+                {!shown.length && <tr><td colSpan={4} className={cx(td, 'text-muted')}>{rows.length ? `没有包含「${q.trim()}」的行` : '内容为空。点击「编辑来源」填写规则。'}</td></tr>}
+              </tbody>
+            </table>
             {shown.length > 300 && <div className="px-4 py-2.5 text-[12.5px] text-muted">显示前 300 行，共 {shown.length} 行</div>}
-          </Card>
+          </Card>}
           <Card title="输出预览" className="min-w-0">
             <div className="flex flex-col gap-3">
               <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
