@@ -1,3 +1,4 @@
+import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展开查看快照历史。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,12 +11,7 @@ import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { Badge, Button, Card, DraftInput, Empty, ErrorBox, Field, Input, Modal, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
-import { useDeleteDoc, useDoc, useNodeList, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
-
-function SourceNodes({ source }: { source: SourceDoc }) {
-  const nodes = useNodeList({ type: 'source', id: source.id });
-  return <span className="font-mono text-[13px]">{nodes.data ? nodes.data.total : '—'}</span>;
-}
+import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
 function SourceState({ source }: { source: SourceDoc }) {
   const s = useSourceFetchState(source);
@@ -41,7 +37,7 @@ export function SourceList() {
         columns={[
           { header: '名称', cell: (s) => s.name },
           { header: '地址', cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[12px] text-ink-2">{s.url}</span> },
-          { header: '节点', cell: (s) => <SourceNodes source={s} /> },
+          { header: '节点', cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
           { header: '处理链', cell: (s) => <span className="font-mono text-[13px]">{s.pipeline.length} 步</span> },
           { header: '上次拉取', cell: (s) => <SourceLast source={s} /> },
           { header: '状态', cell: (s) => <SourceState source={s} /> },

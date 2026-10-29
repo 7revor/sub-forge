@@ -86,7 +86,7 @@ export function Users() {
           {stats.data?.pending && <p className="mx-4 my-3 text-[12px] text-muted">配置订阅、订阅源与最近订阅请求的统计还没有接入服务端，暂时显示为「—」。</p>}
         </Card>
 
-        <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">共享的订阅源与组合</h2><span className="text-[12.5px] text-muted">被共享的用户只能引用，看不到原始 URL。</span></div>}
+        <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}
           actions={<Button onClick={() => { setShare({ doc: '', to: [] }); setSharing(true); }}>共享…</Button>}>
           {shares.data?.pending && <div className="mb-3"><PendingNotice>共享模型还没有接入，「共享…」会被拒绝。</PendingNotice></div>}
           <div className="flex flex-col">

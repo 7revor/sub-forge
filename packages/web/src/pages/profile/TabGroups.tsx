@@ -1,3 +1,5 @@
+import { Notice } from '../../components/Notice.tsx';
+import { OptionalBoolean } from '../../components/OptionalBoolean.tsx';
 // 策略组：填充模板组（只能加成员、调整类型与测速参数，不能删除、改名或隐藏，PRF-09），管理私有组。
 
 import type { Builtin, GroupMember, GroupSpec, GroupType, NodeSetID } from '@sub-forge/core';
@@ -14,12 +16,6 @@ import { reorderExtraGroups } from './groupOrder.ts';
 
 const TYPES: GroupType[] = ['select', 'url-test', 'fallback', 'load-balance'];
 type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'whenEmpty' | 'display' | 'extra'>;
-
-function OptionalBoolean({ label, value, onChange }: { label: string; value: boolean | undefined; onChange: (value: boolean | undefined) => void }) {
-  return <Segmented label={label} value={value === undefined ? 'unset' : value ? 'on' : 'off'}
-    options={[{ value: 'unset', label: '不设置' }, { value: 'on', label: '开' }, { value: 'off', label: '关' }]}
-    onChange={(next) => onChange(next === 'unset' ? undefined : next === 'on')} />;
-}
 
 function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => void; excludeGroupId: string }) {
   const { profileNodeSets, groupOptions } = useProfile();
@@ -113,10 +109,7 @@ export function TabGroups() {
   return (
     <>
       {orphans.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-warn-soft px-4 py-3 text-[#6b3406]">
-          <span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除这些组（{orphans.join('、')}），对它们的填充已失效。</span>
-          <Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, groupPatches: Object.fromEntries(Object.entries(o.groupPatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>
-        </div>
+        <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, groupPatches: Object.fromEntries(Object.entries(o.groupPatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除这些组（{orphans.join('、')}），对它们的填充已失效。</span></Notice>
       )}
       <div className="flex flex-wrap items-start gap-5">
         <Card title="策略组" actions={<span className="text-[12px] text-muted">顺序即面板顺序</span>} className="min-w-0 flex-[1_1_300px]" bodyClass="px-4 pb-2">

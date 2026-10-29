@@ -1,7 +1,9 @@
+import { NODE_SET_LABEL, nodeSetPath } from '../domain/nodeSet.ts';
+import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 组合（设计稿「组合」）：有序引用多个节点集，成员可加前后缀；成员各自跑完处理链后合并，再跑组合自身的处理链（COL-01–04）。
 // 详情页与订阅源一致：成员表下方直接展开组合自身的处理链编辑器，逐步预览合并结果。
 
-import type { Collection, NodeSetID } from '@sub-forge/core';
+import type { Collection } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
@@ -13,7 +15,7 @@ import { SortableList } from '../components/SortableList.tsx';
 import { useNodeSetNames } from '../components/pickers.tsx';
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
-import { useList, useNodeList } from '../hooks.ts';
+import { useList } from '../hooks.ts';
 import { usePipelinePreview } from './Sources.tsx';
 
 export function CollectionList() {
@@ -27,14 +29,8 @@ export function CollectionList() {
   );
 }
 
-const NS_LABEL = { source: '订阅源', collection: '组合', local: '本地节点组' } as const;
 // 成员行：拖动手柄、成员、类型、节点数、前缀、后缀、移除
 const GRID = 'grid grid-cols-[24px_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_32px] items-center gap-3 px-4';
-
-function MemberCount({ refId }: { refId: NodeSetID }) {
-  const nodes = useNodeList(refId);
-  return <span className="font-mono text-[12.5px]">{nodes.data ? nodes.data.total : '—'}</span>;
-}
 
 const EMPTY: Collection = { id: '', name: '', members: [], pipeline: [] };
 
@@ -65,7 +61,7 @@ export function CollectionEdit() {
       </>}>
       {e.isNew && <Card title="名称"><Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field></Card>}
 
-      <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">成员</h2><span className="text-[12.5px] text-muted">按顺序合并。每个成员先跑自己的处理链，前后缀等价于自动追加一个改名处理器。组合之间不能成环。</span></div>}
+      <Card title={`成员`} subtitle={`按顺序合并。每个成员先跑自己的处理链，前后缀等价于自动追加一个改名处理器。组合之间不能成环。`}
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加成员</Button>}
         bodyClass="overflow-x-auto pb-1">
         {!d.members.length ? <div className="px-4 pb-4"><Empty title="还没有成员" description="点击「添加成员」选择订阅源、组合或本地节点组。" /></div> : (
@@ -74,9 +70,9 @@ export function CollectionEdit() {
             <SortableList items={d.members} onReorder={(members) => set({ members })} renderItem={(m, i, handle) => (
               <div className={cx(GRID, 'border-b border-line-2 py-2.5')}>
                 {handle}
-                <Link to={`/${m.ref.type === 'local' ? 'locals' : `${m.ref.type}s`}/${m.ref.id}`} className="truncate text-[13.5px] font-medium text-ink no-underline hover:text-accent">{nameOf(m.ref)}</Link>
-                <span className="text-[12.5px] text-ink-2">{NS_LABEL[m.ref.type]}</span>
-                <MemberCount refId={m.ref} />
+                <Link to={nodeSetPath(m.ref)} className="truncate text-[13.5px] font-medium text-ink no-underline hover:text-accent">{nameOf(m.ref)}</Link>
+                <span className="text-[12.5px] text-ink-2">{NODE_SET_LABEL[m.ref.type]}</span>
+                <NodeSetCount nodeSet={m.ref} />
                 <Input aria-label={`${nameOf(m.ref)} 前缀`} className="h-[34px] font-mono text-[12.5px]" value={m.prefix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, prefix: x.target.value || undefined } : y)) })} />
                 <Input aria-label={`${nameOf(m.ref)} 后缀`} className="h-[34px] font-mono text-[12.5px]" value={m.suffix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, suffix: x.target.value || undefined } : y)) })} />
                 <Select aria-label={`${nameOf(m.ref)} 拉取失败时`} className="h-[34px] text-[12.5px]" value={m.onFail ?? 'snapshot'}

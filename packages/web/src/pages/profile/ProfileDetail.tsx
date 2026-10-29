@@ -1,3 +1,4 @@
+import { CopyButton } from '../../components/CopyButton.tsx';
 // Profile 详情：头部 + 分区标签（概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览）。
 // 除"概览"中的订阅链接外，各标签编辑同一份草稿，统一用右上角"保存"提交。
 
@@ -32,7 +33,6 @@ export function ProfileDetail() {
   const log = useQuery({ queryKey: ['access-log', id], enabled: !!id, queryFn: () => api<{ items: AccessLogRow[] }>('GET', `/profiles/${id}/access-log`).then((r) => r.items) });
   const [draft, setDraft] = useState<ProfileDoc>();
   const [tplOpen, setTplOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   useEffect(() => { if (doc.data) setDraft(doc.data); }, [doc.data]);
 
   const { ctx, template } = useProfileCtx(draft, setDraft);
@@ -43,7 +43,6 @@ export function ProfileDetail() {
   const preset = presets.data?.find((p) => p.id === draft.base?.presetId);
   const warnings = log.data?.[0]?.warnings ?? 0;
   const firstUrl = tokens.data?.[0]?.url;
-  const copyLink = () => { if (!firstUrl) return; void navigator.clipboard?.writeText(firstUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); };
   const duplicate = () => {
     const { id: _id, ...rest } = doc.data ?? draft;
     dup.mutate({ ...rest, name: `${rest.name} 副本` }, { onSuccess: (p) => navigate(`/profiles/${p.id}/overview`) });
@@ -56,7 +55,7 @@ export function ProfileDetail() {
           actions={<>
             {dirty && <Button onClick={discard}>放弃修改</Button>}
             <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
-            {!dirty && tab !== 'overview' && <Button onClick={copyLink} disabled={!firstUrl} title={firstUrl ? undefined : '先在「概览」新增订阅链接'}>{copied ? '已复制' : '复制订阅链接'}</Button>}
+            {!dirty && tab !== 'overview' && <CopyButton text={firstUrl ?? ''} disabled={!firstUrl} title={firstUrl ? undefined : '先在「概览」新增订阅链接'}>复制订阅链接</CopyButton>}
             {tab !== 'preview' && !dirty && ['overview', 'groups', 'rules', 'chains'].includes(tab) && <Link to={`/profiles/${id}/preview`} className={buttonClass('primary')}>预览配置</Link>}
             <Button onClick={() => setTplOpen(true)}>更换模板</Button>
             {(dirty || !['overview', 'preview'].includes(tab)) && <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>}

@@ -1,3 +1,4 @@
+import { OptionalBoolean } from './OptionalBoolean.tsx';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
 // 左侧步骤列表（拖拽排序、节点数变化、末尾自动去重兜底、添加处理器菜单）；
 // 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方是这一步输入 → 输出的逐节点对照；
@@ -131,10 +132,8 @@ function SetFieldsForm({ fields, onChange }: { fields: Record<string, unknown>; 
   const extra = Object.fromEntries(Object.entries(fields).filter(([key]) => !SET_KEYS.includes(key)));
   // 公共 ExtraFields 没有键名校验接口，在此捕获输入并在写入前再次用内核校验。
   return <div className="flex flex-col gap-2.5">
-    {SET_BOOLS.map((key) => <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><Segmented label={key} size="sm"
-      value={fields[key] === true ? 'on' : fields[key] === false ? 'off' : 'unset'}
-      options={[{ value: 'unset', label: '不设置' }, { value: 'on', label: '开' }, { value: 'off', label: '关' }]}
-      onChange={(v) => onChange(updateSetField(fields, key, v === 'unset' ? undefined : v === 'on'))} /></div>)}
+    {SET_BOOLS.map((key) => <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><OptionalBoolean label={key} size="sm" value={typeof fields[key] === 'boolean' ? fields[key] as boolean : undefined}
+      onChange={(v) => onChange(updateSetField(fields, key, v))} /></div>)}
     {Object.entries(SET_SELECTS).map(([key, options]) => {
       const value = fields[key] === undefined ? '' : String(fields[key]);
       return <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><Select aria-label={key} className="h-9 max-w-[240px]" value={value}

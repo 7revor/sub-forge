@@ -43,7 +43,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
 }) {
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map((r) => r.id === rule.id ? rule : r) });
   return <Card bodyClass="overflow-x-auto px-4 pb-4"
-    title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（{value.rules.length} 条）</h2><span className="text-[12.5px] text-muted">出口只能是模板组或内置策略。</span></div>}
+    title={`规则（${value.rules.length} 条）`} subtitle={`出口只能是模板组或内置策略。`}
     actions={<Button onClick={() => {
       const id = newId('r');
       onChange({ ...value, rules: [...value.rules, { id, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } }, target: { kind: 'builtin', name: 'REJECT' } }] });

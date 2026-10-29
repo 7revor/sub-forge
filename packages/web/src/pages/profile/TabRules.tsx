@@ -1,3 +1,4 @@
+import { Notice } from '../../components/Notice.tsx';
 // 模板规则只改启用和出口；私有规则支持拖拽、匹配项及客户端覆盖编辑。
 
 import type { Matcher, RuleEntry, RuleIR, Target } from '@sub-forge/core';
@@ -115,11 +116,8 @@ export function TabRules() {
   }));
 
   return <>
-    {orphans.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-warn-soft px-4 py-3 text-[#6b3406]">
-      <span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span>
-      <Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>
-    </div>}
-    <Card title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">规则（自上而下匹配）</h2><span className="text-[12.5px] text-muted">继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则；点击行展开编辑。</span></div>}
+    {orphans.length > 0 && <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span></Notice>}
+    <Card title={`规则（自上而下匹配）`} subtitle={`继承自模板 · 可禁用、改出口为已加入的节点、在锚点前后插入私有规则；点击行展开编辑。`}
       actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入私有规则</Button>}>
       {!rows.length ? <Empty title="没有规则" description="所有流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
         onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}

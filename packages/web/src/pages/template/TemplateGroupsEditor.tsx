@@ -25,7 +25,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
   // 设计稿「管理员 · 模板编辑器」：骨架表格（组 / 类型 / 成员 / 为空时 / 填充提示），点击行在下方展开编辑
   const grid = 'grid grid-cols-[24px_minmax(0,1.1fr)_minmax(0,0.6fr)_minmax(0,1.4fr)_88px_minmax(0,1fr)] items-center gap-3';
   return <Card bodyClass="overflow-x-auto pb-2"
-    title={<div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">策略组骨架</h2><span className="text-[12.5px] text-muted">只含其他模板组和内置策略，不含节点，也不预设 filter。</span></div>}
+    title={`策略组骨架`} subtitle={`只含其他模板组和内置策略，不含节点，也不预设 filter。`}
     actions={<Button onClick={() => {
       const id = newId('g');
       onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [], whenEmpty: 'reject' }] });

@@ -1,3 +1,4 @@
+import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 总览（设计稿「总览」）：四个统计、我的配置订阅（最近访问与状态）、待处理事项、订阅源拉取。
 // 访问统计来自各配置订阅的访问日志，孤儿覆盖项按当前模板计算。
 
@@ -7,7 +8,7 @@ import { Link } from 'react-router';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { api, type AccessLogRow, type SnapshotMeta } from '../api.ts';
 import { Badge, buttonClass, Card, Empty, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
-import { useList, useNodeList, useTemplates, type SourceDoc } from '../hooks.ts';
+import { useList, useTemplates } from '../hooks.ts';
 import { findOverlayOrphans } from './profile/orphans.ts';
 
 const DAY = 86_400_000;
@@ -18,11 +19,6 @@ function ago(ms: number): string {
   if (d < 3_600_000) return `${Math.floor(d / 60_000)} 分钟前`;
   if (d < DAY) return `${Math.floor(d / 3_600_000)} 小时前`;
   return formatTime(ms).slice(5);
-}
-
-function SourceNodes({ source }: { source: SourceDoc }) {
-  const nodes = useNodeList({ type: 'source', id: source.id });
-  return <>{nodes.data ? nodes.data.total : '—'}</>;
 }
 
 type Todo = { tone: 'err' | 'warn' | 'info'; title: string; body: string; action: string; to: string };
@@ -153,7 +149,7 @@ export function Overview() {
                   return (
                     <DocTableRow key={source.id} to={`/sources/${source.id}`}>
                       <td className={cx(td, 'whitespace-nowrap')}><Link to={`/sources/${source.id}`} className={docNameLinkClass}>{source.name}</Link></td>
-                      <td className={cx(td, 'font-mono')}><SourceNodes source={source} /></td>
+                      <td className={cx(td, 'font-mono')}><NodeSetCount nodeSet={{ type: 'source', id: source.id }} /></td>
                       <td className={cx(td, 'whitespace-nowrap')}>{st?.lastOk ? formatTime(st.lastOk.fetchedAt).slice(5) : '—'}</td>
                       <td className={td}>{u?.total ? (
                         <div className="flex items-center gap-2.5">
