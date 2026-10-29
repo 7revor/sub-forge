@@ -1,0 +1,122 @@
+proxy-groups:
+  # sub-forge-group: g_mvtdoh3xbh53
+  - name: 🚀 科学上网
+    type: fallback
+    proxies: []
+  # sub-forge-group: g_mvtdoh3x6pay
+  - name: 🎯 国内网络
+    type: select
+    proxies:
+      - DIRECT
+      - 🚀 科学上网
+  # sub-forge-group: g_mvtdoh3xvbnu
+  - name: 🐟 其他网站
+    type: select
+    proxies:
+      - 🚀 科学上网
+      - DIRECT
+  # sub-forge-group: g_mvtdoh3xtrmg
+  - name: 🖥️ 微软服务
+    type: select
+    proxies:
+      - 🚀 科学上网
+      - DIRECT
+rule-providers:
+  lan:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Lan/Lan.list
+  proxy:
+    type: http
+    url: https://raw.githubusercontent.com/7revor/proxy-rules/main/proxy.list
+  direct:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Direct/Direct.list
+  steam-cn:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/SteamCN/SteamCN.list
+  playstation:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/PlayStation/PlayStation.list
+  game-download-cn:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Game/GameDownloadCN/GameDownloadCN.list
+  google:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/refs/heads/master/rule/Surge/Google/Google.list
+  microsoft:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Microsoft/Microsoft.list
+  proxy-all:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Proxy/Proxy_All_No_Resolve.list
+  china-all:
+    type: http
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/China/China_All_No_Resolve.list
+rules:
+  # sub-forge-rule: r_mvtdoh3xjr9t
+  - RULE-SET,lan,🎯 国内网络
+  # sub-forge-rule: r_mvtdoh3xddgd
+  - RULE-SET,proxy,🚀 科学上网
+  # sub-forge-rule: r_mvtdoh3x24dm
+  - RULE-SET,direct,🎯 国内网络
+  # sub-forge-rule: r_mvtdoh3xml46
+  - RULE-SET,steam-cn,🎯 国内网络
+  # sub-forge-rule: r_mvtdoh3x3bff
+  - RULE-SET,playstation,🎯 国内网络
+  # sub-forge-rule: r_mvtdoh3xosga
+  - RULE-SET,game-download-cn,🎯 国内网络
+  # sub-forge-rule: r_mvtdoh3x7tsi
+  - RULE-SET,microsoft,🖥️ 微软服务
+  # sub-forge-rule: r_mvtdoh3xoojb
+  - RULE-SET,proxy-all,🚀 科学上网
+  # sub-forge-rule: r_mvtdoh3xl87z
+  - RULE-SET,china-all,🎯 国内网络
+  # sub-forge-rule: r_mvtdoh3xy221
+  - GEOIP,CN,🎯 国内网络
+  - MATCH,🐟 其他网站
+x-sub-forge-rulesets:
+  lan:
+    kind: ruleset
+    id: remote:8cd1dc954e3dff0a
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Lan/Lan.list
+  proxy:
+    kind: ruleset
+    id: remote:e7921f7711656204
+    remote:
+      url: https://raw.githubusercontent.com/7revor/proxy-rules/main/proxy.list
+  direct:
+    kind: ruleset
+    id: remote:1e352e067f28774a
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Direct/Direct.list
+  steam-cn:
+    kind: ruleset
+    id: remote:5a3624f58e3c9a16
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/SteamCN/SteamCN.list
+  playstation:
+    kind: ruleset
+    id: remote:6a8b55987faa9ca2
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/PlayStation/PlayStation.list
+  game-download-cn:
+    kind: ruleset
+    id: remote:04e414feb5e944f7
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Game/GameDownloadCN/GameDownloadCN.list
+  microsoft:
+    kind: ruleset
+    id: remote:5cb5b49f233c4b96
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Microsoft/Microsoft.list
+  proxy-all:
+    kind: ruleset
+    id: remote:816c3de409de962d
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Proxy/Proxy_All_No_Resolve.list
+  china-all:
+    kind: ruleset
+    id: remote:273dcf338e32ede1
+    remote:
+      url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/China/China_All_No_Resolve.list

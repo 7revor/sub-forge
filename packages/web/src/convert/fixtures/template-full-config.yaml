@@ -1,0 +1,100 @@
+proxy-groups:
+  - name: "🚀 科学上网"
+    type: fallback
+    proxies:
+      - "🇺🇸 ORCL"
+      - "🇺🇸 CloudSilk"
+      - "🇺🇸 ORCL Reality"
+  - name: "🎯 国内网络"
+    type: select
+    proxies:
+      - DIRECT
+      - "🚀 科学上网"
+  - name: "🐟 其他网站"
+    type: select
+    proxies:
+      - "🚀 科学上网"
+      - DIRECT
+rule-providers:
+  lan:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Lan/Lan.list"
+    path: ./rules/lan.list
+    interval: 259200
+  proxy:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/7revor/proxy-rules/main/proxy.list"
+    path: ./rules/proxy.list
+    interval: 259200
+  direct:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Direct/Direct.list"
+    path: ./rules/direct.list
+    interval: 259200
+  steam-cn:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/SteamCN/SteamCN.list"
+    path: ./rules/steam-cn.list
+    interval: 259200
+  playstation:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/PlayStation/PlayStation.list"
+    path: ./rules/playstation.list
+    interval: 259200
+  game-download-cn:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Game/GameDownloadCN/GameDownloadCN.list"
+    path: ./rules/game-download-cn.list
+    interval: 259200
+  google:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/refs/heads/master/rule/Surge/Google/Google.list"
+    path: ./rules/google.list
+    interval: 259200
+  microsoft:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Microsoft/Microsoft.list"
+    path: ./rules/microsoft.list
+    interval: 259200
+  proxy-all:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Proxy/Proxy_All_No_Resolve.list"
+    path: ./rules/proxy-all.list
+    interval: 259200
+  china-all:
+    type: http
+    behavior: classical
+    format: text
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/China/China_All_No_Resolve.list"
+    path: ./rules/china-all.list
+    interval: 259200
+rules:
+  - RULE-SET,lan,🎯 国内网络
+  - RULE-SET,proxy,🚀 科学上网
+  - RULE-SET,direct,🎯 国内网络
+  - RULE-SET,steam-cn,🎯 国内网络
+  - RULE-SET,playstation,🎯 国内网络
+  - RULE-SET,game-download-cn,🎯 国内网络
+  - RULE-SET,microsoft,🖥️ 微软服务
+  - RULE-SET,proxy-all,🚀 科学上网
+  - RULE-SET,china-all,🎯 国内网络
+  - GEOIP,CN,🎯 国内网络
+  - MATCH,🐟 其他网站

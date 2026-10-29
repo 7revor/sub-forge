@@ -197,7 +197,7 @@ function TemplatePage({ id }: { id: string }) {
     const t = tpl.data?.item;
     if (!t) return;
     setName(t.name ?? '');
-    setBody({ groups: t.groups, rules: t.rules, final: t.final });
+    setBody({ groups: t.groups, rules: t.rules, final: t.final, ...(t.ruleProviders ? { ruleProviders: t.ruleProviders } : {}) });
   }, [tpl.data]);
 
   const currentValidation = validation?.body === body && validation.name === name ? validation : undefined;
@@ -269,6 +269,7 @@ function TemplatePage({ id }: { id: string }) {
       ...diff.rules.modified.map((r) => ['~', `修改规则 ${matcherLabel(r.after.matcher, ctx)}`] as [string, string]),
       ...(diff.groups.moved.length || diff.rules.moved.length ? [['~', `调整顺序：${diff.groups.moved.length} 个组、${diff.rules.moved.length} 条规则`] as [string, string]] : []),
       ...(diff.final ? [['~', '修改 MATCH 出口'] as [string, string]] : []),
+      ...(diff.ruleProviders ? [['~', '修改远程规则来源或顺序'] as [string, string]] : []),
     ] : body.groups.map((g) => ['+', `新增组「${g.name}」`] as [string, string]);
     const own = report.filter((r) => r.level !== 'info');
     return (
@@ -382,13 +383,13 @@ function TemplatePage({ id }: { id: string }) {
       <Modal title="从 YAML 导入" open={importing !== undefined} onClose={() => setImporting(undefined)} wide
         footer={<><Button onClick={() => setImporting(undefined)}>取消</Button><Button variant="primary" onClick={() => {
           const r = templateFromYaml(importing ?? '', body, ctx);
-          if (r.ok) { setBody(r.value); setImporting(undefined); notifySuccess('模板已导入，发布后生效'); }
+          if (r.ok) { setBody(r.value); setImporting(undefined); notifySuccess(['模板已导入，发布后生效', ...r.notes].join('\n')); }
           else alertError(r.error);
         }}>导入</Button></>}>
-        <Field label="mihomo 的策略组、规则与远程规则来源" hint="完整配置替换组与规则；策略组列表补入当前组，规则列表替换当前规则。rule-providers 只读取 URL，单独导入时补入当前模板。">
+        <Field label="mihomo 的策略组、规则与远程规则来源" hint="可粘贴完整配置：保留组、规则、来源 URL 及其引用顺序，移除单个节点和节点订阅。未引用的来源保留；出口组缺失时须先补齐或更正。独立列表补入组或替换规则，单独导入来源时补入当前模板。">
           {(fid) => <YamlTextarea id={fid} rows={16} className="font-mono text-[12.5px]" spellCheck={false} value={importing ?? ''} onChange={(e) => setImporting(e.target.value)} />}
         </Field>
-        {importing !== undefined && (() => { const r = templateFromYaml(importing, body, ctx); return r.ok ? null : <FieldError error={`第 ${r.line ?? 1} 行：${r.error}`} />; })()}
+        {importing !== undefined && (() => { const r = templateFromYaml(importing, body, ctx); return r.ok ? <ul className="m-0 pl-5 text-[13px] text-muted">{r.notes.map((note, i) => <li key={i}>{note}</li>)}</ul> : <FieldError error={`第 ${r.line ?? 1} 行：${r.error}`} />; })()}
       </Modal>
     </>
   );

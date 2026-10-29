@@ -13,7 +13,7 @@ export function recoverYaml(text: string, shape: 'mapping' | 'template' = 'mappi
 function recoverDocument(text: string, shape: 'mapping' | 'template') {
   const lines = new LineCounter();
   const sourceLines = text.split('\n');
-  const doc: Document = parseYamlDocument(text, { lineCounter: lines }, shape);
+  const doc: Document = parseYamlDocument(text, { lineCounter: lines, merge: shape === 'template' }, shape);
   const notes: string[] = [];
   const nodes: Node[] = [];
   const collect = (node: unknown, depth = 0) => {
@@ -60,10 +60,10 @@ function recoverDocument(text: string, shape: 'mapping' | 'template') {
     if (isMap(node)) {
       const keys = new Set<string>();
       node.items = node.items.filter((pair) => {
-        if (!isScalar(pair.key) || typeof pair.key.value !== 'string' || invalid.has(pair.key)) {
+        if (!isScalar(pair.key) || (typeof pair.key.value !== 'string' && !(typeof pair.key.value === 'symbol' && pair.key.value.description === '<<')) || invalid.has(pair.key)) {
           ignore('字段名无效'); return false;
         }
-        const key = pair.key.value;
+        const key = typeof pair.key.value === 'symbol' ? '<<' : pair.key.value;
         if (keys.has(key)) { notes.push(`已忽略 ${path}.${key} 的重复项，保留第一项`); return false; }
         keys.add(key);
         const value = clean(pair.value, path === '根节点' ? key : `${path}.${key}`, next);
