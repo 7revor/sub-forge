@@ -133,7 +133,7 @@ describe('本地节点前置与上游自带前置', () => {
   });
 
   it('上游自带 dialer-proxy：同源前置也要经包装组（provider 中不能直接写节点名）', () => {
-    const up: NodeSetInputs = { ...NODESETS, sources: { ...NODESETS.sources, M: { id: 'M', name: '源 M', kind: 'local', pipeline: [{ op: 'rename.affix', prefix: 'M·' }], content: `proxies:\n  - { name: JP-Relay-in, type: trojan, server: m1, port: 443, password: x, dialer-proxy: SG-Relay }\n  - { name: SG-Relay, type: trojan, server: m2, port: 443, password: y }\n` } } };
+    const up: NodeSetInputs = { ...NODESETS, sources: { ...NODESETS.sources, M: { ...src('M', '源 M'), pipeline: [{ op: 'rename.affix', prefix: 'M·' }] } }, snapshots: { ...NODESETS.snapshots, M: [`proxies:\n  - { name: JP-Relay-in, type: trojan, server: m1, port: 443, password: x, dialer-proxy: SG-Relay }\n  - { name: SG-Relay, type: trojan, server: m2, port: 443, password: y }\n`] } };
     const r = render({ nodeSets: [{ ref: { type: 'source', id: 'M' }, output: 'provider' }] }, { nodeSets: up });
     const nodes = providerProxies(r, 'source:M');
     expect(nodes[0]!['dialer-proxy']).toMatch(/^__ref_M_/);
@@ -156,7 +156,7 @@ describe('校验', () => {
   });
 
   it('组名与节点重名时报错', () => {
-    const clash: NodeSetInputs = { ...NODESETS, sources: { ...NODESETS.sources, X: src('X', 'X', [trojan('🚀 节点选择', 'x')]) } };
+    const clash: NodeSetInputs = { ...NODESETS, sources: { ...NODESETS.sources, X: src('X', 'X') }, snapshots: { ...NODESETS.snapshots, X: [trojan('🚀 节点选择', 'x')] } };
     const r = render({ nodeSets: [{ ref: { type: 'source', id: 'X' }, output: 'inline' }] }, { nodeSets: clash });
     expect(r.report.byCode('name.conflict')).toHaveLength(1);
   });

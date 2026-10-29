@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addUser, client, setupApp } from './helpers.ts';
 
-const localSource = (name = '本地源') => ({ name, kind: 'local', content: 'trojan://pw@a.example.com:443#HK-01', pipeline: [] });
+const remoteSource = (name = '远程源') => ({ name, urls: ['https://a.example.com/sub'], pipeline: [] });
 
 async function twoUsers() {
   const env = setupApp();
@@ -45,12 +45,12 @@ describe('文档增删改查', () => {
 
   it('创建由服务端生成 id；更新、读取、删除', async () => {
     const { alice } = await twoUsers();
-    const created = await alice.post('/api/sources', localSource());
+    const created = await alice.post('/api/sources', remoteSource());
     expect(created.status).toBe(201);
     const id = created.json.item.id as string;
     expect(id).toMatch(/^[\w-]{12}$/);
-    expect((await alice.put(`/api/sources/${id}`, { ...localSource('改名'), id })).json.item.name).toBe('改名');
-    expect((await alice.put(`/api/sources/${id}`, { ...localSource(), id: 'other' })).status).toBe(400);
+    expect((await alice.put(`/api/sources/${id}`, { ...remoteSource('改名'), id })).json.item.name).toBe('改名');
+    expect((await alice.put(`/api/sources/${id}`, { ...remoteSource(), id: 'other' })).status).toBe(400);
     expect((await alice.get(`/api/sources/${id}`)).json.item.name).toBe('改名');
     expect((await alice.get('/api/sources')).json.items).toHaveLength(1);
     expect((await alice.del(`/api/sources/${id}`)).status).toBe(200);
@@ -59,10 +59,10 @@ describe('文档增删改查', () => {
 
   it('用户之间数据隔离：看不到、改不了、删不掉别人的文档', async () => {
     const { alice, bob } = await twoUsers();
-    const id = (await alice.post('/api/sources', localSource())).json.item.id as string;
+    const id = (await alice.post('/api/sources', remoteSource())).json.item.id as string;
     expect((await bob.get('/api/sources')).json.items).toEqual([]);
     expect((await bob.get(`/api/sources/${id}`)).status).toBe(404);
-    expect((await bob.put(`/api/sources/${id}`, localSource())).status).toBe(404);
+    expect((await bob.put(`/api/sources/${id}`, remoteSource())).status).toBe(404);
     expect((await bob.del(`/api/sources/${id}`)).status).toBe(404);
     // 也不能在自己的组合里引用别人的订阅源
     const res = await bob.post('/api/collections', { name: 'C', members: [{ ref: { type: 'source', id } }] });
@@ -72,19 +72,22 @@ describe('文档增删改查', () => {
 
   it('保存前校验：必填项、正则、远程地址、脚本权限', async () => {
     const { alice } = await twoUsers();
-    expect((await alice.post('/api/sources', { kind: 'local', content: '' })).json.error).toMatch(/name/);
-    expect((await alice.post('/api/sources', { name: 'R', kind: 'remote', urls: ['file:///etc/passwd'] })).json.error).toMatch(/http/);
-    const badRegex = await alice.post('/api/sources', { ...localSource(), pipeline: [{ op: 'filter.regex', patterns: ['(['], keep: true }] });
+    expect((await alice.post('/api/sources', { urls: ['https://a.example.com/sub'] })).json.error).toMatch(/name/);
+    expect((await alice.post('/api/sources', { name: 'L', kind: 'local', content: 'x' })).json.error).toMatch(/本地节点组/);
+    expect((await alice.post('/api/sources', { ...remoteSource(), content: 'x' })).json.error).toMatch(/本地节点组/);
+    expect((await alice.post('/api/sources', { name: 'R', kind: 'remote', urls: ['https://a.example.com/sub'] })).json.item).not.toHaveProperty('kind');
+    expect((await alice.post('/api/sources', { name: 'R', urls: ['file:///etc/passwd'] })).json.error).toMatch(/http/);
+    const badRegex = await alice.post('/api/sources', { ...remoteSource(), pipeline: [{ op: 'filter.regex', patterns: ['(['], keep: true }] });
     expect(badRegex.status).toBe(400);
     expect(badRegex.json.error).toMatch(/第 1 步.*非法正则/);
-    expect((await alice.post('/api/sources', { ...localSource(), pipeline: [{ op: 'script', code: 'x' }] })).json.error).toMatch(/脚本/);
+    expect((await alice.post('/api/sources', { ...remoteSource(), pipeline: [{ op: 'script', code: 'x' }] })).json.error).toMatch(/脚本/);
     expect((await alice.post('/api/rulesets', { name: 'M', kind: 'remote', format: 'mrs', url: 'https://a.example.com/x.mrs' })).json.error).toMatch(/behavior/);
     expect((await alice.post('/api/bundles', { name: 'B', items: [{ kind: 'bundle', id: 'x' }] })).json.error).toMatch(/两层/);
   });
 
   it('组合成环时拒绝保存', async () => {
     const { alice } = await twoUsers();
-    const s = (await alice.post('/api/sources', localSource())).json.item.id;
+    const s = (await alice.post('/api/sources', remoteSource())).json.item.id;
     const a = (await alice.post('/api/collections', { name: 'A', members: [{ ref: { type: 'source', id: s } }] })).json.item.id;
     const b = (await alice.post('/api/collections', { name: 'B', members: [{ ref: { type: 'collection', id: a } }] })).json.item.id;
     const res = await alice.put(`/api/collections/${a}`, { name: 'A', members: [{ ref: { type: 'collection', id: b } }] });
@@ -108,7 +111,7 @@ describe('文档增删改查', () => {
 
   it('被引用的文档不能删除，返回引用方', async () => {
     const { alice } = await twoUsers();
-    const s = (await alice.post('/api/sources', localSource())).json.item.id;
+    const s = (await alice.post('/api/sources', remoteSource())).json.item.id;
     await alice.post('/api/collections', { name: '全部', members: [{ ref: { type: 'source', id: s } }] });
     await alice.post('/api/profiles', { name: '订阅', nodeSets: [{ ref: { type: 'source', id: s }, output: 'provider' }] });
     const res = await alice.del(`/api/sources/${s}`);
@@ -159,7 +162,7 @@ describe('预设 Surge 预留字段', () => {
 describe('拉取参数校验', () => {
   it('快照有效期不能短于 5 分钟', async () => {
     const { alice } = await twoUsers();
-    const src = { name: '远程源', kind: 'remote', urls: ['https://example.com/sub'] };
+    const src = { name: '远程源', urls: ['https://example.com/sub'] };
     const short = await alice.post('/api/sources', { ...src, fetch: { ttlSec: 60 } });
     expect(short.status).toBe(400);
     expect(short.json.error).toMatch(/快照有效期不能短于 5 分钟/);

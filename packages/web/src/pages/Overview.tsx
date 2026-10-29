@@ -32,7 +32,7 @@ export function Overview() {
   const profiles = useList('profiles');
   const sources = useList('sources');
   const templates = useTemplates();
-  const remote = (sources.data ?? []).filter((s) => s.kind === 'remote');
+  const remote = sources.data ?? [];
   const snaps = useQueries({
     queries: remote.map((s) => ({ queryKey: ['snapshots', s.id], queryFn: () => api<{ items: SnapshotMeta[] }>('GET', `/sources/${s.id}/snapshots`).then((r) => r.items) })),
   });
@@ -159,9 +159,9 @@ export function Overview() {
                         <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line-2"><div className="h-1.5 bg-accent" style={{ width: `${pct}%` }} /></div>
                         <span className="text-[12.5px] whitespace-nowrap text-muted">{formatBytes(used)} / {formatBytes(u.total)}</span>
                       </div>
-                    ) : <span className="text-[12.5px] text-muted">{source.kind === 'local' ? '无流量信息' : '—'}</span>}</td>
+                    ) : <span className="text-[12.5px] text-muted">—</span>}</td>
                     <td className={cx(td, 'whitespace-nowrap text-muted')}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
-                    <td className={td}>{source.kind === 'local' ? <Badge tone="ok">正常</Badge> : st?.failing ? <Badge tone="err">{st.lastOk ? '拉取失败 · 使用快照' : '拉取失败'}</Badge> : st?.lastOk ? <Badge tone="ok">正常</Badge> : <Badge>未拉取</Badge>}</td>
+                    <td className={td}>{st?.failing ? <Badge tone="err">{st.lastOk ? '拉取失败 · 使用快照' : '拉取失败'}</Badge> : st?.lastOk ? <Badge tone="ok">正常</Badge> : <Badge>未拉取</Badge>}</td>
                     <td className={cx(td, 'text-right')}><DocActionLink to={`/sources/${source.id}`} name={source.name} /></td>
                   </DocTableRow>
                 );

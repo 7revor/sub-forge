@@ -77,11 +77,11 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
 
   switch (kind) {
     case 'source': {
-      if (doc.kind === 'remote') {
-        if (!Array.isArray(doc.urls) || !doc.urls.length || !doc.urls.every(isHttpUrl)) throw bad('远程订阅源需要至少一个 http(s) 地址');
-      } else if (doc.kind === 'local') {
-        if (typeof doc.content !== 'string') throw bad('本地订阅源需要 content');
-      } else throw bad('kind 只能是 remote 或 local');
+      // 订阅源只有远程一种；手写或粘贴的节点放在本地节点组。旧客户端带的 kind: 'remote' 直接去掉
+      if (doc.kind !== undefined && doc.kind !== 'remote') throw bad('订阅源只支持远程地址，粘贴的节点请放到本地节点组');
+      delete doc.kind;
+      if (doc.content !== undefined) throw bad('订阅源不再支持 content，粘贴的节点请放到本地节点组');
+      if (!Array.isArray(doc.urls) || !doc.urls.length || !doc.urls.every(isHttpUrl)) throw bad('订阅源需要至少一个 http(s) 地址');
       checkFetch(doc.fetch);
       if (doc.pipeline === undefined) doc.pipeline = [];
       checkPipeline(doc.pipeline, '处理链', user);

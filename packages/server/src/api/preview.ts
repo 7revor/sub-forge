@@ -10,7 +10,6 @@ import {
   type Client, type NodeSetID, type OperatorStep, type Platform, type ProxyIR,
 } from '@sub-forge/core';
 import { Hono, type Context } from 'hono';
-import type { SourceDoc } from '../docs.ts';
 import type { RenderService } from '../render.ts';
 import type { SnapshotService } from '../snapshots.ts';
 import type { Store } from '../store.ts';
@@ -56,9 +55,8 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
 
   app.post('/sources/:id/refresh', async (c) => {
     const src = own('source', c.req.param('id'), c.get('user').id);
-    if (src.kind !== 'remote') return c.json({ items: [] });
     const items = [];
-    for (const url of src.urls ?? []) {
+    for (const url of src.urls) {
       const r = await snapshots.refresh('source', src.id, url, src.fetch ?? {});
       items.push({ url, ok: r.ok, fetchedAt: r.fetchedAt, ...(r.error ? { error: r.error } : {}), ...(r.userinfo ? { userinfo: r.userinfo } : {}) });
     }
@@ -90,10 +88,8 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     let input: ProxyIR[];
     let failures: { line: string; reason: string }[] = [];
     if (kind === 'source') {
-      const src = doc as SourceDoc;
-      const bodies = src.kind === 'local' ? [src.content ?? ''] : loaded.inputs.snapshots[doc.id] ?? [];
       input = [];
-      for (const b of bodies) {
+      for (const b of loaded.inputs.snapshots[doc.id] ?? []) {
         const r = parseContent(b, ref);
         input.push(...r.proxies);
         failures = failures.concat(r.failures);
