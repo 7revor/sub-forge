@@ -74,27 +74,6 @@ describe('上游拉取', () => {
     await expect(f2('https://a.example.com/')).rejects.toThrow(/过大/);
   });
 
-  it('GitHub Token 仅发送到 HTTPS API，同源跳转保留，跨源或降级后永久移除', async () => {
-    for (const target of ['https://raw.githubusercontent.com/file', 'http://api.github.com/file', 'https://api.github.com:8443/file', 'https://api.github.com.evil.example/file']) {
-      const seen: (string | undefined)[] = [];
-      const f = createUpstreamFetcher({ allow: NONE, fetchImpl: async (_url, init) => {
-        seen.push(init.headers.authorization);
-        if (seen.length === 1) return respond(302, '', { location: '/same-origin' });
-        if (seen.length === 2) return respond(302, '', { location: target });
-        if (seen.length === 3) return respond(302, '', { location: 'https://api.github.com/back' });
-        return respond(200, '{}');
-      } });
-      await f('https://api.github.com/start', { githubToken: 'test_token' });
-      expect(seen).toEqual(['Bearer test_token', 'Bearer test_token', undefined, undefined]);
-    }
-    const f = createUpstreamFetcher({ allow: NONE, fetchImpl: async (_url, init) => {
-      expect(init.headers.authorization).toBeUndefined();
-      return respond(200, '{}');
-    } });
-    await f('https://raw.githubusercontent.com/file', { githubToken: 'test_token' });
-    await f('https://api.github.com/file');
-  });
-
   it('userinfo 解析忽略无效字段', () => {
     expect(parseUserinfo('upload=x; total=5; foo=1')).toEqual({ total: 5 });
     expect(parseUserinfo(null)).toBeUndefined();

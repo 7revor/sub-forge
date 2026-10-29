@@ -5,7 +5,11 @@ import { mkdir, open, readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { RepoDefinition } from './adapters.ts';
 
+export type RepoIdentity = Pick<RepoDefinition, 'id' | 'owner' | 'repo'>;
+export type RepoRemoteInfo = { defaultBranch?: string; branches: string[] };
+
 export interface RepoCache {
+  inspect(repo: RepoIdentity): Promise<RepoRemoteInfo>;
   sync(repo: RepoDefinition): Promise<Record<string, string>>;
   files(repo: RepoDefinition, commit: string): Promise<string[]>;
   read(repo: RepoDefinition, commit: string, path: string): Promise<string>;
@@ -19,8 +23,8 @@ export class GitRepoCache implements RepoCache {
   private jobs = new Set<Promise<unknown>>();
   private queues = new Map<string, Promise<unknown>>();
   constructor(private root: string) { this.root = resolve(root); }
-  private directory(repo: RepoDefinition) { return join(this.root, hash(repo.id), hash(`${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`)); }
-  private async locked<T>(repo: RepoDefinition, action: (dir: string) => Promise<T>): Promise<T> {
+  private directory(repo: RepoIdentity) { return join(this.root, hash(repo.id), hash(`${repo.owner.toLowerCase()}/${repo.repo.toLowerCase()}`)); }
+  private async locked<T>(repo: RepoIdentity, action: (dir: string) => Promise<T>): Promise<T> {
     const dir = this.directory(repo);
     const previous = this.queues.get(dir);
     const job = (async () => {
@@ -78,6 +82,21 @@ export class GitRepoCache implements RepoCache {
         if (failure || code !== 0) reject(failure ?? new Error(`Git 更新失败（${code}）：${errors.trim()}`));
         else resolveResult(output.toString('utf8'));
       });
+    });
+  }
+  /** 通过匿名 Git 握手读取 HEAD 与分支；不使用 GitHub API 或猜测 main/master。 */
+  inspect(repo: RepoIdentity): Promise<RepoRemoteInfo> {
+    return this.locked(repo, async dir => {
+      const output = await this.run(dir, ['ls-remote', '--symref', `https://github.com/${repo.owner}/${repo.repo}.git`, 'HEAD', 'refs/heads/*']);
+      const branches: string[] = [];
+      let defaultBranch: string | undefined;
+      for (const line of output.split('\n')) {
+        const head = /^ref: refs\/heads\/(.+)\tHEAD$/.exec(line);
+        if (head) defaultBranch = head[1];
+        const branch = /^[a-f0-9]{40}\trefs\/heads\/(.+)$/.exec(line);
+        if (branch) branches.push(branch[1]!);
+      }
+      return { branches: [...new Set(branches)].sort(), ...(defaultBranch && branches.includes(defaultBranch) ? { defaultBranch } : {}) };
     });
   }
   sync(repo: RepoDefinition) {
