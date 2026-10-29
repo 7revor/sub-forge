@@ -128,7 +128,7 @@ type GroupSpec = {
   display?: { hidden?: boolean; icon?: string };
   extra?: Record<string, unknown>;             // 高级参数，带客户端适用范围
   hint?: string;                               // 模板填充提示
-  whenEmpty?: 'reject' | 'direct';             // 模板组为空时的行为，默认 reject（TPL-10）
+  whenEmpty?: 'reject' | 'direct';             // 废弃，仅兼容历史存储；渲染忽略，空组固定 REJECT
 };
 
 type RuleEntry = { id: ID; matcher: Matcher; target: Target; options?: { noResolve?: boolean; src?: boolean }; enabled: boolean };
@@ -296,7 +296,7 @@ effective.final = overlay.final ?? template.final
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
 - 模板组不能在 Profile 中删除、改名或隐藏（Q6）；`groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。Profile 私有组（`extraGroups`）不受此限制。
-- 空组处理（TPL-10）：模板组在 Profile 中未被填充任何成员时照常输出为空组，`report.warn`。按 `whenEmpty` 输出：`reject`（默认）→ mihomo `proxies: [REJECT]`、Surge `select, REJECT`；`direct` → mihomo `proxies: [COMPATIBLE]`、Surge `select, DIRECT`。mihomo 的 `proxies` 与 `use` 都为空时直接报错，Surge 不接受无成员无参数的组，所以必须写一个内置成员；`COMPATIBLE` 实测等效直连（07 M7）。
+- 空组处理（TPL-10，2026-10-29 修订）：模板和私有组统一拒绝。静态无成员或内联节点筛空时补 `proxies: [REJECT]`，记录 `group.empty` 告警；所有组固定输出 `empty-fallback: REJECT`，由 Mihomo v1.19.27+ 处理运行时 provider 未加载、更新或筛选后无成员的情况。覆盖层、旧 `whenEmpty: direct` 和 `extra.empty-fallback` 都不能改变此行为。节点测速失败仍按组类型处理，不等于空组。UI 不提供空组设置，Surge 输出仍未开放。
 
 ## 6. 规则集展开与输出
 

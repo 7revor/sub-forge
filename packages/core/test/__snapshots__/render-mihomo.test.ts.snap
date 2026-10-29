@@ -26,22 +26,25 @@ proxy-groups:
     proxies:
       - 🇭🇰 香港
       - DIRECT
+    empty-fallback: REJECT
   - name: 🇭🇰 香港
     type: url-test
     use:
       - 中转
-    empty-fallback: REJECT
     url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
+    empty-fallback: REJECT
   - name: 🤖 AI 服务
     type: select
     proxies:
       - REJECT
+    empty-fallback: REJECT
   - name: 📺 国内媒体
     type: select
     proxies:
-      - COMPATIBLE
+      - REJECT
+    empty-fallback: REJECT
 rule-providers:
   rs_fin_classical:
     type: http

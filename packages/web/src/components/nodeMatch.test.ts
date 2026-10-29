@@ -11,6 +11,9 @@ const nodes: NodeBrief[] = [
 ];
 
 describe('节点过滤', () => {
+  it('Mihomo 的 Shadowsocks 名称与节点的 ss 别名筛选一致', () => {
+    expect(filterNodes(nodes, { excludeType: 'Shadowsocks|HTTP' })).toEqual({ nodes: [nodes[1], nodes[2]] });
+  });
   it('组合保留、剔除和大小写不敏感的协议排除，并保持顺序', () => {
     expect(filterNodes(nodes, { filter: '(?i)^hk', excludeFilter: '备用', excludeType: ' SS | http ' })).toEqual({ nodes: [nodes[1]] });
   });

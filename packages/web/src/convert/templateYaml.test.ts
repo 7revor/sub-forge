@@ -47,6 +47,14 @@ function imported(text: string, current = empty, context = ctx) {
 }
 
 describe('模板与 mihomo YAML 双向转换', () => {
+  it('空组行为固定，原始配置不再保留可覆盖的 empty-fallback', () => {
+    const body = fixture();
+    body.groups[0]!.extra = { ...body.groups[0]!.extra, 'empty-fallback': 'DIRECT' };
+    const text = templateToYaml(body, ctx);
+    expect(text).not.toContain('empty-fallback');
+    const result = imported(text.replace('type: select', 'type: select\n    empty-fallback: DIRECT'), body);
+    expect(result.value.groups[0]!.extra).not.toHaveProperty('empty-fallback');
+  });
   it('仓库与重名本地引用可独立导出导入，改出口和选项不丢失文件映射', () => {
     const repository = { repo: 'github', entry: 'Google', name: '仓库 · Google', sources: [{ id: 's', kind: 'remote' as const, format: 'auto' as const, url: 'https://example.test/Google.list', repository: { repo: 'github', entry: 'Google', ref: 'main', path: 'Google.list' } }] };
     const context = { rulesets: [{ id: 'one', name: 'Google' }, { id: 'two', name: 'Google' }] };
