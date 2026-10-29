@@ -78,7 +78,6 @@ export function PresetEdit() {
     setRawValid(true);
     setEditorRevision((value) => value + 1);
   };
-  const jump = (title: string) => document.querySelector(`[data-section="${title}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <>
@@ -104,13 +103,9 @@ export function PresetEdit() {
               </div>
             </div>
             {client === 'surge' && <Empty title="Surge 预设暂未开放" description="Surge 段（[General]、[Host]）在 M2 提供；目前预设只输出 mihomo。" />}
-            {client === 'mihomo' && mode === 'form' && <div className="flex flex-wrap gap-1.5">
-              {mihomoBaseGroups.map((g) => <button key={g.title} type="button" onClick={() => jump(g.title)}
-                className="cursor-pointer rounded-full border border-line bg-ground px-2.5 py-1 text-[12.5px] text-ink-2 hover:border-[#c5cad3]">{g.title}</button>)}
-            </div>}
             {client === 'mihomo' && <DualEditor key={`${d.id}-${editorRevision}`} value={d.mihomo} onChange={(mihomo) => e.setDraft({ ...d, mihomo })} mode={mode} onModeChange={setMode}
               toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={baseFormFromYaml} onValidityChange={setRawValid} rawLabel="mihomo · YAML"
-              renderForm={() => <SchemaForm groups={mihomoBaseGroups} value={baseToForm(d.mihomo)} extra
+              renderForm={() => <SchemaForm groups={mihomoBaseGroups} value={baseToForm(d.mihomo)} extra collapsible
                 onChange={(value) => e.setDraft({ ...d, mihomo: baseFromForm(value, d.mihomo) })} />} />}
           </section>
 
