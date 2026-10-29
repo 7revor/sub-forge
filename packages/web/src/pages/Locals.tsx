@@ -19,7 +19,7 @@ import { inspectLocalNodeYaml } from '../convert/localNodeYaml.ts';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { groupFromYaml, groupToYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, DeleteDialog, ActionButtons } from '../components/DetailActions.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, Modal, PageHeader, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
@@ -66,7 +66,7 @@ export function LocalEdit() {
   const [deletingNode, setDeletingNode] = useState<number>();
   const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew);
   if (e.isNew) return <Navigate to="/locals" replace />;
-  if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const validName = !!d.name.trim();
   const setProxies = (proxies: LocalProxy[]) => e.setDraft({ ...d, proxies });
@@ -86,7 +86,7 @@ export function LocalEdit() {
         <Badge>{d.proxies.length} 个节点</Badge>
         {e.dirty && <Badge tone="warn">有未保存的修改</Badge>}
       </PageHeader>
-      <ErrorBox error={e.save.error} />
+      <ErrorAlert error={e.save.error} />
       <Card title="基本信息" bodyClass="flex flex-col gap-4 px-4 pb-4">
         <Field label="名称">{(id) => <Input id={id} value={d.name} placeholder="例如：自建、家宽" aria-invalid={!validName} onChange={(event) => e.setDraft({ ...d, name: event.target.value })} />}</Field>
         {!validName && <span className="text-[12px] text-err">请填写分组名称</span>}
@@ -123,7 +123,7 @@ export function LocalEdit() {
         <Field label="整个分组的 proxies 列表">
           {(id) => <YamlTextarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
         </Field>
-        <ErrorBox error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
+        <FieldError error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
       </Modal>
       <DeleteDialog open={deletingNode !== undefined} title={`删除节点「${deletingNode === undefined ? '' : d.proxies[deletingNode]?.name ?? ''}」？`} error={e.save.error} pending={e.save.isPending}
         onClose={() => setDeletingNode(undefined)}
@@ -140,7 +140,7 @@ export function LocalEdit() {
 export function LocalNodeEdit() {
   const { id, index } = useParams();
   const doc = useDoc('locals', id);
-  if (doc.error) return <ErrorBox error={doc.error} />;
+  if (doc.error) return <ErrorAlert error={doc.error} />;
   if (!doc.data) return <div className="text-muted">加载中…</div>;
   const idx = Number(index);
   if (index !== 'new' && !(Number.isInteger(idx) && idx >= 0 && idx < doc.data.proxies.length)) return <Navigate to={`/locals/${id}`} replace />;
@@ -185,7 +185,7 @@ function LocalNodeEditor({ group: g, index }: { group: LocalProxyGroup; index: n
       <Badge>分组 · {g.name}</Badge>
       {dirty && <Badge tone="warn">有未保存的修改</Badge>}
     </PageHeader>
-    <ErrorBox error={save.error} />
+    <ErrorAlert error={save.error} />
     <Card scroll title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
       <LocalNodeYamlEditor disabled={save.isPending} text={text} onChange={setText} result={result} checking={checking} />
     </Card>

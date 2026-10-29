@@ -1,5 +1,5 @@
 import type { Blocker } from 'react-router';
-import { Button, ErrorBox, Modal } from './ui.tsx';
+import { Button, ErrorAlert, Modal } from './ui.tsx';
 
 export function LeaveDialog({ blocker, what, canSave, pending, error, onSave, onDiscard, saveLabel = '保存并离开' }: {
   blocker: Blocker; what: string; canSave: boolean; pending: boolean; error: unknown;
@@ -14,6 +14,6 @@ export function LeaveDialog({ blocker, what, canSave, pending, error, onSave, on
   </>}>
     <span className="text-[13.5px] leading-relaxed">{what}有未保存的修改。离开后修改会丢失。</span>
     {!canSave && <span className="text-[12.5px] text-muted">当前内容有错误，请继续编辑修复，或明确放弃修改。</span>}
-    <ErrorBox error={error} />
+    <ErrorAlert error={error} />
   </Modal>;
 }

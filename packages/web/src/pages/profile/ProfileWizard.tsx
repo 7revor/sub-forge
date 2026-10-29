@@ -3,7 +3,7 @@
 import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Button, Card, ErrorBox, Field, Input, PageHeader, cx } from '../../components/ui.tsx';
+import { Button, Card, ErrorAlert, Field, Input, PageHeader, cx } from '../../components/ui.tsx';
 import { useSaveDoc, useTemplates, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
 import { TabBase, TabNodeSets } from './TabsBasic.tsx';
@@ -75,7 +75,7 @@ export function ProfileWizard() {
         </>}
         {step === 1 && <TabNodeSets />}
         {step === 2 && <Card title="模板">
-          <ErrorBox error={templates.error} />
+          <ErrorAlert error={templates.error} />
           {templates.isPending && <p className="text-[13px] text-muted">正在加载模板…</p>}
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
             {[{ id: '', name: '空白', desc: '不使用模板，只用私有组和私有规则' }, ...(templates.data ?? []).map((t) => ({ id: t.id, name: `${t.name ?? t.id} v${t.version}`, desc: `${t.groups.length} 个组 · ${t.rules.length} 条规则` }))].map((t) => (
@@ -88,14 +88,14 @@ export function ProfileWizard() {
           </div>
           {draft.template && <p className="mt-3 mb-0 text-[12.5px] text-muted">自动跟随模板最新版本。</p>}
         </Card>}
-        <ErrorBox error={template.error} />
+        <ErrorAlert error={template.error} />
         {step >= 3 && !templateReady && <div className="text-muted">{template.isError ? '模板加载失败，请返回模板步骤重新选择，或重试。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
         {templateReady && step === 3 && <TabGroups />}
         {templateReady && step === 4 && <TabRules />}
         {templateReady && step === 5 && <TabChains />}
         {templateReady && step === 6 && <TabPreview />}
       </fieldset>
-      <ErrorBox error={save.error} />
+      <ErrorAlert error={save.error} />
       <div className="flex flex-wrap justify-end gap-2">
         {!ctx!.baseValid && <Button onClick={ctx!.resetBaseEditor}>放弃无效的 YAML</Button>}
         <Button disabled={step === 0 || !ctx!.baseValid || save.isPending} onClick={() => setStep(step - 1)}>上一步</Button>

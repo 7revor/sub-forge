@@ -1,3 +1,4 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { AsyncSelect, type AsyncSelectPage } from '../components/listbox.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
@@ -16,7 +17,7 @@ import { SortableList } from '../components/SortableList.tsx';
 import { DetailShell } from '../components/DetailShell.tsx';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Switch, Textarea, buttonClass, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, FieldError, Field, Input, Select, Switch, Textarea, buttonClass, cx } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
@@ -76,7 +77,6 @@ export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [target, setTarget] = useState('mihomo');
   const [selected, setSelected] = useState<string | undefined>();
-  const [showError, setShowError] = useState(false);
   const t = TARGETS.find((x) => x.key === target)!;
   const draft = useDebouncedValue(e.draft, 400);
   const preview = useQuery({
@@ -88,7 +88,7 @@ export function RulesetEdit() {
       client: t.client, ...(t.platform ? { platform: t.platform } : {}),
     }),
   });
-  if (!e.draft) return e.doc.error ? <ErrorBox error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
   const d = e.draft;
   const selectedSource = d.sources.find((s) => s.id === selected);
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
@@ -101,10 +101,10 @@ export function RulesetEdit() {
   return (
     <DetailShell listPath="/rulesets" listLabel="规则集" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
       onSave={() => {
-        setShowError(true);
+        if (error) { alertError(error); return; }
         if (!error) e.submit((x) => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => (s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' })) }));
       }}
-      saveError={(showError && error) || e.save.error}
+      saveError={e.save.error}
       onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
       badges={!e.isNew && <>
         <Badge>{sourceSummary(d)}</Badge>
@@ -171,22 +171,20 @@ async function loadRepositoryOptions(query: string, offset: number): Promise<Asy
 
 function RepositoryPicker({ onAdd }: { onAdd: (sources: RuleSetSourceDoc[]) => void }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>();
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   return <>
     <AsyncSelect aria-label="关联仓库规则" placeholder={busy ? '正在关联…' : '关联仓库规则'} disabled={busy} loadOptions={loadRepositoryOptions}
       triggerClassName={sourceActionClass} triggerIcon={<Link2 size={15} className="hidden shrink-0 sm:block" />}
       onChange={async value => {
-        setBusy(true); setError(undefined);
+        setBusy(true);
         try {
           const [repo, path] = JSON.parse(value) as [string, string];
           const result = await api<{ sources: RuleSetSourceDoc[] }>('POST', '/rule-repos/resolve', { repo, path });
-          if (alive.current) onAdd(result.sources);
-        } catch (e) { if (alive.current) setError(e); }
+          if (alive.current) { onAdd(result.sources); notifySuccess('仓库规则已关联，保存后生效'); }
+        } catch (e) { if (alive.current) alertError(e); }
         finally { if (alive.current) setBusy(false); }
       }} />
-    {error != null && <div className="order-last col-span-full"><ErrorBox error={error} /></div>}
   </>;
 }
 
@@ -258,13 +256,13 @@ function MergedStats({ stats }: { stats: NonNullable<RulesetPreview['stats']> })
 }
 
 function PreviewBody({ preview }: { preview: UseQueryResult<RulesetPreview> }) {
-  if (preview.error) return <ErrorBox error={preview.error} />;
+  if (preview.error) return <ErrorAlert error={preview.error} />;
   const p = preview.data;
   if (!p) return <div className="text-[13px] text-muted">加载中…</div>;
   if (p.passthrough) return <Empty title="该来源为二进制透传" description="由客户端直接读取，无法在此展示文本规则。" />;
   return (
     <>
-      {p.error && <ErrorBox error={`拉取失败：${p.error}`} />}
+      {p.error && <FieldError error={`拉取失败：${p.error}`} />}
       {p.lines.length ? <CodePreview text={p.lines.join('\n')} loading={preview.isFetching} bodyClassName="min-h-[120px]" /> : <Empty title="没有可输出的规则" />}
       <span className="text-[12px] text-muted">{p.total ?? p.lines.length} 行{(p.total ?? 0) > p.lines.length ? `（显示前 ${p.lines.length} 行）` : ''} · 降级 {p.notes?.length ?? 0} · 丢弃 {p.dropped.length} · 无法解析 {p.rejected.length}</span>
       {[...(p.notes ?? []).map((n) => ['降级', n]), ...p.dropped.map((x) => ['丢弃', x.reason]), ...p.rejected.map((x) => ['不支持', `第 ${x.line} 行 ${x.text}：${x.reason}`])].slice(0, 50).map(([k, v], i) => (

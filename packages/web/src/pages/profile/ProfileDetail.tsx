@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
 import { DeleteAction } from '../../components/DetailActions.tsx';
-import { Badge, Button, buttonClass, ErrorBox, Modal, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
+import { Badge, Button, buttonClass, ErrorAlert, Modal, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
 import { TemplateCard } from './TemplateCard.tsx';
 import { useDeleteDoc, useDoc, useList, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
@@ -37,7 +37,7 @@ export function ProfileDetail() {
 
   const { ctx, template } = useProfileCtx(draft, setDraft);
 
-  if (!draft || !ctx) return doc.error ? <ErrorBox error={doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!draft || !ctx) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-muted">加载中…</div>;
   const dirty = !ctx.baseValid || JSON.stringify(draft) !== JSON.stringify(doc.data);
   const discard = () => { setDraft(doc.data); ctx.resetBaseEditor(); };
   const preset = presets.data?.find((p) => p.id === draft.base?.presetId);
@@ -77,9 +77,9 @@ export function ProfileDetail() {
           ))}
         </nav>
       </div>
-      <ErrorBox error={save.error ?? dup.error} />
+      <ErrorAlert error={save.error ?? dup.error} />
       <ProfileEditGuard valid={ctx.baseValid} onDiscard={discard} />
-      {template.error && <ErrorBox error={template.error} />}
+      {template.error && <ErrorAlert error={template.error} />}
 
       <PageScroll>
         {tab === 'overview' && <TabOverview />}

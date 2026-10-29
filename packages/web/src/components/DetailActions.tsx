@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { deleteErrorText } from '../domain/deleteError.ts';
-import { Button, Modal } from './ui.tsx';
+import { Button, ErrorAlert, Modal } from './ui.tsx';
 
 export type ActionItem = { label: string; onSelect: () => void };
 
@@ -11,7 +11,7 @@ export function ActionButtons({ items }: { items: ActionItem[] }) {
   return <>{items.map((item) => <Button key={item.label} onClick={item.onSelect}>{item.label}</Button>)}</>;
 }
 
-/** 删除确认：被引用时服务端拒绝，原因（含引用方）显示在对话框里 */
+/** 删除确认：被引用时服务端拒绝，原因（含引用方）交给统一失败弹窗 */
 export function DeleteDialog({ open, title, children, error, pending, onClose, onConfirm }: {
   open: boolean; title: string; children?: ReactNode; error?: unknown; pending?: boolean; onClose: () => void; onConfirm: () => void;
 }) {
@@ -20,7 +20,7 @@ export function DeleteDialog({ open, title, children, error, pending, onClose, o
     <Modal title={title} open={open} onClose={onClose}
       footer={<><Button onClick={onClose}>取消</Button><Button variant="danger-solid" disabled={pending || !!reason} onClick={onConfirm}>{pending ? '删除中…' : '删除'}</Button></>}>
       {children && <div className="text-[13.5px] leading-relaxed">{children}</div>}
-      {reason && <div role="alert" className="rounded-lg bg-err-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8f2a1f]"><b>还不能删除：</b>{reason}</div>}
+      {open && <ErrorAlert error={error} />}
     </Modal>
   );
 }

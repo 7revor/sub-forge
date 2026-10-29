@@ -1,7 +1,8 @@
+import { alertError, notifySuccess } from '../feedback.ts';
 import { YamlTextarea } from './YamlTextarea.tsx';
 import { useState } from 'react';
 import { extraNameError, formatExtraValue, parseExtraValue } from './extraFields.ts';
-import { Button, ErrorBox, Input } from './ui.tsx';
+import { Button, FieldError, Input } from './ui.tsx';
 
 function ValueRow({ name, value, onChange, onRename, onRemove }: {
   name: string; value: unknown; onChange: (value: unknown) => void; onRename: (name: string) => string | undefined; onRemove: () => void;
@@ -33,7 +34,7 @@ function ValueRow({ name, value, onChange, onRename, onRemove }: {
         }} />
         <Button size="sm" aria-label={`删除 ${name}`} onClick={onRemove}>删除</Button>
       </div>
-      <ErrorBox error={keyError || error} />
+      <FieldError error={keyError || error} />
     </div>
   );
 }
@@ -44,7 +45,6 @@ export function ExtraFields({ value, onChange, validateName }: {
 }) {
   const [key, setKey] = useState('');
   const [text, setText] = useState('');
-  const [error, setError] = useState('');
   return (
     <details className="rounded-lg border border-line p-3">
       <summary className="cursor-pointer text-[13px] text-muted">其他字段 {Object.keys(value).length} 个</summary>
@@ -66,14 +66,13 @@ export function ExtraFields({ value, onChange, validateName }: {
           <Button size="sm" onClick={() => {
             const name = key.trim();
             const error = extraNameError(value, name, undefined, validateName);
-            if (error) { setError(error); return; }
+            if (error) { alertError(error); return; }
             const parsed = parseExtraValue(text);
-            if (!parsed.ok) { setError(parsed.error); return; }
+            if (!parsed.ok) { alertError(parsed.error); return; }
             onChange({ ...value, [name]: parsed.value });
-            setKey(''); setText(''); setError('');
+            setKey(''); setText(''); notifySuccess('字段已添加');
           }}>添加</Button>
         </div>
-        <ErrorBox error={error} />
       </div>
     </details>
   );
