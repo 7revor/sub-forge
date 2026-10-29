@@ -50,35 +50,4 @@ describe('代理链的失败保护与真实成员展开', () => {
     input.profile.refPolicy.default = 'copy';
     expect(renderMihomo(input).report.byCode('chain.cycle')).toHaveLength(1);
   });
-
-  describe('本地节点的前置指向同组节点', () => {
-    const local = (dialerTo: string, output: 'provider' | 'inline'): RenderInput => {
-      const ref = { type: 'local', id: 'l' } as const;
-      const input = base(group(), output);
-      input.profile.nodeSets = [{ ref, output }];
-      input.profile.chains = [];
-      input.profile.overlay = {};
-      input.nodeSets.locals.l = { id: 'l', name: '自建', proxies: [
-        { name: '中转', type: 'http', server: 'relay.test', port: 8080 },
-        { name: '落地', type: 'socks5', server: 'landing.test', port: 1080, dialer: { kind: 'node', ref: { nodeSet: ref, match: { exact: dialerTo } } } },
-      ] };
-      return input;
-    };
-
-    it('inline 输出直接写同组节点名', () => {
-      const r = renderMihomo(local('中转', 'inline'));
-      expect(r.report.items.filter((i) => i.level === 'error')).toEqual([]);
-      expect(r.config.proxies).toContainEqual(expect.objectContaining({ name: '落地', 'dialer-proxy': '中转' }));
-    });
-
-    it('provider 输出用包装组指向同一 provider', () => {
-      const r = renderMihomo(local('中转', 'provider'));
-      expect(r.report.items.filter((i) => i.level === 'error')).toEqual([]);
-      expect(r.config['proxy-groups']).toContainEqual(expect.objectContaining({ use: ['自建'], filter: '^中转$' }));
-    });
-
-    it.each(['provider', 'inline'] as const)('指向自己时报环（%s）', (output) => {
-      expect(renderMihomo(local('落地', output)).report.byCode('chain.cycle')).toHaveLength(1);
-    });
-  });
 });

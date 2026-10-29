@@ -51,7 +51,7 @@ type OperatorRef = { enabled: boolean } & (Operator | { op: 'fragment'; fragment
 
 type ProxyIR = {                  // 客户端无关的节点表示（字段对齐 mihomo）
   name: string; type: string; server: string; port: number; [k: string]: unknown;
-  dialer?: Target;                // 前置（渲染时转为 dialer-proxy / underlying-proxy）；可以指向同一 NodeSet 内的其他节点，指向自己由环检测报错
+  dialer?: Target;                // 前置（渲染时转为 dialer-proxy / underlying-proxy）
   _source: NodeSetID; _origName: string; _key: string;   // 隐式字段，输出时剥离
 };
 
