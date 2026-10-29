@@ -4,11 +4,12 @@
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { validateTemplate, type ReportItem, type RuleBundle, type RuleSet, type Template } from '@sub-forge/core';
+import { parseRuleSetContent, validateTemplate, type ReportItem, type RuleBundle, type RuleSet, type Template } from '@sub-forge/core';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { TemplateVersionDoc } from '../docs.ts';
 import type { RenderService } from '../render.ts';
+import { unusableBody, type SnapshotService } from '../snapshots.ts';
 import type { Store } from '../store.ts';
 import { bad, HttpError, isStr, jsonBody, notFound, requireAdmin, requireUser, type ApiEnv } from './common.ts';
 
@@ -17,10 +18,45 @@ export type ImpactEntry = { profileId: string; profileName: string; owner: strin
 /** 只关心新版本带来的问题：渲染错误、孤儿覆盖项、空组 */
 const IMPACT_CODES = new Set(['overlay.orphan', 'overlay.orphan-anchor', 'group.empty']);
 
-function selfCheck(store: Store, t: Template): ReportItem[] {
+async function selfCheck(store: Store, snapshots: SnapshotService, t: Template): Promise<ReportItem[]> {
   const rulesets: Record<string, RuleSet> = Object.fromEntries(store.list('ruleset').map((r) => [r.id, r]));
   const bundles: Record<string, RuleBundle> = Object.fromEntries(store.list('bundle').map((b) => [b.id, b]));
-  return validateTemplate(t, { rulesets, bundles }).items;
+  const report = validateTemplate(t, { rulesets, bundles }).items;
+  if (report.some(i => i.level === 'error')) return report;
+  const ids = new Set<string>();
+  for (const r of t.rules) {
+    if (r.enabled === false) continue;
+    if (r.matcher.kind === 'ruleset') ids.add(r.matcher.id);
+    if (r.matcher.kind === 'bundle') {
+      for (const item of bundles[r.matcher.id]!.items) if (item.kind === 'ruleset' && item.enabled !== false) ids.add(item.id);
+    }
+  }
+  for (const id of ids) {
+    const rs = store.get('ruleset', id)!;
+    const where = `ruleset:${id}`;
+    if (rs.format === 'mrs' || rs.format === 'srs') {
+      report.push({ level: 'info', code: 'template.ruleset-passthrough', message: `规则集「${rs.name}」为二进制透传，内容与可达性由客户端检查`, where });
+      continue;
+    }
+    let content = rs.content ?? '';
+    if (rs.kind === 'remote') {
+      const result = await snapshots.get('ruleset', id, rs.url!, { ttlSec: rs.fetch?.ttlSec ?? 86400, ...rs.fetch });
+      if (!result.snapshot) {
+        report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `规则集「${rs.name}」没有可用快照：${result.error ?? '无法拉取'}`, where });
+        continue;
+      }
+      content = result.snapshot.body ?? '';
+      if (result.error || result.stale) report.push({ level: 'warn', code: 'template.ruleset-snapshot', message: `规则集「${rs.name}」使用可用快照${result.error ? `：${result.error}` : '，后台刷新中'}`, where });
+    }
+    const reason = unusableBody('ruleset', id, content, rs.format);
+    if (reason) {
+      report.push({ level: 'error', code: 'template.ruleset-invalid', message: `规则集「${rs.name}」不可用：${reason}`, where });
+      continue;
+    }
+    const parsed = parseRuleSetContent(content, rs.format);
+    if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', message: `规则集「${rs.name}」有 ${parsed.rejected.length} 行无法解析或不支持`, where });
+  }
+  return report;
 }
 
 function draftFrom(body: Record<string, unknown>, id: string, version: number): TemplateVersionDoc {
@@ -29,7 +65,7 @@ function draftFrom(body: Record<string, unknown>, id: string, version: number): 
   return { ...(body as unknown as TemplateVersionDoc), id, version, ...(isStr(body.changelog) ? { changelog: body.changelog } : {}) };
 }
 
-export function templateRoutes(store: Store, renderer: RenderService) {
+export function templateRoutes(store: Store, renderer: RenderService, snapshots: SnapshotService) {
   const app = new Hono<ApiEnv>();
 
   app.get('/templates', requireUser, (c) => c.json({ items: store.listLatestTemplates() }));
@@ -50,7 +86,7 @@ export function templateRoutes(store: Store, renderer: RenderService) {
   app.post('/templates/validate', requireAdmin, async (c) => {
     const body = await jsonBody(c);
     const draft = draftFrom(body, isStr(body.id) ? body.id : 'draft', 0);
-    return c.json({ report: selfCheck(store, draft) });
+    return c.json({ report: await selfCheck(store, snapshots, draft) });
   });
 
   /** 发布：新模板（:id 为 new）或已有模板的新版本 */
@@ -62,7 +98,7 @@ export function templateRoutes(store: Store, renderer: RenderService) {
     if (!isNew && !current) throw notFound('模板');
     const draft = draftFrom(body, id, (current?.version ?? 0) + 1);
 
-    const own = selfCheck(store, draft);
+    const own = await selfCheck(store, snapshots, draft);
     if (own.some((i) => i.level === 'error')) throw new HttpError(400, '模板自身校验未通过，禁止发布', { report: own });
 
     const impact = isNew ? [] : await analyzeImpact(store, renderer, draft);
@@ -80,7 +116,8 @@ export function templateRoutes(store: Store, renderer: RenderService) {
     const current = store.getTemplate(id);
     if (!current) throw notFound('模板');
     const draft = draftFrom(await jsonBody(c), id, current.version + 1);
-    return c.json({ report: selfCheck(store, draft), impact: await analyzeImpact(store, renderer, draft) });
+    const report = await selfCheck(store, snapshots, draft);
+    return c.json({ report, impact: report.some(i => i.level === 'error') ? [] : await analyzeImpact(store, renderer, draft) });
   });
 
   return app;
