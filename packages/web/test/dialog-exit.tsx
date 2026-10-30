@@ -7,6 +7,7 @@ import { Frame as FrameApi } from '../src/modals/Frame.tsx';
 import { createModal, ModalRoot, ModalContent, ModalHeader, ModalTitle, useModalDraft, useModalPresentation } from '../src/modals/index.tsx';
 import { NodeSetPreviewModal } from '../src/components/NodeSetPreviewModal.tsx';
 import { ChainRuleModal } from '../src/pages/profile/ChainRuleModal.tsx';
+import { exactNodeFilter } from '../src/pages/profile/memberModel.ts';
 import type { ProfileModalData } from '../src/pages/profile/modalProfile.ts';
 import { RuleSourcePreview } from '../src/components/RuleSourcePreview.tsx';
 import { Button, Input } from '../src/components/ui.tsx';
@@ -104,6 +105,15 @@ function App() {
       <Button onClick={() => void record(NodeSetPreviewModal.show(nodeFixture))}>节点列表退场</Button>
       <Button onClick={() => void record(ChainRuleModal.show({ ...profileFixture, title: '代理链退场验收', chain: { id: 'exit-chain', landing: { nodeSet: nodeFixture.nodeSet, filter: 'GCP', excludeFilter: '过期' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'relay' }, match: { regex: '日本' } } } } }))}>代理链列表退场</Button>
       <Button onClick={() => void record(ChainRuleModal.show({ ...profileFixture, title: '全部来源代理链退场', chain: { id: 'all-chain', landing: { nodeSet: { type: 'all', id: 'inline' } }, via: { kind: 'node', ref: { nodeSet: { type: 'all', id: 'provider' }, match: { regex: '' } } } } }))}>全部来源代理链退场</Button>
+      <Button onClick={() => void record(ChainRuleModal.show({
+        ...profileFixture,
+        profile: { ...profileFixture.profile, routing: { mode: 'independent', config: {
+          groups: [{ id: 'direct', name: '直连前置组', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }, { id: 'backup', name: '备用前置组', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }],
+          rules: [], final: { kind: 'builtin', name: 'DIRECT' },
+        } } },
+        title: '直接点选代理链退场',
+        chain: { id: 'click-chain', landing: { nodeSet: nodeFixture.nodeSet, filter: exactNodeFilter('🇺🇸 GCP [01]') }, via: { kind: 'node', ref: { nodeSet: nodeFixture.nodeSet, match: { exact: '🇸🇬 新加坡' } } } },
+      }))}>直接点选代理链退场</Button>
       <Button onClick={() => void record(QueryModal.show({}))}>查询结果弹窗</Button>
       <Button onClick={() => { attempt.current = 0; void record(FrameApi.modal.prompt({ title: '保存失败后重试', initialValue: '保留我的草稿', placeholder: '输入要保存的名称' }, { submit: async () => { if (++attempt.current === 1) throw new Error('模拟保存失败，请重试'); } })); }}>异步失败与重试</Button>
       <Button onClick={() => void record(NestedModal.show({ name: '外部原值' }))}>嵌套与路由</Button>

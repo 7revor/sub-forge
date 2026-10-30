@@ -46,24 +46,42 @@ export function ChainRuleEditor({ initial, fixedLanding = false, landingLabel, o
         <div><h3 className="m-0 text-[14px] font-semibold">1. 前置节点</h3><p className="mt-1 mb-0 text-[12px] text-ink-muted">本机先连接这里，再经由它连接落地。</p></div>
         <Segmented label="前置来源" value={kind} options={[{ value: 'provider', label: 'Provider', disabled: !sourcesFor('provider').length }, { value: 'inline', label: 'Inline', disabled: !sourcesFor('inline').length }, { value: 'group', label: '策略组', disabled: !groupOptions.length }, ...(initial.via.kind === 'builtin' ? [{ value: 'direct' as const, label: `${initial.via.name}（原设置）` }] : [])]} onChange={v => { setKind(v); choose(v === 'group' ? { kind: 'group', groupId: '' } : v === 'direct' ? initial.via : emptyVia(allSources(v))); }} />
         {(kind === 'inline' || kind === 'provider') && <>
-          <Field label={kind === 'provider' ? '前置 Provider' : '前置 Inline 节点集'}>{id => <Select id={id} aria-label={kind === 'provider' ? '前置 Provider' : '前置 Inline 节点集'} placeholder="全部" clearable disabled={!sources.length} value={active ? nodeSetKey(active.ref) : ''} onChange={e => { const s = sources.find(s => nodeSetKey(s.ref) === e.target.value); if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, nodeSet: s?.ref ?? allSources(kind) } }); }}>{sources.map(s => <option key={nodeSetKey(s.ref)} value={nodeSetKey(s.ref)}>{s.name}</option>)}</Select>}</Field>
+          <Field label={kind === 'provider' ? '前置 Provider' : '前置 Inline 节点集'}>{id => <Select id={id} aria-label={kind === 'provider' ? '前置 Provider' : '前置 Inline 节点集'} placeholder="全部" clearable disabled={!sources.length} value={active ? nodeSetKey(active.ref) : ''} onChange={e => { const s = sources.find(s => nodeSetKey(s.ref) === e.target.value); if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, nodeSet: s?.ref ?? allSources(kind), ...(kind === 'inline' ? { match: { regex: '' } } : {}) } }); }}>{sources.map(s => <option key={nodeSetKey(s.ref)} value={nodeSetKey(s.ref)}>{s.name}</option>)}</Select>}</Field>
           {chain.via.kind === 'node' && <>
-            <Field label="前置节点筛选（正则）">{id => <Input id={id} placeholder={chainPlaceholders.viaFilter} disabled={!sources.length} value={viaFilter} onChange={e => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, match: { regex: e.target.value } } }); }} />}</Field>
-            <p className="m-0 text-[12px] text-ink-muted">来源留空包含全部同类来源；可筛选或点击节点。</p>
-            <NodeSetPreview nodeSets={previewSources(chain.via.ref.nodeSet)} filter={viaFilter} label="前置节点" firstMatch onSelect={(name, nodeSet) => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, nodeSet, match: { exact: name } } }); }} />
+            {kind === 'provider' ? <>
+              <Field label="前置节点筛选（正则）">{id => <Input id={id} placeholder={chainPlaceholders.viaFilter} disabled={!sources.length} value={viaFilter} onChange={e => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, match: { regex: e.target.value } } }); }} />}</Field>
+              <p className="m-0 text-[12px] text-ink-muted">来源留空包含全部同类来源；可筛选或点击节点。</p>
+            </> : <div className="flex items-center justify-between gap-2 text-[12px] text-ink-muted">
+              <p className="m-0">点击节点指定前置；未指定时按顺序采用首个节点。</p>
+              {viaFilter && <Button size="sm" variant="ghost" onClick={() => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, match: { regex: '' } } }); }}>恢复全部前置节点</Button>}
+            </div>}
+            <NodeSetPreview nodeSets={previewSources(chain.via.ref.nodeSet)} filter={kind === 'provider' ? viaFilter : undefined} selection={kind === 'inline' ? { match: chain.via.ref.match } : undefined} label="前置节点" firstMatch onSelect={(name, nodeSet) => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, nodeSet, match: { exact: name } } }); }} />
           </>}
         </>}
-        {kind === 'group' && <Field label="前置策略组">{id => <Select id={id} placeholder="选择用于连接落地节点的前置策略组" value={chain.via.kind === 'group' ? chain.via.groupId : ''} onChange={e => choose({ kind: 'group', groupId: e.target.value })}>{groupOptions.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>}</Field>}
+        {kind === 'group' && <div className="flex flex-col gap-2">
+          <p className="m-0 text-[12px] text-ink-muted">点击策略组作为前置。</p>
+          <div role="group" aria-label="前置策略组" className="max-h-64 overflow-y-auto rounded-md border border-line">
+            {groupOptions.map(group => {
+              const selected = chain.via.kind === 'group' && chain.via.groupId === group.id;
+              return <button key={group.id} type="button" aria-pressed={selected} className={`flex w-full cursor-pointer items-center justify-between gap-3 border-b border-line-2 px-3 py-2.5 text-left text-[13px] last:border-0 hover:bg-ground focus-visible:bg-ground ${selected ? 'bg-ground font-medium' : ''}`} onClick={() => choose({ kind: 'group', groupId: group.id })}><span className="min-w-0 break-all">{group.name}</span>{selected && <span className="shrink-0 text-[11px] text-ink-muted">当前采用</span>}</button>;
+            })}
+          </div>
+        </div>}
       </section>
       <section aria-label="落地节点" className="flex min-w-0 flex-col gap-3 border-t border-line pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5">
         <div><h3 className="m-0 text-[14px] font-semibold">2. 落地节点</h3><p className="mt-1 mb-0 text-[12px] text-ink-muted">通过前置连接这里，由落地访问目标。</p></div>
         {fixedLanding ? <div className="rounded-md bg-ground p-3 text-[13px]">{landingText}</div> : <>
           <Segmented label="落地来源" value={landingKind} options={[{ value: 'inline', label: 'Inline', disabled: !sourcesFor('inline').length }, { value: 'provider', label: 'Provider', disabled: !sourcesFor('provider').length }]} onChange={v => { setLandingKind(v); setChain({ ...chain, landing: { nodeSet: allSources(v) } }); }} />
-          <Field label={landingKind === 'provider' ? '落地 Provider' : '落地 Inline 节点集'}>{id => <Select id={id} aria-label={landingKind === 'provider' ? '落地 Provider' : '落地 Inline 节点集'} placeholder="全部" clearable value={landingSource ? nodeSetKey(landingSource.ref) : ''} disabled={!sourcesFor(landingKind).length} onChange={e => { const s = sourcesFor(landingKind).find(s => nodeSetKey(s.ref) === e.target.value); setChain({ ...chain, landing: { ...chain.landing, nodeSet: s?.ref ?? allSources(landingKind) } }); }}>{sourcesFor(landingKind).map(s => <option key={nodeSetKey(s.ref)} value={nodeSetKey(s.ref)}>{s.name}</option>)}</Select>}</Field>
-          <Field label="落地节点筛选（正则）">{id => <Input id={id} placeholder="全部" disabled={!sourcesFor(landingKind).length} value={chain.landing.filter ?? ''} onChange={e => setChain({ ...chain, landing: { ...chain.landing, filter: e.target.value || undefined } })} />}</Field>
-          {chain.landing.excludeFilter !== undefined && <Field label="排除落地节点（正则）">{id => <Input id={id} placeholder="输入要排除的节点名称或正则" value={chain.landing.excludeFilter} onChange={e => setChain({ ...chain, landing: { ...chain.landing, excludeFilter: e.target.value } })} />}</Field>}
-          <p className="m-0 text-[12px] text-ink-muted">来源留空包含全部同类来源及后续新增节点；可筛选或点击节点。</p>
-          <NodeSetPreview nodeSets={previewSources(chain.landing.nodeSet)} filter={chain.landing.filter} excludeFilter={chain.landing.excludeFilter} label="落地节点" onSelect={(name, nodeSet) => setChain({ ...chain, landing: { ...chain.landing, nodeSet, filter: exactNodeFilter(name) } })} />
+          <Field label={landingKind === 'provider' ? '落地 Provider' : '落地 Inline 节点集'}>{id => <Select id={id} aria-label={landingKind === 'provider' ? '落地 Provider' : '落地 Inline 节点集'} placeholder="全部" clearable value={landingSource ? nodeSetKey(landingSource.ref) : ''} disabled={!sourcesFor(landingKind).length} onChange={e => { const s = sourcesFor(landingKind).find(s => nodeSetKey(s.ref) === e.target.value); setChain({ ...chain, landing: { ...(landingKind === 'provider' ? chain.landing : {}), nodeSet: s?.ref ?? allSources(landingKind) } }); }}>{sourcesFor(landingKind).map(s => <option key={nodeSetKey(s.ref)} value={nodeSetKey(s.ref)}>{s.name}</option>)}</Select>}</Field>
+          {landingKind === 'provider' ? <>
+            <Field label="落地节点筛选（正则）">{id => <Input id={id} placeholder="全部" disabled={!sourcesFor(landingKind).length} value={chain.landing.filter ?? ''} onChange={e => setChain({ ...chain, landing: { ...chain.landing, filter: e.target.value || undefined } })} />}</Field>
+            {chain.landing.excludeFilter !== undefined && <Field label="排除落地节点（正则）">{id => <Input id={id} placeholder="输入要排除的节点名称或正则" value={chain.landing.excludeFilter} onChange={e => setChain({ ...chain, landing: { ...chain.landing, excludeFilter: e.target.value } })} />}</Field>}
+            <p className="m-0 text-[12px] text-ink-muted">来源留空包含全部同类来源及后续新增节点；可筛选或点击节点。</p>
+          </> : <div className="flex items-center justify-between gap-2 text-[12px] text-ink-muted">
+            <p className="m-0">默认使用全部节点；点击节点指定落地。</p>
+            {!whole && <Button size="sm" variant="ghost" onClick={() => setChain({ ...chain, landing: { nodeSet: chain.landing.nodeSet } })}>恢复全部落地节点</Button>}
+          </div>}
+          <NodeSetPreview nodeSets={previewSources(chain.landing.nodeSet)} filter={landingKind === 'provider' ? chain.landing.filter : undefined} excludeFilter={landingKind === 'provider' ? chain.landing.excludeFilter : undefined} selection={landingKind === 'inline' ? { filter: chain.landing.filter, excludeFilter: chain.landing.excludeFilter } : undefined} label="落地节点" onSelect={(name, nodeSet) => setChain({ ...chain, landing: { nodeSet, filter: exactNodeFilter(name), ...(landingKind === 'provider' && chain.landing.excludeFilter !== undefined ? { excludeFilter: chain.landing.excludeFilter } : {}) } })} />
         </>}
       </section>
       </div>
