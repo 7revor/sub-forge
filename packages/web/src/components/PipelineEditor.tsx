@@ -349,7 +349,7 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
         <input type="checkbox" checked={options.changedOnly} onChange={(e) => onOptions({ ...options, changedOnly: e.target.checked })} />只看有变化的
       </label>
     </div>
-    {shown.length ? <div className="pipeline-mapping-scroll overflow-auto overscroll-contain">
+    {shown.length ? <div className="pipeline-mapping-scroll mx-4 overflow-auto overscroll-contain">
       <table className="w-full border-collapse text-[13px]">
         <thead><tr>
           <th className={cx(th, 'w-10 pl-4 text-right')}>#</th>
