@@ -33,7 +33,7 @@ export type Operator =
   | { op: 'sort.name'; order: 'asc' | 'desc' }
   | { op: 'sort.regex'; patterns: string[] }
   | { op: 'dedupe'; strategy: 'suffix' | 'drop'; by?: 'name' | 'key' }
-  | { op: 'set'; fields: Record<string, unknown> }
+  | { op: 'set'; types?: string[]; fields: Record<string, unknown> }
   | { op: 'script'; code: string };
 
 export type OperatorStep = Operator & { enabled?: boolean };
@@ -199,6 +199,8 @@ export type GroupSpec = {
     interval?: number;
     timeout?: number;
     tolerance?: number;
+    /** Loon 的节点可用性阈值，毫秒；不同于单次请求超时。 */
+    maxTimeout?: number;
     lazy?: boolean;
     maxFailedTimes?: number;
     expectedStatus?: string;

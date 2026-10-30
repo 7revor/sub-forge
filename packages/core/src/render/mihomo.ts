@@ -1,3 +1,4 @@
+import { nodeSemantics } from './node-semantics.ts';
 import { chainSources } from '../nodeset/chain.ts';
 import type { ChainNodeRef, ChainTarget } from '../types.ts';
 import { expandLocalRules, localRulesError } from '../rules/local.ts';
@@ -35,6 +36,7 @@ export type UrlBuilder = {
 export type RuleResourceReference = { matcher: Extract<Matcher, { kind: 'ruleset' }>; options?: RuleEntry['options'] };
 
 export type RenderInput = {
+  common?: import('../base/common.ts').CommonBase;
   resourceIntervalSec?: number;
   profile: Profile;
   template?: Template;
@@ -176,7 +178,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       key, ref: ps.ref, providerName,
       output: inlineNodes ? 'inline' : ps.output,
       requestedOutput: ps.output,
-      nodes: resolver.resolve(ps.ref).map((n) => client === 'stash' ? stashProxy(n, report) : ({ ...n })),
+      nodes: resolver.resolve(ps.ref).map(n => nodeSemantics(n, client, report)).map(n => client === 'stash' ? stashProxy(n, report) : n),
     });
   }
 
@@ -303,6 +305,12 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       if (g.excludeType) out['exclude-type'] = excludedAdapterTypes(g.excludeType).join('|');
     }
     const t = g.test ?? {};
+    if (t.maxTimeout !== undefined) {
+      if (client === 'loon' && ['fallback', 'load-balance'].includes(g.type)) out['max-timeout'] = t.maxTimeout;
+      else report.error('group.max-timeout-unsupported', 'Loon 节点可用性阈值 max-timeout 尚无等价公共映射；请清除或使用 Loon fallback/load-balance 组', where);
+    }
+    if (g.type === 'select' && t.url && client === 'loon') out.url = t.url;
+    if (g.type === 'select' && t.url && client === 'mihomo') report.warn('group.select-test-url', 'Mihomo 手动选择组没有等价的组级测速 URL；此参数未输出', where);
     if (g.type !== 'select') {
       if (t.url) out.url = t.url;
       if (t.interval !== undefined) out.interval = t.interval;
@@ -327,6 +335,9 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     // 运行时筛空同样拒绝；放在扩展字段之后，防止历史配置覆盖固定策略。
     return client === 'stash' ? stashGroup(out, g, report) as MihomoGroup : { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
   };
+  for (const group of eff.groups) if (input.common?.testUrl !== undefined || input.common?.testTimeoutMs !== undefined) {
+    group.test = { ...(input.common.testUrl !== undefined ? { url: input.common.testUrl } : {}), ...(input.common.testTimeoutMs !== undefined ? { timeout: input.common.testTimeoutMs } : {}), ...group.test };
+  }
   const groups = eff.groups.map(lowerGroup);
 
   // ---------- 代理链：先确定有效前置，再写入订阅专属节点副本 ----------
@@ -369,10 +380,6 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       }
     }
     if (rules.length && set.output === 'provider') report.info('chain.provider-materialized', `「${set.providerName}」的前置已写入本订阅专属 Provider 内容，节点更新后自动重新应用`, set.key);
-  }
-  if (client === 'loon') for (const chain of profile.chains) {
-    report.error('chain.unsupported', 'Loon 尚未适配代理链，请为 Loon 使用不带前置的配置订阅', 'chain:' + chain.id, [chain.id]);
-    const count = chainCounts.get(chain.id); if (count) count.appliedCount = 0;
   }
   for (const chain of profile.chains) if (!chainSources(chain.landing.nodeSet, profile.nodeSets).length) {
     report.error('ref.nodeset-not-in-profile', `链规则的落地节点集 ${nodeSetKey(chain.landing.nodeSet)} 未加入本订阅`, `chain:${chain.id}`);

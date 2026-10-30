@@ -1,3 +1,4 @@
+import { validateCommonBase } from '@sub-forge/core';
 import { stringifyIniBase, localRulesError } from '@sub-forge/core';
 import { normalizeRulePresence } from '../rule-presence.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
@@ -125,6 +126,7 @@ function checkPipeline(steps: unknown, where: string, user: User): void {
       case 'dedupe':
         choice(s.strategy, ['suffix', 'drop'], 'strategy'); choice(s.by, ['name', 'key'], 'by', true); break;
       case 'set':
+        if (s.types !== undefined && (!Array.isArray(s.types) || !s.types.every(t => typeof t === 'string'))) throw bad(`${at}：types 必须是协议名称数组`);
         if (!isObj(s.fields)) throw bad(`${at}：fields 必须是对象`);
         if (Object.keys(s.fields).some(k => ['name', 'type', 'server', 'port'].includes(k) || k.startsWith('_'))) throw bad(`${at}：fields 不能修改节点身份或隐式字段`);
         break;
@@ -276,6 +278,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       break;
     }
     case 'preset': {
+      if (doc.common !== undefined) try { validateCommonBase(doc.common); } catch (error) { throw bad((error as Error).message); }
       if (!isObj(doc.mihomo)) throw bad('mihomo 段必须是对象');
       if (doc.stash !== undefined && !isObj(doc.stash)) throw bad('stash 段必须是对象');
       for (const client of ['surge', 'loon']) if (doc[client] !== undefined) {
@@ -298,6 +301,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         const f = doc.template.follow;
         if (f !== 'latest' && !(isObj(f) && typeof f.pinned === 'number' && store.getTemplate(doc.template.id, f.pinned))) throw bad('模板版本不存在');
       }
+      if (isObj(doc.base) && doc.base.common !== undefined) try { validateCommonBase(doc.base.common); } catch (error) { throw bad((error as Error).message); }
       if (doc.base !== undefined && (!isObj(doc.base) || doc.base.stashPatch !== undefined && !isObj(doc.base.stashPatch))) throw bad('基础设置及 stashPatch 必须是对象');
       for (const key of ['surgePatch', 'loonPatch']) if (isObj(doc.base) && doc.base[key] !== undefined) {
         if (!isObj(doc.base[key])) throw bad(key + ' 必须是对象');

@@ -44,10 +44,11 @@ describe('代理链全部来源', () => {
     f.profile.chains[0]!.landing.filter = '^落地-b$';
     expect(render(f).chainResolutions[0]).toMatchObject({ landingCount: 0, appliedCount: 0, issues: [expect.objectContaining({ code: 'chain.no-landing' })] });
   });
-  it('Loon 的全部来源仍明确拒绝代理链，不能在合并后静默改成直连', () => {
+  it('Loon 的全部来源输出代理链，保留前置', () => {
     const out = renderLoon(fixture('provider'));
-    expect(out.report.hasErrors).toBe(true);
-    expect(out.chainResolutions[0]).toMatchObject({ landingCount: 2, appliedCount: 0, issues: [expect.objectContaining({ code: 'chain.unsupported' })] });
+    expect(out.report.hasErrors).toBe(false);
+    expect(out.yaml).toContain('[Proxy Chain]');
+    expect(out.chainResolutions[0]).toMatchObject({ landingCount: 2, appliedCount: 2 });
   });
   it('默认全范围不能绕过循环检查', () => {
     const f = fixture('provider');
