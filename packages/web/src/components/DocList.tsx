@@ -51,8 +51,8 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
       <ErrorAlert error={list.error} />
       <section className="list-panel" aria-busy={list.isFetching}>
         <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
-          <SearchInput aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-80" value={q} onChange={(e) => setQ(e.target.value)} />
           <span className={cx('shrink-0 text-[12.5px] text-ink-muted', !list.isFetching && 'invisible')}>加载中…</span>
+          <SearchInput aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-80" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div key={`${list.page}-${list.pageSize}-${q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
           <ListTable label={`${title}列表`} columns={tableColumns}>

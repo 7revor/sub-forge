@@ -17,7 +17,7 @@ export function RepositoryManager({ repos, admin, loading = false, failed = fals
   const remove = useMutation({ meta: { successMessage: '仓库已删除', modalErrors: true }, mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: invalidate });
   return <section aria-label="仓库" className="flex shrink-0 flex-col gap-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-col gap-0.5"><h2 className="m-0 text-[15px] font-semibold">仓库</h2><span className="text-[12.5px] text-ink-muted">仅索引目录、.list 和 .txt 文件</span></div>
+      <h2 className="m-0 text-[15px] font-semibold">仓库</h2>
       {admin && <Link to={`/rule-repo/new${search}`} className={buttonClass('default', 'sm')}><Plus size={14} />添加仓库</Link>}
     </div>
     <div className="list-panel">

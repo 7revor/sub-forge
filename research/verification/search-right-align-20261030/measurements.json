@@ -1,0 +1,56 @@
+[
+  {
+    "path": "/profiles",
+    "background": "rgba(0, 0, 0, 0)",
+    "border": "rgb(213, 217, 224)",
+    "inputBackground": "rgba(0, 0, 0, 0)",
+    "paddingRight": "16px",
+    "placeholder": "rgb(139, 147, 161)",
+    "rightGap": 16
+  },
+  {
+    "path": "/sources",
+    "background": "rgba(0, 0, 0, 0)",
+    "border": "rgb(213, 217, 224)",
+    "inputBackground": "rgba(0, 0, 0, 0)",
+    "paddingRight": "16px",
+    "placeholder": "rgb(139, 147, 161)",
+    "rightGap": 16
+  },
+  {
+    "path": "/locals",
+    "background": "rgba(0, 0, 0, 0)",
+    "border": "rgb(213, 217, 224)",
+    "inputBackground": "rgba(0, 0, 0, 0)",
+    "paddingRight": "16px",
+    "placeholder": "rgb(139, 147, 161)",
+    "rightGap": 16
+  },
+  {
+    "path": "/collections",
+    "background": "rgba(0, 0, 0, 0)",
+    "border": "rgb(213, 217, 224)",
+    "inputBackground": "rgba(0, 0, 0, 0)",
+    "paddingRight": "16px",
+    "placeholder": "rgb(139, 147, 161)",
+    "rightGap": 16
+  },
+  {
+    "path": "/rulesets",
+    "background": "rgba(0, 0, 0, 0)",
+    "border": "rgb(213, 217, 224)",
+    "inputBackground": "rgba(0, 0, 0, 0)",
+    "paddingRight": "16px",
+    "placeholder": "rgb(139, 147, 161)",
+    "rightGap": 16
+  },
+  {
+    "path": "/templates",
+    "background": "rgba(0, 0, 0, 0)",
+    "border": "rgb(213, 217, 224)",
+    "inputBackground": "rgba(0, 0, 0, 0)",
+    "paddingRight": "16px",
+    "placeholder": "rgb(139, 147, 161)",
+    "rightGap": 16
+  }
+]
