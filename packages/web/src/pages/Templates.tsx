@@ -13,7 +13,7 @@ import { ListActions } from '../components/ListActions.tsx';
 import { SearchInput } from '../components/SearchInput.tsx';
 import { Pagination } from '../components/Pagination.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll, td, cx } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll, listTd, td, cx } from '../components/ui.tsx';
 import { useList, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { usePagedList } from '../hooks/usePagedList.ts';
@@ -46,15 +46,15 @@ export function TemplateList() {
             { header: '名称', width: 240 }, { header: '策略组', width: 100 }, { header: '规则', width: 100 },
             { header: '使用情况', width: 180 }, { header: actionHeader, width: 216 },
           ]}>
-            {!list.data && !list.error ? <ListTableLoading columns={5} rowHeight={53} /> : list.data?.items.map(t => {
+            {!list.data && !list.error ? <ListTableLoading columns={5} /> : list.data?.items.map(t => {
               const n = inUse(t.id);
               const path = `/templates/${encodeURIComponent(t.id)}`;
               return <DocTableRow key={t.id} to={path}>
-                <td className={td}><Link to={path} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
-                <td className={td}>{t.groups.length} 个</td>
-                <td className={td}>{t.rules.length} 条</td>
-                <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</td>
-                <td className={cx(td, 'whitespace-nowrap text-right')}><ListActions>
+                <td className={listTd}><Link to={path} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
+                <td className={listTd}>{t.groups.length} 个</td>
+                <td className={listTd}>{t.rules.length} 条</td>
+                <td className={cx(listTd, 'whitespace-nowrap text-ink-2')}>{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</td>
+                <td className={cx(listTd, 'whitespace-nowrap text-right')}><ListActions>
                   <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
                   <DocActionLink to={path} name={t.name ?? t.id} />
                 </ListActions></td>

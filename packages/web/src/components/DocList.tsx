@@ -11,7 +11,7 @@ import { Plus } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useDeleteDoc, type DocMap, type Kind } from '../hooks.ts';
-import { Button, buttonClass, cx, Empty, ErrorAlert, PageHeader, td } from './ui.tsx';
+import { Button, buttonClass, cx, Empty, ErrorAlert, PageHeader, listTd } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { Frame } from '../modals/Frame.tsx';
 import { ResourceLinkButton } from './ResourceLinkButton.tsx';
@@ -59,13 +59,13 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
             {!list.data && !list.error ? <ListTableLoading columns={tableColumns.length} /> : rows.map((d) => (
               <DocTableRow key={d.id} to={`/${kind}/${d.id}`}>
                 {columns.map((c, i) => (
-                  <td key={c.header} className={cx(td, 'py-3', c.className)}>
+                  <td key={c.header} className={cx(listTd, c.className)}>
                     {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}>{c.cell(d)}</Link> : c.cell(d)}
                   </td>
                 ))}
-                {refreshable && <td className={td}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
-                {refreshable && <td className={td}><ResourceLastRefreshTime kind={kind} id={d.id}/></td>}
-                <td className={cx(td, 'text-right whitespace-nowrap')}>
+                {refreshable && <td className={listTd}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
+                {refreshable && <td className={listTd}><ResourceLastRefreshTime kind={kind} id={d.id}/></td>}
+                <td className={cx(listTd, 'text-right whitespace-nowrap')}>
                   <ListActions>
                     <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />
                     {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}

@@ -2,7 +2,7 @@ import { boundTemplateId, modeLabel } from './routing.ts';
 // 配置订阅列表与七步新建向导入口（PRD 4.9）。
 
 import { DocList } from '../../components/DocList.tsx';
-import { Badge } from '../../components/ui.tsx';
+import { Badge, listMono } from '../../components/ui.tsx';
 import { useTemplates } from '../../hooks.ts';
 import { ProfileWizard } from './ProfileWizard.tsx';
 
@@ -16,8 +16,8 @@ export function ProfileList() {
           const label = modeLabel(p, templates.find(t => t.id === boundTemplateId(p))?.name);
           return <span title={label}><Badge className="max-w-full"><span className="truncate">{label}</span></Badge></span>;
         } },
-        { header: '节点集', width: 80, cell: (p) => <span className="font-mono">{p.nodeSets.length}</span> },
-        { header: '代理链', width: 80, cell: (p) => <span className="font-mono">{p.chains.length}</span> },
+        { header: '节点集', width: 80, cell: (p) => <span className={listMono}>{p.nodeSets.length}</span> },
+        { header: '代理链', width: 80, cell: (p) => <span className={listMono}>{p.chains.length}</span> },
       ]} />
   );
 }

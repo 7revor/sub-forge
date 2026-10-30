@@ -21,7 +21,7 @@ import { inspectLocalNodeYaml } from '../convert/localNodeYaml.ts';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { groupFromYaml, groupToYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, ActionButtons } from '../components/DetailActions.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, PageHeader, cx, listMono, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
@@ -46,7 +46,7 @@ export function LocalList() {
         columns={[
           { header: '名称', cell: (g) => g.name },
           { header: '备注', cell: (g) => <NoteCell note={g.note} /> },
-          { header: '节点', width: 80, cell: (g) => <span className="font-mono text-[13px]">{g.proxies.length}</span> },
+          { header: '节点', width: 80, cell: (g) => <span className={listMono}>{g.proxies.length}</span> },
           { header: '协议', width: 200, cell: (g) => <span className="font-mono text-[12.5px] text-ink-2">{typesText(g)}</span> },
         ]} />
     </>

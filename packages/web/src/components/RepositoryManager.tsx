@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
 import { api, type RuleRepo } from '../api.ts';
-import { Badge, Button, Empty, ErrorAlert, buttonClass, formatTime, td } from './ui.tsx';
+import { Badge, Button, Empty, ErrorAlert, buttonClass, cx, formatTime, listMono, listTd } from './ui.tsx';
 
 export function RepositoryManager({ repos, admin, loading = false, failed = false, onRetry }: { repos: RuleRepo[]; admin: boolean; loading?: boolean; failed?: boolean; onRetry?: () => void }) {
   const qc = useQueryClient();
@@ -26,16 +26,16 @@ export function RepositoryManager({ repos, admin, loading = false, failed = fals
           { header: '仓库名称', width: 180 }, { header: '分支', width: 136 }, { header: '规则数', width: 72 },
           { header: '更新时间', width: 136 }, { header: '状态', width: 96 }, ...(admin ? [{ header: actionHeader, width: 288 }] : []),
         ]}>
-          {loading ? <ListTableLoading columns={admin ? 6 : 5} rows={3} rowHeight={53} /> : repos.map(r => <tr key={r.id} className="hover:bg-ground focus-within:bg-ground">
-              <td className={td}><a href={r.url} target="_blank" rel="noreferrer" className="break-all font-medium text-ink hover:text-brand">{r.name}</a>
+          {loading ? <ListTableLoading columns={admin ? 6 : 5} rows={3} /> : repos.map(r => <tr key={r.id} className="hover:bg-ground focus-within:bg-ground">
+              <td className={listTd}><a href={r.url} target="_blank" rel="noreferrer" className="break-all font-medium text-ink hover:text-brand">{r.name}</a>
                 {r.pending && r.builtAt && <div className="mt-1 text-[12px] text-ink-muted">新配置待同步，搜索仍使用上次成功索引。</div>}
                 {r.error && <div className="mt-1 max-w-sm break-words text-[12px] text-err">{r.error}{r.builtAt ? '（保留上次索引）' : ''}</div>}
               </td>
-              <td className={td}><span className="break-all">{r.refs.join('、')}</span></td>
-              <td className={`${td} tabular-nums`}>{r.entries}</td>
-              <td className={`${td} whitespace-nowrap text-ink-muted`}>{r.builtAt ? formatTime(r.builtAt).slice(5) : '—'}</td>
-              <td className={td}><Badge tone={!r.enabled ? 'neutral' : r.error ? 'err' : r.builtAt ? 'ok' : 'neutral'}>{!r.enabled ? '已停用' : r.indexing ? '更新中…' : r.error ? '更新失败' : r.builtAt ? '已索引' : '待索引'}</Badge></td>
-              {admin && <td className={td}><ListActions><Button size="sm" disabled={!r.enabled || r.indexing || refresh.isPending} onClick={() => refresh.mutate(r.id)}>更新索引</Button><Button size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button><Link to={`/rule-repo/${encodeURIComponent(r.id)}/edit${search}`} aria-label={`编辑 ${r.name}`} className={buttonClass('default', 'sm')}>编辑</Link><Button size="sm" variant="danger" aria-label={`删除 ${r.name}`} disabled={r.indexing || remove.isPending} onClick={() => { remove.reset(); void Frame.modal.confirm({ title: `删除仓库「${r.name}」？`, description: '仓库及其索引会被删除，无法恢复。已创建的增强集合会保留；仍被模板或配置订阅直接引用时不能删除。', confirmLabel: '删除', danger: true }, { submit: async () => { await remove.mutateAsync(r.id); } }); }}>删除</Button></ListActions></td>}
+              <td className={listTd}><span className="break-all font-mono text-[13px]">{r.refs.join('、')}</span></td>
+              <td className={cx(listTd, listMono)}>{r.entries}</td>
+              <td className={cx(listTd, listMono, 'whitespace-nowrap text-ink-2')}>{r.builtAt ? formatTime(r.builtAt).slice(5) : '—'}</td>
+              <td className={listTd}><Badge tone={!r.enabled ? 'neutral' : r.error ? 'err' : r.builtAt ? 'ok' : 'neutral'}>{!r.enabled ? '已停用' : r.indexing ? '更新中…' : r.error ? '更新失败' : r.builtAt ? '已索引' : '待索引'}</Badge></td>
+              {admin && <td className={listTd}><ListActions><Button size="sm" disabled={!r.enabled || r.indexing || refresh.isPending} onClick={() => refresh.mutate(r.id)}>更新索引</Button><Button size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button><Link to={`/rule-repo/${encodeURIComponent(r.id)}/edit${search}`} aria-label={`编辑 ${r.name}`} className={buttonClass('default', 'sm')}>编辑</Link><Button size="sm" variant="danger" aria-label={`删除 ${r.name}`} disabled={r.indexing || remove.isPending} onClick={() => { remove.reset(); void Frame.modal.confirm({ title: `删除仓库「${r.name}」？`, description: '仓库及其索引会被删除，无法恢复。已创建的增强集合会保留；仍被模板或配置订阅直接引用时不能删除。', confirmLabel: '删除', danger: true }, { submit: async () => { await remove.mutateAsync(r.id); } }); }}>删除</Button></ListActions></td>}
             </tr>)}
         </ListTable>
         {failed && <div className="p-4 text-ink-muted">仓库加载失败。<Button size="sm" onClick={onRetry}>重试</Button></div>}

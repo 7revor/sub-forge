@@ -14,7 +14,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleRepo } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
-import { Button, ErrorAlert, PageHeader, td } from '../components/ui.tsx';
+import { Button, cx, ErrorAlert, listMono, listTd, PageHeader } from '../components/ui.tsx';
 
 const loadFiles = ruleOptionsLoader('repository', 30);
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
@@ -26,7 +26,7 @@ const FILE_COLUMNS = [
 function RepositoryFileLoading({ failed }: { failed: boolean }) {
   return <>
     <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
-      <ListTable label="规则文件" columns={FILE_COLUMNS}>{!failed && <ListTableLoading columns={FILE_COLUMNS.length} rowHeight={53} />}</ListTable>
+      <ListTable label="规则文件" columns={FILE_COLUMNS}>{!failed && <ListTableLoading columns={FILE_COLUMNS.length} rowHeight={45} />}</ListTable>
     </div>
     <div role="status" className="shrink-0 table-panel-divider px-3 py-2 text-center text-[12px] text-ink-muted">{failed ? '仓库加载失败，无法读取文件列表。' : '正在加载…'}</div>
   </>;
@@ -55,14 +55,14 @@ function RepositoryFileTable({ query, repos }: { query: string; repos: RuleRepo[
   return <>
     <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain" aria-busy={page.isFetching}>
       <ListTable label="规则文件" columns={FILE_COLUMNS}>
-        {!page.data && !page.error ? <ListTableLoading columns={FILE_COLUMNS.length} rowHeight={53} /> : page.options.map(option => {
+        {!page.data && !page.error ? <ListTableLoading columns={FILE_COLUMNS.length} rowHeight={45} /> : page.options.map(option => {
           const selection = JSON.parse(option.value) as RepositoryFile;
           const repoName = repos.find(repo => repo.id === selection.repo)?.name ?? selection.repo;
           const href = option.url;
           return <tr key={option.value} className="cursor-pointer hover:bg-ground focus-within:bg-ground" onClick={event => openFileRow(event, href)} onAuxClick={event => openFileRow(event, href)}>
-            <td className={`${td} text-ink-muted`}>{repoName}</td>
-            <td className={`${td} text-ink-muted`}>{selection.file.ref}</td>
-            <td className={`${td} font-mono text-[12px] text-ink-muted`}><span className="group/name inline-flex max-w-full items-center gap-1"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="min-w-0 cursor-pointer break-all rounded-sm text-left no-underline hover:text-brand focus-visible:outline-2 focus-visible:outline-brand" aria-label={`打开 ${selection.file.path}，${repoName}，${selection.file.ref}`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></a>{href && <CopyFileLink href={href} name={selection.file.path} />}</span></td>
+            <td className={cx(listTd, 'text-ink-2')}>{repoName}</td>
+            <td className={cx(listTd, listMono, 'text-ink-2')}>{selection.file.ref}</td>
+            <td className={cx(listTd, listMono)}><span className="group/name inline-flex max-w-full items-center gap-1"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="min-w-0 cursor-pointer break-all rounded-sm text-left no-underline hover:text-brand focus-visible:outline-2 focus-visible:outline-brand" aria-label={`打开 ${selection.file.path}，${repoName}，${selection.file.ref}`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></a>{href && <CopyFileLink href={href} name={selection.file.path} />}</span></td>
           </tr>;
         })}
       </ListTable>
@@ -89,7 +89,7 @@ export function RuleRepoPage() {
       <div className="flex shrink-0 flex-wrap items-center gap-3 table-panel-divider-bottom px-6 py-4">
         <h2 className="m-0 text-base font-semibold">规则文件</h2>
         <span role="status" className="text-[12px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
-        <SearchInput size="md" aria-label="搜索规则名称或路径" placeholder="按文件名或路径搜索，例如 115.list" value={q} onChange={event => setQ(event.target.value)} className="w-80" />
+        <SearchInput size="md" aria-label="搜索规则名称或路径" placeholder="按文件名或路径搜索，例如 115.list" value={q} onChange={event => setQ(event.target.value)}  />
       </div>
       {!pending && repos.data ? <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} /> : <RepositoryFileLoading failed={!!repos.error && !repos.data} />}
     </section>
