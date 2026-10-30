@@ -242,3 +242,5 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
 
 2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。
+
+2026-10-30 订阅弹窗整合：固定正文滚动与底部操作，单节点前置复用组弹窗底栏；全 Provider 优先引用，循环候选说明原因。显式传递 disabled，并保留公共 Select 必填中文 placeholder、clearable 和 false/0 语义。验收见 research/verification/subscription-dialog-merge-20261030/README.md。
