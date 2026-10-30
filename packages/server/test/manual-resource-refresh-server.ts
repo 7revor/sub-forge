@@ -17,6 +17,21 @@ const env=setupApp({now:Date.now,fetcher:async url=>{
 }});
 const user=await addUser(env.store,'refresh-admin','admin');
 env.store.put('source',{id:'nodes',name:'测试节点订阅',url:'https://fixture.test/nodes.txt',pipeline:[{op:'rename.regex',rules:[{pattern:'^Demo',replace:'示例'}]},{op:'flag',mode:'add'},{op:'sort.regex',patterns:['HK','SG','US']},{op:'rename.delete',patterns:['HK|US|SG']}]},user.id);
+// 全部 12 种参数表单的隔离验收样本；不写入生产种子。
+env.store.put('source', { id: 'all-operators', name: '全部处理器验收', url: 'https://fixture.test/nodes.txt', pipeline: [
+  { op: 'filter.useless' },
+  { op: 'filter.regex', patterns: ['不匹配'], keep: false },
+  { op: 'filter.type', types: ['ss'], keep: true },
+  { op: 'rename.regex', rules: [{ pattern: '^Demo', replace: '示例' }, { pattern: 'US', replace: '美国' }] },
+  { op: 'rename.delete', patterns: ['示例'] },
+  { op: 'rename.affix', prefix: '测试-', suffix: '' },
+  { op: 'flag', mode: 'add' },
+  { op: 'sort.name', order: 'asc' },
+  { op: 'sort.regex', patterns: ['HK', 'SG', '美国'] },
+  { op: 'dedupe', by: 'name', strategy: 'suffix' },
+  { op: 'set', fields: { udp: false, 'x-example': 0 } },
+  { op: 'script', code: '(nodes, ctx) => nodes' },
+]}, user.id);
 env.store.put('source',{id:'many-nodes',name:'长列表验收',url:'https://fixture.test/many-nodes.txt',pipeline:Array.from({length:20},(_,i)=>({op:'rename.affix' as const,prefix:`${i+1}-`}))},user.id);
 env.store.put('collection',{id:'node-group',name:'测试节点组合',members:[{ref:{type:'source',id:'nodes'}}],pipeline:[]},user.id);
 env.store.put('ruleset',{id:'local',name:'本地规则',sources:[{id:'local',kind:'local',content:'DOMAIN,local.test',format:'auto'}]},user.id);
@@ -45,7 +60,7 @@ async function stop() {
   env.store.closeEvents();
   await resources.stop();
   await env.snapshots.settled();
-  await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
+  await new Promise<void>((resolve,reject)=>{ server.close(error=>error?reject(error):resolve()); if ('closeAllConnections' in server) server.closeAllConnections(); });
   env.store.close();
 }
 for(const signal of ['SIGINT','SIGTERM'] as const)process.once(signal,()=>{

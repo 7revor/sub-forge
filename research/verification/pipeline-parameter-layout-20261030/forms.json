@@ -1,0 +1,437 @@
+[
+  {
+    "step": 1,
+    "label": "无用节点过滤",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 0,
+    "labels": [
+      {
+        "label": "",
+        "placeholder": "移除命中关键词的节点，每行填写一条正则",
+        "type": null
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 2,
+    "label": "正则过滤",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 1,
+    "labels": [
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "添加正则",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "正则（命中任一条即算命中） 1",
+        "placeholder": "按节点名称匹配的正则表达式",
+        "type": null
+      },
+      {
+        "label": "删除第 1 条",
+        "placeholder": null,
+        "type": "button"
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 3,
+    "label": "协议类型过滤",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 0,
+    "labels": [
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "其他协议",
+        "placeholder": "其他协议，如 wireguard",
+        "type": null
+      },
+      {
+        "label": "添加协议",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "checkbox"
+      }
+    ],
+    "scrollWidth": 763,
+    "width": 763
+  },
+  {
+    "step": 4,
+    "label": "正则改名",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 2,
+    "labels": [
+      {
+        "label": "添加规则",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "删除规则 1",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "规则 1 匹配正则",
+        "placeholder": "匹配节点名称中需要替换的部分",
+        "type": null
+      },
+      {
+        "label": "规则 1 替换为",
+        "placeholder": "替换后的文字，可用 $1 引用分组",
+        "type": null
+      },
+      {
+        "label": "删除规则 2",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "规则 2 匹配正则",
+        "placeholder": "匹配节点名称中需要替换的部分",
+        "type": null
+      },
+      {
+        "label": "规则 2 替换为",
+        "placeholder": "替换后的文字，可用 $1 引用分组",
+        "type": null
+      }
+    ],
+    "scrollWidth": 763,
+    "width": 763
+  },
+  {
+    "step": 5,
+    "label": "正则删除字符",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 1,
+    "labels": [
+      {
+        "label": "添加正则",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "要删除的部分（正则） 1",
+        "placeholder": "按节点名称匹配的正则表达式",
+        "type": null
+      },
+      {
+        "label": "删除第 1 条",
+        "placeholder": null,
+        "type": "button"
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 6,
+    "label": "前缀 / 后缀",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 0,
+    "labels": [
+      {
+        "label": "",
+        "placeholder": "添加到节点名称开头的文字",
+        "type": null
+      },
+      {
+        "label": "",
+        "placeholder": "添加到节点名称末尾的文字",
+        "type": null
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 7,
+    "label": "地区旗帜",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 0,
+    "labels": [
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 8,
+    "label": "按名称排序",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 0,
+    "labels": [
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 9,
+    "label": "按正则优先级排序",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 3,
+    "labels": [
+      {
+        "label": "添加优先级",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "拖动第 1 项",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "优先级 1",
+        "placeholder": "按此正则匹配节点，排在上面的优先",
+        "type": null
+      },
+      {
+        "label": "删除优先级 1",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "拖动第 2 项",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "优先级 2",
+        "placeholder": "按此正则匹配节点，排在上面的优先",
+        "type": null
+      },
+      {
+        "label": "删除优先级 2",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "拖动第 3 项",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "优先级 3",
+        "placeholder": "按此正则匹配节点，排在上面的优先",
+        "type": null
+      },
+      {
+        "label": "删除优先级 3",
+        "placeholder": null,
+        "type": "button"
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 10,
+    "label": "去重",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 0,
+    "labels": [
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      },
+      {
+        "label": "",
+        "placeholder": null,
+        "type": "radio"
+      }
+    ],
+    "scrollWidth": 767,
+    "width": 767
+  },
+  {
+    "step": 11,
+    "label": "快捷设置",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 1,
+    "labels": [
+      {
+        "label": "udp",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "清空udp",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "tfo",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "skip-cert-verify",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "client-fingerprint",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "ip-version",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "新字段名称",
+        "placeholder": "字段名称",
+        "type": null
+      },
+      {
+        "label": "新字段值",
+        "placeholder": "YAML 值",
+        "type": null
+      },
+      {
+        "label": "添加",
+        "placeholder": null,
+        "type": "button"
+      },
+      {
+        "label": "x-example 的字段名称",
+        "placeholder": "原生配置中的字段名称",
+        "type": null
+      },
+      {
+        "label": "x-example 的值",
+        "placeholder": "填写字段值，支持 YAML 字符串、列表或对象",
+        "type": null
+      },
+      {
+        "label": "删除 x-example",
+        "placeholder": null,
+        "type": "button"
+      }
+    ],
+    "scrollWidth": 763,
+    "width": 763
+  },
+  {
+    "step": 12,
+    "label": "脚本",
+    "background": "rgba(0, 0, 0, 0)",
+    "cards": 0,
+    "labels": [
+      {
+        "label": "(nodes, ctx) => nodes",
+        "placeholder": "填写接收 nodes 和 ctx 并返回节点列表的脚本",
+        "type": null
+      }
+    ],
+    "scrollWidth": 763,
+    "width": 763
+  }
+]

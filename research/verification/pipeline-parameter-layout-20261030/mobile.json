@@ -1,0 +1,98 @@
+[
+  {
+    "step": 1,
+    "label": "无用节点过滤",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 2,
+    "label": "正则过滤",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 3,
+    "label": "协议类型过滤",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 4,
+    "label": "正则改名",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 5,
+    "label": "正则删除字符",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 6,
+    "label": "前缀 / 后缀",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 7,
+    "label": "地区旗帜",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 8,
+    "label": "按名称排序",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 9,
+    "label": "按正则优先级排序",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 10,
+    "label": "去重",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 11,
+    "label": "快捷设置",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  },
+  {
+    "step": 12,
+    "label": "脚本",
+    "documentWidth": 390,
+    "scrollWidth": 320,
+    "viewport": 390,
+    "width": 320
+  }
+]
