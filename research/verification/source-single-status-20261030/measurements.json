@@ -1,0 +1,5 @@
+{
+  "list": "名称\t备注\t地址\t节点\t状态\t上次刷新时间\t\n操作\n\n长列表验收\t\t\nhttps://fixture.test/many-nodes.txt\n\t80\t正常\t2026-10-30 11:01\t\n刷新缓存\n删除\n编辑\n\n测试节点订阅\t\t\nhttps://fixture.test/nodes.txt\n\t3\t正常\t2026-10-30 11:01\t\n刷新缓存\n删除\n编辑",
+  "refreshingList": "名称\t备注\t地址\t节点\t状态\t上次刷新时间\t\n操作\n\n长列表验收\t\t\nhttps://fixture.test/many-nodes.txt\n\t80\t正常\t2026-10-30 11:01\t\n刷新缓存\n删除\n编辑\n\n测试节点订阅\t\t\nhttps://fixture.test/nodes.txt\n\t3\t刷新中\t2026-10-30 11:01\t\n刷新中…\n删除\n编辑",
+  "failedList": "名称\t备注\t地址\t节点\t状态\t上次刷新时间\t\n操作\n\n长列表验收\t\t\nhttps://fixture.test/many-nodes.txt\n\t80\t正常\t2026-10-30 11:01\t\n刷新缓存\n删除\n编辑\n\n测试节点订阅\t\t\nhttps://fixture.test/nodes.txt\n\t3\t1 项失败 · 使用旧缓存\t2026-10-30 11:01\t\n刷新缓存\n删除\n编辑"
+}

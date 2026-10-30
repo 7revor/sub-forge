@@ -1,0 +1,238 @@
+{
+  "desktopShort": {
+    "pageHeight": 607,
+    "pageScroll": 658,
+    "panels": [
+      {
+        "bottom": 720.25,
+        "height": 360,
+        "top": 360.25
+      },
+      {
+        "bottom": 720.25,
+        "height": 360,
+        "top": 360.25
+      }
+    ],
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  "desktopWide": {
+    "pageHeight": 887,
+    "pageScroll": 887,
+    "panels": [
+      {
+        "bottom": 972,
+        "height": 561.75,
+        "top": 410.25
+      },
+      {
+        "bottom": 972,
+        "height": 561.75,
+        "top": 410.25
+      }
+    ],
+    "viewport": [
+      1600,
+      1000
+    ]
+  },
+  "savedReplacement": "验收",
+  "longScroll": {
+    "areas": [
+      {
+        "class": "page-scroll",
+        "height": 887,
+        "scrollHeight": 887,
+        "scrollTop": 0
+      },
+      {
+        "class": "pipeline-step-scroll",
+        "height": 440,
+        "scrollHeight": 1417,
+        "scrollTop": 0
+      },
+      {
+        "class": "pipeline-mapping-scroll overflow-auto overscroll-contain",
+        "height": 382,
+        "scrollHeight": 12075,
+        "scrollTop": 11693.5
+      }
+    ],
+    "panels": [
+      {
+        "bottom": 972,
+        "height": 561.75
+      },
+      {
+        "bottom": 972,
+        "height": 561.75
+      }
+    ]
+  },
+  "lastStep": {
+    "heights": [
+      561.75,
+      561.75
+    ],
+    "pageScroll": 0,
+    "stepScroll": 977
+  },
+  "empty": {
+    "empty": "没有任何节点发生变化",
+    "heights": [
+      561.75,
+      561.75
+    ]
+  },
+  "narrow": {
+    "pageWidth": 600,
+    "panels": [
+      {
+        "height": 494.75,
+        "width": 520,
+        "x": 256,
+        "y": 485
+      },
+      {
+        "height": 318.75,
+        "width": 520,
+        "x": 256,
+        "y": 999.75
+      }
+    ],
+    "scrollWidth": 600,
+    "viewport": [
+      820,
+      900
+    ]
+  },
+  "mobile": {
+    "pageWidth": 386,
+    "panels": [
+      {
+        "height": 494.75,
+        "width": 354,
+        "x": 16
+      },
+      {
+        "height": 410.5,
+        "width": 354,
+        "x": 16
+      }
+    ],
+    "scrollWidth": 386,
+    "viewport": [
+      390,
+      844
+    ]
+  },
+  "collection": {
+    "panels": [
+      {
+        "height": 360,
+        "label": "组合自身的处理链"
+      },
+      {
+        "height": 360,
+        "label": "编辑与预览"
+      }
+    ],
+    "preview": "总览 · 原始 → 最终原始 3最终 3按输出顺序按输入顺序只看有变化的#原始节点 3#最终输出 3位置经过的步骤1🇭🇰 验收 1→1🇭🇰 验收 12🇸🇬 验收 3→2🇸🇬 验收 33🇺🇸 验收 2→3🇺🇸 验收 2显示 3 / 3 行 · 「位置」是在保留下来的节点中名次的变化"
+  },
+  "keyboardOrder": [
+    "1",
+    "前缀 / 后缀",
+    "2-…",
+    "80 ~80",
+    "2",
+    "前缀 / 后缀",
+    "1-…",
+    "80 ~80"
+  ],
+  "logs": [],
+  "finalWide": {
+    "automaticVisible": false,
+    "panels": [
+      {
+        "bottom": 972,
+        "height": 561.75
+      },
+      {
+        "bottom": 972,
+        "height": 561.75
+      }
+    ],
+    "rowHeights": [
+      66,
+      66,
+      66,
+      66,
+      66
+    ],
+    "viewport": [
+      1600,
+      1000
+    ]
+  },
+  "finalShort": {
+    "heights": [
+      360,
+      360
+    ],
+    "pageHeight": 607,
+    "pageScroll": 658,
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  "finalMobile": {
+    "automaticVisible": false,
+    "pageWidth": 386,
+    "scrollWidth": 386,
+    "viewport": [
+      390,
+      844
+    ]
+  },
+  "finalLong": {
+    "areas": [
+      {
+        "class": "page-scroll",
+        "height": 887,
+        "scrollHeight": 887,
+        "scrollTop": 0
+      },
+      {
+        "class": "pipeline-step-scroll",
+        "height": 440,
+        "scrollHeight": 1386,
+        "scrollTop": 0
+      },
+      {
+        "class": "pipeline-mapping-scroll overflow-auto overscroll-contain",
+        "height": 382,
+        "scrollHeight": 12075,
+        "scrollTop": 11693.5
+      }
+    ],
+    "heights": [
+      561.75,
+      561.75
+    ],
+    "viewport": [
+      1600,
+      1000
+    ]
+  },
+  "finalEmpty": {
+    "heights": [
+      561.75,
+      561.75
+    ],
+    "text": "没有任何节点发生变化"
+  }
+}

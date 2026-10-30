@@ -1,0 +1,42 @@
+{
+  "layout": {
+    "automaticVisible": false,
+    "leftGap": 17,
+    "marginLeft": "16px",
+    "marginRight": "16px",
+    "panels": [
+      {
+        "bottom": 972,
+        "height": 561.75
+      },
+      {
+        "bottom": 972,
+        "height": 561.75
+      }
+    ],
+    "rightGap": 17,
+    "rowHeights": [
+      66,
+      66,
+      66,
+      66,
+      66
+    ],
+    "viewport": [
+      1600,
+      1000
+    ]
+  },
+  "mobile": {
+    "pageWidth": 386,
+    "scrollWidth": 386,
+    "tableMargin": "16px",
+    "viewport": [
+      390,
+      844
+    ]
+  },
+  "list": "#\t原始节点 3\t\t#\t最终输出 3\t位置\t经过的步骤\n1\tDemo HK 1\t→\t1\t🇭🇰 示例 1\t\t\n1\n2\n4\n\n2\tDemo US 2\t→\t2\t🇸🇬 示例 3\t\t\n1\n2\n3\n4\n\n3\tDemo SG 3\t→\t3\t🇺🇸 示例 2\t\t\n1\n2\n3\n4",
+  "refresh": "刷新缓存 · Finance\nFinance / v2fly-domain-list · stripe.txt\n拉取成功\nFinance / v2fly-domain-list · wise.txt\n拉取成功\nFinance / v2fly-domain-list · schwab.txt\n拉取成功\nFinance / v2fly-domain-list · ibkr.txt\n拉取成功\nFinance / v2fly-domain-list · paypal.txt\n拉取成功\n\n已完成：5 项成功，0 项失败\n\n关闭\nClose",
+  "logs": []
+}
