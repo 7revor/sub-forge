@@ -19,8 +19,8 @@ const loadFiles = ruleOptionsLoader('repository', 30);
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
 
 const FILE_COLUMNS = [
-  { header: '文件名', width: 220 }, { header: '路径', width: 440 }, { header: '仓库', width: 220 },
-  { header: '分支', width: 160 },
+  { header: '仓库', width: 220 }, { header: '分支', width: 160 }, { header: '路径', width: 440 },
+  { header: '文件名', width: 220 },
 ];
 
 function RepositoryFileLoading({ failed }: { failed: boolean }) {
@@ -60,10 +60,10 @@ function RepositoryFileTable({ query, repos }: { query: string; repos: RuleRepo[
           const repoName = repos.find(repo => repo.id === selection.repo)?.name ?? selection.repo;
           const href = option.url;
           return <tr key={option.value} className="cursor-pointer hover:bg-ground focus-within:bg-ground" onClick={event => openFileRow(event, href)} onAuxClick={event => openFileRow(event, href)}>
-            <td className={td}><span className="group/name inline-flex max-w-full items-center gap-1"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="cursor-pointer rounded-sm text-left font-medium text-ink no-underline hover:text-brand focus-visible:outline-2 focus-visible:outline-brand" aria-label={`打开 ${option.label}，${repoName}，${selection.file.ref}，${selection.file.path}`}><HighlightedText text={option.label} matches={option.matches?.label} /></a>{href && <CopyFileLink href={href} name={option.label} />}</span></td>
-            <td className={`${td} break-all font-mono text-[12px] text-ink-muted`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></td>
             <td className={`${td} text-ink-muted`}>{repoName}</td>
             <td className={`${td} text-ink-muted`}>{selection.file.ref}</td>
+            <td className={`${td} break-all font-mono text-[12px] text-ink-muted`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></td>
+            <td className={td}><span className="group/name inline-flex max-w-full items-center gap-1"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="cursor-pointer rounded-sm text-left font-medium text-ink no-underline hover:text-brand focus-visible:outline-2 focus-visible:outline-brand" aria-label={`打开 ${option.label}，${repoName}，${selection.file.ref}，${selection.file.path}`}><HighlightedText text={option.label} matches={option.matches?.label} /></a>{href && <CopyFileLink href={href} name={option.label} />}</span></td>
           </tr>;
         })}
       </ListTable>
