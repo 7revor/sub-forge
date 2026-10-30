@@ -7,6 +7,7 @@ import { formatRelativeTime } from '../../utils/format.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { Notice } from '../../components/Notice.tsx';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
+import { NodeSetPreviewModal } from '../../components/NodeSetPreviewModal.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 import { CopyButton } from '../../components/CopyButton.tsx';
 // Profile 标签：概览（订阅链接、输出设置、访问日志）、基础设置、节点集。
@@ -187,9 +188,9 @@ export function TabNodeSets() {
         actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={15} />添加节点集</Button>} bodyClass="pb-1">
         {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : <ul className="m-0 list-none p-0">
           {draft.nodeSets.map((n, i) => <li key={`${n.ref.type}:${n.ref.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line-2 px-4 py-3">
-            <div className="flex min-w-0 flex-[1_1_180px] flex-col gap-1"><span className="truncate text-[13.5px] font-medium">{nodeSetName(n.ref)}</span>
-              <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
-            </div>
+            <button type="button" aria-label={`预览 ${nodeSetName(n.ref)} 的节点`} onClick={() => void NodeSetPreviewModal.show({ nodeSet: n.ref, name: nodeSetName(n.ref) })} className="group flex min-w-0 flex-[1_1_180px] cursor-pointer flex-col gap-1 rounded text-left focus-visible:outline-brand"><span className="truncate text-[13.5px] font-medium group-hover:text-brand group-hover:underline">{nodeSetName(n.ref)}</span>
+              <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'} · 点击预览</span>
+            </button>
             <Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} />
             <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => void remove(n.ref)}><Trash2 size={14} /></Button>
           </li>)}

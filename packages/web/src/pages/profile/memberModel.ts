@@ -38,7 +38,7 @@ export function chainInputError(chain: ChainRule): string | undefined {
     if (chain.via.kind === 'group' && !chain.via.groupId) return '请选择前置策略组';
     if (chain.via.kind === 'node') {
       const ref = chain.via.ref;
-      if (!ref.nodeSet.id || !('exact' in ref.match ? ref.match.exact : ref.match.regex).trim()) return '请选择前置节点';
+      if (!ref.nodeSet.id || ('exact' in ref.match && !ref.match.exact.trim())) return '请选择前置节点';
       if ('regex' in ref.match) compileUserRegex(ref.match.regex);
       if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && !chain.landing.filter && !chain.landing.excludeFilter) return '前置与整集落地不能使用同一节点集，会形成循环';
       if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && 'exact' in ref.match) {

@@ -1,0 +1,20 @@
+退场验收：8 项
+通过：代理链退场验收本机 → 中转机场 · /日本/ → 自建落地 · 筛选节；121 帧；高度 680px，标题、正文、输入值保持一致
+通过：自建落地 · 节点预览节点筛选（正则）筛选 1 / 2 个节点🇸🇬 ；121 帧；高度 286px，标题、正文、输入值保持一致
+通过：自建落地 · 节点预览节点筛选（正则）全部 2 / 2 个节点🇺🇸 ；121 帧；高度 327px，标题、正文、输入值保持一致
+通过：代理链退场验收本机 → 中转机场 · /日本/ → 自建落地 · 筛选节；121 帧；高度 680px，标题、正文、输入值保持一致
+通过：自建落地 · 节点预览节点筛选（正则）全部 2 / 2 个节点🇺🇸 ；120 帧；高度 327px，标题、正文、输入值保持一致
+通过：自建落地 · 节点预览节点筛选（正则）筛选 1 / 2 个节点🇺🇸 ；121 帧；高度 286px，标题、正文、输入值保持一致
+通过：嵌套草稿与路由验收打开子弹窗打开嵌套节点预览切换路由取消保存Close；121 帧；高度 383px，标题、正文、输入值保持一致
+通过：保存失败后重试名称取消处理中…模拟保存失败，请重试Close；121 帧；高度 238px，标题、正文、输入值保持一致
+
+Promise 结果：9 项
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"navigation"}
+{"status":"confirmed","data":"保留我的草稿"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"confirmed","data":{"id":"exit-chain","landing":{"nodeSet":{"type":"local","id":"self"},"filter":"GCP","excludeFilter":"过期"},"via":{"kind":"node","ref":{"nodeSet":{"type":"local","id":"relay"},"match":{"regex":"日本"}}}}}

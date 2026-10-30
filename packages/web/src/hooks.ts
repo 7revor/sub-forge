@@ -69,13 +69,19 @@ export function useDeleteDoc(kind: Kind) {
 
 export const useTemplates = () => useQuery({ queryKey: ['templates'], queryFn: () => api<{ items: TemplateDoc[] }>('GET', '/templates').then((r) => r.items) });
 
-export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined, query = '') {
+export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined, query = '', filters?: { filter?: string; excludeFilter?: string }) {
   const q = normalizeNameSearch(query);
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (filters?.filter) params.set('filter', filters.filter);
+  if (filters?.excludeFilter) params.set('excludeFilter', filters.excludeFilter);
+  const queryKey = ['nodes', ref?.type, ref?.id, q];
+  if (filters?.filter || filters?.excludeFilter) queryKey.push(filters.filter ?? '', filters.excludeFilter ?? '');
   return useQuery({
-    queryKey: ['nodes', ref?.type, ref?.id, q],
+    queryKey,
     enabled: !!ref?.id,
     staleTime: 0,
-    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes${params.size ? `?${params}` : ''}`),
   });
 }
 

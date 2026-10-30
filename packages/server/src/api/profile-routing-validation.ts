@@ -94,7 +94,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
     if (value.kind === 'node' && obj(value.ref) && obj(value.ref.match)) {
       nodeSet(value.ref.nodeSet, where);
       const match = value.ref.match;
-      if (!isStr(match.exact) && !isStr(match.regex)) throw bad(`${where}：节点匹配条件不能为空`);
+      if (!isStr(match.exact) && !isStr(match.regex, 0)) throw bad(`${where}：节点匹配条件不能为空`);
       if (value.ref.fallback && value.ref.fallback !== 'error') target(value.ref.fallback, where, depth + 1);
       return;
     }
