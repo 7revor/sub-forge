@@ -1,8 +1,8 @@
 # @sub-forge/server
 
-当前资源权限、清理与 v23 迁移契约见 [全局托管与鉴权](../../docs/19-managed-resources.md)。文末按日期记录的旧接口设计以该契约为准。
+当前资源权限、清理与 v25 迁移契约见 [全局托管与鉴权](../../docs/19-managed-resources.md)。文末按日期记录的旧接口设计以该契约为准。
 
-订阅服务（M1 服务端）：SQLite 存储、多用户与登录、管理接口、上游拉取与快照、实时渲染、订阅接口。目前支持 Mihomo 与 Stash；生产镜像同源托管 `packages/web` 管理前端。
+订阅服务（M1 服务端）：SQLite 存储、多用户与登录、管理接口、上游拉取与快照、实时渲染、订阅接口。目前支持 Mihomo、Stash、Surge 与 Loon；生产镜像同源托管 `packages/web` 管理前端。
 
 ## 运行
 
@@ -45,50 +45,46 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `MIHOMO_BIN` | 空 | 设置后每次渲染都执行 `mihomo -t` 校验，失败时返回上一份成功结果 |
 | `MIHOMO_DIR` | 临时目录 | `-t` 的工作目录；GEOIP 规则需要其中有 `Country.mmdb`，否则 mihomo 会尝试下载 |
 
-## 订阅接口
+## 订阅与公共文件接口
+
+资源 token 统一放查询参数，路径只有固定分类。完整参数、权限和删除边界见 [资源契约](../../docs/19-managed-resources.md)。
 
 | 地址 | 内容 |
 | --- | --- |
-| `GET /sub/:token/:profile` | 主配置。`?target=mihomo\|surge\|stash\|loon&platform=...` 优先于 UA；Surge/Loon 输出完整 INI |
-| `GET /p/:token/:profile/:key` | Profile 专属 provider 内容 |
-| `GET /r/:token/:key` | 全站公共规则产物，任意有效用户 token 可读 |
-| `GET /nodes/:token/:kind/:id` | 自己的节点源/组合/本地节点经处理链后的 Mihomo / Stash / Surge / Loon 节点内容；支持 HEAD 和流量信息 |
-| `GET /rules/:token/:id` | 独立公共规则增强，按 UA 选择公共变体，无需先建立配置订阅 |
+| `GET /subs/profile?id=P&token=T` | 本人完整配置，支持 target/platform 与 UA 选择 |
+| `GET /subs/nodes?kind=source&id=N&token=T` | 本人 source / collection / local；支持 HEAD 与流量头 |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&version=V&token=T` | 本配置的节点 provider，按目标保留最多 32 个结构版本 |
+| `GET /subs/ruleset?profile=P&key=K&version=V&token=T` | 本配置的专属规则产物 |
+| `GET /resources/ruleset?id=R&token=T` | 公共增强，view=source 为来源原文；key 参数读取固定公共变体 |
+| `GET /resources/repo?id=REPO&ref=分支&path=文件&token=T` | 公共仓库文件原文；key 参数读取固定公共变体 |
 | `GET /healthz` | 健康检查 |
 
-- token 无效或所属用户被禁用：主订阅、节点与规则资源统一返回 404，空响应体。
-- 渲染失败（报告中有错误、`mihomo -t` 失败或内核异常）：返回上一份成功结果；从未成功过：503 与纯文本原因。
-- 渲染结果与 token 无关，同一 Profile 重置链接后仍复用 last_good 和结构版本资源，下发时把地址里的占位符换成请求所用的 token。
-- 每次渲染读取当前流量信息与拉取告警，并同步到最近成功结果。流量先按同源不同 URL 累加，再按 Profile 选择汇总、指定源或关闭；缺失字段不补零，到期时间取最早值，重复引用同一源不重复累加。仅流量变化不产生新的结构版本。
-- `/p` 带配置 ID、结构版本 `v` 与客户端/平台；每个配置和目标保留最近 32 个版本。`/r` 只带用户 token 与公共资源键；其正文按当前规则定义独立更新，不绑定配置订阅或结构版本。
-- SQLite v23 会撤销旧的单订阅 token，清空旧配置产物并为每个用户生成独立 token。升级后必须重新复制订阅链接；旧 token 不会扩大权限。详见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
+私有资源在读取前后校验有效 token、所属用户和依赖。公共资源接受任意有效用户 token；模板只提供登录态预览。正文直接显示，不以附件下载。v25 保留现有用户 token，但旧地址全部停用，客户端需要重新复制链接；数据库清除旧地址配置缓存和错误公开的远程引用产物。
 
 ## 管理接口（`/api`）
 
-管理接口返回 JSON，错误格式 `{ error, details? }`。会话用 HttpOnly + SameSite=Lax cookie；写操作要求 `content-type: application/json`，带 Origin 时须同源或在 `ALLOWED_ORIGINS` 中。`/api/files` 为独立 token 鉴权的文本文件入口，不依赖会话。
+管理接口返回 JSON，错误格式 `{ error, details? }`。会话用 HttpOnly + SameSite=Lax cookie；写操作要求 `content-type: application/json`，带 Origin 时须同源或在 `ALLOWED_ORIGINS` 中。所有管理接口统一要求登录并拒绝资源 token；建立会话使用 `/auth/login`，退出使用 `/auth/logout`。
 
 | 地址 | 说明 |
 | --- | --- |
-| `POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
+| `POST /auth/login`、`POST /auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
 | `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限 |
-| `GET/POST /api/{kind}`、`GET/PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles` `presets`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；预设由管理员维护、所有人可读；被引用的文档不能删除（409 返回引用方） |
-| `GET /api/templates`、`GET /api/templates/:id` | 所有人可读 |
+| `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles` `presets`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；预设由管理员维护、所有人可读；被引用的文档不能删除（409 返回引用方） |
+| `GET /api/templates`、`GET /api/templates?id=ID` | 所有登录用户可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
 | `POST /api/templates`、`PUT /api/templates/:id` | 管理员新建或直接保存；不需要版本号，后保存的内容覆盖当前内容。自身校验不通过 400；绑定冲突返回 409，不允许 `force` 跳过。旧 `POST /api/templates/:id/publish` 兼容同一保存逻辑，不再创建历史 |
-| `GET /api/profiles/:id/link` | 校验归属，返回该用户 token 与此配置订阅地址 |
-| `GET /api/resource-links/:kind/:id` | 复制当前用户令牌的节点源、组合、本地组、配置或公共规则增强链接；只生成地址，不拉取上游 |
-| `GET /api/files/:token/repository?repo&ref&path` | 索引内公共仓库文件原文，任意有效用户 token 可读 |
-| `GET /api/files/:token/{templates\|profiles}/:id/rules/:ruleId?revision=...` | 已保存非静态规则的来源原文，模板公共、配置按用户归属；摘要只检查内容一致性 |
+| `GET /api/profiles/link?id=ID` | 校验归属，返回该用户 token 与此配置订阅地址 |
+| `GET /api/resource-links?kind=类型&id=ID` | 复制当前用户令牌的节点源、组合、本地组、配置或公共规则增强链接；只生成地址，不拉取上游 |
 | `GET /api/me/token`、`POST /api/me/token/reset` | 读取或原子重置自己的唯一令牌；重置请求携带当前 `{ token }`，过期值返回 409 |
 | `GET /api/system/rule-resources`、`DELETE /api/system/rule-resources/:key` | 管理员查看公共产物与转换错误；删除仍被配置或模板引用的资源返回 409 |
 | `POST /api/profiles/:id/preview` | 预览配置、代理链检查结果、只读引用详情与渲染报告；请求体可带未保存的 `profile` 草稿 |
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
 | `GET /api/access-log` | 当前用户 token 的四类下载访问；可选 `kind=subscription|nodes|rule-collection|enhancement`，默认全部；`page` / `pageSize` 分页，保留 30 天，管理员也只可读自己的记录 |
-| `GET /api/profiles/:id/access-log` | 单个私有配置订阅的历史访问摘要，用于首页配置列表 |
-| `POST /api/sources/:id/refresh`、`GET /api/sources/:id/snapshots` | 立即拉取、最近成功内容与最新失败状态（不含正文） |
+| `GET /api/profiles/access-log?id=ID` | 单个私有配置订阅的历史访问摘要，用于首页配置列表 |
+| `POST /api/sources/:id/refresh`、`GET /api/sources/snapshots?id=ID` | 立即拉取、最近成功内容与最新失败状态（不含正文） |
 | `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；订阅源还可带 `source: { url, fetch }`，组合还可带 `members`（按保存规则校验引用与成环） |
-| `GET /api/nodesets/:type/:id/nodes` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
+| `GET /api/nodesets/nodes?type=类型&id=ID` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
 | `POST /api/rulesets/preview` | 规则集草稿按 `client` + `platform` 的输出，请求体 `{ ruleset, id?, source?, client, platform? }`：给出 `source` 时为该来源（含无法解析的行），否则为全部启用来源合并去重后的结果与 domain / classical / ipcidr 统计；两种预览均应用顶层 `overrides`（按规则内容精确匹配）；每个来源的拉取 / 解析状态一并返回，`rejected` 为完整计数，存在无法解析行时附带 `rejectedDetails`（行号、原文、原因，最多前 100 条），用于来源徽标的悬停与点击详情。`id` 为已保存的规则集时，已保存的远程地址读写它名下的快照；新建草稿与编辑中新填的地址只拉取、不写快照（仅合并同一用户仍在途的草稿请求） |
 
 本地节点在「原始配置」粘贴后先同步编辑草稿，点击「添加到分组 / 保存节点」时调用 `PUT /api/locals/:id`，提交完整分组；服务端校验通过后立即持久化并返回保存结果。该交互复用现有接口，不新增暂存状态或迁移。
@@ -220,7 +216,7 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 ### 自动识别规则格式与全局托管（2026-10-30）
 
-规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/r/:token/:key` 按规则身份、有效处理参数与客户端/平台共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo、Stash、Surge、Loon。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
+规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/resources/ruleset?key=KEY&token=TOKEN` 与 `/resources/repo?key=KEY&token=TOKEN` 按规则身份、有效处理参数与客户端/平台共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo、Stash、Surge、Loon。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
 
 ### 管理列表分页
 
@@ -246,7 +242,7 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 ### 订阅源固定拉取设置（2026-10-29）
 
-SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文档归属和更新时间；订阅源历史压缩为最近一次成功及最新失败状态。规则集拉取设置和历史不受影响。服务层对正式拉取、草稿预览都强制使用默认 UA 与 10 秒超时，旧种子与保存接口也会规范化。节点只能内联输出或由本服务 `/p/…` 托管，不提供节点订阅地址透传；规则也统一由服务端托管。
+SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文档归属和更新时间；订阅源历史压缩为最近一次成功及最新失败状态。规则集拉取设置和历史不受影响。服务层对正式拉取、草稿预览都强制使用默认 UA 与 10 秒超时，旧种子与保存接口也会规范化。节点只能内联输出或由本服务 `/subs/nodes?kind=provider&…` 托管，不提供节点订阅地址透传；规则也统一由服务端托管。
 
 
 2026-10-29 规则转换：合并预览及实际订阅资源对 mihomo wildcard 按小写键去重，保留首条原文；存在重复 wildcard 的远程文本和 YAML 自动返回托管资源，下载与合并预览一致。单来源原文预览仍保留全部行，接口及保存数据无需迁移。
@@ -259,7 +255,7 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 新订阅保存 `routing.mode = bound | independent` 与空 `overlay`。绑定保存模板 ID、`groupAdditions` 与可选前置规则，不需要版本号；独立保存完整 groups/rules/final，初始化来源仅作说明。旧的 template/overlay 创建请求与种子会自动转换，新模式 PUT 不允许回退为旧形状。
 
 - `POST /api/profiles/routing/convert`：`{ profile, mode, templateId?, mapping? }`。只返回 `{ item, changes }` 草稿；mapping 以旧组 ID 映射目标 ID，null 表示明确不迁移。应用后通过原 PUT 保存，后保存的内容覆盖当前内容。
-- `GET /api/profiles/:id/migration-backup`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；备份在库内加密，删除订阅时一并删除。
+- `GET /api/profiles/migration-backup?id=ID`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；备份在库内加密，删除订阅时一并删除。
 - 模板 impact/publish 仅影响绑定订阅。组改名保留成员；删组和合并环等冲突不能强制发布。保存不因模板或订阅在检查期间更新而中断。
 
 升级前先停止写入并保留完整数据库一致性备份及原密钥（运行中的 SQLite 使用 backup API，不能只复制主文件遗漏 WAL）。可在现有库上执行只读预检：
@@ -287,7 +283,7 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 
 规则转换支持 `USER-AGENT`：来源读取计为已解析，POST 预览与 GET 下载对 Surge 输出有效规则，mihomo 保留客户端不支持注释；全部没有有效输出时 GET 仍返回 400。
 
-Stash：/sub/:token/:profile?target=stash&platform=ios 或 macos 输出完整订阅；UA 可自动识别。预览接口接受 client: stash，并返回可独立导入的 exportYaml。资源和历史版本按客户端/平台隔离；Mihomo 校验器不用于 Stash。预设 stash 与 base.stashPatch 独立保存，节点按快照内联。详见 docs/17-official-client-configuration-guides.md。
+Stash：/subs/profile?id=PROFILE&token=TOKEN&target=stash&platform=ios 或 macos 输出完整订阅；UA 可自动识别。预览接口接受 client: stash，并返回可独立导入的 exportYaml。资源和历史版本按客户端/平台隔离；Mihomo 校验器不用于 Stash。预设 stash 与 base.stashPatch 独立保存，节点按快照内联。详见 docs/17-official-client-configuration-guides.md。
 
 ### 2026-10-29：目录级联索引
 
@@ -299,7 +295,7 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 
 ### 2026-10-29：全量名称筛选
 
-仓库目录接口支持 `q`，使用规范化后的 SQL LIKE 与转义参数筛选；匹配路径由前端恢复父级目录。加密文档仍在授权读取解密后执行等价的包含筛选，再分页。`GET /api/nodesets/:type/:id/nodes?q=...` 在完整已处理节点集筛选后截取响应上限，`total` 为筛选后的数量。`%`、`_` 和反斜线按字面匹配，不当作用户通配符。
+仓库目录接口支持 `q`，使用规范化后的 SQL LIKE 与转义参数筛选；匹配路径由前端恢复父级目录。加密文档仍在授权读取解密后执行等价的包含筛选，再分页。`GET /api/nodesets/nodes?type=类型&id=ID&q=...` 在完整已处理节点集筛选后截取响应上限，`total` 为筛选后的数量。`%`、`_` 和反斜线按字面匹配，不当作用户通配符。
 
 ### 2026-10-29：仓库单文件正文预览
 
@@ -312,7 +308,7 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 
 v19 在事务中先展开仍引用旧模板版本的遗留订阅并保存原始备份，再为每个模板保留当前内容、移除旧记录和 changelog。已采用 bound 模式的订阅保持绑定；更新保留订阅归属、更新时间和链接。旧种子导入执行相同顺序，缺失所引用历史时整批失败。升级前沿用上文完整数据库及密钥备份要求。
 
-`GET /api/templates/:id` 只返回 `item`，历史版本读取接口已移除。旧 publish / impact 路径仅兼容旧调用，前端不再使用。
+`GET /api/templates?id=ID` 只返回 `item`，历史版本读取接口已移除。旧 publish / impact 路径仅兼容旧调用，前端不再使用。
 
 
 ### 移除模板与订阅并发拦截（数据库 v20）
@@ -347,9 +343,9 @@ v20 清理旧记录中的并发字段，保留配置内容、绑定关系、归�
 ## 2026-10-30：统一资源缓存 API
 
 - `GET/PUT /api/system`：管理员读取/设置 `resourceCacheTtlSec`（3600–31536000，3600 的整数倍），默认 86400。
-- `GET /api/{sources,collections,rulesets,profiles}/:id/cache`：当前资源状态。
+- `GET /api/{sources,collections,rulesets,profiles}/cache?id=ID`：当前资源状态。
 - `POST /api/{sources,collections,rulesets,profiles}/:id/refresh-cache`：返回 202 和任务；订阅递归所有生效依赖并重建配置。
-- `GET /api/refresh-jobs/:id`：仅任务所有者可读；逐项结果与生成结果分开显示。
+- `GET /api/refresh-jobs?id=ID`：仅任务所有者可读；逐项结果与生成结果分开显示。
 - `POST /api/rule-repos/file-refresh`：刷新已授权索引中的单个公开文件。
 - `GET /api/system/resources`：管理员汇总资源及仓库索引状态。
 - `GET /api/events`：登录用户 SSE 通知，不携带文档数据；具体读取仍校验权限。服务退出主动关闭流。
@@ -429,7 +425,7 @@ SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，�
 
 SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列表 token_hash 排序），移除其余链接，并为没有链接的 Profile 补生成。其他旧链接及其资源地址在升级后返回 404；保留下来的链接、归属和文档更新时间不变。这里描述的是升级规则，本次开发验收仅使用隔离测试数据库。
 
-当前 `GET /sub/:token/:profile` 通过 User-Agent 选择 Mihomo / Stash / Surge / Loon，并按可识别的平台选择配置。`target` / `platform` 参数保留为手工覆盖，页面显示无参数的链接。浏览器及未知 UA 默认 Mihomo，响应为 `text/plain; charset=utf-8`、`Content-Disposition: inline`、`X-Content-Type-Options: nosniff`，直接显示配置；保留文件名、流量信息和更新间隔。`Vary: User-Agent` 与 `Cache-Control: no-store` 防止缓存混用客户端输出。
+当前 `GET /subs/profile?id=PROFILE&token=TOKEN` 通过 User-Agent 选择 Mihomo / Stash / Surge / Loon，并按可识别的平台选择配置。`target` / `platform` 参数保留为手工覆盖，页面显示仅含配置 ID 与 token 的自动适配链接。浏览器及未知 UA 默认 Mihomo，响应为 `text/plain; charset=utf-8`、`Content-Disposition: inline`、`X-Content-Type-Options: nosniff`，直接显示配置；保留文件名、流量信息和更新间隔。`Vary: User-Agent` 与 `Cache-Control: no-store` 防止缓存混用客户端输出。
 
 请求头依据与验收范围见 [唯一链接验收](../../research/verification/single-subscription-20261030/README.md)。
 
@@ -440,3 +436,8 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 不存完整地址或有效 token，UA 和资源标识中的当前 token 会脱敏；查询接口也不返回 token 摘要。删除资源和重置 token 不删除用户历史，30 天后按原清理任务清理。v23 旧日志只有截断摘要，无法可靠确定访问者，迁移保留原表记录但不猜测归属，因此不出现在新的首页日志列表。
 
 2026-10-30 文件链接：配置、节点、规则增强的列表与详情支持复制当前用户 token 链接，首页两张资源表同样支持。规则仓库、模板/订阅非静态规则及订阅节点来源在新标签页显示文件；静态规则保留弹窗。`/api/files` 只读取已保存引用，不接受任意 URL，不创建私有预览资源；读取前后复核 token、归属和文档。规则未保存或在途变更返回 409；失效权限或引用返回 404；二进制文本预览返回 415。节点和 provider 的文本 MIME 统一为 `text/plain`，GET/HEAD 流量头保持。验收见 [文件链接与复制按钮](../../research/verification/resource-file-links-20261030/README.md)。
+
+
+### 2026-10-30：查询参数入口与凭证分离（v25）
+
+现行契约见 [资源入口、鉴权与生命周期](../../docs/19-managed-resources.md)。所有 GET 动态值使用 query，旧资源入口和旧管理 GET 路径全部关闭。`/api` 仅登录态，`/subs` 按当前用户 token 校验私有归属，`/resources` 允许任意有效用户 token 访问公共规则。模板专属原文只有登录态 `/api/templates/rule-file`，不发行 token 地址；订阅使用模板后，其直接远程规则由该订阅鉴权。v25 保留用户 token，清除含旧地址的配置缓存与旧公共远程产物，客户端须重新复制链接。仓库停用、删除、索引移除及在途撤销同时清除无引用正文，不能在重新启用后恢复旧请求的缓存绑定。

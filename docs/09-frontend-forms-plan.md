@@ -154,7 +154,7 @@ P1 缺口（GRP-05/06、RL-04、RB-04、BS-04、系统设置页、SYS-06）放�
 
 | 改动 | 用途 | 规模 |
 | --- | --- | --- |
-| `GET /nodesets/:type/:id/nodes`：节点集经处理链之后的节点列表（名称、类型、server:port），带缓存 | `NodePicker`、`MatchPreview` | 小：复用 pipeline-preview 的逻辑，返回完整列表，不截断 |
+| `GET /nodesets/nodes?type=类型&id=ID`：节点集经处理链之后的节点列表（名称、类型、server:port），带缓存 | `NodePicker`、`MatchPreview` | 小：复用 pipeline-preview 的逻辑，返回完整列表，不截断 |
 | `PresetDoc` 增加 `surge?: { general?: …; host?: … }` | BS-02 预留 | 小（渲染部分在 M2） |
 | `RuleEntry` 增加 `overrides?: ClientOverride[]` | 单条规则的客户端覆盖（CR-02） | 小：内核已有 `ClientOverride` 类型和应用逻辑 |
 | 覆盖层支持私有组的位置（如 `extraGroups[].after?: groupId`） | 私有组拖拽排序 | 小：内核 `merge.ts` 按锚点插入 |

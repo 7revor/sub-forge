@@ -98,8 +98,8 @@ Stash 使用 YAML；配置、节点集和规则集的形状与 Clash 家族相�
 保留现有订阅 token，显式使用：
 
 ```text
-/sub/<token>?target=stash&platform=ios
-/sub/<token>?target=stash&platform=macos
+/subs/profile?id=<配置ID>&token=<token>&target=stash&platform=ios
+/subs/profile?id=<配置ID>&token=<token>&target=stash&platform=macos
 ```
 
 Stash User-Agent 可以自动识别；显式参数优先。前端「订阅 → 概览」只提供一个无参数链接，Stash 与 Mihomo 客户端共用该链接，浏览器直接显示 Mihomo YAML；「预览」选择 Stash 和平台，可查看草稿及导出独立 YAML 文件。导出文件把本次已转换的托管规则内嵌到 `rules` 中，避免依赖预览占位 token；原始远程规则集合继续使用其真实 URL。
@@ -114,7 +114,7 @@ Stash 专属基础设置保存在预设的 `stash` 和订阅的 `base.stashPatch
 GET /api/rules/convert?url=<完整编码的上游URL>&target=stash&platform=ios
 ```
 
-转换预览需要登录；正式公共规则通过 `/r/:token/:key` 托管，任意有效用户令牌可读，旧 token 转换入口已移除。转换不会将未知类型当作可执行规则透传。规则编辑器中显式输入 RAW 仍沿用原有的原文输出语义。
+转换预览需要登录；正式公共规则通过 `/resources/ruleset?key=K&token=T` 托管，任意有效用户令牌可读，旧 token 转换入口已移除。转换不会将未知类型当作可执行规则透传。规则编辑器中显式输入 RAW 仍沿用原有的原文输出语义。
 
 ## 3. 后续同步流程
 

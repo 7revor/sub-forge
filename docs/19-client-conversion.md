@@ -16,7 +16,7 @@
 
 INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Host]`；节点、组、规则由对应领域对象生成。原生项仍按客户端独立合并；新增公共项只映射已适配语义，不把任意 Mihomo DNS/TUN 配置自动套到其他客户端。表单和 INI 双向转换保留 `false`、`0`、列表、引号和转义；清空字段恢复未配置状态。INI 大小写和行内注释按解析规则处理，非法段、重复键、换行注入和不支持的嵌套值报错。
 
-`GET /sub/:token/:profileId?target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。token 为当前用户的统一资源令牌，配置必须属于该用户；导入沿用现有令牌。Surge 主订阅含带当前 token 和配置 ID 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
+`GET /subs/profile?id=配置ID&token=用户token&target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。token 为当前用户的统一资源令牌，配置必须属于该用户；导入沿用现有令牌。Surge 主订阅含带当前 token 和配置 ID 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
 
 预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同客户端、同平台的上一份成功产物；没有可回退产物时返回 503，不发布半成品。规则产物按公共资源身份、处理参数、客户端和平台共享，下载使用有效用户 token 鉴权；节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
 
