@@ -49,7 +49,7 @@ const RefreshProgressModal = createModal<{ name: string; kind: string; jobId: st
   const job = useModalPresentation(query);
   const current = job.data?.job;
   useEffect(() => { if (current && current.state !== 'running') void qc.invalidateQueries(); }, [qc, current?.state]);
-  return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{`刷新缓存 · ${name}`}</ModalTitle></ModalHeader>
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto pb-9 sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{`刷新缓存 · ${name}`}</ModalTitle></ModalHeader>
       <ErrorAlert error={job.error??current?.error} />
       {current && <div className="flex min-w-0 flex-col gap-3 whitespace-normal text-left">
         {!current.total && <p className="text-ink-muted">没有需要拉取的远程资源。</p>}
