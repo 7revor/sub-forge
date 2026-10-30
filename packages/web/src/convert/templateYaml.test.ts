@@ -66,7 +66,7 @@ describe('模板与 mihomo YAML 双向转换', () => {
     const result = imported('rules: ["IN-TYPE,SOCKS/HTTP,DIRECT", "AND,((DOMAIN,a.test),(NETWORK,tcp)),DIRECT", "MATCH,DIRECT"]');
     expect(result.value.rules.map(rule => rule.matcher)).toEqual([
       { kind: 'rule', rule: { type: 'RAW', text: 'IN-TYPE,SOCKS/HTTP' } },
-      { kind: 'rule', rule: { type: 'RAW', text: 'AND,((DOMAIN,a.test),(NETWORK,tcp))' } },
+      { kind: 'rule', rule: { type: 'AND', children: [{ type: 'DOMAIN', value: 'a.test' }, { type: 'NETWORK', value: 'tcp' }] } },
     ]);
   });
   it('空组行为固定，原始配置不再保留可覆盖的 empty-fallback', () => {
@@ -302,9 +302,9 @@ rules:
     expect(imported(yaml, t).value).toStrictEqual({ ...t, rules: t.rules.map(rule => { const { noResolve: _, ...options } = rule.options ?? {}; return { ...rule, options }; }) });
   });
 
-  it('core 暂不支持的逻辑规则导出明确报错，不静默丢弃', () => {
+  it('畸形逻辑规则导出明确报错，不静默丢弃', () => {
     const t: TemplateBody = { ...empty, rules: [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'AND', children: [] } }, target: direct }] };
-    expect(() => templateToYaml(t, ctx)).toThrow('逻辑规则暂不支持');
+    expect(() => templateToYaml(t, ctx)).toThrow('逻辑规则子条件数量不合法');
   });
 
   it('不将非法结构或多余规则字段静默转换成有效模板', () => {

@@ -9,7 +9,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { Hono, type Context } from 'hono';
 import type { Platform } from '@sub-forge/core';
 import { createApi, type ApiDeps } from './api/index.ts';
-import { detectClient } from './client.ts';
+import { InvalidClientTarget, detectClient } from './client.ts';
 import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService, type Target } from './render.ts';
 import type { Store, TrafficInfo } from './store.ts';
 
@@ -77,7 +77,9 @@ export function createApp(deps: AppDeps) {
     const profile = store.get('profile', t.profileId);
     if (!profile) return notFound(c);
     const ua = c.req.header('user-agent') ?? '';
-    const detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform') });
+    let detected;
+    try { detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform') }); }
+    catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
 
     const log = (status: number, outcome?: RenderOutcome) => store.logAccess({
       token, profileId: t.profileId, at: started, ua, client: `${detected.client}${detected.by === 'default' ? '?' : ''}`,
@@ -87,12 +89,8 @@ export function createApp(deps: AppDeps) {
       source: outcome ? (outcome.ok ? outcome.source : 'failed') : 'unsupported',
     });
 
-    if (detected.client === 'stash' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
-      log(400); return c.text('Stash 平台仅支持 ios 或 macos', 400);
-    }
-    if (detected.client === 'surge') {
-      log(501);
-      return c.text('Surge 输出尚未实现（M2）。如需 mihomo 配置，请在链接后加 ?target=mihomo', 501);
+    if (detected.client !== 'mihomo' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
+      log(400); return c.text('该客户端平台仅支持 ios 或 macos', 400);
     }
 
     const outcome = await renderer.render(t.profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
@@ -120,9 +118,10 @@ export function createApp(deps: AppDeps) {
     if (!t) return notFound(c);
     const qp = c.req.query('platform');
     const platform = PLATFORMS.find((p) => p === qp);
+    if (qp !== undefined && !platform) return notFound(c);
     const client = c.req.query('target') ?? 'mihomo';
-    if (client !== 'mihomo' && client !== 'stash') return notFound(c);
-    if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
+    if (client !== 'mihomo' && client !== 'stash' && client !== 'surge' && client !== 'loon') return notFound(c);
+    if (client !== 'mihomo' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
     const target: Target = { client, ...(platform ? { platform } : {}) };
     const version = c.req.query('v');
     const key = c.req.param('key')!;

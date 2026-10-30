@@ -16,6 +16,7 @@ export function profileEditorOverlay(profile: Pick<Profile, 'routing' | 'overlay
   const routing = profile.routing;
   if (!routing) return profile.overlay;
   if (routing.mode === 'bound') return {
+    extraGroups: (routing.extraGroups ?? []).map(group => ({ group })),
     groupPatches: Object.fromEntries(Object.entries(routing.groupAdditions).map(([id, addMembers]) => [id, { addMembers }])),
     // 覆盖层逐条 unshift，倒序保存才能保持前置规则的显示顺序。
     extraRules: [...(routing.prependRules ?? [])].reverse().map(rule => ({ anchor: 'top', rule })),
@@ -36,10 +37,17 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
   for (const [id, members] of Object.entries(profile.routing.groupAdditions)) {
     if (members.length && !template.groups.some(g => g.id === id)) report.error('binding.orphan', `策略组 ${id} 已删除，必须先迁移或移除它的追加成员`, `group:${id}`);
   }
+  const groups = [...template.groups, ...(profile.routing.extraGroups ?? [])];
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  for (const group of groups) {
+    if (ids.has(group.id) || names.has(group.name.trim())) report.error('binding.duplicate-group', `策略组「${group.name}」的 ID 或名称与现有组重复`, `group:${group.id}`);
+    ids.add(group.id); names.add(group.name.trim());
+  }
   const ruleIds = new Set(template.rules.map(rule => rule.id));
   const checkTarget = (target: Target, where: string, depth = 0): void => {
     if (depth > 20) { report.error('binding.prepend-target', '前置规则的兜底引用过深', where); return; }
-    if (target.kind === 'group' && !template.groups.some(group => group.id === target.groupId)) report.error('binding.prepend-target', `前置规则引用的策略组 ${target.groupId} 已不存在`, where);
+    if (target.kind === 'group' && !groups.some(group => group.id === target.groupId)) report.error('binding.prepend-target', `前置规则引用的策略组 ${target.groupId} 已不存在`, where);
     if (target.kind === 'node' && target.ref.fallback && target.ref.fallback !== 'error') checkTarget(target.ref.fallback, where, depth + 1);
   };
   for (const rule of profile.routing.prependRules ?? []) {

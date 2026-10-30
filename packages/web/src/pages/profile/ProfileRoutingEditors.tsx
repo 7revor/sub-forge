@@ -10,15 +10,19 @@ import { TemplateGroupsEditor } from '../template/TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from '../template/TemplateRulesEditor.tsx';
 import { draftIssues } from '../template/model.ts';
 import { useProfile } from './context.ts';
+import { Frame } from '../../modals/Frame.tsx';
+import { removeIndependentGroup } from './providerGroup.ts';
 import { ProfileGroupDialog } from './ProfileGroupDialog.tsx';
 
 function useRoutingBody() {
   const { draft, setDraft, template } = useProfile();
   const routing = draft.routing;
   const bound = routing?.mode === 'bound';
-  const body: TemplateBody = routing?.mode === 'independent' ? routing.config : template ?? { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } };
+  const base: TemplateBody = template ?? { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } };
+  const body: TemplateBody = routing?.mode === 'independent' ? routing.config : { ...base, groups: [...base.groups, ...(routing?.mode === 'bound' ? routing.extraGroups ?? [] : [])] };
   const update = (config: TemplateBody) => {
     if (routing?.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config } });
+    else if (routing?.mode === 'bound') setDraft({ ...draft, routing: { ...routing, extraGroups: config.groups.filter(group => !template?.groups.some(g => g.id === group.id)) } });
   };
   return { body, update, bound };
 }
@@ -28,8 +32,12 @@ export function ProfileGroupsEditor() {
   const { draft, setDraft, template, groupName, nodeSetName } = profile;
   const { body, update, bound } = useRoutingBody();
   return <>
-    {bound && <p className="m-0 text-[13px] text-ink-muted">策略组结构跟随 <Link className="text-brand" to={`/templates/${template?.id}`}>{template?.name ?? '模板'}</Link>。点击编辑，为各组填充本订阅的节点。</p>}
-    <TemplateGroupsEditor value={body} onChange={update} report={draftIssues(body)} readOnly={bound} nodeSetName={nodeSetName}
+    {bound && <p className="m-0 text-[13px] text-ink-muted">策略组结构跟随 <Link className="text-brand" to={`/templates/${template?.id}`}>{template?.name ?? '模板'}</Link>。模板组可追加节点；独立组仅属于本订阅，可自由编辑。</p>}
+    <TemplateGroupsEditor value={body} onChange={update} report={draftIssues(body)} readOnly={bound} isGroupReadOnly={group => bound && !!template?.groups.some(g => g.id === group.id)} nodeSetName={nodeSetName}
+      onRemoveGroup={async group => {
+        const result = await Frame.modal.confirm({ title: `删除策略组「${group.name}」？`, description: '同时移除组内成员引用及引用它的代理链，相关规则出口改为 REJECT。保存订阅后生效。', confirmLabel: '删除', danger: true });
+        if (result.status === 'confirmed') setDraft(removeIndependentGroup(draft, group.id));
+      }}
       memberSummary={group => {
         const additions = draft.routing?.mode === 'bound' ? draft.routing.groupAdditions[group.id] ?? [] : [];
         return [...group.members, ...additions].map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '尚未添加成员';

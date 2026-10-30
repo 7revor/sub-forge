@@ -1,0 +1,27 @@
+退场验收：12 项
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型远程 URL本地规则系统；13 帧；高度 330px，标题、正文、输入值保持一致
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型远程 URL本地规则系统；12 帧；高度 330px，标题、正文、输入值保持一致
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型远程 URL本地规则系统；13 帧；高度 330px，标题、正文、输入值保持一致
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型远程 URL本地规则系统；14 帧；高度 330px，标题、正文、输入值保持一致
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型远程 URL本地规则系统；12 帧；高度 330px，标题、正文、输入值保持一致
+通过：保存失败后重试名称取消处理中…模拟保存失败，请重试Close；13 帧；高度 238px，标题、正文、输入值保持一致
+通过：子弹窗名称取消保存Close；13 帧；高度 203px，标题、正文、输入值保持一致
+通过：嵌套草稿与路由验收打开子弹窗打开嵌套节点预览切换路由取消保存Close；13 帧；高度 383px，标题、正文、输入值保持一致
+通过：添加规则来源修改当前来源，合并顺序保持不变。规则地址取消保存Close；12 帧；高度 254px，标题、正文、输入值保持一致
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型本地规则本地规则系统规则；12 帧；高度 408px，标题、正文、输入值保持一致
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型系统规则集本地规则系统规；13 帧；高度 328px，标题、正文、输入值保持一致
+通过：添加规则编辑规则内容，出口在卡片中选择。匹配类型远程 URL本地规则系统；13 帧；高度 386px，标题、正文、输入值保持一致
+
+Promise 结果：12 项
+{"status":"confirmed","data":{"matcher":{"kind":"ruleset","id":"remote:99af0793f8b77710","remote":{"url":"https://example.test/rules.list"}},"target":{"kind":"builtin","name":"DIRECT"}}}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"confirmed","data":"保留我的草稿"}
+{"status":"cancelled","reason":"navigation"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}

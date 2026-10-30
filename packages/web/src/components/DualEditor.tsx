@@ -91,7 +91,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           <CopyButton size="sm" text={text} />
         </div>
         {rawHint && <span className="text-[12px] leading-relaxed text-ink-muted">{rawHint}</span>}
-        <YamlTextarea placeholder="填写此客户端的 YAML 配置" aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
+        <YamlTextarea placeholder="填写此客户端的配置文本" aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
           const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
           if (!imported) return;
           event.preventDefault();

@@ -3,12 +3,11 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { chainSources, type ChainRule, type ChainNodeSet, type ChainTarget } from '@sub-forge/core';
 import { NodeSetPreview } from '../../components/NodeSetPreview.tsx';
-import { chainNodeSetName, targetLabel } from '../../components/pickers.tsx';
+import { useChainNames } from './useChainNames.ts';
 import { Button, Field, Input, Segmented, Select } from '../../components/ui.tsx';
 import { chainPlaceholders } from '../../schemas/placeholders.ts';
 import { useProfile } from './context.ts';
 import { chainInputError, exactNodeFilter, nodeSetKey, sameLanding } from './memberModel.ts';
-import { landingNodeName } from './chainModel.ts';
 
 type SourceKind = 'inline' | 'provider';
 const emptySet: ChainNodeSet = { type: 'source', id: '' };
@@ -16,10 +15,10 @@ const allSources = (output: SourceKind): ChainNodeSet => ({ type: 'all', id: out
 const emptyVia = (nodeSet: ChainNodeSet = emptySet): ChainTarget => ({ kind: 'node', ref: { nodeSet, match: { regex: '' }, fallback: 'error' } });
 
 /** 编辑顺序与流量方向一致；前置与落地各自选择，整集设置只由代理链入口创建。 */
-export function ChainRuleEditor({ initial, fixedLanding = false, landingLabel, onApply, onCancel, onRemove, footerTarget }: {
-  initial: ChainRule; fixedLanding?: boolean; landingLabel?: string; onApply: (chain: ChainRule) => void; onCancel: () => void; onRemove?: () => void; footerTarget?: HTMLDivElement | null;
+export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCancel, onRemove, footerTarget }: {
+  initial: ChainRule; fixedLanding?: boolean; onApply: (chain: ChainRule) => void; onCancel: () => void; onRemove?: () => void; footerTarget?: HTMLDivElement | null;
 }) {
-  const { draft, profileNodeSets, groupOptions, groupName, nodeSetName } = useProfile();
+  const { draft, profileNodeSets, groupOptions, nodeSetName } = useProfile();
   const outputOf = (ref: ChainNodeSet) => ref.type === 'all' ? ref.id : draft.nodeSets.find(s => nodeSetKey(s.ref) === nodeSetKey(ref))?.output;
   const defaultKind = draft.nodeSets.some(source => source.output === 'provider') ? 'provider' : 'inline';
   const [chain, setChain] = useModalDraft(() => ({ ...initial, landing: { ...initial.landing, nodeSet: initial.landing.nodeSet.id ? initial.landing.nodeSet : allSources(defaultKind) }, via: initial.via.kind === 'node' && !initial.via.ref.nodeSet.id ? { ...initial.via, ref: { ...initial.via.ref, nodeSet: allSources(defaultKind) } } : initial.via }));
@@ -35,8 +34,9 @@ export function ChainRuleEditor({ initial, fixedLanding = false, landingLabel, o
   const error = ((kind === 'provider' || kind === 'inline') && !sources.length ? '当前前置类型没有节点来源' : !previewSources(chain.landing.nodeSet).length ? '当前落地范围没有节点来源' : undefined) ?? chainInputError(chain) ?? (draft.chains.some(c => c.id !== chain.id && sameLanding(c.landing, chain.landing)) ? '该落地范围已有代理链，请编辑已有规则' : undefined);
   const viaFilter = chain.via.kind === 'node' ? ('regex' in chain.via.ref.match ? chain.via.ref.match.regex : chain.via.ref.match.exact ? exactNodeFilter(chain.via.ref.match.exact) : '') : '';
   const choose = (via: ChainTarget) => setChain({ ...chain, via });
-  const viaLabel = chain.via.kind === 'group' ? (chain.via.groupId ? groupName(chain.via.groupId) : '待选前置') : chain.via.kind === 'node' ? (chain.via.ref.nodeSet.id ? targetLabel(chain.via, groupName, nodeSetName) : '待选前置') : chain.via.name;
-  const landingText = landingLabel ?? landingNodeName(chain.landing) ?? (chain.landing.nodeSet.id ? `${chainNodeSetName(chain.landing.nodeSet, nodeSetName)}${whole ? ' · 全部节点' : ' · 筛选节点'}` : '待选落地');
+  const names = useChainNames(chain);
+  const viaLabel = names.via;
+  const landingText = names.landing;
   const actions = <>{onRemove && <Button className="text-err" onClick={onRemove}>移除前置</Button>}<Button onClick={onCancel}>取消{footerTarget ? '前置' : ''}</Button><Button variant="primary" disabled={!!error || overridden} onClick={() => onApply(chain)}>{footerTarget ? '应用前置' : '应用代理链'}</Button></>;
   return <section aria-label="代理链设置" className={footerTarget ? 'flex min-w-0 flex-col' : 'flex min-h-0 flex-1 flex-col overflow-hidden'}>
     <div className={footerTarget ? 'flex flex-col gap-5' : 'flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4'}>

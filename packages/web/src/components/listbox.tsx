@@ -144,11 +144,11 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
       disabled={disabled} data-placeholder={isPlaceholder ? '' : undefined} className={cx(triggerClassName ?? 'h-9 w-full justify-between text-[13px]', isPlaceholder && 'font-normal text-ink-muted')}>
       {triggerIcon}<span title={displayLabel} className="min-w-0 truncate">{displayLabel}</span>{!triggerClassName && <ChevronDown />}
     </Button></PopoverTrigger>
-    <PopoverContent align="start" collisionPadding={12} className="flex w-[min(400px,calc(100vw-2rem))] max-h-[min(320px,var(--radix-popover-content-available-height))] flex-col overflow-hidden p-0"
+    <PopoverContent align="start" collisionPadding={12} className="flex h-[min(320px,var(--radix-popover-content-available-height))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden p-0"
       style={placeholder ? { width: 'var(--radix-popover-trigger-width)' } : undefined} aria-label={ariaLabel} onInteractOutside={() => setOpen(false)}>
-      <Command shouldFilter={false} className="min-h-0 [&_[data-slot=command-input-wrapper]]:shrink-0 [&_[data-slot=command-list]]:min-h-0 [&_[data-slot=command-list]]:max-h-[240px] [&_[data-slot=command-list]]:flex-1">
+      <Command shouldFilter={false} className="min-h-0 [&_[data-slot=command-input-wrapper]]:shrink-0 [&_[data-slot=command-list]]:min-h-0 [&_[data-slot=command-list]]:max-h-none [&_[data-slot=command-list]]:flex-1">
         <CommandInput aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query} onValueChange={setQuery} />
-        {query !== debounced ? <div role="status" className="p-4 text-sm text-muted-foreground">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { setOpen(false); onChange(value); }} />}
+        {query !== debounced ? <div role="status" className="min-h-0 flex-1 p-4 text-sm text-muted-foreground">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { setOpen(false); onChange(value); }} />}
       </Command>
     </PopoverContent>
   </Popover>;

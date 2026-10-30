@@ -12,7 +12,7 @@ const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
 function setup() {
   let paths = ['ai.list', 'nested/ai.list', 'nested/ai.yaml', 'README.txt', 'script.js', 'data.mrs'];
-  let body = 'DOMAIN,example.com\nAND,((DOMAIN,example.com))';
+  let body = 'DOMAIN,example.com\nAND,((DOMAIN,example.com),(DST-PORT,443))\nUNKNOWN,example.com';
   let revision = 'a'.repeat(40);
   let fail = false;
   const fetcher = vi.fn<UpstreamFetcher>(async target => {
@@ -133,7 +133,7 @@ describe('自定义仓库管理及导入 API', () => {
     expect(added.status).toBe(201); const id = added.json.id;
     await h.service.refresh(id);
     const detail = await h.service.detail(id, 'ai.list');
-    expect(detail).toMatchObject({ count: 1, rejected: 1, rejectedDetails: [expect.objectContaining({ line: 2 })] });
+    expect(detail).toMatchObject({ count: 2, rejected: 1, rejectedDetails: [expect.objectContaining({ line: 3 })] });
     const imported = await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' });
     expect(imported.status).toBe(201);
     expect(imported.json.item.sources[0]).toMatchObject({ kind: 'remote', format: 'auto', url: 'https://raw.githubusercontent.com/7revor/proxy-rules/main/ai.list' });
@@ -152,7 +152,7 @@ describe('自定义仓库管理及导入 API', () => {
     expect((await user.put(`/api/rulesets/${target}`, { ...imported.json.item, note: '仓库删除后仍可编辑' })).status).toBe(200);
     expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(404);
   });
-  it.each(['', '<html>错误页面</html>', 'payload: invalid', 'AND,((DOMAIN,a))'])('无可解析内容不能导入：%s', async body => {
+  it.each(['', '<html>错误页面</html>', 'payload: invalid', 'NOT,((DOMAIN,a),(DOMAIN,b))'])('无可解析内容不能导入：%s', async body => {
     const h = setup(); h.body(body);
     const id = await h.service.addCustom({ url }); await h.service.refresh(id);
     await addUser(h.store, 'alice'); const user = client(h.app); await user.login('alice');

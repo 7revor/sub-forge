@@ -191,7 +191,7 @@ Inline 点选前置保存具体来源与 `match.exact`；点选落地保存具�
  ③ Resolve Refs         收集所有 NodeRef / ChainRule / 上游自带 dialer → 依赖解析（见 §4）
  ④ Expand Rules         RuleSet（逐个来源）→ RuleIR[]（读取规则快照，应用各来源的 overrides/script）
  ⑤ Validate (IR)        环检测、悬挂引用、名称唯一、空组
- ⑥ Lower(client, plat)  IR → mihomo YAML / Surge INI（见 04）
+ ⑥ Lower(client, plat)  IR → Mihomo / Stash YAML、Surge / Loon INI（见 04）
  ⑦ Verify               mihomo -t（可选）/ 静态校验
             └──────────→ { config, providers[], rulesets[], report }
 ```
@@ -205,7 +205,7 @@ Inline 点选前置保存具体来源与 `match.exact`；点选落地保存具�
 | 地址 | 用途 |
 | --- | --- |
 | `GET /sub/:token` | Profile 主配置（UA 识别客户端） |
-| `GET /p/:token/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge 的 `policy-path` 也指向此地址，内容不注入前置 |
+| `GET /p/:token/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
 | `GET /r/:token/:rulesetKey?behavior=domain\|ipcidr\|classical&format=yaml\|text` | 转换后的规则集拆分结果（合并全部启用来源后按 behavior 拆分） |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
@@ -256,31 +256,15 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 - 包装组名对用户不可见（`hidden: true`），面板中仍按 provider 分组展示，满足"不打平、按源看面板"。
 - 包装组是 select 且只有一个成员，行为与直接引用节点一致；provider 更新后 filter 重新命中，**无需重新下发主配置**（只要名称不变；名称变化本身意味着处理链输出变化，主配置会在下次拉取时更新）。
 
-### 4.3 Surge 的对应处理
+### 4.3 Surge 与 Loon 的对应处理
 
-原理见 [06 §5](06-proxy-chain-research.md#5-surge)。步骤 1–3、7、8 与 mihomo 相同，差异在步骤 4、5：
+2026-10-30 实现采用节点快照内联，取代旧的 policy-path 包装组草案。共用节点筛选、引用解析、重名处理、模板合并及环检测；客户端差异集中在最后的序列化层。
 
-```
-4'. n 在外部节点集 P（policy-path）中：
-   wrap  → 生成包装组（D2 暂定写法）：
-             __ref_<P>_<hash>_in = select, policy-path=<P 地址>, policy-regex-filter=^<转义名>$, hidden=true
-             __ref_<P>_<hash>    = fallback, __ref_<P>_<hash>_in, REJECT, hidden=true
-           r 指向 __ref_<P>_<hash>；report.info("Surge 防泄漏未验证")
-   copy  → 节点写入 [Proxy]，r 指向副本名
-   inline→ 将 P 整体切换为 inline，重跑本步骤
-5'. ChainRule 的落地侧：
-   - 落地 NodeSet 为 inline → 给匹配节点写 underlying-proxy=<前置名>
-   - 落地 NodeSet 为 policy-path →
-       客户端版本 ≥ iOS 5.22.0 / Mac 6.9.0：
-         生成 __chain_<P>_<hash> = select, policy-path=<P 地址>,
-               [policy-regex-filter=<落地 filter>], underlying-proxy=<前置名>, hidden=true
-         原本引用 P 的组改为把 __chain_<P>_<hash> 作为嵌套成员；未被 filter 命中的节点仍走原组
-       否则：不输出该链规则，report.warn("Surge 版本过低，外部节点集上的代理链不可用")
-```
-
-- Surge 的外部内容不需要注入前置，因此 `/p/:token/:key` 对 Surge 只输出处理链结果；
-- 落地 `excludeFilter` 没有对应参数，转为负向前瞻合并进 `policy-regex-filter`，或服务端预过滤后用精确名称列表构造正则；
-- 运行时待验证的点见 06 §5.3，验证结果若不同，只替换 Lowering 实现，IR 与 UI 不变。
+- Surge 将节点级 `dialer-proxy` 转成 `underlying-proxy`；QUIC 端口跳跃与代理链不能同时使用，冲突时报错。
+- Loon 尚未适配代理链。链配置或上游前置引用会阻止发布，不删除前置后输出直连节点。
+- 四类组均以筛选后的成员名称输出，无成员补 REJECT。节点更新随主订阅刷新生效。
+- Surge 规则集采用版本化托管 LIST，独立文件导出时展开；Loon 在原规则位置内嵌转换结果，避免本地/远程来源优先级重排。
+- `Client` 增加 `loon`；`BaseSettings.loon`、`Profile.base.loonPatch` 与其他客户端配置隔离。完整范围、限制和测试证据见 [19](19-client-conversion.md)。
 
 ## 5. 模板 ⊕ 覆盖层 合并
 
@@ -304,7 +288,7 @@ effective.final = overlay.final ?? template.final
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
 - 模板组不能在 Profile 中删除、改名或隐藏（Q6）；`groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。Profile 私有组（`extraGroups`）不受此限制。
-- 空组处理（TPL-10，2026-10-29 修订）：模板和私有组统一拒绝。静态无成员或内联节点筛空时补 `proxies: [REJECT]`，记录 `group.empty` 告警；所有组固定输出 `empty-fallback: REJECT`，由 Mihomo v1.19.27+ 处理运行时 provider 未加载、更新或筛选后无成员的情况。覆盖层、旧 `whenEmpty: direct` 和 `extra.empty-fallback` 都不能改变此行为。节点测速失败仍按组类型处理，不等于空组。UI 不提供空组设置，Surge 输出仍未开放。
+- 空组处理（TPL-10，2026-10-29 修订）：模板和私有组统一拒绝。静态无成员或内联节点筛空时补 `proxies: [REJECT]`，记录 `group.empty` 告警；所有组固定输出 `empty-fallback: REJECT`，由 Mihomo v1.19.27+ 处理运行时 provider 未加载、更新或筛选后无成员的情况。覆盖层、旧 `whenEmpty: direct` 和 `extra.empty-fallback` 都不能改变此行为。节点测速失败仍按组类型处理，不等于空组。UI 不提供空组设置；Surge/Loon 快照内联后的空组固定补 REJECT。
 
 ## 6. 规则集展开与输出
 
@@ -395,7 +379,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 - Surge DOMAIN-SET 的 `.域名` 包含根域；Clash/YAML domain 的前导点只含子域，转换不能扩大匹配范围。纯文本方言存在歧义时沿用既有领域约定，并参考仓库元数据。
 - 旧 MRS/SRS 仅保留已有透传能力，不新增解码器；无法转换时报告错误，订阅服务沿用已有失败回退。
 
-格式支持依据：[mihomo rule-providers](https://wiki.metacubex.one/en/config/rule-providers/)、[文件内容格式](https://wiki.metacubex.one/en/config/rule-providers/content/)。当前完整订阅下载实现为 mihomo；Surge 继续用于规则预览。
+格式支持依据：[mihomo rule-providers](https://wiki.metacubex.one/en/config/rule-providers/)、[文件内容格式](https://wiki.metacubex.one/en/config/rule-providers/content/)。完整订阅现支持 Mihomo、Surge、Loon、Stash；客户端差异见 [19](19-client-conversion.md)。
 
 ## 管理列表查询模型（2026-10-29）
 
@@ -589,3 +573,13 @@ URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应�
 2026-10-30 拖动阴影归属修正只涉及前端样式，排序身份、顺序、锁定、落点限制、API、领域、数据库及生产种子均不变。
 
 2026-10-30 处理器参数区仅重设计前端布局：12 种 OperatorStep 的字段、执行顺序、默认行为、origins 和独立输入输出预览契约不变；布尔 false、数值 0 与清空值保持原语义。API、数据库、核心渲染和生产示例种子无需修改。manual-resource-refresh-server.ts 增加 all-operators 虚构内存样本供全类型表单验收，并在停止时关闭测试连接；不会写入 examples/seed.example.json。
+
+### 2026-10-30：绑定订阅的独立策略组
+
+`ProfileRouting.bound` 增加可选 `extraGroups: GroupSpec[]`。有效组按“最新模板组（附追加成员）+ 本订阅独立组”排列；缺省为空，无需数据库迁移。独立组可以编辑名称、类型、成员、高级设置、隐藏状态和自身顺序；模板组继续锁定结构，只允许追加成员。
+
+节点来源的 Provider 行提供“追加独立策略组”操作：创建 SELECT 组，使用来源名称（重名自动加编号），成员引用整个节点集，后续节点更新自动进入组。修改仍属于订阅草稿，保存后生效。独立模式写入 `routing.config.groups`，绑定模式写入 `routing.extraGroups`；不改模板、不写旧覆盖层。
+
+组 ID 和名称不得与模板组或其他独立组冲突；成员来源归属、组引用和循环继续统一校验。前置规则、模板组追加成员与代理链可引用独立组。删除独立组同步清理成员引用、引用它的代理链，并将相关规则或兜底出口改为 REJECT。模板发布也检查冲突，不能覆盖订阅独立组。
+
+绑定间切换模板保留独立组及其 ID，只对其中引用的模板组按映射更新；解除绑定将全部有效组复制到独立配置。节点来源与代理链列表复用策略组、规则的 `RoutingCard`。代理链路径与前置摘要只显示节点名或组名；全部/正则范围查询匹配节点名称，查询失败明确展示失败，关闭弹窗时保留最后展示。

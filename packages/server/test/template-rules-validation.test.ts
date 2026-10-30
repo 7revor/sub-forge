@@ -27,11 +27,10 @@ describe('模板自身的规则可用性检查', () => {
     const res = await h.admin.post('/api/templates/validate', h.template);
     expect(res.status).toBe(200);
     const issue = res.json.report.find((r: { where: string; code: string }) => r.where === 'rule:rule' && r.code === 'template.ruleset-rejected-lines');
-    expect(issue.message).toBe('类型不支持：2 行 · 写法有误：1 行');
+    expect(issue.message).toBe('类型不支持：1 行 · 写法有误：1 行');
     expect(issue.ruleIssues).toEqual([
       { source: 1, line: 3, kind: 'unimplemented', reason: '不支持的规则类型 UNKNOWN' },
       { source: 1, line: 4, kind: 'invalid', reason: '缺少规则值' },
-      { source: 1, line: 5, kind: 'unimplemented', reason: '暂不支持逻辑规则' },
     ]);
     expect(JSON.stringify(issue)).not.toContain('https://');
   });

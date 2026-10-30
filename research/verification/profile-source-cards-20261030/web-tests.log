@@ -1,0 +1,13 @@
+
+> @sub-forge/web@0.0.0 test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/profile-source-cards/packages/web
+> vitest run --passWithNoTests
+
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/profile-source-cards/packages/web
+
+
+ Test Files  44 passed (44)
+      Tests  356 passed | 2 skipped (358)
+   Start at  13:33:09
+   Duration  3.28s (transform 4.48s, setup 0ms, import 14.42s, tests 2.15s, environment 5ms)
+

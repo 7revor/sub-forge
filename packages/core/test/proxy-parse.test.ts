@@ -104,7 +104,7 @@ loglevel = notify
 [Proxy]
 DIRECT = direct
 HK = ss, hk.example.com, 8388, encrypt-method=aes-128-gcm, password=p, obfs=http, obfs-host=bing.com, udp-relay=true
-VM = vmess, v.example.com, 443, username=u-1, tls=true, ws=true, ws-path=/ray, ws-headers=Host:cdn.example.com, sni=v.example.com
+VM = vmess, v.example.com, 443, username=u-1, vmess-aead=true, tls=true, ws=true, ws-path=/ray, ws-headers=Host:cdn.example.com, sni=v.example.com
 Home = socks5, 10.0.0.2, 1080, user, pass, underlying-proxy=HK
 WG = wireguard, section-name=wg0
 

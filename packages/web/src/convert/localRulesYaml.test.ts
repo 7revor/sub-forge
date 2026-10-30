@@ -22,6 +22,7 @@ describe('本地多条规则的 YAML 往返', () => {
   it('客户端限制、整组覆盖和 src 选项在往返中保留', () => {
     const value: TemplateBody = { ...empty, rules: [{ id: 'surge', target: direct, options: { src: true }, matcher: { kind: 'local', client: 'surge', content: '# 原文\nDOMAIN,a.test\nIP-CIDR,198.51.100.0/24,no-resolve', overrides: [{ when: { client: 'stash' }, action: { drop: true } }] } }] };
     const yaml = templateToYaml(value, { rulesets: [] });
+    expect(parse(yaml).rules).toEqual(['DOMAIN,a.test,DIRECT', 'IP-CIDR,198.51.100.0/24,DIRECT,no-resolve,src', 'MATCH,DIRECT']);
     expect(templateFromYaml(yaml, empty, { rulesets: [] })).toMatchObject({ ok: true, value });
   });
   it('正文或出口修改后按实际 YAML 导入，旧元数据不能覆盖修改', () => {

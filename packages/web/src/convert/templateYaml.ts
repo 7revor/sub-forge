@@ -1,4 +1,4 @@
-import { expandLocalRules, localRulesError, composeRule, lowerRule, parseRuleLine, remoteRuleMatcher, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
+import { expandLocalRules, withIpOptions, localRulesError, splitRuleFields, composeRule, lowerRule, parseRuleLine, remoteRuleMatcher, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
 import { Document, isAlias, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
 import { recoverYaml } from './recoverYaml.ts';
 import { parseYamlDocument } from './yamlDocument.ts';
@@ -30,7 +30,8 @@ export function newId(prefix: string): string {
 }
 
 function lowerMatcher(matcher: Extract<Matcher, { kind: 'rule' }>) {
-  const lowered = lowerRule(matcher.rule, { client: 'mihomo' });
+  const primary = lowerRule(matcher.rule, { client: 'mihomo' });
+  const lowered = primary.kind === 'ok' ? primary : lowerRule(matcher.rule, { client: 'surge' });
   if (lowered.kind === 'drop') throw new Error(`无法导出规则：${lowered.reason}`);
   return { ...lowered, noResolve: lowered.noResolve || ('noResolve' in matcher.rule && matcher.rule.noResolve) };
 }
@@ -78,8 +79,8 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     const entries: RuleEntry[] = m.kind === 'local' ? expandLocalRules(m).map((rule, i) => ({ ...r, id: i ? `${r.id}:line:${i}` : r.id, matcher: { kind: 'rule', rule: rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule } })) : [r];
     const offset = exported.length;
     const lines = entries.map(entry => {
-      const lowered = entry.matcher.kind === 'rule' ? lowerMatcher(entry.matcher) : { text: `RULE-SET,${providerAlias(entry)}` };
-      const line = composeRule({ ...lowered, src: ('src' in lowered && lowered.src) || entry.options?.src }, targetName(entry.target, t.groups));
+      const lowered = entry.matcher.kind === 'rule' ? lowerMatcher({ ...entry.matcher, rule: withIpOptions(entry.matcher.rule, entry.options ?? {}) }) : { text: `RULE-SET,${providerAlias(entry)}`, src: entry.options?.src };
+      const line = composeRule(lowered, targetName(entry.target, t.groups));
       exported.push({ rule: entry, line });
       return line;
     });
@@ -400,11 +401,11 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       if (comments.some((comment) => typeof comment === 'string' && comment.split('\n').some((s) => s.trim() === 'disabled'))) continue;
       const original = node.value;
       try {
-        const rawParts = original.split(',');
+        const rawParts = splitRuleFields(original, /^(AND|OR|NOT)\s*,/i.test(original.trim()), false);
         const parts = rawParts.map((part) => part.trim());
         const type = parts[0]!.toUpperCase();
         let targetIndex = parts.length - 1;
-        while (targetIndex > 0 && ['no-resolve', 'src'].includes(parts[targetIndex]!.toLowerCase())) targetIndex--;
+        while (targetIndex > 0 && ['no-resolve', 'src', 'extended-matching'].includes(parts[targetIndex]!.toLowerCase())) targetIndex--;
         if (targetIndex < (['MATCH', 'FINAL'].includes(type) ? 1 : 2)) throw new Error('缺少匹配项或出口');
         if (['MATCH', 'FINAL'].includes(type) && final !== undefined) {
           notes.push(`第 ${index + 1} 条 ${type} 已忽略：多条 MATCH / FINAL 仅采用第一条`);
@@ -443,7 +444,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
             }
           }
         }
-        if (!(matcher.kind === 'rule' && matcher.rule.type === 'RAW') && matchingParts.slice(2).some(part => !['no-resolve', 'src'].includes(part.toLowerCase()))) throw new Error('规则包含多余字段或不支持的选项');
+        if (!(matcher.kind === 'rule' && matcher.rule.type === 'RAW') && matchingParts.slice(2).some(part => !['no-resolve', 'src', 'extended-matching'].includes(part.toLowerCase()))) throw new Error('规则包含多余字段或不支持的选项');
         const key = matcherKey(matcher);
         if (byId && used.has(byId.id)) {
           if (!recover) throw new Error('重复使用同一个稳定 ID，请删除复制项的 sub-forge-rule 注释后再导入');
@@ -473,7 +474,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       const first = entries[0];
       const index = first ? rules.indexOf(first) : -1;
       const originalLines = isSeq(ruleNodes) ? ruleNodes.items.slice(saved.offset, saved.offset + saved.lines.length).map(node => isScalar(node) ? node.value : undefined) : [];
-      const expected = expandLocalRules(saved.entry.matcher).map(rule => composeRule({ ...lowerMatcher({ kind: 'rule', rule: rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule }), src: saved.entry.options?.src || rawRuleParts(rule.type === 'RAW' ? rule.text : '').src }, first ? targetName(first.target, groups) : ''));
+      const expected = expandLocalRules(saved.entry.matcher).map(rule => composeRule(lowerMatcher({ kind: 'rule', rule: withIpOptions(rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule, saved.entry.options ?? {}) }), first ? targetName(first.target, groups) : ''));
       if (index < 0 || entries.some((entry, i) => !entry || rules[index + i] !== entry) || stableStringify(expected) !== stableStringify(saved.lines) || stableStringify(originalLines) !== stableStringify(saved.lines)) {
         notes.push('本地规则分组正文已修改，按当前 YAML 中的独立规则导入'); return;
       }

@@ -7,7 +7,7 @@ export type FieldSpec = {
   placeholder: string;
   keyPlaceholder?: string;
   valuePlaceholder?: string;
-  clients?: ('mihomo' | 'surge')[];
+  clients?: import('@sub-forge/core').Client[];
   showIf?: (obj: Record<string, unknown>) => boolean;
 };
 export type FieldGroup = { title: string; fields: FieldSpec[] };

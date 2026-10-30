@@ -1,0 +1,28 @@
+
+> @sub-forge/server@0.0.0 test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/profile-source-cards/packages/server
+> vitest run
+
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/profile-source-cards/packages/server
+
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'replacement'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+
+ Test Files  53 passed | 2 skipped (55)
+      Tests  469 passed | 5 skipped (474)
+   Start at  13:29:18
+   Duration  17.43s (transform 5.00s, setup 0ms, import 27.22s, tests 68.54s, environment 3ms)
+

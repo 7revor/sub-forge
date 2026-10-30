@@ -14,7 +14,7 @@ const builtins = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']);
 function checkPrependRule(value: unknown): void {
   if (!obj(value) || !isStr(value.type)) throw bad('前置规则格式错误');
   if (value.type === 'RAW') {
-    if (value.client !== undefined && !['mihomo', 'surge', 'stash'].includes(String(value.client))) throw bad('前置 RAW 规则客户端不合法');
+    if (value.client !== undefined && !['mihomo', 'surge', 'stash', 'loon'].includes(String(value.client))) throw bad('前置 RAW 规则客户端不合法');
     const error = typeof value.text === 'string' ? rawRuleError(value.text) : 'RAW 内容必须是字符串';
     if (error) throw bad(`前置规则：${error}`);
     return;
@@ -33,12 +33,18 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
   if (doc.template !== undefined || Object.keys(doc.overlay).length) throw bad('新分流模式不能同时保存旧模板引用或覆盖层');
   let template;
   if (r.mode === 'bound') {
-    if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions', 'prependRules'].includes(k))) throw bad('绑定模式只能保存模板引用、追加成员和前置单条规则');
+    if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions', 'prependRules', 'extraGroups'].includes(k))) throw bad('绑定模式只能保存模板引用、追加成员、独立策略组和前置规则');
     if (!isStr(r.templateId) || !(template = store.getTemplate(r.templateId))) throw bad('模板不存在');
     if (!obj(r.groupAdditions)) throw bad('追加成员必须按策略组 ID 保存');
     for (const [id, members] of Object.entries(r.groupAdditions)) {
       if (!template.groups.some(g => g.id === id)) throw bad(`追加成员指向不存在的策略组 ${id}`);
       if (!Array.isArray(members)) throw bad(`策略组 ${id} 的追加成员必须是数组`);
+    }
+    if (r.extraGroups !== undefined) {
+      if (!Array.isArray(r.extraGroups)) throw bad('独立策略组必须是数组');
+      for (const group of r.extraGroups) {
+        if (!obj(group) || !isStr(group.id) || !isStr(group.name) || !Array.isArray(group.members) || group.members.some(m => !obj(m))) throw bad('独立策略组格式错误');
+      }
     }
     if (r.prependRules !== undefined) {
       if (!Array.isArray(r.prependRules)) throw bad('前置规则必须是数组');
@@ -53,7 +59,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
         if (rule.matcher.overrides !== undefined) {
           if (!Array.isArray(rule.matcher.overrides)) throw bad('客户端覆盖必须是数组');
           for (const override of rule.matcher.overrides) {
-            if (!obj(override) || !obj(override.when) || !['mihomo', 'surge', 'stash'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
+            if (!obj(override) || !obj(override.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
             if (override.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(String(override.when.platform))) throw bad('客户端覆盖平台不合法');
             const action = override.action;
             if (Object.keys(action).length !== 1) throw bad('客户端覆盖只能指定一个动作');

@@ -2,8 +2,11 @@ import type { GroupSpec, Profile, ChainTarget } from '@sub-forge/core';
 
 /** 只要求映射仍需保留的填充及引用，避免为无关策略组制造空表单。 */
 export function associationRequirements(profile: Profile, groups: GroupSpec[], mapping: Record<string, string> = {}) {
+  const privateGroups = profile.routing?.mode === 'bound' ? profile.routing.extraGroups ?? [] : [];
+  const privateIds = new Set(privateGroups.map(group => group.id));
   const required = new Map<string, { id: string; name: string; reasons: string[]; canDrop: boolean }>();
   const add = (id: string, reason: string, reference = false) => {
+    if (privateIds.has(id)) return;
     const item = required.get(id) ?? { id, name: groups.find(g => g.id === id)?.name ?? id, reasons: [], canDrop: true };
     if (!item.reasons.includes(reason)) item.reasons.push(reason);
     if (reference) item.canDrop = false;
@@ -19,6 +22,7 @@ export function associationRequirements(profile: Profile, groups: GroupSpec[], m
     add(group.id, `${members.length} 项节点填充`);
     if (mapping[group.id] !== '__drop') for (const member of members) if (member.kind === 'node' || member.kind === 'group') visit(member, '成员引用');
   }
+  for (const group of privateGroups) for (const member of group.members) if (member.kind === 'group' || member.kind === 'node') visit(member, '独立组成员引用');
   for (const chain of profile.chains) visit(chain.via, '代理链引用');
   if (profile.routing?.mode === 'bound') for (const rule of profile.routing.prependRules ?? []) visit(rule.target, '前置规则出口');
   return [...required.values()];

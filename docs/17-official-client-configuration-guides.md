@@ -46,7 +46,7 @@ rules:
 
 使用分段文本配置，例如 `[Proxy]`、`[Proxy Group]`、`[Rule]`。外部 RULE-SET 文件每行省略出口，主配置中的引用负责选择出口。`USER-AGENT` 支持通配符且匹配区分大小写；它是否能命中还取决于 HTTP 引擎能否看到相应请求头，不能把配置接受等同于实际命中。依据：[配置语法](https://manual.nssurge.com/profile/format.html)、[规则集合](https://manual.nssurge.com/rules/ruleset.html)、[HTTP 规则](https://manual.nssurge.com/rules/http.html)。
 
-本项目：规则解析、转换预览与登录后的 LIST 下载已支持；完整 Surge 主订阅仍返回 501。不得把规则转换验收写成完整 Surge 配置导出已实现。
+本项目：2026-10-30 已支持完整 Surge 主订阅、独立基础配置、节点、四类策略组、托管规则与独立文件导出。官方离线配置检查通过，真实客户端转发未验收；详见 [19](19-client-conversion.md)。
 
 ### Loon
 
@@ -63,7 +63,7 @@ rules:
 
 配置结构及参数应直接对照 Loon 手册；不能将 Surge 的整段配置直接标记为 Loon。官方 HTTP 规则页明确列出 `USER-AGENT` 的通配匹配；规则订阅使用 Loon 支持的逐行规则语法。依据：[HTTP 规则](https://nsloon.app/en/docs/Rule/http_rule/)、[规则订阅](https://nsloon.app/en/docs/Rule/sub_rule/)。
 
-本项目：本轮只登记官方资料；尚未新增 Loon 客户端、规则输出或完整主订阅导出。后续接入需单独完成 IR 映射、保存校验、API、前端和回归测试。
+本项目：2026-10-30 已接入 Loon IR 映射、保存校验、API、基础配置、节点、策略组、规则和完整 INI 订阅。规则集原位置内嵌；代理链与未适配协议明确报错。详见 [19](19-client-conversion.md)。
 
 ### Stash
 
@@ -134,3 +134,5 @@ GET /api/rules/convert?url=<完整编码的上游URL>&target=stash&platform=ios
 | 2026-10-29 | Surge | USER-AGENT 规则转换已支持；完整主订阅仍未实现 | 转换/API 回归；未进行 Surge 真机验收 |
 | 2026-10-29 | Loon | 登记官方配置指引及 HTTP 规则/规则订阅入口 | 文档核对；未新增代码适配，未真机验收 |
 | 2026-10-29 | Stash | 完整订阅、独立文件导出、规则转换及 iOS/macOS 预览接入；节点按快照内联 | 自动化及内置浏览器结果见[验收记录](../research/verification/stash-support-20261029/验收记录.md)；未进行 Stash 真机导入/转发验收 |
+| 2026-10-30 | Surge | 完整主订阅、独立导出、基础配置、节点与策略组接通 | 全量回归、内置浏览器、官方 surge-cli 离线检查；未真机转发 |
+| 2026-10-30 | Loon | 独立 INI 适配、规则集内嵌、平台规则与失败回退接通 | 全量回归和内置浏览器；未运行官方校验器或真机转发 |

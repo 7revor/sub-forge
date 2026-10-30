@@ -6,11 +6,12 @@ import type { NodeSetID, ProxyIR } from '../types.ts';
 import { tryDecodeBase64 } from '../util/base64.ts';
 import { proxyKey } from './key.ts';
 import type { RawProxy } from './raw.ts';
+import { isLoonLine, parseLoonLine } from './loon.ts';
 import { parseSurgeLine } from './surge.ts';
 import { parseUri } from './uri.ts';
 
 export type ParseFailure = { line: string; reason: string };
-export type ContentFormat = 'clash' | 'surge' | 'uri' | 'base64' | 'empty';
+export type ContentFormat = 'clash' | 'surge' | 'loon' | 'uri' | 'base64' | 'empty';
 export type ParseResult = { format: ContentFormat; proxies: ProxyIR[]; failures: ParseFailure[] };
 
 function tryClashYaml(text: string): unknown[] | undefined {
@@ -98,8 +99,13 @@ export function parseContent(text: string, nodeSet: NodeSetID): ParseResult {
   }
 
   if (looksLikeSurge(trimmed)) {
-    collect(surgeProxyLines(trimmed), (l) => parseSurgeLine(l as string), String);
-    return { format: 'surge', proxies, failures };
+    let loon = false;
+    collect(surgeProxyLines(trimmed), (l) => {
+      const text = l as string;
+      if (isLoonLine(text)) { loon = true; return parseLoonLine(text); }
+      return parseSurgeLine(text);
+    }, String);
+    return { format: loon ? 'loon' : 'surge', proxies, failures };
   }
 
   let format: ContentFormat = 'uri';

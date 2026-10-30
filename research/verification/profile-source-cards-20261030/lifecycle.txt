@@ -1,0 +1,18 @@
+退场验收：6 项
+通过：独立组草稿保留SELECT本订阅的策略组组名称类型SELECT固定成员勾；121 帧；高度 688px，标题、正文、输入值保持一致
+通过：关闭按钮草稿SELECT本订阅的策略组组名称类型SELECT固定成员勾选；121 帧；高度 688px，标题、正文、输入值保持一致
+失败：订阅独立机场SELECT本订阅的策略组组名称类型SELECT固定成员勾选；120 帧；高度 688px → 800px，内容发生变化：订阅独立机场SELECT本订阅的策略组组名称类型SELECT固定成员勾选 Inline 节点、策略组或内置策略，可批量添加。Inline 节点策略组内置策略自建落地🇺🇸 GCP [01]SOCKS5🇸🇬 新加坡SOCKS5添加当前 2 个结果固定成员 0 项拖动排序 To pick up a draggable item, press the space bar. While dragging, use the arrow keys to move the item. Press space again to drop the item in its new position, or press escape to cancel. 尚未添加固定成员勾选左侧成员即可添加；Provider 在动态成员中配置。Provider 与动态成员统一筛选指定 Provider全部 Provider中转机场同时自动包含全部 Inline 节点所有动态来源共享这套筛选；filter 不筛选手动加入的固定成员。中转机场 · 当前快照命中 2 / 总数 2🇭🇰 香港 IPLC🇯🇵 日本 IEPL高级设置图标地址保留名称（filter）排除名称（exclude-filter）排除协议选择需要排除的节点协议类型其他字段 0 个 添加取消保存Close
+通过：订阅独立机场SELECT本订阅的策略组组名称类型SELECT固定成员勾选；121 帧；高度 688px，标题、正文、输入值保持一致
+通过：Escape 稳定视口复验SELECT本订阅的策略组组名称类型SELEC；120 帧；高度 688px，标题、正文、输入值保持一致
+通过：代理链退场验收本机 → 🇭🇰 香港 IPLC → 🇺🇸 GCP ；121 帧；高度 680px，标题、正文、输入值保持一致
+
+Promise 结果：9 项
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"confirmed","data":{"id":"exit-check","name":"代理链退场验收","nodeSets":[{"ref":{"type":"local","id":"self"},"output":"inline"},{"ref":{"type":"local","id":"relay"},"output":"provider"}],"chains":[],"overlay":{},"refPolicy":{"default":"wrap"},"routing":{"mode":"bound","templateId":"tpl","groupAdditions":{},"extraGroups":[{"id":"private","name":"无动画保存","type":"select","members":[{"kind":"nodeset","ref":{"type":"local","id":"relay"}}]}]}}}
+{"status":"confirmed","data":"保留我的草稿"}
+{"status":"cancelled","reason":"navigation"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}

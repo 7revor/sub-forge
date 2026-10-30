@@ -27,6 +27,7 @@ export function ruleSetDelivery(rs: RuleSet, inputs: RuleSetInputs, ctx: ClientC
       ? { mode: 'original', format: 'mrs', behavior: src.behavior, url: src.url }
       : { mode: 'unsupported', reason: '目标客户端不支持该二进制规则，无法转换为 LIST' };
   }
+  if (ctx.client === 'loon') return managed; // Loon 规则集统一转换为原生 classical 文本。
   const body = inputs.snapshots[sourceKey(rs.id, src.id)];
   if (body === undefined || body.startsWith(DECODED_MRS_HEADER)) return managed;
   const document = prepared?.get(src.id);
