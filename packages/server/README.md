@@ -47,7 +47,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 | 地址 | 内容 |
 | --- | --- |
-| `GET /sub/:token` | 主配置。`?target=mihomo\|surge\|stash&platform=...` 优先于 UA；Surge 暂返回 501 |
+| `GET /sub/:token` | 主配置。`?target=mihomo\|surge\|stash\|loon&platform=...` 优先于 UA；Surge/Loon 输出完整 INI |
 | `GET /p/:token/:key` | Profile 专属 provider 内容 |
 | `GET /r/:token/:key` | 转换后的规则集 |
 | `GET /healthz` | 健康检查 |
@@ -210,7 +210,7 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 ### 自动识别规则格式与下载策略（2026-10-29）
 
-规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（original/managed/unsupported）。单来源兼容时订阅配置引用原始 URL 并填写实际 format/behavior；其余可解析文本输出一个带版本参数的 `/r/:token/rs_…_classical.list`，内容为 classical，IP 选项写在各自规则行内。旧版本资源路由保持可读。旧二进制来源遇到合并、改写或客户端不支持时明确报错，沿用 last-good 回退，不静默丢弃。未增加 MRS/SRS 解码器；当前完整订阅下载仍只有 mihomo，Surge 为规则预览。
+规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（original/managed/unsupported）。单来源兼容时订阅配置引用原始 URL 并填写实际 format/behavior；其余可解析文本输出一个带版本参数的 `/r/:token/rs_…_classical.list`，内容为 classical，IP 选项写在各自规则行内。旧版本资源路由保持可读。旧二进制来源遇到合并、改写或客户端不支持时明确报错，沿用 last-good 回退，不静默丢弃。未增加 MRS/SRS 解码器；当前完整订阅支持 Mihomo、Stash、Surge、Loon；两种 INI 客户端的输出与限制见 [转换说明](../../docs/19-client-conversion.md)。
 
 ### 管理列表分页
 

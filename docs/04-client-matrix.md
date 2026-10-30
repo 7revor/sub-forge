@@ -1,20 +1,20 @@
-# 04 · 客户端能力矩阵与输出映射（mihomo / Surge）
+# 04 · 客户端能力矩阵与输出映射
 
 > mihomo 部分已对照官方文档（MetaCubeX/Meta-Docs）核对，关键行为经 v1.19.33 实测（[07 §2](07-verification-checklist.md#2-mihomo-实测)）。
 > Surge 部分已对照 Surge 手册（2026-10）与 Surge Mac 6.9.1 的 `surge-cli --check` 核对（[07 §1](07-verification-checklist.md#1-surge)）。仍需运行时验证的条目标 ⏳。
-> 最低支持版本见 [PRD §5](02-PRD.md#5-客户端兼容与订阅输出约定)。Loon / Stash / sing-box 预留，首期不实现。
+> 最低支持版本见 [PRD §5](02-PRD.md#5-客户端兼容与订阅输出约定)。2026-10-30 已接入 Surge / Loon / Stash；四客户端实际输出范围以 [19](19-client-conversion.md) 为准。下列协议对照包含客户端原生能力，不代表每个可选参数均已适配。
 
 ## 1. 节点与 provider
 
 | 能力 | mihomo | Surge | 输出策略 |
 | --- | --- | --- | --- |
 | 本地节点 | `proxies:` | `[Proxy]` | inline 输出 |
-| 外部节点集 | `proxy-providers:`（`type: http`，指向 `/p/:token/:key`；**不写 `path`**，见 §1.1） | 组参数 `policy-path=<url>`，内容为逐行 `[Proxy]` 格式；`update-interval=<秒>`（默认 86400） | provider 输出（Q9：Surge 只用 `policy-path`） |
+| 外部节点集 | `proxy-providers:`（`type: http`，指向 `/p/:token/:key`；**不写 `path`**，见 §1.1） | 组参数 `policy-path=<url>`，内容为逐行 `[Proxy]` 格式；`update-interval=<秒>`（默认 86400） | Mihomo 输出 provider；本项目 Surge 将快照内联，不采用 policy-path |
 | provider 统一改写 | `override`（含 `dialer-proxy`、`additional-prefix/suffix`、`udp`、`skip-cert-verify` 等） | 组参数 `external-policy-modifier="k=v,..."`（只作用于 `policy-path` 成员）、`external-policy-name-prefix` | 改名、改参数一律在服务端处理链中完成，两端都不依赖客户端侧改写（06 §3） |
 | provider 过滤 | provider 级 `filter` / `exclude-filter` / `exclude-type` | 组级 `policy-regex-filter` | 优先用服务端处理链，不依赖客户端过滤 |
 | 链式代理（节点级） | 节点 `dialer-proxy: <组或节点名>`（`relay` 组已废弃） | 节点 `underlying-proxy=<节点或组名>`，只能写在 `[Proxy]` 中的节点上 | 见 03 §4 |
 | 链式代理（整组） | 无；用 `override.dialer-proxy` 实现整源 | 组参数 `underlying-proxy=<节点或组名>`（iOS 5.22.0+ / Mac 6.9.0+），覆盖显式成员、`policy-path`、`include-*` 引入的全部成员；成员显示为 `Name (via X)` | 见 03 §4.3 |
-| 不支持的协议 | — | 无 vless / reality、hysteria(v1)；tuic 只有 `tuic` / `tuic-v5` | Lowering 丢弃并写入 `report.dropped`，节点集预览按客户端标"不可用" |
+| 不支持的协议 | — | 无 vless / reality、hysteria(v1)；tuic 只有 `tuic` / `tuic-v5` | 未适配协议给出错误并阻止发布，不能静默丢节点 |
 
 ### 1.1 mihomo provider 不写 `path`
 
@@ -30,7 +30,7 @@ http provider 不写 `path` 时，缓存路径由 URL 哈希决定，URL 一变�
 | --- | --- | --- |
 | select / url-test / fallback / load-balance | 同名 | 同名（另有 `smart`、`subnet`，首期不使用） |
 | 成员：组/节点 | `proxies: [...]` | 逗号列表 |
-| 成员：节点集 | `use: [provider]` | `policy-path=`。一个组含多个节点集时：直接写多个 `policy-path` 是否都生效 ⏳（07 S1④）；在验证前，为每个节点集生成隐藏子组，父组用 `include-other-group` 合并 |
+| 成员：节点集 | `use: [provider]` | 本项目将节点集快照内联，列出筛选后的节点名称 |
 | 成员：其他组的全部成员 | 列组名（嵌套） | `include-other-group="g1,g2"`（递归展开） |
 | 成员：全部节点 | `include-all` / `include-all-proxies` / `include-all-providers` | `include-all-proxies=true`（只含 `[Proxy]` 中的节点，不含外部节点和组） |
 | filter | `filter` | `policy-regex-filter`（不作用于显式列出的成员） |
@@ -43,9 +43,9 @@ http provider 不写 `path` 时，缓存路径由 URL 哈希决定，URL 一变�
 | lazy / max-failed-times / expected-status | 同名 | 无（忽略并在报告中注明） |
 | 首次使用前先测速 | 无 | `evaluate-before-use=true`（仅作为 Surge 高级参数） |
 | hidden / icon | `hidden` / `icon` | `hidden` / `icon-url`（Mac 6.5.0+） |
-| load-balance 策略 | `strategy: consistent-hashing / round-robin / sticky-sessions` | `persistent=true` 按目标主机名哈希（≈ consistent-hashing）；其余策略 ⇒ 不写 `persistent`（随机），报告中注明 |
-| 防静默直连（包装组） | `empty-fallback: REJECT`（v1.19.27+） | 无对应参数 ⇒ D2 暂定写法：`Inner = select, policy-path=..., policy-regex-filter=^X$, hidden=true` + `__ref = fallback, Inner, REJECT, hidden=true` ⏳ |
-| 空组（TPL-10） | 为空时=拒绝 ⇒ `proxies: [REJECT]`；为空时=直连 ⇒ `proxies: [COMPATIBLE]` | `select, REJECT` / `select, DIRECT`（Surge 不接受无成员无参数的组） |
+| load-balance 策略 | `strategy: consistent-hashing / round-robin / sticky-sessions` | `persistent=true` 按目标主机名哈希（≈ consistent-hashing）；其余没有等价映射的策略报错，不能改成随机 |
+| 防静默直连（包装组） | `empty-fallback: REJECT`（v1.19.27+） | 本项目改为快照内联，空组固定 REJECT；原 D2 policy-path 方案未采用 |
+| 空组（TPL-10） | 固定 `proxies: [REJECT]`，不允许空组直连 | 固定补 REJECT，保留原组类型 |
 | 其他 | `disable-udp`、`interface-name`、`routing-mark`、`default-selected` | `no-alert`（仅 url-test / fallback 生效）、`category`（iOS 5.23.0+ / Mac 6.10.0+） |
 
 ## 3. 规则映射
@@ -143,4 +143,4 @@ URL 参数 `?target=&platform=` 优先于 UA。各客户端 UA 原文 ⏳（07 S
 
 2026-10-29 表单中的单条规则统一 RAW；上表的类型映射仍用于既有结构化 IR 与来源转换。未限定客户端的 RAW 在目标客户端原样输出，不作类型降级或方言翻译；旧 client 限定仍生效。RAW 末尾 no-resolve / src 放在出口后输出；mihomo 的 RAW wildcard 延用 lowercase 去重。
 
-2026-10-29 Stash 已接入：主订阅、规则转换和独立文件导出支持 iOS/macOS；保留 USER-AGENT、DOMAIN-REGEX、GEOSITE、NETWORK 等规则，进程规则仅 macOS。节点集按快照内联；Hysteria2 认证与带宽、节点级延迟测试、空组拒绝、代理链互斥约束按 Stash 官方语法适配。未适配参数报告错误，不把 Mihomo 配置直接当作 Stash 配置。Loon 本轮仅登记官方资料，完整边界及来源见 [17](17-official-client-configuration-guides.md)。
+2026-10-29 Stash 已接入：主订阅、规则转换和独立文件导出支持 iOS/macOS；保留 USER-AGENT、DOMAIN-REGEX、GEOSITE、NETWORK 等规则，进程规则仅 macOS。节点集按快照内联；Hysteria2 认证与带宽、节点级延迟测试、空组拒绝、代理链互斥约束按 Stash 官方语法适配。未适配参数报告错误，不把 Mihomo 配置直接当作 Stash 配置。2026-10-30 的 Loon 接入范围见 [19](19-client-conversion.md)，官方来源见 [17](17-official-client-configuration-guides.md)。
