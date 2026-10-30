@@ -6,6 +6,7 @@ import { createApp } from '../src/app.ts';
 import { setupRuleReferences } from './rule-reference-fixture.ts';
 
 const env = await setupRuleReferences();
+env.setBody(Array.from({ length: 200 }, (_, index) => `DOMAIN-SUFFIX,${index === 0 ? `${'long-segment.'.repeat(40)}` : ''}sample-${index}.example.test`).join('\n'));
 for (let index = 0; index < 35; index++) env.store.put('ruleset', {
   id: `sample-${index}`, name: `分页验收 ${String(index).padStart(2, '0')}`,
   sources: [{ id: 'local', kind: 'local', format: 'auto', content: `DOMAIN,sample-${index}.example.test` }],

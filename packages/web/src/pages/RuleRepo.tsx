@@ -84,14 +84,14 @@ export function RuleRepoPage() {
       <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : '规则文件'}</div>
       {!pending && repos.data && <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} onSelect={select} />}
     </section>
-    <Dialog open={!!selected} onOpenChange={next => { if (!next) (() => setSelected(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"文件内容预览"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <Dialog open={!!selected} onOpenChange={next => { if (!next) (() => setSelected(undefined))(); }}><DialogContent className="flex h-[min(640px,calc(100dvh-2rem))] min-w-0 flex-col overflow-hidden sm:max-w-[800px] [&>*]:min-w-0" style={{ width: 'min(800px, calc(100vw - 2rem))' }} aria-describedby={undefined}><DialogHeader className="shrink-0"><DialogTitle>{"文件内容预览"}</DialogTitle></DialogHeader><div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-hidden">
       {selected && <>
         <div className="flex shrink-0 flex-col gap-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="m-0 break-all text-[17px] font-semibold">{selected.file.path.split('/').at(-1)}</h2>
             <Badge>分支：{selected.file.ref}</Badge>
           </div>
-          <span className="break-all font-mono text-[12px] text-ink-muted">{repos.data?.repos.find(repo => repo.id === selected.repo)?.name ?? selected.repo} · {selected.file.path}</span>
+          <span className="line-clamp-2 break-all font-mono text-[12px] text-ink-muted">{repos.data?.repos.find(repo => repo.id === selected.repo)?.name ?? selected.repo} · {selected.file.path}</span>
           {file && !preview.isFetching && !preview.isError && <div className="flex flex-wrap items-center gap-3 text-[12px]">
             <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-brand">打开原文件</a>
             <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>
@@ -100,7 +100,7 @@ export function RuleRepoPage() {
           <ErrorAlert error={preview.error ?? create.error} />
           {preview.isError && <Button size="sm" onClick={() => void preview.refetch()}>重试读取文件</Button>}
         </div>
-        {preview.isFetching ? <div role="status" className="p-4 text-[13px] text-ink-muted">正在读取文件内容…</div> : file && !preview.isError && <CodePreview label="文件正文" key={`${file.repo}:${file.ref}:${file.path}`} text={file.content} title={file.content ? '文件正文' : '文件正文（空文件）'} copyable className="nav-scroll shrink-0" bodyClassName="overscroll-contain p-4 whitespace-pre" />}
+        {preview.isFetching ? <div role="status" className="p-4 text-[13px] text-ink-muted">正在读取文件内容…</div> : file && !preview.isError && <CodePreview label="文件正文" key={`${file.repo}:${file.ref}:${file.path}`} text={file.content} fill className="nav-scroll" bodyClassName="overscroll-contain p-4 whitespace-pre" />}
       </>}
     </div></DialogContent></Dialog>
   </>;
