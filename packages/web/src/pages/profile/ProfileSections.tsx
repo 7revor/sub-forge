@@ -33,7 +33,7 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
           setActive(TABS[next]![0]); tabs.current[next]?.focus();
         }}>{label}</button>)}
     </div>
-    <PageScroll>
+    <PageScroll contained={active === 'preview'}>
       <fieldset disabled={disabled} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
         <div role="tabpanel" id={`${id}-basic-panel`} aria-labelledby={`${id}-basic-tab`} hidden={active !== 'basic'} className={active === 'basic' ? 'flex min-w-0 flex-col gap-5' : undefined}>
           <TabProfileInfo />
@@ -50,7 +50,7 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
             <section ref={el => { sections.current.rules = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabRules /></section>
           </>}
         </div>
-        <div role="tabpanel" id={`${id}-preview-panel`} aria-labelledby={`${id}-preview-tab`} hidden={active !== 'preview'} className={active === 'preview' ? 'flex min-w-0 flex-col gap-5' : undefined}>
+        <div role="tabpanel" id={`${id}-preview-panel`} aria-labelledby={`${id}-preview-tab`} hidden={active !== 'preview'} className={active === 'preview' ? 'flex min-h-0 min-w-0 flex-1 flex-col gap-5' : undefined}>
           {active === 'preview' && <TabPreview />}
         </div>
         {children}

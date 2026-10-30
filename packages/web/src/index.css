@@ -140,6 +140,21 @@ body {
   margin-inline: auto;
 }
 
+/* 内部分栏自行滚动时，外层只传递剩余高度与公共留白。 */
+.page-scroll-contained {
+  overflow: hidden;
+}
+
+.page-scroll-contained > .page-scroll-content {
+  height: 100%;
+  min-height: 0;
+}
+
+.page-scroll-contained > .page-scroll-content > * {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
 /* 沿用公共页面限宽；基础设置之下的处理链与预览只在纵向共享剩余高度。 */
 
 /* 处理器参数区保持无底色，YAML 高亮只保留文字颜色。 */

@@ -1,0 +1,509 @@
+[
+  {
+    "name": "左栏滚动",
+    "document": [
+      720,
+      1280
+    ],
+    "regions": [
+      {
+        "bottom": 193.5,
+        "height": 47,
+        "name": "订阅设置",
+        "overflow": "visible",
+        "overscroll": "auto",
+        "scrollHeight": 47,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 984,
+        "top": 145.5,
+        "width": 984
+      },
+      {
+        "bottom": 720,
+        "height": 511,
+        "name": "page-scroll page-scroll-contained",
+        "overflow": "hidden",
+        "overscroll": "contain",
+        "scrollHeight": 511,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 1064,
+        "top": 209.5,
+        "width": 1064
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "最终配置",
+        "overflow": "hidden",
+        "overscroll": "auto",
+        "scrollHeight": 419,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 624,
+        "top": 273.5,
+        "width": 624
+      },
+      {
+        "bottom": 692,
+        "height": 362,
+        "name": "m-0 overflow-auto p-3 font-mono text-[12.5px] leading-[1.7] text-[#dde1e7] transition-opacity min-h-0 flex-1 overscroll-contain p-4 leading-[1.75]",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 17270,
+        "scrollLeft": 0,
+        "scrollTop": 1440,
+        "scrollWidth": 1018,
+        "top": 326.5,
+        "width": 620
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "渲染报告",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 3334,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 336,
+        "top": 273.5,
+        "width": 336
+      }
+    ],
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  {
+    "name": "右栏滚动",
+    "document": [
+      720,
+      1280
+    ],
+    "regions": [
+      {
+        "bottom": 193.5,
+        "height": 47,
+        "name": "订阅设置",
+        "overflow": "visible",
+        "overscroll": "auto",
+        "scrollHeight": 47,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 984,
+        "top": 145.5,
+        "width": 984
+      },
+      {
+        "bottom": 720,
+        "height": 511,
+        "name": "page-scroll page-scroll-contained",
+        "overflow": "hidden",
+        "overscroll": "contain",
+        "scrollHeight": 511,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 1064,
+        "top": 209.5,
+        "width": 1064
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "最终配置",
+        "overflow": "hidden",
+        "overscroll": "auto",
+        "scrollHeight": 419,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 624,
+        "top": 273.5,
+        "width": 624
+      },
+      {
+        "bottom": 692,
+        "height": 362,
+        "name": "m-0 overflow-auto p-3 font-mono text-[12.5px] leading-[1.7] text-[#dde1e7] transition-opacity min-h-0 flex-1 overscroll-contain p-4 leading-[1.75]",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 17270,
+        "scrollLeft": 0,
+        "scrollTop": 1440,
+        "scrollWidth": 1018,
+        "top": 326.5,
+        "width": 620
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "渲染报告",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 3334,
+        "scrollLeft": 0,
+        "scrollTop": 1440,
+        "scrollWidth": 336,
+        "top": 273.5,
+        "width": 336
+      }
+    ],
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  {
+    "name": "右栏触底继续滚动",
+    "document": [
+      720,
+      1280
+    ],
+    "regions": [
+      {
+        "bottom": 193.5,
+        "height": 47,
+        "name": "订阅设置",
+        "overflow": "visible",
+        "overscroll": "auto",
+        "scrollHeight": 47,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 984,
+        "top": 145.5,
+        "width": 984
+      },
+      {
+        "bottom": 720,
+        "height": 511,
+        "name": "page-scroll page-scroll-contained",
+        "overflow": "hidden",
+        "overscroll": "contain",
+        "scrollHeight": 511,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 1064,
+        "top": 209.5,
+        "width": 1064
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "最终配置",
+        "overflow": "hidden",
+        "overscroll": "auto",
+        "scrollHeight": 419,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 624,
+        "top": 273.5,
+        "width": 624
+      },
+      {
+        "bottom": 692,
+        "height": 362,
+        "name": "m-0 overflow-auto p-3 font-mono text-[12.5px] leading-[1.7] text-[#dde1e7] transition-opacity min-h-0 flex-1 overscroll-contain p-4 leading-[1.75]",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 17270,
+        "scrollLeft": 0,
+        "scrollTop": 1440,
+        "scrollWidth": 1018,
+        "top": 326.5,
+        "width": 620
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "渲染报告",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 3334,
+        "scrollLeft": 0,
+        "scrollTop": 2915.5,
+        "scrollWidth": 336,
+        "top": 273.5,
+        "width": 336
+      }
+    ],
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  {
+    "name": "左栏触底与横向滚动",
+    "document": [
+      720,
+      1280
+    ],
+    "regions": [
+      {
+        "bottom": 193.5,
+        "height": 47,
+        "name": "订阅设置",
+        "overflow": "visible",
+        "overscroll": "auto",
+        "scrollHeight": 47,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 984,
+        "top": 145.5,
+        "width": 984
+      },
+      {
+        "bottom": 720,
+        "height": 511,
+        "name": "page-scroll page-scroll-contained",
+        "overflow": "hidden",
+        "overscroll": "contain",
+        "scrollHeight": 511,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 1064,
+        "top": 209.5,
+        "width": 1064
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "最终配置",
+        "overflow": "hidden",
+        "overscroll": "auto",
+        "scrollHeight": 419,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 624,
+        "top": 273.5,
+        "width": 624
+      },
+      {
+        "bottom": 692,
+        "height": 362,
+        "name": "m-0 overflow-auto p-3 font-mono text-[12.5px] leading-[1.7] text-[#dde1e7] transition-opacity min-h-0 flex-1 overscroll-contain p-4 leading-[1.75]",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 17270,
+        "scrollLeft": 398,
+        "scrollTop": 16908,
+        "scrollWidth": 1018,
+        "top": 326.5,
+        "width": 620
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "渲染报告",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 3334,
+        "scrollLeft": 0,
+        "scrollTop": 2915.5,
+        "scrollWidth": 336,
+        "top": 273.5,
+        "width": 336
+      }
+    ],
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  {
+    "name": "核心设置原滚动",
+    "document": [
+      720,
+      1280
+    ],
+    "regions": [
+      {
+        "bottom": 193.5,
+        "height": 47,
+        "name": "订阅设置",
+        "overflow": "visible",
+        "overscroll": "auto",
+        "scrollHeight": 47,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 984,
+        "top": 145.5,
+        "width": 984
+      },
+      {
+        "bottom": 720,
+        "height": 511,
+        "name": "page-scroll",
+        "overflow": "scroll",
+        "overscroll": "contain",
+        "scrollHeight": 2900,
+        "scrollLeft": 0,
+        "scrollTop": 2389.5,
+        "scrollWidth": 1060,
+        "top": 209.5,
+        "width": 1060
+      }
+    ],
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  {
+    "name": "滚动后切回预览",
+    "document": [
+      720,
+      1280
+    ],
+    "regions": [
+      {
+        "bottom": 193.5,
+        "height": 47,
+        "name": "订阅设置",
+        "overflow": "visible",
+        "overscroll": "auto",
+        "scrollHeight": 47,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 984,
+        "top": 145.5,
+        "width": 984
+      },
+      {
+        "bottom": 720,
+        "height": 511,
+        "name": "page-scroll page-scroll-contained",
+        "overflow": "hidden",
+        "overscroll": "contain",
+        "scrollHeight": 511,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 1064,
+        "top": 209.5,
+        "width": 1064
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "最终配置",
+        "overflow": "hidden",
+        "overscroll": "auto",
+        "scrollHeight": 419,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 624,
+        "top": 273.5,
+        "width": 624
+      },
+      {
+        "bottom": 692,
+        "height": 362,
+        "name": "m-0 overflow-auto p-3 font-mono text-[12.5px] leading-[1.7] text-[#dde1e7] transition-opacity min-h-0 flex-1 overscroll-contain p-4 leading-[1.75]",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 17270,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 1018,
+        "top": 326.5,
+        "width": 620
+      },
+      {
+        "bottom": 692,
+        "height": 419,
+        "name": "渲染报告",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 3334,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 336,
+        "top": 273.5,
+        "width": 336
+      }
+    ],
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  {
+    "name": "手机布局",
+    "document": [
+      844,
+      390
+    ],
+    "regions": [
+      {
+        "bottom": 357.75,
+        "height": 47,
+        "name": "订阅设置",
+        "overflow": "visible",
+        "overscroll": "auto",
+        "scrollHeight": 47,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 358,
+        "top": 309.75,
+        "width": 358
+      },
+      {
+        "bottom": 844,
+        "height": 470,
+        "name": "page-scroll page-scroll-contained",
+        "overflow": "hidden",
+        "overscroll": "contain",
+        "scrollHeight": 470,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 390,
+        "top": 373.75,
+        "width": 390
+      },
+      {
+        "bottom": 671.875,
+        "height": 136,
+        "name": "最终配置",
+        "overflow": "hidden",
+        "overscroll": "auto",
+        "scrollHeight": 136,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 358,
+        "top": 535.75,
+        "width": 358
+      },
+      {
+        "bottom": 671.875,
+        "height": 79,
+        "name": "m-0 overflow-auto p-3 font-mono text-[12.5px] leading-[1.7] text-[#dde1e7] transition-opacity min-h-0 flex-1 overscroll-contain p-4 leading-[1.75]",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 17270,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 1018,
+        "top": 588.75,
+        "width": 354
+      },
+      {
+        "bottom": 828,
+        "height": 136,
+        "name": "渲染报告",
+        "overflow": "auto",
+        "overscroll": "contain",
+        "scrollHeight": 3334,
+        "scrollLeft": 0,
+        "scrollTop": 0,
+        "scrollWidth": 354,
+        "top": 691.875,
+        "width": 354
+      }
+    ],
+    "viewport": [
+      390,
+      844
+    ]
+  }
+]

@@ -75,8 +75,8 @@ export function Field({ label, hint, children, className }: { label: string; hin
 }
 
 /** 页面剩余展示区；同级的标题、筛选和操作栏保持固定。 */
-export function PageScroll({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className="page-scroll"><div className={cx('page-scroll-content flex flex-col gap-5', className)}>{children}</div></div>;
+export function PageScroll({ children, className, contained = false }: { children: ReactNode; className?: string; contained?: boolean }) {
+  return <div className={cx('page-scroll', contained && 'page-scroll-contained')}><div className={cx('page-scroll-content flex flex-col gap-5', className)}>{children}</div></div>;
 }
 
 export function Card({ title, subtitle, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; subtitle?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
