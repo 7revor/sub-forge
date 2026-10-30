@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { cx } from '../../components/ui.tsx';
+import { PageScroll, cx } from '../../components/ui.tsx';
 import { TabBase, TabNodeSets, TabOutput } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
 import { TabGroups } from './TabGroups.tsx';
@@ -10,7 +10,7 @@ const TABS = [['basic', '基础设置'], ['core', '核心设置']] as const;
 const sectionTab = (section?: string) => ['template', 'nodesets', 'chains', 'groups', 'rules', 'preview', 'core'].includes(section ?? '') ? 'core' : 'basic';
 
 /** 两个面板保持挂载，切换时保留草稿、展开状态和未解析的 YAML。 */
-export function ProfileSections({ initialSection, routingReady = true, templateNotice }: { initialSection?: string; routingReady?: boolean; templateNotice?: ReactNode }) {
+export function ProfileSections({ initialSection, routingReady = true, templateNotice, disabled = false, children }: { initialSection?: string; routingReady?: boolean; templateNotice?: ReactNode; disabled?: boolean; children?: ReactNode }) {
   const id = useId();
   const [active, setActive] = useState(sectionTab(initialSection));
   const [previewOpen, setPreviewOpen] = useState(initialSection === 'preview');
@@ -25,8 +25,8 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
     }
   }, [initialSection]);
   return <>
-    <div role="tablist" aria-label="订阅设置" className="sticky top-0 z-10 flex shrink-0 gap-6 border-b border-line bg-ground">
-      {TABS.map(([key, label], index) => <button key={key} ref={el => { tabs.current[index] = el; }} type="button" role="tab" id={`${id}-${key}-tab`} aria-controls={`${id}-${key}-panel`} aria-selected={active === key} tabIndex={active === key ? 0 : -1}
+    <div role="tablist" aria-label="订阅设置" className="flex shrink-0 gap-6 border-b border-line bg-ground">
+      {TABS.map(([key, label], index) => <button key={key} ref={el => { tabs.current[index] = el; }} type="button" disabled={disabled} role="tab" id={`${id}-${key}-tab`} aria-controls={`${id}-${key}-panel`} aria-selected={active === key} tabIndex={active === key ? 0 : -1}
         className={cx('border-b-2 px-1 py-3 text-[14px] font-medium outline-offset-4 transition-colors', active === key ? 'border-brand text-brand' : 'border-transparent text-ink-muted hover:text-ink')}
         onClick={() => setActive(key)} onKeyDown={event => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -35,24 +35,29 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
           setActive(TABS[next]![0]); tabs.current[next]?.focus();
         }}>{label}</button>)}
     </div>
-    <div role="tabpanel" id={`${id}-basic-panel`} aria-labelledby={`${id}-basic-tab`} hidden={active !== 'basic'} className={active === 'basic' ? 'flex min-w-0 flex-col gap-5' : undefined}>
-      <ProfileIdentityFields />
-      <section ref={el => { sections.current.base = el; }} className="flex scroll-mt-16 flex-col gap-4">
-        <h2 className="m-0 text-[15px] font-semibold">基本设置</h2><TabBase />
-      </section>
-      <TabOutput />
-    </div>
-    <div role="tabpanel" id={`${id}-core-panel`} aria-labelledby={`${id}-core-tab`} hidden={active !== 'core'} className={active === 'core' ? 'flex min-w-0 flex-col gap-5' : undefined}>
-      <section ref={el => { sections.current.template = el; }} className="scroll-mt-16"><TemplateCard />{templateNotice}</section>
-      <section ref={el => { sections.current.nodesets = el; }} className="scroll-mt-16"><TabNodeSets /></section>
-      <section ref={el => { sections.current.chains = el; }} className="flex scroll-mt-16 flex-col gap-4"><TabChains /></section>
-      {routingReady && <>
-        <section ref={el => { sections.current.groups = el; }} className="flex scroll-mt-16 flex-col gap-4"><TabGroups /></section>
-        <section ref={el => { sections.current.rules = el; }} className="flex scroll-mt-16 flex-col gap-4"><TabRules /></section>
-      </>}
-      <details ref={el => { sections.current.preview = el; }} open={previewOpen} onToggle={event => setPreviewOpen(event.currentTarget.open)} className="scroll-mt-16 rounded-lg border border-line bg-panel p-4">
-        <summary className="cursor-pointer text-[14px] font-semibold">预览配置</summary>{previewOpen && <div className="mt-4 flex flex-col gap-4"><TabPreview /></div>}
-      </details>
-    </div>
+    <PageScroll>
+      <fieldset disabled={disabled} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+        <div role="tabpanel" id={`${id}-basic-panel`} aria-labelledby={`${id}-basic-tab`} hidden={active !== 'basic'} className={active === 'basic' ? 'flex min-w-0 flex-col gap-5' : undefined}>
+          <ProfileIdentityFields />
+          <section ref={el => { sections.current.base = el; }} className="flex scroll-mt-1 flex-col gap-4">
+            <h2 className="m-0 text-[15px] font-semibold">基本设置</h2><TabBase />
+          </section>
+          <TabOutput />
+        </div>
+        <div role="tabpanel" id={`${id}-core-panel`} aria-labelledby={`${id}-core-tab`} hidden={active !== 'core'} className={active === 'core' ? 'flex min-w-0 flex-col gap-5' : undefined}>
+          <section ref={el => { sections.current.template = el; }} className="scroll-mt-1"><TemplateCard />{templateNotice}</section>
+          <section ref={el => { sections.current.nodesets = el; }} className="scroll-mt-1"><TabNodeSets /></section>
+          <section ref={el => { sections.current.chains = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabChains /></section>
+          {routingReady && <>
+            <section ref={el => { sections.current.groups = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabGroups /></section>
+            <section ref={el => { sections.current.rules = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabRules /></section>
+          </>}
+          <details ref={el => { sections.current.preview = el; }} open={previewOpen} onToggle={event => setPreviewOpen(event.currentTarget.open)} className="scroll-mt-1 rounded-lg border border-line bg-panel p-4">
+            <summary className="cursor-pointer text-[14px] font-semibold">预览配置</summary>{previewOpen && <div className="mt-4 flex flex-col gap-4"><TabPreview /></div>}
+          </details>
+        </div>
+        {children}
+      </fieldset>
+    </PageScroll>
   </>;
 }
