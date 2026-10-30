@@ -40,7 +40,7 @@ export function TabChains() {
       <Card title="代理链" subtitle={`${draft.chains.length} 条`}
         actions={<>{draft.chains.length > 0 && <Button size="sm" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button size="sm" onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
-        {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[13px] text-err">当前配置无法生成。请修正代理链问题，其他配置错误可在「预览配置」中查看。</p>}
+        {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[13px] text-err">Mihomo 检查未通过。请在「预览配置」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
         {!draft.chains.length ? <div className="px-4 pb-4"><Empty title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /></div> : (
           <div aria-label="代理链列表"><SortableList items={draft.chains} getKey={chain => chain.id} onReorder={chains => setDraft({ ...draft, chains })} renderItem={(chain, i, handle) => <ChainCard chain={chain} index={i} handle={handle} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === chain.id)} onEdit={() => void edit(chain)} onDelete={() => setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== chain.id) })} /> } /></div>
         )}

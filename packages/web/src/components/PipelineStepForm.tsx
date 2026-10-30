@@ -235,7 +235,7 @@ export function PipelineStepForm({ step, names, onChange }: { step: OperatorStep
         <span className={hint}>节点身份 = 协议 + 服务器 + 端口 + 凭据。保留先出现的那个。</span>
       </div>;
     case 'set':
-      return <SetFieldsForm fields={step.fields} onChange={(fields) => onChange({ ...step, fields })} />;
+      return <div>{step.types && <p className={hint}>此步仅应用于 {step.types.join("、")} 协议节点。</p>}<SetFieldsForm fields={step.fields} onChange={(fields) => onChange({ ...step, fields })} /></div>;
     case 'script':
       return <div className="flex flex-col gap-2">
         <label htmlFor="script-code" className={lbl}>处理脚本</label>

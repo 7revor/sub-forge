@@ -55,13 +55,13 @@ describe('Loon 完整订阅', () => {
     expect(out.yaml).not.toMatch(/Remote Rule|RULE-SET|https:\/\/sub.test|extended-matching/);
     expect(out.report.items).toContainEqual(expect.objectContaining({ code: 'rule.client', message: expect.stringContaining('extended-matching') }));
   });
-  it('不支持协议、链、PASS 和不一致测速超时均阻止发布', () => {
+  it('支持代理链，不支持协议、PASS 和不一致测速超时阻止发布', () => {
     const f = fixture(), groups = routing(f).groups;
     f.nodeSets.locals.nodes!.proxies[0]!.type = 'tuic';
     expect(renderLoon(f).report.hasErrors).toBe(true);
     f.nodeSets.locals.nodes!.proxies[0]!.type = 'trojan';
     f.profile.chains = [{ id: 'chain', landing: { nodeSet: { type: 'local', id: 'nodes' }, filter: '日本' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'nodes' }, match: { exact: '香港' } } } }];
-    expect(renderLoon(f).chainResolutions[0]).toMatchObject({ appliedCount: 0, issues: [expect.objectContaining({ code: 'chain.unsupported' })] });
+    expect(renderLoon(f).chainResolutions[0]).toMatchObject({ appliedCount: 1 });
     f.profile.chains = []; routing(f).final = { kind: 'builtin', name: 'PASS' };
     expect(renderLoon(f).report.byCode('loon.policy')).toHaveLength(1);
     routing(f).final = { kind: 'builtin', name: 'DIRECT' };

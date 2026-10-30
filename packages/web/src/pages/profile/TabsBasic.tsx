@@ -1,3 +1,4 @@
+import { BaseExtract } from '../../components/BaseExtract.tsx';
 import { RoutingCard, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { appendProviderGroup } from './providerGroup.ts';
@@ -104,10 +105,10 @@ export function TabOverview() {
 export function TabBase() {
   const { draft, setDraft, baseValid, setBaseValid, baseEditorKey, template } = useProfile();
   const presets = useList('presets').data ?? [];
-  const [client, setClient] = useState<'mihomo' | 'surge' | 'stash' | 'loon'>('mihomo');
+  const [client, setClient] = useState<'common' | 'mihomo' | 'surge' | 'stash' | 'loon'>('common');
   const preset = presets.find((p) => p.id === draft.base?.presetId);
   const mode = draft.base === undefined ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
-  const patch = draft.base?.[basePatchKey(client)] ?? {};
+  const patch: Record<string, unknown> = draft.base?.[basePatchKey(client)] ?? {};
   const inherited = preset?.[client] ?? {};
   const editor = baseEditorFor(client);
   const groups = editor.groups;
@@ -124,7 +125,7 @@ export function TabBase() {
           <Segmented label="基础设置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '完全自定义' }, { value: 'none', label: '不输出' }]}
             onChange={(m) => {
               if (m === 'none') { const { base: _b, ...rest } = draft; setDraft(rest); }
-              else if (m === 'custom') setDraft({ ...draft, base: { patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, loonPatch: draft.base?.loonPatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
+              else if (m === 'custom') setDraft({ ...draft, base: { common: draft.base?.common, patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, loonPatch: draft.base?.loonPatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
               else setDraft({ ...draft, base: { ...(draft.base ?? {}), presetId: presets[0]?.id ?? '' } });
             }} />
         </fieldset>
@@ -142,7 +143,9 @@ export function TabBase() {
       {mode !== 'none' && (
         <div className="flex flex-wrap items-start gap-5">
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
-            <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
+            <Segmented label="客户端" value={client} options={[{ value: 'common', label: '公共项' }, { value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
+            <p className="text-[13px] text-ink-muted">合并顺序：预设公共项 → 本订阅公共项 → 预设客户端覆盖 → 本订阅客户端覆盖。</p>
+            {client !== 'common' && <BaseExtract client={client} value={patch} common={draft.base?.common} disabled={!baseValid} onApply={(common, native) => setDraft({ ...draft, base: { ...draft.base, common, [basePatchKey(client)]: native } })} />}
             {(
               <DualEditor key={`${draft.id}:${client}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
                 toRaw={editor.toRaw} fromRaw={editor.fromRaw} recoverForm={(text) => editor.recoverForm(text, patch)} rawLabel={`${mode === 'preset' ? '覆盖项' : client} ${editor.format}`}

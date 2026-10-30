@@ -14,7 +14,7 @@
 | 独立文件 | 现有 YAML 导出 | 规则内嵌 `.conf` | 完整 `.conf` | 规则内嵌 YAML |
 | 平台 | 现有平台 | iOS / macOS | iOS / macOS | iOS / macOS |
 
-INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Host]`；节点、组、规则由对应领域对象生成。各客户端配置独立合并，不把 Mihomo DNS/TUN 配置自动套到其他客户端。表单和 INI 双向转换保留 `false`、`0`、列表、引号和转义；清空字段恢复未配置状态。INI 大小写和行内注释按解析规则处理，非法段、重复键、换行注入和不支持的嵌套值报错。
+INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Host]`；节点、组、规则由对应领域对象生成。原生项仍按客户端独立合并；新增公共项只映射已适配语义，不把任意 Mihomo DNS/TUN 配置自动套到其他客户端。表单和 INI 双向转换保留 `false`、`0`、列表、引号和转义；清空字段恢复未配置状态。INI 大小写和行内注释按解析规则处理，非法段、重复键、换行注入和不支持的嵌套值报错。
 
 `GET /sub/:token?target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。Surge 主订阅含带当前 token 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
 
@@ -27,16 +27,49 @@ INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Ho
 | 已适配节点 | SS、VMess AEAD、Trojan、AnyTLS、HTTP(S)、SOCKS5/TLS、Snell、TUIC/v5、Hysteria2 | SS、SSR、VMess、VLESS（含 Reality）、Trojan、AnyTLS、HTTP(S)、SOCKS5/TLS、Hysteria2 |
 | WebSocket | VMess | VMess / VLESS / Trojan 的已适配字段 |
 | Hysteria2 | Salamander、下载带宽、端口跳跃 | Salamander、下载带宽、端口跳跃 |
-| 代理链 | `underlying-proxy`，继续检查引用和环 | 未适配，报错阻止发布；不会移除前置后改成直连 |
+| 代理链 | `underlying-proxy`，继续检查引用和环 | 输出 `[Proxy Chain]`，继续检查引用和环；命名链使用独立落地副本 |
 | 四类策略组 | select / url-test / fallback / load-balance | 同左 |
 | 哈希负载均衡 | consistent-hashing → persistent | consistent-hashing → PCC |
 | 轮询负载均衡 | 没有等价转换，报错 | round-robin → Round-Robin |
 | 单次测速超时 | 毫秒转秒，下放节点；共享节点参数冲突报错 | 毫秒转秒放 General；组间或与基础设置冲突时报错 |
 | 空组 | REJECT | REJECT |
 
-协议名出现在表内不代表所有可选参数都已覆盖。未适配协议、传输或重要参数给出错误；已明确允许省略的差异（例如部分显示/测速选项和上传带宽）在报告中说明。Loon 不输出 PASS、TUIC、Snell、WireGuard 或代理链；Surge 不输出 VLESS/Reality。引用、重名、筛选和循环检测继续使用已有实现。
+协议名出现在表内不代表所有可选参数都已覆盖。未适配协议、传输或重要参数给出错误；已明确允许省略的差异（例如部分显示/测速选项和上传带宽）在报告中说明。Loon 不输出 PASS、TUIC、Snell 或 WireGuard；Surge 不输出 VLESS/Reality。引用、重名、筛选和循环检测继续使用已有实现。
 
-节点输入支持完整 INI 的 `[Proxy]` 段及裸节点行，通过位置凭据和专有参数区分 Surge/Loon。凭据中的逗号、等号、引号、反斜杠以及显式 false 可往返。Surge VMess 输入要求显式 `vmess-aead=true`；旧的非 AEAD 配置无法忠实映射时拒绝导入。这里只导入节点，不把外部整份配置的 DNS、规则和策略组反向导入本项目。
+节点输入支持完整 INI 的 `[Proxy]` 段及裸节点行，通过位置凭据和专有参数区分 Surge/Loon。凭据中的逗号、等号、引号、反斜杠以及显式 false 可往返。Surge VMess 输入要求显式 `vmess-aead=true`；旧的非 AEAD 配置无法忠实映射时拒绝导入。节点粘贴入口仍只导入节点；整份 Loon 配置使用配置订阅列表中的「导入 Loon 完整配置」入口。
+
+## 公共基础配置与专用覆盖
+
+预设新增 `common`，订阅新增 `base.common`。合并顺序为：**预设公共项 → 本订阅公共项 → 预设客户端原生项 → 本订阅客户端原生覆盖**。数组替换，对象递归合并，`false`、`0` 不当作空值。公共测速默认值进入节点/组适配流程，组显式参数优先；INI 端明确设置的全局测速覆盖优先于公共默认值。
+
+| 公共项 | 映射与边界 |
+| --- | --- |
+| `dnsServers` | 普通 DNS IP / system → Mihomo、Stash nameserver，Surge、Loon dns-server；加密 DNS 和复杂上游参数保留原生配置 |
+| `hosts` / `dnsPolicy` | 精确域名 → 单个固定 IP / DNS；INI 使用 Host。通配符、别名、SSID、域名集合与特殊 DNS 规则暂不提取 |
+| `realIpDomains` | 精确域名 → fake-ip-filter / always-real-ip / real-ip；不同通配语法不互换，也不当作 DIRECT 分流规则 |
+| `dnsIpv6` | Mihomo/Stash dns.ipv6，Surge ipv6；Loon ip-mode 还控制连接，不能等价替换。若明确配置 Loon ip-mode 则采用原生覆盖并警告，否则阻止该目标生成。Stash true 仍依赖网络状态并提示 |
+| `geoipUrl` | Mihomo MMDB、Surge geoip-maxmind-url、Loon geoip-url；Stash 暂未适配 |
+| `httpPort` / `socksPort` / `allowLan` | Mihomo 原生端口；Surge 需明确 macOS/iOS，macOS 使用监听地址，iOS/Loon 使用 Wi-Fi 代理共享并提示范围差异；Stash 暂未适配。Wi-Fi 端口不以 0 表示停用 |
+| `testUrl` / `testTimeoutMs` | 默认代理测速 URL / 毫秒超时；各端按节点、组或全局作用域输出，不同组要求冲突时明确报错 |
+
+预设和订阅基础编辑器提供「公共项」表单/YAML；原生标签提供「提取公共基础项」预览，只在「应用到草稿」后改变草稿，仍需保存。已有公共值优先于提取值，未映射字段保持原样并逐项报告。Mihomo `tun.stack=mips` 保留且表单可选。
+
+`mode`、日志等级、TUN 栈/路由/DNS 劫持、FakeIP 模式与地址段、API/dashboard、HTTP 引擎、skip-proxy、STUN、网络接口选择等仍在专用覆盖维护。特别是 `skip-proxy` 不能自动改成 DIRECT，`*.example.com` 和 `*example.com` 不能盲目换成 Mihomo 后缀语法。原文中有 Host 通配/特殊条目时整个 Host 段保留，避免破坏匹配顺序。
+
+## Loon 完整配置导入
+
+入口：配置订阅列表 → 导入 Loon 完整配置。接口 `POST /api/profiles/import/loon`，默认只预览；`save:true` 创建资源。导入预览不联网，展示四端本地内容兼容报告；远程节点和规则需正常拉取后再次验证。资源使用新 ID，归属当前用户，创建失败整体回滚，不改已有订阅。
+
+- 识别 `[General]`、`[Host]`、`[Proxy]`、`[Remote Proxy]`、`[Remote Filter]`、`[Proxy Group]`、`[Proxy Chain]`、`[Rule]`、`[Remote Rule]`。未适配的非空段、未知运行参数、重名、缺失引用、循环引用明确报错。
+- 远程订阅保留 URL，不访问用户的真实地址。udp、block-quic、证书校验、fast-open 覆盖进入现有处理链；`default` 不覆写，VMess AEAD 仅作用于 VMess。停用来源保存为独立资源但不加入本订阅；flexible-sni=true 暂不适配。
+- NameRegex 筛选器变成只包含启用远程来源的动态组合，`(?i)` 保留。重叠组合可能生成独立节点副本并自动改名，会报告改名。NodeSelect 缺少选择结果时给出提示；若被引用则拒绝导入。
+- 当前导入两跳命名链，落地必须在 `[Proxy]` 声明，前置可为节点/策略组。为每个链名生成独立落地副本和已有 ChainRule，同一原落地可走多个前置，原出口不变。多跳或动态落地不能等价适配时明确报错。
+- 缺少 FINAL 必须在原文补充或在表单明确选择最终出口，不默认选 DIRECT。远程规则保留现有远程引用，报告本地/远程及域名/IP 阶段匹配的差异；停用远程规则明确提示未加入分流。
+- Loon `max-timeout` 独立保存在 `test.maxTimeout`，与全局单次测试超时区分；其他端尚未等价适配时阻止输出。可在策略组高级设置中清除。
+
+节点转换统一规范 VLESS/VMess 的 `sni` 为 `servername`；冲突报错。Loon block-quic 布尔值对应 Surge on/off，Surge auto/adaptive 保留原值并在 Loon 报不兼容。Mihomo/Stash 当前没有适配等价的节点级阻断：true/on/auto/adaptive 报错，false/off 可省略；绝不擅自替换成全局拒绝 UDP 443。
+
+新增依据：[Mihomo 域名语法](https://wiki.metacubex.one/handbook/syntax/)、[Mihomo TUN](https://wiki.metacubex.one/config/inbound/tun/)、[Loon General](https://nsloon.app/en/docs/General/)、[Surge General](https://manual.nssurge.com/profile/general.html)、[Surge 节点选项](https://manual.nssurge.com/policies/parameters.html)、[Stash DNS](https://stash.wiki/en/features/dns-server)。本轮实现和验收见[公共配置与完整导入验收](../research/verification/common-base-loon-import-20261030/验收记录.md)。
 
 ## 规则修复与边界
 

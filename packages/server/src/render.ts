@@ -1,3 +1,4 @@
+import { lowerCommonBase, mergeBase, type CommonBase } from '@sub-forge/core';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
 // 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 缓存；失败时返回上一份成功结果（OUT-05 / TPL-12）。
@@ -203,19 +204,28 @@ export class RenderService {
     checkCurrent();
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
     if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    const base = profile.base ? target.client === 'loon'
+    const common = mergeBase(preset?.common ?? {}, profile.base?.common ?? {}) as CommonBase;
+    const nativeBase = profile.base ? target.client === 'loon'
       ? deepMerge(preset?.loon ?? {}, profile.base.loonPatch ?? {})
       : target.client === 'surge'
       ? deepMerge(preset?.surge ?? {}, profile.base.surgePatch ?? {})
       : target.client === 'stash'
       ? deepMerge(preset?.stash ?? {}, profile.base.stashPatch ?? {})
       : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
+    const mapped = lowerCommonBase(common, target.client, target.platform, nativeBase);
+    pre.push(...mapped.report);
+    const base = profile.base ? mergeBase(mapped.base, nativeBase ?? {}) : undefined;
+    const general = base?.general as Record<string, unknown> | undefined;
+    const defaults = { ...common,
+      ...(typeof general?.['proxy-test-url'] === 'string' ? { testUrl: general['proxy-test-url'] } : {}),
+      ...(typeof general?.['test-timeout'] === 'number' ? { testTimeoutMs: general['test-timeout'] * 1000 } : {}),
+    };
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const qs = `${target.client !== 'mihomo' ? '&target=' + target.client : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
     const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
-      profile, nodeSets, rules, managedResources:true, resourceIntervalSec:this.store.resourceCacheTtlSec,
+      profile, nodeSets, rules, common: defaults, managedResources:true, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),

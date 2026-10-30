@@ -62,7 +62,7 @@ export function stepSummary(s: OperatorStep): string {
     case 'sort.name': return s.order === 'asc' ? '升序' : '降序';
     case 'sort.regex': return s.patterns.filter(Boolean).join(' > ');
     case 'dedupe': return `${s.by === 'key' ? '按节点身份' : '按名称'} · ${s.strategy === 'drop' ? '删除重复' : '追加序号'}`;
-    case 'set': return Object.entries(s.fields).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
+    case 'set': return (s.types ? `仅 ${s.types.join('、')}：` : '') + Object.entries(s.fields).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
     case 'script': return '自定义脚本';
   }
 }

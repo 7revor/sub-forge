@@ -43,3 +43,7 @@ export * from './render/surge-config.ts';
 export * from './render/loon-config.ts';
 export * from './proxy/loon.ts';
 export * from './nodeset/chain.ts';
+
+export * from './base/common.ts';
+
+export * from './import/loon.ts';

@@ -107,7 +107,8 @@ export function applyOperator(op: Operator, nodes: ProxyIR[]): ProxyIR[] {
     case 'set': {
       const bad = Object.keys(op.fields).filter((k) => PROTECTED_FIELDS.has(k) || k.startsWith('_'));
       if (bad.length) throw new Error(`快捷设置不能修改字段：${bad.join(', ')}`);
-      return nodes.map((n) => ({ ...n, ...op.fields }));
+      if (op.types !== undefined && (!Array.isArray(op.types) || !op.types.every(t => typeof t === 'string'))) throw new Error('快捷设置 types 必须为协议名称列表');
+      return nodes.map(n => op.types && !op.types.includes(n.type) ? n : ({ ...n, ...op.fields }));
     }
     case 'script':
       throw new Error('脚本处理器需要沙箱执行环境，内核不直接运行（SRC-08）');

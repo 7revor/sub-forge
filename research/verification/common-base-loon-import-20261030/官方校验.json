@@ -1,0 +1,14 @@
+[
+  {
+    "client": "mihomo",
+    "status": "通过",
+    "exitCode": 0,
+    "log": "time=\"2026-10-30T14:18:09.819736000+08:00\" level=info msg=\"Start initial configuration in progress\"\ntime=\"2026-10-30T14:18:09.820622000+08:00\" level=info msg=\"Geodata Loader mode: memconservative\"\ntime=\"2026-10-30T14:18:09.820629000+08:00\" level=info msg=\"Geosite Matcher implementation: succinct\"\ntime=\"2026-10-30T14:18:09.821095000+08:00\" level=info msg=\"Initial configuration complete, total time: 1ms\"\nconfiguration file <隔离目录>/common-mihomo.yaml test is successful\n"
+  },
+  {
+    "client": "surge",
+    "status": "通过",
+    "exitCode": 0,
+    "log": "OK\n"
+  }
+]
