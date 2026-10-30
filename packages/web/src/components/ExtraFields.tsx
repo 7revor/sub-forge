@@ -1,4 +1,4 @@
-import { alertError, notifySuccess } from '../feedback.ts';
+import { alertError } from '../feedback.ts';
 import { YamlTextarea } from './YamlTextarea.tsx';
 import { useState } from 'react';
 import { extraNameError, formatExtraValue, parseExtraValue } from './extraFields.ts';
@@ -70,7 +70,7 @@ export function ExtraFields({ value, onChange, validateName }: {
             const parsed = parseExtraValue(text);
             if (!parsed.ok) { alertError(parsed.error); return; }
             onChange({ ...value, [name]: parsed.value });
-            setKey(''); setText(''); notifySuccess('字段已添加');
+            setKey(''); setText('');
           }}>添加</Button>
         </div>
       </div>

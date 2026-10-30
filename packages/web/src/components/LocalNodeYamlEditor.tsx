@@ -27,7 +27,6 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
       if (latest.current.disabled || latest.current.text !== after) return;
       latest.current.onChange(before);
       undo.current = undefined;
-      notifySuccess('已撤销');
     } });
     undo.current = { before, after, notification };
   };

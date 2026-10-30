@@ -1,4 +1,4 @@
-import { alertError, notifySuccess } from '../feedback.ts';
+import { alertError } from '../feedback.ts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -20,7 +20,6 @@ export function Login() {
     try {
       const { user } = await api<{ user: User }>('POST', '/auth/login', { username, password });
       qc.setQueryData(['me'], user);
-      notifySuccess('登录成功');
       navigate(from === '/login' ? '/' : from, { replace: true });
     } catch (err) {
       alertError(err);

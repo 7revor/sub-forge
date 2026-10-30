@@ -28,6 +28,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
   /** 可把视图切换放进外层工具栏；传 null 时等待容器挂载，未传时仍在编辑器内展示。 */
   modeControlContainer?: HTMLElement | null;
 }) {
+  const [recoveryNotes, setRecoveryNotes] = useState<string[]>([]);
   const [localMode, setLocalMode] = useState<EditorMode>('form');
   const current = mode ?? localMode;
   const [text, setText] = useState(() => { const r = current === 'raw' ? tryRaw(toRaw, value) : undefined; return r && 'text' in r ? r.text : ''; });
@@ -58,12 +59,13 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
     if (next === current) return;
     if (next === 'form') {
       const recovered = recoverForm(text);
-      notifySuccess(recovered.notes.length ? `已返回表单，保留可识别的有效字段：\n${recovered.notes.join('\n')}` : '已返回表单');
+      setRecoveryNotes(recovered.notes);
       setResult({ ok: true, ...recovered });
       onChange(recovered.value);
       onValidityChange?.(true);
     }
     if (next === 'raw') {
+      setRecoveryNotes([]);
       const raw = tryRaw(toRaw, value);
       if ('error' in raw) { alertError(`无法生成${rawLabel}：${raw.error}`); return; }
     }
@@ -77,7 +79,13 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
   return <div className="dual-editor flex flex-col gap-3">
     {modeControlContainer === undefined ? modeControl : modeControlContainer && createPortal(modeControl, modeControlContainer)}
     <div className="editor-content flex flex-col gap-3">
-      {current === 'form' ? renderForm() : <>
+      {current === 'form' ? <>
+        {!!recoveryNotes.length && <div role="status" className="rounded-lg bg-warn-soft px-3 py-2.5 text-[13px] text-warn">
+          <p className="m-0">部分内容无法转为表单，已保留可识别的字段：</p>
+          <ul className="m-0 mt-1 pl-5">{recoveryNotes.map((note, i) => <li key={i}>{note}</li>)}</ul>
+        </div>}
+        {renderForm()}
+      </> : <>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[13px] text-muted">{rawLabel}</span>
           <CopyButton size="sm" text={text} />

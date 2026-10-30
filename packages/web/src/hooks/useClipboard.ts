@@ -1,4 +1,4 @@
-import { alertError, notifySuccess } from '../feedback.ts';
+import { alertError } from '../feedback.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** 只有浏览器确认写入后才反馈成功；文本改变和卸载均使旧请求失效。 */
@@ -19,7 +19,6 @@ export function useClipboard(text: string) {
       await navigator.clipboard.writeText(text);
       if (request !== sequence.current) return;
       setState({ text, status: 'copied' });
-      notifySuccess('已复制');
       timer.current = setTimeout(() => setState(undefined), 1500);
     } catch (error) {
       if (request === sequence.current) {
