@@ -4,15 +4,15 @@ import { OptionalBoolean } from './OptionalBoolean.tsx';
 import { proxyPlaceholders } from '../schemas/placeholders.ts';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
 // 左侧步骤列表（拖拽排序、节点数变化、添加处理器菜单）；自动去重仅计入最终输出。
-// 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方是这一步输入 → 输出的逐节点对照；
+// 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方分别展示这一步的输入列表与输出列表；
 // 未选择步骤时展示原始节点与最终结果的总览；点击编辑器之外取消选择。
 
 import { DEFAULT_USELESS_PATTERNS, type OperatorStep } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ExtraFields } from './ExtraFields.tsx';
-import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetField } from './pipelineForm.ts';
-import { mapRows, mapStats, removedAtStep, renamedAtSteps, rowChanged, type MapRow } from './pipelineMap.ts';
+import { patternHits, regexError, renameHits, setFieldsError, updateSetField } from './pipelineForm.ts';
+import { mapRows, mapStats } from './pipelineMap.ts';
 import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview, TraceStep } from '../api.ts';
 import { Badge, Button, DraftInput, DraftTextarea, Empty, ErrorAlert, Input, Segmented, Select, Switch, cx } from './ui.tsx';
@@ -329,66 +329,36 @@ function resultText(t: TraceStep): string {
 const OVERVIEW = -1;
 
 type Side = { names: string[]; origins: (number | null)[] };
-type MapOptions = { order: 'out' | 'in'; changedOnly: boolean };
-
-const th = 'sticky top-0 z-[1] border-b border-line bg-panel px-3 py-2 text-left text-[12px] font-medium text-ink-muted whitespace-nowrap';
-const td = 'border-b border-line-2 px-3 py-[7px]';
-
-/** 输入 → 输出对照表：一行一个节点，左边是它进入时的样子，右边是出来时的样子 */
-function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, options, onOptions, truncated }: {
-  before: Side; after: Side; inLabel: string; outLabel: string;
-  extraLabel?: string; extra?: (r: MapRow) => ReactNode;
-  options: MapOptions; onOptions: (o: MapOptions) => void; truncated?: boolean;
+/** 两侧独立排列与滚动，不按节点来源配对，也不补齐缺失行。 */
+function InputOutputView({ before, after, inLabel, outLabel, truncated }: {
+  before: Side; after: Side; inLabel: string; outLabel: string; truncated?: boolean;
 }) {
-  const rows = useMemo(() => mapRows(before, after, options.order), [before, after, options.order]);
-  const shown = options.changedOnly ? rows.filter(rowChanged) : rows;
   return <>
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3">
-      <Segmented label="排列方式" size="sm" value={options.order} options={[{ value: 'out', label: '按输出顺序' }, { value: 'in', label: '按输入顺序' }]} onChange={(order) => onOptions({ ...options, order })} />
-      <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-ink-2">
-        <input type="checkbox" checked={options.changedOnly} onChange={(e) => onOptions({ ...options, changedOnly: e.target.checked })} />只看有变化的
-      </label>
-    </div>
-    {shown.length ? <div className="pipeline-mapping-scroll mx-4 overflow-auto overscroll-contain">
-      <table className="w-full border-collapse text-[13px]">
-        <thead><tr>
-          <th className={cx(th, 'w-10 pl-4 text-right')}>#</th>
-          <th className={th}>{inLabel} <span className="font-normal text-faint">{before.names.length}</span></th>
-          <th className="w-6 border-b border-line" aria-hidden="true" />
-          <th className={cx(th, 'w-10 text-right')}>#</th>
-          <th className={th}>{outLabel} <span className="font-normal text-faint">{after.names.length}</span></th>
-          <th className={cx(th, 'w-14')}>位置</th>
-          {extra && <th className={cx(th, 'pr-4')}>{extraLabel}</th>}
-        </tr></thead>
-        <tbody>
-          {shown.map((r) => {
-            const renamed = !!r.in && !!r.out && r.in.name !== r.out.name;
-            return (
-              <tr key={`${r.in?.index ?? ''}:${r.out?.index ?? ''}`} className={cx(!r.out && 'bg-[#fafbfc]')}>
-                <td className={cx(td, 'pl-4 text-right font-mono text-[12px] text-faint')}>{r.in ? r.in.index + 1 : ''}</td>
-                <td className={cx(td, 'font-mono whitespace-nowrap', !r.in ? 'text-faint italic' : !r.out ? 'text-ink-muted line-through decoration-[#c9a8a4]' : renamed ? 'bg-[#fdf4f3] text-[#8f2a1f]' : 'text-ink-2')}>{r.in ? r.in.name : '（新增）'}</td>
-                <td className={cx(td, 'text-center text-faint')} aria-hidden="true">→</td>
-                <td className={cx(td, 'text-right font-mono text-[12px] text-faint')}>{r.out ? r.out.index + 1 : ''}</td>
-                <td className={cx(td, 'font-mono whitespace-nowrap', !r.out ? 'text-ink-muted italic' : renamed || !r.in ? 'bg-[#f2faf5] text-[#17633a]' : 'text-ink-2')}>{r.out ? r.out.name : '（移除）'}</td>
-                <td className={cx(td, 'font-mono text-[12px] whitespace-nowrap')}>
-                  {r.moved !== 0 && <span className="text-accent-ink" title={`在保留的节点中${r.moved > 0 ? '上移' : '下移'} ${Math.abs(r.moved)} 位`}>{r.moved > 0 ? '↑' : '↓'}{Math.abs(r.moved)}</span>}
-                </td>
-                {extra && <td className={cx(td, 'pr-4 font-mono text-[12px] whitespace-nowrap text-ink-muted')}>{extra(r)}</td>}
+    <div className="pipeline-mapping-scroll mx-4 grid grid-cols-2 gap-4">
+      {[{ side: before, label: inLabel }, { side: after, label: outLabel }].map(({ side, label }, column) => (
+        <section key={column} aria-label={label} className="min-h-0 min-w-0 overflow-auto overscroll-contain">
+          <table className="w-full border-collapse text-[13px]">
+            <thead className="sticky top-0 z-[1] bg-panel">
+              <tr>
+                <th className="w-10 border-b border-line px-3 py-2 text-right text-[12px] font-medium text-faint">#</th>
+                <th className="border-b border-line px-3 py-2 text-left text-[12px] font-medium whitespace-nowrap text-ink-muted">{label} <span className="font-normal text-faint">{side.names.length}</span></th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div> : <div className="pipeline-mapping-scroll px-4 pb-4"><Empty title={rows.length ? '没有任何节点发生变化' : '没有节点'} /></div>}
+            </thead>
+            <tbody>
+              {side.names.map((name, index) => <tr key={index}>
+                <td className="border-b border-line-2 px-3 py-[7px] text-right font-mono text-[12px] text-faint">{index + 1}</td>
+                <td className="border-b border-line-2 px-3 py-[7px] font-mono whitespace-nowrap text-ink-2">{name}</td>
+              </tr>)}
+            </tbody>
+          </table>
+          {!side.names.length && <div className="py-3"><Empty title="没有节点" /></div>}
+        </section>
+      ))}
+    </div>
     <div className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-ink-muted">
-      显示 {shown.length} / {rows.length} 行 · 「位置」是在保留下来的节点中名次的变化{truncated && ' · 节点较多，预览只包含前 500 个'}
+      输入 {before.names.length} 个 · 输出 {after.names.length} 个{truncated && ' · 节点较多，预览只包含前 500 个'}
     </div>
   </>;
-}
-
-function StepChip({ index, tone, onClick, children }: { index: number; tone?: 'err'; onClick: () => void; children?: ReactNode }) {
-  return <button type="button" onClick={onClick} title={`查看第 ${index + 1} 步`}
-    className={cx('cursor-pointer rounded px-1.5 py-px font-mono text-[11.5px] hover:underline', tone === 'err' ? 'bg-err-soft text-err' : 'bg-accent-soft text-accent-ink')}>{children ?? index + 1}</button>;
 }
 
 export function PipelineEditor({ steps, onChange, preview, previewError, loading, inputLabel, title = '处理链' }: {
@@ -414,7 +384,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
     document.addEventListener('click', clearSelection);
     return () => document.removeEventListener('click', clearSelection);
   }, []);
-  const [mapOptions, setMapOptions] = useState<MapOptions>({ order: 'out', changedOnly: false });
   const keys = ids.length === steps.length ? ids : steps.map((_, i) => ids[i] ?? `x${i}`);
   const add = (op: OperatorStep['op']) => {
     onChange([...steps, NEW_STEP[op]()]);
@@ -447,10 +416,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   const before = mode === 'overview' ? sideAt(-1) : sideAt(selected - 1);
   const after = mode === 'overview' ? finalSide : sideAt(selected);
 
-  const removedAt = useMemo(() => (preview ? removedAtStep(preview.inputNodes.length, preview.trace) : new Map<number, number>()), [preview]);
-  const renamedAt = useMemo(() => (sides ? renamedAtSteps(sides[0]!.names, sides.slice(1)) : new Map<number, number[]>()), [sides]);
   const overviewStats = useMemo(() => (sides && finalSide ? mapStats(mapRows(sides[0]!, finalSide)) : undefined), [sides, finalSide]);
-  const stepName = (k: number) => (k >= steps.length ? '自动去重' : OP_LABEL[steps[k]!.op]);
 
   return (
     <div className="pipeline-workspace" onClickCapture={(event) => internalClicks.current.add(event.nativeEvent)}>
@@ -490,16 +456,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
             </div>}
             {loading && <span className="text-[12.5px] text-ink-muted">预览中…</span>}
           </div>
-          {before && after && <MappingView before={before} after={after} inLabel="原始节点" outLabel="最终输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated}
-            extraLabel="经过的步骤" extra={(r) => {
-              if (r.origin === null) return null;
-              const gone = removedAt.get(r.origin);
-              const renames = (renamedAt.get(r.origin) ?? []).filter(k=>k<steps.length);
-              return <span className="flex flex-wrap items-center gap-1">
-                {renames.map((k) => <StepChip key={k} index={k} onClick={() => setSelected(k)} />)}
-                {gone !== undefined && <StepChip index={gone} tone="err" onClick={() => setSelected(gone)}>第 {gone + 1} 步 {stepName(gone)} 移除</StepChip>}
-              </span>;
-            }} />}
+          {before && after && <InputOutputView before={before} after={after} inLabel="输入" outLabel="输出" truncated={truncated} />}
           {!preview && !previewError && <div className="px-4 pb-4 text-[13px] text-ink-muted">{loading ? '预览中…' : '保存后可预览'}</div>}
         </>}
 
@@ -524,9 +481,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-2 px-4 pt-3 pb-3">
             <h3 className="m-0 text-[13.5px] font-semibold">这一步的输入 → 输出 <span className="font-normal text-ink-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
           </div>
-          {cur && before && after && <MappingView before={before} after={after} inLabel={selected === 0 ? '输入（原始节点）' : `输入（第 ${selected} 步之后）`} outLabel="输出"
-            options={mapOptions} onOptions={setMapOptions} truncated={truncated}
-            extraLabel="命中" extra={(r) => (r.in && (!r.out || r.in.name !== r.out.name || r.moved !== 0) ? rowHit(step, r.in.name) : null)} />}
+          {cur && before && after && <InputOutputView before={before} after={after} inLabel="输入" outLabel="输出" truncated={truncated} />}
         </>}
 
         {preview && preview.failures.length > 0 && (
