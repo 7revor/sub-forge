@@ -15,8 +15,8 @@ import { RuleEditDialog } from './RuleEditDialog.tsx';
 import { applyRuleDraft } from './ruleDraft.ts';
 
 export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
-  if (matcher.kind === 'local') return `本地规则 · ${localRuleLines(matcher.content)[0]?.text ?? '尚未填写'}`;
-  if (matcher.kind === 'rule') return `本地规则 · ${ruleToLine(matcher.rule)}`;
+  if (matcher.kind === 'local') return localRuleLines(matcher.content)[0]?.text ?? '尚未填写';
+  if (matcher.kind === 'rule') return ruleToLine(matcher.rule);
   if (matcher.repository) return matcher.repository.sources.map(source => source.name ?? `${matcher.repository!.name} · ${source.repository?.path}`).join('、');
   if (matcher.remote) return matcher.remote.url || '远程规则';
   return ctx.rulesets.find(r => r.id === matcher.id)?.name ?? matcher.id ?? '增强集合';
@@ -73,7 +73,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         const label = ruleMatcherLabel(matcher, ctx);
         return <RuleCard id={`template-rule-${r.id}`} label={`第 ${i + 1} 项规则`} handle={handle} readOnly={readOnly}
           invalid={report.some(item => item.level === 'error' && item.where === `rule:${r.id}`)}
-          icon={local ? <FileText size={18} /> : matcher.remote ? <Globe size={18} /> : <Link2 size={18} />}
+          icon={local ? <FileText size={16} /> : matcher.remote ? <Globe size={16} /> : <Link2 size={16} />}
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
           hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
           target={readOnly ? <span className="block truncate text-center text-[13px]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
