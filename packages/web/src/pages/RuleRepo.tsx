@@ -12,7 +12,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleRepo, type RepoFilePreview } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
-import { Badge, Button, ErrorAlert, Input, Modal, PageHeader, td, th } from '../components/ui.tsx';
+import { Badge, Button, ErrorAlert, Input, Modal, PageHeader, formatTime, td, th } from '../components/ui.tsx';
 
 const loadFiles = ruleOptionsLoader('repository');
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
@@ -95,6 +95,7 @@ export function RuleRepoPage() {
             <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-accent">打开原文件</a>
             <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>
           </div>}
+          {file?.cache?.error && !preview.isFetching && <p role="status" className="text-[13px] text-amber-700">拉取失败：{file.cache.error}；正在显示上次成功内容（{file.cache.lastSuccessAt ? formatTime(file.cache.lastSuccessAt) : '时间未知'}）。</p>}
           <ErrorAlert error={preview.error ?? create.error} />
           {preview.isError && <Button size="sm" onClick={() => void preview.refetch()}>重试读取文件</Button>}
         </div>

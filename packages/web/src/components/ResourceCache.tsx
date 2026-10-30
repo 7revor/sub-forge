@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { Badge, Button, ErrorAlert, Modal, formatTime } from './ui.tsx';
 export type ResourceState={name:string;lastSuccessAt?:number;lastAttemptAt?:number;nextFetchAt?:number;refreshing:boolean;error?:string;available:boolean};
@@ -17,7 +17,9 @@ export function RefreshCacheButton({kind,id,name,endpoint,body,disabled=false}:{
   const qc=useQueryClient();const [open,setOpen]=useState(false);const [jobId,setJobId]=useState<string>();
   const refresh=useMutation({mutationFn:()=>api<{job:Job}>('POST',endpoint??`/${kind}/${id}/refresh-cache`,body??{}),onSuccess:r=>{setJobId(r.job.id);qc.setQueryData(['refresh-job',r.job.id],r);}});
   const job=useQuery({queryKey:['refresh-job',jobId],enabled:!!jobId,queryFn:()=>api<{job:Job}>('GET',`/refresh-jobs/${jobId}`),refetchInterval:q=>q.state.data?.job.state==='running'?500:false});
-  const current=job.data?.job;const busy=refresh.isPending||current?.state==='running';
+  const current=job.data?.job;
+  useEffect(()=>{if(current && current.state!=='running')void qc.invalidateQueries();},[qc,jobId,current?.state]);
+  const busy=refresh.isPending||current?.state==='running';
   return <>
     <Button size="sm" disabled={disabled||busy} aria-label={`${kind==='profiles'?'刷新全部资源':'刷新缓存'} ${name}`} onClick={()=>{setOpen(true);setJobId(undefined);refresh.mutate();}}>{busy?'刷新中…':kind==='profiles'?'刷新全部资源':'刷新缓存'}</Button>
     <Modal open={open} title={`刷新缓存 · ${name}`} onClose={()=>setOpen(false)} footer={<Button onClick={()=>{setOpen(false);void qc.invalidateQueries();}}>关闭</Button>}>
