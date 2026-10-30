@@ -1,3 +1,4 @@
+import { nodeSemantics } from './node-semantics.ts';
 import { chainSources } from '../nodeset/chain.ts';
 import type { ChainNodeRef, ChainTarget } from '../types.ts';
 import { expandLocalRules, localRulesError } from '../rules/local.ts';
@@ -174,7 +175,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       key, ref: ps.ref, providerName,
       output: inlineNodes ? 'inline' : ps.output,
       requestedOutput: ps.output,
-      nodes: resolver.resolve(ps.ref).map((n) => client === 'stash' ? stashProxy(n, report) : ({ ...n })),
+      nodes: resolver.resolve(ps.ref).map(n => nodeSemantics(n, client, report)).map(n => client === 'stash' ? stashProxy(n, report) : n),
     });
   }
 

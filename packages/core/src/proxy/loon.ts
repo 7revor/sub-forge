@@ -71,6 +71,7 @@ export function parseLoonLine(line: string): RawProxy {
   for (const key of ['flow', 'protocol', 'protocol-param', 'obfs', 'obfs-param']) move(key);
   move('sni'); const tlsName = take('tls-name');
   if (tlsName !== undefined) { if (p.sni !== undefined && p.sni !== tlsName) throw new Error('sni 与 tls-name 不一致'); p.sni = tlsName; }
+  if (['vless', 'vmess'].includes(type) && p.sni !== undefined) { p.servername = p.sni; delete p.sni; }
   move('tls-cert-sha256', 'fingerprint'); move('tls-pubkey-sha256');
   move('underlying-proxy', 'dialer-proxy');
   const tlsProfile = take('tls-profile');

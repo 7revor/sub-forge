@@ -146,7 +146,12 @@ export function parseSurgeLine(line: string): RawProxy | undefined {
     default:
       throw new UnsupportedError(`暂不支持的 Surge 节点类型 ${type}`);
   }
-  boolean('udp-relay', 'udp'); boolean('tfo'); boolean('block-quic');
+  boolean('udp-relay', 'udp'); boolean('tfo');
+  if (kv['block-quic'] !== undefined) {
+    const block = kv['block-quic'];
+    if (!['on', 'off', 'auto', 'adaptive', 'true', 'false'].includes(block)) throw new Error('block-quic 必须为 on、off、auto 或 adaptive');
+    p['block-quic'] = block === 'true' ? 'on' : block === 'false' ? 'off' : block;
+  }
   if (allowed.has('ecn')) boolean('ecn');
   if (kv.alpn !== undefined) p.alpn = kv.alpn.split(',').map(s => s.trim());
   if (kv['port-hopping'] !== undefined) p.ports = kv['port-hopping'].replace(/;/g, ',');
