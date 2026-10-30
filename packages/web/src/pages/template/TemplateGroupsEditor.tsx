@@ -19,9 +19,9 @@ function SettingsSection({ readOnly, children }: { readOnly: boolean; children: 
   return readOnly ? <details className="flex flex-col gap-4"><summary className="cursor-pointer text-[13px] text-ink-muted">模板组设置 · 只读</summary>{children}</details> : <>{children}</>;
 }
 
-export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report, readOnly = false, saveHint = '保存模板后生效', renderMembers, renderGroupDialog, memberSummary, nodeSetName = ref => ref.id }: {
+export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report, readOnly = false, renderMembers, renderGroupDialog, memberSummary, nodeSetName = ref => ref.id }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; report: ReportItem[];
-  readOnly?: boolean; saveHint?: string; renderGroupDialog?: (group: GroupSpec, onClose: () => void) => ReactNode; renderMembers?: (group: GroupSpec) => ReactNode; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
+  readOnly?: boolean; renderGroupDialog?: (group: GroupSpec, onClose: () => void) => ReactNode; renderMembers?: (group: GroupSpec) => ReactNode; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
 }) {
   const [deleting, setDeleting] = useState<string>();
   const deletingGroup = value.groups.find(g => g.id === deleting);
@@ -96,7 +96,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           </div>}
         </section>}
       </>}
-    </div><DialogFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button variant="primary" onClick={close}>完成</Button></>}</DialogFooter></DialogContent></Dialog>}
+    </div><DialogFooter><Button variant="primary" onClick={close}>完成</Button></DialogFooter></DialogContent></Dialog>}
     <DeleteDialog open={!!deletingGroup} title={`删除策略组「${deletingGroup?.name || '未命名组'}」？`} onClose={() => setDeleting(undefined)} onConfirm={() => {
       if (!deletingGroup) return;
       onChange(removeGroup(value, deletingGroup.id));
@@ -104,7 +104,6 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
       setDeleting(undefined);
     }}>
       <p className="mt-0">删除此组会移除 {references} 个组内的引用，将 {rules} 条规则{final ? '和 MATCH' : ''}的出口改为 REJECT。</p>
-      <p className="mb-0 text-ink-muted">{saveHint}。</p>
     </DeleteDialog>
   </>;
 }

@@ -42,6 +42,6 @@ export function ProfileGroupDialog({ groupId, onClose }: { groupId: string; onCl
       </fieldset>}
       {errors.map((e, i) => <p role="alert" key={i} className="text-[12px] text-err">{e.message}</p>)}
     </div>
-    <DialogFooter className="h-[105px] shrink-0 flex-row flex-wrap items-center border-t border-line bg-ground px-5 py-3 sm:h-[65px]"><div ref={setFooterTarget} className="flex w-full flex-wrap items-center justify-end gap-2">{!chainEditing && <><span className="mr-auto w-full self-center text-[12px] text-ink-muted sm:w-auto">保存订阅后生效</span><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!errors.length} onClick={() => { parent.setDraft(working); onClose(); }}>应用到订阅</Button></>}</div></DialogFooter>
+    <DialogFooter className="h-[65px] shrink-0 flex-row flex-wrap items-center border-t border-line bg-ground px-5 py-3"><div ref={setFooterTarget} className="flex w-full flex-wrap items-center justify-end gap-2">{!chainEditing && <><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!errors.length} onClick={() => { parent.setDraft(working); onClose(); }}>应用到订阅</Button></>}</div></DialogFooter>
   </DialogContent></Dialog></ProfileContext.Provider>;
 }

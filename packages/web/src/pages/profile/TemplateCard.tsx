@@ -66,7 +66,7 @@ function AssociationEditor({ onDone, onPending }: { onDone?: () => void; onPendi
       {mode === 'detach' && <p className="m-0 text-[13px] text-ink-muted">当前「{template?.name ?? currentId}」的完整配置将复制到本订阅。</p>}
       {error && <div role="alert" className="text-[13px] text-err">{error.message}{templates.error && <Button size="sm" onClick={() => void templates.refetch()}>重新加载</Button>}</div>}
     </div>
-    <DialogFooter className="h-[105px] shrink-0 flex-row flex-wrap items-center justify-end border-t border-line bg-ground px-5 py-3 sm:h-[65px]"><span className="mr-auto w-full self-center text-[12px] text-ink-muted sm:w-auto">{mode !== 'detach' && target && unresolved ? '请完成上方策略组对应关系' : '应用到草稿，保存订阅后生效'}</span>{onDone && <Button disabled={change.isPending} onClick={onDone}>取消</Button>}<Button variant="primary" disabled={change.isPending || (mode === 'detach' ? !template : !target || unresolved || (mode === 'bound' && selected === currentId))} onClick={() => change.mutate()}>{change.isPending ? '正在应用…' : '应用到订阅'}</Button></DialogFooter>
+    <DialogFooter className="min-h-[65px] shrink-0 flex-row flex-wrap items-center justify-end border-t border-line bg-ground px-5 py-3">{mode !== 'detach' && target && unresolved && <span className="mr-auto self-center text-[12px] text-ink-muted">请完成上方策略组对应关系</span>}{onDone && <Button disabled={change.isPending} onClick={onDone}>取消</Button>}<Button variant="primary" disabled={change.isPending || (mode === 'detach' ? !template : !target || unresolved || (mode === 'bound' && selected === currentId))} onClick={() => change.mutate()}>{change.isPending ? '正在应用…' : '应用到订阅'}</Button></DialogFooter>
   </div>;
 }
 

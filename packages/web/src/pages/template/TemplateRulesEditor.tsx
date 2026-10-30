@@ -22,10 +22,10 @@ export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
   return ctx.rulesets.find(r => r.id === matcher.id)?.name ?? matcher.id ?? '增强集合';
 }
 
-export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady, readOnly = false, saveHint = '保存模板后生效', title = '规则', hideFinal = false, staticOnly = false, renderTarget, renderOptions, importedUrls }: {
+export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady, readOnly = false, title = '规则', hideFinal = false, staticOnly = false, renderTarget, renderOptions, importedUrls }: {
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
-  readOnly?: boolean; saveHint?: string; title?: string; hideFinal?: boolean; staticOnly?: boolean; importedUrls?: string[];
+  readOnly?: boolean; title?: string; hideFinal?: boolean; staticOnly?: boolean; importedUrls?: string[];
   renderTarget?: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => ReactNode;
   renderOptions?: (rule: RuleEntry, onChange: (rule: RuleEntry) => void) => ReactNode;
 }) {
@@ -90,7 +90,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         </div><ItemIssues report={report} where="final" />
       </div>}
     </Card>
-    {!readOnly && rule && <RuleEditDialog key={rule.id} rule={rule} index={value.rules.indexOf(rule)} ctx={ctx} staticOnly={staticOnly} adding={newRule?.id === rule.id} saveHint={saveHint} renderOptions={renderOptions} onClose={close} onSave={draft => {
+    {!readOnly && rule && <RuleEditDialog key={rule.id} rule={rule} index={value.rules.indexOf(rule)} ctx={ctx} staticOnly={staticOnly} adding={newRule?.id === rule.id} renderOptions={renderOptions} onClose={close} onSave={draft => {
       const added = newRule?.id === draft.id;
       const old = value.rules.find(r => r.id === draft.id)?.matcher;
       const url = draft.matcher.kind === 'ruleset' ? draft.matcher.remote?.url : undefined;

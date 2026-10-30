@@ -6,8 +6,8 @@ import { RuleEditShell } from '../../components/RuleEditShell.tsx';
 import type { ConvertCtx } from '../../convert/templateYaml.ts';
 
 /** 编辑只修改弹窗草稿；URL 检测由列表在新增或导入时显式触发。 */
-export function RuleEditDialog({ rule, index, ctx, staticOnly, adding, saveHint, renderOptions, onSave, onClose }: {
-  rule: RuleEntry; index: number; ctx: ConvertCtx; staticOnly: boolean; adding: boolean; saveHint: string;
+export function RuleEditDialog({ rule, index, ctx, staticOnly, adding, renderOptions, onSave, onClose }: {
+  rule: RuleEntry; index: number; ctx: ConvertCtx; staticOnly: boolean; adding: boolean;
   renderOptions?: (rule: RuleEntry, onChange: (rule: RuleEntry) => void) => ReactNode;
   onSave: (rule: RuleEntry) => void; onClose: () => void;
 }) {
@@ -22,7 +22,7 @@ export function RuleEditDialog({ rule, index, ctx, staticOnly, adding, saveHint,
     try { normalized = { ...matcher, ...remoteRuleMatcher(matcher.remote.url) }; }
     catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
   } else if (!matcher.id) error = '请选择规则集';
-  return <RuleEditShell tall={matcher.kind !== 'ruleset'} title={adding ? '添加规则' : `编辑第 ${index + 1} 项规则`} description="编辑规则内容，出口在卡片中选择。" saveHint={saveHint}
+  return <RuleEditShell tall={matcher.kind !== 'ruleset'} title={adding ? '添加规则' : `编辑第 ${index + 1} 项规则`} description="编辑规则内容，出口在卡片中选择。"
     error={attempted ? error : undefined} onClose={onClose} onApply={() => { setAttempted(true); if (!error) onSave({ ...draft, matcher: normalized }); }}>
     <MatcherEditor directRemote fixedKind={staticOnly} value={matcher} rulesets={ctx.rulesets}
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}

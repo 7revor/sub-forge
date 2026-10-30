@@ -254,3 +254,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-10-30 刷新弹窗：取得任务完整资源列表后打开，按原顺序原位显示等待、刷新中、成功、失败和中断；完成时不追加卡片。客户端更新说明和订阅生成状态预留位置，长错误单行省略并保留全文提示，维持刷新前后的高度。后端任务同时提供逐项状态，旧任务按 `ok` 兼容展示。验收见 `research/verification/refresh-stable-list-20261030/`。
 
 2026-10-30 全局图标修正：buttonClass 使用项目已有 cn，正确合并 padding 等 Tailwind 冲突；基础层为 Lucide 图标设 flex-shrink: 0。规则卡片不再需要 px-0! 局部补丁，其他图标维持各自声明尺寸。通知位置按用户要求暂不调整；整合最新订阅弹窗及刷新修复，验证见 research/verification/global-icons-merge-20261030/README.md。
+
+2026-10-30 本地规则多行输入移除蓝色焦点装饰；移除编辑弹窗及导入反馈中重复的保存提示，并删除 saveHint 透传参数。单选、错误校验、应用及保存流程沿用现有逻辑。

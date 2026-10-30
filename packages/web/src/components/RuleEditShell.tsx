@@ -3,8 +3,8 @@ import { Button, FieldError, cx } from './ui.tsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog.tsx';
 
 /** 三处规则编辑共用模板弹窗的尺寸、分区与默认动画。 */
-export function RuleEditShell({ title, description, saveHint, error, children, onApply, onClose, tall = false }: {
-  tall?: boolean; title: string; description: string; saveHint: string; error?: string; children: ReactNode; onApply: () => void; onClose: () => void;
+export function RuleEditShell({ title, description, error, children, onApply, onClose, tall = false }: {
+  tall?: boolean; title: string; description: string; error?: string; children: ReactNode; onApply: () => void; onClose: () => void;
 }) {
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className={cx('flex min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg', tall ? 'h-[min(600px,85dvh)]' : 'h-[min(460px,85dvh)]')}>
@@ -17,7 +17,6 @@ export function RuleEditShell({ title, description, saveHint, error, children, o
           {children}<FieldError error={error} />
         </div>
         <DialogFooter className="shrink-0 flex-row flex-wrap items-center justify-end border-t border-line-2 bg-ground px-5 py-3 sm:px-6">
-          <span className="mr-auto basis-full text-[12px] text-ink-muted sm:basis-auto">{saveHint}</span>
           <Button onClick={onClose}>取消</Button><Button type="submit" variant="primary">应用</Button>
         </DialogFooter>
       </form>
