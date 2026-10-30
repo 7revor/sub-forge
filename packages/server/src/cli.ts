@@ -116,7 +116,12 @@ async function start(): Promise<void> {
     store.closeEvents();
     // 立即停止接收请求并取消探测；同时等待所有清理，避免先前未等待的 close 拒绝。
     const closed = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    // SSE 已主动结束；仍未退出的连接最多保留 10 秒，避免僵持连接阻塞进程回收。
+    const drainDeadline = setTimeout(() => {
+      if ('closeAllConnections' in server) server.closeAllConnections();
+    }, 10_000);
     const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop(), resources.stop()]);
+    clearTimeout(drainDeadline);
     await snapshots.settled();
     store.close();
     const errors = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
