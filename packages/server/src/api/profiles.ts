@@ -23,7 +23,7 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
     if (body.platform !== undefined && !platform) throw bad('platform 不合法');
     if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') throw bad('Stash 平台仅支持 ios 或 macos');
     const draft = validateDoc('profile', body.profile as Record<string, unknown>, '', c.get('user'), store);
-    const res = await renderer.previewDraft(draft, { client, ...(platform ? { platform } : {}) });
+    const res = await renderer.previewDraft(draft, { client, ...(platform ? { platform } : {}) }, c.get('user').id);
     return c.json(res.yaml ? { ...res, yaml: res.yaml.replaceAll(TOKEN_PLACEHOLDER, '{token}') } : res);
   });
   app.use('/profiles/:id/*', requireUser);

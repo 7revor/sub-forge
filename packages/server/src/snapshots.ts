@@ -8,8 +8,8 @@ import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 
 const SOURCE_REQUEST_OPTIONS = { ua: DEFAULT_UA, timeoutMs: DEFAULT_TIMEOUT_MS };
 
-export type SnapshotResult = { snapshot?: SnapshotRow; stale: boolean; error?: string };
-export type SnapshotFetchOptions = FetchOptions & { format?: RuleSetFormat; scope?: string };
+export type SnapshotResult = { snapshot?: SnapshotRow; revision?: string; stale: boolean; error?: string };
+export type SnapshotFetchOptions = FetchOptions & { format?: RuleSetFormat; behavior?: 'domain' | 'ipcidr' | 'classical'; scope?: string };
 
 /** 内容不可用时返回原因；可用返回 undefined */
 export function unusableBody(kind: SnapshotOwner, id: string, body: string, format: RuleSetFormat = 'auto'): string | undefined {
@@ -32,9 +32,29 @@ export class SnapshotService {
   private readonly inflight = new Map<string, Promise<SnapshotRow>>();
   private readonly previews = new Map<string, Promise<{ body?: string; error?: string }>>();
   constructor(private readonly store: Store, private readonly fetcher: UpstreamFetcher, private readonly now: () => number = Date.now) {}
+  private options(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions): SnapshotFetchOptions {
+    if (kind === 'source') return { ...SOURCE_REQUEST_OPTIONS, scope: opts.scope };
+    const source = this.store.get('ruleset', id)?.sources.find(s => s.url === url);
+    const format = opts.format ?? source?.format ?? 'auto';
+    return { ...(format === 'mrs' ? { behavior: opts.behavior ?? source?.behavior } : {}), ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format, scope: opts.scope };
+  }
   identity(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): string {
-    const options = kind === 'source' ? SOURCE_REQUEST_OPTIONS : { ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format: opts.format ?? (kind === 'ruleset' ? this.store.get('ruleset',id)?.sources.find(s=>s.url===url)?.format : undefined) ?? 'auto' };
-    return this.store.bindResource(kind,id,url,options,opts.scope);
+    const { scope, ...options } = this.options(kind, id, url, opts);
+    const saved = this.store.getWithOwner(kind, id);
+    const sources = kind === 'ruleset' ? this.store.get('ruleset', id)?.sources.filter(s => s.url === url) : undefined;
+    const compatible = !sources?.length ? !options.ua || options.ua === DEFAULT_UA : sources.every(source =>
+      options.ua === (source.fetch?.ua ?? DEFAULT_UA) && options.timeoutMs === (source.fetch?.timeoutMs ?? DEFAULT_TIMEOUT_MS) && options.format === source.format && (options.format !== 'mrs' || options.behavior === source.behavior));
+    // 升级旧快照时不能把旧参数或旧权限的正文绑定到本次草稿读取身份。
+    const migrateLegacy = compatible && (!scope || !saved?.owner || scope === saved.owner || scope === 'public-repository' && sources?.every(s => !!s.repository && !s.fetch?.ua));
+    return this.store.bindResource(kind, id, url, options, scope, !!migrateLegacy);
+  }
+  private revision(snapshot: SnapshotRow): string {
+    const success = this.store.latestSnapshot(snapshot.ownerKind,snapshot.ownerId,snapshot.url);
+    const attempt = this.store.latestSnapshot(snapshot.ownerKind,snapshot.ownerId,snapshot.url,false);
+    return JSON.stringify([success?.id,success?.fetchedAt,success?.hash,attempt?.id,attempt?.fetchedAt]);
+  }
+  isCurrent(snapshot: SnapshotRow, revision: string | undefined): boolean {
+    return this.revision(snapshot) === revision;
   }
   status(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}) {
     const resource = this.identity(kind,id,url,opts);
@@ -59,15 +79,17 @@ export class SnapshotService {
     return result;
   }
   refresh(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): Promise<SnapshotRow> {
+    opts = this.options(kind, id, url, opts);
     const resource = this.identity(kind,id,url,opts);
     const running = this.inflight.get(resource);
     if (running) return running;
+    const documentExisted = !!this.store.get(kind,id);
     const p = (async () => {
       // 先进入微任务，确保同步失败也能正确清理在途表。
       await Promise.resolve();
       try {
         if (opts.format === 'srs') throw new Error('暂不支持 SRS 资源托管，请使用文本或 MRS 来源');
-        const res = await this.fetcher(url,kind === 'source' ? SOURCE_REQUEST_OPTIONS : { ua: opts.ua, timeoutMs: opts.timeoutMs, ruleContent: true, rawMrs: opts.format === 'mrs' });
+        const res = await this.fetcher(url,kind === 'source' ? SOURCE_REQUEST_OPTIONS : { ua: opts.ua, timeoutMs: opts.timeoutMs, ruleContent: true, rawMrs: opts.format === 'mrs', mrsBehavior: opts.behavior });
         const unusable = opts.format === 'mrs' && res.body.startsWith('#subforge-binary-mrs\n') ? undefined : unusableBody(kind,id,res.body,opts.format);
         if (unusable) throw new Error(unusable);
         if (opts.format === 'mrs' && !res.body.startsWith('#subforge-binary-mrs\n')) throw new Error('上游没有返回有效 MRS 文件');
@@ -83,7 +105,16 @@ export class SnapshotService {
       } catch (error) {
         const previous = this.store.latestSnapshot(kind,resource,url,false);
         return this.store.addSnapshot({ ownerKind:kind,ownerId:resource,url,fetchedAt:Math.max(this.now(),(previous?.fetchedAt ?? -1)+1),ok:false,error:(error as Error).message });
-      } finally { this.inflight.delete(resource); this.store.changed(); }
+      } finally {
+        this.inflight.delete(resource);
+        // 临时引用和同 URL 的不同读取参数可能并发，不把它们误当已删除文档。
+        if (documentExisted) {
+          const doc = this.store.get(kind,id);
+          const stillReferenced = doc && ('url' in doc ? doc.url === url : doc.sources.some(s => s.url === url));
+          if (!stillReferenced) this.store.pruneUnusedResource(resource);
+        }
+        this.store.changed();
+      }
     })();
     this.inflight.set(resource,p);
     return p;
@@ -94,9 +125,9 @@ export class SnapshotService {
     if (policy.refresh || status.nextFetchAt === undefined || this.now() >= status.nextFetchAt || status.refreshing) {
       const row = await this.refresh(kind,id,url,opts);
       latest = this.store.latestSnapshot(kind,status.resource,url);
-      return { snapshot:latest,stale:!row.ok && !!latest,error:row.ok ? undefined : row.error };
+      return { snapshot:latest,revision:latest ? this.revision(latest) : undefined,stale:!row.ok && !!latest,error:row.ok ? undefined : row.error };
     }
-    return { snapshot:latest,stale:!!status.error && !!latest,error:status.error };
+    return { snapshot:latest,revision:latest ? this.revision(latest) : undefined,stale:!!status.error && !!latest,error:status.error };
   }
   async peek(url: string, opts: SnapshotFetchOptions = {}): Promise<{ body?: string; error?: string }> {
     const result = await this.peekRuleContent(url,opts);

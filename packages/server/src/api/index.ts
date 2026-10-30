@@ -1,3 +1,4 @@
+import { ResourceAccessError } from '../resource-access.ts';
 import { ResourceService } from '../resources.ts';
 import { resourceRoutes } from './resources.ts';
 import { systemRoutes } from './system.ts';
@@ -42,6 +43,7 @@ export type ApiDeps = {
 export function createApi(deps: ApiDeps) {
   const api = new Hono<ApiEnv>();
   api.onError((err, c) => {
+    if (err instanceof ResourceAccessError) return c.json({ error: err.message }, 404);
     if (err instanceof HttpError) return c.json(err.details === undefined ? { error: err.message } : { error: err.message, details: err.details }, err.status);
     console.error(err);
     return c.json({ error: '服务器内部错误' }, 500);
@@ -52,6 +54,7 @@ export function createApi(deps: ApiDeps) {
   // 占位接口先于 /users/:id 等通配路由注册
   const repos = deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now,undefined,deps.snapshots);
   const resources=deps.resources ?? new ResourceService(deps.store,deps.snapshots,deps.renderer,deps.now);
+  resources.setAdditionalResources(() => repos.cachedResources());
   api.route('/', ruleRepoRoutes(deps.store, repos, resources));
   api.route('/', ruleOptionRoutes(deps.store, repos));
 

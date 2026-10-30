@@ -13,13 +13,13 @@ import type { UpstreamFetcher } from '../net/upstream.ts';
 import { HttpError, bad, notFound } from '../api/common.ts';
 import { applyReadme, buildEntries, BUILTIN_REPOS, normalizeSearch, rawUrl, upstreamUrl, type IndexedEntry, type RepoDefinition, type RepoFile } from './adapters.ts';
 
-const DAY = 86_400_000;
 type RepoRow = { id: string; enabled: number; built_at: number | null; checked_at: number | null; revisions: string; error: string | null; entries: number; definition: string | null; indexed_definition: string | null };
 const configRevision = (value: string) => createHash('sha256').update(value).digest('hex');
 
 export class RuleRepoService {
   private jobs = new Map<string, Promise<void>>();
   private details = new Map<string, Promise<ReturnType<RuleRepoService['formatDetail']>>>();
+  private detailJobs = new Set<Promise<ReturnType<RuleRepoService['formatDetail']>>>();
   private timer?: ReturnType<typeof setInterval>;
   private stopped = false;
   private editing = new Set<string>();
@@ -126,6 +126,17 @@ export class RuleRepoService {
     if (!findRuleFile(this.store.db,id,ref,path) || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中');
     return {kind:'ruleset' as const,id:`repository-file:${id}:${ref}:${path}`,name:path,url:rawUrl(this.definition(id,true),{ref,path,format:'auto'}),options:{format:'auto' as const,scope:'public-repository'}};
   }
+  /** 只调度已实际读取的公开正文，不预抓取整库文件。失效索引不再自动拉取。 */
+  cachedResources() {
+    const rows = this.store.db.prepare("SELECT DISTINCT id FROM resource_bindings WHERE kind = 'ruleset' AND id LIKE 'repository-file:%'").all() as {id:string}[];
+    return rows.flatMap(row => {
+      const match = /^repository-file:([^:]+):([^:]+):(.+)$/.exec(row.id);
+      if (!match) return [];
+      const id=match[1]!, ref=match[2]!, path=match[3]!;
+      if (!this.rows().some(r => r.id === id && r.enabled) || !findRuleFile(this.store.db,id,ref,path)) return [];
+      return [this.fileResource(id,ref,path)];
+    });
+  }
   /** 只预览选中的目录文件，保留注释和空行，不解析 README 或聚合其他来源。 */
   async filePreview(id: string, ref: string, path: string) {
     const version = this.snapshotVersion(id);
@@ -139,6 +150,7 @@ export class RuleRepoService {
     const content = await this.readFile(definition, file);
     this.assertSnapshot(id, version);
     return { repo: id, entry: node.entry ?? undefined, ref, path, name: path.split('/').at(-1)!, content,
+      ...(this.snapshots ? {cache:this.snapshots.status('ruleset',`repository-file:${id}:${ref}:${path}`,rawUrl(definition,file),{format:'auto',scope:'public-repository'})} : {}),
       url: rawUrl(definition, file), upstream: upstreamUrl(definition, file), license: definition.license };
   }
   async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
@@ -304,6 +316,7 @@ export class RuleRepoService {
     return JSON.parse(row.data) as IndexedEntry;
   }
   private async readFile(repo: RepoDefinition, file: RepoFile): Promise<string> {
+    if (this.stopped) throw new HttpError(409,'索引服务已停止');
     this.assertEnabled(repo.id);
     if (this.snapshots && isIndexedRuleFile(file.path)) {
       const url=rawUrl(repo,file);
@@ -376,7 +389,7 @@ export class RuleRepoService {
     clearInterval(this.timer);
     await this.cache.stop();
     await Promise.all(this.jobs.values());
-    await Promise.allSettled(this.details.values());
+    await Promise.allSettled(this.detailJobs);
   }
   private formatDetail(entry: IndexedEntry, preview: string[], count: number | undefined, previewError?: string, rejectedDetails: { line: number; text: string; reason: string }[] = [], rejected = 0) {
     const repo = this.definition(entry.repo, true);
@@ -406,6 +419,8 @@ export class RuleRepoService {
     this.entry(id, path);
     const version = this.snapshotVersion(id);
     const key = `${id}:${path}:${version}`;
+    const running = this.details.get(key);
+    if (running) return running;
 
     const job = (async () => {
       const entry = await this.resolvedEntry(id, path);
@@ -431,10 +446,14 @@ export class RuleRepoService {
         return this.formatDetail(entry, [], undefined, `内容预览失败：${error instanceof Error ? error.message : String(error)}`);
       }
     })();
-    if (this.details.size >= 50) this.details.delete(this.details.keys().next().value!);
     this.details.set(key, job);
-    // 失败后可重新尝试；成功结果只在当前索引版本内缓存。
-    void job.then(() => this.details.delete(key), () => this.details.delete(key));
+    this.detailJobs.add(job);
+    const finished = () => {
+      this.detailJobs.delete(job);
+      if (this.details.get(key) === job) this.details.delete(key);
+    };
+    // 只合并在途任务；索引变化清空查询表后仍等待所有旧任务退出。
+    void job.then(finished, finished);
     return job;
   }
   importVariant(entry: IndexedEntry, variantId?: string) {

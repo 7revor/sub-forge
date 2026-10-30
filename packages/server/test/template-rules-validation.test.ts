@@ -98,14 +98,15 @@ describe('模板自身的规则可用性检查', () => {
     expect(h.calls).toEqual([]);
   });
 
-  it('二进制透传明确标注未检查内容和可达性，不执行服务端下载', async () => {
+  it('二进制必须经过服务端校验，普通文本不能作为 MRS 保存', async () => {
     const h = await setup();
+    h.respond('DOMAIN,not-binary.test');
     const rs = h.store.get('ruleset', 'r')!;
     h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, format: 'mrs', behavior: 'domain' }] });
     const res = await h.admin.post('/api/templates/new/publish', h.template);
-    expect(res.status).toBe(201);
-    expect(res.json.report).toContainEqual(expect.objectContaining({ code: 'template.ruleset-passthrough', level: 'info' }));
-    expect(h.calls).toEqual([]);
+    expect(res.status).toBe(400);
+    expect(res.text).toContain('MRS');
+    expect(h.calls).toHaveLength(1);
   });
   it('没有订阅引用时也拒绝需要合并或改写的旧二进制来源', async () => {
     const h = await setup();

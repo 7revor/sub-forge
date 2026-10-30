@@ -144,6 +144,7 @@ export class Store {
     try { this.migrate(); } catch (e) { this.db.close(); throw e; }
   }
 
+  configurationRevision = 0;
   readonly listeners = new Set<() => void>();
   eventsClosed = false;
   closeEvents(): void { this.eventsClosed = true; this.changed(); }
@@ -154,18 +155,19 @@ export class Store {
   }
   setResourceCacheTtlSec(value: number): void {
     if (!Number.isSafeInteger(value) || value < 3600 || value > 8760 * 3600 || value % 3600) throw new Error('资源缓存时间必须为 1 至 8760 的整数小时');
+    this.configurationRevision++;
     this.db.prepare("INSERT OR REPLACE INTO system_settings VALUES ('resourceCacheTtlSec', ?)").run(String(value));
     this.changed();
   }
   /** 相同权限、地址与读取参数共享一份成功原文。绑定不改变文档归属。 */
-  bindResource(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string): string {
+  bindResource(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string, migrateLegacy = true): string {
     const owner = scope ?? this.getWithOwner(kind, id)?.owner ?? `reference:${id}`;
     const resource = 'resource:' + this.cipher.hmac(JSON.stringify([kind, owner, url, options]));
     const urlHash = this.cipher.hmac(url);
     const prior = this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,urlHash) as { resource: string } | undefined;
     if (prior?.resource === resource) return resource;
     // 旧快照只在首次绑定时迁移；参数变化不能沿用旧读取身份的正文。
-    if (!prior) {
+    if (!prior && migrateLegacy) {
       for (const ok of [true, false]) {
         const legacy = this.latestSnapshot(kind,id,url,ok);
         const current = this.latestSnapshot(kind,resource,url,ok);
@@ -175,6 +177,20 @@ export class Store {
     }
     this.db.prepare('INSERT OR REPLACE INTO resource_bindings VALUES (?, ?, ?, ?)').run(kind,id,urlHash,resource);
     return resource;
+  }
+  pruneUnusedResource(resource: string): void {
+    if (resource.startsWith('resource:') && !this.db.prepare('SELECT 1 FROM resource_bindings WHERE resource = ? LIMIT 1').get(resource)) {
+      this.db.prepare('DELETE FROM snapshots WHERE owner_id = ?').run(resource);
+    }
+  }
+  private dropResourceBindings(kind: SnapshotOwner, id: string, urls: string[] = []): void {
+    const keep = new Set(urls.map(url => this.cipher.hmac(url)));
+    const rows = this.db.prepare('SELECT url_hash, resource FROM resource_bindings WHERE kind = ? AND id = ?').all(kind,id) as {url_hash:string;resource:string}[];
+    for (const row of rows) {
+      if (keep.has(row.url_hash)) continue;
+      this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(kind,id,row.url_hash);
+      this.pruneUnusedResource(row.resource);
+    }
   }
   private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
     return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,this.cipher.hmac(url)) as {resource:string}|undefined)?.resource ?? id;
@@ -489,12 +505,15 @@ export class Store {
 
   /** owner 为 null 表示系统级文档（预设等），只在新建时写入，更新时保持原归属 */
   put<K extends DocKind>(kind: K, doc: DocTypes[K], owner: string | null = null): void {
+    this.configurationRevision++;
     doc = structuredClone(doc);
     this.stripResourceTiming(doc as unknown as Record<string, any>);
     if (kind === 'profile') doc = stripProfileRevisions(doc as ProfileDoc) as DocTypes[K];
     if (kind === 'source') doc = normalizeSourceFetch(doc as SourceDoc) as DocTypes[K];
     this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
       .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
+    if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
+    if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
     this.changed();
   }
 
@@ -535,12 +554,15 @@ export class Store {
   }
 
   delete(kind: DocKind, id: string): boolean {
+    this.configurationRevision++;
+    if (kind === 'source' || kind === 'ruleset') this.dropResourceBindings(kind,id);
     return this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
   }
 
   // ---------- 当前模板（沿用旧表结构；版本列仅兼容旧数据迁移，新写入固定为 1） ----------
 
   putTemplateVersion(t: TemplateVersionDoc): void {
+    this.configurationRevision++;
     const { changelog: _changelog, version: _version, ...current } = t;
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM template_versions WHERE template_id = ?').run(t.id);
@@ -779,6 +801,7 @@ export class Store {
     if (patch.scriptAllowed !== undefined) { sets.push('script_allowed = ?'); args.push(patch.scriptAllowed ? 1 : 0); }
     if (patch.passwordHash !== undefined) { sets.push('password_hash = ?'); args.push(patch.passwordHash); }
     if (!sets.length) return;
+    this.configurationRevision++;
     this.db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...args, id);
   }
 

@@ -30,15 +30,19 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
   // 事件不携带文档、URL 或其他用户数据；实际读取仍经每个接口授权。
   app.get('/events',requireUser,c=>streamSSE(c,async stream=>{
     let wake:()=>void=()=>{};
-    const signal=()=>wake();store.listeners.add(signal);
+    let revision=0;
+    const signal=()=>{revision++;wake();};store.listeners.add(signal);
     let closed=false;stream.onAbort(()=>{closed=true;wake();});
     try {
       while(!closed && !store.eventsClosed) {
         if(!store.getSessionUser(getCookie(c,SESSION_COOKIE)??''))break;
+        const sentRevision=revision;
         await stream.writeSSE({event:'changed',data:'{}'});
+        if(closed || store.eventsClosed)break;
+        if(revision!==sentRevision)continue;
         await new Promise<void>(resolve=>{const timer=setTimeout(resolve,15000);wake=()=>{clearTimeout(timer);resolve();};});
       }
-    } finally {store.listeners.delete(signal);}
+    } finally {wake();store.listeners.delete(signal);}
   }));
   return app;
 }

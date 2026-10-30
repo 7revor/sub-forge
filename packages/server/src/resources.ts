@@ -1,3 +1,4 @@
+import { ResourceAccessError } from './resource-access.ts';
 // 资源调度与手动刷新使用同一依赖收集和状态。任务持久化，重启后明确标记中断。
 import type { NodeSetID } from '@sub-forge/core';
 import { profileTemplate } from './profile-routing.ts';
@@ -14,6 +15,8 @@ export class ResourceService {
   private readonly running = new Map<string, Promise<void>>();
   private timer?: ReturnType<typeof setInterval>;
   private stopping = false;
+  private additionalResources: () => Resource[] = () => [];
+  setAdditionalResources(read: () => Resource[]) { this.additionalResources = read; }
   private ticking?: Promise<void>;
   constructor(private store:Store,private snapshots:SnapshotService,private renderer:RenderService,private now:()=>number=Date.now) {
     store.db.exec('CREATE TABLE IF NOT EXISTS refresh_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL, at INTEGER NOT NULL)');
@@ -31,10 +34,10 @@ export class ResourceService {
     return row ? JSON.parse(this.store.cipher.decrypt(row.data)) : undefined;
   }
   ruleResources(rs:RuleSetDoc,scope?:string):Resource[] {
-    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:rs.id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,scope:s.repository && !s.fetch?.ua ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? scope}}));
+    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:rs.id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:s.repository && !s.fetch?.ua ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? scope}}));
   }
-  nodeResources(refs:NodeSetID[]):Resource[] {
-    return this.renderer.collectNodeSets(refs).sources.map(s=>({kind:'source',id:s.id,name:s.name,url:s.url,options:{}}));
+  nodeResources(refs:NodeSetID[], owner?:string|null):Resource[] {
+    return this.renderer.collectNodeSets(refs,owner).sources.map(s=>({kind:'source',id:s.id,name:s.name,url:s.url,options:{}}));
   }
   collect(kind:string,id:string):Resource[] {
     if (kind === 'source' || kind === 'collection') return this.nodeResources([{type:kind,id}]);
@@ -43,7 +46,7 @@ export class ResourceService {
     const profile = this.store.get('profile',id);
     if (!profile) throw new Error('配置订阅不存在');
     const template = profile.routing?.mode === 'independent' ? undefined : profileTemplate(profile,(key,v)=>this.store.getTemplate(key,v));
-    return [...this.nodeResources(profile.nodeSets.map(n=>n.ref)),...Object.values(this.renderer.collectRules(profile,template).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,this.store.getWithOwner('profile',id)?.owner ?? undefined))];
+    return [...this.nodeResources(profile.nodeSets.map(n=>n.ref),this.store.getWithOwner('profile',id)?.owner),...Object.values(this.renderer.collectRules(profile,template).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,this.store.getWithOwner('profile',id)?.owner ?? undefined))];
   }
   unique(resources:Resource[]):Resource[] {
     return [...new Map(resources.map(r=>[this.snapshots.identity(r.kind,r.id,r.url,r.options),r])).values()];
@@ -52,18 +55,29 @@ export class ResourceService {
     return this.unique(resources).map(r=>({name:r.name,...this.snapshots.status(r.kind,r.id,r.url,r.options)}));
   }
   all():Resource[] {
+    const collect = (kind:string,id:string) => {
+      try { return this.collect(kind,id); }
+      catch (error) {
+        if (!(error instanceof ResourceAccessError)) throw error;
+        console.warn(`跳过无权访问的资源依赖：${kind}:${id}`);
+        return [];
+      }
+    };
     return this.unique([
-      ...this.store.list('source').flatMap(s=>this.collect('source',s.id)),
-      ...this.store.list('ruleset').flatMap(s=>this.collect('ruleset',s.id)),
-      ...this.store.list('profile').flatMap(p=>this.collect('profile',p.id)),
+      ...this.additionalResources(),
+      ...this.store.list('source').flatMap(s=>collect('source',s.id)),
+      ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
+      ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
       ...this.store.listLatestTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,'public-template'))),
     ]);
   }
   private async each(resources:Resource[],read:(r:Resource)=>Promise<void>) {
     let next = 0;
-    await Promise.all(Array.from({length:Math.min(4,resources.length)},async()=>{
+    const results = await Promise.allSettled(Array.from({length:Math.min(4,resources.length)},async()=>{
       while (!this.stopping && next < resources.length) await read(resources[next++]!);
     }));
+    const errors = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    if (errors.length) throw new AggregateError(errors.map(r => r.reason), '资源刷新执行失败');
   }
   startJob(owner:string,kind:string,id:string,explicit?:Resource[]):RefreshJob {
     if (this.stopping) throw new Error('服务正在关闭');
@@ -76,6 +90,11 @@ export class ResourceService {
     this.save(job);
     const work = (async()=>{
       await this.each(resources,async r=>{
+        if (!explicit) {
+          const root = this.store.getWithOwner(kind as 'source'|'collection'|'ruleset'|'profile', id);
+          if (!root || root.owner !== owner) throw new ResourceAccessError();
+          if (dependencyKey(this.collect(kind,id)) !== initialDependencies) throw new Error('刷新期间资源配置已变化，请重新刷新');
+        }
         const result = await this.snapshots.refresh(r.kind,r.id,r.url,r.options);
         job.results.push({name:r.name,ok:result.ok,available:!!this.store.latestSnapshot(r.kind,result.ownerId,r.url),error:result.error});
         job.completed++; this.save(job);
@@ -96,12 +115,16 @@ export class ResourceService {
         }
         job.render={ok:!failures.length,...(failures.length ? {error:failures.join('；')} : {})};
       }
+      if (!explicit && dependencyKey(this.collect(kind,id)) !== initialDependencies) {
+        job.state='interrupted';job.error='刷新期间资源配置已变化，请重新刷新';return;
+      }
       job.state='done';
     })().catch(error=>{job.state='interrupted';job.error=error instanceof Error?error.message:String(error);}).finally(()=>{this.save(job);this.running.delete(job.id);});
     this.running.set(job.id,work);
     return job;
   }
   tick():Promise<void> {
+    if (this.stopping) return Promise.resolve();
     if (this.ticking) return this.ticking;
     const work = (async()=>{
       await this.each(this.all(),async r=>{
@@ -113,7 +136,7 @@ export class ResourceService {
     this.ticking=work;return work;
   }
   start() {
-    if(this.timer)return;
+    if(this.timer || this.stopping)return;
     const run=()=>void this.tick().catch(error=>console.error('资源调度失败',error));
     run();this.timer=setInterval(run,60_000);this.timer.unref();
   }
