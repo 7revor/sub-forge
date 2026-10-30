@@ -30,11 +30,12 @@ describe('PRD 场景 3：落地走中转（provider 内节点）', () => {
   };
   const via = { kind: 'node' as const, ref: { nodeSet: { type: 'source' as const, id: 'T' }, match: { exact: '🇭🇰 IPLC-01' } } };
 
-  it('整源走同一前置：生成包装组 + provider override.dialer-proxy', () => {
+  it('整源走同一前置：生成包装组并覆写专属 Provider 内容', () => {
     const r = render({ ...base, chains: [{ id: 'c1', landing: { nodeSet: { type: 'source', id: 'L' } }, via }] });
     const wrapper = groupsOf(r).find((g) => String(g.name).startsWith('__ref_T_'))!;
     expect(wrapper).toEqual({ name: wrapper.name, type: 'select', use: ['中转'], filter: '^🇭🇰 IPLC-01$', hidden: true, 'empty-fallback': 'REJECT' });
-    expect((r.config['proxy-providers'] as Record<string, Record<string, unknown>>)['落地']!.override).toEqual({ 'dialer-proxy': wrapper.name });
+    expect((r.config['proxy-providers'] as Record<string, Record<string, unknown>>)['落地']).not.toHaveProperty('override');
+    expect(providerProxies(r, 'source:L').every(n => n['dialer-proxy'] === wrapper.name)).toBe(true);
     expect(r.dependencies).toEqual([{ refKey: expect.any(String), nodeSet: 'source:T', node: '🇭🇰 IPLC-01', strategy: 'wrap', output: wrapper.name, usedBy: ['chain:c1'] }]);
     expect(r.report.items.filter((i) => i.level === 'error')).toEqual([]);
   });

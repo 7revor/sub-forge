@@ -39,7 +39,7 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
         {isLoading && <span className="text-ink-muted">节点列表加载中…</span>}
         {error && <span className="text-err">节点列表加载失败：{error.message}</span>}
         {result.error && <span className="text-err">{result.error}</span>}
-        {data && !error && !result.error && <span className={result.count ? 'text-ink-muted' : 'text-err'}>{data.truncated ? '当前列表：' : ''}{result.node ? `命中 ${result.count} 个，使用：${result.node.name}` : '没有命中'}</span>}
+        {data && !!text.trim() && !error && !result.error && <span className={result.count ? 'text-ink-muted' : 'text-err'}>{data.truncated ? '当前列表：' : ''}{result.node ? `命中 ${result.count} 个，使用：${result.node.name}` : '没有命中'}</span>}
         {data && !error && exact && text && !result.count && <span className="text-[#6b3406]">当前列表中没有这个节点，上游恢复后会重新解析</span>}
         {data?.truncated && <span className="text-[#6b3406]">节点列表已截断：当前 {data.nodes.length} / 总数 {data.total}，命中数与首个节点仅基于当前列表，最终以完整列表解析为准。</span>}
         {data?.report.map((item, i) => <span key={i} className={item.level === 'error' ? 'text-err' : 'text-ink-muted'}>{item.message}</span>)}

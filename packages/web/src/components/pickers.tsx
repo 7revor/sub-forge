@@ -83,6 +83,6 @@ export function memberLabel(m: GroupMember, groupName: (id: string) => string, n
     case 'group': return { kind: '组', text: groupName(m.groupId) };
     case 'nodeset': return { kind: '节点集', text: nodeSetName(m.ref) };
     case 'node': return { kind: '节点', text: targetLabel({ kind: 'node', ref: m.ref }, groupName, nodeSetName) };
-    case 'all': return { kind: '全部', text: m.scope === 'all' ? '全部节点与组' : m.scope === 'proxies' ? '全部本地节点' : '全部 provider' };
+    case 'all': return { kind: '全部', text: m.scope === 'all' ? '全部节点' : m.scope === 'proxies' ? '全部 Inline 节点' : '全部 Provider' };
   }
 }

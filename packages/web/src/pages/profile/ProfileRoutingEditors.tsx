@@ -1,21 +1,18 @@
 // 订阅与模板使用同一套列表和弹窗；订阅补充节点成员与独立规则出口。
-import type { GroupSpec, RuleEntry } from '@sub-forge/core';
+import type { RuleEntry } from '@sub-forge/core';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ClientOverrides } from '../../components/ClientOverrides.tsx';
-import { ExtraFields } from '../../components/ExtraFields.tsx';
-import { MatchPreview } from '../../components/MatchPreview.tsx';
-import { SortableList } from '../../components/SortableList.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { RuleTargetSelect } from '../../components/RuleTargetSelect.tsx';
-import { Badge, Button, Empty, ErrorAlert, Field, Input, Switch } from '../../components/ui.tsx';
+import { ErrorAlert, Switch } from '../../components/ui.tsx';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
 import { useRuleSetRefs } from '../../hooks.ts';
 import { TemplateGroupsEditor } from '../template/TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from '../template/TemplateRulesEditor.tsx';
 import { draftIssues } from '../template/model.ts';
 import { useProfile } from './context.ts';
-import { MemberAdder } from './MemberAdder.tsx';
+import { ProfileGroupDialog } from './ProfileGroupDialog.tsx';
 
 function useRoutingBody() {
   const { draft, setDraft, template } = useProfile();
@@ -28,33 +25,6 @@ function useRoutingBody() {
   return { body, update, bound };
 }
 
-function GroupMembers({ group }: { group: GroupSpec }) {
-  const { draft, setDraft, groupName, nodeSetName } = useProfile();
-  const routing = draft.routing!;
-  const bound = routing.mode === 'bound';
-  const members = bound ? routing.groupAdditions[group.id] ?? [] : group.members;
-  const inherited = bound ? group.members : [];
-  const setMembers = (members: GroupSpec['members']) => setDraft({ ...draft, routing: routing.mode === 'bound'
-    ? { ...routing, groupAdditions: { ...routing.groupAdditions, [group.id]: members } }
-    : { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, members } : g) } } });
-  const refs = [...new Map([...inherited, ...members].flatMap(m => m.kind === 'nodeset' ? [[`${m.ref.type}:${m.ref.id}`, m.ref] as const] : [])).values()];
-  return <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
-    {inherited.length > 0 && <div className="flex flex-col gap-2"><span className="text-[12px] text-ink-muted">模板成员</span>{inherited.map((m, i) => <div key={i} className="flex items-center gap-2 text-[13px]"><Badge>模板</Badge>{memberLabel(m, groupName, nodeSetName).text}</div>)}</div>}
-    <h3 className="m-0 text-[14px] font-semibold">{bound ? '本订阅填充' : '成员与节点填充'}</h3>
-    {bound && <p className="m-0 text-[12.5px] text-ink-muted">追加在模板成员之后，仅影响本订阅。</p>}
-    {members.length ? <div className="rounded-lg border border-line px-3"><SortableList items={members} onReorder={setMembers} renderItem={(m, i, handle) => <div className="flex items-center gap-2 border-b border-line-2 py-2 last:border-0">
-      {handle}<span className="min-w-0 flex-1 break-all text-[13px]">{memberLabel(m, groupName, nodeSetName).text}</span>
-      <Button size="sm" aria-label={`移除 ${memberLabel(m, groupName, nodeSetName).text}`} onClick={() => setMembers(members.filter((_, j) => i !== j))}>移除</Button>
-    </div>} /></div> : <Empty title={bound ? '尚未填充节点' : '还没有成员'} />}
-    <MemberAdder key={group.id} excludeGroupId={group.id} onAdd={m => setMembers([...members, m])} />
-    {refs.map(ref => <div key={`${ref.type}:${ref.id}`} className="flex flex-col gap-2"><span className="text-[12px] text-ink-muted">{nodeSetName(ref)}</span><MatchPreview nodeSet={ref} filter={group.filter} excludeFilter={group.excludeFilter} excludeType={group.excludeType} /></div>)}
-    {!bound && <details className="text-[13px]"><summary className="cursor-pointer text-ink-muted">更多组设置</summary><div className="mt-3 flex flex-col gap-3">
-      <Field label="图标地址">{id => <Input id={id} value={group.display?.icon ?? ''} onChange={e => { if (routing.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, display: { ...g.display, icon: e.target.value || undefined } } : g) } } }); }} />}</Field>
-      <ExtraFields value={group.extra ?? {}} validateName={name => name === 'empty-fallback' ? '空组固定使用 REJECT' : undefined} onChange={extra => { if (routing.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, extra } : g) } } }); }} />
-    </div></details>}
-  </section>;
-}
-
 export function ProfileGroupsEditor() {
   const { draft, template, groupName, nodeSetName } = useProfile();
   const { body, update, bound } = useRoutingBody();
@@ -65,7 +35,7 @@ export function ProfileGroupsEditor() {
       memberSummary={group => {
         const additions = draft.routing?.mode === 'bound' ? draft.routing.groupAdditions[group.id] ?? [] : [];
         return [...group.members, ...additions].map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '尚未添加成员';
-      }} renderMembers={group => <GroupMembers group={group} />} />
+      }} renderGroupDialog={(group, close) => <ProfileGroupDialog key={group.id} groupId={group.id} onClose={close} />} />
   </>;
 }
 

@@ -136,7 +136,7 @@ it('代理链前置节点在保存、解除绑定与重新绑定时保留', asyn
   expect((await alice.put(`/api/profiles/${profile.id}`, detached.json.item)).status).toBe(200);
   const rendered = await renderer.render(profile.id, { client: 'mihomo' });
   expect(rendered.ok, JSON.stringify(rendered.report)).toBe(true);
-  expect(rendered.ok && rendered.render.yaml).toContain('dialer-proxy');
+  expect(rendered.ok && Object.values(rendered.render.providers).join('\n')).toContain('dialer-proxy: __ref_');
   const independent = (await alice.get(`/api/profiles/${profile.id}`)).json.item;
   const rebound = await alice.post('/api/profiles/routing/convert', { profile: independent, mode: 'bound', templateId: profile.routing.templateId, mapping: { g: 'g' } });
   expect(rebound.status).toBe(200);
