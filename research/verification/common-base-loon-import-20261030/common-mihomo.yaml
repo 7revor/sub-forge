@@ -1,0 +1,47 @@
+hosts:
+  home.example.test: 192.0.2.1
+dns:
+  nameserver:
+    - 223.5.5.5
+  ipv6: false
+  nameserver-policy:
+    dns.example.test: 1.1.1.1
+  fake-ip-filter:
+    - real.example.test
+  enable: true
+  use-hosts: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+port: 7890
+socks-port: 7891
+allow-lan: false
+tun:
+  enable: true
+  stack: mips
+  auto-route: true
+  auto-detect-interface: true
+  dns-hijack:
+    - any:53
+proxies:
+  - name: 入口
+    type: ss
+    server: entry.example.test
+    port: 443
+    cipher: aes-128-gcm
+    password: example
+  - name: 落地
+    type: ss
+    server: exit.example.test
+    port: 443
+    cipher: aes-128-gcm
+    password: example
+    dialer-proxy: 入口
+proxy-groups:
+  - name: 代理
+    type: select
+    proxies:
+      - 入口
+      - 落地
+    empty-fallback: REJECT
+rules:
+  - MATCH,DIRECT

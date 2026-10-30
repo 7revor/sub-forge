@@ -103,11 +103,17 @@ export function surgeProxyLine(node: Node, report: Report): string | undefined {
         for (const k of Object.keys(ws)) if (!['path', 'headers'].includes(k)) error('Surge 尚未适配 WebSocket 参数 ' + k);
       }
     }
+    const block = value('block-quic');
+    if (block !== undefined) {
+      const mode = block === true ? 'on' : block === false ? 'off' : block;
+      if (!['on', 'off', 'auto', 'adaptive'].includes(String(mode))) error('Surge block-quic 必须为 on、off、auto 或 adaptive');
+      else add('block-quic', mode);
+    }
     const sni = value('sni'), servername = value('servername');
     if (sni !== undefined && servername !== undefined && sni !== servername) error('节点 sni 与 servername 不一致');
     add('sni', sni ?? servername);
     const alpn = value('alpn'); if (alpn !== undefined) add('alpn', Array.isArray(alpn) ? alpn.map(v => iniValue(v)).join(',') : alpn, true);
-    for (const [source, target] of [['udp','udp-relay'], ['tfo','tfo'], ['skip-cert-verify','skip-cert-verify'], ['dialer-proxy','underlying-proxy'], ['interface-name','interface'], ['test-url','test-url'], ['test-timeout','test-timeout'], ['block-quic','block-quic']]) map(source!, target!);
+    for (const [source, target] of [['udp','udp-relay'], ['tfo','tfo'], ['skip-cert-verify','skip-cert-verify'], ['dialer-proxy','underlying-proxy'], ['interface-name','interface'], ['test-url','test-url'], ['test-timeout','test-timeout']]) map(source!, target!);
     const ipVersion = value('ip-version');
     if (ipVersion !== undefined) {
       const mapping: Record<string, string> = { dual: 'dual', ipv4: 'v4-only', ipv6: 'v6-only', 'ipv4-prefer': 'prefer-v4', 'ipv6-prefer': 'prefer-v6' };

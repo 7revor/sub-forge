@@ -138,7 +138,9 @@ export function createApp(deps: AppDeps) {
     if (!renderer.canReadNodes(selected, t.userId) || typeof selected.providers[key] !== 'string') return notFound(c);
     const traffic = userinfoHeader(selected.providerUserinfo?.[key]);
     if (traffic) c.header('subscription-userinfo', traffic);
-    c.header('content-type', 'text/yaml; charset=utf-8');
+    c.header('content-type', 'text/plain; charset=utf-8');
+    c.header('content-disposition', 'inline');
+    c.header('x-content-type-options', 'nosniff');
     return c.body(selected.providers[key]!.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
@@ -174,8 +176,7 @@ export function createApp(deps: AppDeps) {
     let target;
     try { target = detectClient(c.req.header('user-agent') ?? '', c.req.query()); }
     catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
-    if (target.client === 'surge') return c.text('Surge 规则订阅输出尚未开放，请使用规则转换预览', 501);
-    if (target.client === 'stash' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('Stash 平台仅支持 ios 或 macos', 400);
+    if (target.client !== 'mihomo' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('该客户端平台仅支持 ios 或 macos', 400);
     const reference = { matcher: { kind: 'ruleset' as const, id } };
     const output = { client: target.client, ...(target.platform ? { platform: target.platform } : {}) };
     try {
@@ -209,8 +210,7 @@ export function createApp(deps: AppDeps) {
     let target;
     try { target = detectClient(c.req.header('user-agent') ?? '', c.req.query()); }
     catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
-    if (target.client === 'surge' || target.client === 'loon') return c.text('该客户端的独立节点订阅输出尚未实现', 501);
-    if (target.client === 'stash' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('Stash 平台仅支持 ios 或 macos', 400);
+    if (target.client !== 'mihomo' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('该客户端平台仅支持 ios 或 macos', 400);
     try {
       const result = await renderer.nodeSet({ type, id }, user.userId, { client: target.client, ...(target.platform ? { platform: target.platform } : {}) });
       if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
@@ -218,7 +218,7 @@ export function createApp(deps: AppDeps) {
       if (traffic) c.header('subscription-userinfo', traffic);
       c.header('profile-update-interval', String(Math.max(1, Math.round(store.resourceCacheTtlSec / 3600))));
       c.header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(store.get(type, id)!.name)}`);
-      c.header('content-type', 'text/yaml; charset=utf-8');
+      c.header('content-type', 'text/plain; charset=utf-8');
       c.header('x-content-type-options', 'nosniff');
       return c.body(result.yaml);
     } catch (error) {

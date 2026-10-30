@@ -63,7 +63,7 @@ export function stringifySurge(result: Pick<MihomoRenderResult, 'config' | 'rule
       const key = match[1]!, target = iniName(match[2]!), provider = providers[key];
       if (!provider || typeof provider.url !== 'string') throw new Error('规则来源缺失');
       if (standalone) {
-        const resource = Object.values(result.rulesets).find(file => file.providerName === key);
+        const resource = Object.values(result.rulesets).find(resource => resource.providerName === key) ?? result.rulesets[key + '.list'];
         if (resource) return resource.text.split(/\r?\n/).filter(s => s.trim() && !s.trim().startsWith('#')).map(s => composeRule(rawRuleParts(s), target));
       }
       return ['RULE-SET,' + iniValue(provider.url) + ',' + target];

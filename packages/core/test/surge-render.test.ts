@@ -90,7 +90,7 @@ describe('Surge 完整订阅', () => {
     expect(renderSurge(f).report.byCode('surge.platform')).toHaveLength(1);
     f.rules.rulesets.rs = { id: 'rs', name: '二进制', sources: [{ id: 'remote', kind: 'remote', url: 'https://example.test/r.mrs', format: 'mrs', behavior: 'domain' }] };
     routing(f).rules.push({ id: 'binary', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } });
-    expect(renderSurge(f).report.byCode('surge.binary-rules')).toHaveLength(1);
+    expect(renderSurge(f).report.byCode('ruleset.conversion-unavailable')).toHaveLength(1);
   });
 });
 

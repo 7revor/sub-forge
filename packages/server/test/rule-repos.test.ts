@@ -71,6 +71,30 @@ describe('规则仓库适配器', () => {
 });
 
 describe('规则仓库索引', () => {
+  it('带 token 的文件链接不依赖登录会话，限制索引范围并阻止在途撤销后的正文泄露', async () => {
+    const h = setup(); await h.service.refresh('blackmatrix7');
+    const reader = h.store.createUser({ username: 'file-reader', passwordHash: 'fixture', role: 'user' });
+    const token = h.store.userToken(reader.id)!.token;
+    const query = new URLSearchParams({ repo: 'blackmatrix7', ref: 'master', path: 'rule/Surge/OpenAI/OpenAI.list' });
+    const url = `/api/files/${token}/repository?${query}`;
+    const response = await h.app.request(url);
+    expect(response.status).toBe(200); expect(await response.text()).toBe('DOMAIN,chatgpt.com\n');
+    expect(response.headers.get('content-type')).toContain('text/plain');
+    expect(response.headers.get('content-disposition')).toMatch(/^inline;/);
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect((await h.app.request(url.replace(token, 'invalid'))).status).toBe(404);
+    query.set('path', 'not-indexed.list');
+    expect((await h.app.request(`/api/files/${token}/repository?${query}`)).status).toBe(400);
+    const original = h.service.filePreview.bind(h.service);
+    let started!: () => void, release!: () => void;
+    const began = new Promise<void>(resolve => { started = resolve; });
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    vi.spyOn(h.service, 'filePreview').mockImplementation(async (...args) => { const result = await original(...args); started(); await pending; return result; });
+    const request = h.app.request(url); await began;
+    h.store.resetToken(token); release();
+    const revoked = await request;
+    expect(revoked.status).toBe(404); expect(await revoked.text()).toBe('');
+  });
   it.each([9, 10])('v%s 持久化库升级后保留文档，重启可直接搜索缓存索引', async version => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-repo-index-'));
     const path = join(dir, 'test.db');

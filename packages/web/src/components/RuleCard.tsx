@@ -7,16 +7,16 @@ const layoutClass = 'grid grid-cols-[24px_minmax(0,1fr)_60px] sm:flex sm:flex-wr
 const contentClass = 'flex min-w-0 items-center gap-2 text-left sm:flex-[1_1_160px]';
 
 /** 规则增强、模板与订阅共用：正文预览，铅笔编辑，操作不会触发预览。 */
-export function RuleCard({ handle, icon, children, count, hint, target, readOnly, invalid, onPreview, onEdit, onDelete, label, id }: {
+export function RuleCard({ handle, icon, children, count, hint, target, readOnly, invalid, previewHref, externalPreview, onPreview, onEdit, onDelete, label, id }: {
   handle: ReactNode; icon: ReactNode; children: ReactNode; count?: ReactNode; hint?: ReactNode; target?: ReactNode;
-  readOnly?: boolean; invalid?: boolean; onPreview: () => void; onEdit: () => void; onDelete: () => void; label: string; id?: string;
+  readOnly?: boolean; invalid?: boolean; previewHref?: string; externalPreview?: boolean; onPreview: () => void; onEdit: () => void; onDelete: () => void; label: string; id?: string;
 }) {
   return <RoutingCard id={id} invalid={invalid} className={layoutClass}>
     {handle}
-    <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg ${contentClass}`}>
+    {externalPreview ? <a href={previewHref} target="_blank" rel="noreferrer noopener" aria-label={`打开${label}的文件`} aria-disabled={!previewHref} title={previewHref ? '在新标签页查看已保存的规则源文件' : '保存后可打开规则文件'} className={`cursor-pointer rounded-lg no-underline ${contentClass}`}><RoutingCardIcon>{icon}</RoutingCardIcon><span className="min-w-0 truncate font-medium">{children}</span></a> : <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg ${contentClass}`}>
       <RoutingCardIcon>{icon}</RoutingCardIcon>
       <span className="min-w-0 truncate font-medium">{children}</span>
-    </button>
+    </button>}
     <div className="col-span-2 col-start-2 row-start-2 flex min-w-0 items-center justify-end gap-2 empty:hidden sm:contents">
       {hint}{count}
       {target && <div className={targetClass}>{target}</div>}

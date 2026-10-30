@@ -43,3 +43,30 @@ it('Mihomo 的 DNS/TUN/端口不会自动转换；各端只合并自己的预设
     }
   } finally { await h.snapshots.settled(); h.store.close(); }
 });
+
+it('公共配置四层合并，原生覆盖最后生效，预览与订阅一致', async () => {
+  const h = setupApp();
+  try {
+    const user = await addUser(h.store, 'common'), api = client(h.app); await api.login('common');
+    h.store.put('preset', { id: 'common', name: '公共预设', version: 1, common: { dnsServers: ['223.5.5.5'], hosts: { 'a.test': '192.0.2.1' } }, mihomo: { dns: { nameserver: ['1.1.1.1'] } } });
+    const saved = await api.post('/api/profiles', { name: '公共订阅', nodeSets: [], chains: [], overlay: {}, base: { presetId: 'common', common: { dnsServers: ['9.9.9.9'] }, loonPatch: { general: { 'dns-server': ['1.0.0.1'], 'allow-wifi-access': false } } }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
+    expect(saved.status, saved.text).toBe(201);
+    for (const target of ['mihomo', 'surge', 'loon', 'stash'] as const) {
+      const out = await h.renderer.render(saved.json.item.id, { client: target });
+      expect(out.ok, JSON.stringify(out.report)).toBe(true); if (!out.ok) throw new Error('渲染失败');
+      const parsed = readConfig(target, out.render.yaml);
+      expect(target === 'mihomo' || target === 'stash' ? (parsed.dns as any).nameserver : (parsed.general as any)['dns-server']).toEqual([target === 'mihomo' ? '1.1.1.1' : target === 'loon' ? '1.0.0.1' : '9.9.9.9']);
+    }
+    expect((await api.put('/api/profiles/' + saved.json.item.id, { ...saved.json.item, base: { common: { unknown: true } } })).status).toBe(400);
+  } finally { await h.snapshots.settled(); h.store.close(); }
+});
+it('客户端专用测速覆盖优先于公共默认值，不制造 Loon 超时冲突', async () => {
+  const h = setupApp();
+  try {
+    const user = await addUser(h.store, 'timeout'), api = client(h.app); await api.login('timeout');
+    const saved = await api.post('/api/profiles', { name:'超时',nodeSets:[],chains:[],overlay:{},base:{common:{testTimeoutMs:3000,dnsIpv6:false},loonPatch:{general:{'test-timeout':5,'ip-mode':'v4-only'}}},routing:{mode:'independent',config:{groups:[{id:'g',name:'测速',type:'url-test',members:[{kind:'builtin',name:'DIRECT'}]}],rules:[],final:{kind:'group',groupId:'g'}}} });
+    expect(saved.status).toBe(201); const out=await h.renderer.render(saved.json.item.id,{client:'loon'});
+    expect(out.ok,JSON.stringify(out.report)).toBe(true);if(out.ok)expect(out.render.yaml).toContain('test-timeout = 5');
+    expect(out.report.some(r=>r.code==='base.native-override')).toBe(true);
+  } finally {await h.snapshots.settled();h.store.close();}
+});

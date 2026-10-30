@@ -43,8 +43,8 @@ describe('Surge 主订阅和 API', () => {
     const url = resourceUrl(text), file = await h.app.request(url);
     expect(url).toContain('/r/' + h.token + '/'); expect(file.status).toBe(200);
     expect(await file.text()).toContain('DOMAIN,example.test,extended-matching');
-    expect(await (await h.app.request(url + '?target=mihomo')).text()).toContain('extended-matching');
-    expect((await h.app.request(url + '?platform=macos')).status).toBe(200);
+    expect(await (await h.app.request(url + '?target=mihomo')).text()).toContain('DOMAIN,example.test,extended-matching');
+    expect(await (await h.app.request(url + '?platform=macos')).text()).not.toContain('PROCESS-NAME');
     const mac = await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=surge&platform=macos');
     expect(await mac.text()).toContain('PROCESS-NAME,Example,代理');
     h.store.deleteToken(h.token);

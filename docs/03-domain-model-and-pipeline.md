@@ -376,7 +376,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 单一合法 MRS 来源经校验后原字节托管，SRS 明确不支持。`managedRuleDelivery` 只检查目标输出是否可生成；没有自动透传分支。用户 token、公共资源身份、名称与清理规则见 [全局托管与鉴权](19-managed-resources.md)。
 
-完整订阅支持 Mihomo、Surge、Loon、Stash；客户端差异见 [客户端转换](19-client-conversion.md)。
+完整订阅支持 Mihomo、Surge、Loon、Stash；客户端差异见 [转换说明](19-client-conversion.md)。
 
 ## 管理列表查询模型（2026-10-29）
 

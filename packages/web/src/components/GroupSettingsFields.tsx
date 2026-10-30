@@ -9,6 +9,7 @@ const TEST_FIELDS = [
   ['interval', '间隔（秒）', true, groupPlaceholders.interval], ['timeout', '超时（ms）', true, groupPlaceholders.timeout],
   ['maxFailedTimes', 'max-failed-times', true, groupPlaceholders.maxFailedTimes], ['expectedStatus', 'expected-status', false, groupPlaceholders.expectedStatus],
   ['tolerance', '容差（ms）', true, groupPlaceholders.tolerance],
+  ['maxTimeout', 'Loon 可用性阈值（毫秒）', true, '填写 Loon 节点判定不可用的耗时阈值；其他端尚未等价适配'],
 ] as const;
 
 /** 模板和配置订阅共用参数字段；覆盖写入及可编辑权限留给调用方。 */
@@ -21,7 +22,7 @@ export function GroupSettingsFields({ value, onChange, disabled = false, section
       {TYPES.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}
     </Select>}</Field>}
     {section !== 'type' && <>{value.type !== 'select' && <>
-      {TEST_FIELDS.filter(([key]) => key !== 'tolerance' || value.type === 'url-test').map(([key, label, numeric, placeholder]) => <Field key={key} label={label}>{(id) => <Input disabled={disabled} id={id}
+      {TEST_FIELDS.filter(([key]) => (key !== 'tolerance' || value.type === 'url-test') && (key !== 'maxTimeout' || ['fallback', 'load-balance'].includes(value.type))).map(([key, label, numeric, placeholder]) => <Field key={key} label={label}>{(id) => <Input disabled={disabled} id={id}
         type={numeric ? 'number' : 'text'} min={numeric ? 0 : undefined} step={key === 'maxFailedTimes' ? 1 : undefined}
         className={numeric ? undefined : 'font-mono'} placeholder={disabled ? `${placeholder}（模板未配置）` : placeholder} value={test[key] ?? ''}
         onChange={(event) => onChange('test', { ...test, [key]: event.target.value === '' ? undefined : numeric ? Number(event.target.value) : event.target.value })} />}</Field>)}

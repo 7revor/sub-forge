@@ -1,3 +1,4 @@
+import { lowerCommonBase, mergeBase, type CommonBase } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
@@ -8,7 +9,7 @@ import { profileTemplate } from './profile-routing.ts';
 import { createHash } from 'node:crypto';
 import { stringify } from 'yaml';
 import {
-  resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, renderLoon, isIniClient, stringifySurge, exportStashConfig, sourceKey, sourceLabel, stableStringify,
+  resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, renderLoon, isIniClient, stringifySurge, surgeProxyLine, loonProxyLine, exportStashConfig, sourceKey, sourceLabel, stableStringify,
   type Client, type RuleResourceReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -205,20 +206,29 @@ export class RenderService {
     checkCurrent();
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
     if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    const base = profile.base ? target.client === 'loon'
+    const common = mergeBase(preset?.common ?? {}, profile.base?.common ?? {}) as CommonBase;
+    const nativeBase = profile.base ? target.client === 'loon'
       ? deepMerge(preset?.loon ?? {}, profile.base.loonPatch ?? {})
       : target.client === 'surge'
       ? deepMerge(preset?.surge ?? {}, profile.base.surgePatch ?? {})
       : target.client === 'stash'
       ? deepMerge(preset?.stash ?? {}, profile.base.stashPatch ?? {})
       : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
+    const mapped = lowerCommonBase(common, target.client, target.platform, nativeBase);
+    pre.push(...mapped.report);
+    const base = profile.base ? mergeBase(mapped.base, nativeBase ?? {}) : undefined;
+    const general = base?.general as Record<string, unknown> | undefined;
+    const defaults = { ...common,
+      ...(typeof general?.['proxy-test-url'] === 'string' ? { testUrl: general['proxy-test-url'] } : {}),
+      ...(typeof general?.['test-timeout'] === 'number' ? { testTimeoutMs: general['test-timeout'] * 1000 } : {}),
+    };
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const qs = `${target.client !== 'mihomo' ? '&target=' + target.client : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
     const sharedReferences = new Map<string, RuleResourceReference>();
     const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
-      profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
+      profile, nodeSets, rules, common: defaults, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
@@ -320,14 +330,18 @@ export class RenderService {
     const loaded = await this.loadNodeSets([ref], owner);
     if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
     if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
-    const result = (target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
       profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
       platform: target.platform,
       nodeSets: loaded.inputs, rules: { rulesets: {}, snapshots: {} }, urls: { provider: key => key, ruleset: key => key },
     });
+    const yaml = isIniClient(target.client) ? (result.config.proxies as Record<string, unknown>[]).flatMap(node => {
+      const line = (target.client === 'loon' ? loonProxyLine : surgeProxyLine)(node, result.report);
+      return line ? [line] : [];
+    }).join('\n') + '\n' : stringify({ proxies: result.config.proxies ?? [] }, { lineWidth: 0 });
     const errors = [...loaded.report, ...result.report.items].filter(i => i.level === 'error');
     if (errors.length) throw new Error(errors.map(i => i.message).join('；'));
-    return { yaml: stringify({ proxies: result.config.proxies ?? [] }, { lineWidth: 0 }), userinfo: nodeTraffic(ref, loaded.inputs, loaded.userinfo) };
+    return { yaml, userinfo: nodeTraffic(ref, loaded.inputs, loaded.userinfo) };
   }
 
   collectNodeSets(refs: NodeSetID[], owner?: string | null): { inputs: NodeSetInputs; sources: SourceDoc[] } {

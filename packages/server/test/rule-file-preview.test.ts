@@ -56,3 +56,15 @@ describe('仓库单文件原文预览', () => {
     expect((await pending).status).toBe(404);
   });
 });
+
+it('带 token 的仓库文件读取按访问者记录，GET 和 HEAD 归入规则集合', async () => {
+  const h = await setup();
+  const token = h.store.userToken(h.privateUser.id)!.token;
+  const path = `/api/files/${token}/repository?${new URLSearchParams({ repo: 'blackmatrix7', ref: 'master', path: 'rule/Surge/Google/Google.list' })}`;
+  for (const method of ['GET', 'HEAD']) expect((await h.app.request(path, { method })).status).toBe(200);
+  const page = { page: 1, pageSize: 20, q: '' };
+  expect(h.store.userAccessPage(h.user.id, page).total).toBe(0);
+  const result = h.store.userAccessPage(h.privateUser.id, page);
+  expect(result.total).toBe(2);
+  expect(result.items).toMatchObject([{ kind: 'rule-collection', resourceName: 'Google.list', method: 'HEAD', source: 'file' }, { kind: 'rule-collection', method: 'GET' }]);
+});

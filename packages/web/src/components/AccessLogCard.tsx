@@ -7,7 +7,7 @@ import { Pagination } from './Pagination.tsx';
 import { Badge, Button, Card, Empty, Select, cx, formatTime, td, th } from './ui.tsx';
 
 const TYPES = { subscription: '订阅', nodes: '节点订阅', 'rule-collection': '规则集合', enhancement: '增强集合' } as const;
-const SOURCES: Record<string, string> = { fresh: '新生成', cache: '缓存', 'last-good': '上次成功结果', managed: '托管资源', failed: '失败', unsupported: '不支持' };
+const SOURCES: Record<string, string> = { fresh: '新生成', cache: '缓存', 'last-good': '上次成功结果', managed: '托管资源', file: '原文预览', failed: '失败', unsupported: '不支持' };
 
 export function AccessLogCard() {
   const [kind, setKind] = useState('all');
