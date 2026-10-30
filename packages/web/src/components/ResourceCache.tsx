@@ -1,4 +1,4 @@
-import { createModal, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
+import { createModal, useModalPresentation, ModalContent, ModalHeader, ModalTitle } from '../modals/index.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from '../api.ts';
@@ -57,5 +57,5 @@ const RefreshProgressModal = createModal<{ name: string; kind: string; jobId: st
         {kind==='profiles' && <p className={`truncate ${current.render?.ok===false?'text-red-600':'text-ink-muted'}`} title={current.render?.error}>{current.render?current.render.ok?'订阅配置已重新生成':`订阅生成失败：${current.render.error}`:current.state==='interrupted'?'订阅生成已中断':current.completed===current.total?'正在重新生成订阅配置…':'等待资源刷新后重新生成订阅配置'}</p>}
         <p role="status" className="truncate" title={current.error??job.error?.message}>{job.error?'状态读取失败，正在重试…':current.state==='running'?`正在刷新：${current.completed} / ${current.total}`:current.state==='interrupted'?`刷新已中断${current.error?`：${current.error}`:''}`:`已完成：${current.results.filter(r=>r.ok===true).length} 项成功，${current.results.filter(r=>r.ok===false).length} 项失败`}</p>
       </div>}
-    <ModalFooter><Button onClick={modal.cancel}>关闭</Button></ModalFooter></ModalContent>;
+    </ModalContent>;
 });

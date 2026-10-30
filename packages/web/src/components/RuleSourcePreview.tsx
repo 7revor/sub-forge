@@ -1,4 +1,4 @@
-import { createModal, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
+import { createModal, useModalPresentation, ModalContent, ModalHeader, ModalTitle } from '../modals/index.tsx';
 import type { Matcher } from '@sub-forge/core';
 import type { RuleSetSourceDoc } from '../hooks.ts';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import { Button, FieldError } from './ui.tsx';
 type Source = { rulesetId?: string; source: RuleSetSourceDoc };
 /** 三处统一只读预览；预览与编辑、合并输出相互独立。 */
 export const RuleSourcePreview = createModal<{ matcher?: Matcher; source?: Source }>(function SourcePreview({ data: current, modal }) {
-  const open = modal.active, onClose = modal.cancel;
+  const open = modal.active;
   const referenceQuery = useQuery({
     queryKey: ['rule-matcher-source', current.matcher], enabled: open && current.matcher?.kind === 'ruleset', retry: false, staleTime: 0,
     queryFn: () => api<{ name: string; content: string; sources: number }>('POST', '/rules/matcher-source', { matcher: current.matcher }),
@@ -33,6 +33,6 @@ export const RuleSourcePreview = createModal<{ matcher?: Matcher; source?: Sourc
         <CodePreview label="完整规则源文件" text={text} loading={loading} lineNumbers fill bodyClassName="overscroll-contain" />
         {!loading && !text && <span className="text-[12.5px] text-ink-muted">源文件为空</span>}
       </>}
-    </div><ModalFooter className="shrink-0"><Button onClick={onClose}>关闭</Button></ModalFooter>
+    </div>
   </ModalContent>;
 });
