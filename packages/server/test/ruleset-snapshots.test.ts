@@ -57,7 +57,7 @@ describe('远程规则快照有效性', () => {
 
   it('首次收到错误页面时返回 503，不生成只有兜底规则的成功配置', async () => {
     const h = setup('auto', '<html>Not available</html>');
-    expect((await h.app.request('/sub/test-token/p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(503);
     expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
   });
 
@@ -93,6 +93,6 @@ describe('远程规则快照有效性', () => {
     const h = setup('classical', 'DOMAIN,valid.example.test');
     const rs = h.store.get('ruleset', 'r')!;
     h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, overrides: [{ line: 1, override: { when: { client: 'mihomo' }, action: { drop: true } } }] }] });
-    expect((await h.app.request('/sub/test-token/p')).status).toBe(200);
+    expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(200);
   });
 });

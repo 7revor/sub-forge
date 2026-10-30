@@ -1,3 +1,5 @@
+import { queryUrl } from '@sub-forge/core';
+import { requiredQuery } from '../query.ts';
 import { profileConversionRoutes } from './profile-conversion.ts';
 // Profile 的附属接口：订阅链接（token）管理、预览与渲染报告、访问日志。
 
@@ -33,10 +35,10 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
     if (!row || row.owner !== userId) throw notFound('配置订阅');
     return row.doc;
   };
-  app.get('/profiles/:id/link', c => {
-    const profile = own(c.req.param('id'), c.get('user').id);
+  app.get('/profiles/link', c => {
+    const profile = own(requiredQuery(c, 'id'), c.get('user').id);
     const token = store.createToken(c.get('user').id);
-    return c.json({ item: { ...token, url: `${publicUrl.replace(/\/$/, '')}/sub/${token.token}/${encodeURIComponent(profile.id)}` } });
+    return c.json({ item: { ...token, url: queryUrl('/subs/profile', { id: profile.id, token: token.token }, publicUrl) } });
   });
 
   // ---------- 预览（CR-05 / 4.9 第 7 步）----------
@@ -59,8 +61,8 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
 
   // ---------- 访问日志（PRF-07）----------
 
-  app.get('/profiles/:id/access-log', (c) => {
-    const p = own(c.req.param('id'), c.get('user').id);
+  app.get('/profiles/access-log', (c) => {
+    const p = own(requiredQuery(c, 'id'), c.get('user').id);
     return c.json({ items: store.recentAccess(p.id, Math.min(Number(c.req.query('limit') ?? 50) || 50, 500)) });
   });
 

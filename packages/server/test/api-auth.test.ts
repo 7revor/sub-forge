@@ -26,7 +26,7 @@ describe('登录与会话', () => {
     expect(login.headers.get('set-cookie')).toMatch(/HttpOnly/i);
     expect(login.headers.get('set-cookie')).toMatch(/SameSite=Lax/i);
     expect((await c.get('/api/me')).json.user.username).toBe('alice');
-    await c.post('/api/auth/logout');
+    await c.post('/auth/logout');
     expect((await c.get('/api/me')).status).toBe(401);
   });
 
@@ -63,10 +63,10 @@ describe('CSRF 防护', () => {
     const { app, store } = setupApp();
     await addUser(store, 'alice');
     const c = client(app);
-    expect((await c.post('/api/auth/login', { username: 'alice', password: 'password-123' }, { origin: 'https://evil.example.com' })).status).toBe(403);
-    const form = await app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'username=alice&password=password-123' });
+    expect((await c.post('/auth/login', { username: 'alice', password: 'password-123' }, { origin: 'https://evil.example.com' })).status).toBe(403);
+    const form = await app.request('/auth/login', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'username=alice&password=password-123' });
     expect(form.status).toBe(400);
-    expect((await c.post('/api/auth/login', { username: 'alice', password: 'password-123' }, { origin: 'http://localhost' })).status).toBe(200);
+    expect((await c.post('/auth/login', { username: 'alice', password: 'password-123' }, { origin: 'http://localhost' })).status).toBe(200);
   });
 });
 
@@ -79,8 +79,8 @@ describe('用户管理（管理员）', () => {
     store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' }] }, user.id);
     store.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'local', id: 's' }, output: 'provider' }], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } } }] }, chains: [], refPolicy: { default: 'wrap' } }, user.id);
     const token = store.createToken(user.id).token;
-    const cfg = parse(await (await app.request(`/sub/${token}/p`)).text());
-    const paths = [`/sub/${token}/p`, cfg['proxy-providers'].S.url, cfg['rule-providers'].R.url].map((url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; });
+    const cfg = parse(await (await app.request(`/subs/profile?token=${token}&id=p`)).text());
+    const paths = [`/subs/profile?token=${token}&id=p`, cfg['proxy-providers'].S.url, cfg['rule-providers'].R.url].map((url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; });
     const admin = client(app); await admin.login('root');
     for (const path of paths) expect((await app.request(path)).status).toBe(200);
     await admin.patch(`/api/users/${user.id}`, { disabled: true });

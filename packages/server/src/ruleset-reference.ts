@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { normalizeRuleUrl, remoteRuleMatcher, stableStringify, type Matcher, type RepositoryRuleSetReference } from '@sub-forge/core';
 import type { RuleSetDoc } from './docs.ts';
 import type { Store } from './store.ts';
-import { bad, isStr } from './api/common.ts';
+import { bad, isStr, HttpError } from './api/common.ts';
 import { checkRepositorySource } from './api/validate.ts';
 
 export type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
@@ -51,7 +51,13 @@ export function checkRuleSetReference(matcher: RuleSetMatcher, store: Store, pri
 /** 两类引用统一送入现有快照、解析与渲染链路。 */
 export function resolveRuleSetReference(matcher: RuleSetMatcher, store: Store): RuleSetDoc | undefined {
   if (matcher.remote) return { id: matcher.id, name: matcher.remote.url, sources: [{ id: 'remote', kind: 'remote', url: matcher.remote.url, format: 'auto' }] };
-  return matcher.repository
+  const rs = matcher.repository
     ? { id: matcher.id, name: matcher.repository.name, sources: matcher.repository.sources }
     : store.get('ruleset', matcher.id);
+  if (!rs || !Array.isArray(rs.sources)) return undefined;
+  for (const source of rs.sources.filter(source => source.enabled !== false && source.repository)) {
+    try { checkRepositorySource(source, undefined, store, '仓库规则'); }
+    catch (error) { if (error instanceof HttpError) return undefined; throw error; }
+  }
+  return rs;
 }

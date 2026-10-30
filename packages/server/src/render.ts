@@ -1,3 +1,5 @@
+import { ruleBinding } from './rule-binding.ts';
+import { queryUrl } from '@sub-forge/core';
 import { lowerCommonBase, mergeBase, type CommonBase } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
@@ -31,6 +33,7 @@ export type StoredRender = {
   providerUserinfo?: Record<string, TrafficInfo>;
   nodeDependencies: NodeSetID[];
   ruleResources: string[];
+  privateRules?: Record<string, { reference: RuleResourceReference; body: string }>;
   userinfo?: TrafficInfo;
   warnings: number;
 };
@@ -118,12 +121,30 @@ export class RenderService {
     if (!this.store.get('profile', profileId)) return { ok: false, message: 'Profile 不存在', report: attempt.report };
     const last = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
     if (last && this.store.getWithOwner('profile', profileId)?.owner && !this.canReadNodes(last.data, this.store.getWithOwner('profile', profileId)!.owner!)) return { ok: false, accessDenied: true, message: '节点资源权限已变化', report: attempt.report };
+    if (last && !this.canReadRules(profileId, last.data)) return { ok: false, accessDenied: true, message: '规则资源已移除或失效', report: attempt.report };
     if (last) return { ok: true, source: 'last-good', render: last.data, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
     return { ok: false, message: attempt.failure ?? '渲染失败', report: attempt.report };
   }
 
   canReadNodes(render: StoredRender, owner: string): boolean {
     return Array.isArray(render.nodeDependencies) && render.nodeDependencies.every(ref => this.store.getWithOwner(ref.type, ref.id)?.owner === owner);
+  }
+
+  canReadRule(profileId: string, reference: RuleResourceReference): boolean {
+    const profile = this.store.get('profile', profileId);
+    if (!profile) return false;
+    const template = profileTemplate(profile, (id, version) => this.store.getTemplate(id, version));
+    const rules = resolveProfileRouting(profile, template, new Report()).rules;
+    return rules.some(rule => rule.enabled !== false && stableStringify(rule.matcher) === stableStringify(reference.matcher) && !!rule.options?.src === !!reference.options?.src)
+      && !!resolveRuleSetReference(reference.matcher, this.store);
+  }
+
+  canReadRules(profileId: string, render: StoredRender): boolean {
+    return Object.values(render.privateRules ?? {}).every(rule => this.canReadRule(profileId, rule.reference))
+      && render.ruleResources.every(key => {
+        const record = this.store.getSharedRule<import('./shared-rules.ts').SharedRuleRecord>(key);
+        return record && !record.reference.matcher.remote && !!resolveRuleSetReference(record.reference.matcher, this.store);
+      });
   }
 
   private remember(profileId: string, target: Target, render: StoredRender): void {
@@ -149,7 +170,7 @@ export class RenderService {
         : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
-    }
+    } finally { this.store.pruneResourceBindings(); }
   }
 
   /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不读写渲染缓存、last-good 或访问日志。 */
@@ -193,7 +214,8 @@ export class RenderService {
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
       for (const src of rs.sources) {
         if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
-        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
+        const binding = ruleBinding(rs.id, `profile:${profileId || `draft:${owner}`}`);
+        const r = await this.snapshots.get('ruleset', binding.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: binding.scope });
         checkCurrent();
         if (r.snapshot) usedSnapshots.push({snapshot:r.snapshot,revision:r.revision});
         if (r.snapshot?.body !== undefined) {
@@ -225,19 +247,22 @@ export class RenderService {
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
-    const qs = `${target.client !== 'mihomo' ? '&target=' + target.client : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
-    const sharedReferences = new Map<string, RuleResourceReference>();
+    const output = { target: target.client, platform: target.platform, token: TOKEN_PLACEHOLDER };
+    const ruleReferences = new Map<string, RuleResourceReference>();
     const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
       profile, nodeSets, rules, common: defaults, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
       urls: {
-        provider: (k, v) => `${publicUrl}/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(profile.id)}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}&h=${v}${qs}`,
+        provider: (k, v) => queryUrl('/subs/nodes', { kind: 'provider', profile: profile.id, id: k, version: GENERATION_PLACEHOLDER, hash: v, ...output }, publicUrl),
         ruleset: (k, reference) => {
           if (!reference) throw new Error('托管规则缺少资源定义');
-          sharedReferences.set(k, reference);
-          return `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${this.sharedRules.key(reference, target)}`;
+          ruleReferences.set(k, reference);
+          const key = this.sharedRules.key(reference, target);
+          return reference.matcher.remote
+            ? queryUrl('/subs/ruleset', { profile: profile.id, key, version: GENERATION_PLACEHOLDER, ...output }, publicUrl)
+            : queryUrl(reference.matcher.repository ? '/resources/repo' : '/resources/ruleset', { key, token: TOKEN_PLACEHOLDER }, publicUrl);
         },
       },
     });
@@ -246,10 +271,10 @@ export class RenderService {
     if (errors.length) return { report, result, failure: errors.map((e) => e.message).join('；') };
 
     // 文档意图与主配置结构决定版本。远程快照不参与；兼容的节点/规则内容可在本版本独立更新。
-    // provider 的 h 仅用于主配置刷新时破除客户端缓存，不影响结构版本。
+    // provider 的 hash 仅用于主配置刷新时破除客户端缓存，不影响结构版本。
     const contract = structuredClone(result.config);
     for (const entry of Object.values((contract['proxy-providers'] ?? {}) as Record<string, { url: string }>)) {
-      entry.url = entry.url.replace(/&h=[0-9a-f]+/, '');
+      entry.url = entry.url.replace(/&hash=[0-9a-f]+/, '');
     }
     const generation = createHash('sha256').update(stableStringify({
       profile, template, base, target, contract,
@@ -271,7 +296,7 @@ export class RenderService {
     const render: StoredRender = {
       generation,
       yaml: target.client === 'surge'
-        ? '#!MANAGED-CONFIG ' + publicUrl + '/sub/' + TOKEN_PLACEHOLDER + '/' + encodeURIComponent(profile.id) + '?target=surge' + (target.platform ? '&platform=' + target.platform : '') + ' interval=' + this.store.resourceCacheTtlSec + ' strict=false\n' + result.yaml
+        ? '#!MANAGED-CONFIG ' + queryUrl('/subs/profile', { id: profile.id, ...output }, publicUrl) + ' interval=' + this.store.resourceCacheTtlSec + ' strict=false\n' + result.yaml
         : result.yaml,
       nodeDependencies: [
         ...Object.keys(nodeSets.sources).map(id => ({ type: 'source' as const, id })),
@@ -283,16 +308,17 @@ export class RenderService {
         const info = nodeTraffic(ref, nodeSets, userinfoBySource);
         return info ? [[`${ref.type}:${ref.id}`, info]] : [];
       })),
-      ruleResources: [...new Set([...sharedReferences.values()].map(ref => this.sharedRules.key(ref, target)))],
+      ruleResources: [...new Set([...ruleReferences.values()].filter(ref => !ref.matcher.remote).map(ref => this.sharedRules.key(ref, target)))],
+      privateRules: Object.fromEntries([...ruleReferences].filter(([, ref]) => ref.matcher.remote).map(([file, reference]) => [this.sharedRules.key(reference, target), { reference, body: result.rulesets[file]!.text }])),
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };
     if (opts.dry) return { from: 'fresh', render, report, result };
 
     this.store.db.transaction(() => {
-      for (const [file, reference] of sharedReferences) {
+      for (const [file, reference] of ruleReferences) {
         const body = result.rulesets[file]?.text;
-        if (body !== undefined) this.sharedRules.register(reference, target, rules.rulesets[reference.matcher.id] as RuleSetDoc, rules, body);
+        if (body !== undefined && !reference.matcher.remote) this.sharedRules.register(reference, target, rules.rulesets[reference.matcher.id] as RuleSetDoc, rules, body);
       }
       this.remember(profileId, target, render);
     })();

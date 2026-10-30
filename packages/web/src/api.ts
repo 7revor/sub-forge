@@ -13,7 +13,7 @@ const unauthorizedListeners = new Set<Listener>();
 export const onUnauthorized = (fn: Listener) => { unauthorizedListeners.add(fn); return () => { unauthorizedListeners.delete(fn); }; };
 
 export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(path.startsWith('/auth/') ? path : `/api${path}`, {
     method, cache: 'no-store',
     credentials: 'same-origin',
     headers: body === undefined ? {} : { 'content-type': 'application/json' },

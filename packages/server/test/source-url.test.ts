@@ -29,7 +29,7 @@ describe('订阅源单 URL 契约', () => {
     const path = `/api/sources/${created.json.item.id}`;
     const updated = await alice.put(path, { name: '旧客户端', urls: [`${url}?v=2`] });
     expect(updated.status).toBe(200);
-    expect((await alice.get(path)).json.item).toMatchObject({ name: '旧客户端', url: `${url}?v=2` });
+    expect((await alice.get(`/api/sources?id=${created.json.item.id}`)).json.item).toMatchObject({ name: '旧客户端', url: `${url}?v=2` });
     expect((await alice.get('/api/sources')).json.items[0]).not.toHaveProperty('urls');
     const before = h.store.list('source');
     for (const address of [{}, { url: '' }, { url: [url] }, { urls: [] }, { urls: [url, url] }, { urls: [url], url }, { url: 'file:///tmp/a' }, { url: `${url}\n${url}` }, { url: `${url} ${url}` }]) {
@@ -56,7 +56,7 @@ describe('订阅源单 URL 契约', () => {
     old.addSnapshot({ ownerKind: 'source', ownerId: 's', url, fetchedAt: 100, ok: true, body: '旧快照' });
     old.db.pragma(`user_version = ${version}`); old.close();
     const s = new Store(file, { cipher }); stores.push(s);
-    expect(s.db.pragma('user_version', { simple: true })).toBe(24);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(25);
     expect(s.getWithOwner('source', 's')).toMatchObject({ owner: 'alice', doc: { id: 's', url } });
     expect(s.get('source', 's')).not.toHaveProperty('urls');
     expect(s.get('source', 's')).not.toHaveProperty('fetch');

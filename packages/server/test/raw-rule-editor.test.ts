@@ -21,7 +21,7 @@ describe('三个入口的 RAW 保存及输出', () => {
       const created = await c.post('/api/profiles', { ...profile([{ anchor: 'top', rule: entry('private-raw', 'IP-SUFFIX,8.8.8.8/24,no-resolve,src') }]), template: { id: published.json.item.id, follow: 'latest' } });
       expect(created.status).toBe(201);
       const id = created.json.item.id;
-      const saved = (await c.get(`/api/profiles/${id}`)).json.item;
+      const saved = (await c.get(`/api/profiles?id=${id}`)).json.item;
       expect(saved.routing.mode).toBe('independent');
       expect(saved.routing.config.rules.find((rule: { id: string }) => rule.id === 'private-raw').matcher.rule).toEqual(raw('IP-SUFFIX,8.8.8.8/24,no-resolve,src'));
       const rendered = await h.renderer.render(id, { client: 'mihomo' });
@@ -47,7 +47,7 @@ describe('三个入口的 RAW 保存及输出', () => {
       expect(preview.json.lines.filter((line: string) => line && !line.startsWith('#'))).toEqual(['PROCESS-PATH-WILDCARD,/Apps/*']);
       const created = await c.post('/api/rulesets', draft);
       expect(created.status).toBe(201);
-      expect((await c.get(`/api/rulesets/${created.json.item.id}`)).json.item.overrides).toEqual(draft.overrides);
+      expect((await c.get(`/api/rulesets?id=${created.json.item.id}`)).json.item.overrides).toEqual(draft.overrides);
       const custom = ruleset('FUTURE,a,b,c');
       const customPreview = await c.post('/api/rulesets/preview', { ruleset: custom, client: 'mihomo' });
       expect(customPreview.status).toBe(200);
