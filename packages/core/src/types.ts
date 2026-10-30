@@ -277,7 +277,7 @@ export type RoutingConfig = Pick<Template, 'groups' | 'rules' | 'final'>;
 export type ProfileRouting =
   | {
     mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]>;
-    /** 按显示顺序优先于全部模板规则，仅允许本地单条或多条规则。 */
+    /** 按显示顺序优先于全部模板规则，支持与模板相同的匹配类型。 */
     prependRules?: RuleEntry[];
     /** 按显示顺序放在全部模板规则之后、最终 MATCH 之前。 */
     appendRules?: RuleEntry[];

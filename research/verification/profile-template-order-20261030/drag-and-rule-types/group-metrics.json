@@ -1,0 +1,19 @@
+{
+  "before": {
+    "cardShadow": "none",
+    "height": 50,
+    "radius": "10px",
+    "transform": "none",
+    "width": 946,
+    "wrapperShadow": "none"
+  },
+  "during": {
+    "background": "oklab(0.984794 -0.00806241 0.00257791)",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px",
+    "height": 50,
+    "radius": "10px",
+    "transform": "matrix(1, 0, 0, 1, 0, -174)",
+    "width": 946,
+    "wrapperShadow": "none"
+  }
+}

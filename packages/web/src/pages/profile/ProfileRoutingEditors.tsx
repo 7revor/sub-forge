@@ -66,7 +66,7 @@ export function ProfileRulesEditor() {
   };
   return <>
     <ErrorAlert error={rulesets.error} />
-    <TemplateRulesEditor {...props} value={body} onChange={changeRules} report={draftIssues(body)} title="规则" staticOnly={bound}
+    <TemplateRulesEditor {...props} value={body} onChange={changeRules} report={draftIssues(body)} title="规则"
       templateRuleIds={bound ? template?.rules.map(r => r.id) ?? [] : undefined} templateStart={draft.routing?.mode === 'bound' ? draft.routing.prependRules?.length ?? 0 : undefined} />
   </>;
 }

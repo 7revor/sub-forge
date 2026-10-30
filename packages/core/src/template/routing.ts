@@ -1,4 +1,4 @@
-// 订阅分流配置：绑定模式补充成员与模板前后的本地规则，独立模式拥有完整配置。
+// 订阅分流配置：绑定模式补充成员与模板前后的自定义规则，独立模式拥有完整配置。
 import type { GroupMember, Overlay, Profile, RoutingConfig, Target, Template } from '../types.ts';
 import { Report } from '../report.ts';
 import { findGroupCycles, mergeTemplate, type Effective } from './merge.ts';
@@ -51,7 +51,6 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
     if (target.kind === 'node' && target.ref.fallback && target.ref.fallback !== 'error') checkTarget(target.ref.fallback, where, depth + 1);
   };
   for (const rule of [...(profile.routing.prependRules ?? []), ...(profile.routing.appendRules ?? [])]) {
-    if (rule.matcher.kind !== 'rule' && rule.matcher.kind !== 'local') report.error('binding.prepend-ruleset', '自定义规则只能使用本地规则', `rule:${rule.id}`);
     if (ruleIds.has(rule.id)) report.error('binding.duplicate-rule', `自定义规则 ID ${rule.id} 与现有规则重复`, `rule:${rule.id}`);
     ruleIds.add(rule.id);
     checkTarget(rule.target, `rule:${rule.id}`);
