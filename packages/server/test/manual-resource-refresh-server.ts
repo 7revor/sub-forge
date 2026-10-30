@@ -12,11 +12,12 @@ let failing=false;
 const env=setupApp({now:Date.now,fetcher:async url=>{
   if(!releaseAll)await new Promise<void>(resolve=>pending.set(url,resolve));
   if(failing && (url.endsWith('/schwab.txt') || url.endsWith('/nodes.txt')))throw new Error('模拟远程资源服务暂时不可用，错误详情较长时仍保持单行状态，可悬停查看完整信息');
-  if(url.endsWith('/nodes.txt'))return {status:200,body:'proxies:\n  - {name: 测试节点, type: ss, server: example.test, port: 443, cipher: aes-128-gcm, password: fixture-only}'};
+  if(url.endsWith('/nodes.txt') || url.endsWith('/many-nodes.txt'))return {status:200,body:JSON.stringify({proxies:Array.from({length:url.endsWith('/many-nodes.txt')?80:3},(_,i)=>({name:`Demo ${['HK','US','SG'][i%3]} ${i+1}`,type:'ss',server:'example.test',port:443,cipher:'aes-128-gcm',password:'fixture-only'}))})};
   return {status:200,body:'DOMAIN,example.test'};
 }});
 const user=await addUser(env.store,'refresh-admin','admin');
-env.store.put('source',{id:'nodes',name:'测试节点订阅',url:'https://fixture.test/nodes.txt',pipeline:[]},user.id);
+env.store.put('source',{id:'nodes',name:'测试节点订阅',url:'https://fixture.test/nodes.txt',pipeline:[{op:'rename.regex',rules:[{pattern:'^Demo',replace:'示例'}]},{op:'flag',mode:'add'},{op:'sort.regex',patterns:['HK','SG','US']},{op:'rename.delete',patterns:['HK|US|SG']}]},user.id);
+env.store.put('source',{id:'many-nodes',name:'长列表验收',url:'https://fixture.test/many-nodes.txt',pipeline:Array.from({length:20},(_,i)=>({op:'rename.affix' as const,prefix:`${i+1}-`}))},user.id);
 env.store.put('collection',{id:'node-group',name:'测试节点组合',members:[{ref:{type:'source',id:'nodes'}}],pipeline:[]},user.id);
 env.store.put('ruleset',{id:'local',name:'本地规则',sources:[{id:'local',kind:'local',content:'DOMAIN,local.test',format:'auto'}]},user.id);
 env.store.put('ruleset',{id:'finance',name:'Finance',sources:['stripe','wise','schwab','ibkr','paypal'].map(name=>({id:name,name:`v2fly-domain-list · ${name}.txt`,kind:'remote',url:`https://fixture.test/${name}.txt`,format:'auto'}))},user.id);

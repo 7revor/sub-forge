@@ -69,9 +69,9 @@ function BasicSettings({ draft, set }: {
 }) {
   return (
     <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
-      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
-        <Field label="名称" className="min-w-0 sm:col-span-2">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
-        <Field label="订阅地址" className="col-span-full min-w-0">{(id) =>
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(0,3fr)]">
+        <Field label="名称" className="min-w-0">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
+        <Field label="订阅地址" className="min-w-0">{(id) =>
           <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
       </div>
@@ -150,7 +150,7 @@ export function SourceEdit() {
       <ErrorAlert error={refresh.error} />
       <ErrorAlert error={state.snaps.error} />
 
-      <PageScroll>
+      <PageScroll className="source-detail-content">
         {preview.data?.report.filter((r) => r.level === 'error' || r.level === 'warn').map((r, i) => (
           <div key={i} role="status" className={cx('rounded-lg px-3 py-2 text-[13px]', r.level === 'error' ? 'bg-err-soft text-err' : 'bg-warn-soft text-warn')}>{r.message}</div>
         ))}

@@ -3,13 +3,13 @@ import { alertError } from '../feedback.ts';
 import { OptionalBoolean } from './OptionalBoolean.tsx';
 import { proxyPlaceholders } from '../schemas/placeholders.ts';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
-// 左侧步骤列表（拖拽排序、节点数变化、末尾自动去重兜底、添加处理器菜单）；
+// 左侧步骤列表（拖拽排序、节点数变化、添加处理器菜单）；自动去重仅计入最终输出。
 // 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方是这一步输入 → 输出的逐节点对照；
 // 列表顶部的「总览」对照原始节点与整条处理链跑完后的结果。
 
 import { DEFAULT_USELESS_PATTERNS, type OperatorStep } from '@sub-forge/core';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ExtraFields } from './ExtraFields.tsx';
 import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetField } from './pipelineForm.ts';
 import { mapRows, mapStats, removedAtStep, renamedAtSteps, rowChanged, type MapRow } from './pipelineMap.ts';
@@ -301,7 +301,7 @@ function StepRow({ handle, index, step, selected, onSelect, trace }: {
 }) {
   const enabled = step.enabled !== false;
   return (
-    <div className={cx('flex items-center gap-1 border-t border-line-2 pl-2', selected ? 'bg-accent-soft' : 'bg-panel')}>
+    <div className={cx('flex min-h-[66px] items-center gap-1 border-t border-line-2 pl-2', selected ? 'bg-accent-soft' : 'bg-panel')}>
       {handle}
       <button type="button" onClick={onSelect} aria-current={selected || undefined} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-3 pr-4 pl-1 text-left">
         <span className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md font-mono text-[12px]', selected ? 'bg-brand text-white' : 'bg-[#ebedf1] text-ink-2')}>{index + 1}</span>
@@ -325,7 +325,7 @@ function resultText(t: TraceStep): string {
   return parts.join('，');
 }
 
-/** 左侧列表中「总览」的序号；自动去重兜底的序号为 steps.length */
+/** 左侧列表中「总览」的序号；自动去重不作为可选步骤展示。 */
 const OVERVIEW = -1;
 
 type Side = { names: string[]; origins: (number | null)[] };
@@ -333,37 +333,6 @@ type MapOptions = { order: 'out' | 'in'; changedOnly: boolean };
 
 const th = 'sticky top-0 z-[1] border-b border-line bg-panel px-3 py-2 text-left text-[12px] font-medium text-ink-muted whitespace-nowrap';
 const td = 'border-b border-line-2 px-3 py-[7px]';
-
-/** main 的下内边距（py-7）+ 卡片下边框 */
-const PAGE_BOTTOM = 29;
-/** 视口太矮时对照表至少保留的高度，此时退回整页滚动 */
-const MIN_SCROLL_HEIGHT = 320;
-
-/**
- * 宽屏下让对照表填满视口剩余高度并在内部滚动，节点再多页面本身也不滚动，左侧导航与处理链保持不动；
- * 窄屏（处理链与预览上下堆叠）不限高。
- */
-function useFillViewport(scroll: RefObject<HTMLElement | null>, footer: RefObject<HTMLElement | null>) {
-  const [maxHeight, setMaxHeight] = useState<number>();
-  useLayoutEffect(() => {
-    const wide = window.matchMedia('(min-width: 768px)');
-    const measure = () => {
-      const el = scroll.current;
-      if (!el || !wide.matches) { setMaxHeight(undefined); return; }
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      const below = footer.current?.offsetHeight ?? 0;
-      setMaxHeight(Math.max(MIN_SCROLL_HEIGHT, Math.floor(window.innerHeight - top - below - PAGE_BOTTOM)));
-    };
-    measure();
-    // 页头徽章异步加载、参数表单增减行都会改变表格位置；只依赖位置计算，不会因自身限高反复触发
-    const observer = new ResizeObserver(measure);
-    observer.observe(document.body);
-    window.addEventListener('resize', measure);
-    wide.addEventListener('change', measure);
-    return () => { observer.disconnect(); window.removeEventListener('resize', measure); wide.removeEventListener('change', measure); };
-  }, [scroll, footer]);
-  return maxHeight;
-}
 
 /** 输入 → 输出对照表：一行一个节点，左边是它进入时的样子，右边是出来时的样子 */
 function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, options, onOptions, truncated }: {
@@ -373,9 +342,6 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
 }) {
   const rows = useMemo(() => mapRows(before, after, options.order), [before, after, options.order]);
   const shown = options.changedOnly ? rows.filter(rowChanged) : rows;
-  const scroll = useRef<HTMLDivElement>(null);
-  const footer = useRef<HTMLDivElement>(null);
-  const maxHeight = useFillViewport(scroll, footer);
   return <>
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3">
       <Segmented label="排列方式" size="sm" value={options.order} options={[{ value: 'out', label: '按输出顺序' }, { value: 'in', label: '按输入顺序' }]} onChange={(order) => onOptions({ ...options, order })} />
@@ -383,7 +349,7 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
         <input type="checkbox" checked={options.changedOnly} onChange={(e) => onOptions({ ...options, changedOnly: e.target.checked })} />只看有变化的
       </label>
     </div>
-    {shown.length ? <div ref={scroll} className="overflow-auto overscroll-contain" style={maxHeight ? { maxHeight } : undefined}>
+    {shown.length ? <div className="pipeline-mapping-scroll overflow-auto overscroll-contain">
       <table className="w-full border-collapse text-[13px]">
         <thead><tr>
           <th className={cx(th, 'w-10 pl-4 text-right')}>#</th>
@@ -413,8 +379,8 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
           })}
         </tbody>
       </table>
-    </div> : <div className="px-4 pb-4"><Empty title={rows.length ? '没有任何节点发生变化' : '没有节点'} /></div>}
-    <div ref={footer} className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-ink-muted">
+    </div> : <div className="pipeline-mapping-scroll px-4 pb-4"><Empty title={rows.length ? '没有任何节点发生变化' : '没有节点'} /></div>}
+    <div className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-ink-muted">
       显示 {shown.length} / {rows.length} 行 · 「位置」是在保留下来的节点中名次的变化{truncated && ' · 节点较多，预览只包含前 500 个'}
     </div>
   </>;
@@ -455,8 +421,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
   const trace = preview?.trace;
   const last = trace?.at(-1);
-  const autoDedupe = trace && trace.length > steps.length ? last : undefined;
-  const mode = selected === OVERVIEW || selected > steps.length || (selected === steps.length && !autoDedupe) ? 'overview' : selected === steps.length ? 'auto' : 'step';
+  const mode = selected === OVERVIEW || selected >= steps.length ? 'overview' : 'step';
   const step = mode === 'step' ? steps[selected] : undefined;
   const cur = mode === 'overview' ? undefined : trace?.[selected];
   const enabled = step?.enabled !== false;
@@ -480,7 +445,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
   const overviewRow = (
     <button type="button" onClick={() => setSelected(OVERVIEW)} aria-current={mode === 'overview' || undefined}
-      className={cx('flex w-full cursor-pointer items-center gap-3 border-t border-line-2 py-3 pr-4 pl-4 text-left', mode === 'overview' ? 'bg-accent-soft' : 'bg-panel hover:bg-[#fafbfc]')}>
+      className={cx('flex min-h-[66px] w-full cursor-pointer items-center gap-3 border-t border-line-2 py-3 pr-4 pl-4 text-left', mode === 'overview' ? 'bg-accent-soft' : 'bg-panel hover:bg-[#fafbfc]')}>
       <span aria-hidden="true" className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md', mode === 'overview' ? 'bg-brand text-white' : 'bg-[#ebedf1] text-ink-2')}><ArrowLeftRight size={13} /></span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[13.5px] font-medium">总览 · 原始 → 最终</span>
@@ -490,13 +455,14 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   );
 
   return (
-    <div className="flex flex-wrap items-start gap-5">
+    <div className="pipeline-workspace">
       <ErrorAlert error={previewError} />
-      <section aria-label={title} className="min-w-0 flex-[1_1_360px] rounded-[10px] border border-line bg-panel pt-4 pb-2">
-        <div className="flex items-center justify-between px-4 pb-3">
+      <section aria-label={title} className="pipeline-steps rounded-[10px] border border-line bg-panel pt-4 pb-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 pb-3">
           <h2 className="m-0 text-[15px] font-semibold">{title}</h2>
           <span className="text-[12.5px] text-ink-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
+        <div className="pipeline-step-scroll">
         {overviewRow}
         <SortableList items={steps.map((s, i) => ({ step: s, id: keys[i]! }))} getKey={(item) => item.id}
           onReorder={(items, { to }) => {
@@ -507,19 +473,11 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           renderItem={({ step: s }, i, handle) => (
             <StepRow handle={handle} index={i} step={s} selected={mode === 'step' && i === selected} onSelect={() => setSelected(i)} {...(trace?.[i] ? { trace: trace[i] } : {})} />
           )} />
-        <button type="button" disabled={!autoDedupe} onClick={() => setSelected(steps.length)} aria-current={mode === 'auto' || undefined}
-          className={cx('flex w-full items-center gap-3 border-t border-line-2 px-4 py-3 text-left', mode === 'auto' ? 'bg-accent-soft' : 'bg-[#fafbfc]', autoDedupe && 'cursor-pointer')}>
-          <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md bg-[#ebedf1] font-mono text-[12px] text-faint">✓</span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[13.5px] font-medium text-ink-2">去重 · 加序号 <span className="text-[12px] font-normal text-ink-muted">自动</span></span>
-            <span className="font-mono text-[12px] text-ink-muted">{autoDedupe?.renamed.length ? `${autoDedupe.renamed.length} 个重名节点追加了序号` : '同名节点追加 2、3…'}</span>
-          </span>
-          {last && <span className="font-mono text-[12.5px] text-ink-2">{last.after}{autoDedupe && <span className="text-ok"> ~{autoDedupe.renamed.length}</span>}</span>}
-        </button>
+        </div>
         <AddMenu onAdd={add} />
       </section>
 
-      <section aria-label="编辑与预览" className="min-w-0 flex-[999_1_540px] rounded-[10px] border border-line bg-panel">
+      <section aria-label="编辑与预览" className="pipeline-preview rounded-[10px] border border-line bg-panel">
         {mode === 'overview' && <>
           <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">
@@ -539,21 +497,13 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
             extraLabel="经过的步骤" extra={(r) => {
               if (r.origin === null) return null;
               const gone = removedAt.get(r.origin);
-              const renames = renamedAt.get(r.origin) ?? [];
+              const renames = (renamedAt.get(r.origin) ?? []).filter(k=>k<steps.length);
               return <span className="flex flex-wrap items-center gap-1">
-                {renames.map((k) => <StepChip key={k} index={k} onClick={() => setSelected(k)}>{k >= steps.length ? '去重' : k + 1}</StepChip>)}
+                {renames.map((k) => <StepChip key={k} index={k} onClick={() => setSelected(k)} />)}
                 {gone !== undefined && <StepChip index={gone} tone="err" onClick={() => setSelected(gone)}>第 {gone + 1} 步 {stepName(gone)} 移除</StepChip>}
               </span>;
             }} />}
           {!preview && !previewError && <div className="px-4 pb-4 text-[13px] text-ink-muted">{loading ? '预览中…' : '保存后可预览'}</div>}
-        </>}
-
-        {mode === 'auto' && autoDedupe && <>
-          <div className="flex flex-col gap-0.5 px-4 pt-4 pb-3">
-            <h2 className="m-0 text-[15px] font-semibold">去重 · 加序号（自动兜底）</h2>
-          </div>
-          <div className="border-t border-line-2 px-4 pt-3 pb-3"><h3 className="m-0 text-[13.5px] font-semibold">输入 → 输出 <span className="font-normal text-ink-muted">· {resultText(autoDedupe)}</span></h3></div>
-          {before && after && <MappingView before={before} after={after} inLabel="输入" outLabel="输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated} />}
         </>}
 
         {mode === 'step' && step && <>
