@@ -1,0 +1,29 @@
+{
+  "floating": [
+    {
+      "animation": "enter",
+      "duration": "0.15s",
+      "slot": "select-content",
+      "state": "open"
+    }
+  ],
+  "dialog": {
+    "animation": "enter / exit",
+    "duration": "0.2s"
+  },
+  "overlay": {
+    "animation": "enter / exit",
+    "duration": "0.15s"
+  },
+  "reducedMotion": {
+    "dialog": "none",
+    "overlay": "none"
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "left": 16,
+    "right": 374
+  },
+  "browser": "Codex 内置浏览器"
+}

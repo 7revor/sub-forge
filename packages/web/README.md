@@ -204,3 +204,9 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 2026-10-29：单条规则的按钮、类型选项和原文预览说明统一称为「静态规则」；模板列表同步显示「静态规则 · 规则内容」，与另外三类来源保持一致。
 
 2026-10-29：模板策略组列表增加「隐藏」开关，与编辑弹窗共享页面草稿；切换即时回显，保存模板后生效。桌面独立显示隐藏列，窄屏放在每行操作按钮下方。
+
+## 公共弹层与动效
+
+全站弹层沿用 shadcn/ui Radix 版的标准动效，公共封装在 `src/components/primitives/overlays.tsx`：编辑与预览使用 Dialog，危险操作与错误使用 AlertDialog，单选使用 Select，多选／输入候选／异步搜索／规则诊断使用 Popover，处理器菜单使用 DropdownMenu，通知使用 Sonner。
+
+关键帧统一来自 `tw-animate-css`，退场卸载交给 Radix，不再添加业务关键帧或用固定时长计时器卸载弹层。保留系统减少动态效果支持；业务页面继续调用现有 `Modal`、`Select`、`Combobox` 和 feedback API。验收见 [2026-10-30 记录](../../research/verification/ui-library-motion-20261030/README.md)。
