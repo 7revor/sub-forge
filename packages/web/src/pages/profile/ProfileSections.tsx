@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { PageScroll, cx } from '../../components/ui.tsx';
-import { TabBase, TabNodeSets, TabOutput } from './TabsBasic.tsx';
+import { TabBase, TabNodeSets, TabProfileInfo } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
 import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
-import { ProfileIdentityFields, TemplateCard } from './TemplateCard.tsx';
+import { TemplateCard } from './TemplateCard.tsx';
 
 const TABS = [['basic', '基础设置'], ['core', '核心设置']] as const;
 const sectionTab = (section?: string) => ['template', 'nodesets', 'chains', 'groups', 'rules', 'preview', 'core'].includes(section ?? '') ? 'core' : 'basic';
@@ -38,11 +38,10 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
     <PageScroll>
       <fieldset disabled={disabled} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
         <div role="tabpanel" id={`${id}-basic-panel`} aria-labelledby={`${id}-basic-tab`} hidden={active !== 'basic'} className={active === 'basic' ? 'flex min-w-0 flex-col gap-5' : undefined}>
-          <ProfileIdentityFields />
+          <TabProfileInfo />
           <section ref={el => { sections.current.base = el; }} className="flex scroll-mt-1 flex-col gap-4">
-            <h2 className="m-0 text-[15px] font-semibold">基本设置</h2><TabBase />
+            <TabBase />
           </section>
-          <TabOutput />
         </div>
         <div role="tabpanel" id={`${id}-core-panel`} aria-labelledby={`${id}-core-tab`} hidden={active !== 'core'} className={active === 'core' ? 'flex min-w-0 flex-col gap-5' : undefined}>
           <section ref={el => { sections.current.template = el; }} className="scroll-mt-1"><TemplateCard />{templateNotice}</section>

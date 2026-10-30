@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../../api.ts';
-import { Badge, Button, Field, Input, Select, Textarea } from '../../components/ui.tsx';
+import { Badge, Button, Field, Select } from '../../components/ui.tsx';
 import { useTemplates, type ProfileDoc } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { boundTemplateId, persistedProfile } from './routing.ts';
@@ -112,16 +112,5 @@ export function TemplateCard() {
       {editing ? <div id={editorId} className="pt-1"><TemplateAssociationEditor key={`${draft.id}:${JSON.stringify(draft.routing ?? draft.template)}`} onClose={() => setEditing(false)} /></div>
         : <p className="m-0 text-[12.5px] leading-relaxed text-ink-muted">{currentId ? '模板组和规则随模板更新；节点填充与独立组保留。' : initialized ? `复制自「${initialized.name ?? initialized.templateId}」，后续修改互不影响。` : '直接编辑策略组和规则，也可以选择模板作为起点。'}</p>}
     </div>
-  </section>;
-}
-
-export function ProfileIdentityFields() {
-  const { draft, setDraft } = useProfile();
-  return <section aria-label="订阅基本信息" className="flex min-w-0 flex-col gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-    <div className="min-w-0">
-      <Field label="订阅名称" hint="同时用作客户端中的显示名。">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} aria-invalid={!!draft.id && !draft.name.trim()} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
-      {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-[12px] text-err">请填写订阅名称</p>}
-    </div>
-    <Field label="备注">{id => <Textarea id={id} rows={2} className="resize-y" placeholder="记录用途或使用说明（可选）" value={draft.note ?? ''} onChange={e => setDraft({ ...draft, note: e.target.value })} />}</Field>
   </section>;
 }
