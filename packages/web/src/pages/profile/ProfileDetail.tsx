@@ -1,7 +1,6 @@
 import { acceptProfileSave, modeLabel, syncProfileDraft } from './routing.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { formatRelativeTime } from '../../utils/format.ts';
-import { CopyButton } from '../../components/CopyButton.tsx';
 // 与新建共用单页编辑，旧分区链接保留为页内定位入口。
 
 import { useQuery } from '@tanstack/react-query';
@@ -72,7 +71,6 @@ export function ProfileDetail() {
           <span className="shrink-0 text-ink-muted">订阅链接</span>
           {subscriptionUrl ? <>
             <a href={subscriptionUrl} target="_blank" rel="noreferrer" className="min-w-0 break-all font-mono text-accent-ink no-underline hover:underline">{subscriptionUrl}</a>
-            <CopyButton size="sm" text={subscriptionUrl}>复制链接</CopyButton>
             <span className="text-ink-muted">{log.data?.[0] ? `最近访问 ${formatRelativeTime(log.data[0].at)}` : '从未访问'} · 自动适配客户端</span>
           </> : tokens.isPending ? <span className="text-ink-muted">正在加载订阅链接…</span> : <>
             <span role="alert" className="text-err">{tokens.error?.message ?? '暂未获取到订阅链接'}</span>
