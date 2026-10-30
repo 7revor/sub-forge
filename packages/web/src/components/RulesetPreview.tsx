@@ -15,6 +15,8 @@ const TARGETS: { key: string; client: Client; platform?: Platform; label: string
   { key: 'mihomo-android', client: 'mihomo', platform: 'android', label: 'mihomo Android' },
   { key: 'surge-macos', client: 'surge', platform: 'macos', label: 'Surge macOS' },
   { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
+  { key: 'loon-ios', client: 'loon', platform: 'ios', label: 'Loon iOS' },
+  { key: 'loon-macos', client: 'loon', platform: 'macos', label: 'Loon macOS' },
   { key: 'stash-macos', client: 'stash', platform: 'macos', label: 'Stash macOS' },
   { key: 'stash-ios', client: 'stash', platform: 'ios', label: 'Stash iOS' },
 ];

@@ -39,3 +39,6 @@ export * from './rules/local.ts';
 
 export * from './render/ini-format.ts';
 export * from './render/surge-config.ts';
+
+export * from './render/loon-config.ts';
+export * from './proxy/loon.ts';

@@ -94,8 +94,10 @@ export type Target =
 
 // ---------- 规则侧 ----------
 
-export const CLIENTS = ['mihomo', 'surge', 'stash'] as const;
+export const CLIENTS = ['mihomo', 'surge', 'stash', 'loon'] as const;
 export type Client = typeof CLIENTS[number];
+export type IniClient = Extract<Client, 'surge' | 'loon'>;
+export const isIniClient = (client: Client): client is IniClient => client === 'surge' || client === 'loon';
 export type YamlClient = Extract<Client, 'mihomo' | 'stash'>;
 export type Platform = 'android' | 'macos' | 'windows' | 'ios' | 'linux';
 

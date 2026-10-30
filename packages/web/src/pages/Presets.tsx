@@ -12,7 +12,7 @@ import { Button, Card, Empty, ErrorAlert, PageHeader, PageScroll, Segmented, cx 
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { DualEditor, type EditorMode } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
-import { baseEditorFor } from '../convert/baseClient.ts';
+import { baseEditorFor, basePatchKey } from '../convert/baseClient.ts';
 import { baseFromForm, baseToForm } from '../schemas/mihomoBase.ts';
 import { useList, useSaveDoc, type PresetDoc } from '../hooks.ts';
 
@@ -49,7 +49,7 @@ export function PresetEdit() {
   const profiles = useList('profiles');
   const [rawValid, setRawValid] = useState(true);
   const [mode, setMode] = useState<EditorMode>('form');
-  const [client, setClient] = useState<'mihomo' | 'surge' | 'stash'>('mihomo');
+  const [client, setClient] = useState<'mihomo' | 'surge' | 'stash' | 'loon'>('mihomo');
   const [editorRevision, setEditorRevision] = useState(0);
   const dirty = !!e.draft && (e.dirty || !rawValid);
   const { blocker, leave } = useLeaveGuard(!e.isNew && dirty, undefined, () => ({ what: `预设「${d.name}」`, canSave: rawValid, saveLabel: '发布并离开', onSave: () => e.save.mutateAsync({ ...d, version: d.version + 1 }), onDiscard: discard }));
@@ -85,7 +85,7 @@ export function PresetEdit() {
             <div className="flex flex-wrap items-center justify-between gap-2.5">
               <h2 className="m-0 text-[17px] font-semibold">基础设置</h2>
               <div className="flex flex-wrap items-center gap-2">
-                <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
+                <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
               </div>
             </div>
             {<DualEditor key={`${d.id}-${client}-${editorRevision}`} value={d[client] ?? {}} onChange={(value) => e.setDraft({ ...d, [client]: value })} mode={mode} onModeChange={setMode}
@@ -98,7 +98,7 @@ export function PresetEdit() {
             <ErrorAlert error={profiles.error} />
             {profiles.isLoading && <span className="text-ink-muted">加载中…</span>}
             {refs.map((p) => {
-              const overrides = Object.keys((client === 'stash' ? p.base?.stashPatch : p.base?.patch) ?? {}).length;
+              const overrides = Object.keys(p.base?.[basePatchKey(client)] ?? {}).length;
               return (
                 <div key={p.id} className="flex justify-between gap-2 border-t border-line-2 py-2.5 text-[13px] first:border-0 first:pt-0">
                   <Link to={`/profiles/${p.id}/base`} className="font-medium text-ink no-underline hover:text-brand">{p.name}</Link>

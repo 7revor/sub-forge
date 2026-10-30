@@ -27,7 +27,7 @@ export function checkRuleSetOverrides(value: unknown): void {
   if (!Array.isArray(value)) throw bad('客户端改写必须是数组');
   const rule = (r: unknown): boolean => {
     if (!isObj(r) || (r.extendedMatching !== undefined && typeof r.extendedMatching !== 'boolean')) return false;
-    if (r.type === 'RAW') return (r.client === undefined || ['mihomo', 'surge', 'stash'].includes(r.client as string)) && typeof r.text === 'string' && !rawRuleError(r.text);
+    if (r.type === 'RAW') return (r.client === undefined || ['mihomo', 'surge', 'stash', 'loon'].includes(r.client as string)) && typeof r.text === 'string' && !rawRuleError(r.text);
     if (['AND', 'OR', 'NOT'].includes(r.type as string)) return Array.isArray(r.children) && r.children.length > 0 && r.children.every(rule);
     if (r.type === 'PROCESS') return ['name', 'path'].includes(r.kind as string) && ['exact', 'wildcard', 'regex'].includes(r.mode as string) && isStr(r.value);
     if (r.type === 'NETWORK') return r.value === 'tcp' || r.value === 'udp';
@@ -37,7 +37,7 @@ export function checkRuleSetOverrides(value: unknown): void {
     const at = `客户端改写第 ${i + 1} 条`;
     if (!isObj(item) || item.line !== undefined) throw bad(`${at}：只支持规则内容匹配，请填写完整规则内容`);
     const o = item.override;
-    if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge', 'stash'].includes(o.when.client as string) || (o.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(o.when.platform as string))) throw bad(`${at}：客户端或平台不合法`);
+    if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(o.when.client as string) || (o.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(o.when.platform as string))) throw bad(`${at}：客户端或平台不合法`);
     const a = o.action;
     if (!isObj(a) || !(
       a.drop === true && a.replace === undefined && a.append === undefined ||
@@ -64,7 +64,7 @@ function checkRawRules(value: unknown, where: string): void {
     if (error) throw bad(`${where}：${error}`);
   }
   if (value.type === 'RAW') {
-    if (value.client !== undefined && !['mihomo', 'surge', 'stash'].includes(value.client as string)) throw bad(`${where}：RAW 客户端不合法`);
+    if (value.client !== undefined && !['mihomo', 'surge', 'stash', 'loon'].includes(value.client as string)) throw bad(`${where}：RAW 客户端不合法`);
     if (typeof value.text !== 'string') throw bad(`${where}：RAW 内容必须是字符串`);
     const error = rawRuleError(value.text);
     if (error) throw bad(`${where}：${error}`);
@@ -275,11 +275,9 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
     case 'preset': {
       if (!isObj(doc.mihomo)) throw bad('mihomo 段必须是对象');
       if (doc.stash !== undefined && !isObj(doc.stash)) throw bad('stash 段必须是对象');
-      if (doc.surge !== undefined) {
-        try { stringifyIniBase(doc.surge as Record<string, unknown>); } catch (error) { throw bad(error instanceof Error ? error.message : 'Surge 基础设置不合法'); }
-        if (!isObj(doc.surge)) throw bad('surge 段必须是对象');
-        if (doc.surge.general !== undefined && !isObj(doc.surge.general)) throw bad('surge.general 必须是对象');
-        if (doc.surge.host !== undefined && (!isObj(doc.surge.host) || !Object.values(doc.surge.host).every((v) => typeof v === 'string'))) throw bad('surge.host 必须是值为字符串的对象');
+      for (const client of ['surge', 'loon']) if (doc[client] !== undefined) {
+        if (!isObj(doc[client])) throw bad(client + ' 段必须是对象');
+        try { stringifyIniBase(doc[client]); } catch (error) { throw bad(error instanceof Error ? error.message : '基础设置不合法'); }
       }
       if (typeof doc.version !== 'number') doc.version = 1;
       break;
@@ -298,9 +296,9 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (f !== 'latest' && !(isObj(f) && typeof f.pinned === 'number' && store.getTemplate(doc.template.id, f.pinned))) throw bad('模板版本不存在');
       }
       if (doc.base !== undefined && (!isObj(doc.base) || doc.base.stashPatch !== undefined && !isObj(doc.base.stashPatch))) throw bad('基础设置及 stashPatch 必须是对象');
-      if (isObj(doc.base) && doc.base.surgePatch !== undefined) {
-        if (!isObj(doc.base.surgePatch)) throw bad('surgePatch 必须是对象');
-        try { stringifyIniBase(doc.base.surgePatch); } catch (error) { throw bad(error instanceof Error ? error.message : 'Surge 基础设置不合法'); }
+      for (const key of ['surgePatch', 'loonPatch']) if (isObj(doc.base) && doc.base[key] !== undefined) {
+        if (!isObj(doc.base[key])) throw bad(key + ' 必须是对象');
+        try { stringifyIniBase(doc.base[key]); } catch (error) { throw bad(error instanceof Error ? error.message : '基础设置不合法'); }
       }
       if (doc.base !== undefined && isObj(doc.base) && doc.base.presetId !== undefined && !store.get('preset', String(doc.base.presetId))) throw bad('基础设置预设不存在');
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};

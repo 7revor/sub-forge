@@ -91,7 +91,7 @@ export function TabPreview() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }]} onChange={(value) => { preview.reset(); setClient(value); setPlatform(value !== 'mihomo' ? 'ios' : 'any'); }} />
+        <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setPlatform(value !== 'mihomo' ? 'ios' : 'any'); }} />
         <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">平台
           <Select placeholder="选择客户端运行的系统平台" className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{platforms.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
         <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
@@ -100,7 +100,7 @@ export function TabPreview() {
       </div>
       <ErrorAlert error={preview.error} />
       {preview.data && !current && !preview.isPending && <p role="status" className="text-[13px] text-ink-muted">配置已更改，请重新渲染预览。</p>}
-      {client === 'stash' && <p className="text-[12.5px] text-ink-muted">Stash 节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
+      {client !== 'mihomo' && <p className="text-[12.5px] text-ink-muted">节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
       {current && (
         <div className="flex flex-wrap items-start gap-5">
           <CodePreview label="最终配置" className="flex-[999_1_560px] rounded-[10px]" title={`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="max-h-[720px] p-4 text-[12.5px] leading-[1.75]" />

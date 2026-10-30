@@ -19,6 +19,16 @@ async function done(api:Awaited<ReturnType<typeof setup>>['api'],id:string){
   for(let i=0;i<100;i++){const result=await api.get(`/api/refresh-jobs/${id}`);if(result.json.job.state!=='running')return result.json.job;await new Promise(r=>setTimeout(r,5));}throw new Error('刷新任务没有结束');
 }
 describe('资源刷新任务',()=>{
+  it('手动刷新同时重建已发布的 Surge 和 Loon 配置', async () => {
+    const h = await setup();
+    for (const client of ['surge', 'loon'] as const) expect((await h.renderer.render('p', { client, platform: 'ios' })).ok).toBe(true);
+    const profile = h.store.get('profile', 'p')!;
+    h.store.put('profile', { ...profile, base: { surgePatch: { general: { 'test-timeout': 3 } }, loonPatch: { general: { 'test-timeout': 7 } } } }, h.user.id);
+    const started = await h.api.post('/api/profiles/p/refresh-cache');
+    expect((await done(h.api, started.json.job.id)).render.ok).toBe(true);
+    expect((h.store.getLastGood('p', 'surge:ios')?.data as { yaml: string }).yaml).toContain('test-timeout = 3');
+    expect((h.store.getLastGood('p', 'loon:ios')?.data as { yaml: string }).yaml).toContain('test-timeout = 7');
+  });
   it('创建时列出全部资源，并发乱序完成时只更新原位置的状态',async()=>{
     const releases = new Map<string,()=>void>();
     let finishing=false;

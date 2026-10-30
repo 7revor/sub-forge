@@ -45,7 +45,7 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
               update(index, { ...override, action: next === 'drop' ? { drop: true } : next === 'append' ? { append: replacements ?? [rawRuleFromText('')] } : { replace: replacements ?? [rawRuleFromText('')] } });
             }}><option value="replace">替换</option><option value="drop">丢弃</option>{allowAppend && <option value="append">追加</option>}</Select>}</Field>
           <Field label="客户端">{(id) => <Select placeholder="选择这条改写适用的客户端" id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
-            <option value="mihomo">mihomo</option><option value="surge">Surge</option><option value="stash">Stash</option>
+            <option value="mihomo">mihomo</option><option value="surge">Surge</option><option value="loon">Loon</option><option value="stash">Stash</option>
           </Select>}</Field>
           <Field label="平台">{(id) => <Select clearable aria-label="适用平台" placeholder="限定适用的系统平台，留空适用于所有平台" id={id} value={override.when.platform ?? ''} onChange={(e) => {
             const { platform: _, ...when } = override.when;

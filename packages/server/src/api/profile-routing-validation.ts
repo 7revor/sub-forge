@@ -14,7 +14,7 @@ const builtins = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']);
 function checkPrependRule(value: unknown): void {
   if (!obj(value) || !isStr(value.type)) throw bad('前置规则格式错误');
   if (value.type === 'RAW') {
-    if (value.client !== undefined && !['mihomo', 'surge', 'stash'].includes(String(value.client))) throw bad('前置 RAW 规则客户端不合法');
+    if (value.client !== undefined && !['mihomo', 'surge', 'stash', 'loon'].includes(String(value.client))) throw bad('前置 RAW 规则客户端不合法');
     const error = typeof value.text === 'string' ? rawRuleError(value.text) : 'RAW 内容必须是字符串';
     if (error) throw bad(`前置规则：${error}`);
     return;
@@ -53,7 +53,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
         if (rule.matcher.overrides !== undefined) {
           if (!Array.isArray(rule.matcher.overrides)) throw bad('客户端覆盖必须是数组');
           for (const override of rule.matcher.overrides) {
-            if (!obj(override) || !obj(override.when) || !['mihomo', 'surge', 'stash'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
+            if (!obj(override) || !obj(override.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
             if (override.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(String(override.when.platform))) throw bad('客户端覆盖平台不合法');
             const action = override.action;
             if (Object.keys(action).length !== 1) throw bad('客户端覆盖只能指定一个动作');

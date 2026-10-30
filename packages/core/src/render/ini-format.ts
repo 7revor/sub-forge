@@ -24,6 +24,7 @@ export function stringifyIniBase(base: Record<string, unknown>): string {
     if (entries === undefined) return [];
     if (!entries || typeof entries !== 'object' || Array.isArray(entries)) throw new Error(section + ' 必须是对象');
     const lines = Object.entries(entries).map(([key, value]) => {
+      if (section === 'host' && typeof value !== 'string') throw new Error('host 必须是值为字符串的对象');
       if (!key || key !== key.trim() || /[=\r\n\u2028\u2029\0[\]]/.test(key) || /^[#;]/.test(key)) throw new Error('基础配置字段名不合法');
       const text = Array.isArray(value) ? value.map(v => iniValue(v)).join(', ') : iniValue(value);
       return key + ' = ' + text;

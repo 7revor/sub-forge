@@ -6,7 +6,7 @@ import { profileTemplate } from './profile-routing.ts';
 
 import { createHash } from 'node:crypto';
 import {
-  resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, stringifySurge, exportStashConfig, sourceKey, sourceLabel, stableHash, stableStringify,
+  resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, renderLoon, isIniClient, stringifySurge, exportStashConfig, sourceKey, sourceLabel, stableHash, stableStringify,
   type Client, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -141,7 +141,7 @@ export class RenderService {
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
       return a.result
-        ? { ok: !a.failure, yaml: a.result.yaml, format: target.client === 'surge' ? 'ini' : 'yaml', ...(target.client === 'surge' && !a.failure ? { exportYaml: stringifySurge(a.result, true) } : {}), ...(target.client === 'stash' && !a.failure ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
+        ? { ok: !a.failure, yaml: a.result.yaml, format: isIniClient(target.client) ? 'ini' : 'yaml', ...(target.client === 'surge' && !a.failure ? { exportYaml: stringifySurge(a.result, true) } : {}), ...(target.client === 'stash' && !a.failure ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
         : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
@@ -203,7 +203,9 @@ export class RenderService {
     checkCurrent();
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
     if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    const base = profile.base ? target.client === 'surge'
+    const base = profile.base ? target.client === 'loon'
+      ? deepMerge(preset?.loon ?? {}, profile.base.loonPatch ?? {})
+      : target.client === 'surge'
       ? deepMerge(preset?.surge ?? {}, profile.base.surgePatch ?? {})
       : target.client === 'stash'
       ? deepMerge(preset?.stash ?? {}, profile.base.stashPatch ?? {})
@@ -212,7 +214,7 @@ export class RenderService {
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const qs = `${target.client !== 'mihomo' ? '&target=' + target.client : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
-    const result = (target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
       profile, nodeSets, rules, managedResources:true, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),

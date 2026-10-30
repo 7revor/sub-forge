@@ -13,13 +13,13 @@ export type SourceFetchOptions = Pick<FetchOptions, 'ttlSec'>;
 export type SourceDoc = Source & { fetch?: SourceFetchOptions };
 export type RuleSetSourceDoc = RuleSetSource & { fetch?: FetchOptions };
 export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[] };
-export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; stash?: Record<string, unknown>; surge?: Record<string, unknown> };
+export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; stash?: Record<string, unknown>; surge?: Record<string, unknown>; loon?: Record<string, unknown> };
 export type TemplateDoc = Template & { name?: string };
 export type ProfileDoc = import('@sub-forge/core').Profile & {
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
   template?: { id: string; follow: 'latest' | { pinned: number } };
   /** raw：原样片段（追加到末尾；服务端尚未输出，见 docs/11） */
-  base?: { presetId?: string; patch?: Record<string, unknown>; stashPatch?: Record<string, unknown>; surgePatch?: Record<string, unknown>; raw?: string };
+  base?: { presetId?: string; patch?: Record<string, unknown>; stashPatch?: Record<string, unknown>; surgePatch?: Record<string, unknown>; loonPatch?: Record<string, unknown>; raw?: string };
   updateIntervalSec?: number;
   userinfo?: { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
 };

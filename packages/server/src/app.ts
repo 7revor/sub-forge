@@ -87,10 +87,9 @@ export function createApp(deps: AppDeps) {
       source: outcome ? (outcome.ok ? outcome.source : 'failed') : 'unsupported',
     });
 
-    if (detected.client === 'stash' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
-      log(400); return c.text('Stash 平台仅支持 ios 或 macos', 400);
+    if (detected.client !== 'mihomo' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
+      log(400); return c.text('该客户端平台仅支持 ios 或 macos', 400);
     }
-    if (detected.client === 'surge' && detected.platform && !['ios', 'macos'].includes(detected.platform)) return c.text('Surge 仅支持 ios 或 macos', 400);
 
     const outcome = await renderer.render(t.profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
     if (store.getActiveToken(token)?.profileId !== t.profileId) return notFound(c);
@@ -99,7 +98,7 @@ export function createApp(deps: AppDeps) {
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
     }
     const interval = store.resourceCacheTtlSec;
-    c.header('content-type', detected.client === 'surge' ? 'text/plain; charset=utf-8' : 'text/yaml; charset=utf-8');
+    c.header('content-type', (detected.client === 'surge' || detected.client === 'loon') ? 'text/plain; charset=utf-8' : 'text/yaml; charset=utf-8');
     c.header('cache-control', 'no-store');
     c.header('profile-update-interval', String(Math.max(1, Math.round(interval / 3600))));
     c.header('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(profile.name)}`);
@@ -116,9 +115,10 @@ export function createApp(deps: AppDeps) {
     if (!t) return notFound(c);
     const qp = c.req.query('platform');
     const platform = PLATFORMS.find((p) => p === qp);
+    if (qp !== undefined && !platform) return notFound(c);
     const client = c.req.query('target') ?? 'mihomo';
-    if (client !== 'mihomo' && client !== 'stash' && client !== 'surge') return notFound(c);
-    if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
+    if (client !== 'mihomo' && client !== 'stash' && client !== 'surge' && client !== 'loon') return notFound(c);
+    if (client !== 'mihomo' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
     const target: Target = { client, ...(platform ? { platform } : {}) };
     const version = c.req.query('v');
     const key = c.req.param('key')!;

@@ -68,6 +68,7 @@ export function TabOverview() {
                       <CopyButton className="h-9" text={t.url}><Copy size={13} />复制</CopyButton>
                       <CopyButton className="h-9" text={`${t.url}?target=stash&platform=ios`}>复制 Stash 链接</CopyButton>
                       <CopyButton className="h-9" text={`${t.url}?target=surge&platform=ios`}>复制 Surge 链接</CopyButton>
+                      <CopyButton className="h-9" text={`${t.url}?target=loon&platform=ios`}>复制 Loon 链接</CopyButton>
                       <Button className="h-9 text-err" onClick={() => void manage(t, true)}><RotateCcw size={13} />重置 token</Button>
                       <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => void manage(t, false)}><Trash2 size={14} /></Button>
                     </div>
@@ -124,7 +125,7 @@ export function TabOverview() {
 export function TabBase() {
   const { draft, setDraft, baseValid, setBaseValid, baseEditorKey, template } = useProfile();
   const presets = useList('presets').data ?? [];
-  const [client, setClient] = useState<'mihomo' | 'surge' | 'stash'>('mihomo');
+  const [client, setClient] = useState<'mihomo' | 'surge' | 'stash' | 'loon'>('mihomo');
   const preset = presets.find((p) => p.id === draft.base?.presetId);
   const mode = draft.base === undefined ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
   const patch = draft.base?.[basePatchKey(client)] ?? {};
@@ -144,7 +145,7 @@ export function TabBase() {
           <Segmented label="基础设置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '完全自定义' }, { value: 'none', label: '不输出' }]}
             onChange={(m) => {
               if (m === 'none') { const { base: _b, ...rest } = draft; setDraft(rest); }
-              else if (m === 'custom') setDraft({ ...draft, base: { patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
+              else if (m === 'custom') setDraft({ ...draft, base: { patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, loonPatch: draft.base?.loonPatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
               else setDraft({ ...draft, base: { ...(draft.base ?? {}), presetId: presets[0]?.id ?? '' } });
             }} />
         </fieldset>
@@ -162,7 +163,7 @@ export function TabBase() {
       {mode !== 'none' && (
         <div className="flex flex-wrap items-start gap-5">
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
-            <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
+            <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
             {(
               <DualEditor key={`${draft.id}:${client}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
                 toRaw={editor.toRaw} fromRaw={editor.fromRaw} recoverForm={(text) => editor.recoverForm(text, patch)} rawLabel={`${mode === 'preset' ? '覆盖项' : client} ${editor.format}`}

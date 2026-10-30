@@ -160,6 +160,34 @@ function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   }
 }
 
+/** Loon 按官方原生规则单独适配；不能把 Surge 专用参数直接透传。 */
+function lowerLoon(rule: RuleIR, ctx: ClientCtx): LoweredRule {
+  switch (rule.type) {
+    case 'DOMAIN': case 'DOMAIN-SUFFIX': case 'DOMAIN-KEYWORD': case 'USER-AGENT': case 'URL-REGEX':
+      return { kind: 'ok', text: `${rule.type},${rule.value}` };
+    case 'DOMAIN-WILDCARD':
+      return { kind: 'ok', text: `${rule.type},${rule.value}`, note: 'Loon 域名通配规则需要 Build 1008 或更新版本' };
+    case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
+      return rule.src ? { kind: 'drop', reason: 'Loon 尚未适配源 IP 匹配，不能丢弃 src 后转换为目标 IP' }
+        : { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
+    case 'SRC-IP-CIDR': case 'DOMAIN-REGEX': case 'GEOSITE':
+      return { kind: 'drop', reason: `Loon 尚未适配 ${rule.type}` };
+    case 'DST-PORT': case 'SRC-PORT':
+      if (rule.value.includes('/')) return { kind: 'drop', reason: 'Loon 不支持斜杠分隔的端口集合，请改用 OR 规则' };
+      return { kind: 'ok', text: `${rule.type === 'DST-PORT' ? 'DEST-PORT' : 'SRC-PORT'},${rule.value}` };
+    case 'NETWORK': return { kind: 'ok', text: `PROTOCOL,${rule.value.toUpperCase()}` };
+    case 'PROCESS': {
+      if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Loon 进程规则仅支持 macOS' };
+      const value = rule.mode === 'regex' ? regexToWildcard(rule.value) : rule.value;
+      if (value === undefined || (rule.kind === 'path' && value.endsWith('/'))) return { kind: 'drop', reason: '该进程表达式无法等价转换为 Loon 名称或完整路径匹配' };
+      const notes = [rule.kind === 'name' ? 'Loon 进程名称匹配不区分大小写' : '', rule.mode === 'regex' ? '进程正则转换为 Loon 通配符' : ''].filter(Boolean);
+      return { kind: 'ok', text: `PROCESS-NAME,${value}`, ...(notes.length ? { note: notes.join('；') } : {}) };
+    }
+    case 'AND': case 'OR': case 'NOT': return lowerLogical(rule, ctx);
+    case 'RAW': return lowerRaw(rule, ctx);
+  }
+}
+
 function lowerRaw(rule: Extract<RuleIR, { type: 'RAW' }>, ctx: ClientCtx): LoweredRule {
   if (rule.client && rule.client !== ctx.client) return { kind: 'drop', reason: `原样规则仅对 ${rule.client} 输出` };
   const error = rawRuleError(rule.text);
@@ -178,6 +206,7 @@ export function lowerRule(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'mihomo': return lowerMihomo(rule, ctx);
     case 'surge': return lowerSurge(rule, ctx);
     case 'stash': return lowerStash(rule, ctx);
+    case 'loon': return lowerLoon(rule, ctx);
   }
 }
 
