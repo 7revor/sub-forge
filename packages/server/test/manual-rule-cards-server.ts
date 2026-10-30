@@ -1,14 +1,18 @@
 // 卡片与按需匹配隔离验收：仅内存数据、模拟索引与虚构上游，关闭时释放所有资源。
 import { serve } from '@hono/node-server';
 import { resolve } from 'node:path';
-import { remoteRuleMatcher } from '@sub-forge/core';
+import { remoteRuleMatcher, type GroupSpec } from '@sub-forge/core';
 import { createApp } from '../src/app.ts';
 import { setupRuleReferences } from './rule-reference-fixture.ts';
 const env = await setupRuleReferences();
 const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
 const url = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.list';
 const linked = (await env.resolve()).repository.sources[0];
-const template = { id: 'cards-template', name: '统一规则卡片验收', version: 1, groups: [], rules: [
+const groups: GroupSpec[] = process.argv.includes('--layout') ? [
+  { id: 'select', name: '🚀 节点选择', type: 'select', members: [direct, { kind: 'builtin', name: 'REJECT' }] },
+  { id: 'long', name: '较长的策略组名称用于检查卡片截断与操作按钮', type: 'url-test', members: [direct], display: { hidden: true } },
+] : [];
+const template = { id: 'cards-template', name: '统一规则卡片验收', version: 1, groups, rules: [
   { id: 'remote', matcher: remoteRuleMatcher(url), target: direct },
   { id: 'local', matcher: { kind: 'local' as const, content: '# 本地示例\nDOMAIN,a.example.test\nIP-CIDR,198.51.100.0/24,no-resolve' }, target: direct },
 ], final: direct };

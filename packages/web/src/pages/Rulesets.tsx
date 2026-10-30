@@ -22,9 +22,10 @@ import { Badge, Button, Card, ErrorAlert, FieldError, Field, Input, buttonClass 
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
+import { localRuleLines } from '@sub-forge/core';
 
 const isPassthrough = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
-const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : '本地规则');
+const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '')[0]?.text ?? '尚未填写');
 
 function sourceSummary(rs: RuleSetDoc): string {
   const remote = rs.sources.filter((s) => s.kind === 'remote').length;
@@ -47,7 +48,7 @@ export function RulesetList() {
 const newLocal = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'local', format: 'auto', content: '' });
 const newRemote = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'remote', format: 'auto', url: '' });
 const EMPTY_RS: RuleSetDoc = { id: '', name: '', sources: [] };
-const sourceActionClass = buttonClass('default', 'md', 'w-full min-w-0 whitespace-normal max-sm:gap-1.5 max-sm:px-2 max-sm:text-[12px]');
+const sourceActionClass = buttonClass('default', 'sm', 'w-full min-w-0 whitespace-normal max-sm:gap-1.5 max-sm:px-2');
 
 function rulesetError(d: RuleSetDoc): string | undefined {
   if (!d.name.trim()) return '请填写名称。';
@@ -107,12 +108,12 @@ export function RulesetEdit() {
     <Card title="来源" actions={<Button size="sm" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>}>
       <ErrorAlert error={matches.error} /><FieldError error={linkError} />
       <div role="group" aria-label="添加规则来源" className="grid grid-cols-3 gap-2">
-        <Button className={sourceActionClass} onClick={() => void edit({ source: newRemote(), adding: true, repository: true })}><Link2 size={15} className="hidden sm:block" />关联规则集合</Button>
-        <Button className={sourceActionClass} onClick={() => void edit({ source: newRemote(), adding: true })}><Globe size={15} className="hidden sm:block" />添加远程地址</Button>
-        <Button className={sourceActionClass} onClick={() => void edit({ source: newLocal(), adding: true })}><FileText size={15} className="hidden sm:block" />添加本地规则</Button>
+        <Button size="sm" className={sourceActionClass} onClick={() => void edit({ source: newRemote(), adding: true, repository: true })}><Link2 size={14} className="hidden sm:block" />关联规则集合</Button>
+        <Button size="sm" className={sourceActionClass} onClick={() => void edit({ source: newRemote(), adding: true })}><Globe size={14} className="hidden sm:block" />添加远程地址</Button>
+        <Button size="sm" className={sourceActionClass} onClick={() => void edit({ source: newLocal(), adding: true })}><FileText size={14} className="hidden sm:block" />添加本地规则</Button>
       </div>
       <SortableList items={d.sources} getKey={s => s.id} onReorder={sources => set({ sources })} renderItem={(s, i, handle) => <RuleCard label={`第 ${i + 1} 项来源`} handle={handle}
-        icon={s.repository ? <Link2 size={18} /> : s.kind === 'remote' ? <Globe size={18} /> : <FileText size={18} />}
+        icon={s.repository ? <Link2 size={16} /> : s.kind === 'remote' ? <Globe size={16} /> : <FileText size={16} />}
         count={<SourceStatus src={s} status={status.get(s.id)} loading={sources.loading.has(s.id)} />}
         hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking} onLink={match => link(s.id, s.url!, match)} />}
         onPreview={() => void RuleSourcePreview.show({ source: { rulesetId: e.isNew ? undefined : e.id, source: s } })} onEdit={() => void edit({ source: s, adding: false })} onDelete={() => { set({ sources: d.sources.filter(x => x.id !== s.id) }); if (s.url) matches.clear([s.url]); }}>

@@ -1,12 +1,13 @@
 import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
 import { Frame } from '../../modals/Frame.tsx';
 import { compileUserRegex, type GroupSpec, type ReportItem } from '@sub-forge/core';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Layers3, Plus } from 'lucide-react';
 
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
+import { RoutingCard, RoutingCardActions, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { Button, Card, Empty, Field, Input, Switch, cx } from '../../components/ui.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
@@ -14,7 +15,7 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
-const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_56px_64px]';
+const columns = 'grid grid-cols-[24px_32px_minmax(0,1fr)_60px] md:grid-cols-[24px_32px_minmax(0,1fr)_88px_minmax(0,1.4fr)_44px_60px]';
 
 export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, onEditGroup, memberSummary, nodeSetName = ref => ref.id }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; report: ReportItem[];
@@ -34,7 +35,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
     if (result.status === 'confirmed') onChange(removeGroup(value, group.id));
   };
   return <>
-    <Card title="策略组" subtitle={`${value.groups.length} 个`} bodyClass="pb-1" actions={!readOnly && <>
+    <Card title="策略组" subtitle={`${value.groups.length} 个`} actions={!readOnly && <>
       <Button size="sm" disabled={REGION_GROUPS.every(region => value.groups.some(g => g.name === region.name))} onClick={() => {
         const added = createRegionGroups(value.groups);
         onChange({ ...value, groups: [...value.groups, ...added] });
@@ -44,25 +45,25 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
         void edit({ id, name: '新策略组', type: 'select', members: [] }, true);
       }}><Plus size={14} />新增组</Button>
     </>}>
-      {!value.groups.length ? <div className="px-4 pb-4"><Empty title="还没有策略组" /></div> : <>
-        <div className={cx(columns, 'items-center px-4 pb-2 text-[12px] font-medium text-ink-muted')}><span /><span>组</span><span>类型</span><span className="hidden sm:block">成员</span><span className="hidden text-center sm:block">隐藏</span><span className="sr-only">操作</span></div>
+      {!value.groups.length ? <Empty title="还没有策略组" /> : <>
         <SortableList items={value.groups} getKey={g => g.id} isLocked={() => readOnly} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '—');
-          return <div id={`template-group-${g.id}`} className={cx(columns, 'items-center border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
+          return <RoutingCard id={`template-group-${g.id}`} className={columns} invalid={error}>
             {handle}
-            <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left font-medium', error && 'text-err')}>{g.name || '未命名组'}{g.display?.hidden && <span className="ml-2 text-[11px] font-normal text-ink-muted">已隐藏</span>}</span>
-            <span className="font-mono text-[12px]">{g.type.toUpperCase()}</span>
-            <span className="col-span-2 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-4 sm:row-start-1" title={members}>{members}</span>
-            <div className="col-start-4 row-start-2 flex flex-col items-center justify-center gap-0.5 sm:col-start-5 sm:row-start-1 sm:flex-row">
-              <span className="text-[12px] text-ink-muted sm:hidden">隐藏</span>
-              <Switch disabled={readOnly} label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
+            <RoutingCardIcon><Layers3 size={16} /></RoutingCardIcon>
+            <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left font-medium', error && 'text-err')}>{g.name || '未命名组'}</span>
+            <div className="col-span-2 col-start-3 row-start-2 flex min-w-0 items-center gap-3 md:contents">
+              <span className="shrink-0 text-ink-2" title="策略组类型">{g.type.toUpperCase()}</span>
+              <span className="min-w-0 flex-1 truncate text-ink-2" title={members}>{members}</span>
+              <div className="flex shrink-0 items-center" title="隐藏策略组">
+                <Switch disabled={readOnly} label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
+              </div>
             </div>
-            <div className="col-start-4 row-start-1 flex gap-1 sm:col-start-6">
-              <Button size="sm" variant="ghost" className="px-1.5" aria-label={`编辑策略组「${g.name}」`} onClick={() => void edit(g)}><Pencil size={14} /></Button>
-              {!readOnly && <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除策略组「${g.name}」`} onClick={() => void remove(g)}><Trash2 size={14} /></Button>}
+            <div className="col-start-4 row-start-1 md:col-start-7">
+              <RoutingCardActions label={`策略组「${g.name}」`} onEdit={() => void edit(g)} onDelete={readOnly ? undefined : () => void remove(g)} />
             </div>
-          </div>;
+          </RoutingCard>;
         }} />
       </>}
     </Card>
