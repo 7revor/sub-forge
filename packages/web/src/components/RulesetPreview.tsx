@@ -50,9 +50,9 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
     : result?.delivery.mode === 'unsupported' ? result.delivery.reason
     : result?.binary ? 'MRS 由服务端缓存并原样托管，无法展示文本；SRS 暂不支持。' : null;
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
-    <div role="group" aria-label="规则内核" className="flex flex-wrap gap-1.5">
-      {TARGETS.map(x => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
-        className={cx('h-[34px] shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3 text-[12.5px]', x.key === target ? 'border-brand bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
+    <div role="group" aria-label="规则内核" className="flex flex-wrap gap-2">
+      {TARGETS.map(x => <Button key={x.key} size="sm" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
+        className={cx('shrink-0', x.key === target && 'border-brand bg-accent-soft text-accent-ink')}>{x.label}</Button>)}
     </div>
     <CodePreview label="规则输出" text={result?.lines.join('\n') ?? ''} loading={old} className="shrink-0" bodyClassName="h-[420px]" lineNumbers />
     <div className="min-h-10 text-[12.5px] text-ink-2" aria-label="转换统计">

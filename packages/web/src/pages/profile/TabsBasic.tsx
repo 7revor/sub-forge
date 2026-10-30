@@ -12,42 +12,55 @@ import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 
 import { Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Button, Card, Empty, Field, Segmented, Select } from '../../components/ui.tsx';
+import { Button, Card, Empty, Field, Input, Segmented, Select, Switch, Textarea } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
-/** 输出设置与基本信息放在同一个标签页。 */
-export function TabOutput() {
+/** 名称、备注和流量信息放在同一行，配置原文使用独立编辑区。 */
+export function TabProfileInfo() {
   const { draft, setDraft, allNodeSets } = useProfile();
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
   const sources = allNodeSets.filter(n => n.ref.type === 'source' && draft.nodeSets.some(p => p.ref.type === 'source' && p.ref.id === n.ref.id));
-  return <Card title="输出设置" className="min-w-0">
-    <div className="flex flex-col gap-3.5">
-      <Field label="流量 / 到期信息">{id => <Select placeholder="选择订阅流量与到期信息的来源" id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={e => {
-        const value = e.target.value;
-        setDraft({ ...draft, userinfo: value.startsWith('source:') ? { mode: 'source', sourceId: value.slice(7) } : { mode: value as 'sum' | 'none' } });
-      }}>
-        <option value="sum">汇总全部订阅源</option>
-        {sources.map(s => <option key={s.ref.id} value={`source:${s.ref.id}`}>取「{s.name}」</option>)}
-        <option value="none">不输出</option>
-      </Select>}</Field>
-      <p className="m-0 text-[12.5px] text-ink-muted">更新间隔由管理员在系统中统一设置。</p>
+  return <section aria-label="订阅基本信息" className="grid min-w-0 gap-4 rounded-[10px] border border-line bg-panel p-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.2fr]">
+    <div className="min-w-0">
+      <Field label="订阅名称">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} aria-invalid={!!draft.id && !draft.name.trim()} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
+      {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-[12px] text-err">请填写订阅名称</p>}
     </div>
-  </Card>;
+    <Field label="流量 / 到期信息" className="min-w-0">{id => <Select placeholder="选择订阅流量与到期信息的来源" id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={e => {
+      const value = e.target.value;
+      setDraft({ ...draft, userinfo: value.startsWith('source:') ? { mode: 'source', sourceId: value.slice(7) } : { mode: value as 'sum' | 'none' } });
+    }}>
+      <option value="sum">汇总全部订阅源</option>
+      {sources.map(s => <option key={s.ref.id} value={`source:${s.ref.id}`}>取「{s.name}」</option>)}
+      <option value="none">不输出</option>
+    </Select>}</Field>
+    <Field label="备注" className="min-w-0 sm:col-span-2 xl:col-span-1">{id => <Textarea id={id} rows={1} className="min-h-[38px] resize-y" placeholder="记录用途或说明（可选）" value={draft.note ?? ''} onChange={e => setDraft({ ...draft, note: e.target.value })} />}</Field>
+  </section>;
 }
 
-/** 按内核和可选客户端保存原文，编辑阶段不做字段解析。 */
+/** 启用开关与两层原文集中展示；暂停输出只隐藏编辑区，不清空草稿。 */
 export function TabBase() {
   const { draft, setDraft } = useProfile();
   const enabled = draft.base !== undefined && draft.base.enabled !== false;
-  return <>
-    {(draft.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[13px] text-warn">{note}</p>)}
-    <section className="flex flex-wrap items-center gap-4 rounded-[10px] border border-line bg-panel p-4">
-      <Field label="基础配置追加">{() => <Segmented label="基础配置追加" value={enabled ? 'enabled' : 'disabled'} options={[{ value: 'enabled', label: '启用' }, { value: 'disabled', label: '不输出' }]} onChange={m => {
-        setDraft({ ...draft, base: { ...draft.base, enabled: m === 'enabled' } });
-      }} />}</Field>
-    </section>
-    {enabled && <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />}
-  </>;
+  return <section aria-label="基础配置追加" className="min-w-0 rounded-[10px] border border-line bg-panel">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
+      <div>
+        <h2 className="m-0 text-[15px] font-semibold">配置追加</h2>
+        <p className="mt-1 mb-0 text-[12.5px] text-ink-muted">为不同内核保存各自的原始配置。</p>
+      </div>
+      <div className="flex items-center gap-2.5">
+        <span className="text-[12.5px] text-ink-2">{enabled ? '已启用' : '未启用'}</span>
+        <Switch label="启用基础配置追加" checked={enabled} onChange={value => setDraft({ ...draft, base: { ...draft.base, enabled: value } })} />
+      </div>
+    </div>
+    {!enabled && <p className="m-0 border-t border-line px-4 py-5 text-[13px] text-ink-muted sm:px-5">当前不追加基础配置。启用后可编辑，已填写的原文会保留。</p>}
+    <div hidden={!enabled} className="border-t border-line">
+      <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />
+    </div>
+    {!!draft.migrationNotes?.length && <details className="border-t border-line px-4 py-3 text-[12px] sm:px-5">
+      <summary className="w-fit cursor-pointer text-warn">配置迁移记录（{draft.migrationNotes.length}）</summary>
+      <div className="mt-2 space-y-2 leading-relaxed text-ink-muted">{draft.migrationNotes.map((note, i) => <p key={i} className="m-0">{note}</p>)}</div>
+    </details>}
+  </section>;
 }
 
 /** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
@@ -64,7 +77,7 @@ export function TabNodeSets() {
   };
   return (
     <>
-      <Card title="节点来源" subtitle={`${draft.nodeSets.length} 个`}
+      <Card title="节点来源"
         actions={<Button size="sm" onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={14} />添加节点集</Button>}>
         {!draft.nodeSets.length ? <Empty title="还没有节点集" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[24px_32px_minmax(0,1fr)_68px] md:grid-cols-[24px_32px_minmax(0,1fr)_minmax(0,1fr)_140px_68px]">
           {handle}<RoutingCardIcon><Boxes size={16} /></RoutingCardIcon>

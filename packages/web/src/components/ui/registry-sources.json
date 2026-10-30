@@ -38,5 +38,11 @@
     "file": "select.tsx",
     "url": "https://ui.shadcn.com/r/styles/new-york-v4/select.json",
     "sha256": "962830436bd0b7ee50e556f0747e277d6a86869ed27d167516346b15f26309d8"
+  },
+  {
+    "file": "sidebar.tsx",
+    "url": "https://ui.shadcn.com/r/styles/new-york-v4/sidebar.json",
+    "sha256": "2ba1a9b9422f4172373f4cd0587b675d2331a41f4fa68f65dab2b23ca98fd9d2",
+    "adaptation": "仅保留固定侧栏与分组菜单；窄屏使用页内展开，移除未使用的 Sheet、Tooltip、输入、骨架、折叠状态与快捷键。"
   }
 ]

@@ -67,7 +67,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
     finally { setLinkingRule(undefined); }
   };
   return <>
-    <Card title={title} subtitle={`${value.rules.length} 项 · 自上而下匹配`} actions={!readOnly && <>
+    <Card title={title} actions={!readOnly && <>
       {!staticOnly && <Button size="sm" disabled={!remoteUrls.length || repositoryMatches.isPending} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
       <Button size="sm" className="gap-1" aria-label="添加本地规则" onClick={() => add({ kind: 'local', content: '' })}><Plus size={15} />本地规则</Button>
       {!staticOnly && <><Button size="sm" className="gap-1" onClick={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><Plus size={15} />远程链接</Button><Button size="sm" className="gap-1" onClick={() => add({ kind: 'ruleset', id: '' })}><Plus size={15} />引用规则</Button></>}
