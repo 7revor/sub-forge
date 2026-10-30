@@ -16,11 +16,11 @@ export function RepositoryManager({ repos, admin, loading = false, failed = fals
   const toggle = useMutation({ meta: { successMessage: '仓库状态已更新' }, mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: invalidate });
   const remove = useMutation({ meta: { successMessage: '仓库已删除', modalErrors: true }, mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: invalidate });
   return <section aria-label="仓库" className="flex shrink-0 flex-col gap-3">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="m-0 text-[15px] font-semibold">仓库</h2>
-      {admin && <Link to={`/rule-repo/new${search}`} className={buttonClass('default', 'sm')}><Plus size={14} />添加仓库</Link>}
-    </div>
     <div className="list-panel">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 table-panel-divider-bottom px-6 py-4">
+        <h2 className="m-0 text-base font-semibold">仓库</h2>
+        {admin && <Link to={`/rule-repo/new${search}`} className={buttonClass('default')}><Plus size={16} />添加仓库</Link>}
+      </div>
       <div className="list-table-scroll max-h-[min(30vh,240px)] min-h-0 overflow-auto overscroll-contain" aria-busy={loading}>
         <ListTable label="仓库管理" columns={[
           { header: '仓库名称', width: 180 }, { header: '分支', width: 136 }, { header: '规则数', width: 72 },
