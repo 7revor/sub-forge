@@ -283,3 +283,5 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 实际访问外部设计画布仍显示「Sign in to view this page」，本轮未编辑。待同步预设与订阅基础设置的全部字段、策略组、处理链、规则来源、原始配置编辑器及业务表单：空值显示对应中文字段解释，选项菜单只绘制实际值；可选单选有值时在触发框旁显示独立清空按钮，清空后恢复 placeholder；多选取消全部勾选后显示 placeholder。保持独立标签和官方组件动画。Mihomo 文案以 packages/web/src/schemas/placeholders.ts 为准；DNS 策略键和值分别说明匹配条件和 DNS 地址，不显示「未设置」。
 
 此项替代本文此前自动更新时间 placeholder 仅为 `24`、可选字段以「不设置」占位的画法。原有默认数据不变，placeholder 不写入配置。截图与验收见 research/verification/form-placeholders-20261030/README.md。
+
+2026-10-30 合并待同步补充：新版订阅单页的成员填充与组设置弹窗、前置编辑器、系统资源缓存字段采用相同中文提示和空值交互。组设置空 lazy 显示用途说明，下拉只含开/关，清空后恢复说明；前置策略组空值显示连接用途，不绘制空选项。参考 [合并验收](../research/verification/form-placeholders-merge-20261030/README.md)，本轮未编辑外部画布。

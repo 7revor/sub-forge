@@ -232,3 +232,13 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 验证包含 schema 中文提示覆盖、空 Select、零值、false 与清空删除的回归测试，以及 Codex 内置浏览器的发布、回显和 YAML 检查。后端和核心模型无需迁移。
 
 2026-10-30 合并适配：缓存刷新任务使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。
+
+
+### 2026-10-30：规则卡片与操作间距
+
+仓库关联来源隐藏地址/格式的第二行，名称垂直居中，选中不改变高度；来源卡片外 pointerdown 取消选择。文档列表操作使用 flex gap-2 统一按钮间距。验收见 `research/verification/rule-card-interactions-20261030/`。
+
+
+2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
+
+2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。

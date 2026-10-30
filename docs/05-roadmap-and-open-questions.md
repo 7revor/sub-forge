@@ -249,3 +249,13 @@ Docker 验证中发现并修复的问题：
 
 
 2026-10-30 用户已授权将统一资源缓存分支合入 main，替代此前“暂不合并”状态。已整合主分支官方组件与规则编辑草稿更新，1005 项测试通过、46 跳过，类型/构建和内置浏览器冒烟验收通过；见 [合并记录](../research/verification/unified-resource-cache-merge-20261030/README.md)。
+
+
+### 2026-10-30：规则卡片与操作间距
+
+已完成关联卡片单行居中、选择高度稳定、外部点击取消和列表按钮间距修复。302 项前端测试通过、2 项跳过，类型/构建及内置浏览器验收通过。记录见 [验收](../research/verification/rule-card-interactions-20261030/README.md)。独立工作树待合并。
+
+
+2026-10-30 用户已授权合并规则卡片与操作间距修复，并将格式标签统一为 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS；替代上文“待合并”状态。已整合主分支订阅与规则编辑器最新改动；格式值、服务端和种子数据不变。
+
+2026-10-30 表单占位合并适配完成：保留统一缓存与新版订阅编辑，新增字段已遵循中文 placeholder 和真正空值规则；合并验证见 [记录](../research/verification/form-placeholders-merge-20261030/README.md)。
