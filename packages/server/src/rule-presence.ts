@@ -30,7 +30,7 @@ export function normalizeRulePresence<T>(kind: string, value: T): T {
   if (kind === 'template') next = { ...value, rules: rules(value.rules) };
   if (kind === 'profile' && obj(value.routing)) {
     const routing = value.routing;
-    if (routing.mode === 'bound' && routing.prependRules !== undefined) next = { ...value, routing: { ...routing, prependRules: rules(routing.prependRules) } };
+    if (routing.mode === 'bound') next = { ...value, routing: { ...routing, ...(routing.prependRules !== undefined ? { prependRules: rules(routing.prependRules) } : {}), ...(routing.appendRules !== undefined ? { appendRules: rules(routing.appendRules) } : {}) } };
     if (routing.mode === 'independent' && obj(routing.config)) next = { ...value, routing: { ...routing, config: normalizeRulePresence('template', routing.config) } };
   }
   // 旧订阅先清除额外选项，再进行分流模式迁移；原文和结构化规则中的标记保留。

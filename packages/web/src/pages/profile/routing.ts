@@ -10,9 +10,17 @@ export function persistedProfile(p: ProfileDoc): ProfileDoc {
 export function updateEditorOverlay(p: ProfileDoc, change: (o: Overlay) => Overlay): ProfileDoc {
   const overlay = change(profileEditorOverlay(p));
   if (!p.routing) return { ...p, overlay };
-  return { ...p, overlay: {}, routing: p.routing.mode === 'bound'
-    ? { ...p.routing, groupAdditions: additionsFromOverlay(overlay), ...((overlay.extraGroups?.length || p.routing.extraGroups) ? { extraGroups: (overlay.extraGroups ?? []).map(extra => extra.group) } : {}), ...((overlay.extraRules?.length || p.routing.prependRules) ? { prependRules: [...(overlay.extraRules ?? [])].reverse().map(extra => extra.rule) } : {}) }
-    : { ...p.routing, config: routingConfig(mergeTemplate(undefined, overlay, new Report())) } };
+  if (p.routing.mode === 'independent') return { ...p, overlay: {}, routing: { ...p.routing, config: routingConfig(mergeTemplate(undefined, overlay, new Report())) } };
+  const extraGroups = (overlay.extraGroups ?? []).map(extra => extra.group);
+  const extraRules = overlay.extraRules ?? [];
+  return { ...p, overlay: {}, routing: {
+    ...p.routing,
+    groupAdditions: additionsFromOverlay(overlay),
+    ...((extraGroups.length || p.routing.extraGroups) ? { extraGroups } : {}),
+    ...(p.routing.prependGroupIds ? { prependGroupIds: p.routing.prependGroupIds.filter(id => extraGroups.some(group => group.id === id)) } : {}),
+    ...((extraRules.length || p.routing.prependRules) ? { prependRules: extraRules.filter(extra => extra.anchor === 'top').reverse().map(extra => extra.rule) } : {}),
+    ...((p.routing.appendRules || extraRules.some(extra => extra.anchor === 'bottom')) ? { appendRules: extraRules.filter(extra => extra.anchor === 'bottom').map(extra => extra.rule) } : {}),
+  } };
 }
 export function modeLabel(p: ProfileDoc, name?: string): string {
   if (p.routing?.mode === 'bound') return `绑定模板 · ${name ?? p.routing.templateId}`;

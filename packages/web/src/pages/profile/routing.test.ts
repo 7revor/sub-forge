@@ -52,3 +52,13 @@ it('绑定前置规则的增删、排序、编辑与再次保存保留显示顺�
   expect(removed.routing?.mode === 'bound' && removed.routing.prependRules).toEqual([]);
   expect(persistedProfile({ ...edited, overlay }).overlay).toEqual({});
 });
+
+it('编辑覆盖层和删除独立组保留规则两侧位置并清理前置组标记', () => {
+  const bound: ProfileDoc = { ...profile, routing: { mode: 'bound', templateId: 't', groupAdditions: {},
+    extraGroups: profile.routing?.mode === 'independent' ? profile.routing.config.groups : [], prependGroupIds: ['a'],
+    prependRules: [], appendRules: profile.routing?.mode === 'independent' ? profile.routing.config.rules : [],
+  } };
+  expect(updateEditorOverlay(bound, o => o)).toEqual(bound);
+  const removed = updateEditorOverlay(bound, o => ({ ...o, extraGroups: o.extraGroups?.filter(e => e.group.id !== 'a') }));
+  expect(removed.routing).toMatchObject({ prependGroupIds: [], prependRules: [], appendRules: [{ id: 'r' }] });
+});

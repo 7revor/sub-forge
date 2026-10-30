@@ -276,8 +276,12 @@ export type ProfileRouting =
     mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]>;
     /** 按显示顺序优先于全部模板规则，仅允许本地单条或多条规则。 */
     prependRules?: RuleEntry[];
-    /** 本订阅独立维护的策略组，追加于模板组末尾。 */
+    /** 按显示顺序放在全部模板规则之后、最终 MATCH 之前。 */
+    appendRules?: RuleEntry[];
+    /** 本订阅独立维护的策略组，默认追加于模板组末尾。 */
     extraGroups?: GroupSpec[];
+    /** 放在模板组之前的独立组 ID，顺序仍由 extraGroups 决定。 */
+    prependGroupIds?: ID[];
   }
   | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version?: number; name?: string } };
 

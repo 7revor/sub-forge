@@ -2,7 +2,7 @@ import { rulePreviewLinks } from '../../domain/rulePreview.ts';
 import { type Matcher, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
 import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { SortableList } from '../../components/SortableList.tsx';
+import { TemplateBoundList } from '../../components/TemplateBoundList.tsx';
 import { targetLabel } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, FieldError } from '../../components/ui.tsx';
@@ -23,18 +23,20 @@ export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
   return ctx.rulesets.find(r => r.id === matcher.id)?.name ?? matcher.id ?? '增强集合';
 }
 
-export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValidationReady, readOnly = false, title = '规则', hideFinal = false, staticOnly = false, renderTarget, extendedOptions, importedUrls }: {
-  value: TemplateBody; onChange: (value: TemplateBody) => void; ctx: ConvertCtx; report: ReportItem[];
+export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValidationReady, readOnly = false, title = '规则', hideFinal = false, staticOnly = false, renderTarget, extendedOptions, importedUrls, templateRuleIds, templateStart }: {
+  value: TemplateBody; onChange: (value: TemplateBody, templateStart?: number) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
   readOnly?: boolean; title?: string; hideFinal?: boolean; staticOnly?: boolean; importedUrls?: string[];
   renderTarget?: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => ReactNode;
+  templateRuleIds?: string[]; templateStart?: number;
   extendedOptions?: boolean;
 }) {
+  const ruleReadOnly = (rule: RuleEntry) => readOnly || !!templateRuleIds?.includes(rule.id);
   const [linkError, setLinkError] = useState<string>();
   const [linkingRule, setLinkingRule] = useState<string>();
   const currentValue = useRef(value);
   currentValue.current = value;
-  const remoteUrls = readOnly ? [] : value.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
+  const remoteUrls = readOnly ? [] : value.rules.filter(r => !ruleReadOnly(r)).flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
   const repositoryMatches = useRepositoryUrlMatches();
   useEffect(() => { if (importedUrls && !readOnly) void repositoryMatches.detect(importedUrls); }, [importedUrls, readOnly, repositoryMatches.detect]);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
@@ -72,7 +74,8 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
     </>}>
       <ErrorAlert error={repositoryMatches.error} />{linkError && <FieldError error={linkError} />}
       {!value.rules.length && <Empty title="没有规则" description={hideFinal ? '先于模板规则匹配，仅影响本订阅。' : '未匹配的流量走 MATCH。'} />}
-      <SortableList items={value.rules} getKey={r => r.id} isLocked={() => readOnly} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
+      <TemplateBoundList label="规则" items={value.rules} templateIds={templateRuleIds} templateStart={templateStart} isLocked={ruleReadOnly} onReorder={(rules, start) => onChange({ ...value, rules }, start)} renderItem={(r, i, handle) => {
+        const readOnly = ruleReadOnly(r);
         const matcher = r.matcher;
         const local = matcher.kind !== 'ruleset';
         const label = ruleMatcherLabel(matcher, ctx);
@@ -88,7 +91,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           }}><span title={label}>{label}</span></RuleCard>;
       }} />
       {!hideFinal && <>
-        <RuleFinalCard readOnly={readOnly} targetId="template-rule-final" target={readOnly ? <span className="block truncate px-1.5" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />} />
+        <RuleFinalCard readOnly={readOnly || !!templateRuleIds} targetId="template-rule-final" target={readOnly || templateRuleIds ? <span className="block truncate px-1.5" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />} />
         <ItemIssues report={report} where="final" />
       </>}
     </Card>

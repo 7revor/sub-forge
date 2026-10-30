@@ -6,6 +6,7 @@ import { Layers3, Plus } from 'lucide-react';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 
 import { memberLabel } from '../../components/pickers.tsx';
+import { TemplateBoundList } from '../../components/TemplateBoundList.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { RoutingCard, RoutingCardActions, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { Button, Card, Empty, Field, Input, Switch, cx } from '../../components/ui.tsx';
@@ -17,8 +18,9 @@ import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts
 
 const columns = 'grid grid-cols-[24px_32px_minmax(0,1fr)_60px] md:grid-cols-[24px_32px_minmax(0,1fr)_88px_minmax(0,1.4fr)_44px_60px]';
 
-export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, isGroupReadOnly = () => readOnly, onRemoveGroup, onEditGroup, memberSummary, nodeSetName = ref => ref.id }: {
-  value: TemplateBody; onChange: (body: TemplateBody) => void; report: ReportItem[];
+export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, isGroupReadOnly = () => readOnly, onRemoveGroup, onEditGroup, memberSummary, nodeSetName = ref => ref.id, templateGroupIds, templateStart }: {
+  value: TemplateBody; onChange: (body: TemplateBody, templateStart?: number) => void; report: ReportItem[];
+  templateGroupIds?: string[]; templateStart?: number;
   isGroupReadOnly?: (group: GroupSpec) => boolean; onRemoveGroup?: (group: GroupSpec) => void;
   readOnly?: boolean; onEditGroup?: (group: GroupSpec, adding: boolean) => void; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
 }) {
@@ -48,7 +50,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
       }}><Plus size={14} />新增组</Button>
     </>}>
       {!value.groups.length ? <Empty title="还没有策略组" /> : <>
-        <SortableList items={value.groups} getKey={g => g.id} isLocked={isGroupReadOnly} canDrop={(_from, to) => !isGroupReadOnly(value.groups[to]!)} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
+        <TemplateBoundList label="策略组" items={value.groups} templateIds={templateGroupIds} templateStart={templateStart} isLocked={isGroupReadOnly} canDrop={(_from, to) => !isGroupReadOnly(value.groups[to]!)} onReorder={(groups, start) => onChange({ ...value, groups }, start)} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '—');
           return <RoutingCard id={`template-group-${g.id}`} className={columns} invalid={error}>

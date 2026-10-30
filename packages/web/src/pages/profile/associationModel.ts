@@ -24,7 +24,7 @@ export function associationRequirements(profile: Profile, groups: GroupSpec[], m
   }
   for (const group of privateGroups) for (const member of group.members) if (member.kind === 'group' || member.kind === 'node') visit(member, '独立组成员引用');
   for (const chain of profile.chains) visit(chain.via, '代理链引用');
-  if (profile.routing?.mode === 'bound') for (const rule of profile.routing.prependRules ?? []) visit(rule.target, '前置规则出口');
+  if (profile.routing?.mode === 'bound') for (const [rules, label] of [[profile.routing.prependRules, '前置规则出口'], [profile.routing.appendRules, '后置规则出口']] as const) for (const rule of rules ?? []) visit(rule.target, label);
   return [...required.values()];
 }
 
