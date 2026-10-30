@@ -1,7 +1,7 @@
 import { RoutingCard, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { appendProviderGroup } from './providerGroup.ts';
-import { chainSources, type NodeSetID } from '@sub-forge/core';
+import type { NodeSetID } from '@sub-forge/core';
 import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
 import { Frame } from '../../modals/Frame.tsx';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
@@ -180,20 +180,18 @@ export function TabNodeSets() {
     }
     setDraft(removeProfileNodeSet(draft, ref));
   };
-  const chained = new Set(draft.chains.flatMap(c => chainSources(c.landing.nodeSet, draft.nodeSets).map(source => `${source.ref.type}:${source.ref.id}`)));
-
   return (
     <>
       <Card title="节点来源" subtitle={`${draft.nodeSets.length} 个`}
         actions={<Button size="sm" onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={14} />添加节点集</Button>}>
-        {!draft.nodeSets.length ? <Empty title="还没有节点集" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[24px_32px_minmax(0,1fr)_auto] md:grid-cols-[24px_32px_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+        {!draft.nodeSets.length ? <Empty title="还没有节点集" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[24px_32px_minmax(0,1fr)_68px] md:grid-cols-[24px_32px_minmax(0,1fr)_minmax(0,1fr)_140px_68px]">
           {handle}<RoutingCardIcon><Boxes size={16} /></RoutingCardIcon>
           <button type="button" aria-label={`预览 ${nodeSetName(n.ref)} 的节点`} onClick={() => void NodeSetPreviewModal.show({ nodeSet: n.ref, name: nodeSetName(n.ref) })} className="min-w-0 cursor-pointer truncate rounded text-left font-medium hover:text-brand hover:underline focus-visible:outline-brand">{nodeSetName(n.ref)}</button>
-          <span className="col-start-3 row-start-2 min-w-0 truncate text-ink-2 md:col-auto md:row-auto">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
-          <div className="col-span-2 col-start-3 row-start-3 md:col-auto md:row-auto"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>
-          <div className="col-start-4 row-start-1 flex justify-end gap-1 md:col-auto md:row-auto">
-            {n.output === 'provider' && <Button size="sm" variant="ghost" className="px-1.5" aria-label={`为 ${nodeSetName(n.ref)} 追加独立策略组`} title="追加独立策略组" onClick={() => setDraft(appendProviderGroup(draft, n.ref, nodeSetName(n.ref), groups))}><ListPlus size={14} /></Button>}
-            <Button size="sm" variant="ghost" className="px-1.5" aria-label={`移除 ${nodeSetName(n.ref)}`} title="移除节点来源" onClick={() => void remove(n.ref)}><Trash2 size={14} /></Button>
+          <span className="col-start-3 row-start-2 min-w-0 truncate text-ink-2 md:col-auto md:row-auto">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span>
+          <div className="col-span-2 col-start-3 row-start-3 w-[140px] md:col-auto md:row-auto [&>div]:w-full [&_button]:flex-1 [&_button]:px-0"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>
+          <div className="col-start-4 row-start-1 grid w-[68px] grid-cols-2 gap-1 md:col-auto md:row-auto">
+            {n.output === 'provider' ? <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`为 ${nodeSetName(n.ref)} 追加独立策略组`} title="追加独立策略组" onClick={() => setDraft(appendProviderGroup(draft, n.ref, nodeSetName(n.ref), groups))}><ListPlus size={14} /></Button> : <span aria-hidden="true" className="size-8" />}
+            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} title="移除节点来源" onClick={() => void remove(n.ref)}><Trash2 size={14} /></Button>
           </div>
         </RoutingCard>} />}
       </Card>

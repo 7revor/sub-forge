@@ -48,7 +48,13 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
       <div className="max-h-48 overflow-y-auto rounded-md border border-line" aria-label={`${label}列表`}>
         {nodes.slice(0, size).map((node, i) => {
           const active = selection ? selectedNodes.has(node) : firstMatch && i === 0;
-          const content = <><span className="min-w-0 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-[11px] text-ink-muted">{node.sourceName}</span>}</span><span className="shrink-0 text-[11px] text-ink-muted">{active ? firstMatch ? '当前采用' : '已选' : node.type.toUpperCase()}</span></>;
+          const content = <>
+            <span className="min-w-0 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-[11px] text-ink-muted">{node.sourceName}</span>}</span>
+            <span className="flex shrink-0 items-center gap-2 text-[11px] text-ink-muted">
+              {active && <span>{firstMatch ? '当前采用' : '已选'}</span>}
+              <span>{node.type.toUpperCase()}</span>
+            </span>
+          </>;
           const className = 'flex w-full items-center justify-between gap-3 border-b border-line-2 px-3 py-2.5 text-left text-[13px] last:border-0';
           return onSelect ? <button key={`${i}:${node.name}`} type="button" aria-pressed={selection ? active : undefined} className={`${className} cursor-pointer hover:bg-ground focus-visible:bg-ground ${selection && active ? 'bg-ground font-medium' : ''}`} title={`仅使用 ${node.name}`} onClick={() => onSelect(node.name, node.nodeSet)}>{content}</button> : <div key={`${i}:${node.name}`} className={className}>{content}</div>;
         })}
