@@ -136,7 +136,7 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
       {triggerIcon}<span title={displayLabel} className="min-w-0 truncate">{displayLabel}</span>{!triggerClassName && <ChevronDown />}
     </Button></PopoverTrigger>
     <PopoverContent align="start" collisionPadding={12} className="flex w-[min(400px,calc(100vw-2rem))] max-h-[min(320px,var(--radix-popover-content-available-height))] flex-col overflow-hidden p-0"
-      style={placeholder ? { width: 'min(400px, var(--radix-popover-trigger-width))' } : undefined} aria-label={ariaLabel} onInteractOutside={() => setOpen(false)}>
+      style={placeholder ? { width: 'var(--radix-popover-trigger-width)' } : undefined} aria-label={ariaLabel} onInteractOutside={() => setOpen(false)}>
       <Command shouldFilter={false} className="min-h-0 [&_[data-slot=command-input-wrapper]]:shrink-0 [&_[data-slot=command-list]]:min-h-0 [&_[data-slot=command-list]]:max-h-[240px] [&_[data-slot=command-list]]:flex-1">
         <CommandInput aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query} onValueChange={setQuery} />
         {query !== debounced ? <div role="status" className="p-4 text-sm text-muted-foreground">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { setOpen(false); onChange(value); }} />}

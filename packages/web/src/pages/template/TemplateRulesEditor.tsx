@@ -108,7 +108,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
           <span className="flex items-center text-[12px] text-ink-muted">{handle}{i + 1}</span>
           <div className="flex min-w-0 items-center gap-2">
-            <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer overflow-hidden text-left hover:text-brand"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
+            <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer overflow-hidden text-left"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
             {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 条规则可关联仓库文件`} matches={repositoryMatches.matches[r.matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)} />}
           </div>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
