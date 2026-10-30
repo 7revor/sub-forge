@@ -6,6 +6,20 @@ import { formatRuleLine } from '../src/rules/expand.ts';
 import { regexToWildcard } from '../src/rules/client.ts';
 
 describe('规则跨客户端转换保留语义', () => {
+  it.each(['surge', 'loon', 'stash'] as const)('%s 端口集合转换为 OR，保留出口、源端口和嵌套条件', client => {
+    const port = client === 'stash' ? 'DST-PORT' : 'DEST-PORT';
+    const lowered = lowerRule(parseRuleLine('DST-PORT,80/443/8000-9000'), { client });
+    expect(lowered).toEqual({ kind: 'ok', text: `OR,((${port},80),(${port},443),(${port},8000-9000))` });
+    if (lowered.kind === 'ok') expect(composeRule(lowered, '代理')).toBe(`OR,((${port},80),(${port},443),(${port},8000-9000)),代理`);
+    expect(lowerRule(parseRuleLine('SRC-PORT,80/443'), { client })).toMatchObject({ kind: 'ok', text: 'OR,((SRC-PORT,80),(SRC-PORT,443))' });
+    expect(lowerRule(parseRuleLine('AND,((DOMAIN,a.test),(NOT,((DST-PORT,80/443))))'), { client })).toMatchObject({
+      kind: 'ok', text: `AND,((DOMAIN,a.test),(NOT,((OR,((${port},80),(${port},443))))))`,
+    });
+    for (const value of ['80//443', '80/65536', '80/9000-8000', '80/abc', '80/']) {
+      expect(lowerRule(parseRuleLine('DST-PORT,' + value), { client }).kind).toBe('drop');
+    }
+    expect(lowerRule(parseRuleLine('DST-PORT,80/443'), { client: 'mihomo' })).toEqual({ kind: 'ok', text: 'DST-PORT,80/443' });
+  });
   it('相同网段的解析选项和源地址选项不能被去重合并', () => {
     const lines = ['IP-CIDR,192.0.2.0/24', 'IP-CIDR,192.0.2.0/24,no-resolve', 'IP-CIDR,192.0.2.0/24,src', 'IP-CIDR,192.0.2.0/24,no-resolve,src'];
     expect(new Set(lines.map(line => ruleKey(parseRuleLine(line)))).size).toBe(4);

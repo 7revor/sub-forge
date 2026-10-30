@@ -70,6 +70,19 @@ export function regexToWildcard(re: string): string | undefined {
 
 const nr = (r: { noResolve?: boolean }) => (r.noResolve ? { noResolve: true } : {});
 
+/** Mihomo 用斜杠表示端口集合；目标不接受该写法时用 OR 保留并集和嵌套语义。 */
+function lowerPort(type: string, value: string): LoweredRule {
+  if (!value.includes('/')) return { kind: 'ok', text: `${type},${value}` };
+  const parts = value.split('/');
+  const valid = parts.every(part => {
+    if (!/^\d+(?:-\d+)?$/.test(part)) return false;
+    const [start, end = start] = part.split('-').map(Number) as [number, number?];
+    return start >= 0 && end! <= 65535 && start <= end!;
+  });
+  if (!valid) return { kind: 'drop', reason: '端口集合必须由有效端口或闭区间组成，不能忽略无效成员' };
+  return { kind: 'ok', text: `OR,(${parts.map(port => `(${type},${port})`).join(',')})` };
+}
+
 function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
     case 'USER-AGENT':
@@ -109,10 +122,8 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
     case 'SRC-IP-CIDR':
       return { kind: 'ok', text: `SRC-IP,${rule.value}` };
-    case 'DST-PORT':
-      return { kind: 'ok', text: `DEST-PORT,${rule.value}` };
-    case 'SRC-PORT':
-      return { kind: 'ok', text: `SRC-PORT,${rule.value}` };
+    case 'DST-PORT': case 'SRC-PORT':
+      return lowerPort(rule.type === 'DST-PORT' ? 'DEST-PORT' : 'SRC-PORT', rule.value);
     case 'NETWORK':
       return { kind: 'ok', text: `PROTOCOL,${rule.value.toUpperCase()}` };
     case 'PROCESS': {
@@ -132,6 +143,7 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
 
 function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
+    case 'DST-PORT': return lowerPort('DST-PORT', rule.value);
     case 'RAW': return lowerRaw(rule, ctx);
     case 'AND': case 'OR': case 'NOT':
       return lowerLogical(rule, ctx);
@@ -144,8 +156,10 @@ function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule) };
     case 'SRC-IP-CIDR':
       return { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'Stash SRC-IP 需要 iOS 3.7 / macOS 4.4 或更新版本' };
-    case 'SRC-PORT':
-      return { kind: 'ok', text: `SRC-PORT,${rule.value}`, note: 'Stash SRC-PORT 需要 iOS 3.7 / macOS 4.4 或更新版本' };
+    case 'SRC-PORT': {
+      const lowered = lowerPort('SRC-PORT', rule.value);
+      return lowered.kind === 'ok' ? { ...lowered, note: 'Stash SRC-PORT 需要 iOS 3.7 / macOS 4.4 或更新版本' } : lowered;
+    }
     case 'PROCESS': {
       if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Stash 进程规则仅支持 macOS' };
       if (rule.kind === 'path') return rule.mode === 'exact'
@@ -174,8 +188,7 @@ function lowerLoon(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'SRC-IP-CIDR': case 'DOMAIN-REGEX': case 'GEOSITE':
       return { kind: 'drop', reason: `Loon 尚未适配 ${rule.type}` };
     case 'DST-PORT': case 'SRC-PORT':
-      if (rule.value.includes('/')) return { kind: 'drop', reason: 'Loon 不支持斜杠分隔的端口集合，请改用 OR 规则' };
-      return { kind: 'ok', text: `${rule.type === 'DST-PORT' ? 'DEST-PORT' : 'SRC-PORT'},${rule.value}` };
+      return lowerPort(rule.type === 'DST-PORT' ? 'DEST-PORT' : 'SRC-PORT', rule.value);
     case 'NETWORK': return { kind: 'ok', text: `PROTOCOL,${rule.value.toUpperCase()}` };
     case 'PROCESS': {
       if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Loon 进程规则仅支持 macOS' };

@@ -96,6 +96,10 @@ describe('Surge 完整订阅', () => {
 
 it.skipIf(!process.env.SURGE_BIN)('Surge 官方离线检查：基础配置、四类组、常用节点与完整规则', () => {
   const f = iniFixture(), groups = routing(f).groups;
+  routing(f).rules.push(
+    { id: 'ports', matcher: { kind: 'rule', rule: { type: 'DST-PORT', value: '80/443/8000-9000' } }, target: { kind: 'group', groupId: 'all' } },
+    { id: 'source-ports', matcher: { kind: 'rule', rule: { type: 'SRC-PORT', value: '12345/12346' } }, target: { kind: 'group', groupId: 'all' } },
+  );
   const nodes = f.nodeSets.locals.nodes!.proxies;
   nodes.push(
     { name: 'SS', type: 'ss', server: 'ss.example.test', port: 443, cipher: 'aes-128-gcm', password: 'example' },
