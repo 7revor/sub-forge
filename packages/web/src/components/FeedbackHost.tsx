@@ -1,25 +1,18 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { Toaster } from './ui/sonner.tsx';
-import { alertError, feedbackStore, type Feedback } from '../feedback.ts';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from './ui/alert-dialog.tsx';
-import { useDialogDraft } from '../hooks/useDialogDraft.ts';
-
-function ErrorDialog({ item }: { item?: Feedback }) {
-  const [message] = useDialogDraft(!!item, item?.message, item ? String(item.id) : undefined);
-  return <AlertDialog open={!!item} onOpenChange={open => { if (!open && item) feedbackStore.dismiss(item.id); }}>
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>操作失败</AlertDialogTitle>
-        <AlertDialogDescription className="whitespace-pre-wrap break-words">{message}</AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter><AlertDialogCancel>知道了</AlertDialogCancel></AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>;
-}
+import { alertError, feedbackStore } from '../feedback.ts';
+import { Frame } from '../modals/Frame.tsx';
 
 export function FeedbackHost() {
   const items = useSyncExternalStore(feedbackStore.subscribe, feedbackStore.getSnapshot);
+  const errorShown = useRef(new Set<number>());
+  useEffect(() => {
+    const item = items.find(item => item.kind === 'error');
+    if (!item || errorShown.current.has(item.id)) return;
+    errorShown.current.add(item.id);
+    void Frame.modal.error({ title: '操作失败', description: item.message }).then(() => { feedbackStore.dismiss(item.id); errorShown.current.delete(item.id); });
+  }, [items]);
   const shown = useRef(new Set<number>());
   useEffect(() => {
     for (const item of items.filter(item => item.kind === 'success')) {
@@ -42,7 +35,7 @@ export function FeedbackHost() {
   useEffect(() => () => { for (const id of shown.current) toast.dismiss(`feedback-${id}`); shown.current.clear(); }, []);
   return <>
     <Toaster />
-    <ErrorDialog item={items.find(item => item.kind === 'error')} />
+
   </>;
 }
 

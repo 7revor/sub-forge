@@ -32,13 +32,13 @@ describe('Store', () => {
     expect(s.getTemplate('std')).not.toHaveProperty('version');
   });
 
-  it.each(['source', 'ruleset'] as const)('%s 快照：订阅源只留一次成功，规则集保留 5 份，失败只留最新一条', (kind) => {
+  it.each(['source', 'ruleset'] as const)('%s 快照：订阅源只留一次成功，规则集也只保留一次成功，失败只留最新一条', (kind) => {
     let t = 0;
     const s = new Store(':memory:', { now: () => t });
     try {
       for (let i = 0; i < 8; i++) s.addSnapshot({ ownerKind: kind, ownerId: 'a', url: 'u', fetchedAt: ++t, ok: true, body: `b${i}`, hash: `h${i}` });
       for (let i = 0; i < 3; i++) s.addSnapshot({ ownerKind: kind, ownerId: 'a', url: 'u', fetchedAt: ++t, ok: false, error: `e${i}` });
-      expect(s.countSnapshots(kind, 'a', 'u')).toEqual({ ok: kind === 'source' ? 1 : 5, failed: 1 });
+      expect(s.countSnapshots(kind, 'a', 'u')).toEqual({ ok: 1, failed: 1 });
       expect(s.latestSnapshot(kind, 'a', 'u')!.body).toBe('b7');
       expect(s.latestSnapshot(kind, 'a', 'u', false)!.error).toBe('e2');
     } finally { s.close(); }
@@ -87,12 +87,12 @@ describe('加密与迁移', () => {
       store.db.pragma(`user_version = ${version}`);
       store.close();
       store = new Store(file, { cipher });
-      expect(store.getWithOwner('source', 's')).toMatchObject({ owner: 'u1', updatedAt: 42, doc: { fetch: { ttlSec: 7200 } } });
-      expect(store.get('source', 's')?.fetch).toEqual({ ttlSec: 7200 });
+      expect(store.getWithOwner('source', 's')).toMatchObject({ owner: 'u1', updatedAt: 42, doc: { id:'s' } });
+      expect(store.get('source', 's')?.fetch).toBeUndefined();
       expect(store.snapshotHistory('source', 's')).toHaveLength(2);
       expect(store.latestSnapshot('source', 's', legacy.url)?.body).toBe('内容4');
       expect(store.latestSnapshot('source', 's', legacy.url, false)?.error).toBe('失败1');
-      expect(store.snapshotHistory('ruleset', 'r')).toHaveLength(7);
+      expect(store.snapshotHistory('ruleset', 'r')).toHaveLength(2);
       expect(store.get('ruleset', 'r')?.sources[0]?.fetch).toEqual({ ua: '规则 UA', timeoutMs: 2000 });
       const before = store.snapshotHistory('source', 's');
       store.close();
@@ -100,7 +100,7 @@ describe('加密与迁移', () => {
       expect(store.snapshotHistory('source', 's')).toEqual(before);
       // 旧种子导入也不能恢复自定义拉取选项。
       store.importSeed({ sources: [legacy] });
-      expect(store.get('source', 's')?.fetch).toEqual({ ttlSec: 7200 });
+      expect(store.get('source', 's')?.fetch).toBeUndefined();
     } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
   });
 
@@ -192,7 +192,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(20);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(21);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
@@ -207,7 +207,7 @@ describe('加密与迁移', () => {
     const old = new Store(file, { cipher });
     const raw = (kind: string, doc: { id: string }, owner: string | null) => old.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, 0)').run(kind, doc.id, owner, cipher.encrypt(JSON.stringify(doc)));
     const overrides = [{ line: 1, override: { when: { client: 'surge' }, action: { drop: true } } }];
-    raw('ruleset', { id: 'tg', name: 'Telegram', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } } as never, 'u1');
+    raw('ruleset', { id: 'tg', name: 'Telegram', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch:{ttlSec:3600} } as never, 'u1');
     raw('ruleset', { id: 'own', name: '自定', kind: 'local', format: 'auto', content: 'DOMAIN,a.test', overrides } as never, 'u1');
     raw('bundle', { id: 'fin', name: '金融', noResolve: true, items: [
       { kind: 'ruleset', id: 'tg' }, { kind: 'ruleset', id: 'own', enabled: false }, { kind: 'ruleset', id: 'gone' },
@@ -225,11 +225,11 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(20);
-    expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } }] });
+    expect(s.db.pragma('user_version', { simple: true })).toBe(21);
+    expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list' }] });
     expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [{ match: 'DOMAIN,a.test', override: overrides[0]!.override }] });
     expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', sources: [
-      { id: 'tg', name: 'Telegram', kind: 'remote', url: 'https://r.test/tg.list', fetch: { ttlSec: 3600 } },
+      { id: 'tg', name: 'Telegram', kind: 'remote', url: 'https://r.test/tg.list' },
       { id: 'rules', name: '单条规则', kind: 'local', format: 'classical', content: 'IP-CIDR,10.0.0.0/8' },
     ] } });
     expect(s.latestSnapshot('ruleset', 'fin', 'https://r.test/tg.list')?.body).toBe('DOMAIN,t.me');
@@ -245,7 +245,7 @@ describe('加密与迁移', () => {
     const migratedRulesets = s.list('ruleset');
     s.close();
     const reopened = new Store(file, { cipher });
-    expect(reopened.db.pragma('user_version', { simple: true })).toBe(20);
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(21);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
     expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });

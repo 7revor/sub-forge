@@ -119,12 +119,12 @@ describe('订阅接口', () => {
     expect(store.recentAccess('p1')[0]).toMatchObject({ client: 'surge', status: 501 });
   });
 
-  it('第二次请求命中缓存；访问日志记录来源', async () => {
+  it('第二次请求重新生成；访问日志记录来源', async () => {
     const { app, store, calls } = setup();
     await get(app, '/sub/tk-mac');
     await get(app, '/sub/tk-mac');
     expect(calls).toHaveLength(2); // 订阅源 + 规则集各拉一次
-    expect(store.recentAccess('p1').map((r) => r.source)).toEqual(['cache', 'fresh']);
+    expect(store.recentAccess('p1').map((r) => r.source)).toEqual(['fresh', 'fresh']);
   });
 });
 

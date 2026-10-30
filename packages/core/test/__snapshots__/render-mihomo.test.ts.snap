@@ -10,14 +10,12 @@ exports[`校验 > 同一输入输出完全相同（快照） 1`] = `
 proxy-providers:
   落地:
     type: http
-    url: https://sub.example.com/p/TOKEN/source%3AL?v=0e66dd5c
+    url: https://sub.example.com/p/TOKEN/source%3AL?v=6c1cc6ed
     interval: 3600
     proxy: DIRECT
-    override:
-      dialer-proxy: 🇭🇰 香港
   中转:
     type: http
-    url: https://sub.example.com/p/TOKEN/source%3AT?v=b6f49804
+    url: https://sub.example.com/p/TOKEN/source%3AT?v=c3955ca5
     interval: 3600
     proxy: DIRECT
 proxy-groups:

@@ -1,45 +1,38 @@
 import type { GroupSpec } from '@sub-forge/core';
 import { Field, Input, Select } from './ui.tsx';
+import { groupPlaceholders } from '../schemas/placeholders.ts';
 
 type Settings = Pick<GroupSpec, 'type' | 'test' | 'strategy'>;
-type SettingsProps = {
-  value: Settings; onChange: <K extends keyof Settings>(key: K, value: Settings[K] | undefined) => void;
-};
 const TYPES = ['select', 'url-test', 'fallback', 'load-balance'] as const;
 const TEST_FIELDS = [
-  ['url', '测速地址', false, '输入测速 URL（选填）'],
-  ['interval', '间隔（秒）', true, '例如：300'], ['timeout', '超时（ms）', true, '例如：5000'],
-  ['maxFailedTimes', 'max-failed-times', true, '例如：5'], ['expectedStatus', 'expected-status', false, '例如：204'],
-  ['tolerance', '容差（ms）', true, '例如：50'],
+  ['url', '测速地址', false, groupPlaceholders.url],
+  ['interval', '间隔（秒）', true, groupPlaceholders.interval], ['timeout', '超时（ms）', true, groupPlaceholders.timeout],
+  ['maxFailedTimes', 'max-failed-times', true, groupPlaceholders.maxFailedTimes], ['expectedStatus', 'expected-status', false, groupPlaceholders.expectedStatus],
+  ['tolerance', '容差（ms）', true, groupPlaceholders.tolerance],
 ] as const;
 
 /** 模板和配置订阅共用参数字段；覆盖写入及可编辑权限留给调用方。 */
-export function GroupTypeField({ value, onChange }: SettingsProps) {
-  return <Field label="类型">{(id) => <Select id={id} value={value.type} onChange={(event) => onChange('type', event.target.value as GroupSpec['type'])}>
-      {TYPES.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}
-    </Select>}</Field>;
-}
-
-export function GroupAdvancedFields({ value, onChange }: SettingsProps) {
+export function GroupSettingsFields({ value, onChange, disabled = false, section = 'all' }: {
+  value: Settings; disabled?: boolean; section?: 'all' | 'type' | 'advanced'; onChange: <K extends keyof Settings>(key: K, value: Settings[K] | undefined) => void;
+}) {
   const test = value.test ?? {};
   return <>
-    {value.type !== 'select' && <>
-      {TEST_FIELDS.filter(([key]) => key !== 'tolerance' || value.type === 'url-test').map(([key, label, numeric, placeholder]) => <Field key={key} label={label}>{(id) => <Input id={id}
+    {section !== 'advanced' && <Field label="类型">{(id) => <Select disabled={disabled} placeholder={groupPlaceholders.type} id={id} value={value.type} onChange={(event) => onChange('type', event.target.value as GroupSpec['type'])}>
+      {TYPES.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}
+    </Select>}</Field>}
+    {section !== 'type' && <>{value.type !== 'select' && <>
+      {TEST_FIELDS.filter(([key]) => key !== 'tolerance' || value.type === 'url-test').map(([key, label, numeric, placeholder]) => <Field key={key} label={label}>{(id) => <Input disabled={disabled} id={id}
         type={numeric ? 'number' : 'text'} min={numeric ? 0 : undefined} step={key === 'maxFailedTimes' ? 1 : undefined}
-        className={numeric ? undefined : 'font-mono'} placeholder={placeholder} value={test[key] ?? ''}
+        className={numeric ? undefined : 'font-mono'} placeholder={disabled ? `${placeholder}（模板未配置）` : placeholder} value={test[key] ?? ''}
         onChange={(event) => onChange('test', { ...test, [key]: event.target.value === '' ? undefined : numeric ? Number(event.target.value) : event.target.value })} />}</Field>)}
-      <Field label="lazy">{(id) => <Select id={id} placeholder="不设置" value={test.lazy === undefined ? '' : String(test.lazy)}
+      <Field label="lazy">{(id) => <Select disabled={disabled} id={id} aria-label="lazy" placeholder={groupPlaceholders.lazy} clearable value={test.lazy === undefined ? '' : String(test.lazy)}
         onChange={(event) => onChange('test', { ...test, lazy: event.target.value === '' ? undefined : event.target.value === 'true' })}>
-        {test.lazy !== undefined && <option value="">清空</option>}
         <option value="true">开</option><option value="false">关</option>
       </Select>}</Field>
     </>}
-    {value.type === 'load-balance' && <Field label="策略">{(id) => <Select id={id} placeholder="默认策略" value={value.strategy ?? ''} onChange={(event) => onChange('strategy', (event.target.value || undefined) as GroupSpec['strategy'])}>
-      {value.strategy && <option value="">清空</option>}{['consistent-hashing', 'round-robin', 'sticky-sessions'].map((strategy) => <option key={strategy}>{strategy}</option>)}
+    {value.type === 'load-balance' && <Field label="策略">{(id) => <Select disabled={disabled} id={id} aria-label="负载均衡策略" placeholder={groupPlaceholders.strategy} clearable value={value.strategy ?? ''} onChange={(event) => onChange('strategy', (event.target.value || undefined) as GroupSpec['strategy'])}>
+      {['consistent-hashing', 'round-robin', 'sticky-sessions'].map((strategy) => <option key={strategy}>{strategy}</option>)}
     </Select>}</Field>}
+    </>}
   </>;
-}
-
-export function GroupSettingsFields(props: SettingsProps) {
-  return <><GroupTypeField {...props} /><GroupAdvancedFields {...props} /></>;
 }

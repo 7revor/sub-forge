@@ -1,51 +1,38 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
+import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
+import { Frame } from '../../modals/Frame.tsx';
 import type { GroupSpec, ReportItem } from '@sub-forge/core';
-import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { GroupAdvancedFields, GroupTypeField } from '../../components/GroupSettingsFields.tsx';
-import { DeleteDialog } from '../../components/DetailActions.tsx';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
+
+import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
+
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Button, Card, Empty, Field, Input, Switch, cx } from '../../components/ui.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
-import { draftIssues, removeGroup } from './model.ts';
+import { removeGroup } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
-import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
-import { useDialogPresentation } from '../../hooks/useDialogPresentation.ts';
 
 const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_56px_64px]';
 
-export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report, readOnly = false, saveHint = '保存模板后生效', renderMembers, renderAdvanced, onSave, memberSummary, nodeSetName = ref => ref.id }: {
-  value: TemplateBody; onChange: (body: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; report: ReportItem[];
-  readOnly?: boolean; saveHint?: string; renderMembers?: (group: GroupSpec, update: (patch: Partial<GroupSpec>) => void) => ReactNode; renderAdvanced?: (group: GroupSpec, update: (patch: Partial<GroupSpec>) => void) => ReactNode; onSave?: (group: GroupSpec) => void; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
+export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, saveHint = '保存模板后生效', onEditGroup, memberSummary, nodeSetName = ref => ref.id }: {
+  value: TemplateBody; onChange: (body: TemplateBody) => void; report: ReportItem[];
+  readOnly?: boolean; saveHint?: string; onEditGroup?: (group: GroupSpec, adding: boolean) => void; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
 }) {
-  const [deleting, setDeleting] = useState<string>();
-  const [newGroup, setNewGroup] = useState<GroupSpec>();
-  const deletingGroup = value.groups.find(g => g.id === deleting);
-  const source = value.groups.find(g => g.id === selected) ?? (newGroup?.id === selected ? newGroup : undefined);
-  const open = !!selected && !!source && !deletingGroup;
-  const [group, setGroup] = useDialogDraft(open, source, selected);
-  const [advanced, setAdvanced] = useDialogDraft(open, false, selected);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
-  const update = (patch: Partial<GroupSpec>) => {
-    setGroup(current => current ? { ...current, ...structuredClone(patch) } : current);
+  const edit = async (group: GroupSpec, adding = false) => {
+    if (onEditGroup) { onEditGroup(group, adding); return; }
+    const result = await TemplateGroupModal.show({ group, groups: value.groups, report, readOnly, saveHint });
+    if (result.status === 'confirmed') onChange({ ...value, groups: adding ? [...value.groups, result.data] : value.groups.map(g => g.id === group.id ? result.data : g) });
   };
-  const close = () => { onSelect(undefined); setDeleting(undefined); };
-  const dialogReport = useDialogPresentation(open, group ? draftIssues({ ...value, groups: value.groups.some(g => g.id === group.id) ? value.groups.map(g => g.id === group.id ? group : g) : [...value.groups, group] }) : []);
-  const save = () => {
-    if (!group) return;
-    if (!readOnly) {
-      const saved = structuredClone(group);
-      onChange({ ...value, groups: value.groups.some(g => g.id === saved.id) ? value.groups.map(g => g.id === saved.id ? saved : g) : [...value.groups, saved] });
-    }
-    onSave?.(structuredClone(group));
-    close();
+  const remove = async (group: GroupSpec) => {
+    const references = value.groups.filter(g => g.id !== group.id && g.members.some(m => m.kind === 'group' && m.groupId === group.id)).length;
+    const rules = value.rules.filter(r => r.target.kind === 'group' && r.target.groupId === group.id).length;
+    const final = value.final.kind === 'group' && value.final.groupId === group.id;
+    const result = await Frame.modal.confirm({ title: `删除策略组「${group.name || '未命名组'}」？`, description: `删除此组会移除 ${references} 个组内的引用，将 ${rules} 条规则${final ? '和 MATCH' : ''}的出口改为 REJECT。\n${saveHint}。`, confirmLabel: '删除', danger: true });
+    if (result.status === 'confirmed') onChange(removeGroup(value, group.id));
   };
-  const references = deletingGroup ? value.groups.filter(g => g.id !== deletingGroup.id && g.members.some(m => m.kind === 'group' && m.groupId === deletingGroup.id)).length : 0;
-  const rules = deletingGroup ? value.rules.filter(r => r.target.kind === 'group' && r.target.groupId === deletingGroup.id).length : 0;
-  const final = deletingGroup && value.final.kind === 'group' && value.final.groupId === deletingGroup.id;
   return <>
     <Card title="策略组" subtitle={`${value.groups.length} 个`} bodyClass="pb-1" actions={!readOnly && <>
       <Button size="sm" disabled={REGION_GROUPS.every(region => value.groups.some(g => g.name === region.name))} onClick={() => {
@@ -54,8 +41,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
       }}>添加地区节点</Button>
       <Button size="sm" onClick={() => {
         const id = newId('g');
-        setNewGroup({ id, name: '新策略组', type: 'select', members: [] });
-        onSelect(id);
+        void edit({ id, name: '新策略组', type: 'select', members: [] }, true);
       }}><Plus size={14} />新增组</Button>
     </>}>
       {!value.groups.length ? <div className="px-4 pb-4"><Empty title="还没有策略组" /></div> : <>
@@ -63,33 +49,49 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <SortableList items={value.groups} getKey={g => g.id} isLocked={() => readOnly} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '—');
-          return <div className={cx(columns, 'items-center border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
+          return <div id={`template-group-${g.id}`} className={cx(columns, 'items-center border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
             {handle}
             <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left font-medium', error && 'text-err')}>{g.name || '未命名组'}{g.display?.hidden && <span className="ml-2 text-[11px] font-normal text-ink-muted">已隐藏</span>}</span>
             <span className="font-mono text-[12px]">{g.type.toUpperCase()}</span>
             <span className="col-span-2 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-4 sm:row-start-1" title={members}>{members}</span>
             <div className="col-start-4 row-start-2 flex flex-col items-center justify-center gap-0.5 sm:col-start-5 sm:row-start-1 sm:flex-row">
               <span className="text-[12px] text-ink-muted sm:hidden">隐藏</span>
-              {readOnly ? <span className="text-[12px] text-ink-muted">{g.display?.hidden ? '是' : '否'}</span> : <Switch label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />}
+              {readOnly ? <span className="text-[12px] text-ink-muted">{g.display?.hidden ? '已隐藏' : '显示'}</span> : <Switch label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />}
             </div>
             <div className="col-start-4 row-start-1 flex gap-1 sm:col-start-6">
-              <Button size="sm" variant="ghost" className="px-1.5" aria-label={`编辑策略组「${g.name}」`} onClick={() => onSelect(g.id)}><Pencil size={14} /></Button>
-              {!readOnly && <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除策略组「${g.name}」`} onClick={() => setDeleting(g.id)}><Trash2 size={14} /></Button>}
+              <Button size="sm" variant="ghost" className="px-1.5" aria-label={`编辑策略组「${g.name}」`} onClick={() => void edit(g)}><Pencil size={14} /></Button>
+              {!readOnly && <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除策略组「${g.name}」`} onClick={() => void remove(g)}><Trash2 size={14} /></Button>}
             </div>
           </div>;
         }} />
       </>}
     </Card>
-    <Dialog open={open} onOpenChange={next => { if (!next) close(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      {group && <>
-        <ItemIssues report={dialogReport} where={`group:${group.id}`} />
+  </>;
+}
+
+export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupSpec[]; report: ReportItem[]; readOnly: boolean; saveHint: string }, GroupSpec>(function TemplateGroup({ data: { groups, report, readOnly, saveHint, group: initial }, modal }) {
+  const [group, setGroup] = useModalDraft(initial);
+  const value = { groups };
+  const groupName = (id: string) => groups.find(g => g.id === id)?.name ?? id;
+  const update = (patch: Partial<GroupSpec>) => setGroup(current => ({ ...current, ...patch }));
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
+      <>
+        <ItemIssues report={report} where={`group:${group.id}`} />
+        
         <fieldset disabled={readOnly} className="m-0 contents border-0 p-0">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="组名称">{id => <Input id={id} value={group.name} onChange={e => update({ name: e.target.value })} />}</Field>
-          <GroupTypeField value={group} onChange={(key, next) => update({ [key]: next })} />
+          <Field label="组名称">{id => <Input placeholder="填写策略组在配置中的名称" id={id} value={group.name} onChange={e => update({ name: e.target.value })} />}</Field>
+          <GroupSettingsFields section="type" disabled={readOnly} value={group} onChange={(key, next) => update({ [key]: next })} />
         </div>
+        <details className="mt-4"><summary className="cursor-pointer text-[13px] font-medium">高级设置</summary><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <GroupSettingsFields section="advanced" disabled={readOnly} value={group} onChange={(key, next) => update({ [key]: next })} />
+          <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
+          <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
+          <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
+        </div></details>
         </fieldset>
-        {renderMembers ? renderMembers(group, update) : <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
+        
+        <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-ink-muted">{group.members.length} 个</span></h3>
             <TemplateTargetSelect action label="添加成员" value={undefined} groups={value.groups.filter(g => g.id !== group.id)} onChange={member => update({ members: [...group.members, member] })} />
           </div>
@@ -99,32 +101,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
               <Button size="sm" onClick={() => update({ members: group.members.filter((_, i) => i !== index) })}>删除</Button>
             </div>} />
           </div>}
-        </section>}
-        <details open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)} className="group border-t border-line-2 pt-3.5">
-          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm text-[13.5px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
-            <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-ink-muted transition-transform group-open:rotate-90" />
-            高级设置{readOnly && <span className="ml-auto text-[12px] font-normal text-ink-muted">模板组设置 · 只读</span>}
-          </summary>
-          <div className="flex flex-col gap-4 pt-4">
-            <fieldset disabled={readOnly} className="m-0 grid grid-cols-1 gap-4 border-0 p-0 sm:grid-cols-2">
-              <GroupAdvancedFields value={group} onChange={(key, next) => update({ [key]: next })} />
-              <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
-              <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
-              <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
-            </fieldset>
-            {renderAdvanced?.(group, update)}
-          </div>
-        </details>
-      </>}
-    </div><DialogFooter><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={close}>取消</Button><Button variant="primary" disabled={!group?.name.trim()} onClick={save}>保存</Button></DialogFooter></DialogContent></Dialog>
-    <DeleteDialog open={!!deletingGroup} title={`删除策略组「${deletingGroup?.name || '未命名组'}」？`} onClose={() => setDeleting(undefined)} onConfirm={() => {
-      if (!deletingGroup) return;
-      onChange(removeGroup(value, deletingGroup.id));
-      if (selected === deletingGroup.id) onSelect(undefined);
-      setDeleting(undefined);
-    }}>
-      <p className="mt-0">删除此组会移除 {references} 个组内的引用，将 {rules} 条规则{final ? '和 MATCH' : ''}的出口改为 REJECT。</p>
-      <p className="mb-0 text-ink-muted">{saveHint}。</p>
-    </DeleteDialog>
-  </>;
-}
+        </section>
+      </>
+    </div><ModalFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!group.name.trim()} onClick={() => modal.confirm(group)}>保存</Button></>}</ModalFooter></ModalContent>;
+});

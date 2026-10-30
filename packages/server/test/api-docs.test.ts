@@ -214,14 +214,15 @@ describe('预设 Surge 预留字段', () => {
 });
 
 describe('拉取参数校验', () => {
-  it('自动更新时间不能短于 5 分钟', async () => {
+  it('旧的来源 TTL 被忽略，统一使用系统设置', async () => {
     const { alice } = await twoUsers();
     const src = { name: '远程源', url: 'https://example.com/sub' };
     const short = await alice.post('/api/sources', { ...src, fetch: { ttlSec: 60 } });
-    expect(short.status).toBe(400);
-    expect(short.json.error).toMatch(/自动更新时间不能短于 5 分钟/);
+    expect(short.status).toBe(201);
+    expect(short.json.item.fetch).toBeUndefined();
     expect((await alice.post('/api/sources', { ...src, fetch: { ttlSec: 300 } })).status).toBe(201);
     const rs = await alice.post('/api/rulesets', { name: '远程规则', kind: 'remote', format: 'classical', url: 'https://example.com/r.list', fetch: { ttlSec: 0 } });
-    expect(rs.status).toBe(400);
+    expect(rs.status).toBe(201);
+    expect(rs.json.item.sources[0].fetch?.ttlSec).toBeUndefined();
   });
 });

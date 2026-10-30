@@ -5,7 +5,7 @@ import { ruleSetDelivery } from '../rules/delivery.ts';
 // mihomo 渲染（docs/03 §3 ②–⑥、§4）：模板合并 → 节点集 → 依赖解析 → 规则展开 → 引用校验 → YAML。
 // 纯函数：所有外部数据（快照、模板、规则集）由调用方传入。
 
-import { stringify } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { NodeSetResolver, nodeSetKey, type NodeSetInputs } from '../nodeset/resolve.ts';
 import { Report } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
@@ -25,6 +25,8 @@ export type UrlBuilder = {
 };
 
 export type RenderInput = {
+  resourceIntervalSec?: number;
+  managedResources?: boolean;
   profile: Profile;
   template?: Template;
   nodeSets: NodeSetInputs;
@@ -303,32 +305,42 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
   };
   const groups = eff.groups.map(lowerGroup);
 
-  // ---------- 代理链（REF-03 / REF-04 / REF-06）----------
-  const providerOverride = new Map<string, string>();
-  const setDialer = (set: NS, node: ProxyIR, via: string) => { node['dialer-proxy'] = via; };
-
+  // ---------- 代理链：先确定有效前置，再写入订阅专属节点副本 ----------
+  // 整集覆写保持 Mihomo override 的优先级；所有客户端共用已覆写的内容，
+  // 不依赖客户端的 provider override，也不修改输入快照或原始节点。
+  const resolvedChains = new Map<(typeof profile.chains)[number], string | undefined>();
   for (const set of sets.values()) {
+    const rules = profile.chains.filter(c => nodeSetKey(c.landing.nodeSet) === set.key);
+    const whole = rules.filter(c => !c.landing.filter && !c.landing.excludeFilter);
+    const partial = rules.filter(c => c.landing.filter || c.landing.excludeFilter);
+    if (whole.length > 1 && new Set(whole.map(c => JSON.stringify(c.via))).size > 1) {
+      report.error('chain.conflict', `节点集「${set.providerName}」有不同的整集前置，请保留一个`, set.key);
+    }
+    if (whole.length && partial.length) report.warn('chain.overridden', `节点集「${set.providerName}」的 ${partial.length} 条局部规则被整集前置覆盖；要设置例外，请改为按节点配置`, set.key);
+    const matches = new Map(partial.map(c => [c, new Set(filterNodes(set.nodes, c.landing))]));
+    for (const [c, nodes] of matches) if (!nodes.size) report.warn('chain.no-landing', '链规则没有命中任何落地节点', `chain:${c.id}`);
     for (const n of set.nodes) {
-      if (n.upstreamDialer) {
+      const selected = whole.length ? whole : partial.filter(c => matches.get(c)!.has(n));
+      if (selected.length > 1 && new Set(selected.map(c => JSON.stringify(c.via))).size > 1) {
+        report.error('chain.conflict', `节点「${n.name}」命中不同的前置规则，请消除重叠`, set.key);
+      }
+      const chain = selected.at(-1);
+      if (chain) {
+        if (!resolvedChains.has(chain)) resolvedChains.set(chain, resolveTarget(chain.via, `chain:${chain.id}`));
+        const via = resolvedChains.get(chain);
+        if (via) n['dialer-proxy'] = via;
+      } else if (n.upstreamDialer) {
+        const target = set.nodes.find(x => x !== n && (x._origName === n.upstreamDialer || x.name === n.upstreamDialer));
         const where = `node:${set.key}:${n.name}`;
-        const target = set.nodes.find((x) => x !== n && (x._origName === n.upstreamDialer || x.name === n.upstreamDialer));
-        const via = target ? nameForNode(set, target, where) : topNames.has(n.upstreamDialer) || groups.some((g) => g.name === n.upstreamDialer) ? n.upstreamDialer : undefined;
-        if (via) setDialer(set, n, via);
+        const via = target ? nameForNode(set, target, where) : BUILTINS.has(n.upstreamDialer) || topNames.has(n.upstreamDialer) || groups.some(g => g.name === n.upstreamDialer) ? n.upstreamDialer : undefined;
+        if (via) n['dialer-proxy'] = via;
         else report.error('ref.upstream-dialer-missing', `节点「${n.name}」自带的前置「${n.upstreamDialer}」找不到，拒绝发布缺少前置的配置`, where);
       }
     }
+    if (rules.length && set.output === 'provider') report.info('chain.provider-materialized', `「${set.providerName}」的前置已写入本订阅专属 Provider 内容，节点更新后自动重新应用`, set.key);
   }
-  for (const chain of profile.chains) {
-    const where = `chain:${chain.id}`;
-    const set = sets.get(nodeSetKey(chain.landing.nodeSet));
-    if (!set) { report.error('ref.nodeset-not-in-profile', `链规则的落地节点集 ${nodeSetKey(chain.landing.nodeSet)} 未加入本 Profile`, where); continue; }
-    const via = resolveTarget(chain.via, where);
-    if (!via) continue;
-    const whole = !chain.landing.filter && !chain.landing.excludeFilter;
-    if (set.output === 'provider' && whole) { providerOverride.set(set.key, via); continue; }
-    const matched = filterNodes(set.nodes, chain.landing);
-    if (!matched.length) report.warn('chain.no-landing', '链规则没有命中任何落地节点', where);
-    for (const n of matched) setDialer(set, n, via);
+  for (const chain of profile.chains) if (!sets.has(nodeSetKey(chain.landing.nodeSet))) {
+    report.error('ref.nodeset-not-in-profile', `链规则的落地节点集 ${nodeSetKey(chain.landing.nodeSet)} 未加入本订阅`, `chain:${chain.id}`);
   }
 
   // ---------- 规则 ----------
@@ -355,6 +367,20 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
     const base = `rs_${safeId(m.id)}${r.options?.src ? '_src' : ''}`;
     const rs = input.rules.rulesets[m.id];
     if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${m.id}`); continue; }
+    const enabled = rs.sources.filter(s => s.enabled !== false);
+    if (input.managedResources && enabled.some(s => s.format === 'mrs' || s.format === 'srs')) {
+      const src = enabled[0]!;
+      const body = input.rules.snapshots[sourceKey(rs.id,src.id)];
+      if (enabled.length !== 1 || src.format !== 'mrs' || !['domain','ipcidr'].includes(src.behavior ?? '') || rs.overrides?.length || src.overrides?.length || r.options?.src || !body?.startsWith('#subforge-binary-mrs\n')) {
+        report.error('ruleset.binary-unavailable','MRS 需要单一有效来源且不能合并或改写；SRS 暂不支持托管',where);
+        continue;
+      }
+      const key = `${base}_binary`, file = `${key}.mrs`;
+      rulesets[file] = { behavior: src.behavior as Behavior, text: body };
+      ruleProviders[key] = { type:'http',behavior:src.behavior,format:'mrs',url:input.urls.ruleset(file),interval:input.resourceIntervalSec ?? RULESET_INTERVAL,...(client === 'mihomo' ? {proxy:FETCH_VIA} : {}) };
+      ruleLines.push(`RULE-SET,${key},${target}`);
+      continue;
+    }
     // 只解析一次：校验、输出方式判断和正文转换共用容错文档。
     const documents = new Map<string, RuleDocument>();
     for (const src of rs.sources.filter(s => s.enabled !== false)) {
@@ -377,14 +403,14 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
       }
       if (document.diagnostics.length) report.info('ruleset.rejected-lines', `${label}有 ${document.diagnostics.length} 行无法解析`, where);
     }
-    const delivery = m.remote ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
+    const delivery = m.remote || input.managedResources ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
     if (delivery.mode === 'unsupported') {
       report.error('ruleset.conversion-unavailable', delivery.reason, where);
       continue;
     }
     if (delivery.mode === 'original') {
       const key = `${base}_original`;
-      ruleProviders[key] ??= { type: 'http', behavior: delivery.behavior, format: delivery.format, url: delivery.url, interval: RULESET_INTERVAL };
+      ruleProviders[key] ??= { type: 'http', behavior: delivery.behavior, format: delivery.format, url: delivery.url, interval: input.resourceIntervalSec ?? RULESET_INTERVAL };
       ruleLines.push(`RULE-SET,${key},${target}`);
       continue;
     }
@@ -400,7 +426,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
       }
       if (!converted.lines.length) continue;
       rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', ...(m.remote ? { remoteUrl: m.remote.url } : {}) };
-      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
+      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
     }
     ruleLines.push(`RULE-SET,${key},${target}`);
   }
@@ -408,7 +434,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
   ruleLines.push(`MATCH,${finalName}`);
 
   // 规则出口也可能新增节点副本或包装组，全部解析后再检查 include-all 等动态成员的链环。
-  checkChains(sets, groups, wrappers, wrapperNode, copies, providerOverride, report);
+  checkChains(sets, groups, wrappers, wrapperNode, copies, report);
 
   // ---------- 输出 ----------
   const inlineProxies = [...[...sets.values()].filter((s) => s.output === 'inline').flatMap((s) => s.nodes), ...copies.map((c) => ({ ...c.node, name: c.name }))].map(stripNode);
@@ -418,11 +444,9 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
     if (s.output !== 'provider') continue;
     const yaml = stringify({ proxies: s.nodes.map(stripNode) }, { lineWidth: 0 });
     // 版本号随内容（含注入的前置）变化，客户端重载主配置即重新下载；不输出 path（REF-11）
-    const version = shortHash(`${yaml}|${providerOverride.get(s.key) ?? ''}`, 8);
+    const version = shortHash(yaml, 8);
     providers[s.key] = { name: s.providerName, version, yaml };
-    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: PROVIDER_INTERVAL, proxy: FETCH_VIA };
-    const ov = providerOverride.get(s.key);
-    if (ov) entry.override = { 'dialer-proxy': ov };
+    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
     proxyProviders[s.providerName] = entry;
   }
 
@@ -431,7 +455,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
     stashBenchmarks(allGroups, inlineProxies, eff.groups, report);
     for (const node of inlineProxies) if (node['dialer-proxy'] && node['interface-name']) report.error('stash.dialer-interface', 'Stash 的 dialer-proxy 与 interface-name 不能同时配置', `proxy:${String(node.name)}`);
   }
-  validateReferences(allGroups, inlineProxies, providers, providerOverride, proxyProviders, report);
+  validateReferences(allGroups, inlineProxies, providers, proxyProviders, report);
 
   const config: Record<string, unknown> = { ...(input.base ?? {}), proxies: inlineProxies };
   if (Object.keys(proxyProviders).length) config['proxy-providers'] = proxyProviders;
@@ -458,7 +482,6 @@ function validateReferences(
   groups: MihomoGroup[],
   inlineProxies: Record<string, unknown>[],
   providers: Record<string, ProviderOutput>,
-  providerOverride: Map<string, string>,
   proxyProviders: Record<string, unknown>,
   report: Report,
 ): void {
@@ -472,12 +495,9 @@ function validateReferences(
   };
   for (const p of inlineProxies) checkDialer(p['dialer-proxy'], `proxy:${String(p.name)}`);
   for (const [key, prov] of Object.entries(providers)) {
-    for (const line of prov.yaml.split('\n')) {
-      const m = /^\s+dialer-proxy: (.+)$/.exec(line);
-      if (m) checkDialer(m[1]!.replace(/^["']|["']$/g, ''), `provider:${key}`);
-    }
+    const payload = parse(prov.yaml) as { proxies: Record<string, unknown>[] };
+    for (const node of payload.proxies) checkDialer(node['dialer-proxy'], `provider:${key}`);
   }
-  for (const [key, via] of providerOverride) checkDialer(via, `provider:${key}`);
 }
 
 /**
@@ -490,7 +510,6 @@ function checkChains(
   wrappers: MihomoGroup[],
   wrapperNode: Map<string, { set: NS; node: ProxyIR }>,
   copies: { node: ProxyIR; name: string }[],
-  providerOverride: Map<string, string>,
   report: Report,
 ): void {
   const id = (s: NS, n: ProxyIR) => `${s.key}|${n._key}|${n.name}`;
@@ -539,8 +558,7 @@ function checkChains(
     ])];
   };
   const dialerOf = (nid: string): string | undefined => {
-    const { set, node } = nodeById.get(nid)!;
-    return providerOverride.get(set.key) ?? (node['dialer-proxy'] as string | undefined);
+    return nodeById.get(nid)!.node['dialer-proxy'] as string | undefined;
   };
 
   const depth = new Map<string, number>();

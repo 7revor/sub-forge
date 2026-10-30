@@ -87,6 +87,20 @@ describe('真实 Git 本地缓存', () => {
     await h.cache.remove(h.repo.id); expect(await readdir(join(h.root, 'cache'))).toEqual([]);
     expect(await h.cache.sync(h.repo)).toEqual(versions);
   });
+  it('只在成功索引后回收 Git 引用，失败更新保留上次可读内容', async () => {
+    const h = await fixture();
+    const first = await h.cache.sync(h.repo);
+    await h.cache.compact(h.repo, first);
+    await writeFile(join(h.upstream, h.path), 'DOMAIN,new.example\n');
+    h.git('add', '.'); h.git('commit', '-m', '缓存更新');
+    const current = await h.cache.sync(h.repo);
+    // 尚未确认索引成功，旧提交仍有保护引用。
+    expect(await h.cache.read(h.repo, first.main!, h.path)).toContain('old.example');
+    await h.cache.compact(h.repo, current);
+    expect(await h.cache.read(h.repo, current.main!, h.path)).toContain('new.example');
+    await expect(h.cache.sync({ ...h.repo, refs: ['main', 'missing'] })).rejects.toThrow();
+    expect(await h.cache.read(h.repo, current.main!, h.path)).toContain('new.example');
+  });
   it.each(['sync', 'inspect'] as const)('%s 停止时终止 Git 及其子进程，释放锁且不留下进程', async operation => {
     const h = await fixture(); transport.hang = true; transport.pids = [];
     const pending = h.cache[operation](h.repo); const rejected = expect(pending).rejects.toThrow('取消');

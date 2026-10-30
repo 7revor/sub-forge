@@ -1,7 +1,7 @@
 // 业务选项与数据加载集中在这里；视觉、键盘交互和动效使用官方组件。
 import { matchesNameSearch, normalizeNameSearch } from '@sub-forge/core';
-import { Check, ChevronDown } from 'lucide-react';
-import { Children, Fragment, isValidElement, useState, type HTMLAttributes, type ReactElement, type ReactNode } from 'react';
+import { Check, ChevronDown, X } from 'lucide-react';
+import { Children, Fragment, isValidElement, useRef, useState, type HTMLAttributes, type ReactElement, type ReactNode } from 'react';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { PagedOptionList, type OptionLoader } from './OptionPage.tsx';
 import { cx } from './cx.ts';
@@ -30,30 +30,34 @@ function collect(children: ReactNode, group?: string, out: Opt[] = []): Opt[] {
     else if (el.type === 'optgroup') collect(el.props.children, el.props.label, out);
     else if (el.type === 'option') {
       const text = textOf(el.props.children);
-      out.push({ value: String(el.props.value ?? text), label: el.props.children, text, hint: el.props['data-hint'], disabled: el.props.disabled, group });
+      const value = String(el.props.value ?? text);
+      // 空值只用于显示 placeholder，不能生成可选的空白项目。
+      if (value !== '') out.push({ value, label: el.props.children, text, hint: el.props['data-hint'], disabled: el.props.disabled, group });
     }
   });
   return out;
 }
 
 export type SelectProps = Omit<HTMLAttributes<HTMLButtonElement>, 'onChange' | 'children'> & {
-  value?: string | number; onChange?: (e: { target: { value: string } }) => void; disabled?: boolean; children?: ReactNode; placeholder?: string;
+  value?: string | number; onChange?: (e: { target: { value: string } }) => void; disabled?: boolean; children?: ReactNode; placeholder: string; clearable?: boolean;
 };
 
-/** 仅将既有业务 option 数据转换为官方 SelectItem，保留空值选项。 */
-export function Select({ value, onChange, disabled, children, placeholder = '请选择', className, ...rest }: SelectProps) {
+/** 选项只含实际值；可选字段通过独立清空按钮恢复 placeholder。 */
+export function Select({ value, onChange, disabled, children, placeholder, clearable = false, className, style, ...rest }: SelectProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const opts = collect(children);
   const current = value == null ? '' : String(value);
-  const selected = opts.find(option => option.value === current);
+  const selected = current === '' ? undefined : opts.find(option => option.value === current);
   const groups = opts.reduce<{ label?: string; options: Opt[] }[]>((groups, option) => {
     const last = groups.at(-1);
     if (last && last.label === option.group) last.options.push(option);
     else groups.push({ label: option.group, options: [option] });
     return groups;
   }, []);
-  return <ShadcnSelect value={selected ? `value:${current}` : ''} disabled={disabled}
+  const select = <ShadcnSelect value={selected ? `value:${current}` : ''} disabled={disabled}
     onValueChange={next => { const value = next.slice(6); if (value !== current) onChange?.({ target: { value } }); }}>
-    <SelectTrigger {...rest} className={cx('w-full', className)}><SelectValue placeholder={placeholder}>{selected?.label}</SelectValue></SelectTrigger>
+    <SelectTrigger {...rest} ref={triggerRef} title={selected?.text ?? placeholder} style={clearable ? undefined : style}
+      className={cx('w-full', clearable ? 'h-full min-h-9' : className, clearable && current !== '' && 'pr-16')}><SelectValue placeholder={placeholder}>{selected?.label}</SelectValue></SelectTrigger>
     <SelectContent aria-label={rest['aria-label']}>
       {groups.map((group, i) => <SelectGroup key={i}>
         {group.label && <SelectLabel>{group.label}</SelectLabel>}
@@ -63,25 +67,31 @@ export function Select({ value, onChange, disabled, children, placeholder = '请
       </SelectGroup>)}
     </SelectContent>
   </ShadcnSelect>;
+  return clearable ? <div className={cx('relative w-full min-w-0', className)} style={style}>
+    {select}
+    {current !== '' && <Button type="button" variant="ghost" size="icon" disabled={disabled} title="清空"
+      aria-label={`清空${rest['aria-label'] ?? placeholder}`} className="absolute top-1/2 right-7 size-7 -translate-y-1/2"
+      onClick={() => { onChange?.({ target: { value: '' } }); triggerRef.current?.focus(); }}><X aria-hidden="true" /></Button>}
+  </div> : select;
 }
 
 export type ComboOption = { value: string; label?: ReactNode; hint?: ReactNode };
 
-/** 使用官方复选菜单；空字符串选项表示清空。 */
-export function MultiSelect({ value, onChange, children, placeholder = '请选择', className, disabled, ...rest }: Omit<SelectProps, 'value' | 'onChange'> & {
+/** 使用官方复选菜单，取消全部勾选后恢复 placeholder。 */
+export function MultiSelect({ value, onChange, children, placeholder, className, disabled, ...rest }: Omit<SelectProps, 'value' | 'onChange' | 'clearable'> & {
   value: string[]; onChange: (value: string[]) => void;
 }) {
   const opts = collect(children);
   return <DropdownMenu>
     <DropdownMenuTrigger asChild><Button {...rest} type="button" variant="outline" disabled={disabled} className={cx('w-full justify-between', className)}>
-      <span className="truncate">{value.length ? opts.filter(option => value.includes(option.value)).map(option => option.text).join('、') : placeholder}</span><ChevronDown />
+      <span className={cx('truncate', !value.length && 'text-muted-foreground')}>{value.length ? opts.filter(option => value.includes(option.value)).map(option => option.text).join('、') : placeholder}</span><ChevronDown />
     </Button></DropdownMenuTrigger>
     <DropdownMenuContent>
       {opts.map((option, i) => <Fragment key={`${option.value}-${i}`}>
         {option.group && option.group !== opts[i - 1]?.group && <DropdownMenuLabel>{option.group}</DropdownMenuLabel>}
-        <DropdownMenuCheckboxItem checked={option.value ? value.includes(option.value) : value.length === 0} disabled={option.disabled}
+        <DropdownMenuCheckboxItem checked={value.includes(option.value)} disabled={option.disabled}
           onSelect={event => event.preventDefault()}
-          onCheckedChange={checked => onChange(!option.value ? [] : checked ? [...value, option.value] : value.filter(item => item !== option.value))}>
+          onCheckedChange={checked => onChange(checked ? [...value, option.value] : value.filter(item => item !== option.value))}>
           {option.label}
         </DropdownMenuCheckboxItem>
       </Fragment>)}
@@ -91,7 +101,7 @@ export function MultiSelect({ value, onChange, children, placeholder = '请选�
 
 /** 官方 Command + Popover 组合，保留业务允许自由输入的行为。 */
 export function Combobox({ value, onChange, options, className, placeholder, disabled, empty, ...rest }: Omit<HTMLAttributes<HTMLInputElement>, 'onChange'> & {
-  value: string; onChange: (v: string) => void; options: ComboOption[]; placeholder?: string; disabled?: boolean; empty?: ReactNode;
+  value: string; onChange: (v: string) => void; options: ComboOption[]; placeholder: string; disabled?: boolean; empty?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [filtering, setFiltering] = useState(false);
@@ -119,20 +129,24 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
 }
 
 /** 搜索与分页属于业务数据；浮层和候选交互使用官方 Popover/Command。 */
-export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon }: {
+export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon, valueLabel, placeholder, modal = false }: {
   loadOptions: OptionLoader; onChange: (value: string) => void;
   label: string; ariaLabel?: string; disabled?: boolean; id?: string; triggerClassName?: string; triggerIcon?: ReactNode;
+  valueLabel?: string; placeholder?: string; modal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const debounced = useDebouncedValue(query, 250);
-  return <Popover open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}>
+  const displayLabel = valueLabel ?? placeholder ?? label;
+  const isPlaceholder = !!placeholder && !valueLabel;
+  return <Popover modal={modal} open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}>
     <PopoverTrigger asChild><Button type="button" id={id} variant="outline" role="combobox" aria-label={ariaLabel} aria-expanded={open}
-      disabled={disabled} className={triggerClassName ?? 'w-full justify-between'}>
-      {triggerIcon}<span title={label} className="min-w-0 truncate">{label}</span>{!triggerClassName && <ChevronDown />}
+      disabled={disabled} data-placeholder={isPlaceholder ? '' : undefined} className={cx(triggerClassName ?? 'h-9 w-full justify-between text-[13px]', isPlaceholder && 'font-normal text-ink-muted')}>
+      {triggerIcon}<span title={displayLabel} className="min-w-0 truncate">{displayLabel}</span>{!triggerClassName && <ChevronDown />}
     </Button></PopoverTrigger>
-    <PopoverContent className="w-[min(560px,calc(100vw-2rem))] p-0" aria-label={ariaLabel}>
-      <Command shouldFilter={false}>
+    <PopoverContent align="start" collisionPadding={12} className="flex w-[min(400px,calc(100vw-2rem))] max-h-[min(320px,var(--radix-popover-content-available-height))] flex-col overflow-hidden p-0"
+      style={placeholder ? { width: 'var(--radix-popover-trigger-width)' } : undefined} aria-label={ariaLabel} onInteractOutside={() => setOpen(false)}>
+      <Command shouldFilter={false} className="min-h-0 [&_[data-slot=command-input-wrapper]]:shrink-0 [&_[data-slot=command-list]]:min-h-0 [&_[data-slot=command-list]]:max-h-[240px] [&_[data-slot=command-list]]:flex-1">
         <CommandInput aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query} onValueChange={setQuery} />
         {query !== debounced ? <div role="status" className="p-4 text-sm text-muted-foreground">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { setOpen(false); onChange(value); }} />}
       </Command>

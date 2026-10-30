@@ -1,3 +1,4 @@
+import type { SnapshotService } from '../snapshots.ts';
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
 import { matchesNameSearch, nameLikePattern, normalizeNameSearch, parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { createHash } from 'node:crypto';
@@ -12,18 +13,18 @@ import type { UpstreamFetcher } from '../net/upstream.ts';
 import { HttpError, bad, notFound } from '../api/common.ts';
 import { applyReadme, buildEntries, BUILTIN_REPOS, normalizeSearch, rawUrl, upstreamUrl, type IndexedEntry, type RepoDefinition, type RepoFile } from './adapters.ts';
 
-const DAY = 86_400_000;
 type RepoRow = { id: string; enabled: number; built_at: number | null; checked_at: number | null; revisions: string; error: string | null; entries: number; definition: string | null; indexed_definition: string | null };
 const configRevision = (value: string) => createHash('sha256').update(value).digest('hex');
 
 export class RuleRepoService {
   private jobs = new Map<string, Promise<void>>();
   private details = new Map<string, Promise<ReturnType<RuleRepoService['formatDetail']>>>();
+  private detailJobs = new Set<Promise<ReturnType<RuleRepoService['formatDetail']>>>();
   private timer?: ReturnType<typeof setInterval>;
   private stopped = false;
   private editing = new Set<string>();
   private cache: RepoCache;
-  constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now, cache?: RepoCache) {
+  constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now, cache?: RepoCache, private snapshots?: SnapshotService) {
     this.cache = cache ?? new GitRepoCache(join(dirname(store.db.name === ':memory:' ? './data/sub-forge.db' : store.db.name), 'rule-repo-cache'));
     this.initializeDefinitions();
     this.upgradeTextIndex();
@@ -120,6 +121,22 @@ export class RuleRepoService {
       files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path) || a.ref.localeCompare(b.ref))
         .map(file => ({ ...file, url: rawUrl(definition, file), upstream: upstreamUrl(definition, file) })) };
   }
+  fileResource(id:string,ref:string,path:string) {
+    this.assertEnabled(id);
+    if (!findRuleFile(this.store.db,id,ref,path) || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中');
+    return {kind:'ruleset' as const,id:`repository-file:${id}:${ref}:${path}`,name:path,url:rawUrl(this.definition(id,true),{ref,path,format:'auto'}),options:{format:'auto' as const,scope:'public-repository'}};
+  }
+  /** 只调度已实际读取的公开正文，不预抓取整库文件。失效索引不再自动拉取。 */
+  cachedResources() {
+    const rows = this.store.db.prepare("SELECT DISTINCT id FROM resource_bindings WHERE kind = 'ruleset' AND id LIKE 'repository-file:%'").all() as {id:string}[];
+    return rows.flatMap(row => {
+      const match = /^repository-file:([^:]+):([^:]+):(.+)$/.exec(row.id);
+      if (!match) return [];
+      const id=match[1]!, ref=match[2]!, path=match[3]!;
+      if (!this.rows().some(r => r.id === id && r.enabled) || !findRuleFile(this.store.db,id,ref,path)) return [];
+      return [this.fileResource(id,ref,path)];
+    });
+  }
   /** 只预览选中的目录文件，保留注释和空行，不解析 README 或聚合其他来源。 */
   async filePreview(id: string, ref: string, path: string) {
     const version = this.snapshotVersion(id);
@@ -133,6 +150,7 @@ export class RuleRepoService {
     const content = await this.readFile(definition, file);
     this.assertSnapshot(id, version);
     return { repo: id, entry: node.entry ?? undefined, ref, path, name: path.split('/').at(-1)!, content,
+      ...(this.snapshots ? {cache:this.snapshots.status('ruleset',`repository-file:${id}:${ref}:${path}`,rawUrl(definition,file),{format:'auto',scope:'public-repository'})} : {}),
       url: rawUrl(definition, file), upstream: upstreamUrl(definition, file), license: definition.license };
   }
   async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
@@ -298,7 +316,14 @@ export class RuleRepoService {
     return JSON.parse(row.data) as IndexedEntry;
   }
   private async readFile(repo: RepoDefinition, file: RepoFile): Promise<string> {
+    if (this.stopped) throw new HttpError(409,'索引服务已停止');
     this.assertEnabled(repo.id);
+    if (this.snapshots && isIndexedRuleFile(file.path)) {
+      const url=rawUrl(repo,file);
+      const result=await this.snapshots.get('ruleset',`repository-file:${repo.id}:${file.ref}:${file.path}`,url,{format:'auto',scope:'public-repository'});
+      if (!result.snapshot?.body) throw new Error(result.error ?? '没有可用规则缓存');
+      return result.snapshot.body;
+    }
     if (file.commit) return this.cache.read(repo, file.commit, file.path);
     // 迁移前的旧索引仍可使用；首次 Git 同步后每个文件均携带固定提交。
     const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
@@ -338,10 +363,13 @@ export class RuleRepoService {
         this.details.clear();
         this.upgradeLegacySources();
       }
+      await this.cache.compact?.(repo,revisions);
       this.store.db.prepare('UPDATE rule_repos SET checked_at = ?, error = NULL WHERE id = ?').run(this.now(), id);
+      this.store.changed();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.store.db.prepare('UPDATE rule_repos SET checked_at = ?, error = ? WHERE id = ?').run(this.now(), `索引更新失败：${message}`, id);
+      this.store.changed();
       console.warn(`规则仓库 ${id} 索引更新失败：${message}`);
     }
   }
@@ -349,7 +377,7 @@ export class RuleRepoService {
     if (this.timer || this.stopped) return;
     const tick = () => {
       for (const row of this.rows()) {
-        if (!this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (row.error ? 15 * 60_000 : DAY))) void this.refresh(row.id);
+        if (!this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (this.store.resourceCacheTtlSec * 1000))) void this.refresh(row.id);
       }
     };
     tick();
@@ -361,7 +389,7 @@ export class RuleRepoService {
     clearInterval(this.timer);
     await this.cache.stop();
     await Promise.all(this.jobs.values());
-    await Promise.allSettled(this.details.values());
+    await Promise.allSettled(this.detailJobs);
   }
   private formatDetail(entry: IndexedEntry, preview: string[], count: number | undefined, previewError?: string, rejectedDetails: { line: number; text: string; reason: string }[] = [], rejected = 0) {
     const repo = this.definition(entry.repo, true);
@@ -391,8 +419,9 @@ export class RuleRepoService {
     this.entry(id, path);
     const version = this.snapshotVersion(id);
     const key = `${id}:${path}:${version}`;
-    const cached = this.details.get(key);
-    if (cached) return cached;
+    const running = this.details.get(key);
+    if (running) return running;
+
     const job = (async () => {
       const entry = await this.resolvedEntry(id, path);
       const variant = this.importVariant(entry);
@@ -417,10 +446,14 @@ export class RuleRepoService {
         return this.formatDetail(entry, [], undefined, `内容预览失败：${error instanceof Error ? error.message : String(error)}`);
       }
     })();
-    if (this.details.size >= 50) this.details.delete(this.details.keys().next().value!);
     this.details.set(key, job);
-    // 失败后可重新尝试；成功结果只在当前索引版本内缓存。
-    void job.then(result => { if (result.previewError) this.details.delete(key); }, () => this.details.delete(key));
+    this.detailJobs.add(job);
+    const finished = () => {
+      this.detailJobs.delete(job);
+      if (this.details.get(key) === job) this.details.delete(key);
+    };
+    // 只合并在途任务；索引变化清空查询表后仍等待所有旧任务退出。
+    void job.then(finished, finished);
     return job;
   }
   importVariant(entry: IndexedEntry, variantId?: string) {

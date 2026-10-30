@@ -50,7 +50,7 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
       </div>
     </div>
     <p className="m-0 text-[12px] text-ink-muted">支持直接编辑 YAML，粘贴节点分享链接、JSON 或 Surge 配置自动转换。</p>
-    <YamlTextarea disabled={disabled} id="local-node-yaml" aria-label="节点 YAML" aria-invalid={!!errorText} aria-describedby="local-node-status" rows={16} value={text}
+    <YamlTextarea placeholder="粘贴单个节点的分享链接、YAML、JSON 或 Surge 配置" disabled={disabled} id="local-node-yaml" aria-label="节点 YAML" aria-invalid={!!errorText} aria-describedby="local-node-status" rows={16} value={text}
       onChange={e => { clearUndo(); onChange(e.target.value); }}
       onPaste={event => {
         const input = event.clipboardData.getData('text/plain');

@@ -138,7 +138,9 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
       const retained = renderer.getVersion(active.profileId, target, version);
       // 在发起任何刷新之前检查 URL 与版本归属，防止把订阅链接用成任意地址代理。
       if (!retained || retained.remoteRuleUrls?.[key] !== url) throw notFound();
-      await renderer.render(active.profileId, target);
+      const outcome = await renderer.render(active.profileId, target);
+      if (!outcome.ok && outcome.accessDenied) throw notFound();
+      if (store.getActiveToken(token)?.profileId !== active.profileId) throw notFound();
       const selected = renderer.getVersion(active.profileId, target, version) ?? retained;
       const body = selected.rulesets[key];
       if (selected.remoteRuleUrls?.[key] !== url || body === undefined) throw notFound();

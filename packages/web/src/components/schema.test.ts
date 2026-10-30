@@ -4,10 +4,10 @@ import { getPath, knownKeys, otherFields, replaceOtherFields, setPath, type Fiel
 const groups: FieldGroup[] = [{
   title: '设置',
   fields: [
-    { key: 'port', label: '端口', type: 'number' },
-    { key: 'dns.enable', label: 'DNS', type: 'bool' },
-    { key: 'dns.nested.known', label: '嵌套', type: 'string', showIf: () => false },
-    { key: 'hosts', label: '主机', type: 'kv' },
+    { key: 'port', label: '端口', type: 'number', placeholder: '代理监听端口' },
+    { key: 'dns.enable', label: 'DNS', type: 'bool', placeholder: '是否启用内置 DNS' },
+    { key: 'dns.nested.known', label: '嵌套', type: 'string', placeholder: '嵌套字段内容', showIf: () => false },
+    { key: 'hosts', label: '主机', type: 'kv', placeholder: '域名与 IP 映射' },
   ],
 }];
 

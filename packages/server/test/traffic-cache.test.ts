@@ -27,7 +27,7 @@ function setup() {
 }
 
 describe('订阅流量与渲染缓存', () => {
-  it('正文不变时缓存仍命中，但响应头、last-good 与保留版本使用新流量', async () => {
+  it('正文不变时重新生成配置，但响应头、last-good 与保留版本使用新流量', async () => {
     const h = setup();
     const first = await h.app.request('/sub/token');
     const yaml = await first.text();
@@ -36,7 +36,7 @@ describe('订阅流量与渲染缓存', () => {
     const next = await h.app.request('/sub/token');
     expect(next.headers.get('subscription-userinfo')).toBe('download=80; total=1000; expire=2000000000');
     expect(await next.text()).toBe(yaml);
-    expect(h.store.recentAccess('p')[0]?.source).toBe('cache');
+    expect(h.store.recentAccess('p')[0]?.source).toBe('fresh');
     const last = h.store.getLastGood<StoredRender>('p', 'mihomo:any')!;
     expect(last.data.userinfo).toEqual(h.traffic[a]);
     expect(h.renderer.getVersion('p', { client: 'mihomo' }, last.data.generation!)?.userinfo).toEqual(h.traffic[a]);
@@ -77,14 +77,14 @@ describe('订阅流量与渲染缓存', () => {
     expect((await h.app.request('/sub/token')).headers.get('subscription-userinfo')).toBe('download=10; total=1000');
   });
 
-  it('缓存命中时更新拉取告警计数且保留内核告警', async () => {
+  it('每次生成时更新拉取告警计数且保留内核告警', async () => {
     const h = setup();
     const p = h.store.get('profile', 'p')!;
     h.store.put('profile', { ...p, overlay: { extraGroups: [{ group: { id: 'g', name: '空组', type: 'select', members: [] } }] } });
     await h.app.request('/sub/token');
     h.fail(); await h.refresh();
     const result = await h.renderer.render('p', { client: 'mihomo' });
-    expect(result.ok && result.source).toBe('cache');
+    expect(result.ok && result.source).toBe('fresh');
     expect(result.ok && result.render.warnings).toBe(2);
     expect(result.report.map(r => r.code)).toEqual(['source.fetch-failed', 'group.empty']);
     expect(result.ok && result.render.userinfo).toEqual(h.traffic[a]);

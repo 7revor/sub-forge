@@ -43,7 +43,7 @@ describe('来源失败状态与显式重试', () => {
       expect(observer.getCurrentResult().data).toEqual(success);
       expect(rulesetSourceState([source], [observer.getCurrentResult()]).ready).toBe(true);
       await cache.fetchQuery(rulesetSourceQuery('r', { ...source, name: '改名', overrides: [] }));
-      expect(requests).toHaveLength(2);
+      expect(requests).toHaveLength(3);
     } finally { stop(); cache.clear(); }
   });
 });

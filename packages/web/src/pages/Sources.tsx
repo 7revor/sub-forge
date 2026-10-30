@@ -1,5 +1,5 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
-import { useDialogDraft } from '../hooks/useDialogDraft.ts';
+import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
+import { Frame } from '../modals/Frame.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
@@ -8,12 +8,11 @@ import { NodeSetCount } from '../components/NodeSetCount.tsx';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api } from '../api.ts';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
@@ -32,10 +31,16 @@ const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢�
 
 export function SourceList() {
   const location = useLocation();
-  const [creating, setCreating] = useState(!!(location.state as { create?: boolean } | null)?.create);
+  const navigate = useNavigate();
+  const opened = useRef(false);
+  const create = async () => {
+    const result = await NewSourceModal.show({});
+    if (result.status === 'confirmed') navigate(`/sources/${result.data.id}`, { state: { justCreated: true } });
+  };
+  useEffect(() => { if (!opened.current && (location.state as { create?: boolean } | null)?.create) { opened.current = true; void create(); } }, [location.key]);
   return (
     <>
-      <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={() => setCreating(true)} deleteBody={SOURCE_DELETE_BODY}
+      <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={create} deleteBody={SOURCE_DELETE_BODY}
         columns={[
           { header: '名称', cell: (s) => s.name },
           { header: '备注', cell: (s) => s.note?.trim() ? <NoteCell note={s.note} /> : null },
@@ -44,31 +49,27 @@ export function SourceList() {
           { header: '上次拉取', cell: (s) => <SourceLast source={s} /> },
           { header: '状态', cell: (s) => <SourceState source={s} /> },
         ]} />
-      <NewSourceModal open={creating} onClose={() => setCreating(false)} />
     </>
   );
 }
 
-function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const navigate = useNavigate();
+const NewSourceModal = createModal<Record<string, never>, SourceDoc>(function NewSource({ modal }) {
   const save = useSaveDoc('sources');
-  const [name, setName] = useDialogDraft(open, '');
-  const [url, setUrl] = useDialogDraft(open, '');
-  const [note, setNote] = useDialogDraft(open, '');
+  const [name, setName] = useModalDraft('');
+  const [url, setUrl] = useModalDraft('');
+  const [note, setNote] = useModalDraft('');
   const ready = name.trim() && url.trim();
-  const create = () => save.mutate(
-    { name: name.trim(), url: url.trim(), note, pipeline: [] },
-    { onSuccess: (item) => navigate(`/sources/${item.id}`, { state: { justCreated: true } }) },
-  );
+  const create = () => modal.submit(() => save.mutateAsync({ name: name.trim(), url: url.trim(), note, pipeline: [] }));
+  const onClose = modal.cancel;
   return (
-    <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"新建订阅源"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"新建订阅源"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
-      <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
+      <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
       <NoteField value={note} onChange={setNote} />
       <ErrorAlert error={save.error} />
-    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</DialogFooter></DialogContent></Dialog>
+    </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</ModalFooter></ModalContent>
   );
-}
+});
 
 /** 基础设置和处理链共用页面草稿。 */
 function BasicSettings({ draft, set }: {
@@ -78,16 +79,12 @@ function BasicSettings({ draft, set }: {
     <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
       <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
         <Field label="名称" className="min-w-0 sm:col-span-2">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
-        <Field label="自动更新时间（小时）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min={5 / 60} step="any" className="font-mono" inputMode="decimal" placeholder="24" value={draft.fetch?.ttlSec === undefined ? '' : String(draft.fetch.ttlSec / 3600)} onCommit={(value) => {
-          const ttlSec = value.trim() && Number.isFinite(Number(value)) ? Math.round(Number(value) * 3600) : undefined;
-          set({ fetch: ttlSec === undefined ? undefined : { ttlSec } });
-        }} />}</Field>
         <Field label="订阅地址" className="col-span-full min-w-0">{(id) =>
-          <Input id={id} type="url" className="font-mono" placeholder="https://" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
+          <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
       </div>
       <NoteField value={draft.note} onChange={(note) => set({ note })} />
-      <p className="m-0 text-[12px] leading-relaxed text-ink-muted">默认 24 小时，最短 5 分钟。超过间隔后，下次读取时后台更新；失败时继续使用上次成功内容。</p>
+      <p className="m-0 text-[12px] leading-relaxed text-ink-muted">缓存时间由管理员在系统中统一设置；到期自动拉取，失败时继续使用上次成功内容。</p>
     </Card>
   );
 }
@@ -101,8 +98,8 @@ export function SourceEdit() {
   const save = useSaveDoc('sources');
   const del = useDeleteDoc('sources');
   const [draft, setDraft] = useState<SourceDoc>();
-  const [deleting, setDeleting] = useState(false);
-  useEffect(() => { if (doc.data) setDraft(doc.data); }, [doc.data]);
+  const previous=useRef<SourceDoc|undefined>(undefined);
+  useEffect(()=>{if(doc.data){const before=previous.current;previous.current=doc.data;setDraft(current=>!current||current.id!==doc.data!.id||JSON.stringify(current)===JSON.stringify(before)?doc.data:current);}},[doc.data]);
   const source = useMemo(() => draft ? { url: draft.url.trim(), fetch: draft.fetch ?? {} } : undefined, [draft?.url, draft?.fetch]);
   const preview = usePipelinePreview('sources', id === 'new' ? undefined : id, draft?.pipeline, undefined, source);
   const state = useSourceFetchState(doc.data);
@@ -130,10 +127,10 @@ export function SourceEdit() {
   const set = (patch: Partial<SourceDoc>) => setDraft({ ...draft, ...patch });
   const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
   const submit = () => {
-    save.mutate({ ...draft, name: draft.name.trim(), url: draft.url.trim() });
+    save.mutate({ ...draft, name: draft.name.trim(), url: draft.url.trim() },{onSuccess:item=>setDraft(item)});
   };
   const u = state.lastOk?.userinfo;
-  const openDelete = () => { del.reset(); setDeleting(true); };
+  const openDelete = async () => { del.reset(); const result = await Frame.modal.confirm({ title: `删除订阅源「${draft.name}」？`, description: SOURCE_DELETE_BODY, confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(draft.id); } }); if (result.status === 'confirmed') navigate('/sources'); };
   const busy = save.isPending || refresh.isPending;
   const ready = !!draft.name.trim() && !!draft.url.trim();
   const saveAndRefresh = () => {
@@ -169,10 +166,7 @@ export function SourceEdit() {
           loading={preview.isFetching} {...(preview.error ? { previewError: (preview.error as Error).message } : {})} />
 
       </PageScroll>
-      <DeleteDialog open={deleting} title={`删除订阅源「${draft.name}」？`} error={del.error} pending={del.isPending}
-        onClose={() => setDeleting(false)} onConfirm={() => del.mutate(draft.id, { onSuccess: () => navigate('/sources') })}>
-        {SOURCE_DELETE_BODY}
-      </DeleteDialog>
+
     </>
   );
 }

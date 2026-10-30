@@ -59,19 +59,23 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
     for (const src of rs.sources) {
       if (src.enabled === false) continue;
       const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
-      if (src.format === 'mrs' || src.format === 'srs') {
-        report.push({ level: 'info', code: 'template.ruleset-passthrough', message: `${label}为二进制透传，内容与可达性由客户端检查`, where });
+      if (src.format === 'srs') {
+        report.push({ level: 'error', code: 'template.ruleset-invalid', message: `${label}暂不支持 SRS 托管`, where });
         continue;
       }
       let content = src.content ?? '';
       if (src.kind === 'remote') {
-        const result = await snapshots.get('ruleset', id, src.url!, { ttlSec: src.fetch?.ttlSec ?? 86400, ...src.fetch, format: src.format });
+        const result = await snapshots.get('ruleset', id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: src.repository && !src.fetch?.ua ? 'public-repository' : store.getWithOwner('ruleset', id)?.owner ?? 'public-template' });
         if (!result.snapshot) {
           report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `${label}没有可用快照：${result.error ?? '无法拉取'}`, where });
           continue;
         }
         content = result.snapshot.body ?? '';
         if (result.error || result.stale) report.push({ level: 'warn', code: 'template.ruleset-snapshot', message: `${label}使用可用快照${result.error ? `：${result.error}` : '，后台刷新中'}`, where });
+      }
+      if (src.format === 'mrs') {
+        if (!content.startsWith('#subforge-binary-mrs\n')) report.push({ level: 'error', code: 'template.ruleset-invalid', message: `${label}没有有效的托管 MRS 内容`, where });
+        continue;
       }
       const reason = unusableBody('ruleset', id, content, src.format);
       if (reason) {

@@ -28,7 +28,7 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 | `/collections`、`/collections/:id` | 组合：成员表（类型、节点数、前后缀、拉取失败时），下方当页展开处理链编辑器与逐步预览（预览跟随成员草稿），头部显示引用方；旧地址 `/collections/:id/pipeline` 跳回详情页 |
 | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 本地节点：分组列表（与订阅源一致：搜索、节点数、协议，新建分组为对话框）；分组详情在「基本信息」中直接编辑名称与备注，通过页头统一保存，下方为节点表；分组 YAML 使用对话框；「编辑」「新增节点」进入节点子页（`index` 为 `new` 时新增），表单 / YAML 编辑（不设置前置，代理链在配置订阅中设置），保存即写回分组，删除节点使用独立按钮。有未保存修改时离开前确认 |
 | `/profiles`、`/profiles/new`、`/profiles/:id/:tab` | 配置订阅：七步向导；详情头部显示模板关系（点开可切换绑定 / 独立模式）、预设与最近告警。概览（订阅链接与最近访问、输出设置、访问日志）、基础设置（来源条、进程规则提醒、按分区覆盖 / 来自预设、原样片段）、节点集（添加对话框、输出方式）、策略组、规则（客户端输出列）、代理链（唯一的代理链入口：只读卡片 + 编辑对话框、依赖节点）、预览（打开即渲染、导出文件） |
-| `/rulesets`、`/rulesets/:id` | 规则集：列表（来源概况）；新建（`/rulesets/new`）与编辑共用同一页面。自上而下为来源（多个远程地址 / 本地规则，拖拽排序、启停，点选展开地址、格式、缓存等字段，本地规则输入框紧跟对应配置）、独立的客户端改写区块（先选替换、丢弃或追加；替换和丢弃再填写规则内容精确匹配；追加按客户端与平台条件直接加入规则，无需匹配）、输出预览（选中来源时只读展示该来源，取消选中或点击「查看合并结果」恢复整组合并输出；切换时不沿用上一来源内容），每块独占一行；预览跟随未保存的草稿。原规则包页面 `/bundles` 已并入规则集（2026-10-29） |
+| `/rulesets`、`/rulesets/:id` | 规则集：列表（来源概况）；新建（`/rulesets/new`）与编辑共用同一页面。自上而下为来源（多个远程地址 / 本地规则，拖拽排序、启停，点选展开地址、格式等字段，本地规则输入框紧跟对应配置）、独立的客户端改写区块（先选替换、丢弃或追加；替换和丢弃再填写规则内容精确匹配；追加按客户端与平台条件直接加入规则，无需匹配）、输出预览（选中来源时只读展示该来源，取消选中或点击「查看合并结果」恢复整组合并输出；切换时不沿用上一来源内容），每块独占一行；预览跟随未保存的草稿。原规则包页面 `/bundles` 已并入规则集（2026-10-29） |
 | `/rule-repo` | 规则仓库：搜索、仓库筛选、按客户端的变体与内容预览、引用为规则集或作为远程来源加入已有规则集（`?ruleset=` 进入，内置仓库已接通） |
 | `/templates`、`/templates/new`、`/templates/:id` | 仅管理员显示「模板」入口。详情与编辑合为单页：策略组、规则来源选择、规则与 MATCH 统一使用弹窗，规则默认全部显示，长远程地址省略前半部分。规则与 MATCH 的出口列宽限制为 100～140px，文本居中，其余空间留给规则内容；策略组与规则行加高。名称和出口不触发编辑，仅铅笔按钮进入对应编辑表单；点击规则内容打开只读预览，完整展示源文件或按顺序合并的多来源原文。顶部统一保存，保存时检查绑定订阅，直接同步生效；不再显示版本历史或发布步骤。YAML 仅支持单向导入，在弹窗内应用到草稿，导入后通过策略组和规则表单维护，离开未保存内容前确认。旧 `/edit`、`/overview`、`/publish` 子路由重定向到详情，旧 `/templates/manage` 跳转到列表。普通用户在配置订阅向导中选择当前模板 |
 | `/presets`、`/presets/:id` | 基础设置预设：列表支持搜索、新建、删除和编辑；独立详情页按通用、外部控制、DNS、嗅探、TUN、GEO 数据折叠分组（默认收起，可独立展开），支持表单 / YAML 编辑、发布与引用方，未发布修改离开前确认 |
@@ -45,9 +45,9 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 
 ## 编辑方式
 
-编辑弹窗使用独立草稿：每次打开深拷贝当前值，输入、成员编辑、排序、客户端覆盖与异步解析只作用于弹窗。点击“保存”才一次性更新所属页面草稿；取消、关闭、Escape、遮罩关闭均不提交，重开读取最新外部数据。页面原有保存/发布操作仍负责持久化。新建策略组与静态规则保存前不插入列表；关闭保留内容直到官方退场结束。统一状态工具为 `hooks/useDialogDraft.ts`，完整约束见根目录 `AGENTS.md`。
+所有弹窗统一通过 `createModal` 定义的静态 `show(data)` 调用并返回 Promise；简单交互用 `Frame.modal.confirm / alert / success / error / prompt`。页面不维护弹窗开关、不挂载弹窗。唯一 `ModalRoot` 继承 Router / QueryClient。DTO 与确认结果深拷贝，取消不提交，退场实际卸载后才交付结果，异步失败保留草稿；禁止其他弹窗封装。详见 [规范与示例](../../docs/18-unified-modals.md)。
 
-所有确认和只读弹窗也必须保留退场展示。`hooks/useDialogPresentation.ts` 在打开期间跟随最新展示值，关闭时保留最后一次已提交渲染的标题、正文、说明和查询结果；它不承担业务草稿或提交。删除确认已统一保护动态标题及引用提示，重置、恢复、离开确认和规则预览同样遵守。浏览器逐帧回归入口为 `test/dialog-exit.html`（通过 Vite 开发服务访问，仅用于验收），检查 `data-state="closed"` 至卸载期间的布局高度、正文和输入值。
+浏览器逐帧回归入口为 `test/dialog-exit.html`（Vite 开发服务，仅供验收），覆盖编辑、Frame 提示、只读预览、异步、嵌套、路由和无动画。
 
 策略组弹窗仅默认展示名称、类型和成员，测速参数、负载策略、筛选、排除协议及订阅额外字段统一放入默认收起的“高级设置”。
 
@@ -55,13 +55,13 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 
 YAML 输入统一使用 `YamlTextarea`：浅色背景、等宽字体、键名 / 字符串 / 数字 / 布尔与空值 / 注释 / 锚点与标签高亮。覆盖双向编辑器、分组 YAML、模板导入、基础设置原样片段、自动识别为 YAML 的本地规则，以及其他字段的 YAML 值。高亮复用已有 `yaml` 的 CST 解析器，不改写输入；保留原生选择、撤销、粘贴、标签关联与校验反馈，长行横向滚动、多行纵向滚动、可调整高度。非 YAML 的备注、规则和脚本输入继续使用普通文本框。
 
-模板 YAML 弹窗只允许合法内容应用到页面草稿，无效输入会保留并提示错误；取消时确认放弃。其余双向编辑器允许缺项、字段类型错误或 YAML 语法错误时返回表单：只保留能可靠解析的有效字段，清空无效字段，逐项提示被忽略的内容。重复键保留第一项；列表保留有效条目；未知扩展字段保留；无法确定含义的损坏片段不猜测修复。再次切回原始视图时显示清理后的 YAML。原始视图尚有解析错误时仍禁止保存；返回表单后可继续补齐，保存 / 发布仍执行必填项与业务校验。批量节点导入保持严格校验。
+模板 YAML 弹窗只允许合法内容应用到页面草稿，无效输入会保留并提示错误；取消时丢弃未保存输入。其余双向编辑器允许缺项、字段类型错误或 YAML 语法错误时返回表单：只保留能可靠解析的有效字段，清空无效字段，逐项提示被忽略的内容。重复键保留第一项；列表保留有效条目；未知扩展字段保留；无法确定含义的损坏片段不猜测修复。再次切回原始视图时显示清理后的 YAML。原始视图尚有解析错误时仍禁止保存；返回表单后可继续补齐，保存 / 发布仍执行必填项与业务校验。批量节点导入保持严格校验。
 
 Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步骤跳转；返回表单恢复有效字段后解除拦截，也可直接修复原文或明确放弃。节点与预设不会把无效原文显示为“已保存”。模板 YAML 导出使用 `sub-forge-group` / `sub-forge-rule` 注释保留稳定 ID，因此改名或改匹配内容仍能关联已有个人覆盖。模板 YAML 应用前检查组字段、规则和出口引用，不通过时保持页面草稿不变。复制组或规则时建议删除复制项的 ID 注释；恢复解析会忽略重复注释并保证 ID 唯一。
 
 全局 blank 使用 `Empty.tsx` 的公共 `Empty`（由 `ui.tsx` 导出），包括列表、详情、预览、功能占位和下拉无结果。说明与空框间距由 `Card description` 或 `gap-4` 保证 16 px，不依赖默认段落 margin。尺寸、适用范围与设计稿待同步项见 [空状态规范](../../docs/14-empty-state-guidelines.md)。
 
-公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` 与删除确认 `DeleteDialog`）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
+公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` （内部调用 `Frame.modal.confirm`））、`dialogs`（节点集选择的静态入口）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
 
 公共展示与业务表单的复用边界：
 
@@ -69,7 +69,7 @@ Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步
 - `CodePreview`、`Notice`、`NodeSetCount`、`SourceFetchStatus`、`Card subtitle`：统一预览、提示、节点计数、拉取状态与卡片标题说明。`ReportList` 可由调用方提供定位操作。
 - `GroupSettingsFields`、`MatcherEditor`、`OptionalBoolean`：模板与配置订阅共用字段；权限、继承和覆盖写入仍由页面负责。布尔值区分未设置、开启和关闭，数值 `0` 保留。规则匹配类型切换清理旧类型专属字段。
 - `NamedCreateDialog`：本地分组与预设共用名称校验、回车提交、重复提交保护和错误展示。`ExtraFields.validateName` 同时用于新增和重命名，调用方通过业务校验函数限制字段，不依赖 DOM 事件捕获。
-- `useLeaveGuard` / `LeaveDialog`：模板、本地节点及预设有未保存修改或无效 YAML 时保护路由跳转与刷新；合法内容可以保存后离开，无效内容需继续编辑或明确放弃。Profile 保持仅无效 YAML 阻断的原策略。
+- `useLeaveGuard`（内部调用统一 `LeaveModal.show`）：模板、本地节点及预设有未保存修改或无效 YAML 时保护路由跳转与刷新；合法内容可以保存后离开，无效内容需继续编辑或明确放弃。Profile 保持仅无效 YAML 阻断的原策略。
 - `hooks/documentQueries` 集中定义 token、访问日志和快照查询；`usePipelinePreview` 供订阅源与组合使用；`useDebouncedValue` 复用普通值防抖。节点集标识、匹配项切换、拉取状态及删除错误归入 `domain/`，时间与流量格式化归入 `utils/format.ts`。
 
 本次抽取的验收范围与截图见 [公共组件验收记录](../../research/verification/shared-components-20261029/README.md)。
@@ -93,7 +93,7 @@ Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步
 
 规则集来源区支持公共 `AsyncSelect` 懒加载关联：打开请求、30 条分页、300ms 搜索防抖、错误重试及键盘选择；旧响应被隔离，候选文本不能直接作为值提交。关联来源使用 Link2 图标与只读 URL，自定义远程用 Globe 和可编辑 URL；解析结果只进入草稿，页头保存生效。
 
-规则仓库仍仅展示 list/txt。规则集与自定义仓库都不提供输入格式选择，内容解析后在来源摘要展示识别结果。预览自动转换为规则文本，并显示下载策略：兼容的单一远程来源原格式透传；多个启用来源、覆写或 IP 选项等处理统一输出 classical `.list`。缓存设置继续控制服务端快照有效期。
+规则仓库仍仅展示 list/txt。规则集与自定义仓库都不提供输入格式选择，内容解析后在来源摘要展示识别结果。预览自动转换为规则文本，并显示下载策略：文本统一输出托管 classical `.list`，支持的 MRS 由服务端校验后托管，SRS 不支持。缓存时间在系统页统一设置。
 
 ### GitHub 索引 Token
 
@@ -211,12 +211,40 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 
 2026-10-29：模板策略组列表增加「隐藏」开关，与编辑弹窗共享页面草稿；切换即时回显，保存模板后生效。桌面独立显示隐藏列，窄屏放在每行操作按钮下方。
 
+## 2026-10-30：实时查询与资源刷新
+
+系统页提供唯一资源缓存周期与异常列表。节点、组合、规则列表分别刷新自身资源；订阅“刷新全部资源”刷新生效依赖后生成配置；仓库文件提供单独刷新。任务弹窗区分逐项失败、旧缓存可用性及生成失败。
+
+查询使用 staleTime=0、gcTime=0，挂载/聚焦/联网重新获取，HTTP no-store。SSE 通知重读查询，断开显示重连提示；编辑页面保留未保存内容，未修改页面同步最新数据。搜索防抖、当前页面状态、正在执行请求和明确标注的预览加载占位保留。
+
+
+2026-10-30 审查补充：仓库文件预览使用旧缓存时显示失败原因与最后成功时间；刷新任务完成主动重读查询，不必等待关闭弹窗。内置浏览器已验证旧正文保留及系统异常汇总，记录见 `research/verification/unified-resource-cache-review-20261030/`。
+
 ## 公共弹层与动效
 
-全站弹窗直接组合 `src/components/ui/` 中的 shadcn 官方 Dialog / AlertDialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。不再保留自定义 Modal、动画常量、焦点恢复函数或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
+历史入口已被统一静态调用取代，底层仍使用 shadcn 官方 Dialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。不再保留自定义 Modal、动画常量、焦点恢复函数或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
 
 `listbox.tsx` 仅保留业务选项映射、空值编码、异步搜索与分页；单选采用官方 Select 默认定位，多选采用官方 DropdownMenuCheckboxItem，自由输入候选与异步查询由官方 Command + Popover 组合。页面通过组件属性传入业务状态、内容和必要的宽高约束。官方 neutral 主题与既有页面品牌色分开命名，避免同名 accent / muted 变量覆盖官方组件。`components.json`、TypeScript 和 Vite 路径别名已配置。
 
 合并包含依赖变化的分支后，先在主工作区执行 `pnpm install --frozen-lockfile`，再启动 `pnpm --filter @sub-forge/web dev`。依赖目录应属于当前工作区，不能复用其他 worktree 的 node_modules；若安装期间 Vite 正在运行，应重启开发服务以清除旧依赖解析缓存。
 
 本次不改变后端接口、领域模型和示例种子；视觉验收见 [官方组件迁移记录](../../research/verification/shadcn-official-20261030/README.md)。
+
+
+### 表单中文 placeholder（2026-10-30，硬性规则）
+
+Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSelect、Combobox 和 FieldSpec 必须提供 placeholder；已知 Mihomo 字段解释集中在 src/schemas/placeholders.ts。表单空值保持为空，不添加空 option，不把中文提示写入 value。可选单选使用 clearable，多选取消全部勾选；false 和 0 仍是有效值。业务字段使用对应的中文说明；不支持 placeholder 的开关等控件保留中文标签。完整要求见根目录 CLAUDE.md / AGENTS.md。
+
+验证包含 schema 中文提示覆盖、空 Select、零值、false 与清空删除的回归测试，以及 Codex 内置浏览器的发布、回显和 YAML 检查。后端和核心模型无需迁移。
+
+2026-10-30 合并适配：缓存刷新任务使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。
+
+
+### 2026-10-30：规则卡片与操作间距
+
+仓库关联来源隐藏地址/格式的第二行，名称垂直居中，选中不改变高度；来源卡片外 pointerdown 取消选择。文档列表操作使用 flex gap-2 统一按钮间距。验收见 `research/verification/rule-card-interactions-20261030/`。
+
+
+2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
+
+2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。

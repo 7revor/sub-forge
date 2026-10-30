@@ -1,37 +1,26 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
+import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
+import { profileModalData, useModalProfile, type ProfileModalData } from './modalProfile.ts';
 // 关联摘要与变更操作分开；转换只影响当前草稿，保存订阅后生效。
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../../api.ts';
 import { Badge, Button, ErrorAlert, Field, Select, cx } from '../../components/ui.tsx';
 import { useTemplates, type ProfileDoc } from '../../hooks.ts';
-import { useProfile } from './context.ts';
+import { useProfile, ProfileContext } from './context.ts';
 import { boundTemplateId, persistedProfile } from './routing.ts';
-import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
 
 type Conversion = { item: ProfileDoc; changes: string[] };
 
-function AssociationEditor({ open, onDone }: { open: boolean; onDone?: () => void }) {
-  const { draft, template } = useProfile();
-  const loaded = !boundTemplateId(draft) || !!template;
-  const [ready, setReady] = useDialogDraft(open, loaded);
-  if (open && !ready && loaded) setReady(true);
-  // 等关联模板读取完成后再创建快照；一旦开始编辑，保存及退场不再替换内容。
-  return ready ? <AssociationDraft open={open} onDone={onDone} /> : <p role="status" className="m-0 text-[13px] text-ink-muted">正在加载关联模板…</p>;
-}
-
-function AssociationDraft({ open, onDone }: { open: boolean; onDone?: () => void }) {
-  const { draft: sourceDraft, setDraft, template: sourceTemplate, groups: sourceGroups } = useProfile();
-  const [{ draft, template, groups }] = useDialogDraft(open, { draft: sourceDraft, template: sourceTemplate, groups: sourceGroups });
+function AssociationDraft({ onSave }: { onSave: (item: ProfileDoc) => void }) {
+  const { draft, template, groups } = useProfile();
   const templates = useTemplates();
   const currentId = boundTemplateId(draft);
-  const [selected, setSelected] = useDialogDraft(open, boundTemplateId(sourceDraft) ?? '');
-  const [mode, setMode] = useDialogDraft<'bound' | 'copy'>(open, 'bound');
-  const [mapping, setMapping] = useDialogDraft<Record<string, string>>(open, {});
-  const [staged, setStaged] = useDialogDraft<Conversion | undefined>(open, undefined);
+  const [selected, setSelected] = useModalDraft(boundTemplateId(draft) ?? '');
+  const [mode, setMode] = useModalDraft<'bound' | 'copy'>('bound');
+  const [mapping, setMapping] = useModalDraft<Record<string, string>>({});
+  const [staged, setStaged] = useModalDraft<Conversion | undefined>(undefined);
   const target = templates.data?.find(t => t.id === selected);
-  const apply = (item: ProfileDoc) => { setDraft(structuredClone(item)); onDone?.(); };
+  const apply = onSave;
   const change = useMutation({
     mutationFn: async (action: 'bound' | 'copy' | 'detach') => {
       // 转换接口复用完整文档校验；临时名称仅用于检查，不写入订阅草稿。
@@ -54,8 +43,7 @@ function AssociationDraft({ open, onDone }: { open: boolean; onDone?: () => void
   const reset = () => { setStaged(undefined); change.reset(); };
   return <div className="flex flex-col gap-4">
     <ErrorAlert error={templates.error ?? change.error} />
-    <Field label="模板">{id => <Select id={id} value={selected} disabled={change.isPending} onChange={e => { setSelected(e.target.value); setMapping({}); reset(); }}>
-      <option value="">{templates.isLoading ? '正在加载模板…' : '选择模板'}</option>
+    <Field label="模板">{id => <Select clearable placeholder={templates.isLoading ? '正在加载模板…' : '选择要绑定的规则模板'} id={id} value={selected} disabled={change.isPending} onChange={e => { setSelected(e.target.value); setMapping({}); reset(); }}>
       {(templates.data ?? []).map(t => <option key={t.id} value={t.id}>{t.name ?? t.id}</option>)}
     </Select>}</Field>
     {templates.data?.length === 0 && <p className="m-0 text-[13px] text-ink-muted">还没有模板。可以关闭此窗口，在订阅中直接创建策略组与规则。</p>}
@@ -68,8 +56,8 @@ function AssociationDraft({ open, onDone }: { open: boolean; onDone?: () => void
     {target && groups.length > 0 && selected !== currentId && <details className="rounded-lg border border-line p-3" open>
       <summary className="cursor-pointer text-[13px] font-medium">迁移现有节点填充与代理链引用</summary>
       <p className="text-[12px] text-ink-muted">现有策略组和规则将被替换。有节点或代理链引用的组需要选择目标组。</p>
-      <div className="flex flex-col gap-3">{groups.map(g => <Field key={g.id} label={g.name}>{id => <Select id={id} value={mapping[g.id] ?? ''} disabled={change.isPending} onChange={e => { setMapping({ ...mapping, [g.id]: e.target.value }); reset(); }}>
-        <option value="">选择目标组</option><option value="__drop">不迁移，移除节点填充</option>
+      <div className="flex flex-col gap-3">{groups.map(g => <Field key={g.id} label={g.name}>{id => <Select clearable aria-label={`${g.name}的迁移目标`} placeholder="选择迁移节点填充的目标策略组" id={id} value={mapping[g.id] ?? ''} disabled={change.isPending} onChange={e => { setMapping({ ...mapping, [g.id]: e.target.value }); reset(); }}>
+        <option value="__drop">不迁移，移除节点填充</option>
         {target.groups.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
       </Select>}</Field>)}</div>
     </details>}
@@ -86,23 +74,23 @@ function AssociationDraft({ open, onDone }: { open: boolean; onDone?: () => void
   </div>;
 }
 
-export function TemplateCard({ bare = false, open: parentOpen = true, onDone }: { bare?: boolean; open?: boolean; onDone?: () => void } = {}) {
-  const { draft, template } = useProfile();
-  const [open, setOpen] = useState(false);
+export const TemplateAssociationModal = createModal<ProfileModalData, ProfileDoc>(function AssociationModal({ data, modal }) {
+  const { ctx } = useModalProfile(data);
+  return <ProfileContext.Provider value={ctx}><ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"><ModalHeader><ModalTitle>{boundTemplateId(data.profile) ? '管理模板关联' : '使用模板'}</ModalTitle></ModalHeader><AssociationDraft onSave={modal.confirm} /><ModalFooter><Button onClick={modal.cancel}>取消</Button></ModalFooter></ModalContent></ProfileContext.Provider>;
+});
+
+export function TemplateCard() {
+  const profile = useProfile();
+  const { draft, setDraft, template } = profile;
   const currentId = boundTemplateId(draft);
-  const [dialogHasTemplate] = useDialogDraft(open, !!currentId);
   const initialized = draft.routing?.mode === 'independent' ? draft.routing.initializedFrom : undefined;
-  if (bare) return <AssociationEditor open={parentOpen} onDone={onDone} />;
   return <>
     <section aria-label="模板关联" className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2"><h2 className="m-0 text-[14px] font-semibold">{currentId ? <Link className="text-ink no-underline hover:text-brand" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link> : '独立配置'}</h2><Badge tone={currentId ? 'accent' : 'neutral'}>{currentId ? '跟随模板更新' : '由本订阅维护'}</Badge></div>
         <p className="m-0 text-[12.5px] leading-relaxed text-ink-muted">{currentId ? '策略组和规则由模板维护；节点填充仅用于本订阅。模板保存后，下次刷新订阅时更新。' : initialized ? `复制自「${initialized.name ?? initialized.templateId}」，后续修改互不影响。` : '直接编辑策略组和规则，也可以选择模板作为起点。'}</p>
       </div>
-      <Button onClick={() => setOpen(true)}>{currentId ? '管理模板关联' : '使用模板'}</Button>
+      <Button disabled={!!currentId && !template} onClick={async () => { const result = await TemplateAssociationModal.show(profileModalData(profile)); if (result.status === 'confirmed') setDraft(result.data); }}>{currentId ? '管理模板关联' : '使用模板'}</Button>
     </section>
-    <Dialog open={open} onOpenChange={next => { if (!next) (() => setOpen(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{dialogHasTemplate ? '管理模板关联' : '使用模板'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      <AssociationEditor open={open} onDone={() => setOpen(false)} />
-    </div><DialogFooter>{<Button onClick={() => setOpen(false)}>取消</Button>}</DialogFooter></DialogContent></Dialog>
   </>;
 }

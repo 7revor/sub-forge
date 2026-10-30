@@ -10,7 +10,7 @@ export function rulesetSourceQuery(id: string | undefined, source: RuleSetSource
   const input = sourceReadInput(source);
   return {
     queryKey: ['ruleset-source', id, input] as const,
-    staleTime: refresh ? 0 : 60_000,
+    staleTime: 0,
     retry: false as const,
     queryFn: () => api<RuleSourceContent>('POST', '/rulesets/source', { id, source: input, ...(refresh ? { refresh: true } : {}) }),
   };

@@ -1,103 +1,27 @@
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from '../components/ui/alert-dialog.tsx';
-// 系统（设计稿「管理员 · 系统」）：SSRF 白名单、mihomo 配置校验、规则集合、备份与恢复。
-// 服务端尚未实现：读接口返回空数据并带 pending，保存、导出、恢复返回 501。
-
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
-import { api, type SystemInfo } from '../api.ts';
-import { useDialogPresentation } from '../hooks/useDialogPresentation.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
-
-export function System() {
-  const qc = useQueryClient();
-  const info = useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('GET', '/system') });
-  const [draft, setDraft] = useState<SystemInfo>();
-  const [allow, setAllow] = useState('');
-  const [restoreFile, setRestoreFile] = useState<File>();
-  useEffect(() => { if (info.data) setDraft(info.data); }, [info.data]);
-  const save = useMutation({ meta: { successMessage: '系统设置已保存' }, mutationFn: (body: SystemInfo) => api('PUT', '/system', body), onSuccess: () => qc.invalidateQueries({ queryKey: ['system'] }) });
-  const backup = useMutation({ meta: { successMessage: '备份已导出' }, mutationFn: () => api('POST', '/system/backup') });
-  const restore = useMutation({ meta: { successMessage: '备份已恢复' }, mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
-  const restoreView = useDialogPresentation(!!restoreFile, { name: restoreFile?.name, pending: restore.isPending });
-
-  if (!draft) return info.error ? <ErrorAlert error={info.error} /> : <div className="text-ink-muted">加载中…</div>;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(info.data);
-  const verify = draft.verify ?? { enabled: false };
-
-  return (
-    <>
-      <PageHeader title="系统" actions={<Button variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>} />
-      {info.data?.pending && <PendingNotice>系统设置暂不可用；仓库与索引请前往规则集合管理。</PendingNotice>}
-      <ErrorAlert error={save.error} />
-
-      <PageScroll>
-        <div className="flex flex-wrap items-start gap-5">
-          <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
-            <Card title={`远程拉取 · SSRF 防护`} subtitle={`默认禁止拉取内网与保留地址。以下地址例外放行。`}>
-              <div className="flex flex-col">
-                {draft.ssrfAllow.map((a, i) => (
-                  <div key={a.value} className="flex items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="font-mono text-[13px]">{a.value}</span>{a.note && <span className="text-[12px] text-ink-muted">{a.note}</span>}</span>
-                    <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${a.value}`} onClick={() => setDraft({ ...draft, ssrfAllow: draft.ssrfAllow.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
-                  </div>
-                ))}
-                {!draft.ssrfAllow.length && <Empty title="没有白名单例外" />}
-              </div>
-              <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (allow.trim()) { setDraft({ ...draft, ssrfAllow: [...draft.ssrfAllow, { value: allow.trim() }] }); setAllow(''); } }}>
-                <Input aria-label="新增白名单" placeholder="主机名或 CIDR" className="font-mono" value={allow} onChange={(e) => setAllow(e.target.value)} />
-                <Button type="submit" disabled={!allow.trim()}>添加</Button>
-              </form>
-            </Card>
-
-            <Card title="配置校验">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex flex-col gap-0.5"><span className="text-[13.5px] font-medium">渲染后用内置 mihomo 执行 -t</span><span className="text-[12.5px] text-ink-muted">失败时返回上一份成功版本并告警</span></span>
-                  <Switch label="mihomo 校验" checked={verify.enabled} onChange={(enabled) => setDraft({ ...draft, verify: { ...verify, enabled } })} />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge>{verify.version ? `内置 mihomo ${verify.version}` : '未检测到 mihomo'}</Badge>
-                  {verify.checks24h !== undefined && <Badge tone={verify.fails24h ? 'warn' : 'neutral'}>近 24 小时校验 {verify.checks24h} 次 · 失败 {verify.fails24h ?? 0} 次</Badge>}
-                </div>
-                <span className="text-[12px] leading-relaxed text-ink-muted">引用校验始终开启。</span>
-              </div>
-            </Card>
-          </div>
-
-          <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
-            <Card title="规则集合">
-              <div className="flex flex-col gap-3">
-                <Link to="/rule-repo" className="text-[13px] text-brand">前往规则集合管理仓库与索引 →</Link>
-              </div>
-            </Card>
-
-            <Card title="备份与恢复">
-              <div className="flex flex-col gap-3">
-                <span className="text-[12.5px] leading-relaxed text-ink-2">导出 JSON 配置，不含快照和缓存；敏感字段保持加密。</span>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => backup.mutate()} disabled={backup.isPending}>{backup.isPending ? '导出中…' : '导出备份'}</Button>
-                  <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-[#d5d9e0] bg-panel px-3.5 text-[13.5px] font-medium hover:bg-ground">
-                    从文件恢复…<input type="file" accept="application/json" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { restore.reset(); setRestoreFile(f); } e.target.value = ''; }} />
-                  </label>
-                </div>
-                <span className="text-[12.5px] text-ink-muted">{draft.lastBackup ? `上次导出：${formatTime(draft.lastBackup.at).slice(5)} · ${formatBytes(draft.lastBackup.size)}` : '还没有导出过'}</span>
-                <ErrorAlert error={backup.error ?? restore.error} />
-              </div>
-            </Card>
-          </div>
+import { useMutation,useQuery,useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { api } from '../api.ts';
+import type { ResourceState } from '../components/ResourceCache.tsx';
+import { Button,Card,ErrorAlert,Field,Input,PageHeader,PageScroll,formatTime } from '../components/ui.tsx';
+export function System(){
+  const qc=useQueryClient();const [hours,setHours]=useState<string>();
+  const info=useQuery({queryKey:['system'],queryFn:()=>api<{resourceCacheTtlSec:number}>('GET','/system')});
+  const resources=useQuery({queryKey:['system-resources'],queryFn:()=>api<{items:ResourceState[]}>('GET','/system/resources')});
+  const save=useMutation({meta:{successMessage:'资源缓存设置已保存'},mutationFn:()=>api('PUT','/system',{resourceCacheTtlSec:Number(hours)*3600}),onSuccess:()=>{setHours(undefined);void qc.invalidateQueries();}});
+  const value=hours??String((info.data?.resourceCacheTtlSec??86400)/3600);const valid=Number.isInteger(Number(value))&&Number(value)>=1&&Number(value)<=8760;
+  const failures=resources.data?.items.filter(r=>r.error)??[];
+  return <><PageHeader title="系统" actions={<Button variant="primary" disabled={hours===undefined||!valid||save.isPending||!info.data} onClick={()=>save.mutate()}>{save.isPending?'保存中…':'保存'}</Button>}/>
+    <ErrorAlert error={info.error??save.error??resources.error}/><PageScroll>
+      <Card title="资源缓存" subtitle="节点、规则、仓库索引及客户端更新间隔统一使用此设置。">
+        <div className="flex max-w-[620px] flex-col gap-4">
+          <Field label="资源缓存时间（小时）">{id=><Input placeholder="资源自动更新间隔，单位为小时，范围 1 至 8760" id={id} type="number" min={1} max={8760} step={1} value={value} onChange={e=>setHours(e.target.value)} />}</Field>
+          {!valid&&<p className="text-[13px] text-red-600">请输入 1 至 8760 的整数小时。</p>}
+          <p className="text-[13px] leading-relaxed text-ink-muted">每个资源只保留最后一次成功内容。到期自动拉取，失败时保留旧内容并延后一个周期再次尝试；列表中的“刷新缓存”可立即重新拉取。</p>
+          <p className="text-[13px] text-ink-muted">设置保存后立即应用于服务端。客户端更新间隔在其下次下载配置后生效。</p>
         </div>
-
-      </PageScroll>
-      <AlertDialog open={!!restoreFile} onOpenChange={next => { if (!next) (() => { if (!restore.isPending) setRestoreFile(undefined); })(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{"恢复备份？"}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
-        <span className="text-[13.5px] leading-relaxed">恢复会覆盖当前全部配置。</span>
-        <span className="break-all text-[13px] text-ink-muted">{restoreView.name}</span>
-      </div></AlertDialogDescription><AlertDialogFooter>{<>
-        <AlertDialogCancel disabled={restoreView.pending}>取消</AlertDialogCancel>
-        <Button variant="danger-solid" disabled={restoreView.pending} onClick={() => { if (restoreFile) restore.mutate(restoreFile, { onSuccess: () => setRestoreFile(undefined) }); }}>{restoreView.pending ? '恢复中…' : '恢复'}</Button>
-      </>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
-
-    </>
-  );
+      </Card>
+      <Card title={`资源异常 · ${failures.length}`} subtitle="显示最后成功时间、最近失败原因和下次自动拉取时间。">
+        {!resources.data?<p className="text-ink-muted">正在读取状态…</p>:!failures.length?<p className="text-ink-muted">当前没有资源拉取异常。</p>:<div className="flex flex-col gap-3">{failures.map((r,i)=><div key={i} className="rounded border border-line p-3 text-[13px]"><div className="font-medium">{r.name}</div><p className="text-red-600">{r.error} · {r.available?'正在使用旧缓存':'没有可用缓存'}</p><p className="text-ink-muted">最后成功：{r.lastSuccessAt?formatTime(r.lastSuccessAt):'从未成功'} · 下次拉取：{r.nextFetchAt?formatTime(r.nextFetchAt):'待调度'}</p></div>)}</div>}
+      </Card>
+    </PageScroll></>;
 }

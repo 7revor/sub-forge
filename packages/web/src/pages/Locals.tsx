@@ -1,7 +1,7 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
+import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
+import { Frame } from '../modals/Frame.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
-import { LeaveDialog } from '../components/LeaveDialog.tsx';
 import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 // 本地节点（LOC-01）：与订阅源一致的三层页面——
 // /locals 分组列表 → /locals/:id 分组详情（节点表、分组 YAML）→ /locals/:id/nodes/:index 节点编辑子页（YAML）。
@@ -19,26 +19,13 @@ import { LocalNodeYamlEditor } from '../components/LocalNodeYamlEditor.tsx';
 import { inspectLocalNodeYaml } from '../convert/localNodeYaml.ts';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { groupFromYaml, groupToYaml, proxyToYaml } from '../convert/proxyYaml.ts';
-import { DeleteAction, DeleteDialog, ActionButtons } from '../components/DetailActions.tsx';
+import { DeleteAction, ActionButtons } from '../components/DetailActions.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
-import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 
 const EMPTY: LocalProxyGroup = { id: '', name: '', proxies: [] };
 const crumbLink = 'text-ink-muted no-underline';
-
-function NewGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const navigate = useNavigate();
-  const save = useSaveDoc('locals');
-  const [note, setNote] = useState('');
-  useEffect(() => { if (open) setNote(''); }, [open]);
-  return <NamedCreateDialog open={open} onClose={onClose} title="新建分组" label="分组名称" placeholder="例如：自建、家宽"
-    pending={save.isPending} error={save.error} onReset={save.reset}
-    onCreate={(name) => save.mutateAsync({ name, note, proxies: [] }, { onSuccess: (item) => { onClose(); navigate(`/locals/${item.id}`); } })}>
-    <NoteField value={note} onChange={setNote} />
-  </NamedCreateDialog>;
-}
 
 const typesText = (g: LocalProxyGroup) => [...new Set(g.proxies.map((p) => p.type))].join(' / ') || '—';
 
@@ -46,17 +33,21 @@ const GROUP_DELETE_BODY = '分组里的节点会一起删除；引用它的配�
 
 /** /locals：分组列表，与订阅源列表同一形态 */
 export function LocalList() {
-  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate(); const save = useSaveDoc('locals');
+  const create = async () => {
+    let createdId: string | undefined;
+    const result = await NamedCreateDialog.show({ title: '新建分组', label: '分组名称', placeholder: '例如：自建、家宽', note: true }, { submit: async ({ name, note }) => { createdId = (await save.mutateAsync({ name, note, proxies: [] })).id; } });
+    if (result.status === 'confirmed' && createdId) navigate(`/locals/${createdId}`);
+  };
   return (
     <>
-      <DocList kind="locals" title="本地节点" noun="分组" onCreate={() => setCreating(true)} deleteBody={GROUP_DELETE_BODY}
+      <DocList kind="locals" title="本地节点" noun="分组" onCreate={create} deleteBody={GROUP_DELETE_BODY}
         columns={[
           { header: '名称', cell: (g) => g.name },
           { header: '备注', cell: (g) => <NoteCell note={g.note} /> },
           { header: '节点', cell: (g) => <span className="font-mono text-[13px]">{g.proxies.length}</span> },
           { header: '协议', cell: (g) => <span className="font-mono text-[12.5px] text-ink-2">{typesText(g)}</span> },
         ]} />
-      <NewGroupModal open={creating} onClose={() => setCreating(false)} />
     </>
   );
 }
@@ -64,16 +55,12 @@ export function LocalList() {
 /** /locals/:id：分组详情，节点表的「编辑」「新增节点」进入节点子页 */
 export function LocalEdit() {
   const e = useDocEditor('locals', EMPTY);
-  const [groupOpen, setGroupOpen] = useState(false);
-  const [groupText, setGroupText] = useDialogDraft(groupOpen, groupToYaml(e.draft?.proxies ?? []));
-  const [deletingNode, setDeletingNode] = useState<number>();
-  const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew);
+  const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew, undefined, () => ({ what: `分组「${d.name}」`, canSave: validName, onSave: () => e.save.mutateAsync({ ...d, name: d.name.trim() }) }));
   if (e.isNew) return <Navigate to="/locals" replace />;
   if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const d = e.draft;
   const validName = !!d.name.trim();
   const setProxies = (proxies: LocalProxy[]) => e.setDraft({ ...d, proxies });
-  const groupResult = groupFromYaml(groupText);
   const nodePath = (i: number | 'new') => `/locals/${d.id}/nodes/${i}`;
 
   return (
@@ -81,10 +68,10 @@ export function LocalEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / {e.doc.data?.name}</>}
         title={d.name || '未命名'}
         actions={<>
-          <ActionButtons items={[{ label: '分组 YAML', onSelect: () => setGroupOpen(true) }]} />
+          <ActionButtons items={[{ label: '分组 YAML', onSelect: async () => { const result = await LocalGroupYamlModal.show({ proxies: d.proxies }); if (result.status === 'confirmed') setProxies(result.data); } }]} />
           <Button variant="primary" onClick={() => e.submit((draft) => ({ ...draft, name: draft.name.trim() }))} disabled={e.save.isPending || !e.dirty || !validName}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
           <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
-            onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })} />
+            onDelete={() => e.del.mutateAsync(d.id, { onSuccess: () => leave('/locals') })} />
         </>}>
         <Badge>{d.proxies.length} 个节点</Badge>
         {e.dirty && <Badge tone="warn">有未保存的修改</Badge>}
@@ -109,7 +96,7 @@ export function LocalEdit() {
                   <td className={cx(td, 'px-3.5 py-3')}><span className="rounded bg-[#ebedf1] px-1.5 py-0.5 font-mono text-[12px]">{p.type.toUpperCase()}</span></td>
                   <td className={cx(td, 'px-3.5 py-3 font-mono text-[12.5px] text-ink-2')}>{p.server}:{p.port}</td>
                   <td className={cx(td, 'text-right whitespace-nowrap')}>
-                    <Button size="sm" variant="danger" aria-label={`删除 ${p.name}`} className="mr-2" onClick={() => { e.save.reset(); setDeletingNode(i); }}>删除</Button>
+                    <Button size="sm" variant="danger" aria-label={`删除 ${p.name}`} className="mr-2" onClick={() => { e.save.reset(); void Frame.modal.confirm({ title: `删除节点「${p.name}」？`, description: `节点会从分组「${d.name}」中移除并立即保存${e.dirty ? '；其他未保存的修改也会一起保存' : ''}。`, confirmLabel: '删除', danger: true }, { submit: async () => { const item = await e.save.mutateAsync({ ...d, proxies: d.proxies.filter((_, index) => index !== i) }); e.setDraft(item); } }); }}>删除</Button>
                     <DocActionLink to={nodePath(i)} name={p.name} />
                   </td>
                 </DocTableRow>
@@ -119,21 +106,7 @@ export function LocalEdit() {
         )}
       </Card>
 
-      <Dialog open={groupOpen} onOpenChange={setGroupOpen}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"分组 YAML"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <Field label="整个分组的 proxies 列表">
-          {(id) => <YamlTextarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
-        </Field>
-        <FieldError error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
-      </div><DialogFooter>{<><Button onClick={() => setGroupOpen(false)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {
-          if (groupResult?.ok) { setProxies(structuredClone(groupResult.value)); setGroupOpen(false); }
-        }}>保存</Button></>}</DialogFooter></DialogContent></Dialog>
-      <DeleteDialog open={deletingNode !== undefined} title={`删除节点「${deletingNode === undefined ? '' : d.proxies[deletingNode]?.name ?? ''}」？`} error={e.save.error} pending={e.save.isPending}
-        onClose={() => setDeletingNode(undefined)}
-        onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>
-        节点会从分组「{d.name}」中移除并立即保存{e.dirty ? '；分组里其他未保存的修改也会一起保存' : ''}。
-      </DeleteDialog>
-      <LeaveDialog blocker={blocker} what={`分组「${d.name}」`} canSave={validName} pending={e.save.isPending} error={e.save.error}
-        onSave={(done) => e.save.mutate({ ...d, name: d.name.trim() }, { onSuccess: done })} />
+
     </>
   );
 }
@@ -155,34 +128,31 @@ function LocalNodeEditor({ group: g, index }: { group: LocalProxyGroup; index: n
   const [base, setBase] = useState<LocalProxy | undefined>(() => isNew ? undefined : g.proxies[index]);
   const [text, setText] = useState(() => base ? proxyToYaml(base) : '');
   const [savedText, setSavedText] = useState(text);
-  const [deleting, setDeleting] = useState(false);
   const settledText = useDebouncedValue(text, 400);
   const checking = text !== settledText;
   const result = inspectLocalNodeYaml(settledText);
   const valid = !checking && result.ok;
   const dirty = text !== savedText;
-  const { blocker, leave } = useLeaveGuard(dirty);
+  const { blocker, leave } = useLeaveGuard(dirty, undefined, () => ({ what: isNew ? '新节点' : `节点「${base?.name ?? ''}」`, canSave: valid, onSave: () => persist(true) }));
   const groupPath = `/locals/${g.id}`;
-  const persist = (done?: () => void) => {
+  const persist = async (leaving = false) => {
     // 保存时重新校验当前文本，绝不使用最后一次成功解析的旧节点。
     const current = inspectLocalNodeYaml(text);
     if (!current.ok || save.isPending) return;
     const cur = current.value;
     const submittedText = text;
     const proxies = isNew ? [...g.proxies, cur] : g.proxies.map((p, i) => i === index ? cur : p);
-    save.mutate({ ...g, proxies }, { onSuccess: () => {
-      setSavedText(submittedText); setBase(cur);
-      if (done) done();
-      else if (isNew) leave(`${groupPath}/nodes/${proxies.length - 1}`, { replace: true });
-    } });
+    await save.mutateAsync({ ...g, proxies });
+    setSavedText(submittedText); setBase(cur);
+    if (!leaving && isNew) leave(`${groupPath}/nodes/${proxies.length - 1}`, { replace: true });
   };
-  const remove = () => save.mutate({ ...g, proxies: g.proxies.filter((_, i) => i !== index) }, { onSuccess: () => leave(groupPath) });
+  const remove = async () => { const result = await Frame.modal.confirm({ title: `删除节点「${base?.name ?? ''}」？`, description: `节点会从分组「${g.name}」中移除并立即保存。`, confirmLabel: '删除', danger: true }, { submit: async () => { await save.mutateAsync({ ...g, proxies: g.proxies.filter((_, i) => i !== index) }); } }); if (result.status === 'confirmed') leave(groupPath); };
   return <>
     <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / <Link to={groupPath} className={crumbLink}>{g.name}</Link> / {isNew ? '新增节点' : base?.name}</>}
       title={isNew ? '新增节点' : valid && result.ok ? result.value.name : base?.name || '未命名'}
       actions={<>
         <Button variant="primary" onClick={() => persist()} disabled={save.isPending || !valid || !(dirty || isNew)}>{save.isPending ? '保存中…' : isNew ? '添加到分组' : dirty ? '保存节点' : '已保存'}</Button>
-        {!isNew && <Button variant="danger" disabled={save.isPending} onClick={() => { save.reset(); setDeleting(true); }}>删除</Button>}
+        {!isNew && <Button variant="danger" disabled={save.isPending} onClick={() => { save.reset(); void remove(); }}>删除</Button>}
       </>}>
       <Badge>分组 · {g.name}</Badge>
       {dirty && <Badge tone="warn">有未保存的修改</Badge>}
@@ -191,9 +161,16 @@ function LocalNodeEditor({ group: g, index }: { group: LocalProxyGroup; index: n
     <Card scroll title={<h2 className="m-0 text-[15px] font-semibold">节点配置</h2>}>
       <LocalNodeYamlEditor disabled={save.isPending} text={text} onChange={setText} result={result} checking={checking} />
     </Card>
-    <DeleteDialog open={deleting} title={`删除节点「${base?.name ?? ''}」？`} error={save.error} pending={save.isPending}
-      onClose={() => setDeleting(false)} onConfirm={remove}>节点会从分组「{g.name}」中移除并立即保存。</DeleteDialog>
-    <LeaveDialog blocker={blocker} what={isNew ? '新节点' : `节点「${base?.name ?? ''}」`} canSave={valid} pending={save.isPending} error={save.error}
-      onSave={done => persist(done)} />
+
   </>;
 }
+
+const LocalGroupYamlModal = createModal<{ proxies: LocalProxy[] }, LocalProxy[]>(function GroupYaml({ data, modal }) {
+  const [text, setText] = useModalDraft(() => groupToYaml(data.proxies));
+  const result = groupFromYaml(text);
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"><ModalHeader><ModalTitle>分组 YAML</ModalTitle></ModalHeader>
+    <Field label="整个分组的 proxies 列表">{id => <YamlTextarea placeholder="粘贴本地节点组的 YAML 配置" id={id} rows={18} spellCheck={false} value={text} onChange={event => setText(event.target.value)} />}</Field>
+    <FieldError error={!result.ok ? `第 ${result.line ?? 1} 行：${result.error}` : undefined} />
+    <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!result.ok} onClick={() => { if (result.ok) modal.confirm(result.value); }}>保存</Button></ModalFooter>
+  </ModalContent>;
+});

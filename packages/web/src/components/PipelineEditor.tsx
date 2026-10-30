@@ -1,6 +1,7 @@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem } from './ui/dropdown-menu.tsx';
 import { alertError } from '../feedback.ts';
 import { OptionalBoolean } from './OptionalBoolean.tsx';
+import { proxyPlaceholders } from '../schemas/placeholders.ts';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
 // 左侧步骤列表（拖拽排序、节点数变化、末尾自动去重兜底、添加处理器菜单）；
 // 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方是这一步输入 → 输出的逐节点对照；
@@ -78,7 +79,7 @@ function DeleteIcon({ label, onClick }: { label: string; onClick: () => void }) 
 }
 
 /** 一行一个正则：序号、输入框、命中数、删除；空行提示不会生效，非法正则标红 */
-function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则', flags = '', placeholder }: {
+function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则', flags = '', placeholder = '按节点名称匹配的正则表达式' }: {
   label: string; patterns: string[]; hits?: (number | undefined)[]; onChange: (patterns: string[]) => void; addLabel?: string; flags?: string; placeholder?: string;
 }) {
   const grid = 'grid grid-cols-[22px_minmax(0,1fr)_44px_32px] items-center gap-2';
@@ -105,7 +106,7 @@ function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则
   );
 }
 
-const SET_BOOLS = ['udp', 'tfo', 'skip-cert-verify'];
+const SET_BOOLS = ['udp', 'tfo', 'skip-cert-verify'] as const;
 const SET_SELECTS = {
   'client-fingerprint': ['chrome', 'firefox', 'safari', 'ios', 'android', 'edge', '360', 'qq', 'random', 'randomized'],
   'ip-version': ['dual', 'ipv4', 'ipv6', 'ipv4-prefer', 'ipv6-prefer'],
@@ -119,13 +120,12 @@ function SetFieldsForm({ fields, onChange }: { fields: Record<string, unknown>; 
   const extra = Object.fromEntries(Object.entries(fields).filter(([key]) => !SET_KEYS.includes(key)));
   // 字段名由公共编辑器显式校验，提交时再校验完整数据。
   return <div className="flex flex-col gap-2.5">
-    {SET_BOOLS.map((key) => <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><OptionalBoolean label={key} size="sm" value={typeof fields[key] === 'boolean' ? fields[key] as boolean : undefined}
+    {SET_BOOLS.map((key) => <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><OptionalBoolean label={key} placeholder={proxyPlaceholders[key]} size="sm" value={typeof fields[key] === 'boolean' ? fields[key] as boolean : undefined}
       onChange={(v) => onChange(updateSetField(fields, key, v))} /></div>)}
     {Object.entries(SET_SELECTS).map(([key, options]) => {
       const value = fields[key] === undefined ? '' : String(fields[key]);
-      return <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><Select aria-label={key} className="h-9 max-w-[240px]" value={value}
+      return <div key={key} className={ROW}><span className={cx(lbl, 'font-mono')}>{key}</span><Select clearable placeholder={proxyPlaceholders[key as keyof typeof SET_SELECTS]} aria-label={key} className="h-9" value={value}
         onChange={(e) => onChange(updateSetField(fields, key, e.target.value || undefined))}>
-        <option value="">不设置</option>
         {value && !options.includes(value) && <option value={value}>{value}（当前值）</option>}
         {options.map((v) => <option key={v} value={v}>{v}</option>)}
       </Select></div>;
@@ -178,7 +178,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
       const value = step.patterns ?? [];
       return <div className="flex flex-col gap-2">
         <label htmlFor="useless" className={lbl}>关键词（正则，每行一条；命中任一条的节点被移除）</label>
-        <DraftTextarea id="useless" rows={4} className="font-mono text-[12.5px]" value={value.join('\n')}
+        <DraftTextarea placeholder="移除命中关键词的节点，每行填写一条正则" id="useless" rows={4} className="font-mono text-[12.5px]" value={value.join('\n')}
           aria-invalid={value.some((p) => !!regexError(p))}
           onCommit={(text) => { const lines = text.split('\n').map((l) => l.trim()).filter(Boolean); onChange({ ...step, patterns: lines.length ? lines : undefined }); }} />
         {value.map((p, i) => ({ i, error: p.trim() ? regexError(p.trim()) : undefined })).filter((x) => x.error).map(({ i, error }) => <span key={i} role="status" className="text-[12px] text-err">第 {i + 1} 行：{error}</span>)}
@@ -203,7 +203,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
           <div className="grid grid-cols-[24px_22px_minmax(0,1fr)_44px_32px] items-center gap-2 py-1">
             {handle}
             <span className="font-mono text-[12px] text-ink-muted">{i + 1}</span>
-            <DraftInput aria-label={`优先级 ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && regexError(p) && 'border-err')} value={p} aria-invalid={!!p && !!regexError(p)}
+            <DraftInput placeholder="按此正则匹配节点，排在上面的优先" aria-label={`优先级 ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && regexError(p) && 'border-err')} value={p} aria-invalid={!!p && !!regexError(p)}
               onCommit={(v) => onChange({ ...step, patterns: step.patterns.map((x, j) => (j === i ? v : x)) })} />
             <span className="text-right font-mono text-[12.5px] text-ink-2">{hits(step.patterns)?.[i] ?? '—'}</span>
             <DeleteIcon label={`删除优先级 ${i + 1}`} onClick={() => onChange({ ...step, patterns: step.patterns.filter((_, j) => j !== i) })} />
@@ -222,10 +222,10 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
           return <div key={i} className="flex flex-col gap-1">
             <div className={grid}>
               <span className="font-mono text-[12px] text-ink-muted">{i + 1}</span>
-              <DraftInput aria-label={`规则 ${i + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', r.pattern && error && 'border-err bg-[#fffbfa]')} placeholder="^香港\s*(\d+).*$" value={r.pattern}
+              <DraftInput aria-label={`规则 ${i + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', r.pattern && error && 'border-err bg-[#fffbfa]')} placeholder="匹配节点名称中需要替换的部分" value={r.pattern}
                 aria-invalid={!!r.pattern && !!error} onCommit={(pattern) => setRule(i, { pattern })} />
               <span aria-hidden="true" className="text-center text-faint">→</span>
-              <DraftInput aria-label={`规则 ${i + 1} 替换为`} className="h-9 min-w-0 font-mono" placeholder="HK-$1" value={r.replace} onCommit={(replace) => setRule(i, { replace })} />
+              <DraftInput aria-label={`规则 ${i + 1} 替换为`} className="h-9 min-w-0 font-mono" placeholder="替换后的文字，可用 $1 引用分组" value={r.replace} onCommit={(replace) => setRule(i, { replace })} />
               <span className="text-right font-mono text-[12.5px] text-ink-2">{counts?.[i] ?? '—'}</span>
               <DeleteIcon label={`删除规则 ${i + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, j) => j !== i) })} />
             </div>
@@ -241,8 +241,8 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'rename.affix': {
       const sample = names?.[0] ?? '🇭🇰 HK-01';
       return <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5"><span className={lbl}>前缀</span><DraftInput className="h-9 font-mono" placeholder="不加" value={step.prefix ?? ''} onCommit={(prefix) => onChange({ ...step, prefix })} /></label>
-        <label className="flex flex-col gap-1.5"><span className={lbl}>后缀</span><DraftInput className="h-9 font-mono" placeholder="不加" value={step.suffix ?? ''} onCommit={(suffix) => onChange({ ...step, suffix })} /></label>
+        <label className="flex flex-col gap-1.5"><span className={lbl}>前缀</span><DraftInput className="h-9 font-mono" placeholder="添加到节点名称开头的文字" value={step.prefix ?? ''} onCommit={(prefix) => onChange({ ...step, prefix })} /></label>
+        <label className="flex flex-col gap-1.5"><span className={lbl}>后缀</span><DraftInput className="h-9 font-mono" placeholder="添加到节点名称末尾的文字" value={step.suffix ?? ''} onCommit={(suffix) => onChange({ ...step, suffix })} /></label>
         <span className={cx(hint, 'col-span-2')}>示例：<span className="font-mono">{sample}</span> → <span className="font-mono">{step.prefix ?? ''}{sample}{step.suffix ?? ''}</span></span>
       </div>;
     }
@@ -266,7 +266,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
     case 'script':
       return <div className="flex flex-col gap-2">
         <label htmlFor="script-code" className={lbl}>{'(nodes, ctx) => nodes'}</label>
-        <DraftTextarea id="script-code" rows={7} className="bg-panel font-mono text-[12.5px]" value={step.code} onCommit={(code) => onChange({ ...step, code })} />
+        <DraftTextarea placeholder="填写接收 nodes 和 ctx 并返回节点列表的脚本" id="script-code" rows={7} className="bg-panel font-mono text-[12.5px]" value={step.code} onCommit={(code) => onChange({ ...step, code })} />
         <span className={hint}>需要脚本权限；执行失败时跳过。</span>
       </div>;
   }

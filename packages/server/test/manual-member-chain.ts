@@ -1,0 +1,38 @@
+// 内置浏览器隔离验收：虚构账号、内存数据库和固定上游，不读写用户数据。
+import { serve } from '@hono/node-server';
+import { resolve } from 'node:path';
+import { createApp } from '../src/app.ts';
+import { hashPassword } from '../src/crypto.ts';
+import { Store } from '../src/store.ts';
+import { SnapshotService } from '../src/snapshots.ts';
+import { RenderService } from '../src/render.ts';
+const store = new Store(':memory:');
+const user = store.createUser({ username: 'member-admin', passwordHash: await hashPassword('member-demo-2026'), role: 'admin' });
+const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
+store.importSeed({
+  locals: [
+    { id: 'self', name: '自建落地', proxies: [{ name: '🇺🇸 GCP [01]', type: 'socks5', server: 'gcp.example.test', port: 1080 }, { name: '🇸🇬 新加坡', type: 'socks5', server: 'sg.example.test', port: 1080 }] },
+    { id: 'relay', name: '中转机场', proxies: [{ name: '🇭🇰 香港 IPLC', type: 'socks5', server: 'hk.example.test', port: 1080 }, { name: '🇯🇵 日本 IEPL', type: 'socks5', server: 'jp.example.test', port: 1080 }] },
+    { id: 'other', name: '备用机场', proxies: [{ name: '🇭🇰 香港备用', type: 'socks5', server: 'hk2.example.test', port: 1080 }, { name: '🇯🇵 日本备用', type: 'socks5', server: 'jp2.example.test', port: 1080 }] },
+  ],
+  templates: [{ id: 'tpl', name: '日常分流模板', version: 1, groups: [{ id: 'select', name: '🚀 科学上网', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }, { id: 'hk', name: '🇭🇰 香港', type: 'url-test', filter: '香港', members: [] }], rules: [], final: { kind: 'group', groupId: 'select' } }],
+  profiles: [{ id: 'independent', name: '成员与代理链验收', overlay: {}, nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }, { ref: { type: 'local', id: 'other' }, output: 'provider' }], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'independent', config: {
+    groups: [{ id: 'select', name: '🚀 科学上网', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }, { id: 'hk', name: '🇭🇰 香港', type: 'url-test', filter: '香港', members: [] }], rules: [], final: { kind: 'group', groupId: 'select' },
+  } } }, { id: 'bound', name: '模板绑定验收', overlay: {}, nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'bound', templateId: 'tpl', groupAdditions: {} } }],
+  tokens: [{ token: 'member-test-token', profileId: 'independent', label: '验收设备' }],
+}, user.id);
+const snapshots = new SnapshotService(store, async url => { throw new Error(`验收禁止访问上游：${url}`); });
+const publicUrl = 'http://member-chain.localhost:18952';
+const renderer = new RenderService(store, snapshots, { publicUrl });
+const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
+const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18951 });
+console.log(`隔离验收：${publicUrl}`);
+let stopping = false;
+async function stop() {
+  if (stopping) return;
+  stopping = true;
+  if ('closeIdleConnections' in server) server.closeIdleConnections();
+  await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done()));
+  await snapshots.settled(); store.close();
+}
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => { void stop().catch(error => { console.error(error); process.exitCode = 1; }); });

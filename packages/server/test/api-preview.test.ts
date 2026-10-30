@@ -179,9 +179,9 @@ describe('规则集预览（CR-05）', () => {
       { id: 'l', ok: true, stale: false, format: 'classical', behavior: 'classical', rules: 1, rejected: 0 },
     ]);
     expect(store.snapshotHistory('ruleset', 'draft')).toEqual([]);
-    // 同一地址短时间内复用，不重复拉取
+    // 草稿不保留已完成缓存，下一次请求重新拉取
     await alice.post('/api/rulesets/preview', { ruleset: { name: 'N', sources }, source: 'r', client: 'mihomo' });
-    expect(fetched.filter((u) => u.endsWith('/ok'))).toHaveLength(1);
+    expect(fetched.filter((u) => u.endsWith('/ok'))).toHaveLength(2);
 
     const id = (await alice.post('/api/rulesets', { name: 'N', sources: sources.slice(0, 1) })).json.item.id;
     // 已保存规则集里新填、尚未保存的地址同样不落快照
@@ -293,7 +293,7 @@ describe('节点集最终节点列表', () => {
     expect(again.json.report.map((r: { code: string }) => r.code)).toEqual(['source.fetch-failed', 'source.parse-failure']);
     expect(again.json.total).toBe(3);
     expect(calls).toBe(2);
-    advance(301_000);
+    advance(86_401_000);
     await alice.get(`/api/nodesets/source/${id}/nodes`);
     await snapshots.settled();
     expect(calls).toBe(3);

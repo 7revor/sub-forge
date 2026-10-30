@@ -33,9 +33,9 @@ export function Account() {
           </Card>
           <Card title="修改密码" className="min-w-0 flex-[1_1_360px]">
             <form onSubmit={submit} className="flex flex-col gap-3.5">
-              <Field label="当前密码">{(id) => <Input id={id} type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />}</Field>
-              <Field label="新密码（至少 8 位）">{(id) => <Input id={id} type="password" autoComplete="new-password" minLength={8} value={next} onChange={(e) => setNext(e.target.value)} required />}</Field>
-              <Field label="再次输入新密码" hint={confirm && confirm !== next ? '两次输入不一致' : undefined}>{(id) => <Input id={id} type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />}</Field>
+              <Field label="当前密码">{(id) => <Input placeholder="输入当前登录密码" id={id} type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />}</Field>
+              <Field label="新密码（至少 8 位）">{(id) => <Input placeholder="设置至少 8 位的新密码" id={id} type="password" autoComplete="new-password" minLength={8} value={next} onChange={(e) => setNext(e.target.value)} required />}</Field>
+              <Field label="再次输入新密码" hint={confirm && confirm !== next ? '两次输入不一致' : undefined}>{(id) => <Input placeholder="再次输入新密码以确认" id={id} type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />}</Field>
               <ErrorAlert error={change.error} />
               <div className="flex items-center justify-end gap-3">
                 <Button type="submit" variant="primary" disabled={change.isPending || next !== confirm}>{change.isPending ? '更新中…' : '更新密码'}</Button>

@@ -75,12 +75,12 @@ describe('规则预览、实际下发与来源异常恢复', () => {
       if (++calls > 1) await waiting;
       return { status: 200, body: calls === 1 ? 'DOMAIN,old.test' : 'DOMAIN,new.test' };
     } });
-    await h.read(); h.advance(301_000);
-    const stale = await h.snapshots.get('ruleset', 'r', remote.url!, { ttlSec: 300 });
-    expect(stale).toMatchObject({ stale: true, snapshot: { body: 'DOMAIN,old.test' } });
+    await h.read(); h.advance(86_401_000);
+    const refreshing = h.snapshots.get('ruleset', 'r', remote.url!, { ttlSec: 300 });
     const reading = h.read();
     release();
     const loaded = await reading;
+    expect((await refreshing).snapshot?.body).toBe('DOMAIN,new.test');
     expect(loaded.json).toMatchObject({ content: 'DOMAIN,new.test', status: { ok: true, stale: false } });
     const preview = await h.preview(loaded.json.content);
     expect(await h.download()).toBe(preview.json.lines.join('\n') + '\n');
@@ -94,7 +94,7 @@ describe('规则预览、实际下发与来源异常恢复', () => {
       return { status: 200, body: 'DOMAIN,same.test' };
     } });
     const before = await h.read(); const original = await h.download();
-    h.advance(301_000); fail = true;
+    h.advance(86_401_000); fail = true;
     const failed = await h.read();
     expect(failed.json).toMatchObject({ content: before.json.content, status: { ok: false, stale: true, error: '刷新暂时失败' } });
     expect(await h.download()).toBe(original);
@@ -106,7 +106,7 @@ describe('规则预览、实际下发与来源异常恢复', () => {
     expect(calls).toBe(3);
   });
 
-  it('草稿失败不缓存，主动刷新绕过成功缓存，并发刷新合并且不写正式快照', async () => {
+  it('草稿失败不缓存，每次读取不复用完成结果，并发刷新合并且不写正式快照', async () => {
     let calls = 0; let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     const h = await fixture({ id: 'r', name: '草稿', sources: [remote] }, { fetcher: async () => {
@@ -117,7 +117,6 @@ describe('规则预览、实际下发与来源异常恢复', () => {
     } });
     const read = (refresh = false) => h.api.post('/api/rulesets/source', { source: remote, refresh });
     expect((await read()).json.status.ok).toBe(false);
-    expect((await read()).json.content).toBe('DOMAIN,v2.test');
     expect((await read()).json.content).toBe('DOMAIN,v2.test');
     const a = read(true); const b = read(true);
     // 两个管理请求进入 getter 后才释放上游，验证同一在途 Promise 的复用。

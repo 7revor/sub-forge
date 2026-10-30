@@ -1,14 +1,14 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
+import { Frame } from '../modals/Frame.tsx';
+import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 import { formatRelativeTime } from '../utils/format.ts';
 // 用户管理（SYS-01，管理员）：创建、禁用、改角色、重置密码、脚本编写权限。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { notifySuccess } from '../feedback.ts';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, PendingNotice, Select, Switch, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
-import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 
 /** 用户（设计稿「管理员 · 用户」）：用户表与共享的订阅源 / 组合 */
 export function Users() {
@@ -21,24 +21,6 @@ export function Users() {
   const collections = useList('collections');
   const refresh = () => qc.invalidateQueries({ queryKey: ['users'] });
   const patch = useMutation({ meta: { successMessage: '用户已更新' }, mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => api('PATCH', `/users/${id}`, body), onSuccess: refresh });
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useDialogDraft(creating, { username: '', password: '', role: 'user' as User['role'], scriptAllowed: false });
-  const create = useMutation({ meta: { successMessage: '用户已创建' },
-    mutationFn: async () => {
-      const { user } = await api<{ user: User }>('POST', '/users', { username: form.username, password: form.password, role: form.role });
-      if (form.scriptAllowed && form.role !== 'admin') await api('PATCH', `/users/${user.id}`, { scriptAllowed: true });
-    },
-    onSuccess: () => { setCreating(false); void refresh(); },
-  });
-  const [resetting, setResetting] = useState<User>();
-  const [resetUser] = useDialogDraft(!!resetting, resetting, resetting?.id);
-  const [newPass, setNewPass] = useDialogDraft(!!resetting, '', resetting?.id);
-  const [sharing, setSharing] = useState(false);
-  const [share, setShare] = useDialogDraft<{ doc: string; to: string[] }>(sharing, { doc: '', to: [] });
-  const addShare = useMutation({ meta: { successMessage: '共享已添加' },
-    mutationFn: () => { const [kind, docId] = share.doc.split(':'); return api('POST', '/shares', { kind, id: docId, to: share.to }); },
-    onSuccess: () => { setSharing(false); void qc.invalidateQueries({ queryKey: ['shares'] }); },
-  });
   const st = (id: string) => stats.data?.items[id];
   const list = users.data ?? [];
   const nameOf = (id: string) => list.find((u) => u.id === id)?.username ?? id;
@@ -46,7 +28,7 @@ export function Users() {
   return (
     <>
       <PageHeader title="用户" subtitle={`${list.length} 个用户 · 禁用或重置密码会退出该用户的所有登录。`}
-        actions={<Button variant="primary" onClick={() => setCreating(true)}><Plus size={16} />创建用户</Button>} />
+        actions={<Button variant="primary" onClick={async () => { const result = await CreateUserModal.show({}); if (result.status === 'confirmed') { notifySuccess('用户已创建'); void refresh(); } }}><Plus size={16} />创建用户</Button>} />
       <ErrorAlert error={users.error ?? patch.error} />
       <PageScroll>
         <Card bodyClass="overflow-x-auto">
@@ -60,7 +42,7 @@ export function Users() {
                   <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
                     <td className={cx(td, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-ink-muted">（我）</span>}</td>
                     <td className={td}>
-                      <Select aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
+                      <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
                         <option value="user">用户</option><option value="admin">管理员</option>
                       </Select>
                     </td>
@@ -71,7 +53,7 @@ export function Users() {
                     <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
                     <td className={td}>
                       <div className="flex justify-end gap-1.5">
-                        <Button size="sm" onClick={() => setResetting(u)}>重置密码</Button>
+                        <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `重置 ${u.username} 的密码`, label: '新密码', description: '至少 8 位；该用户的所有登录会失效', placeholder: '设置至少 8 位的新密码', type: 'password', minLength: 8, confirmLabel: '重置' }, { submit: async password => { await api('PATCH', `/users/${u.id}`, { password }); } }); if (result.status === 'confirmed') { notifySuccess('密码已重置'); void refresh(); } }}>重置密码</Button>
                         {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
                       </div>
                     </td>
@@ -84,7 +66,7 @@ export function Users() {
         </Card>
 
         <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}
-          actions={<Button onClick={() => setSharing(true)}>共享…</Button>}>
+          actions={<Button onClick={async () => { const result = await ShareModal.show({ sources: sources.data ?? [], collections: collections.data ?? [], users: list.filter(u => u.id !== me?.id) }); if (result.status === 'confirmed') { notifySuccess('共享已添加'); void qc.invalidateQueries({ queryKey: ['shares'] }); } }}>共享…</Button>}>
           {shares.data?.pending && <div className="mb-3"><PendingNotice>共享暂不可用。</PendingNotice></div>}
           <div className="flex flex-col">
             {(shares.data?.items ?? []).map((x) => (
@@ -98,33 +80,36 @@ export function Users() {
         </Card>
 
       </PageScroll>
-      <Dialog open={creating} onOpenChange={next => { if (!next) (() => setCreating(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"创建用户"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="用户名" hint="2–32 位字母、数字或 _ . -">{(id) => <Input id={id} autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}</Field>
-          <Field label="角色">{(id) => <Select id={id} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as User['role'] })}><option value="user">普通用户</option><option value="admin">管理员</option></Select>}</Field>
-          <Field label="初始密码（至少 8 位）" className="col-span-2">{(id) => <Input id={id} type="password" autoComplete="new-password" className="font-mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />}</Field>
-        </div>
-        {form.role !== 'admin' && <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={form.scriptAllowed} onChange={(e) => setForm({ ...form, scriptAllowed: e.target.checked })} />允许编写脚本处理器</label>}
-        <ErrorAlert error={create.error} />
-      </div><DialogFooter>{<><Button onClick={() => setCreating(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建'}</Button></>}</DialogFooter></DialogContent></Dialog>
 
-      <Dialog open={!!resetting} onOpenChange={next => { if (!next) (() => setResetting(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{`重置 ${resetUser?.username ?? ''} 的密码`}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <Field label="新密码" hint="至少 8 位；该用户的所有登录会失效">{(id) => <Input id={id} type="password" autoComplete="new-password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />}</Field>
-      </div><DialogFooter>{<><Button onClick={() => setResetting(undefined)}>取消</Button><Button variant="primary" disabled={newPass.length < 8 || patch.isPending} onClick={() => resetting && patch.mutate({ id: resetting.id, body: { password: newPass } }, { onSuccess: () => setResetting(undefined) })}>重置</Button></>}</DialogFooter></DialogContent></Dialog>
-
-      <Dialog open={sharing} onOpenChange={next => { if (!next) (() => setSharing(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"共享订阅源或组合"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <Field label="要共享的订阅源或组合">{(id) => <Select id={id} value={share.doc} onChange={(e) => setShare({ ...share, doc: e.target.value })}>
-          <option value="">选择</option>
-          {(sources.data ?? []).map((x) => <option key={x.id} value={`source:${x.id}`}>订阅源 · {x.name}</option>)}
-          {(collections.data ?? []).map((x) => <option key={x.id} value={`collection:${x.id}`}>组合 · {x.name}</option>)}
-        </Select>}</Field>
-        <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-          <legend className="mb-1.5 text-[12.5px] font-medium text-ink-muted">共享给</legend>
-          {list.filter((u) => u.id !== me?.id).map((u) => <label key={u.id} className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={share.to.includes(u.id)} onChange={(e) => setShare({ ...share, to: e.target.checked ? [...share.to, u.id] : share.to.filter((x) => x !== u.id) })} />{u.username}</label>)}
-        </fieldset>
-        <span className="text-[12px] text-ink-muted">仅可引用，无法查看原始 URL 或修改处理链。</span>
-        <ErrorAlert error={addShare.error} />
-      </div><DialogFooter>{<><Button onClick={() => setSharing(false)}>取消</Button><Button variant="primary" disabled={!share.doc || !share.to.length || addShare.isPending} onClick={() => addShare.mutate()}>共享</Button></>}</DialogFooter></DialogContent></Dialog>
     </>
   );
 }
+
+const CreateUserModal = createModal<Record<string, never>>(function CreateUser({ modal }) {
+  const [form, setForm] = useModalDraft({ username: '', password: '', role: 'user' as User['role'], scriptAllowed: false });
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"创建用户"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="用户名" hint="2–32 位字母、数字或 _ . -">{(id) => <Input placeholder="填写 2–32 位字母、数字或 _ . -" id={id} autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}</Field>
+          <Field label="角色">{(id) => <Select placeholder="选择普通用户或管理员权限" id={id} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as User['role'] })}><option value="user">普通用户</option><option value="admin">管理员</option></Select>}</Field>
+          <Field label="初始密码（至少 8 位）" className="col-span-2">{(id) => <Input placeholder="设置至少 8 位的初始密码" id={id} type="password" autoComplete="new-password" className="font-mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />}</Field>
+        </div>
+        {form.role !== 'admin' && <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={form.scriptAllowed} onChange={(e) => setForm({ ...form, scriptAllowed: e.target.checked })} />允许编写脚本处理器</label>}
+        
+      </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={modal.pending} onClick={() => modal.submit(async () => { const { user } = await api<{ user: User }>('POST', '/users', form); if (form.scriptAllowed && form.role !== 'admin') await api('PATCH', `/users/${user.id}`, { scriptAllowed: true }); })}>{modal.pending ? '创建中…' : '创建'}</Button></>}</ModalFooter></ModalContent>;
+});
+
+const ShareModal = createModal<{ sources: { id: string; name: string }[]; collections: { id: string; name: string }[]; users: User[] }>(function ShareForm({ data: { sources, collections, users }, modal }) {
+  const [share, setShare] = useModalDraft<{ doc: string; to: string[] }>({ doc: '', to: [] });
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"共享订阅源或组合"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
+        <Field label="要共享的订阅源或组合">{(id) => <Select clearable placeholder="选择要共享的订阅源或组合" id={id} value={share.doc} onChange={(e) => setShare({ ...share, doc: e.target.value })}>
+          {sources.map((x) => <option key={x.id} value={`source:${x.id}`}>订阅源 · {x.name}</option>)}
+          {collections.map((x) => <option key={x.id} value={`collection:${x.id}`}>组合 · {x.name}</option>)}
+        </Select>}</Field>
+        <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
+          <legend className="mb-1.5 text-[12.5px] font-medium text-ink-muted">共享给</legend>
+          {users.map((u) => <label key={u.id} className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={share.to.includes(u.id)} onChange={(e) => setShare({ ...share, to: e.target.checked ? [...share.to, u.id] : share.to.filter((x) => x !== u.id) })} />{u.username}</label>)}
+        </fieldset>
+        <span className="text-[12px] text-ink-muted">仅可引用，无法查看原始 URL 或修改处理链。</span>
+        
+      </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!share.doc || !share.to.length || modal.pending} onClick={() => modal.submit(async () => { const [kind, id] = share.doc.split(':'); await api('POST', '/shares', { kind, id, to: share.to }); })}>共享</Button></>}</ModalFooter></ModalContent>;
+});

@@ -1,10 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
-import { withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
+import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
+import { type Matcher, type ReportItem, type RuleEntry } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 import { api, type RuleRepo } from '../../api.ts';
-import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { targetLabel } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
@@ -13,13 +12,13 @@ import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
+import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
-import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
-import { useDialogPresentation } from '../../hooks/useDialogPresentation.ts';
-import { draftIssues } from './model.ts';
+import { RuleEditDialog } from './RuleEditDialog.tsx';
+import { applyRuleDraft } from './ruleDraft.ts';
 
-const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(100px,10vw,140px)_64px]';
+const columns = 'grid grid-cols-[36px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[36px_minmax(0,1fr)_16px_136px_64px]';
 
 function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCtx; repos: NamedRef[] }) {
   const sourceClass = 'shrink-0 text-[12px] text-ink-muted';
@@ -51,60 +50,31 @@ function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCt
   return <span className={lineClass}><span className={sourceClass}>增强集合 ·</span><span className="truncate" title={name}>{name}</span></span>;
 }
 
-export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady, readOnly = false, saveHint = '保存模板后生效', title = '规则', hideFinal = false, staticOnly = false, renderTarget, renderOptions }: {
-  value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
+export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValidationReady, readOnly = false, saveHint = '保存模板后生效', title = '规则', hideFinal = false, staticOnly = false, renderTarget, extendedOptions }: {
+  value: TemplateBody; onChange: (value: TemplateBody) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
   readOnly?: boolean; saveHint?: string; title?: string; hideFinal?: boolean; staticOnly?: boolean;
-  renderTarget?: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void) => ReactNode;
-  renderOptions?: (rule: RuleEntry, onChange: (rule: RuleEntry) => void) => ReactNode;
+  renderTarget?: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => ReactNode;
+  extendedOptions?: boolean;
 }) {
   const [linkError, setLinkError] = useState<string>();
   const [linkingRule, setLinkingRule] = useState<string>();
-  const [adding, setAdding] = useState(false);
-  const [reference, setReference] = useDialogDraft<Matcher | undefined>(adding, undefined);
-  const [newRule, setNewRule] = useState<RuleEntry>();
-  const [editingId, setEditingId] = useState(selected);
-  if (selected && selected !== editingId) setEditingId(selected);
   const currentValue = useRef(value);
   currentValue.current = value;
   const remoteUrls = readOnly ? [] : value.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
   const repositoryMatches = useRepositoryUrlMatches(remoteUrls);
   const repositories = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: value.rules.some(r => r.matcher.kind === 'ruleset' && !!r.matcher.repository) });
   const repos = repositories.data?.repos ?? [];
-  const [preview, setPreview] = useState<Matcher>();
-  const sourceRule = value.rules.find(r => r.id === selected) ?? (newRule?.id === selected ? newRule : undefined);
-  const editing = !!sourceRule || selected === 'final';
-  const [draftLinkError, setDraftLinkError] = useDialogDraft<string | undefined>(editing, undefined, selected);
-  const [draftLinking, setDraftLinking] = useDialogDraft(editing, false, selected);
-  const [dialogValue, setDialogValue] = useDialogDraft(editing, sourceRule && !value.rules.some(r => r.id === sourceRule.id) ? { ...value, rules: [...value.rules, sourceRule] } : value, selected);
-  const rule = dialogValue.rules.find(r => r.id === editingId);
-  const dialogReport = draftIssues(dialogValue);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
-  const update = (rule: RuleEntry) => setDialogValue(current => ({ ...current, rules: current.rules.map(r => r.id === rule.id ? structuredClone(rule) : r) }));
-  const close = () => {
-    onSelect(undefined);
-  };
-  const save = () => {
-    if (rule) {
-      const saved = structuredClone(rule);
-      const previous = value.rules.find(r => r.id === saved.id);
-      const previousUrl = previous?.matcher.kind === 'ruleset' ? previous.matcher.remote?.url : undefined;
-      const rules = previous ? value.rules.map(r => r.id === saved.id ? saved : r) : [...value.rules, saved];
-      onChange({ ...value, rules, ...(previousUrl && value.ruleProviders ? { ruleProviders: value.ruleProviders.filter(provider => provider.url !== previousUrl || rules.some(r => r.matcher.kind === 'ruleset' && r.matcher.remote?.url === previousUrl)) } : {}) });
-      onRuleValidationReady(rule.id, true);
-    } else onChange({ ...value, final: structuredClone(dialogValue.final) });
-    close();
+  const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
+  const edit = async (rule: RuleEntry, adding = false) => {
+    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, saveHint, extendedOptions });
+    if (result.status === 'confirmed') { onChange(applyRuleDraft(currentValue.current, result.data, adding)); onRuleValidationReady(rule.id, true); }
   };
   const add = (matcher: Matcher) => {
-    const id = newId('r');
-    const added = { id, matcher: structuredClone(matcher), target: structuredClone(value.final) };
-    if (matcher.kind === 'rule') { setNewRule(added); onSelect(id); }
-    else onChange({ ...value, rules: [...value.rules, added] });
-  };
-  const changeRule = (next: RuleIR) => {
-    if (rule?.matcher.kind !== 'rule') return;
-    const { noResolve: _noResolve, src: _src, ...options } = rule.options ?? {};
-    update({ ...rule, matcher: { ...rule.matcher, rule: next }, ...(rule.options ? { options } : {}) });
+    const rule = { id: newId('r'), matcher, target: value.final };
+    if (matcher.kind === 'rule') void edit(rule, true);
+    else onChange({ ...value, rules: [...value.rules, rule] });
   };
   const linkRepository = async (ruleId: string, url: string, match: RepositoryUrlMatch) => {
     if (readOnly) return;
@@ -114,35 +84,15 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       const latest = currentValue.current;
       const selected = latest.rules.find(r => r.id === ruleId);
       if (selected?.matcher.kind !== 'ruleset' || selected.matcher.remote?.url !== url) return;
-      onChange({ ...latest, rules: latest.rules.map(r => {
-        if (r.id !== ruleId) return r;
-        const { providerName: _providerName, ...rest } = r;
-        return { ...rest, matcher };
-      }),
-        ...(latest.ruleProviders ? { ruleProviders: latest.ruleProviders.filter(p => p.url !== url || latest.rules.some(r => r.id !== ruleId && r.matcher.kind === 'ruleset' && r.matcher.remote?.url === url)) } : {}) });
+      onChange(applyRuleDraft(latest, { ...selected, matcher }));
     } catch (error) { setLinkError(error instanceof Error ? error.message : String(error)); }
     finally { setLinkingRule(undefined); }
   };
-  const linkDraftRepository = async (ruleId: string, url: string, match: RepositoryUrlMatch) => {
-    setDraftLinking(true); setDraftLinkError(undefined);
-    try {
-      const matcher = await resolveRepositoryUrlMatch(url, match);
-      setDialogValue(current => ({ ...current, rules: current.rules.map(r => {
-        if (r.id !== ruleId || r.matcher.kind !== 'ruleset' || r.matcher.remote?.url !== url) return r;
-        const { providerName: _providerName, ...rest } = r;
-        return { ...rest, matcher };
-      }), ...(current.ruleProviders ? { ruleProviders: current.ruleProviders.filter(p => p.url !== url || current.rules.some(r => r.id !== ruleId && r.matcher.kind === 'ruleset' && r.matcher.remote?.url === url)) } : {}) }));
-    } catch (error) { setDraftLinkError(error instanceof Error ? error.message : String(error)); }
-    finally { setDraftLinking(false); }
-  };
-  const draftRemoteUrls = editing && rule?.matcher.kind === 'ruleset' && rule.matcher.remote ? [rule.matcher.remote.url] : [];
-  const draftRepositoryQuery = useRepositoryUrlMatches(draftRemoteUrls);
-  const draftRepositoryMatches = useDialogPresentation(editing, draftRepositoryQuery);
   return <>
     <Card title={title} subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={!readOnly && <>
       <Button size="sm" aria-label="添加静态规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />静态规则</Button>
       {!staticOnly && <RemoteRulePicker label="远程链接" ariaLabel="引用远程链接" triggerClassName={buttonClass('default', 'sm')} onSelect={add} />}
-      {!staticOnly && <Button size="sm" onClick={() => setAdding(true)}>引用规则</Button>}
+      {!staticOnly && <Button size="sm" onClick={async () => { const result = await RuleReferenceModal.show({}); if (result.status === 'confirmed') add(result.data); }}>引用规则</Button>}
     </>}>
       <ErrorAlert error={repositories.error} />
       <ErrorAlert error={repositoryMatches.error} />
@@ -152,51 +102,36 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         const error = report.some(item => item.level === 'error' && item.where === `rule:${r.id}`);
         return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
           <span className="flex items-center text-[12px] text-ink-muted">{handle}{i + 1}</span>
-          <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer text-left hover:text-brand"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
+          <div className="flex min-w-0 items-center gap-2">
+            <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => { void RuleSourcePreview.show({ matcher: r.matcher }); }} className="min-w-0 cursor-pointer overflow-hidden text-left"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
+            {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 条规则可关联仓库文件`} matches={repositoryMatches.matches[r.matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)} />}
+          </div>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-          <span title={targetLabel(r.target, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center text-ink-2 sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</span>
+          <div className="col-start-2 row-start-2 min-w-0 text-ink-2 sm:col-auto sm:row-auto [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:min-w-0 [&_button[role=combobox]]:text-[12.5px]">
+            {readOnly ? <span className="block truncate text-center" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 条规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
+          </div>
           {!readOnly && <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
-            <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
-            <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
+            <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => void edit(r)}><Pencil size={14} /></Button>
+            <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); }}><Trash2 size={14} /></Button>
           </div>}
-          {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && repositoryMatches.matches[r.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="col-span-full flex flex-wrap items-center gap-2 pl-6 text-[12px] text-ink-muted">
-            <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
-            <Button size="sm" disabled={!!linkingRule} onClick={() => void linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)}>关联仓库文件</Button>
-          </div>)}
         </div>;
       }} />
       {!hideFinal && <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
         <span className="pl-6 text-ink-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-        <span title={targetLabel(value.final, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</span>
-        {!readOnly && <Button size="sm" variant="ghost" className="col-start-3 row-start-1 justify-self-start px-1.5 sm:col-start-5" aria-label="编辑 MATCH" onClick={() => onSelect('final')}><Pencil size={14} /></Button>}
+        <div id="template-rule-final" className="col-start-2 row-start-2 min-w-0 sm:col-auto sm:row-auto [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:min-w-0 [&_button[role=combobox]]:text-[12.5px]">
+          {readOnly ? <span className="block truncate text-center" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}
+        </div>
+        <div className="col-span-full"><ItemIssues report={report} where="final" /></div>
       </div>}
     </Card>
-    <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"引用规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" onSelect={matcher => setReference(structuredClone(matcher))} />}</Field>
-      {reference && <RuleMatcher matcher={reference} ctx={ctx} repos={repos} />}
-    </div><DialogFooter><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={!reference} onClick={() => { if (reference) { add(reference); setAdding(false); } }}>保存</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={editing} onOpenChange={next => { if (!next) close(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{rule ? `编辑第 ${dialogValue.rules.findIndex(r => r.id === rule.id) + 1} 条规则` : 'MATCH 出口'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      {rule ? <>
-        <ItemIssues report={dialogReport} where={`rule:${rule.id}`} />
-        <div className="contents">
-          <MatcherEditor fixedKind={staticOnly} value={rule.matcher} rulesets={ctx.rulesets}
-            ruleValue={rule.matcher.kind === 'rule' ? withIpOptions(rule.matcher.rule, rule.options ?? {}) : undefined}
-            onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} />
-        </div>
-        {draftLinkError && <FieldError error={draftLinkError} />}
-        {draftRepositoryMatches.error && <ErrorAlert error={draftRepositoryMatches.error} />}
-        {rule.matcher.kind === 'ruleset' && rule.matcher.remote && draftRepositoryMatches.matches[rule.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="flex flex-wrap items-center gap-2 rounded border border-line bg-ground px-3 py-2 text-[12.5px]">
-          <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
-          <Button size="sm" disabled={draftLinking} onClick={() => void linkDraftRepository(rule.id, rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : '', match)}>关联仓库文件</Button>
-        </div>)}
-        <Field label="出口">{() => renderTarget ? renderTarget(rule.target, target => update({ ...rule, target })) : <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={target => update({ ...rule, target })} />}</Field>
-        {renderOptions?.(rule, update)}
-      </> : <>
-        <span className="text-[13px] text-ink-muted">以上规则均未匹配时使用。</span>
-        {renderTarget ? renderTarget(dialogValue.final, final => setDialogValue(current => ({ ...current, final: structuredClone(final) }))) : <TemplateTargetSelect label="MATCH 出口" value={dialogValue.final} groups={dialogValue.groups} onChange={final => setDialogValue(current => ({ ...current, final: structuredClone(final) }))} />}
-        <ItemIssues report={dialogReport} where="final" />
-      </>}
-    </div><DialogFooter><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={close}>取消</Button><Button variant="primary" disabled={draftLinking || dialogReport.some(item => item.level === 'error' && item.where === (rule ? `rule:${rule.id}` : 'final'))} onClick={save}>保存</Button></DialogFooter></DialogContent></Dialog>
-    <RuleSourcePreview matcher={preview} onClose={() => setPreview(undefined)} />
   </>;
 }
+
+export const RuleReferenceModal = createModal<Record<string, never>, Matcher>(function RuleReference({ modal }) {
+  const [matcher, setMatcher] = useModalDraft<Matcher | undefined>(undefined);
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"><ModalHeader><ModalTitle>引用规则</ModalTitle></ModalHeader>
+    <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" placeholder="选择规则集合或增强集合" modal onSelect={setMatcher} />}</Field>
+    {matcher && <p className="text-[13px] text-ink-muted">已选择规则来源，保存后加入规则列表。</p>}
+    <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!matcher} onClick={() => { if (matcher) modal.confirm(matcher); }}>保存</Button></ModalFooter>
+  </ModalContent>;
+});

@@ -94,11 +94,12 @@ export function createApp(deps: AppDeps) {
     }
 
     const outcome = await renderer.render(t.profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
+    if (store.getActiveToken(token)?.profileId !== t.profileId) return notFound(c);
     if (!outcome.ok) {
       log(503, outcome);
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
     }
-    const interval = profile.updateIntervalSec ?? DEFAULT_INTERVAL_SEC;
+    const interval = store.resourceCacheTtlSec;
     c.header('content-type', 'text/yaml; charset=utf-8');
     c.header('cache-control', 'no-store');
     c.header('profile-update-interval', String(Math.max(1, Math.round(interval / 3600))));
@@ -125,12 +126,18 @@ export function createApp(deps: AppDeps) {
     const retained = version ? renderer.getVersion(t.profileId, target, version, kind === 'providers' ? key : undefined) : undefined;
     if (version && !retained) return c.text('资源版本不存在或已过期，请刷新主订阅', 404);
     const outcome = await renderer.render(t.profileId, target);
+    if (store.getActiveToken(token)?.profileId !== t.profileId) return notFound(c);
+    if (!outcome.ok && outcome.accessDenied) return notFound(c);
     const selected = version ? renderer.getVersion(t.profileId, target, version, kind === 'providers' ? key : undefined) ?? retained : outcome.ok ? outcome.render : undefined;
     if (selected) {
       const body = selected[kind][key];
       if (body === undefined) return notFound(c);
       c.header('content-type', contentType);
       c.header('cache-control', 'no-store');
+      if (body.startsWith('#subforge-binary-mrs\n')) {
+        c.header('content-type','application/octet-stream');
+        return c.body(Buffer.from(body.slice('#subforge-binary-mrs\n'.length),'base64'));
+      }
       return c.body(body.replaceAll(TOKEN_PLACEHOLDER, token));
     }
     if (!outcome.ok) return c.text(`暂时不可用：${outcome.message}`, 503);

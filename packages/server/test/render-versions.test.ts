@@ -76,6 +76,28 @@ describe('订阅结构版本与独立刷新', () => {
     expect(new URL(next.provider).searchParams.get('h')).not.toBe(new URL(old.provider).searchParams.get('h'));
   });
 
+  it('同源不同订阅的整集覆写隔离，新增节点沿用前置，旧版本保留旧链', async () => {
+    const h = harness(); seed(h.store);
+    const whole = { ...structuredClone(profile), chains: [{ ...profile.chains[0]!, landing: { nodeSet: profile.chains[0]!.landing.nodeSet } }] };
+    h.store.put('profile', whole);
+    h.store.put('profile', { ...structuredClone(whole), id: 'p2', chains: [{ ...whole.chains[0]!, via: { kind: 'builtin', name: 'DIRECT' } }] });
+    h.store.putToken({ token: 'token2', profileId: 'p2' });
+    const first = await h.main(); const old = urls(first);
+    expect(first['proxy-providers'].S.override).toBeUndefined();
+    const second = parse(await (await h.get('/sub/token2')).text());
+    expect(parse(await (await h.get(urls(second).provider)).text()).proxies[0]['dialer-proxy']).toBe('DIRECT');
+    expect(parse(await (await h.get(old.provider)).text()).proxies[0]['dialer-proxy']).toBe('旧前置');
+    h.bodies.source += '  - { name: 新落地, type: socks5, server: new.test, port: 1080 }\n'; h.advance();
+    await h.get(old.provider); await h.snapshots.settled();
+    expect(parse(await (await h.get(old.provider)).text()).proxies.map((n: any) => n['dialer-proxy'])).toEqual(['旧前置', '旧前置']);
+    h.store.putTemplateVersion(template(2, '新前置'));
+    const current = urls(await h.main());
+    expect(version(current.provider)).not.toBe(version(old.provider));
+    expect(parse(await (await h.get(old.provider)).text()).proxies[0]['dialer-proxy']).toBe('旧前置');
+    expect(parse(await (await h.get(current.provider)).text()).proxies[0]['dialer-proxy']).toBe('新前置');
+    h.store.close();
+  });
+
   it('版本不存在不冒充最新内容，撤销 token 后历史版本也不可访问', async () => {
     const h = harness(); seed(h.store);
     const old = urls(await h.main());

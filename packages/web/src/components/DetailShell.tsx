@@ -8,7 +8,7 @@ import { Badge, Button, ErrorAlert, PageHeader, PageScroll } from './ui.tsx';
 export function DetailShell({ listPath, listLabel, isNew, name, dirty, saving, saveDisabled = false, onSave, saveError, onDelete, deleteError, deleting, onDeleteReset, deleteBody, canEdit = true, extraActions, actionItems = [], badges, children }: {
   listPath: string; listLabel: string; isNew: boolean; name: string; dirty: boolean; saving: boolean;
   saveDisabled?: boolean;
-  onSave: () => void; saveError: unknown; onDelete?: () => void; deleteError?: unknown; deleting?: boolean; onDeleteReset?: () => void; deleteBody?: ReactNode; canEdit?: boolean;
+  onSave: () => void; saveError: unknown; onDelete?: () => Promise<unknown> | void; deleteError?: unknown; deleting?: boolean; onDeleteReset?: () => void; deleteBody?: string; canEdit?: boolean;
   extraActions?: ReactNode; actionItems?: ActionItem[]; badges?: ReactNode; children: ReactNode;
 }) {
   return (

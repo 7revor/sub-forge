@@ -105,12 +105,12 @@ describe('快照服务', () => {
     expect(calls()).toBe(1);
   });
 
-  it('过期后先返回旧快照，后台刷新', async () => {
+  it('到期等待拉取，返回本次新内容', async () => {
     const { svc, advance, calls } = setup([node('v1'), node('v2')]);
     await svc.get('source', 's', 'u', { ttlSec: 300 });
-    advance(301_000);
+    advance(86_401_000);
     const r = await svc.get('source', 's', 'u', { ttlSec: 300 });
-    expect(r).toMatchObject({ stale: true, snapshot: { body: node('v1') } });
+    expect(r).toMatchObject({ stale: false, snapshot: { body: node('v2') } });
     await svc.settled();
     expect(calls()).toBe(2);
     expect((await svc.get('source', 's', 'u', { ttlSec: 300 })).snapshot!.body).toBe(node('v2'));
@@ -119,7 +119,7 @@ describe('快照服务', () => {
   it('刷新失败时继续使用旧快照，并带上失败原因', async () => {
     const { svc, advance } = setup([node('v1'), new Error('connect timeout')]);
     await svc.get('source', 's', 'u', { ttlSec: 300 });
-    advance(301_000);
+    advance(86_401_000);
     await svc.get('source', 's', 'u', { ttlSec: 300 });
     await svc.settled();
     const r = await svc.get('source', 's', 'u', { ttlSec: 300 });
@@ -136,7 +136,7 @@ describe('快照服务', () => {
     const { svc, store, advance } = setup([node('v1'), '', 'not a node list']);
     await svc.get('source', 's', 'u', { ttlSec: 300 });
     for (const reason of ['上游返回了空内容', '上游内容中没有可用节点（1 行无法解析）']) {
-      advance(301_000);
+      advance(86_401_000);
       await svc.get('source', 's', 'u', { ttlSec: 300 });
       await svc.settled();
       const r = await svc.get('source', 's', 'u', { ttlSec: 300 });
@@ -150,17 +150,17 @@ describe('快照服务', () => {
     const { svc, store, advance } = setup([node('v1'), node('v1'), node('v2'), node('v2')]);
     await svc.get('source', 's', 'u', { ttlSec: 300 });
     const first = store.latestSnapshot('source', 's', 'u')!;
-    advance(301_000);
+    advance(86_401_000);
     await svc.refresh('source', 's', 'u');
     const touched = store.latestSnapshot('source', 's', 'u')!;
     expect(touched.id).toBe(first.id);
-    expect(touched.fetchedAt).toBe(first.fetchedAt + 301_000);
+    expect(touched.fetchedAt).toBe(first.fetchedAt + 86_401_000);
     expect(store.countSnapshots('source', 's', 'u')).toEqual({ ok: 1, failed: 0 });
     // 刷新后未过期：不再拉取
     expect((await svc.get('source', 's', 'u', { ttlSec: 300 })).stale).toBe(false);
-    advance(301_000);
+    advance(86_401_000);
     await svc.refresh('source', 's', 'u');
-    advance(301_000);
+    advance(86_401_000);
     await svc.refresh('source', 's', 'u');
     expect(store.countSnapshots('source', 's', 'u')).toEqual({ ok: 1, failed: 0 });
     expect(store.latestSnapshot('source', 's', 'u')!.body).toBe(node('v2'));
@@ -189,7 +189,7 @@ describe('快照服务', () => {
   it('无变动的刷新清除此前的失败提示', async () => {
     const { svc, advance } = setup([node('v1'), new Error('HTTP 502'), node('v1')]);
     await svc.get('source', 's', 'u', { ttlSec: 300 });
-    advance(301_000);
+    advance(86_401_000);
     expect((await svc.refresh('source', 's', 'u')).ok).toBe(false);
     expect((await svc.get('source', 's', 'u', { ttlSec: 300 })).error).toBe('HTTP 502');
     advance(1_000);
@@ -197,10 +197,10 @@ describe('快照服务', () => {
     expect((await svc.get('source', 's', 'u', { ttlSec: 300 })).error).toBeUndefined();
   });
 
-  it('失败后退避：5 分钟内的订阅请求不再触发拉取，手动刷新不受限', async () => {
+  it('失败后延后一个系统周期，周期内的订阅请求不再触发拉取，手动刷新不受限', async () => {
     const { svc, advance, calls } = setup([node('v1'), new Error('HTTP 429')]);
     await svc.get('source', 's', 'u', { ttlSec: 3600 });
-    advance(3_601_000);
+    advance(86_401_000);
     await svc.get('source', 's', 'u', { ttlSec: 3600 });
     await svc.settled();
     expect(calls()).toBe(2);
@@ -212,7 +212,7 @@ describe('快照服务', () => {
     }
     await svc.settled();
     expect(calls()).toBe(2);
-    advance(51_000);
+    advance(86_401_000);
     await svc.get('source', 's', 'u', { ttlSec: 3600 });
     await svc.settled();
     expect(calls()).toBe(3);
@@ -225,12 +225,12 @@ describe('快照服务', () => {
     await svc.get('source', 's', 'u', { ttlSec: 300 });
     expect(await svc.get('source', 's', 'u', { ttlSec: 300 })).toEqual({ stale: false, error: 'HTTP 500' });
     expect(calls()).toBe(1);
-    advance(300_000);
+    advance(86_401_000);
     await svc.get('source', 's', 'u', { ttlSec: 300 });
     expect(calls()).toBe(2);
   });
 
-  it('TTL 短于 5 分钟的旧数据按 5 分钟算', async () => {
+  it('旧独立 TTL 被忽略，使用系统周期', async () => {
     const { svc, advance, calls } = setup([node('v1'), node('v2')]);
     await svc.get('source', 's', 'u', { ttlSec: 10 });
     advance(60_000);

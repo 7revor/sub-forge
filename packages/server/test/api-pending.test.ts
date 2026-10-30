@@ -11,7 +11,7 @@ describe('尚未实现的接口', () => {
     expect(repos.status).toBe(200);
     expect(repos.json).toMatchObject({ items: [], total: 0 });
     expect(repos.json.pending).toBeUndefined();
-    expect((await c.get('/api/system')).json.pending).toBe(true);
+    expect((await c.get('/api/system')).json.resourceCacheTtlSec).toBe(86400);
     expect((await c.get('/api/shares')).json.items).toEqual([]);
     expect((await c.get('/api/users/stats')).json.items).toEqual({});
     const write = await c.post('/api/shares', { kind: 'source', id: 'x', to: [] });
