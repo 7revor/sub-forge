@@ -284,6 +284,8 @@ export type Profile = {
   routing?: ProfileRouting;
   id: ID;
   name: string;
+  /** 管理备注，不输出到客户端配置。 */
+  note?: string;
   nodeSets: ProfileNodeSet[];
   overlay: Overlay;
   chains: ChainRule[];

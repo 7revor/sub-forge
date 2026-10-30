@@ -22,6 +22,7 @@ describe('文档增删改查', () => {
     ['sources', remoteSource()],
     ['locals', { name: '本地分组', proxies: [] }],
     ['collections', { name: '组合', members: [], pipeline: [] }],
+    ['profiles', { name: '订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }],
     ['rulesets', { name: '规则集', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,example.test' }] }],
   ])('%s 的备注支持旧数据、新建、更新、清空与列表读取，并拒绝非法类型', async (segment, body) => {
     const { alice, store } = await twoUsers();
