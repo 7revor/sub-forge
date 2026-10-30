@@ -48,13 +48,14 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 22;
+const SCHEMA_VERSION = 23;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS system_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS resource_bindings (kind TEXT NOT NULL, id TEXT NOT NULL, url_hash TEXT NOT NULL, resource TEXT NOT NULL, PRIMARY KEY(kind,id,url_hash));
+CREATE INDEX IF NOT EXISTS resource_bindings_resource ON resource_bindings (resource);
 CREATE TABLE IF NOT EXISTS rule_repos (
   id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, built_at INTEGER, checked_at INTEGER,
   revisions TEXT NOT NULL DEFAULT '{}', error TEXT, definition TEXT, indexed_definition TEXT
@@ -86,6 +87,13 @@ CREATE TABLE IF NOT EXISTS snapshots (
   body TEXT, hash TEXT, userinfo TEXT, error TEXT
 );
 CREATE INDEX IF NOT EXISTS snapshots_owner ON snapshots (owner_kind, owner_id, url_hash, fetched_at);
+CREATE TABLE IF NOT EXISTS user_tokens (
+  user_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, token_enc TEXT NOT NULL, created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS shared_rule_resources (
+  key TEXT PRIMARY KEY, ruleset_id TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shared_rule_resources_ruleset ON shared_rule_resources (ruleset_id);
 CREATE TABLE IF NOT EXISTS sub_tokens (
   token_hash TEXT PRIMARY KEY, token_enc TEXT NOT NULL, profile_id TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL
 );
@@ -176,6 +184,7 @@ export class Store {
       this.db.prepare('DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?').run(kind,id,urlHash);
     }
     this.db.prepare('INSERT OR REPLACE INTO resource_bindings VALUES (?, ?, ?, ?)').run(kind,id,urlHash,resource);
+    if (prior && prior.resource !== resource) this.pruneUnusedResource(prior.resource);
     return resource;
   }
   pruneUnusedResource(resource: string): void {
@@ -185,6 +194,9 @@ export class Store {
   }
   private dropResourceBindings(kind: SnapshotOwner, id: string, urls: string[] = []): void {
     const keep = new Set(urls.map(url => this.cipher.hmac(url)));
+    for (const row of this.db.prepare('SELECT DISTINCT url_hash FROM snapshots WHERE owner_kind = ? AND owner_id = ?').all(kind, id) as { url_hash: string }[]) {
+      if (!keep.has(row.url_hash)) this.db.prepare('DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?').run(kind, id, row.url_hash);
+    }
     const rows = this.db.prepare('SELECT url_hash, resource FROM resource_bindings WHERE kind = ? AND id = ?').all(kind,id) as {url_hash:string;resource:string}[];
     for (const row of rows) {
       if (keep.has(row.url_hash)) continue;
@@ -192,6 +204,40 @@ export class Store {
       this.pruneUnusedResource(row.resource);
     }
   }
+  pruneResourceBindings(): void {
+    const keep = new Map<string, Set<string>>();
+    const add = (kind: string, id: string, urls: string[]) => {
+      const key = `${kind}:${id}`;
+      const hashes = keep.get(key) ?? new Set<string>();
+      urls.forEach(url => hashes.add(this.cipher.hmac(url))); keep.set(key, hashes);
+    };
+    const walk = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return;
+      if (Array.isArray(value)) { value.forEach(walk); return; }
+      const v = value as Record<string, any>;
+      if (v.kind === 'ruleset' && typeof v.id === 'string') {
+        if (v.remote?.url) add('ruleset', v.id, [v.remote.url]);
+        if (v.repository?.sources) add('ruleset', v.id, v.repository.sources.flatMap((s: { url?: string }) => s.url ? [s.url] : []));
+      }
+      Object.values(v).forEach(walk);
+    };
+    for (const row of this.db.prepare('SELECT kind,id,data FROM docs').all() as {kind:string;id:string;data:string}[]) {
+      const doc = JSON.parse(this.cipher.decrypt(row.data));
+      if (row.kind === 'source' && doc.url) add('source', row.id, [doc.url]);
+      if (row.kind === 'ruleset') add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
+      if (row.kind === 'profile') walk(doc);
+    }
+    this.listLatestTemplates().forEach(walk);
+    this.listSharedRules<unknown>().forEach(r => walk(r.data));
+    for (const row of this.db.prepare('SELECT * FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
+      // 仓库正文由索引缓存维护，其生命周期不取决于配置订阅。
+      if (row.id.startsWith('repository-file:') || keep.get(`${row.kind}:${row.id}`)?.has(row.url_hash)) continue;
+      this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(row.kind, row.id, row.url_hash);
+      this.pruneUnusedResource(row.resource);
+    }
+    this.db.exec("DELETE FROM snapshots WHERE owner_id LIKE 'resource:%' AND owner_id NOT IN (SELECT resource FROM resource_bindings)");
+  }
+
   private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
     return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,this.cipher.hmac(url)) as {resource:string}|undefined)?.resource ?? id;
   }
@@ -296,13 +342,19 @@ export class Store {
           SELECT token_hash, ROW_NUMBER() OVER (PARTITION BY profile_id ORDER BY created_at, token_hash) AS position FROM sub_tokens
         ) WHERE position = 1)`);
         this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS sub_tokens_one_per_profile ON sub_tokens (profile_id)');
-        for (const row of this.db.prepare("SELECT id FROM docs WHERE kind = 'profile'").all() as { id: string }[]) this.createToken(row.id);
+
+      }
+      if (version < 23) {
+        // 不能把仅能访问某个订阅的旧凭证升级为用户全部私有资源的通行证。
+        for (const user of this.listUsers()) this.createToken(user.id);
+        this.db.exec('DROP TABLE sub_tokens; DELETE FROM last_good; DELETE FROM render_generations;');
+        this.pruneResourceBindings();
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
     // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
-    if (version < 15) this.db.pragma('wal_checkpoint(TRUNCATE)');
+    if (version < 23) this.db.pragma('wal_checkpoint(TRUNCATE)');
     if (hadSnapshots && version < 3) {
       // 清除迁移前留在空闲页和 WAL 中的明文副本。
       this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -521,10 +573,11 @@ export class Store {
     this.db.transaction(() => {
       this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
         .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
-      if (kind === 'profile') this.createToken(doc.id);
+
     })();
     if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
     if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
+    this.pruneResourceBindings();
     this.changed();
   }
 
@@ -566,8 +619,14 @@ export class Store {
 
   delete(kind: DocKind, id: string): boolean {
     this.configurationRevision++;
-    if (kind === 'source' || kind === 'ruleset') this.dropResourceBindings(kind,id);
-    return this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
+    return this.db.transaction(() => {
+      if (kind === 'source' || kind === 'ruleset') this.dropResourceBindings(kind,id);
+      const removed = this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
+      if (kind === 'profile') this.deleteProfileData(id);
+      if (kind === 'ruleset') this.db.prepare('DELETE FROM shared_rule_resources WHERE ruleset_id = ?').run(id);
+      this.pruneResourceBindings();
+      return removed;
+    })();
   }
 
   // ---------- 当前模板（沿用旧表结构；版本列仅兼容旧数据迁移，新写入固定为 1） ----------
@@ -580,6 +639,7 @@ export class Store {
       this.db.prepare('INSERT INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
         .run(t.id, 1, JSON.stringify(current), this.now());
     })();
+    this.pruneResourceBindings();
     this.changed();
   }
 
@@ -607,74 +667,89 @@ export class Store {
       ORDER BY t.template_id`, [], options, data => JSON.parse(data) as TemplateVersionDoc);
   }
 
-  // ---------- 订阅 token ----------
+  // ---------- 用户资源 token ----------
 
-  /** 幂等获取订阅的唯一链接；普通保存和重复调用均不会换链接。 */
-  createToken(profileId: string, label?: string): TokenDoc & { createdAt: number } {
+  /** 每个用户只有一个凭证；重复读取与普通文档保存不轮换。 */
+  createToken(userId: string): TokenDoc & { createdAt: number } {
+    if (!this.getUser(userId)) throw new Error('用户不存在');
     return this.db.transaction(() => {
-      const existing = this.listTokens(profileId)[0];
+      const existing = this.userToken(userId);
       if (existing) return existing;
-      this.putToken({ token: randomId(), profileId, ...(label === undefined ? {} : { label }) });
-      return this.listTokens(profileId)[0]!;
+      this.putToken({ token: randomId(32), userId });
+      return this.userToken(userId)!;
     })();
   }
 
-  /** 显式导入或轮换令牌；不得把其他订阅的令牌转移过来。 */
   putToken(t: TokenDoc): void {
+    if (!this.getUser(t.userId)) throw new Error('用户不存在');
     this.db.transaction(() => {
       const existing = this.getToken(t.token);
-      if (existing && existing.profileId !== t.profileId) throw new Error('订阅令牌已被其他订阅使用');
-      this.db.prepare('DELETE FROM sub_tokens WHERE profile_id = ? AND token_hash <> ?').run(t.profileId, this.cipher.hmac(t.token));
-      this.db.prepare('INSERT INTO sub_tokens (token_hash, token_enc, profile_id, label, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (token_hash) DO UPDATE SET label = excluded.label')
-        .run(this.cipher.hmac(t.token), this.cipher.encrypt(t.token), t.profileId, t.label ?? null, this.now());
+      if (existing && existing.userId !== t.userId) throw new Error('令牌已被其他用户使用');
+      this.db.prepare('INSERT INTO user_tokens (user_id, token_hash, token_enc, created_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET token_hash = excluded.token_hash, token_enc = excluded.token_enc, created_at = excluded.created_at')
+        .run(t.userId, this.cipher.hmac(t.token), this.cipher.encrypt(t.token), this.now());
     })();
+  }
+
+  userToken(userId: string): (TokenDoc & { createdAt: number }) | undefined {
+    const row = this.db.prepare('SELECT token_enc, created_at FROM user_tokens WHERE user_id = ?').get(userId) as { token_enc: string; created_at: number } | undefined;
+    return row ? { token: this.cipher.decrypt(row.token_enc), userId, createdAt: row.created_at } : undefined;
   }
 
   resetToken(token: string): (TokenDoc & { createdAt: number }) | undefined {
     return this.db.transaction(() => {
       const old = this.getToken(token);
       if (!old) return undefined;
-      this.putToken({ ...old, token: randomId() });
-      return this.listTokens(old.profileId)[0]!;
+      this.putToken({ token: randomId(32), userId: old.userId });
+      return this.userToken(old.userId)!;
     })();
   }
 
   getToken(token: string): TokenDoc | undefined {
-    const row = this.db.prepare('SELECT profile_id, label FROM sub_tokens WHERE token_hash = ?').get(this.cipher.hmac(token)) as { profile_id: string; label: string | null } | undefined;
-    if (!row) return undefined;
-    return row.label === null ? { token, profileId: row.profile_id } : { token, profileId: row.profile_id, label: row.label };
+    const row = this.db.prepare('SELECT user_id FROM user_tokens WHERE token_hash = ?').get(this.cipher.hmac(token)) as { user_id: string } | undefined;
+    return row ? { token, userId: row.user_id } : undefined;
   }
 
-  /** 订阅入口同时检查所属用户；无归属的种子 Profile 仍允许使用。 */
   getActiveToken(token: string): TokenDoc | undefined {
     const t = this.getToken(token);
-    if (!t) return undefined;
-    const row = this.getWithOwner('profile', t.profileId);
-    if (!row || (row.owner !== null && this.getUser(row.owner)?.disabled !== false)) return undefined;
-    return t;
-  }
-
-  listTokens(profileId: string): (TokenDoc & { createdAt: number })[] {
-    const rows = this.db.prepare('SELECT token_enc, label, created_at FROM sub_tokens WHERE profile_id = ? ORDER BY created_at, token_hash').all(profileId) as { token_enc: string; label: string | null; created_at: number }[];
-    return rows.map((r) => {
-      const base = { token: this.cipher.decrypt(r.token_enc), profileId, createdAt: r.created_at };
-      return r.label === null ? base : { ...base, label: r.label };
-    });
+    return t && this.getUser(t.userId)?.disabled === false ? t : undefined;
   }
 
   deleteToken(token: string): boolean {
-    return this.db.prepare('DELETE FROM sub_tokens WHERE token_hash = ?').run(this.cipher.hmac(token)).changes > 0;
+    return this.db.prepare('DELETE FROM user_tokens WHERE token_hash = ?').run(this.cipher.hmac(token)).changes > 0;
   }
 
+  /** 只删除订阅专属产物；用户凭证与公共规则资源独立存在。 */
   deleteProfileData(profileId: string): void {
-    const tx = this.db.transaction(() => {
-      this.db.prepare('DELETE FROM sub_tokens WHERE profile_id = ?').run(profileId);
+    this.db.transaction(() => {
       this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM render_generations WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM access_log WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM profile_migration_backups WHERE profile_id = ?').run(profileId);
-    });
-    tx();
+      if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'refresh_jobs'").get()) {
+        for (const row of this.db.prepare('SELECT id,data FROM refresh_jobs').all() as { id: string; data: string }[]) {
+          const job = JSON.parse(this.cipher.decrypt(row.data));
+          if (job.kind === 'profile' && job.documentId === profileId) this.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
+        }
+      }
+    })();
+  }
+
+  putSharedRule(key: string, rulesetId: string, data: unknown): void {
+    this.db.prepare('INSERT INTO shared_rule_resources VALUES (?, ?, ?, ?) ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
+      .run(key, rulesetId, this.cipher.encrypt(JSON.stringify(data)), this.now());
+  }
+  getSharedRule<T>(key: string): T | undefined {
+    const row = this.db.prepare('SELECT data FROM shared_rule_resources WHERE key = ?').get(key) as { data: string } | undefined;
+    return row ? JSON.parse(this.cipher.decrypt(row.data)) as T : undefined;
+  }
+  listSharedRules<T>(): { key: string; rulesetId: string; data: T; updatedAt: number }[] {
+    return (this.db.prepare('SELECT * FROM shared_rule_resources ORDER BY key').all() as { key: string; ruleset_id: string; data: string; updated_at: number }[])
+      .map(r => ({ key: r.key, rulesetId: r.ruleset_id, data: JSON.parse(this.cipher.decrypt(r.data)), updatedAt: r.updated_at }));
+  }
+  deleteSharedRule(key: string): void {
+    this.configurationRevision++;
+    this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(key);
+    this.pruneResourceBindings();
   }
 
   // ---------- 快照 ----------
@@ -801,7 +876,10 @@ export class Store {
 
   createUser(u: { username: string; passwordHash: string; role: Role }): User {
     const id = randomId(9);
-    this.db.prepare('INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)').run(id, u.username, u.passwordHash, u.role, this.now());
+    this.db.transaction(() => {
+      this.db.prepare('INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)').run(id, u.username, u.passwordHash, u.role, this.now());
+      this.createToken(id);
+    })();
     return this.getUser(id)!;
   }
 
@@ -884,12 +962,8 @@ export class Store {
         if (!d.routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)').run(d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
         this.put('profile', next, owner);
       }
-      const importedProfiles = new Set<string>();
-      for (const t of seed.tokens ?? []) {
-        if (importedProfiles.has(t.profileId)) continue;
-        this.putToken(t);
-        importedProfiles.add(t.profileId);
-      }
+      // 旧订阅级凭证不升级权限；新种子仅允许给明确用户设置用户级凭证。
+      for (const t of seed.tokens ?? []) if ('userId' in t) this.putToken(t);
       // 旧种子里的本地内容订阅源同样转成本地节点组，本地节点上的前置同样转成链规则；旧格式规则集与规则包转成多来源规则集
       this.convertLocalSources();
       this.moveLocalDialers();

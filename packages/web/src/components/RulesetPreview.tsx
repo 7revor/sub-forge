@@ -9,7 +9,7 @@ import type { useRulesetSources } from '../hooks/useRulesetSources.ts';
 import { CodePreview } from './CodePreview.tsx';
 import { Badge, Button, FieldError, cx } from './ui.tsx';
 
-type Result = RuleConversion & { delivery: RuleSetDelivery; passthrough: boolean };
+type Result = RuleConversion & { delivery: RuleSetDelivery; binary: boolean };
 const TARGETS: { key: string; client: Client; platform?: Platform; label: string }[] = [
   { key: 'mihomo', client: 'mihomo', label: 'mihomo' },
   { key: 'mihomo-android', client: 'mihomo', platform: 'android', label: 'mihomo Android' },
@@ -50,7 +50,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
     : pending ? result ? `正在更新，暂显示上次${previousLabel ? ` ${previousLabel}` : ''}结果…` : '正在加载规则…'
     : preview.error ? `更新失败，暂显示上次${previousLabel ? ` ${previousLabel} ` : ''}结果。`
     : result?.delivery.mode === 'unsupported' ? result.delivery.reason
-    : result?.passthrough ? 'MRS 由服务端缓存并原样托管，无法展示文本；SRS 暂不支持。' : null;
+    : result?.binary ? 'MRS 由服务端缓存并原样托管，无法展示文本；SRS 暂不支持。' : null;
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
     <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
       {TARGETS.map(x => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}

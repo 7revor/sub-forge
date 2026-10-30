@@ -28,11 +28,12 @@ export function docRoutes(store: Store) {
 
   for (const [seg, kind] of Object.entries(SEGMENTS)) {
     const shared = kind === 'preset';
+    const publicRead = shared || kind === 'ruleset';
 
     /** 读取当前用户可见的文档；不可见与不存在一样返回 404，不暴露是否存在 */
     const load = (id: string, userId: string) => {
       const row = store.getWithOwner(kind, id);
-      if (!row || (!shared && row.owner !== userId)) throw notFound(LABEL[kind]);
+      if (!row || (!publicRead && row.owner !== userId)) throw notFound(LABEL[kind]);
       return row;
     };
     const assertWritable = (role: string) => {
@@ -41,13 +42,14 @@ export function docRoutes(store: Store) {
 
     app.get(`/${seg}`, (c) => {
       const options = readPagination(c.req.query());
-      const owner = shared ? undefined : c.get('user').id;
-      return c.json(options ? store.listPage(kind, options, owner) : { items: store.list(kind, owner) });
+      const owner = publicRead ? undefined : c.get('user').id;
+      const result = options ? store.listPage(kind, options, owner) : { items: store.list(kind, owner) };
+      return c.json(kind === 'ruleset' ? { ...result, writableIds: result.items.filter(doc => c.get('user').role === 'admin' || store.getWithOwner(kind, doc.id)?.owner === c.get('user').id).map(doc => doc.id) } : result);
     });
 
     app.get(`/${seg}/:id`, (c) => {
       const row = load(c.req.param('id'), c.get('user').id);
-      return c.json({ item: row.doc, updatedAt: row.updatedAt });
+      return c.json({ item: row.doc, updatedAt: row.updatedAt, writable: kind !== 'ruleset' || row.owner === c.get('user').id || c.get('user').role === 'admin' });
     });
 
     app.post(`/${seg}`, async (c) => {
@@ -67,12 +69,13 @@ export function docRoutes(store: Store) {
       assertWritable(user.role);
       const body = await jsonBody(c);
       const current = load(id, user.id);
+      if (kind === 'ruleset' && current.owner !== user.id && user.role !== 'admin') throw new HttpError(403, '只有创建者或管理员可以修改公共规则增强');
       if (body.id !== undefined && body.id !== id) throw new HttpError(400, 'id 与路径不一致');
       if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.routing === undefined) throw new HttpError(400, '不能移除分流模式，请使用模式转换');
       let doc = validateDoc(kind, body, id, user, store);
       if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), migration: (current.doc as ProfileDoc).migration };
       doc = normalizeRulePresence(kind, doc);
-      store.put(kind, doc, shared ? null : user.id);
+      store.put(kind, doc, shared ? null : kind === 'ruleset' ? current.owner : user.id);
       return c.json({ item: doc });
     });
 
@@ -80,11 +83,11 @@ export function docRoutes(store: Store) {
       const user = c.get('user');
       const id = c.req.param('id');
       assertWritable(user.role);
-      load(id, user.id);
+      const row = load(id, user.id);
+      if (kind === 'ruleset' && row.owner !== user.id && user.role !== 'admin') throw new HttpError(403, '只有创建者或管理员可以删除公共规则增强');
       const referrers = findReferrers(store, user.id, kind, id);
       if (referrers.length) throw new HttpError(409, `仍被引用，不能删除`, { referrers });
       store.delete(kind, id);
-      if (kind === 'profile') store.deleteProfileData(id);
       return c.json({ ok: true });
     });
   }

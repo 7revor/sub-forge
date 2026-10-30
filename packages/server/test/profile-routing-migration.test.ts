@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { profileMigrationPlan } from '../src/profile-migration-plan.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -37,7 +38,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       { ...base('blank', { extraGroups: [{ group: { id: 'mine', name: '自己的组', type: 'select', members: [node] } }] }), template: undefined },
       base('orphan', { groupPatches: { missing: { addMembers: [node] } }, extraRules: [{ anchor: { before: 'gone' }, rule: { ...template.rules[0]!, id: 'orphan-rule' } }] }),
     ];
-    profiles.forEach(p => { store.put('profile', p, 'owner'); store.putToken({ token: `${p.id}-secret-token`, profileId: p.id }); });
+    profiles.forEach(p => { store.put('profile', p, 'owner'); issueProfileToken(store, { token: `${p.id}-secret-token`, profileId: p.id }); });
     const renderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }), { publicUrl: 'https://test.local' });
     const before = new Map<string, string>();
     for (const p of profiles) {
@@ -48,7 +49,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(22);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(23);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();
@@ -62,7 +63,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       expect(row.doc.routing?.mode).toBe(old.id === 'bound' ? 'bound' : 'independent');
       expect(row.doc.template).toBeUndefined();
       expect(store.getProfileMigrationBackup(old.id)).toEqual(JSON.parse(JSON.stringify(old)));
-      expect(store.getToken(`${old.id}-secret-token`)?.profileId).toBe(old.id);
+      expect(store.userToken('owner')).toBeDefined();
       const original = routingConfig(mergeTemplate(profileTemplate(old, (id, v) => historical.find(t => t.id === id && t.version === (v ?? 2))), old.overlay, new Report()));
       original.rules = original.rules.filter(rule => rule.enabled !== false).map(({ enabled: _, ...rule }) => rule);
       expect(routingConfig(resolveProfileRouting(row.doc, profileTemplate(row.doc, (id, v) => store.getTemplate(id, v)), new Report()))).toEqual(original);
@@ -85,7 +86,7 @@ it('模板版本缺失时整批回滚，数据库版本、原配置及链接保�
   const store = new Store(file, { cipher });
   const valid = { ...base('a-valid', {}), template: undefined };
   const missing = base('z-missing', {});
-  store.put('profile', valid); store.put('profile', missing); store.putToken({ token: 'keep', profileId: missing.id });
+  store.put('profile', valid); store.put('profile', missing); issueProfileToken(store, { token: 'keep', profileId: missing.id });
   store.db.pragma('user_version = 15'); store.close();
   try {
     expect(() => new Store(file, { cipher })).toThrow('模板版本缺失');
@@ -94,7 +95,7 @@ it('模板版本缺失时整批回滚，数据库版本、原配置及链接保�
       expect(raw.pragma('user_version', { simple: true })).toBe(15);
       expect(JSON.parse(cipher.decrypt((raw.prepare("SELECT data FROM docs WHERE id = 'a-valid'").get() as any).data))).toEqual(JSON.parse(JSON.stringify(valid)));
       expect(raw.prepare('SELECT COUNT(*) n FROM profile_migration_backups').get()).toEqual({ n: 0 });
-      expect(raw.prepare('SELECT COUNT(*) n FROM sub_tokens').get()).toEqual({ n: 2 });
+      expect(raw.prepare('SELECT COUNT(*) n FROM user_tokens').get()).toEqual({ n: 1 });
     } finally { raw.close(); }
   } finally { rmSync(dir, { recursive: true }); }
 });
@@ -113,7 +114,7 @@ it('示例种子覆盖两种模式，原 demo 有效配置和链接保持不变'
     const template = store.getTemplate('std')!;
     const old = mergeTemplate(template, { groupPatches: { hk: { set: { filter: 'HK' }, addMembers: [{ kind: 'nodeset', ref: { type: 'local', id: 'demo-a' } }] } } }, new Report());
     expect(routingConfig(resolveProfileRouting(independent, undefined, new Report()))).toEqual(routingConfig(old));
-    expect(store.getToken('demo-token')?.profileId).toBe('demo');
-    expect(store.getToken('demo-bound-token')?.profileId).toBe('demo-bound');
+    expect(store.getToken('demo-token')).toBeUndefined();
+    expect(store.getToken('demo-bound-token')).toBeUndefined();
   } finally { store.close(); }
 });

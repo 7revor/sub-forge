@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 // 内置浏览器验收：临时数据库从 v15 真实迁移；不读取生产库，不访问外部上游。
 import { serve } from '@hono/node-server';
 import { randomBytes } from 'node:crypto';
@@ -26,7 +27,7 @@ const profile: ProfileDoc = { id: 'bound', name: '旧数据·绑定', template: 
 store.put('profile', profile, user.id);
 store.put('profile', { ...profile, id: 'custom', name: '旧数据·独立（私有配置）', overlay: { ...profile.overlay, extraGroups: [{ after: 'hk', group: { id: 'private', name: '私有测速组', type: 'url-test', test: { interval: 600 }, members: [member] } }], rulePatches: { rule: { target: { kind: 'group', groupId: 'private' } } }, final: { kind: 'group', groupId: 'private' } } }, user.id);
 store.put('profile', { ...profile, id: 'pinned', name: '旧数据·锁定版本', template: { id: 'mode-template', follow: { pinned: 1 } } }, user.id);
-store.putToken({ token: 'mode-acceptance-token', profileId: 'bound', label: '迁移前链接' });
+issueProfileToken(store, { token: 'mode-acceptance-token', profileId: 'bound', label: '迁移前链接' });
 store.db.pragma('user_version = 15'); store.close(); store = new Store(database, { cipher });
 const snapshots = new SnapshotService(store, async () => { throw new Error('验收场景不使用外部上游'); });
 const renderer = new RenderService(store, snapshots, { publicUrl: 'http://127.0.0.1:5194' });

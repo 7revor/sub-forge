@@ -1,3 +1,4 @@
+import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
 // 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 缓存；失败时返回上一份成功结果（OUT-05 / TPL-12）。
@@ -6,8 +7,8 @@ import { profileTemplate } from './profile-routing.ts';
 
 import { createHash } from 'node:crypto';
 import {
-  resolveProfileRouting, Report, renderMihomo, renderStash, exportStashConfig, sourceKey, sourceLabel, stableHash, stableStringify,
-  type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
+  resolveProfileRouting, Report, renderMihomo, renderStash, exportStashConfig, sourceKey, sourceLabel, stableStringify,
+  type RuleResourceReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
 import type { SnapshotService } from './snapshots.ts';
@@ -25,8 +26,8 @@ export type StoredRender = {
   generation?: string;
   yaml: string;
   providers: Record<string, string>;
-  rulesets: Record<string, string>;
-  remoteRuleUrls?: Record<string, string>;
+  nodeDependencies: NodeSetID[];
+  ruleResources: string[];
   userinfo?: TrafficInfo;
   warnings: number;
 };
@@ -44,7 +45,6 @@ export type RenderServiceOptions = {
   verify?: Verifier;
   cacheSize?: number;
 };
-
 
 /** 流量累加，缺失字段不补零，到期时间取已知的最早值。 */
 function sumTraffic(infos: Iterable<TrafficInfo>): TrafficInfo | undefined {
@@ -76,19 +76,18 @@ export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; 
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
 export class RenderService {
-
+  readonly sharedRules: SharedRuleService;
 
   constructor(
     private readonly store: Store,
     private readonly snapshots: SnapshotService,
     private readonly opts: RenderServiceOptions,
-  ) {}
+  ) { this.sharedRules = new SharedRuleService(store, snapshots); }
 
   async render(profileId: string, target: Target): Promise<RenderOutcome> {
     const pre: ReportItem[] = [];
     let attempt: Attempt;
     try {
-      this.preserveLegacy(profileId, target);
       attempt = await this.attempt(profileId, target, pre);
     } catch (e) {
       if (e instanceof ResourceAccessError) return { ok: false, accessDenied: true, message: e.message, report: pre };
@@ -99,37 +98,23 @@ export class RenderService {
 
     if (!this.store.get('profile', profileId)) return { ok: false, message: 'Profile 不存在', report: attempt.report };
     const last = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
+    if (last && this.store.getWithOwner('profile', profileId)?.owner && !this.canReadNodes(last.data, this.store.getWithOwner('profile', profileId)!.owner!)) return { ok: false, accessDenied: true, message: '节点资源权限已变化', report: attempt.report };
     if (last) return { ok: true, source: 'last-good', render: last.data, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
     return { ok: false, message: attempt.failure ?? '渲染失败', report: attempt.report };
   }
 
-  /** 只返回指定结构版本，未知版本不能回退到最新内容。 */
-  getVersion(profileId: string, target: Target, version: string, providerKey?: string): StoredRender | undefined {
-    if (/^[0-9a-f]{32}$/.test(version)) return this.store.getRenderGeneration(profileId, targetKey(target), version);
-    // 升级前的 provider URL 使用 8 位内容哈希。只能恢复旧 last-good 已保存的那一套。
-    if (!/^[0-9a-f]{8}$/.test(version) || providerKey === undefined) return undefined;
-    const path = `/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(providerKey)}?v=${version}`;
-    // 旧 provider 地址没有 platform，需在该 Profile 已保存的客户端版本中按内容哈希恢复。
-    if (target.client !== 'mihomo') return undefined;
-    const candidates: Target[] = [target, { client: 'mihomo' }, ...(['android', 'macos', 'windows', 'ios', 'linux'] as const).map(platform => ({ client: 'mihomo' as const, platform }))];
-    for (const candidate of candidates) {
-      this.preserveLegacy(profileId, candidate);
-      const old = this.store.getRenderGeneration<StoredRender>(profileId, targetKey(candidate), 'legacy');
-      if (old && (old.yaml.includes(`${path}\n`) || old.yaml.endsWith(path))) return old;
-    }
-    return undefined;
-  }
-
-  private preserveLegacy(profileId: string, target: Target): void {
-    const last = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
-    if (last && !last.data.generation && !this.store.getRenderGeneration(profileId, targetKey(target), 'legacy')) {
-      this.store.putRenderGeneration(profileId, targetKey(target), 'legacy', last.data);
-    }
+  canReadNodes(render: StoredRender, owner: string): boolean {
+    return Array.isArray(render.nodeDependencies) && render.nodeDependencies.every(ref => this.store.getWithOwner(ref.type, ref.id)?.owner === owner);
   }
 
   private remember(profileId: string, target: Target, render: StoredRender): void {
     if (render.generation) this.store.putRenderGeneration(profileId, targetKey(target), render.generation, render);
     this.store.putLastGood(profileId, targetKey(target), render);
+  }
+
+  /** 只返回指定结构版本，未知版本不能回退到最新内容。 */
+  getVersion(profileId: string, target: Target, version: string): StoredRender | undefined {
+    return /^[0-9a-f]{32}$/.test(version) ? this.store.getRenderGeneration(profileId, targetKey(target), version) : undefined;
   }
 
   /**
@@ -141,7 +126,7 @@ export class RenderService {
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
       return a.result
-        ? { ok: !a.failure, yaml: a.result.yaml, ...(target.client === 'stash' && !a.failure ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
+        ? { ok: !a.failure, yaml: a.result.yaml, ...(target.client === 'stash' && !a.failure && !Object.values(a.result.rulesets).some(r => r.text.startsWith('#subforge-binary-mrs\n')) ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
         : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
@@ -183,18 +168,16 @@ export class RenderService {
     usedSnapshots.push(...loaded.snapshots);
     const nodeSets = loaded.inputs;
     const userinfoBySource = loaded.userinfo;
-    const snapshotHashes = loaded.hashes;
     pre.push(...loaded.report);
 
-    const rules = this.collectRules(profile, template, owner);
+    const rules = this.collectRules(profile, template);
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
       for (const src of rs.sources) {
         if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
-        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: (src.repository && !src.fetch?.ua) || rs.id.startsWith('repo:') ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? this.store.getWithOwner('profile',profileId)?.owner ?? opts.owner });
+        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
         if (r.snapshot) usedSnapshots.push({snapshot:r.snapshot,revision:r.revision});
         if (r.snapshot?.body !== undefined) {
           rules.snapshots[sourceKey(rs.id, src.id)] = r.snapshot.body;
-          snapshotHashes.push(`${rs.id}|${src.url}|${r.snapshot.hash}`);
         }
         if (r.error) pre.push({ level: r.snapshot ? 'warn' : 'error', code: 'ruleset.fetch-failed', message: `规则集「${rs.name}」的来源「${sourceLabel(src)}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `ruleset:${rs.id}` });
       }
@@ -210,14 +193,19 @@ export class RenderService {
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const qs = `${target.client === 'stash' ? '&target=stash' : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
+    const sharedReferences = new Map<string, RuleResourceReference>();
     const result = (target.client === 'stash' ? renderStash : renderMihomo)({
-      profile, nodeSets, rules, managedResources:true, resourceIntervalSec:this.store.resourceCacheTtlSec,
+      profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
       urls: {
-        provider: (k, v) => `${publicUrl}/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}&h=${v}${qs}`,
-        ruleset: (k, url) => url ? `${publicUrl}/api/rules/convert?url=${encodeURIComponent(url)}&token=${TOKEN_PLACEHOLDER}&key=${encodeURIComponent(k)}&v=${GENERATION_PLACEHOLDER}${qs}` : `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}${qs}`,
+        provider: (k, v) => `${publicUrl}/p/${TOKEN_PLACEHOLDER}/${encodeURIComponent(profile.id)}/${encodeURIComponent(k)}?v=${GENERATION_PLACEHOLDER}&h=${v}${qs}`,
+        ruleset: (k, reference) => {
+          if (!reference) throw new Error('托管规则缺少资源定义');
+          sharedReferences.set(k, reference);
+          return `${publicUrl}/r/${TOKEN_PLACEHOLDER}/${this.sharedRules.key(reference, target)}`;
+        },
       },
     });
     const report = [...pre, ...result.report.items];
@@ -250,15 +238,25 @@ export class RenderService {
     const render: StoredRender = {
       generation,
       yaml: result.yaml,
+      nodeDependencies: [
+        ...Object.keys(nodeSets.sources).map(id => ({ type: 'source' as const, id })),
+        ...Object.keys(nodeSets.collections).map(id => ({ type: 'collection' as const, id })),
+        ...Object.keys(nodeSets.locals).map(id => ({ type: 'local' as const, id })),
+      ],
       providers: Object.fromEntries(Object.entries(result.providers).map(([k, p]) => [k, p.yaml])),
-      rulesets: Object.fromEntries(Object.entries(result.rulesets).map(([k, r]) => [k, r.text])),
-      remoteRuleUrls: Object.fromEntries(Object.entries(result.rulesets).flatMap(([k, r]) => r.remoteUrl ? [[k, r.remoteUrl]] : [])),
+      ruleResources: [...new Set([...sharedReferences.values()].map(ref => this.sharedRules.key(ref, target)))],
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };
     if (opts.dry) return { from: 'fresh', render, report, result };
 
-    this.remember(profileId, target, render);
+    this.store.db.transaction(() => {
+      for (const [file, reference] of sharedReferences) {
+        const body = result.rulesets[file]?.text;
+        if (body !== undefined) this.sharedRules.register(reference, target, rules.rulesets[reference.matcher.id] as RuleSetDoc, rules, body);
+      }
+      this.remember(profileId, target, render);
+    })();
     return { from: 'fresh', render, report };
   }
 
@@ -285,6 +283,21 @@ export class RenderService {
     return { inputs, userinfo, hashes, report, snapshots };
   }
 
+  async nodeSet(ref: NodeSetID, owner: string): Promise<string> {
+    if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
+    const revision = this.store.configurationRevision;
+    const loaded = await this.loadNodeSets([ref], owner);
+    if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
+    if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
+    const result = renderMihomo({
+      profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'provider' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
+      nodeSets: loaded.inputs, rules: { rulesets: {}, snapshots: {} }, urls: { provider: key => key, ruleset: key => key },
+    });
+    const errors = [...loaded.report, ...result.report.items].filter(i => i.level === 'error');
+    if (errors.length) throw new Error(errors.map(i => i.message).join('；'));
+    return result.providers[`${ref.type}:${ref.id}`]!.yaml;
+  }
+
   collectNodeSets(refs: NodeSetID[], owner?: string | null): { inputs: NodeSetInputs; sources: SourceDoc[] } {
     const inputs: NodeSetInputs = { sources: {}, collections: {}, locals: {}, snapshots: {} };
     const seen = new Set<string>();
@@ -303,14 +316,10 @@ export class RenderService {
   }
 
   /** 模板规则与 Profile 私有规则引用到的规则集 */
-  collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined, owner = this.store.getWithOwner('profile', profile.id)?.owner): RuleSetInputs {
+  collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RuleSetInputs {
     const out: RuleSetInputs = { rulesets: {}, snapshots: {} };
     const visit = (m: Matcher) => {
       if (m.kind !== 'ruleset') return;
-      if (!m.remote && !m.repository && owner) {
-        const row = this.store.getWithOwner('ruleset', m.id);
-        if (row?.owner && row.owner !== owner && this.store.getUser(row.owner)?.role !== 'admin') throw new ResourceAccessError();
-      }
       const d = resolveRuleSetReference(m, this.store);
       if (d) out.rulesets[m.id] = d;
     };

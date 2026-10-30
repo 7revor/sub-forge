@@ -56,6 +56,16 @@ export function authRoutes(store: Store, opts: { secureCookies: boolean; now: ()
 
   app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }));
 
+  app.get('/me/token', requireUser, c => c.json({ item: store.createToken(c.get('user').id) }));
+  app.post('/me/token/reset', requireUser, async c => {
+    const { token } = await jsonBody<{ token?: unknown }>(c);
+    const current = store.createToken(c.get('user').id);
+    if (token !== current.token) throw new HttpError(409, '访问令牌已变化，请重新加载');
+    const item = store.resetToken(current.token)!;
+    store.changed();
+    return c.json({ item });
+  });
+
   app.post('/me/password', requireUser, async (c) => {
     const { current, next } = await jsonBody<{ current?: unknown; next?: unknown }>(c);
     const me = c.get('user');

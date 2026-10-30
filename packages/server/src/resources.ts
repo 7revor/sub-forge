@@ -1,3 +1,5 @@
+import type { SharedRuleRecord } from './shared-rules.ts';
+import { resolveRuleSetReference } from './ruleset-reference.ts';
 import { ResourceAccessError } from './resource-access.ts';
 // 资源调度与手动刷新使用同一依赖收集和状态。任务持久化，重启后明确标记中断。
 import type { NodeSetID } from '@sub-forge/core';
@@ -32,6 +34,7 @@ export class ResourceService {
     }
   }
   private save(job:RefreshJob) {
+    if (job.kind === 'profile' && !this.store.get('profile', job.documentId)) return;
     this.store.db.prepare('INSERT OR REPLACE INTO refresh_jobs VALUES (?,?,?,?)').run(job.id,job.owner,this.store.cipher.encrypt(JSON.stringify(job)),this.now());
     this.store.changed();
   }
@@ -40,7 +43,7 @@ export class ResourceService {
     return row ? JSON.parse(this.store.cipher.decrypt(row.data)) : undefined;
   }
   ruleResources(rs:RuleSetDoc,scope?:string):Resource[] {
-    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:rs.id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:s.repository && !s.fetch?.ua ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? scope}}));
+    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:rs.id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:'public-rules'}}));
   }
   nodeResources(refs:NodeSetID[], owner?:string|null):Resource[] {
     return this.renderer.collectNodeSets(refs,owner).sources.map(s=>({kind:'source',id:s.id,name:s.name,url:s.url,options:{}}));
@@ -71,6 +74,7 @@ export class ResourceService {
     };
     return this.unique([
       ...this.additionalResources(),
+      ...this.store.listSharedRules<SharedRuleRecord>().flatMap(r => { const rs = resolveRuleSetReference(r.data.reference.matcher, this.store); return rs ? this.ruleResources(rs) : []; }),
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
@@ -101,7 +105,7 @@ export class ResourceService {
       await this.each(resources,async (r,index)=>{
         if (!explicit) {
           const root = this.store.getWithOwner(kind as 'source'|'collection'|'ruleset'|'profile', id);
-          if (!root || root.owner !== owner) throw new ResourceAccessError();
+          if (!root || kind !== 'ruleset' && root.owner !== owner) throw new ResourceAccessError();
           if (dependencyKey(this.collect(kind,id)) !== initialDependencies) throw new Error('刷新期间资源配置已变化，请重新刷新');
         }
         const item = job.results[index]!;
@@ -142,6 +146,7 @@ export class ResourceService {
         const status=this.snapshots.status(r.kind,r.id,r.url,r.options);
         if(status.nextFetchAt===undefined || this.now()>=status.nextFetchAt) await this.snapshots.get(r.kind,r.id,r.url,r.options);
       });
+      this.store.pruneResourceBindings();
       this.store.db.prepare('DELETE FROM refresh_jobs WHERE at < ?').run(this.now()-7*86400000);
     })().finally(()=>{this.ticking=undefined;});
     this.ticking=work;return work;

@@ -32,15 +32,15 @@ describe('统一资源缓存', () => {
     expect(t.snapshots.status('ruleset','r','https://r.test').error).toBeUndefined();
     t.store.close();
   });
-  it('同权限同参数合并在途和成功内容，不跨用户，不复用已改变的读取参数', async () => {
+  it('公共规则同参数跨用户合并在途和成功内容，不复用已改变的读取参数', async () => {
     let calls = 0;
     const t = setupApp({fetcher:async () => { calls++; return {status:200,body:'DOMAIN,a.test'}; }});
     const a = await addUser(t.store,'a'), b = await addUser(t.store,'b');
     for (const [id,owner] of [['r1',a.id],['r2',a.id],['r3',b.id]]) t.store.put('ruleset',{id:id!,name:id!,sources:[]},owner!);
     await Promise.all(['r1','r2'].map(id=>t.snapshots.get('ruleset',id,'https://r.test')));
     expect(calls).toBe(1);
-    await t.snapshots.get('ruleset','r3','https://r.test'); expect(calls).toBe(2);
-    await t.snapshots.get('ruleset','r1','https://r.test',{ua:'other'}); expect(calls).toBe(3);
+    await t.snapshots.get('ruleset','r3','https://r.test'); expect(calls).toBe(1);
+    await t.snapshots.get('ruleset','r1','https://r.test',{ua:'other'}); expect(calls).toBe(2);
     t.store.close();
   });
 });

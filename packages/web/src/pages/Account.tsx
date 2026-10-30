@@ -1,11 +1,24 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { Frame } from '../modals/Frame.tsx';
+import { CopyButton } from '../components/CopyButton.tsx';
 import { api } from '../api.ts';
 import { Button, Card, ErrorAlert, Field, Input, PageHeader, PageScroll } from '../components/ui.tsx';
 import { useMe } from '../hooks.ts';
 
 export function Account() {
   const me = useMe().data;
+  const qc = useQueryClient();
+  const token = useQuery({ queryKey: ['user-token'], queryFn: () => api<{ item: { token: string } }>('GET', '/me/token').then(r => r.item.token) });
+  const resetToken = async () => {
+    if (!token.data) return;
+    const expected = token.data;
+    await Frame.modal.confirm({ title: '重置访问令牌？', description: '你所有配置订阅、节点和规则下载的旧链接都会立即失效。重置后需要重新复制订阅链接到各个客户端。', confirmLabel: '重置全部链接', danger: true }, { submit: async () => {
+      const result = await api<{ item: { token: string } }>('POST', '/me/token/reset', { token: expected });
+      qc.setQueryData(['user-token'], result.item.token);
+      await qc.invalidateQueries({ queryKey: ['subscription-link'] });
+    } });
+  };
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -29,6 +42,14 @@ export function Account() {
               <div className={kv}><span className="text-ink-muted">用户名</span><span>{me?.username}</span></div>
               <div className={kv}><span className="text-ink-muted">角色</span><span>{me?.role === 'admin' ? '管理员' : '普通用户'}</span></div>
               <div className={kv}><span className="text-ink-muted">脚本处理器</span><span>{scripts ? '可以编写' : '未授权 · 需要管理员开启'}</span></div>
+            </div>
+          </Card>
+          <Card title="资源访问令牌" className="min-w-0 flex-[1_1_360px]">
+            <p className="text-[13px] text-ink-muted">同一账户的所有订阅共用一个令牌。公共规则可共享，节点和配置订阅仅限所属账户访问。</p>
+            <ErrorAlert error={token.error} />
+            <div className="flex flex-wrap gap-2">
+              <CopyButton text={token.data ?? ''} disabled={!token.data}>复制令牌</CopyButton>
+              <Button disabled={!token.data} onClick={() => void resetToken()}>重置令牌</Button>
             </div>
           </Card>
           <Card title="修改密码" className="min-w-0 flex-[1_1_360px]">

@@ -1,3 +1,4 @@
+import { ruleBodies } from './helpers.ts';
 import { fixtureCache } from './repo-cache-fixture.ts';
 import { mkdtempSync, readdirSync, unlinkSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -339,7 +340,7 @@ describe('规则仓库接口', () => {
     h.store.put('profile', { id: 'profile', name: '导入验收', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id }, target: { kind: 'builtin', name: 'REJECT' } } }] } });
     const rendered = await h.renderer.render('profile', { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
-    if (rendered.ok) expect(Object.values(rendered.render.rulesets).join('\n')).toContain('chatgpt.com');
+    if (rendered.ok) expect(Object.values(ruleBodies(h.store, rendered.render)).join('\n')).toContain('chatgpt.com');
   });
   it('zydou 空格文件都作为来源导入，不接受任意地址或二进制变体', async () => {
     const h = setup(); await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice'); await h.service.refresh('zydou');

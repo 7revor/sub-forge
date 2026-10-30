@@ -33,36 +33,10 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
     if (!row || row.owner !== userId) throw notFound('配置订阅');
     return row.doc;
   };
-  const withUrl = (t: { token: string; label?: string; createdAt: number }) => ({ ...t, url: `${publicUrl.replace(/\/$/, '')}/sub/${t.token}` });
-
-  // ---------- 订阅链接（PRF-02）----------
-
-  app.get('/profiles/:id/tokens', (c) => {
-    const p = own(c.req.param('id'), c.get('user').id);
-    return c.json({ items: store.listTokens(p.id).map(withUrl) });
-  });
-
-  app.post('/profiles/:id/tokens', async (c) => {
-    const p = own(c.req.param('id'), c.get('user').id);
-    const { label } = await jsonBody<{ label?: unknown }>(c);
-    if (label !== undefined && typeof label !== 'string') throw bad('label 必须是字符串');
-    const t = store.createToken(p.id, label);
-    return c.json({ item: withUrl(t) });
-  });
-
-  /** 重置：旧链接立即失效，换一个新 token，保留备注 */
-  app.post('/profiles/:id/tokens/:token/reset', (c) => {
-    const p = own(c.req.param('id'), c.get('user').id);
-    const old = store.getToken(c.req.param('token'));
-    if (!old || old.profileId !== p.id) throw notFound('订阅链接');
-    return c.json({ item: withUrl(store.resetToken(old.token)!) });
-  });
-
-  app.delete('/profiles/:id/tokens/:token', (c) => {
-    const p = own(c.req.param('id'), c.get('user').id);
-    const old = store.getToken(c.req.param('token'));
-    if (!old || old.profileId !== p.id) throw notFound('订阅链接');
-    throw new HttpError(409, '每个订阅必须保留一个链接；如需使旧链接失效，请重置链接或删除订阅');
+  app.get('/profiles/:id/link', c => {
+    const profile = own(c.req.param('id'), c.get('user').id);
+    const token = store.createToken(c.get('user').id);
+    return c.json({ item: { ...token, url: `${publicUrl.replace(/\/$/, '')}/sub/${token.token}/${encodeURIComponent(profile.id)}` } });
   });
 
   // ---------- 预览（CR-05 / 4.9 第 7 步）----------

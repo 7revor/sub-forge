@@ -6,7 +6,7 @@ import { parse as parseYaml } from 'yaml';
 import type { Client, RuleIR, RuleSetFormat, RuleSetSource } from '../types.ts';
 import { rawRuleParts } from './raw.ts';
 
-// 二进制读取层在解码文本前写入此标记，防止把转换后正文误判为可直连的原始 URL。
+// 二进制读取层在解码文本前写入此标记，防止把转换后正文误判为可直接输出的二进制原文。
 export const DECODED_MRS_HEADER = '# sub-forge: decoded-mrs-v1';
 
 export class UnsupportedRuleError extends Error {}
@@ -16,8 +16,8 @@ export type RejectedRule = { line: number; text: string; reason: string; kind: '
 export type Behavior = 'domain' | 'ipcidr' | 'classical';
 
 export type RuleSetParseResult =
-  | { passthrough: false; format: Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>; rules: ParsedRule[]; rejected: RejectedRule[]; behavior: Behavior; conversion?: 'yaml-to-list' }
-  | { passthrough: true; format: 'mrs' | 'srs' };
+  | { binary: false; format: Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>; rules: ParsedRule[]; rejected: RejectedRule[]; behavior: Behavior; conversion?: 'yaml-to-list' }
+  | { binary: true; format: 'mrs' | 'srs' };
 
 const PROCESS_TYPES: Record<string, { kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex' }> = {
   'PROCESS-PATH': { kind: 'path', mode: 'exact' },
@@ -110,7 +110,7 @@ export function parseCidrLine(text: string): RuleIR {
 
 type TextFormat = Exclude<RuleSetFormat, 'auto' | 'mrs' | 'srs'>;
 
-/** URL 扩展名只用于禁止把已知 YAML 地址标成二进制透传；自动解析仍依据实际内容。 */
+/** URL 扩展名只用于禁止把已知 YAML 地址标成二进制托管；自动解析仍依据实际内容。 */
 export function isYamlRuleUrl(url: string | undefined): boolean {
   if (!url) return false;
   try { return /\.ya?ml$/i.test(new URL(url).pathname); } catch { return false; }
@@ -134,8 +134,8 @@ function behaviorOfYaml(items: string[]): Behavior {
 
 export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto', yamlBehavior?: Behavior): RuleSetParseResult {
   if (format === 'mrs' || format === 'srs') {
-    if (hasYamlPayload(text)) throw new Error('YAML 规则需要自动转换为 LIST 并托管，不能透传');
-    return { passthrough: true, format };
+    if (hasYamlPayload(text)) throw new Error('YAML 规则需要自动转换为 LIST 并托管，不能标记为二进制');
+    return { binary: true, format };
   }
   const fmt: TextFormat = format === 'auto' ? detectFormat(text) : format;
   const rules: ParsedRule[] = [];
@@ -166,7 +166,7 @@ export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto'
       rejected.push({ ...e, reason: (err as Error).message, kind: err instanceof UnsupportedRuleError ? 'unimplemented' : 'invalid' });
     }
   }
-  return { passthrough: false, format: fmt === 'domain' ? 'domain-set' : fmt, rules, rejected, behavior, ...(fmt === 'yaml' ? { conversion: 'yaml-to-list' as const } : {}) };
+  return { binary: false, format: fmt === 'domain' ? 'domain-set' : fmt, rules, rejected, behavior, ...(fmt === 'yaml' ? { conversion: 'yaml-to-list' as const } : {}) };
 }
 
 /** 规则在规则包拆分时归入的 behavior（docs/03 §6） */

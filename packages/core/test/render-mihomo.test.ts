@@ -64,9 +64,9 @@ describe('PRD 场景 4：规则出口为 provider 节点', () => {
       overlay: { rulePatches: { 'r-fin': { target: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'S' }, match: { exact: '🇺🇸 Home-Broadband' } } } } } },
     });
     const w = r.dependencies[0]!.output;
-    expect((r.config.rules as string[])[0]).toBe(`RULE-SET,rs_fin_classical,${w}`);
-    expect(r.rulesets['rs_fin_classical.list']).toEqual({ behavior: 'classical', text: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21,no-resolve\nIP-CIDR,192.0.2.0/24,no-resolve\n' });
-    expect((r.config['rule-providers'] as Record<string, unknown>).rs_fin_classical).toMatchObject({ format: 'text', behavior: 'classical', url: 'https://sub.example.com/r/TOKEN/rs_fin_classical.list' });
+    expect((r.config.rules as string[])[0]).toBe(`RULE-SET,金融服务,${w}`);
+    expect(r.rulesets['rs_fin_classical.list']).toEqual({ behavior: 'classical', providerName: '金融服务', text: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21,no-resolve\nIP-CIDR,192.0.2.0/24,no-resolve\n' });
+    expect((r.config['rule-providers'] as Record<string, unknown>)["金融服务"]).toMatchObject({ format: 'text', behavior: 'classical', url: 'https://sub.example.com/r/TOKEN/rs_fin_classical.list' });
   });
 });
 

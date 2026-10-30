@@ -22,7 +22,7 @@ export const RuleSourcePreview = createModal<{ matcher?: Matcher; source?: Sourc
   const local = current.matcher?.kind === 'local' || current.matcher?.kind === 'rule';
   const query = current.source ? loaded : reference;
   const text = current.source ? loaded.data?.content ?? '' : current.matcher?.kind === 'local' ? current.matcher.content : current.matcher?.kind === 'rule' ? ruleToLine(current.matcher.rule) : reference.data?.content ?? '';
-  const error = query.error ?? (current.source && (loaded.data?.status.error ?? (loaded.data?.status.passthrough ? '二进制规则无法展示文本源文件' : undefined)));
+  const error = query.error ?? (current.source && (loaded.data?.status.error ?? (loaded.data?.status.binary ? '二进制规则无法展示文本源文件' : undefined)));
   const loading = !local && query.isPending;
   const label = current.source ? current.source.source.name ?? current.source.source.url ?? '本地规则' : local ? '本地规则' : reference.data?.name ?? '正在读取规则源文件…';
   return <ModalContent className="flex h-[min(640px,calc(100dvh-2rem))] min-w-0 flex-col overflow-hidden sm:max-w-[800px] [&>*]:min-w-0" style={{ width: 'min(800px, calc(100vw - 2rem))' }} aria-describedby={undefined}>

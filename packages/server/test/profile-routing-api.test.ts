@@ -1,3 +1,4 @@
+import { ruleBodies } from './helpers.ts';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { addUser, client, setupApp } from './helpers.ts';
@@ -20,11 +21,11 @@ async function scenario() {
 describe('模板绑定与独立模式', () => {
   it('模板更新自动生效且保留补充、链接和历史资源；转换后的配置不随模板变更', async () => {
     const { admin, alice, t, profile, app } = await scenario();
-    const token = (await alice.post(`/api/profiles/${profile.id}/tokens`)).json.item.token;
-    const before = parse(await (await app.request(`/sub/${token}`)).text());
+    const token = (await alice.get(`/api/profiles/${profile.id}/link`)).json.item.token;
+    const before = parse(await (await app.request(`/sub/${token}/${profile.id}`)).text());
     const oldResource = new URL((Object.values(before['proxy-providers'])[0] as { url: string }).url);
     expect((await admin.post(`/api/templates/${t.id}/publish`, { ...template, groups: template.groups.map(g => g.id === 'g' ? { ...g, name: '香港新版' } : g), rules: [{ ...template.rules[0], target: { kind: 'builtin', name: 'REJECT' } }] })).status).toBe(200);
-    const updated = parse(await (await app.request(`/sub/${token}`)).text());
+    const updated = parse(await (await app.request(`/sub/${token}/${profile.id}`)).text());
     expect(updated['proxy-groups'][0]).toMatchObject({ name: '香港新版', use: ['本地节点'] });
     expect(updated.rules[0]).toBe('DOMAIN,example.com,REJECT');
     expect((await app.request(oldResource.pathname + oldResource.search)).status).toBe(200);
@@ -33,9 +34,9 @@ describe('模板绑定与独立模式', () => {
     expect(converted.status).toBe(200); expect(converted.json.item.routing.config.groups[0].members).toHaveLength(2);
     expect((await alice.put(`/api/profiles/${profile.id}`, converted.json.item)).status).toBe(200);
     expect((await admin.post(`/api/templates/${t.id}/publish`, template)).status).toBe(200);
-    const final = parse(await (await app.request(`/sub/${token}`)).text());
+    const final = parse(await (await app.request(`/sub/${token}/${profile.id}`)).text());
     expect(final['proxy-groups']).toEqual(updated['proxy-groups']); expect(final.rules).toEqual(updated.rules);
-    expect((await alice.get(`/api/profiles/${profile.id}/tokens`)).json.items[0].token).toBe(token);
+    expect((await alice.get(`/api/profiles/${profile.id}/link`)).json.item.token).toBe(token);
   });
   it('绑定订阅的删组冲突禁止强制发布；组引用环在保存前拒绝', async () => {
     const { admin, alice, t, profile } = await scenario();
@@ -83,10 +84,10 @@ describe('模板绑定与独立模式', () => {
     detached.routing.config.rules = [{ id: 'rs-rule', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } }];
     expect((await alice.put(`/api/profiles/${profile.id}`, detached)).status).toBe(200);
     const before = await renderer.render(profile.id, { client: 'mihomo' });
-    expect(before.ok && Object.values(before.render.rulesets).join('')).toContain('one.test');
+    expect(before.ok && Object.values(ruleBodies(store, before.render)).join('')).toContain('one.test');
     store.put('ruleset', { id: 'rs', name: '规则', sources: [{ id: 's', kind: 'local', format: 'auto', content: 'DOMAIN,two.test' }] }, user.id);
     const after = await renderer.render(profile.id, { client: 'mihomo' });
-    expect(after.ok && Object.values(after.render.rulesets).join('')).toContain('two.test');
+    expect(after.ok && Object.values(ruleBodies(store, after.render)).join('')).toContain('two.test');
     expect((await alice.del('/api/rulesets/rs')).status).toBe(409);
   });
 });

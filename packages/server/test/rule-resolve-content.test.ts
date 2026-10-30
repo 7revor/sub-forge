@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,12 +33,12 @@ describe('no-resolve 以内容为准', () => {
       store.put('profile', { ...base, id: 'bound', routing: { mode: 'bound', templateId: 't', groupAdditions: {}, prependRules: rules } }, 'owner');
       store.put('profile', { ...base, id: 'independent', routing: { mode: 'independent', config } }, 'owner');
       store.put('profile', { ...base, id: 'legacy', overlay: { extraRules: rules.map(rule => ({ anchor: 'top' as const, rule })) } }, 'owner');
-      store.putToken({ token: 'same-token', profileId: 'bound' });
+      issueProfileToken(store, { token: 'same-token', profileId: 'bound' });
       const historical = { rulesets: { 'old.list': 'IP-CIDR,198.51.100.0/24,no-resolve\n' } };
       store.putRenderGeneration('bound', 'mihomo', 'old-version', historical);
       store.putLastGood('bound', 'mihomo', historical);
       store.db.pragma('user_version = 17'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(22);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(23);
       expect(store.getWithOwner('ruleset', 'rs')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { sources: [source] } });
       expect(store.get('ruleset', 'rs')).not.toHaveProperty('noResolve');
       expect(store.listLatestTemplates()).toHaveLength(1);
@@ -47,9 +48,9 @@ describe('no-resolve 以内容为准', () => {
       expect(store.get('profile', 'independent')!.routing).toMatchObject({ config: { rules: cleaned } });
       expect(store.get('profile', 'legacy')!.routing).toMatchObject({ mode: 'independent', config: { rules: [...cleaned].reverse() } });
       expect(store.getWithOwner('profile', 'bound')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
-      expect(store.getToken('same-token')!.profileId).toBe('bound');
-      expect(store.getRenderGeneration('bound', 'mihomo', 'old-version')).toEqual(historical);
-      expect(store.getLastGood('bound', 'mihomo')).toEqual({ renderedAt: 1234, data: historical });
+      expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'bound')?.owner);
+      expect(store.getRenderGeneration('bound', 'mihomo', 'old-version')).toBeUndefined();
+      expect(store.getLastGood('bound', 'mihomo')).toBeUndefined();
       const snapshot = [store.list('profile'), store.list('ruleset'), store.listLatestTemplates()];
       store.close(); store = new Store(file, { cipher });
       expect([store.list('profile'), store.list('ruleset'), store.listLatestTemplates()]).toEqual(snapshot);
@@ -59,7 +60,7 @@ describe('no-resolve 以内容为准', () => {
   it('保存模板、规则集、独立及绑定订阅时清理旧开关，预览与下载保持单条原文', async () => {
     const h = setupApp();
     try {
-      await addUser(h.store, 'admin', 'admin'); const api = client(h.app); await api.login('admin');
+      const user = await addUser(h.store, 'admin', 'admin'); const api = client(h.app); await api.login('admin');
       const rs = await api.post('/api/rulesets', { name: '规则增强', noResolve: true, sources: [source] });
       expect(rs.status, rs.text).toBe(201); expect(rs.json.item.noResolve).toBeUndefined();
       expect(rs.json.item.sources[0].content).toBe(content);
@@ -73,8 +74,8 @@ describe('no-resolve 以内容为准', () => {
         expect(mode === 'bound' ? saved.json.item.routing.prependRules : saved.json.item.routing.config.rules).toEqual(mode === 'bound' ? cleaned.map(rule => ({ ...rule, id: 'pre-' + rule.id })) : cleaned);
         const preview = await api.post('/api/profiles/preview', { profile: saved.json.item });
         expect(preview.status, preview.text).toBe(200);
-        const token = h.store.createToken(saved.json.item.id).token;
-        const download = await h.app.request(`/sub/${token}`);
+        const token = h.store.createToken(user.id).token;
+        const download = await h.app.request(`/sub/${token}/${saved.json.item.id}`);
         expect(download.status).toBe(200);
         for (const output of [preview.json.yaml, await download.text()]) {
           expect(output).toContain('IP-CIDR,192.0.2.0/24,DIRECT,no-resolve');

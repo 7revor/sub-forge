@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.ts';
@@ -47,6 +48,7 @@ function setup(responses: Record<string, string | Error> = {}) {
   const now = () => t;
   const store = new Store(':memory:', { now });
   store.importSeed(SEED);
+  issueProfileToken(store, { token: 'tk-mac', profileId: 'p1' });
   const calls: string[] = [];
   const bodies: Record<string, string | Error> = {
     'https://air.example.com/sub': AIRPORT,
@@ -70,7 +72,7 @@ const get = (app: ReturnType<typeof setup>['app'], path: string, ua = 'clash.met
 describe('订阅接口', () => {
   it('主配置：mihomo YAML、响应头、按请求 token 生成 provider 与规则集地址', async () => {
     const { app } = setup();
-    const res = await get(app, '/sub/tk-mac', 'clash-verge/v2.2.3 Platform/macos');
+    const res = await get(app, '/sub/tk-mac/p1', 'clash-verge/v2.2.3 Platform/macos');
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8');
     expect(res.headers.get('profile-update-interval')).toBe('24');
@@ -79,15 +81,15 @@ describe('订阅接口', () => {
     const cfg = parse(await res.text()) as Record<string, any>;
     expect(cfg['mixed-port']).toBe(7890);
     expect(cfg['allow-lan']).toBe(true);
-    expect(cfg['proxy-providers']['机场 A'].url).toMatch(/^https:\/\/sub\.test\/p\/tk-mac\/source%3Aair\?v=[0-9a-f]{32}&h=[0-9a-f]{8}&platform=macos$/);
-    expect(cfg['rule-providers'].rs_tg_classical.url).toMatch(/^https:\/\/sub\.test\/r\/tk-mac\/rs_tg_classical\.list\?v=[0-9a-f]{32}&platform=macos$/);
+    expect(cfg['proxy-providers']['机场 A'].url).toMatch(/^https:\/\/sub\.test\/p\/tk-mac\/p1\/source%3Aair\?v=[0-9a-f]{32}&h=[0-9a-f]{8}&platform=macos$/);
+    expect(cfg['rule-providers'].Telegram.url).toMatch(/^https:\/\/sub\.test\/r\/tk-mac\/[0-9a-f]{64}$/);
     expect(cfg.proxies[0]['dialer-proxy']).toMatch(/^__ref_air_/);
     expect(cfg.rules.at(-1)).toBe('MATCH,🚀 节点选择');
   });
 
   it('浏览器打开同一链接直接显示 Mihomo，保留订阅更新信息', async () => {
     const { app, store } = setup();
-    const res = await get(app, '/sub/tk-mac', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36');
+    const res = await get(app, '/sub/tk-mac/p1', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36');
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8');
     expect(res.headers.get('content-disposition')).toMatch(/^inline;/);
@@ -100,19 +102,19 @@ describe('订阅接口', () => {
 
   it('provider 内容与规则集内容', async () => {
     const { app } = setup();
-    const cfg = parse(await (await get(app, '/sub/tk-mac')).text()) as Record<string, any>;
-    const provPath = new URL(cfg['proxy-providers']['机场 A'].url).pathname;
+    const cfg = parse(await (await get(app, '/sub/tk-mac/p1')).text()) as Record<string, any>;
+    const provPath = cfg['proxy-providers']['机场 A'].url;
     const prov = await get(app, provPath);
     expect(prov.status).toBe(200);
     expect((parse(await prov.text()) as { proxies: { name: string }[] }).proxies.map((p) => p.name)).toEqual(['🇭🇰 HK-01', '🇯🇵 日本 01']);
-    const rs = await get(app, '/r/tk-mac/rs_tg_classical.list');
+    const rs = await get(app, cfg['rule-providers'].Telegram.url);
     expect(await rs.text()).toBe('DOMAIN-SUFFIX,t.me\nIP-CIDR,91.108.4.0/22,no-resolve\n');
     expect((await get(app, '/r/tk-mac/nope')).status).toBe(404);
   });
 
   it('无效 token 返回 404 空响应', async () => {
     const { app } = setup();
-    for (const p of ['/sub/bad', '/p/bad/source%3Aair', '/r/bad/rs_tg_domain']) {
+    for (const p of ['/sub/bad/p1', '/p/bad/p1/source%3Aair', '/r/bad/rs_tg_domain']) {
       const res = await get(app, p);
       expect(res.status).toBe(404);
       expect(await res.text()).toBe('');
@@ -121,14 +123,14 @@ describe('订阅接口', () => {
 
   it('Surge 暂未支持，返回 501 并记入访问日志', async () => {
     const { app, store } = setup();
-    expect((await get(app, '/sub/tk-mac', 'Surge Mac/2894')).status).toBe(501);
+    expect((await get(app, '/sub/tk-mac/p1', 'Surge Mac/2894')).status).toBe(501);
     expect(store.recentAccess('p1')[0]).toMatchObject({ client: 'surge', status: 501 });
   });
 
   it('第二次请求重新生成；访问日志记录来源', async () => {
     const { app, store, calls } = setup();
-    await get(app, '/sub/tk-mac');
-    await get(app, '/sub/tk-mac');
+    await get(app, '/sub/tk-mac/p1');
+    await get(app, '/sub/tk-mac/p1');
     expect(calls).toHaveLength(2); // 订阅源 + 规则集各拉一次
     expect(store.recentAccess('p1').map((r) => r.source)).toEqual(['fresh', 'fresh']);
   });
@@ -137,9 +139,9 @@ describe('订阅接口', () => {
 describe('失败兜底', () => {
   it('渲染出错时返回上一份成功结果', async () => {
     const { app, store } = setup();
-    const ok = await (await get(app, '/sub/tk-mac')).text();
+    const ok = await (await get(app, '/sub/tk-mac/p1')).text();
     store.put('profile', { ...PROFILE, overlay: { ...PROFILE.overlay, rulePatches: { 'r-tg': { target: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'air' }, match: { exact: '不存在' } } } } } } });
-    const res = await get(app, '/sub/tk-mac');
+    const res = await get(app, '/sub/tk-mac/p1');
     expect(res.status).toBe(200);
     expect(await res.text()).toBe(ok);
     expect(store.recentAccess('p1')[0]!.source).toBe('last-good');
@@ -147,19 +149,19 @@ describe('失败兜底', () => {
 
   it('从未成功渲染过：503 与纯文本说明', async () => {
     const { app } = setup({ 'https://air.example.com/sub': new Error('connect timeout') });
-    const res = await get(app, '/sub/tk-mac');
+    const res = await get(app, '/sub/tk-mac/p1');
     expect(res.status).toBe(503);
     expect(await res.text()).toMatch(/connect timeout/);
   });
 
   it('上游后来失败时继续用快照，订阅照常返回', async () => {
     const { app, bodies, advance, snapshots } = setup();
-    await get(app, '/sub/tk-mac');
+    await get(app, '/sub/tk-mac/p1');
     bodies['https://air.example.com/sub'] = new Error('HTTP 502');
     advance(3_601_000);
-    expect((await get(app, '/sub/tk-mac')).status).toBe(200);
+    expect((await get(app, '/sub/tk-mac/p1')).status).toBe(200);
     await snapshots.settled();
-    const res = await get(app, '/sub/tk-mac');
+    const res = await get(app, '/sub/tk-mac/p1');
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('机场 A');
   });

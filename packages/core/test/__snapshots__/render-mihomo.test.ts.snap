@@ -44,14 +44,14 @@ proxy-groups:
       - REJECT
     empty-fallback: REJECT
 rule-providers:
-  rs_fin_classical:
+  金融服务:
     type: http
     behavior: classical
     format: text
     url: https://sub.example.com/r/TOKEN/rs_fin_classical.list
     interval: 86400
     proxy: DIRECT
-  rs_ai_classical:
+  AI:
     type: http
     behavior: classical
     format: text
@@ -59,8 +59,8 @@ rule-providers:
     interval: 86400
     proxy: DIRECT
 rules:
-  - RULE-SET,rs_fin_classical,🚀 节点选择
-  - RULE-SET,rs_ai_classical,🤖 AI 服务
+  - RULE-SET,金融服务,🚀 节点选择
+  - RULE-SET,AI,🤖 AI 服务
   - PROCESS-PATH-WILDCARD,/Applications/*/WeChat.app/*,DIRECT
   - GEOIP,CN,DIRECT,no-resolve
   - MATCH,🚀 节点选择

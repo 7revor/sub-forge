@@ -1,9 +1,10 @@
 // 订阅接口（OUT-01 – OUT-06）：
-//   GET /sub/:token          主配置
-//   GET /p/:token/:key       Profile 专属 provider 内容
-//   GET /r/:token/:key       转换后的规则集
+//   GET /sub/:token/:profile          主配置
+//   GET /p/:token/:profile/:key       Profile 专属 provider 内容
+//   GET /r/:token/:key       全站共享的托管规则集
 // token 无效一律 404 且不暴露 Profile 是否存在；从未成功渲染时 503 + 纯文本说明，不返回半成品。
 
+import { ResourceAccessError } from './resource-access.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { Hono, type Context } from 'hono';
@@ -13,7 +14,6 @@ import { detectClient } from './client.ts';
 import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService, type Target } from './render.ts';
 import type { Store, TrafficInfo } from './store.ts';
 
-const DEFAULT_INTERVAL_SEC = 86400;
 const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
 
 function userinfoHeader(u: TrafficInfo | undefined): string | undefined {
@@ -34,7 +34,7 @@ const MIME: Record<string, string> = {
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.map': 'application/json',
 };
 /** 这些前缀属于接口，不回落到前端页面 */
-const RESERVED = ['/api/', '/sub/', '/p/', '/r/'];
+const RESERVED = ['/api/', '/sub/', '/p/', '/r/', '/nodes/'];
 
 /** 托管前端：/assets 下的文件名带内容哈希，可长期缓存；index.html 不缓存 */
 function serveWeb(app: Hono, webDir: string) {
@@ -67,20 +67,22 @@ export function createApp(deps: AppDeps) {
   app.get('/healthz', (c) => c.text('ok'));
   app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' }));
 
-  app.get('/sub/:token', async (c) => {
+  app.get('/sub/:token/:profile', async (c) => {
     c.header('cache-control', 'no-store');
     c.header('vary', 'User-Agent');
     const started = now();
     const token = c.req.param('token');
     const t = store.getActiveToken(token);
     if (!t) return notFound(c);
-    const profile = store.get('profile', t.profileId);
-    if (!profile) return notFound(c);
+    const profileId = c.req.param('profile');
+    const owned = store.getWithOwner('profile', profileId);
+    if (!owned || owned.owner !== t.userId) return notFound(c);
+    const profile = owned.doc;
     const ua = c.req.header('user-agent') ?? '';
     const detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform') });
 
     const log = (status: number, outcome?: RenderOutcome) => store.logAccess({
-      token, profileId: t.profileId, at: started, ua, client: `${detected.client}${detected.by === 'default' ? '?' : ''}`,
+      token, profileId: profileId, at: started, ua, client: `${detected.client}${detected.by === 'default' ? '?' : ''}`,
       ...(detected.platform ? { platform: detected.platform } : {}),
       status, ms: now() - started,
       warnings: outcome?.ok ? outcome.render.warnings : 0,
@@ -95,8 +97,9 @@ export function createApp(deps: AppDeps) {
       return c.text('Surge 输出尚未实现（M2）。如需 mihomo 配置，请在链接后加 ?target=mihomo', 501);
     }
 
-    const outcome = await renderer.render(t.profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
-    if (store.getActiveToken(token)?.profileId !== t.profileId) return notFound(c);
+    const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
+    if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
+    if (outcome.ok && !renderer.canReadNodes(outcome.render, t.userId)) return notFound(c);
     if (!outcome.ok) {
       log(503, outcome);
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
@@ -113,42 +116,76 @@ export function createApp(deps: AppDeps) {
     return c.body(outcome.render.yaml.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
-  /** 旧主配置只取所属结构版本的资源；无版本的旧链接保持兼容，刷新主订阅后获得版本化地址。 */
-  const part = (kind: 'providers' | 'rulesets', contentType: string) => async (c: Context) => {
-    const token = c.req.param('token')!;
+  /** 私有节点产物同时检查用户归属与主配置结构版本。 */
+  app.get('/p/:token/:profile/:key', async c => {
+    c.header('cache-control', 'no-store');
+    const token = c.req.param('token');
     const t = store.getActiveToken(token);
-    if (!t) return notFound(c);
+    const profileId = c.req.param('profile');
+    if (!t || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     const qp = c.req.query('platform');
-    const platform = PLATFORMS.find((p) => p === qp);
+    const platform = PLATFORMS.find(p => p === qp);
     const client = c.req.query('target') ?? 'mihomo';
-    if (client !== 'mihomo' && client !== 'stash') return notFound(c);
+    if ((qp && !platform) || (client !== 'mihomo' && client !== 'stash')) return notFound(c);
     if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
     const target: Target = { client, ...(platform ? { platform } : {}) };
     const version = c.req.query('v');
-    const key = c.req.param('key')!;
-    const retained = version ? renderer.getVersion(t.profileId, target, version, kind === 'providers' ? key : undefined) : undefined;
-    if (version && !retained) return c.text('资源版本不存在或已过期，请刷新主订阅', 404);
-    const outcome = await renderer.render(t.profileId, target);
-    if (store.getActiveToken(token)?.profileId !== t.profileId) return notFound(c);
+    const key = c.req.param('key');
+    if (!version) return notFound(c);
+    const retained = renderer.getVersion(profileId, target, version);
+    if (!retained || !renderer.canReadNodes(retained, t.userId) || retained.providers[key] === undefined) return notFound(c);
+    const outcome = await renderer.render(profileId, target);
+    if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     if (!outcome.ok && outcome.accessDenied) return notFound(c);
-    const selected = version ? renderer.getVersion(t.profileId, target, version, kind === 'providers' ? key : undefined) ?? retained : outcome.ok ? outcome.render : undefined;
-    if (selected) {
-      const body = selected[kind][key];
-      if (body === undefined) return notFound(c);
-      c.header('content-type', contentType);
-      c.header('cache-control', 'no-store');
-      if (body.startsWith('#subforge-binary-mrs\n')) {
-        c.header('content-type','application/octet-stream');
-        return c.body(Buffer.from(body.slice('#subforge-binary-mrs\n'.length),'base64'));
-      }
-      return c.body(body.replaceAll(TOKEN_PLACEHOLDER, token));
-    }
-    if (!outcome.ok) return c.text(`暂时不可用：${outcome.message}`, 503);
-    return notFound(c);
-  };
+    const selected = renderer.getVersion(profileId, target, version) ?? retained;
+    if (!renderer.canReadNodes(selected, t.userId)) return notFound(c);
+    c.header('content-type', 'text/yaml; charset=utf-8');
+    return c.body(selected.providers[key]!.replaceAll(TOKEN_PLACEHOLDER, token));
+  });
 
-  app.get('/p/:token/:key', part('providers', 'text/yaml; charset=utf-8'));
-  app.get('/r/:token/:key', part('rulesets', 'text/plain; charset=utf-8'));
+  /** 公共规则只检查有效用户 token；资源身份与用户、订阅无关。 */
+  app.get('/r/:token/:key', async c => {
+    c.header('cache-control', 'no-store');
+    const token = c.req.param('token');
+    const user = store.getActiveToken(token);
+    if (!user) return notFound(c);
+    try {
+      const body = await renderer.sharedRules.read(c.req.param('key'));
+      const resource = store.getSharedRule<{ error?: string }>(c.req.param('key'));
+      if (store.getActiveToken(token)?.userId !== user.userId || !resource || body === undefined) return notFound(c);
+      if (resource.error) c.header('x-sub-forge-warning', 'last-good-rule');
+      if (body.startsWith('#subforge-binary-mrs\n')) {
+        c.header('content-type', 'application/octet-stream');
+        return c.body(Buffer.from(body.slice('#subforge-binary-mrs\n'.length), 'base64'));
+      }
+      c.header('content-type', 'text/plain; charset=utf-8');
+      return c.body(body);
+    } catch (error) {
+      if (store.getActiveToken(token)?.userId !== user.userId) return notFound(c);
+      return c.text(`规则资源暂时不可用：${error instanceof Error ? error.message : String(error)}`, 503);
+    }
+  });
+
+  app.get('/nodes/:token/:kind/:id', async c => {
+    c.header('cache-control', 'no-store');
+    const token = c.req.param('token');
+    const user = store.getActiveToken(token);
+    const kind = c.req.param('kind');
+    const id = c.req.param('id');
+    if (!user || !['source', 'collection', 'local'].includes(kind)) return notFound(c);
+    const type = kind as 'source' | 'collection' | 'local';
+    if (store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+    try {
+      const body = await renderer.nodeSet({ type, id }, user.userId);
+      if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+      c.header('content-type', 'text/yaml; charset=utf-8');
+      return c.body(body);
+    } catch (error) {
+      if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+      if (error instanceof ResourceAccessError) return notFound(c);
+      return c.text(`节点资源暂时不可用：${error instanceof Error ? error.message : String(error)}`, 503);
+    }
+  });
 
   if (deps.webDir) serveWeb(app, deps.webDir);
 

@@ -37,3 +37,5 @@ export { exportStashConfig } from './render/stash-config.ts';
 export * from './rules/local.ts';
 
 export * from './nodeset/chain.ts';
+
+export * from './rules/provider-name.ts';
