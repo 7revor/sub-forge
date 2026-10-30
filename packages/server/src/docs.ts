@@ -22,7 +22,7 @@ export type LocalDoc = LocalProxyGroup;
 /** 当前模板；旧 version 字段仅供导入历史数据，不参与保存和渲染。 */
 export type TemplateVersionDoc = Template & { name?: string };
 
-/** 基础设置预设（BS-03），各客户端基础设置独立保存与合并 */
+/** 仅用于迁移历史预设；正常 API 和渲染已不再使用 */
 export type PresetDoc = { id: string; name: string; version: number; config: import('@sub-forge/core').NativeBase; migrationNotes?: string[] };
 
 export type ProfileDoc = Profile & {
@@ -52,7 +52,7 @@ export type Seed = {
   bundles?: unknown[];
   presets?: PresetDoc[];
   templates?: TemplateVersionDoc[];
-  profiles?: ProfileDoc[];
+  profiles?: (Omit<ProfileDoc, 'base'> & { base?: import('@sub-forge/core').ProfileBase & { presetId?: string } })[];
   tokens?: (TokenDoc | LegacyTokenDoc)[];
 };
 

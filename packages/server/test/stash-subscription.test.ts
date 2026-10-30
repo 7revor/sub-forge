@@ -18,9 +18,8 @@ async function scenario() {
   envs.push(env);
   const user = await addUser(env.store, 'alice', 'admin'); await addUser(env.store, 'bob');
   const alice = client(env.app), bob = client(env.app); await alice.login('alice'); await bob.login('bob');
-  env.store.put('preset', { id: 'preset', name: '双客户端', version: 1, config: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, dns: { enable: true } }), stash: testYaml({ mode: 'rule', dns: { nameserver: ['https://dns.example.test/dns-query'] } }) } } }, user.id);
   env.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '测试节点', type: 'hysteria2', server: 'example.test', port: 443, password: 'example-password' }] }, user.id);
-  const draft = { name: '双客户端订阅', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, base: { presetId: 'preset', kernels: {mihomo: testYaml({ 'allow-lan': true }), stash: testYaml({ 'log-level': 'warning' }) } },
+  const draft = { name: '双客户端订阅', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, 'allow-lan': true , dns: { enable: true } }), stash: testYaml({ mode: 'rule', dns: { nameserver: ['https://dns.example.test/dns-query'] }, 'log-level': 'warning' }) } },
     routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }], rules: [
       { id: 'remote', matcher: remoteRuleMatcher(rulesUrl), target: { kind: 'group', groupId: 'g' } },
       { id: 'proc', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Example' } }, target: { kind: 'group', groupId: 'g' } },
@@ -107,7 +106,6 @@ describe('Stash 主订阅与资源隔离', () => {
     expect((await h.alice.post('/api/rules/convert', { inputs, client: 'stash', platform: 'linux' })).status).toBe(200);
     expect((await h.alice.post('/api/profiles/preview', { profile: h.profile, client: 'stash', platform: 'android' })).status).toBe(400);
     expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=linux`)).status).toBe(400);
-    expect((await h.alice.post('/api/presets', { name: '非法设置', config: { kernels: { stash: [] } } })).status).toBe(400);
     expect((await h.alice.post('/api/profiles', { ...h.draft, base: { kernels: { stash: [] } } })).status).toBe(400);
   });
 

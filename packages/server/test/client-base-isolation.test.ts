@@ -53,17 +53,15 @@ it('原文逐字保存，四内核隔离；仅生成时合并，不把切换目�
   try {
     await addUser(h.store, 'native', 'admin'); const api = client(h.app); await api.login('native');
     const config = { kernels: { mihomo, surge, stash: 'dns:\n  nameserver: [https://doh.pub/dns-query]\n', loon: '[General]\nip-mode = v4-only\n[Host]\n*.example.test = server:1.1.1.1\n' }, clients: { 'surge-ios': '[General]\nallow-wifi-access = false\n', 'surge-macos': '[General]\nsocks5-listen = 0.0.0.0:10001, 0.0.0.0:10002\n' } };
-    const preset = await api.post('/api/presets', { name: '原文', config }); expect(preset.status, preset.text).toBe(201);
-    expect(preset.json.item.config).toEqual(config);
-    const base = { presetId: preset.json.item.id, kernels: { mihomo: 'allow-lan: false\nport: 0\ndns:\n  nameserver-policy:\n    "rule-set:custom": ["tls://1.1.1.1"]\n' }, clients: { flclash: 'dns:\n  nameserver: [9.9.9.9]\n' } };
+    const base = { ...config, clients: { ...config.clients, flclash: 'allow-lan: false\nport: 0\ndns:\n  nameserver: [9.9.9.9]\n  nameserver-policy:\n    "rule-set:custom": ["tls://1.1.1.1"]\n' } };
     const saved = await api.post('/api/profiles', { ...draft, base }); expect(saved.status, saved.text).toBe(201);
     const id = saved.json.item.id;
     for (const kernel of ['mihomo', 'stash', 'surge', 'loon'] as const) {
-      const output = await h.renderer.render(id, { client: kernel }); expect(output.ok, JSON.stringify(output.report)).toBe(true);
+      const output = await h.renderer.render(id, { client: kernel, ...(kernel === 'mihomo' ? { app: 'flclash' as const } : {}) }); expect(output.ok, JSON.stringify(output.report)).toBe(true);
       if (!output.ok) throw new Error(output.message);
       if (kernel === 'mihomo') {
         const actual = parse(output.render.yaml);
-        expect(actual).toMatchObject({ ...parse(mihomo), port: 0, 'allow-lan': false });
+        expect(actual).toMatchObject({ ...parse(mihomo), port: 0, 'allow-lan': false, dns: { ...parse(mihomo).dns, nameserver: ['9.9.9.9'] } });
         expect(actual.dns['nameserver-policy']['rule-set:custom']).toEqual(['tls://1.1.1.1']);
       } else { expect(output.render.yaml).not.toContain('fake-ip-range'); expect(output.render.yaml).not.toContain('mips'); }
     }
@@ -72,7 +70,6 @@ it('原文逐字保存，四内核隔离；仅生成时合并，不把切换目�
     expect(ios.yaml).toContain('allow-wifi-access = false'); expect(ios.yaml).not.toContain('socks5-listen');
     expect(mac.yaml).toContain('socks5-listen = 0.0.0.0:10001, 0.0.0.0:10002'); expect(mac.exportYaml).toContain('[URL Rewrite]');
     expect(h.store.get('profile', id)?.base).toEqual(base);
-    expect(h.store.get('preset', preset.json.item.id)?.config).toEqual(config);
   } finally { await h.snapshots.settled(); h.store.close(); }
 });
 
@@ -83,12 +80,12 @@ it('UA 和显式 app 匹配客户端追加；缓存、节点链接与预览使�
     const saved = await api.post('/api/profiles', { ...draft, base: { kernels: { mihomo: 'port: 7890\n' }, clients: { flclash: 'port: 7892\n', 'clash-verge': 'port: 7893\n' } } });
     expect(saved.status).toBe(201); const id = saved.json.item.id, token = h.store.createToken(user.id).token;
     for (const [ua, app, port] of [['FlClash/1.0 Platform/macos', 'flclash', 7892], ['clash-verge/v2.4 Platform/windows', 'clash-verge', 7893], ['mihomo/1.19', undefined, 7890]] as const) {
-      const response = await h.app.request(`/sub/${token}/${id}`, { headers: { 'user-agent': ua } }); expect(response.status).toBe(200);
+      const response = await h.app.request(`/subs/profile?token=${token}&id=${id}`, { headers: { 'user-agent': ua } }); expect(response.status).toBe(200);
       expect(parse(await response.text()).port).toBe(port);
       const preview = await api.post(`/api/profiles/${id}/preview`, { client: 'mihomo', ...(app ? { app } : {}) });
       expect(parse(preview.json.yaml).port).toBe(port);
     }
-    expect((await h.app.request(`/sub/${token}/${id}?target=surge&app=flclash`)).status).toBe(400);
+    expect((await h.app.request(`/subs/profile?token=${token}&id=${id}&target=surge&app=flclash`)).status).toBe(400);
     const disabled = { ...saved.json.item, base: { ...saved.json.item.base, enabled: false } };
     expect((await api.put('/api/profiles/' + id, disabled)).status).toBe(200);
     const preview = await api.post(`/api/profiles/${id}/preview`, { client: 'mihomo', app: 'flclash' });

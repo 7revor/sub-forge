@@ -150,6 +150,6 @@ it.each(['Surge iOS/3412', 'Loon/3.5.3'])('%s 独立节点与公共规则延续�
   expect(await (await h.app.request(`/resources/ruleset?token=${h.token}&id=r`, { headers })).text()).toContain('DOMAIN,example.test');
   for (const path of [`/subs/nodes?token=${h.token}&kind=source&id=a`, `/resources/ruleset?token=${h.token}&id=r`]) {
     expect((await h.app.request(path + '&target=unknown')).status).toBe(400);
-    expect((await h.app.request(path + '&target=loon&platform=linux')).status).toBe(400);
+    expect((await h.app.request(path + '&target=loon&platform=linux')).status).toBe(path.startsWith('/subs/') ? 400 : 200);
   }
 });

@@ -13,7 +13,6 @@ import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 import { Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Button, Card, Empty, Field, Segmented, Select } from '../../components/ui.tsx';
-import { useList } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 
 /** 输出设置与基本信息放在同一个标签页。 */
@@ -39,22 +38,15 @@ export function TabOutput() {
 /** 按内核和可选客户端保存原文，编辑阶段不做字段解析。 */
 export function TabBase() {
   const { draft, setDraft } = useProfile();
-  const presets = useList('presets').data ?? [];
-  const preset = presets.find(p => p.id === draft.base?.presetId);
-  const mode = draft.base === undefined || draft.base.enabled === false ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
+  const enabled = draft.base !== undefined && draft.base.enabled !== false;
   return <>
     {(draft.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[13px] text-warn">{note}</p>)}
     <section className="flex flex-wrap items-center gap-4 rounded-[10px] border border-line bg-panel p-4">
-      <Field label="基础配置来源">{() => <Segmented label="基础配置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '独立配置' }, { value: 'none', label: '不输出' }]} onChange={m => {
-        if (m === 'none') setDraft({ ...draft, base: { ...draft.base, enabled: false } });
-        else if (m === 'custom') { const { presetId, ...base } = draft.base ?? {}; setDraft({ ...draft, base: { ...base, enabled: true } }); }
-        else setDraft({ ...draft, base: { ...draft.base, enabled: true, presetId: draft.base?.presetId ?? '' } });
+      <Field label="基础配置追加">{() => <Segmented label="基础配置追加" value={enabled ? 'enabled' : 'disabled'} options={[{ value: 'enabled', label: '启用' }, { value: 'disabled', label: '不输出' }]} onChange={m => {
+        setDraft({ ...draft, base: { ...draft.base, enabled: m === 'enabled' } });
       }} />}</Field>
-      {mode === 'preset' && <Field label="预设">{id => <Select id={id} placeholder="选择要引用的基础配置预设" value={draft.base?.presetId ?? ''} onChange={e => setDraft({ ...draft, base: { ...draft.base, presetId: e.target.value } })}>
-        {presets.map(p => <option key={p.id} value={p.id}>{p.name}（v{p.version}）</option>)}
-      </Select>}</Field>}
     </section>
-    {mode !== 'none' && <NativeBaseEditor value={draft.base ?? {}} inherited={preset?.config} onChange={base => setDraft({ ...draft, base: { ...base, ...(draft.base?.presetId !== undefined ? { presetId: draft.base.presetId } : {}) } })} />}
+    {enabled && <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />}
   </>;
 }
 

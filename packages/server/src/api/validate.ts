@@ -278,11 +278,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       Object.assign(doc, promoteRuleSetOverrides(doc as unknown as RuleSetDoc, (src) => src.url ? store.latestSnapshot('ruleset', id, src.url)?.body : undefined));
       break;
     }
-    case 'preset': {
-      try { validateNativeBase(doc.config, 'preset'); } catch (error) { throw bad((error as Error).message); }
-      if (typeof doc.version !== 'number') doc.version = 1;
-      break;
-    }
+    case 'preset': throw bad('基础设置预设已移除');
     case 'profile': {
       delete doc.revision;
       delete doc.templateVersion;
@@ -297,7 +293,6 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (f !== 'latest' && !(isObj(f) && typeof f.pinned === 'number' && store.getTemplate(doc.template.id, f.pinned))) throw bad('模板版本不存在');
       }
       if (doc.base !== undefined) try { validateNativeBase(doc.base); } catch (error) { throw bad((error as Error).message); }
-      if (doc.base !== undefined && isObj(doc.base) && doc.base.presetId !== undefined && !store.get('preset', String(doc.base.presetId))) throw bad('基础设置预设不存在');
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];
       doc.refPolicy = { default: 'wrap' }; // 兼容旧字段，引用方式由客户端自动决定
@@ -361,9 +356,6 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
     for (const t of store.listLatestTemplates()) {
       if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」`);
     }
-  }
-  if (kind === 'preset') {
-    for (const p of store.list('profile')) if (p.base?.presetId === id) hits.push(`配置订阅「${p.name}」`);
   }
   return [...new Set(hits)];
 }

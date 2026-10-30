@@ -1,6 +1,8 @@
 # @sub-forge/server
 
-当前资源权限、清理与 v25 迁移契约见 [全局托管与鉴权](../../docs/19-managed-resources.md)。文末按日期记录的旧接口设计以该契约为准。
+基础配置现行契约见[两层原文追加](../../docs/20-native-client-append.md)：v27 移除预设 API，历史引用备份后展开到订阅，规则只按内核区分。
+
+资源权限、清理与 v25 迁移契约见 [全局托管与鉴权](../../docs/19-managed-resources.md)。文末按日期记录的旧接口设计以该契约为准。
 
 订阅服务（M1 服务端）：SQLite 存储、多用户与登录、管理接口、上游拉取与快照、实时渲染、订阅接口。目前支持 Mihomo、Stash、Surge 与 Loon；生产镜像同源托管 `packages/web` 管理前端。
 
@@ -71,7 +73,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `POST /auth/login`、`POST /auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
 | `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限 |
-| `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles` `presets`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；预设由管理员维护、所有人可读；被引用的文档不能删除（409 返回引用方） |
+| `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；被引用的文档不能删除（409 返回引用方） |
 | `GET /api/templates`、`GET /api/templates?id=ID` | 所有登录用户可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
@@ -218,11 +220,11 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 ### 自动识别规则格式与全局托管（2026-10-30）
 
-规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/resources/ruleset?key=KEY&token=TOKEN` 与 `/resources/repo?key=KEY&token=TOKEN` 按规则身份、有效处理参数与客户端/平台共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo、Stash、Surge、Loon。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
+规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/resources/ruleset?key=KEY&token=TOKEN` 与 `/resources/repo?key=KEY&token=TOKEN` 按规则身份、有效处理参数与内核共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo、Stash、Surge、Loon。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
 
 ### 管理列表分页
 
-`GET /api/{sources,profiles,collections,locals,rulesets,presets,templates}` 支持 `page`、`pageSize`、`q`。传任一参数即启用分页，默认第 1 页、每页 20 条，`pageSize` 范围 1–100；非法页码或条数返回 400。返回 `{ items, total, page, pageSize, totalPages }`，计数仅包含当前用户可见且名称匹配的结果（模板、预设沿用共享读取权限）。模板仅计最新版本；名称搜索忽略首尾空白和大小写，无名称的历史模板按 ID 搜索。顺序保持 ID 升序，越界页回退至最后一页，空结果为第 1 / 1 页。
+`GET /api/{sources,profiles,collections,locals,rulesets,templates}` 支持 `page`、`pageSize`、`q`。传任一参数即启用分页，默认第 1 页、每页 20 条，`pageSize` 范围 1–100；非法页码或条数返回 400。返回 `{ items, total, page, pageSize, totalPages }`，计数仅包含当前用户可见且名称匹配的结果（模板沿用共享读取权限）。模板仅计最新版本；名称搜索忽略首尾空白和大小写，无名称的历史模板按 ID 搜索。顺序保持 ID 升序，越界页回退至最后一页，空结果为第 1 / 1 页。
 
 不传参数仍返回全量 `{ items }`，兼容关联选择器及旧客户端。无搜索时通过 SQLite `LIMIT/OFFSET` 分页；文档正文保持加密，名称搜索在服务端解密后筛选，不新增明文名称索引。
 

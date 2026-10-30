@@ -7,19 +7,18 @@ describe('原文追加的保存与生成边界', () => {
     const config: NativeBase = { kernels: { mihomo: '# 未写完\ndns: [', surge: '[General]\nunknown-key = false\n' }, clients: { flclash: 'port: 0\n' } };
     const snapshot = structuredClone(config);
     expect(() => validateNativeBase(config)).not.toThrow(); expect(config).toEqual(snapshot);
-    expect(() => resolveNativeBase('mihomo', undefined, undefined, config)).toThrow();
-    expect(resolveNativeBase('surge', undefined, undefined, config)).toContain('unknown-key = false');
+    expect(() => resolveNativeBase('mihomo', undefined, config)).toThrow();
+    expect(resolveNativeBase('surge', undefined, config)).toContain('unknown-key = false');
     expect(() => validateNativeBase({ kernels: { mihomo: {} } })).toThrow('原始文本');
     expect(() => validateNativeBase({ clients: { unknown: '' } })).toThrow('未知');
   });
-  it('内核公共追加先于客户端追加，同层订阅优先；列表整体替换，特殊 DNS 键不拆分', () => {
-    const preset: NativeBase = { kernels: { mihomo: 'dns:\n  enable: true\n  nameserver: [223.5.5.5]\n  nameserver-policy:\n    "geosite:cn,private": 223.5.5.5\n' }, clients: { flclash: 'port: 7892\ndns:\n  ipv6: false\n' } };
-    const profile: NativeBase = { kernels: { mihomo: 'port: 7891\ndns:\n  nameserver-policy:\n    "*.example.test": [https://1.1.1.1/dns-query]\n' }, clients: { flclash: 'port: 0\ndns:\n  nameserver: []\n' } };
-    const snapshot = JSON.stringify([preset, profile]);
-    expect(parse(resolveNativeBase('mihomo', 'flclash', preset, profile))).toEqual({ port: 0, dns: { enable: true, ipv6: false, nameserver: [], 'nameserver-policy': { 'geosite:cn,private': '223.5.5.5', '*.example.test': ['https://1.1.1.1/dns-query'] } } });
-    expect(parse(resolveNativeBase('mihomo', 'clash-verge', preset, profile)).port).toBe(7891);
-    expect(JSON.stringify([preset, profile])).toBe(snapshot);
-    expect(() => resolveNativeBase('surge', 'flclash', preset, profile)).toThrow('不匹配');
+  it('内核公共追加先于客户端追加；列表整体替换，特殊 DNS 键不拆分', () => {
+    const profile: NativeBase = { kernels: { mihomo: 'port: 7891\ndns:\n  enable: true\n  nameserver: [223.5.5.5]\n  nameserver-policy:\n    "geosite:cn,private": 223.5.5.5\n' }, clients: { flclash: 'port: 0\ndns:\n  ipv6: false\n  nameserver: []\n  nameserver-policy:\n    "*.example.test": [https://1.1.1.1/dns-query]\n' } };
+    const snapshot = JSON.stringify(profile);
+    expect(parse(resolveNativeBase('mihomo', 'flclash', profile))).toEqual({ port: 0, dns: { enable: true, ipv6: false, nameserver: [], 'nameserver-policy': { 'geosite:cn,private': '223.5.5.5', '*.example.test': ['https://1.1.1.1/dns-query'] } } });
+    expect(parse(resolveNativeBase('mihomo', 'clash-verge', profile)).port).toBe(7891);
+    expect(JSON.stringify(profile)).toBe(snapshot);
+    expect(() => resolveNativeBase('surge', 'flclash', profile)).toThrow('不匹配');
   });
   it('INI 保留值、顺序、注释及其他段落，同名参数按层替换', () => {
     const common = '# 原文\n[General]\nipv6 = false\ndns-server = system, 223.5.5.5\nencrypted-dns-server = https://dns.test/query#h3=true\n[Host]\n*.example.test = server:1.1.1.1\n[MITM]\nhostname = *.example.test\n[URL Rewrite]\n^http://a.test/ https://a.test/ 302\n';
@@ -37,7 +36,6 @@ describe('原文追加的保存与生成边界', () => {
     expect(() => validateNativeText('rules: []', 'mihomo')).toThrow('由订阅生成');
     expect(() => validateNativeText('[Proxy]\na = direct', 'surge')).toThrow('由订阅生成');
     expect(() => validateNativeText('#!MANAGED-CONFIG https://example.test/config', 'surge')).toThrow('托管更新地址');
-    expect(() => validateNativeText('listeners: []', 'mihomo', 'preset')).toThrow('订阅追加');
     expect(() => validateNativeText('listeners: []', 'mihomo')).not.toThrow();
   });
   it('无效 YAML、重复键、循环引用和原型键明确失败', () => {

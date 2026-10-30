@@ -1,4 +1,4 @@
-import { migrateNativeDocument } from './native-migration.ts';
+import { migrateNativeDocument, retireProfilePreset } from './native-migration.ts';
 import { ruleBinding } from './rule-binding.ts';
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 import { findRuleFile } from './rule-repos/options.ts';
@@ -651,6 +651,19 @@ export class Store {
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('template', row.template_id + ':' + row.version, this.cipher.encrypt(row.data), this.now());
       this.db.prepare('UPDATE template_versions SET data = ? WHERE template_id = ? AND version = ?').run(JSON.stringify(next), row.template_id, row.version);
     }
+    const nativePresets = new Map(this.list('preset').map(preset => [preset.id, preset]));
+    for (const row of this.db.prepare("SELECT id,data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
+      const previous = JSON.parse(this.cipher.decrypt(row.data));
+      const next = retireProfilePreset(previous, nativePresets.get(previous.base?.presetId));
+      if (next === previous) continue;
+      this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('profile', row.id, row.data, this.now());
+      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(JSON.stringify(next)), row.id);
+    }
+    // 包括未引用的预设也先留存加密原件，再移除已退役的活动文档。
+    for (const row of this.db.prepare("SELECT id,data FROM docs WHERE kind = 'preset'").all() as { id: string; data: string }[]) {
+      this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('preset', row.id, row.data, this.now());
+    }
+    this.db.exec("DELETE FROM docs WHERE kind = 'preset'");
     // 清理可回退主配置，历史节点/规则资源继续服务已经下发的订阅地址。
     this.db.exec('DELETE FROM last_good');
   }
@@ -662,7 +675,7 @@ export class Store {
   }
   // ---------- 文档 ----------
 
-  /** owner 为 null 表示系统级文档（预设等），只在新建时写入，更新时保持原归属 */
+  /** owner 为 null 表示历史系统级文档，只在新建时写入，更新时保持原归属 */
   put<K extends DocKind>(kind: K, doc: DocTypes[K], owner: string | null = null): void {
     this.configurationRevision++;
     doc = structuredClone(doc);

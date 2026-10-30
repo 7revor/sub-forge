@@ -14,7 +14,6 @@ export type SourceFetchOptions = Pick<FetchOptions, 'ttlSec'>;
 export type SourceDoc = Source & { fetch?: SourceFetchOptions };
 export type RuleSetSourceDoc = RuleSetSource & { fetch?: FetchOptions };
 export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[] };
-export type PresetDoc = { id: string; name: string; version: number; config: import('@sub-forge/core').NativeBase; migrationNotes?: string[] };
 export type TemplateDoc = Template & { name?: string };
 export type ProfileDoc = import('@sub-forge/core').Profile & {
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
@@ -31,7 +30,6 @@ export type DocMap = {
   locals: LocalProxyGroup;
   rulesets: RuleSetDoc;
   profiles: ProfileDoc;
-  presets: PresetDoc;
 };
 export type Kind = keyof DocMap;
 

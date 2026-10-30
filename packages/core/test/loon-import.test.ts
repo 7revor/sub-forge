@@ -4,7 +4,7 @@ import { importLoonConfig, renderLoon, renderMihomo, resolveNativeBase, NodeSetR
 import { loonFull } from './fixtures/loon-full.ts';
 const plan = (text = loonFull) => importLoonConfig(text, { id: 'import', name: '导入样例' });
 function fixture(result = plan()) {
-  return { profile: result.profile, base: resolveNativeBase('loon', undefined, undefined, result.profile.base),
+  return { profile: result.profile, base: resolveNativeBase('loon', undefined, result.profile.base),
     nodeSets: { sources: Object.fromEntries(result.sources.map(s => [s.id,s])), collections: Object.fromEntries(result.collections.map(c => [c.id,c])), locals: Object.fromEntries(result.locals.map(l => [l.id,l])), snapshots: Object.fromEntries(result.sources.map(s => [s.id, ['香港远程 = Shadowsocks,hk.example.test,443,aes-128-gcm,"example"\n日本远程 = Shadowsocks,jp.example.test,443,aes-128-gcm,"example"']])) },
     rules: { rulesets: {}, snapshots: {} }, urls: { provider: () => 'https://example.test/p', ruleset: () => 'https://example.test/r' } };
 }

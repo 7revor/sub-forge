@@ -19,7 +19,6 @@ export function ProfileDetail() {
   const save = useSaveDoc('profiles');
   const dup = useSaveDoc('profiles');
   const del = useDeleteDoc('profiles');
-  const presets = useList('presets');
   const tokens = useQuery(tokenOptions(id));
   const [draft, setDraft] = useState<ProfileDoc>();
   const previous = useRef<ProfileDoc | undefined>(undefined);
@@ -37,7 +36,6 @@ export function ProfileDetail() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
   const validName = !!draft.name.trim();
   const discard = () => { setDraft(doc.data);  };
-  const preset = presets.data?.find((p) => p.id === draft.base?.presetId);
   const subscriptionUrl = tokens.data?.[0]?.url;
   const duplicate = () => {
     const { id: _id, ...rest } = doc.data ?? draft;
@@ -58,7 +56,6 @@ export function ProfileDetail() {
           <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[12.5px] text-accent-ink">
             {modeLabel(draft, template.data?.name)}{template.data && ' · 自动更新'}
           </span>
-          {preset && <Badge>基础设置 {preset.name}</Badge>}
           {dirty && <Badge tone="warn">有未保存的修改</Badge>}
         </PageHeader>
         <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px]">

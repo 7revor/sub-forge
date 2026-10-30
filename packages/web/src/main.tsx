@@ -14,7 +14,6 @@ import { CollectionEdit, CollectionList } from './pages/Collections.tsx';
 import { LocalEdit, LocalList, LocalNodeEdit } from './pages/Locals.tsx';
 import { Login } from './pages/Login.tsx';
 import { Overview } from './pages/Overview.tsx';
-import { PresetEdit, PresetList } from './pages/Presets.tsx';
 import { ProfileDetail } from './pages/profile/ProfileDetail.tsx';
 import { ProfileList, ProfileNew } from './pages/profile/ProfileList.tsx';
 import { RulesetEdit, RulesetList } from './pages/Rulesets.tsx';
@@ -67,8 +66,6 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="rule-repo/new" element={<RequireAdmin><RuleRepoEditorPage /></RequireAdmin>} />
       <Route path="rule-repo/:id/edit" element={<RequireAdmin><RuleRepoEditorPage /></RequireAdmin>} />
       <Route path="system" element={<RequireAdmin><System /></RequireAdmin>} />
-      <Route path="presets" element={<RequireAdmin><PresetList /></RequireAdmin>} />
-      <Route path="presets/:id" element={<RequireAdmin><PresetEdit /></RequireAdmin>} />
       <Route path="users" element={<RequireAdmin><Users /></RequireAdmin>} />
       <Route path="account" element={<Account />} />
       <Route path="*" element={<div className="text-ink-muted">页面不存在</div>} />

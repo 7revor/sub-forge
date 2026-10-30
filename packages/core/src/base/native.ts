@@ -18,7 +18,7 @@ export type NativeBase = {
   kernels?: Partial<Record<Client, string>>;
   clients?: Partial<Record<ClientApp, string>>;
 };
-export type ProfileBase = NativeBase & { presetId?: string; enabled?: boolean };
+export type ProfileBase = NativeBase & { enabled?: boolean };
 type Fields = Record<string, unknown>;
 const object = (x: unknown): x is Fields => !!x && typeof x === 'object' && !Array.isArray(x);
 const GENERATED_YAML = new Set(['proxies', 'proxy-providers', 'proxy-groups', 'rules', 'rule-providers']);
@@ -101,7 +101,7 @@ export function mergeNativeIni(texts: string[]): string {
   return result.map(s => [...(s.name ? ['[' + s.name + ']'] : []), ...s.lines].join('\n').trim()).filter(Boolean).join('\n\n') + (texts.some(t => t.trim()) ? '\n' : '');
 }
 
-export function validateNativeText(text: unknown, kernel: Client, scope: 'preset' | 'profile' = 'profile'): asserts text is string {
+export function validateNativeText(text: unknown, kernel: Client): asserts text is string {
   if (typeof text !== 'string') throw new Error('追加配置必须是原始文本');
   if (isIniClient(kernel)) {
     if (/^\s*#!MANAGED-CONFIG\b/m.test(text)) throw new Error('托管更新地址由订阅生成，请移除 #!MANAGED-CONFIG 行');
@@ -109,16 +109,14 @@ export function validateNativeText(text: unknown, kernel: Client, scope: 'preset
   } else {
     for (const key of Object.keys(parseNativeYaml(text))) {
       if (GENERATED_YAML.has(key)) throw new Error(`${key} 由订阅生成，请在节点、策略组或规则设置中编辑`);
-      if (scope === 'preset' && key === 'listeners') throw new Error('listeners 请放在订阅追加中，基础预设不处理监听器');
     }
   }
 }
 
-export function validateNativeBase(value: unknown, scope: 'preset' | 'profile' = 'profile'): asserts value is ProfileBase {
+export function validateNativeBase(value: unknown): asserts value is ProfileBase {
   if (!object(value)) throw new Error('基础配置必须是对象');
-  for (const key of Object.keys(value)) if (!['kernels', 'clients', ...(scope === 'profile' ? ['presetId', 'enabled'] : [])].includes(key)) throw new Error('不支持的基础配置字段：' + key);
+  for (const key of Object.keys(value)) if (!['kernels', 'clients', 'enabled'].includes(key)) throw new Error('不支持的基础配置字段：' + key);
   if (value.enabled !== undefined && typeof value.enabled !== 'boolean') throw new Error('enabled 必须是布尔值');
-  if (value.presetId !== undefined && typeof value.presetId !== 'string') throw new Error('presetId 必须是字符串');
   for (const [field, configs] of [['kernels', value.kernels], ['clients', value.clients]] as const) {
     if (configs === undefined) continue;
     if (!object(configs)) throw new Error(field + ' 必须是对象');
@@ -130,10 +128,10 @@ export function validateNativeBase(value: unknown, scope: 'preset' | 'profile' =
   }
 }
 
-/** 同一层先预设后订阅，所有内核公共内容先于客户端内容。原文从不回写。 */
-export function resolveNativeBase(kernel: Client, app: ClientApp | undefined, preset?: NativeBase, profile?: NativeBase): string {
+/** 内核公共内容先于可选客户端内容。原文从不回写。 */
+export function resolveNativeBase(kernel: Client, app: ClientApp | undefined, profile?: NativeBase): string {
   if (app && CLIENT_APPS.find(c => c.id === app)?.kernel !== kernel) throw new Error('客户端与内核不匹配');
-  const texts = [preset?.kernels?.[kernel], profile?.kernels?.[kernel], app ? preset?.clients?.[app] : undefined, app ? profile?.clients?.[app] : undefined].filter((s): s is string => s !== undefined);
+  const texts = [profile?.kernels?.[kernel], app ? profile?.clients?.[app] : undefined].filter((s): s is string => s !== undefined);
   texts.forEach(text => validateNativeText(text, kernel));
   return isIniClient(kernel) ? mergeNativeIni(texts) : texts.length ? stringify(texts.reduce((out, text) => mergeNativeObjects(out, parseNativeYaml(text)), {}), { lineWidth: 0 }) : '';
 }

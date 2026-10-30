@@ -10,7 +10,7 @@ function compatibility(plan: LoonImport) {
   return Object.fromEntries((['mihomo', 'surge', 'loon', 'stash'] as Client[]).map(client => {
     const result = ({ mihomo: renderMihomo, surge: renderSurge, loon: renderLoon, stash: renderStash }[client])({
       profile: plan.profile,
-      base: resolveNativeBase(client, undefined, undefined, plan.profile.base),
+      base: resolveNativeBase(client, undefined, plan.profile.base),
       nodeSets: { locals: Object.fromEntries(plan.locals.map(x => [x.id,x])), sources: Object.fromEntries(plan.sources.map(x => [x.id,x])), collections: Object.fromEntries(plan.collections.map(x => [x.id,x])), snapshots: Object.fromEntries(plan.sources.map(x => [x.id, ['']])) },
       rules: { rulesets: {}, snapshots: {} }, urls: { provider: () => 'https://example.invalid/provider', ruleset: () => 'https://example.invalid/rules' },
     });

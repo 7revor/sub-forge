@@ -50,7 +50,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(26);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(27);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();

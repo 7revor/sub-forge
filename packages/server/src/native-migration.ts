@@ -1,5 +1,5 @@
 // 只在历史文档导入/升级时运行；新文档始终保存原文，不经过字段映射。
-import { CLIENTS, isIniClient, stringifyIniBase, type NativeBase, type Client } from '@sub-forge/core';
+import { CLIENT_APPS, mergeNativeIni, mergeNativeObjects, parseNativeYaml, CLIENTS, isIniClient, stringifyIniBase, type NativeBase, type Client } from '@sub-forge/core';
 import { stringify } from 'yaml';
 import { lowerCommonBase, mergeBase, type CommonBase } from './legacy-common-base.ts';
 
@@ -52,13 +52,47 @@ export function migrateNativeDocument(kind: string, original: Doc, preset?: Doc)
     const flatten = old.presetId && Object.keys(old.common ?? {}).length > 0 && preset && !preset.config;
     const common = flatten ? mergeBase(preset.common ?? {}, old.common) : old.common ?? {};
     const native = Object.fromEntries(CLIENTS.map(k => [k, mergeBase(flatten ? preset[k] ?? {} : {}, old[patchKey(k)] ?? {})]));
-    doc.base = { ...convert(common, native, notes), ...(!flatten && old.presetId ? { presetId: old.presetId } : {}) };
-    if (flatten) notes.add('旧订阅公共项与预设原生项存在交叉优先级，已按原有效配置展开为独立原文；原预设引用已备份，可重新选择预设。');
+    doc.base = { ...convert(common, native, notes), ...(old.enabled !== undefined ? { enabled: old.enabled } : {}), ...(!flatten && old.presetId ? { presetId: old.presetId } : {}) };
+    if (flatten) notes.add('旧订阅公共项与预设原生项存在交叉优先级，已按原有效配置展开为独立原文；原预设引用已备份。');
     if (typeof old.raw === 'string' && old.raw.trim()) {
       doc.base.kernels.mihomo = (doc.base.kernels.mihomo ?? '') + '\n' + old.raw;
       notes.add('旧版未输出的原样片段已保留到 Mihomo 原文末尾，请预览核对重复键后再发布。');
     }
   }
   if (notes.size) doc.migrationNotes = [...notes];
+  return doc;
+}
+
+/** 退役预设时展开同层引用；只有一份原文时不重新排版，未完成语法保留并提示修复。 */
+export function retireProfilePreset(original: Doc, preset?: Doc): Doc {
+  if (original.base?.presetId === undefined) return original;
+  const doc = structuredClone(original);
+  const notes = new Set<string>(doc.migrationNotes ?? []);
+  const { presetId, ...base } = doc.base;
+  if (!preset) notes.add(`基础预设 ${presetId} 已不存在；已保留订阅原文，原引用已备份。`);
+  else {
+    for (const note of preset.migrationNotes ?? []) notes.add(note);
+    for (const layer of ['kernels', 'clients'] as const) {
+      const merged: Record<string, string> = { ...preset.config?.[layer], ...base[layer] };
+      for (const id of Object.keys(merged)) {
+        const earlier = preset.config?.[layer]?.[id], later = base[layer]?.[id];
+        if (earlier === undefined || later === undefined || earlier === later) continue;
+        if (!earlier.trim()) { merged[id] = later; continue; }
+        if (!later.trim()) { merged[id] = earlier; continue; }
+        const kernel = layer === 'kernels' ? id as Client : CLIENT_APPS.find(app => app.id === id)!.kernel;
+        try {
+          merged[id] = isIniClient(kernel) ? mergeNativeIni([earlier, later]) : stringify(mergeNativeObjects(parseNativeYaml(earlier), parseNativeYaml(later)), { lineWidth: 0 });
+        } catch (error) {
+          // 不能因草稿语法未完成而丢数据或阻止升级；输出生成仍会报告语法错误。
+          merged[id] = earlier + '\n# 以下为原订阅追加，请修复后预览\n' + later;
+          notes.add(`${id} 预设与订阅无法自动合并，已保留两份原文，请修复后预览：${(error as Error).message}`);
+        }
+      }
+      if (Object.keys(merged).length) base[layer] = merged;
+    }
+    notes.add(`基础预设「${preset.name ?? presetId}」已并入本订阅的两层原文，原始文档已备份。`);
+  }
+  doc.base = base;
+  doc.migrationNotes = [...notes];
   return doc;
 }

@@ -16,7 +16,7 @@ const AIRPORT = `proxies:
   - { name: 剩余流量：10G, type: trojan, server: x.example.com, port: 443, password: c }
 `;
 
-const PROFILE: ProfileDoc = {
+const PROFILE: NonNullable<Seed['profiles']>[number] = {
   id: 'p1', name: '落地链路',
   template: { id: 'std', follow: 'latest' },
   base: { presetId: 'fakeip', kernels: {mihomo: testYaml({ 'allow-lan': true }) } },

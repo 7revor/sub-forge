@@ -9,8 +9,10 @@ import { SnapshotService } from '../src/snapshots.ts';
 import { RenderService } from '../src/render.ts';
 const store = new Store(':memory:');
 const user = store.createUser({ username: 'stash-admin', passwordHash: await hashPassword('stash-demo-2026'), role: 'admin' });
+store.createUser({ username: 'fixture-user', passwordHash: await hashPassword('stash-demo-2026'), role: 'user' });
 const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
 store.importSeed({
+  templates: [{ id: 'default', name: '常用分流', groups: [], rules: [], final: direct }],
   locals: [{ id: 'demo', name: '演示节点', proxies: [
     { name: '香港节点', type: 'trojan', server: 'hk.example.test', port: 443, password: 'example' },
     { name: '日本节点', type: 'hysteria2', server: 'jp.example.test', port: 443, password: 'hy2-example' },

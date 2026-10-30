@@ -7,7 +7,6 @@
 | 项目 | Mihomo | Surge | Loon | Stash |
 | --- | --- | --- | --- | --- |
 | 完整主订阅 | YAML | INI | INI | YAML |
-| 基础预设原文 | `config.kernels.mihomo` | `config.kernels.surge` | `config.kernels.loon` | `config.kernels.stash` |
 | 订阅追加原文 | `base.kernels.mihomo` | `base.kernels.surge` | `base.kernels.loon` | `base.kernels.stash` |
 | 节点集 | provider / inline | 快照内联 | 快照内联 | 快照内联 |
 | 规则集 | 托管 provider | 托管 LIST | 托管 `[Remote Rule]` | 托管 provider |
@@ -18,7 +17,7 @@
 
 `GET /subs/profile?id=配置ID&token=用户token&target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。token 为当前用户的统一资源令牌，配置必须属于该用户；导入沿用现有令牌。Surge 主订阅含带当前 token 和配置 ID 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
 
-预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同客户端、同平台的上一份成功产物；没有可回退产物时返回 503，不发布半成品。公共仓库和增强规则产物按资源身份、处理参数、客户端和平台共享；直接远程规则及 Loon 手写规则按订阅私有，下载校验所有者、客户端和结构版本。节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
+预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同内核、同客户端的上一份成功产物；没有可回退产物时返回 503，不发布半成品。公共仓库和增强规则产物按资源身份、处理参数、内核共享；直接远程规则及 Loon 手写规则按订阅私有，下载校验所有者、客户端和结构版本。节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
 
 ## 节点和策略组
 
@@ -40,9 +39,9 @@
 
 ## 内核与客户端原文追加
 
-合并顺序为：**预设内核原文 → 订阅内核原文 → 预设客户端原文 → 订阅客户端原文**。内核为 Mihomo、Surge、Stash、Loon；FlClash、Clash Verge Rev 属于 Mihomo，Apple 两端按应用选择。保存只检查目标及字符串类型，未写完的原文也能保存。生成时解析必要的结构：YAML 映射递归合并、数组/标量/null 后层替换；INI General/Host/MITM 同名键后层替换，其余段落按顺序追加。原文不回写，错误会在预览报告，不会静默丢字段。
+合并顺序为：**订阅内核公共原文 → 订阅客户端原文（可选）**。内核为 Mihomo、Surge、Stash、Loon；FlClash、Clash Verge Rev 属于 Mihomo，Apple 两端按应用选择。保存只检查目标及字符串类型，未写完的原文也能保存。生成时解析必要的结构：YAML 映射递归合并、数组/标量/null 后层替换；INI General/Host/MITM 同名键后层替换，其余段落按顺序追加。原文不回写，错误会在预览报告，不会静默丢字段。
 
-节点、策略组、规则仍由原有模块管理；原文包含这些受管理的段时生成报错。listeners 仅允许放在订阅追加。预设不再提供表单、原文切换或公共项提取入口。升级前的对象及公共映射只在 v25 一次迁移中使用，保留加密备份与迁移提示。
+节点、策略组、规则仍由原有模块管理；原文包含这些受管理的段时生成报错。listeners 仅允许放在订阅追加。基础预设已移除；旧引用迁移为订阅原文。升级前的对象及公共映射只在 v27 一次迁移中使用，保留加密备份与迁移提示。
 
 ## Loon 完整配置导入
 

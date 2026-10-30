@@ -16,8 +16,7 @@ const NAV: { title?: string; items: NavItem[] }[] = [
   { items: [{ to: '/', label: '总览' }, { to: '/profiles', label: '订阅' }] },
   { title: '节点', items: [{ to: '/sources', label: '订阅' }, { to: '/locals', label: '本地' }, { to: '/collections', label: '组合' }] },
   { title: '规则', items: [{ to: '/rule-repo', label: '规则集合' }, { to: '/rulesets', label: '增强集合' }] },
-  { title: '模板', items: [{ to: '/templates', label: '模板', admin: true, end: true }] },
-  { title: '管理员', items: [{ to: '/presets', label: '基础设置预设', admin: true }, { to: '/users', label: '用户', admin: true }, { to: '/system', label: '系统', admin: true }] },
+  { title: '管理员', items: [{ to: '/templates', label: '模板', admin: true, end: true }, { to: '/users', label: '用户', admin: true }, { to: '/system', label: '系统', admin: true }] },
 ];
 
 function Logo() {

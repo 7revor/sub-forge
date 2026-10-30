@@ -16,10 +16,9 @@ async function scenario() {
   envs.push(env);
   const user = await addUser(env.store, 'alice', 'admin'); await addUser(env.store, 'bob');
   const alice = client(env.app), bob = client(env.app); await alice.login('alice'); await bob.login('bob');
-  env.store.put('preset', { id: 'base', name: '独立基础配置', version: 1, config: { kernels: {mihomo: testYaml({ 'mixed-port': 7890 }), surge: testIni({ general: { ipv6: false, loglevel: 'notify' } }) } } }, user.id);
   env.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'trojan', server: 'example.test', port: 443, password: 'example' }] }, user.id);
   const draft = { name: 'Surge', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' },
-    base: { presetId: 'base', kernels: {mihomo: testYaml({ 'allow-lan': true }), surge: testIni({ general: { 'test-timeout': 5 } }) } },
+    base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, 'allow-lan': true }), surge: testIni({ general: { ipv6: false, loglevel: 'notify', 'test-timeout': 5 } }) } },
     routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }],
       rules: [{ id: 'rs', matcher: remoteRuleMatcher(url), target: { kind: 'group', groupId: 'g' } }, { id: 'proc', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Example' } }, target: { kind: 'group', groupId: 'g' } }], final: { kind: 'builtin', name: 'DIRECT' } } } };
   const saved = await alice.post('/api/profiles', draft); expect(saved.status, saved.text).toBe(201);
@@ -69,7 +68,6 @@ describe('Surge 主订阅和 API', () => {
     expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=unknown`)).status).toBe(400);
     expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=surge&platform=linux`)).status).toBe(400);
     expect((await h.alice.post('/api/profiles/preview', { profile: h.profile, client: 'surge', platform: 'android' })).status).toBe(400);
-    expect((await h.alice.post('/api/presets', { name: '非法', config: { kernels: { surge: {} } } })).status).toBe(400);
     expect((await h.alice.post('/api/profiles', { ...h.draft, base: { kernels: { surge: {} } } })).status).toBe(400);
     const mihomo = await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=mihomo`);
     expect(mihomo.status).toBe(200); expect(await mihomo.text()).toContain('mixed-port: 7890');

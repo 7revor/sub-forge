@@ -1,4 +1,4 @@
-import { CLIENT_APPS, resolveNativeBase, validateNativeText, type ClientApp } from '@sub-forge/core';
+import { CLIENT_APPS, resolveNativeBase, type ClientApp } from '@sub-forge/core';
 import { ruleBinding } from './rule-binding.ts';
 import { queryUrl } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
@@ -236,11 +236,8 @@ export class RenderService {
     }
 
     checkCurrent();
-    const preset = profile.base?.enabled !== false && profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
-    if (profile.base?.enabled !== false && profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    for (const text of [preset?.config.kernels?.[target.client], target.app ? preset?.config.clients?.[target.app] : undefined]) if (text !== undefined) validateNativeText(text, target.client, 'preset');
-    for (const note of [...(preset?.migrationNotes ?? []), ...(profile.migrationNotes ?? [])]) pre.push({ level: 'warn', code: 'base.migrated', message: note });
-    const base = profile.base && profile.base.enabled !== false ? resolveNativeBase(target.client, target.app, preset?.config, profile.base) : undefined;
+    for (const note of profile.migrationNotes ?? []) pre.push({ level: 'warn', code: 'base.migrated', message: note });
+    const base = profile.base && profile.base.enabled !== false ? resolveNativeBase(target.client, target.app, profile.base) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');

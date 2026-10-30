@@ -27,7 +27,7 @@
 | `/subs/ruleset?profile=P&key=K&version=V&target=mihomo&token=T` | 该配置的专属规则产物；目标、结构版本与当前有效引用必须对应 |
 | `/subs/ruleset?profile=P&rule=R&view=source&revision=H&token=T` | 该配置专属规则的来源原文；R 是已保存规则行 ID，H 为 matcher 摘要 |
 | `/resources/ruleset?id=R&token=T` | 公共规则增强输出，支持 `target/platform`；`view=source` 查看启用来源原文，默认或 `view=output` 为转换结果 |
-| `/resources/ruleset?key=K&token=T` | 固定客户端/平台/处理参数的公共增强产物，不接受额外目标或上游 URL |
+| `/resources/ruleset?key=K&token=T` | 固定内核/处理参数的公共增强产物，不接受额外目标或上游 URL |
 | `/resources/repo?id=REPO&ref=分支&path=文件路径&token=T` | 启用仓库当前索引内的文件原文；不能指定任意上游 URL |
 | `/resources/repo?id=REPO&files=JSON&token=T` | 多文件来源原文；JSON 为最多 50 个 `{ref,path}` 的数组，每个文件分别验证索引成员资格，不能同时传 ref/path |
 | `/resources/repo?key=K&token=T` | 仓库引用对应的公共转换产物；仓库停用、删除或文件失效后不可读 |
@@ -36,7 +36,7 @@
 
 ## 公共规则与订阅专属规则
 
-公共规则增强定义和仓库文件属于公共资源。订阅只是引用它们，不复制一份私有公共规则。不同用户读取同一产物时，资源键相同，链接中的 token 不同。客户端格式、平台或 `src` 产生不同公共变体；指定不同出口组不会改变规则正文或归属。
+公共规则增强定义和仓库文件属于公共资源。订阅只是引用它们，不复制一份私有公共规则。不同用户读取同一产物时，资源键相同，链接中的 token 不同。内核格式或 `src` 产生不同公共变体，平台和应用不再拆分公共规则；指定不同出口组不会改变规则正文或归属。
 
 订阅中直接填写的远程规则 URL 属于该订阅。模板中的直接远程引用应用到订阅后，也归该订阅鉴权。专属产物保存在该订阅的加密结构版本中，不进入公共资源表；原文按订阅作用域绑定，其他用户不能借相同 URL 或缓存取得访问权限。
 
@@ -85,7 +85,7 @@
 
 管理 GET 使用固定路径加查询参数：
 
-- 列表 `/api/profiles`，详情 `/api/profiles?id=P`；sources、collections、locals、rulesets、presets、templates 同理。
+- 列表 `/api/profiles`，详情 `/api/profiles?id=P`；sources、collections、locals、rulesets、templates 同理。
 - `/api/nodesets/nodes?type=source&id=N`、`/api/sources/snapshots?id=N`。
 - `/api/profiles/access-log?id=P`、`/api/profiles/migration-backup?id=P`。
 - `/api/{sources|collections|rulesets|profiles}/cache?id=ID`、`/api/refresh-jobs?id=JOB`。
