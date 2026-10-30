@@ -1,4 +1,3 @@
-import { LoonImportPage } from './pages/profile/LoonImport.tsx';
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -49,7 +48,6 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="sources" element={<SourceList />} />
       <Route path="sources/:id" element={<SourceEdit />} />
       <Route path="profiles" element={<ProfileList />} />
-      <Route path="profiles/import-loon" element={<LoonImportPage />} />
       <Route path="profiles/new" element={<ProfileNew />} />
       <Route path="profiles/:id/:tab?" element={<ProfileDetail />} />
       <Route path="collections" element={<CollectionList />} />

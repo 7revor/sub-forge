@@ -15,7 +15,7 @@
 
 基础配置使用「内核公共追加＋可选客户端追加」，只保存原生文本，取消表单解析、公共字段提取及跨内核转换。Mihomo/Stash 填写 YAML；Surge/Loon 填写 INI。DNS 分流、加密 DNS、Hosts、IPv6、GeoData、skip-proxy、TUN 排除及 fake-ip-range 全部由用户在对应内核原文中维护，不猜测等价关系。详见[原文追加约定](20-native-client-append.md)。
 
-`GET /subs/profile?id=配置ID&token=用户token&target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。token 为当前用户的统一资源令牌，配置必须属于该用户；导入沿用现有令牌。Surge 主订阅含带当前 token 和配置 ID 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
+`GET /subs/profile?id=配置ID&token=用户token&target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。token 为当前用户的统一资源令牌，配置必须属于该用户。Surge 主订阅含带当前 token 和配置 ID 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
 
 预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同内核、同客户端的上一份成功产物；没有可回退产物时返回 503，不发布半成品。公共仓库和增强规则产物按资源身份、处理参数、内核共享；直接远程规则及 Loon 手写规则按订阅私有，下载校验所有者、客户端与当前规则引用。节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
 
@@ -35,9 +35,9 @@
 
 协议名出现在表内不代表所有可选参数都已覆盖。未适配协议、传输或重要参数给出错误；已明确允许省略的差异（例如部分显示/测速选项和上传带宽）在报告中说明。Loon 不输出 PASS、TUIC、Snell 或 WireGuard；Surge 不输出 VLESS/Reality。引用、重名、筛选和循环检测继续使用已有实现。
 
-节点输入支持完整 INI 的 `[Proxy]` 段及裸节点行，通过位置凭据和专有参数区分 Surge/Loon。凭据中的逗号、等号、引号、反斜杠以及显式 false 可往返。Surge VMess 输入要求显式 `vmess-aead=true`；旧的非 AEAD 配置无法忠实映射时拒绝导入。节点粘贴入口仍只导入节点；整份 Loon 配置使用配置订阅列表中的「导入 Loon 完整配置」入口。
+节点输入支持完整 INI 的 `[Proxy]` 段及裸节点行，通过位置凭据和专有参数区分 Surge/Loon。凭据中的逗号、等号、引号、反斜杠以及显式 false 可往返。Surge VMess 输入要求显式 `vmess-aead=true`；旧的非 AEAD 配置无法忠实映射时拒绝导入。节点粘贴入口仍只导入节点。
 
-自动生成的 Loon 辅助名称使用下划线分隔：链落地副本为 `原节点名_链落地`，与节点或策略组重名时依次尝试 `原节点名_链落地_2`、`原节点名_链落地_3`；代理链引用同步使用最终名称。完整配置导入创建的本地节点组为 `订阅名_本地节点`。用户已有名称按原文保留，页面说明和诊断文字中的间隔号不参与名称规范化。
+自动生成的 Loon 辅助名称使用下划线分隔：链落地副本为 `原节点名_链落地`，与节点或策略组重名时依次尝试 `原节点名_链落地_2`、`原节点名_链落地_3`；代理链引用同步使用最终名称。用户已有名称按原文保留，页面说明和诊断文字中的间隔号不参与名称规范化。
 
 ## 内核与客户端原文追加
 
@@ -45,20 +45,17 @@
 
 节点、策略组、规则仍由原有模块管理；原文包含这些受管理的段时生成报错。listeners 仅允许放在订阅追加。基础预设已移除；旧引用迁移为订阅原文。升级前的对象及公共映射只在 v28 一次迁移中使用，保留加密备份与迁移提示。
 
-## Loon 完整配置导入
+## 解析职责
 
-入口：配置订阅列表 → 导入 Loon 完整配置。接口 `POST /api/profiles/import/loon`，默认只预览；`save:true` 创建资源。导入预览不联网，展示四端本地内容兼容报告；远程节点和规则需正常拉取后再次验证。资源使用新 ID，归属当前用户，创建失败整体回滚，不改已有订阅。
+不提供整份 Loon 配置导入入口，不从整份配置批量创建订阅、节点来源、节点集或代理链。
 
-- 识别 `[General]`、`[Host]`、`[Proxy]`、`[Remote Proxy]`、`[Remote Filter]`、`[Proxy Group]`、`[Proxy Chain]`、`[Rule]`、`[Remote Rule]`。未适配的非空段、未知运行参数、重名、缺失引用、循环引用明确报错。
-- 远程订阅保留 URL，不访问用户的真实地址。udp、block-quic、证书校验、fast-open 覆盖进入现有处理链；`default` 不覆写，VMess AEAD 仅作用于 VMess。停用来源保存为独立资源但不加入本订阅；flexible-sni=true 暂不适配。
-- NameRegex 筛选器变成只包含启用远程来源的动态组合，`(?i)` 保留。重叠组合可能生成独立节点副本并自动改名，会报告改名。NodeSelect 缺少选择结果时给出提示；若被引用则拒绝导入。
-- 当前导入两跳命名链，落地必须在 `[Proxy]` 声明，前置可为节点/策略组。为每个链名生成独立落地副本和已有 ChainRule，同一原落地可走多个前置，原出口不变。多跳或动态落地不能等价适配时明确报错。
-- 缺少 FINAL 必须在原文补充或在表单明确选择最终出口，不默认选 DIRECT。远程规则保留现有远程引用，报告本地/远程及域名/IP 阶段匹配的差异；停用远程规则明确提示未加入分流。
-- Loon `max-timeout` 独立保存在 `test.maxTimeout`，与全局单次测试超时区分；其他端尚未等价适配时阻止输出。可在策略组高级设置中清除。
+- 模板导入只提取策略组、规则、规则集来源引用与最终出口，忽略节点、DNS、端口等运行配置，详见[模板 YAML 导入](template-yaml-import.md)。
+- 节点与规则内容由各自模块解析，继续用于订阅生成和内核格式转换。
+- 基础配置按内核／客户端原文保存，不提取为表单、不转换为公共字段；生成时只做必要的结构合并和受管理段冲突检查。
 
 节点转换统一规范 VLESS/VMess 的 `sni` 为 `servername`；冲突报错。Loon block-quic 布尔值对应 Surge on/off，Surge auto/adaptive 保留原值并在 Loon 报不兼容。Mihomo/Stash 当前没有适配等价的节点级阻断：true/on/auto/adaptive 报错，false/off 可省略；绝不擅自替换成全局拒绝 UDP 443。
 
-新增依据：[Mihomo 域名语法](https://wiki.metacubex.one/handbook/syntax/)、[Mihomo TUN](https://wiki.metacubex.one/config/inbound/tun/)、[Loon General](https://nsloon.app/en/docs/General/)、[Surge General](https://manual.nssurge.com/profile/general.html)、[Surge 节点选项](https://manual.nssurge.com/policies/parameters.html)、[Stash DNS](https://stash.wiki/en/features/dns-server)。本轮实现和验收见[公共配置与完整导入验收](../research/verification/common-base-loon-import-20261030/验收记录.md)。
+新增依据：[Mihomo 域名语法](https://wiki.metacubex.one/handbook/syntax/)、[Mihomo TUN](https://wiki.metacubex.one/config/inbound/tun/)、[Loon General](https://nsloon.app/en/docs/General/)、[Surge General](https://manual.nssurge.com/profile/general.html)、[Surge 节点选项](https://manual.nssurge.com/policies/parameters.html)、[Stash DNS](https://stash.wiki/en/features/dns-server)。此前的公共配置映射及完整导入验收仅作历史记录；当前基础配置遵循[原文追加约定](20-native-client-append.md)。
 
 ## 规则修复与边界
 
