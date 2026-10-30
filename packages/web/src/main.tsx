@@ -2,6 +2,7 @@ import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from 'react-router';
+import { ModalRoot } from './modals/index.tsx';
 import { FeedbackHost } from './components/FeedbackHost.tsx';
 import { alertError, notifySuccess } from './feedback.ts';
 import { ApiError } from './api.ts';
@@ -29,7 +30,7 @@ const queryClient = new QueryClient({
       const message = mutation.meta?.successMessage;
       if (typeof message === 'string') notifySuccess(message);
     },
-    onError: error => alertError(error),
+    onError: (error, _variables, _result, mutation) => { if (!mutation.meta?.modalErrors) alertError(error); },
   }),
   defaultOptions: {
     queries: {
@@ -41,7 +42,7 @@ const queryClient = new QueryClient({
 });
 
 const router = createBrowserRouter(createRoutesFromElements(
-  <>
+  <Route element={<ModalRoot />}>
     <Route path="/login" element={<Login />} />
     <Route element={<AppLayout />}>
       <Route index element={<Overview />} />
@@ -70,7 +71,7 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="account" element={<Account />} />
       <Route path="*" element={<div className="text-ink-muted">页面不存在</div>} />
     </Route>
-  </>
+  </Route>
 ));
 
 createRoot(document.getElementById('root')!).render(

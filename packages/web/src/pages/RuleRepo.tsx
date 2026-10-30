@@ -1,9 +1,9 @@
 import { RefreshCacheButton } from '../components/ResourceCache.tsx';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
+import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 // 文件搜索分页读取数据库索引，点击表格中的文件后弹窗预览原文。
 import { nameSearchRanges } from '@sub-forge/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
 import { OptionPageStatus, useOptionPages } from '../components/OptionPage.tsx';
@@ -53,27 +53,15 @@ export function RuleRepoPage() {
   const ruleset = params.get('ruleset');
   const [q, setQ] = useState(params.get('q') ?? '');
   const query = useDebouncedValue(q.trim(), 250);
-  const [selected, setSelected] = useState<RepositoryFile>();
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
   const revision = repos.data?.repos.map(repo => `${repo.id}:${repo.builtAt}:${repo.enabled}:${repo.configRevision}`).join('|');
   const pending = q.trim() !== query;
-  useEffect(() => { setSelected(undefined); }, [query]);
-  useEffect(() => {
-    if (selected && repos.data && !repos.data.repos.some(repo => repo.id === selected.repo && repo.enabled)) setSelected(undefined);
-  }, [repos.data, selected]);
-  const preview = useQuery({ queryKey: ['rule-repos', 'file-preview', selected?.repo, selected?.file.ref, selected?.file.path, revision], enabled: !!selected, retry: false,
-    queryFn: () => api<{ item: RepoFilePreview }>('GET', `/rule-repos/file-preview?${new URLSearchParams({ repo: selected!.repo, ref: selected!.file.ref, path: selected!.file.path })}`).then(result => result.item),
-  });
-  const create = useMutation({ meta: { successMessage: ruleset ? '规则文件已加入增强集合' : '增强集合已创建' },
-    mutationFn: (file: RepoFilePreview) => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: file.repo, path: file.entry, file: { ref: file.ref, path: file.path }, ...(ruleset ? { ruleset } : {}) }),
-    onSuccess: async result => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${result.item.id}`); },
-  });
-  const select = (value: string) => {
-    const selection = JSON.parse(value) as RuleSelection;
-    if (selection.source !== 'repository') throw new Error('请选择仓库文件');
-    setSelected(selection); create.reset();
+  const select = async (value: string) => {
+    const selected = JSON.parse(value) as RuleSelection;
+    if (selected.source !== 'repository') throw new Error('请选择仓库文件');
+    const result = await RepositoryPreviewModal.show({ selected, ruleset, repos: repos.data?.repos ?? [] });
+    if (result.status === 'confirmed') { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(`/rulesets/${result.data}`); }
   };
-  const file = preview.data;
   return <>
     <PageHeader title="规则集合" />
     <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} />
@@ -84,24 +72,33 @@ export function RuleRepoPage() {
       <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : '规则文件'}</div>
       {!pending && repos.data && <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} onSelect={select} />}
     </section>
-    <Dialog open={!!selected} onOpenChange={next => { if (!next) (() => setSelected(undefined))(); }}><DialogContent className="flex h-[min(640px,calc(100dvh-2rem))] min-w-0 flex-col overflow-hidden sm:max-w-[800px] [&>*]:min-w-0" style={{ width: 'min(800px, calc(100vw - 2rem))' }} aria-describedby={undefined}><DialogHeader className="shrink-0"><DialogTitle>{"文件内容预览"}</DialogTitle></DialogHeader><div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-hidden">
+
+  </>;
+}
+
+const RepositoryPreviewModal = createModal<{ selected: RepositoryFile; ruleset: string | null; repos: RuleRepo[] }, string>(function RepositoryPreview({ data: { selected, ruleset, repos }, modal }) {
+  const query = useQuery({ queryKey: ['rule-repos', 'file-preview', selected.repo, selected.file.ref, selected.file.path], enabled: modal.active, retry: false,
+    queryFn: () => api<{ item: RepoFilePreview }>('GET', `/rule-repos/file-preview?${new URLSearchParams({ repo: selected.repo, ref: selected.file.ref, path: selected.file.path })}`).then(result => result.item),
+  });
+  const preview = useModalPresentation(query);
+  const file = preview.data;
+  return <ModalContent className="flex h-[min(640px,calc(100dvh-2rem))] min-w-0 flex-col overflow-hidden sm:max-w-[800px] [&>*]:min-w-0" style={{ width: 'min(800px, calc(100vw - 2rem))' }} aria-describedby={undefined}><ModalHeader className="shrink-0"><ModalTitle>{"文件内容预览"}</ModalTitle></ModalHeader><div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-hidden">
       {selected && <>
         <div className="flex shrink-0 flex-col gap-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="m-0 break-all text-[17px] font-semibold">{selected.file.path.split('/').at(-1)}</h2>
             <Badge>分支：{selected.file.ref}</Badge>
           </div>
-          <span className="line-clamp-2 break-all font-mono text-[12px] text-ink-muted">{repos.data?.repos.find(repo => repo.id === selected.repo)?.name ?? selected.repo} · {selected.file.path}</span>
+          <span className="line-clamp-2 break-all font-mono text-[12px] text-ink-muted">{repos.find(repo => repo.id === selected.repo)?.name ?? selected.repo} · {selected.file.path}</span>
           {file && !preview.isFetching && !preview.isError && <div className="flex flex-wrap items-center gap-3 text-[12px]">
             <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-brand">打开原文件</a>
-            <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>
+            <Button size="sm" variant="primary" disabled={modal.pending || file.entry === undefined} onClick={() => modal.submit(async () => { const result = await api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: file.repo, path: file.entry, file: { ref: file.ref, path: file.path }, ...(ruleset ? { ruleset } : {}) }); return ruleset ?? result.item.id; })}>{modal.pending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>
           </div>}
           {file?.cache?.error && !preview.isFetching && <p role="status" className="text-[13px] text-amber-700">拉取失败：{file.cache.error}；正在显示上次成功内容（{file.cache.lastSuccessAt ? formatTime(file.cache.lastSuccessAt) : '时间未知'}）。</p>}
-          <ErrorAlert error={preview.error ?? create.error} />
+          <ErrorAlert error={preview.error} />
           {preview.isError && <Button size="sm" onClick={() => void preview.refetch()}>重试读取文件</Button>}
         </div>
         {preview.isFetching ? <div role="status" className="p-4 text-[13px] text-ink-muted">正在读取文件内容…</div> : file && !preview.isError && <CodePreview label="文件正文" key={`${file.repo}:${file.ref}:${file.path}`} text={file.content} fill className="nav-scroll" bodyClassName="overscroll-contain p-4 whitespace-pre" />}
       </>}
-    </div></DialogContent></Dialog>
-  </>;
-}
+    </div></ModalContent>;
+});

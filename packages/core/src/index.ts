@@ -33,3 +33,5 @@ export * from './util/search.ts';
 
 export * from './rules/diagnostics.ts';
 export { exportStashConfig } from './render/stash-config.ts';
+
+export * from './rules/local.ts';

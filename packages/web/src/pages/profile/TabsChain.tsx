@@ -1,8 +1,9 @@
 import { ChainCheckResult, useChainCheck } from './ChainCheck.tsx';
-import { ChainRuleEditor, chainForLanding } from './ChainRuleEditor.tsx';
+import { chainForLanding } from './ChainRuleEditor.tsx';
+import { ChainRuleModal } from './ChainRuleModal.tsx';
+import { profileModalData } from './modalProfile.ts';
 import { landingNodeName } from './chainModel.ts';
 import { putChain } from './memberModel.ts';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog.tsx';
 import { persistedProfile } from './routing.ts';
 import { CodePreview } from '../../components/CodePreview.tsx';
 // 代理链直接展示业务检查结果，引用生成细节仅在配置预览中按需展开。
@@ -23,13 +24,14 @@ function usePreview() {
 }
 
 export function TabChains() {
-  const { draft, setDraft, groupName, profileNodeSets, nodeSetName } = useProfile();
+  const profile = useProfile();
+  const { draft, setDraft, groupName, profileNodeSets, nodeSetName } = profile;
   const check = useChainCheck();
-  // 编辑在对话框里进行：index 为 -1 表示新增
-  const [editing, setEditing] = useState<{ index: number; chain: ChainRule }>();
-  const add = () => {
-    setEditing({ index: -1, chain: chainForLanding([], { nodeSet: { type: 'source', id: '' } }) });
+  const edit = async (chain: ChainRule, adding = false) => {
+    const result = await ChainRuleModal.show({ ...profileModalData(profile), chain, title: adding ? '添加代理链' : '编辑代理链' });
+    if (result.status === 'confirmed' && result.data) setDraft({ ...draft, chains: putChain(draft.chains, result.data) });
   };
+  const add = () => void edit(chainForLanding([], { nodeSet: { type: 'source', id: '' } }), true);
 
   return (
     <>
@@ -49,7 +51,7 @@ export function TabChains() {
                   <ChainCheckResult chain={c} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === c.id)} />
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`编辑代理链 ${i + 1}`} title="编辑代理链" onClick={() => setEditing({ index: i, chain: c })}><Pencil size={14} /></Button>
+                  <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`编辑代理链 ${i + 1}`} title="编辑代理链" onClick={() => void edit(c)}><Pencil size={14} /></Button>
                   <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除链规则 ${i + 1}`} title="删除代理链" onClick={() => setDraft({ ...draft, chains: draft.chains.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
                 </div>
               </li>;
@@ -58,7 +60,6 @@ export function TabChains() {
         )}
       </Card>
 
-      <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(undefined); }}><DialogContent className="flex h-[min(680px,calc(100dvh-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl" aria-describedby={undefined}><DialogHeader className="shrink-0 border-b border-line px-5 py-4"><DialogTitle>{editing?.index === -1 ? '添加代理链' : '编辑代理链'}</DialogTitle></DialogHeader>{editing && <ChainRuleEditor key={editing.chain.id} initial={editing.chain} onCancel={() => setEditing(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); setEditing(undefined); }} />}</DialogContent></Dialog>
     </>
   );
 }

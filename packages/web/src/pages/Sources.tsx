@@ -1,7 +1,7 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
+import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
+import { Frame } from '../modals/Frame.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
-import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展示最近拉取状态。
 
@@ -12,62 +12,50 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-route
 import { api } from '../api.ts';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
-import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
-
-function SourceState({ source }: { source: SourceDoc }) {
-  const s = useSourceFetchState(source);
-  return <SourceFetchStatus state={s} />;
-}
-
-function SourceLast({ source }: { source: SourceDoc }) {
-  const s = useSourceFetchState(source);
-  return <span className="text-ink-2">{s.lastOk ? formatTime(s.lastOk.fetchedAt).slice(5) : '—'}</span>;
-}
 
 const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢复。';
 
 export function SourceList() {
   const location = useLocation();
-  const [creating, setCreating] = useState(!!(location.state as { create?: boolean } | null)?.create);
+  const navigate = useNavigate();
+  const opened = useRef(false);
+  const create = async () => {
+    const result = await NewSourceModal.show({});
+    if (result.status === 'confirmed') navigate(`/sources/${result.data.id}`, { state: { justCreated: true } });
+  };
+  useEffect(() => { if (!opened.current && (location.state as { create?: boolean } | null)?.create) { opened.current = true; void create(); } }, [location.key]);
   return (
     <>
-      <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={() => setCreating(true)} deleteBody={SOURCE_DELETE_BODY}
+      <DocList kind="sources" title="订阅源" noun="订阅源" onCreate={create} deleteBody={SOURCE_DELETE_BODY}
         columns={[
           { header: '名称', cell: (s) => s.name },
           { header: '备注', cell: (s) => s.note?.trim() ? <NoteCell note={s.note} /> : null },
           { header: '地址', cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[12px] text-ink-2">{s.url}</span> },
           { header: '节点', cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
-          { header: '上次拉取', cell: (s) => <SourceLast source={s} /> },
-          { header: '状态', cell: (s) => <SourceState source={s} /> },
         ]} />
-      <NewSourceModal open={creating} onClose={() => setCreating(false)} />
     </>
   );
 }
 
-function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const navigate = useNavigate();
-  const save = useSaveDoc('sources');
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [note, setNote] = useState('');
+const NewSourceModal = createModal<Record<string, never>, SourceDoc>(function NewSource({ modal }) {
+  const save = useSaveDoc('sources', true);
+  const [name, setName] = useModalDraft('');
+  const [url, setUrl] = useModalDraft('');
+  const [note, setNote] = useModalDraft('');
   const ready = name.trim() && url.trim();
-  const create = () => save.mutate(
-    { name: name.trim(), url: url.trim(), note, pipeline: [] },
-    { onSuccess: (item) => navigate(`/sources/${item.id}`, { state: { justCreated: true } }) },
-  );
+  const create = () => modal.submit(() => save.mutateAsync({ name: name.trim(), url: url.trim(), note, pipeline: [] }));
+  const onClose = modal.cancel;
   return (
-    <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"新建订阅源"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"新建订阅源"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
       <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
       <NoteField value={note} onChange={setNote} />
-      <ErrorAlert error={save.error} />
-    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</DialogFooter></DialogContent></Dialog>
+    </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</ModalFooter></ModalContent>
   );
-}
+});
 
 /** 基础设置和处理链共用页面草稿。 */
 function BasicSettings({ draft, set }: {
@@ -75,9 +63,9 @@ function BasicSettings({ draft, set }: {
 }) {
   return (
     <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
-      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
-        <Field label="名称" className="min-w-0 sm:col-span-2">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
-        <Field label="订阅地址" className="col-span-full min-w-0">{(id) =>
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(0,3fr)]">
+        <Field label="名称" className="min-w-0">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
+        <Field label="订阅地址" className="min-w-0">{(id) =>
           <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
       </div>
@@ -96,7 +84,6 @@ export function SourceEdit() {
   const save = useSaveDoc('sources');
   const del = useDeleteDoc('sources');
   const [draft, setDraft] = useState<SourceDoc>();
-  const [deleting, setDeleting] = useState(false);
   const previous=useRef<SourceDoc|undefined>(undefined);
   useEffect(()=>{if(doc.data){const before=previous.current;previous.current=doc.data;setDraft(current=>!current||current.id!==doc.data!.id||JSON.stringify(current)===JSON.stringify(before)?doc.data:current);}},[doc.data]);
   const source = useMemo(() => draft ? { url: draft.url.trim(), fetch: draft.fetch ?? {} } : undefined, [draft?.url, draft?.fetch]);
@@ -129,7 +116,7 @@ export function SourceEdit() {
     save.mutate({ ...draft, name: draft.name.trim(), url: draft.url.trim() },{onSuccess:item=>setDraft(item)});
   };
   const u = state.lastOk?.userinfo;
-  const openDelete = () => { del.reset(); setDeleting(true); };
+  const openDelete = async () => { del.reset(); const result = await Frame.modal.confirm({ title: `删除订阅源「${draft.name}」？`, description: SOURCE_DELETE_BODY, confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(draft.id); } }); if (result.status === 'confirmed') navigate('/sources'); };
   const busy = save.isPending || refresh.isPending;
   const ready = !!draft.name.trim() && !!draft.url.trim();
   const saveAndRefresh = () => {
@@ -156,7 +143,7 @@ export function SourceEdit() {
       <ErrorAlert error={refresh.error} />
       <ErrorAlert error={state.snaps.error} />
 
-      <PageScroll>
+      <PageScroll className="source-detail-content">
         {preview.data?.report.filter((r) => r.level === 'error' || r.level === 'warn').map((r, i) => (
           <div key={i} role="status" className={cx('rounded-lg px-3 py-2 text-[13px]', r.level === 'error' ? 'bg-err-soft text-err' : 'bg-warn-soft text-warn')}>{r.message}</div>
         ))}
@@ -165,10 +152,7 @@ export function SourceEdit() {
           loading={preview.isFetching} {...(preview.error ? { previewError: (preview.error as Error).message } : {})} />
 
       </PageScroll>
-      <DeleteDialog open={deleting} title={`删除订阅源「${draft.name}」？`} error={del.error} pending={del.isPending}
-        onClose={() => setDeleting(false)} onConfirm={() => del.mutate(draft.id, { onSuccess: () => navigate('/sources') })}>
-        {SOURCE_DELETE_BODY}
-      </DeleteDialog>
+
     </>
   );
 }

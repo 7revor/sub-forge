@@ -1,0 +1,694 @@
+{
+  "template": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「🚀 节点选择」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「🚀 节点选择」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "🚀 节点选择SELECTDIRECT · REJECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "较长的策略组名称用于检查卡片截断与操作按钮URL-TESTDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.listDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 2 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 2 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "DOMAIN,a.example.test2 条🚀 节点选择"
+      }
+    ],
+    "overflow": false,
+    "width": 1280
+  },
+  "profile": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「🚀 节点选择」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「🚀 节点选择」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "🚀 节点选择SELECTDIRECT · REJECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "较长的策略组名称用于检查卡片截断与操作按钮URL-TESTDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.listDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 2 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 2 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "DOMAIN,a.example.test2 条DIRECT"
+      }
+    ],
+    "overflow": false,
+    "width": 1280
+  },
+  "bound": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「🚀 节点选择」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "🚀 节点选择SELECTDIRECT · REJECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "较长的策略组名称用于检查卡片截断与操作按钮URL-TESTDIRECT"
+      },
+      {
+        "actions": [],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.listDIRECT跟随模板"
+      },
+      {
+        "actions": [],
+        "font": "13px",
+        "height": 50,
+        "menus": [],
+        "text": "DOMAIN,a.example.test2 条🚀 节点选择跟随模板"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "DOMAIN,a.example.test2 条DIRECT"
+      }
+    ],
+    "overflow": false,
+    "width": 1280
+  },
+  "boundMobile": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「🚀 节点选择」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 84,
+        "menus": [],
+        "text": "🚀 节点选择SELECTDIRECT · REJECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 84,
+        "menus": [],
+        "text": "较长的策略组名称用于检查卡片截断与操作按钮URL-TESTDIRECT"
+      },
+      {
+        "actions": [],
+        "font": "13px",
+        "height": 78,
+        "menus": [],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.listDIRECT跟随模板"
+      },
+      {
+        "actions": [],
+        "font": "13px",
+        "height": 82,
+        "menus": [],
+        "text": "DOMAIN,a.example.test2 条🚀 节点选择跟随模板"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 0,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "DOMAIN,a.example.test2 条DIRECT"
+      }
+    ],
+    "overflow": false,
+    "width": 390
+  },
+  "templateMobile": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「🚀 节点选择」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「🚀 节点选择」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 84,
+        "menus": [],
+        "text": "🚀 节点选择SELECTDIRECT · REJECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 84,
+        "menus": [],
+        "text": "较长的策略组名称用于检查卡片截断与操作按钮URL-TESTDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 90,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.listDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 2 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 2 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 90,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "DOMAIN,a.example.test2 条🚀 节点选择"
+      }
+    ],
+    "overflow": false,
+    "width": 390
+  },
+  "enhanceMobile": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项来源",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项来源",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 82,
+        "selects": [],
+        "text": "blackmatrix7/ios_rule_script · rule/Surge/Google/Google.list2 条"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 2 项来源",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 2 项来源",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 82,
+        "selects": [],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.list2 条"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 3 项来源",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 3 项来源",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 82,
+        "selects": [],
+        "text": "DOMAIN,a.example.test2 条"
+      }
+    ],
+    "overflow": false,
+    "width": 390
+  },
+  "enhance": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项来源",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项来源",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "selects": [],
+        "text": "blackmatrix7/ios_rule_script · rule/Surge/Google/Google.list2 条"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 2 项来源",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 2 项来源",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "selects": [],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.list2 条"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 3 项来源",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 3 项来源",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 50,
+        "selects": [],
+        "text": "DOMAIN,a.example.test2 条"
+      }
+    ],
+    "overflow": false,
+    "width": 1280
+  },
+  "profileMobile": {
+    "cards": [
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「🚀 节点选择」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「🚀 节点选择」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 84,
+        "menus": [],
+        "text": "🚀 节点选择SELECTDIRECT · REJECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除策略组「较长的策略组名称用于检查卡片截断与操作按钮」",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 84,
+        "menus": [],
+        "text": "较长的策略组名称用于检查卡片截断与操作按钮URL-TESTDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 1 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 1 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 90,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.listDIRECT"
+      },
+      {
+        "actions": [
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "编辑第 2 项规则",
+            "width": 28
+          },
+          {
+            "height": 32,
+            "icon": 14,
+            "label": "删除第 2 项规则",
+            "width": 28
+          }
+        ],
+        "font": "13px",
+        "height": 90,
+        "menus": [
+          {
+            "border": "0px",
+            "font": "13px",
+            "icons": 1,
+            "shadow": "none",
+            "width": 136
+          }
+        ],
+        "text": "DOMAIN,a.example.test2 条DIRECT"
+      }
+    ],
+    "overflow": false,
+    "width": 390
+  }
+}

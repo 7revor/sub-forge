@@ -1,3 +1,4 @@
+import { useModalPresentation } from '../../modals/index.tsx';
 import type { ChainRule, GroupMember, GroupSpec } from '@sub-forge/core';
 import { Link2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -5,16 +6,15 @@ import { useNodeList } from '../../hooks.ts';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { BUILTINS, memberLabel, targetLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, Button, Empty, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, exactNodeFilter, memberKey, nodeSetKey, toggleMember, putChain } from './memberModel.ts';
 import { ChainRuleEditor, chainForLanding } from './ChainRuleEditor.tsx';
 
 type Props = { group: GroupSpec; members: GroupMember[]; inherited: GroupMember[]; onChange: (members: GroupMember[]) => void; onGroupChange: (patch: Partial<GroupSpec>) => void; readOnlySettings: boolean; onChainEditingChange: (editing: boolean) => void; footerTarget: HTMLDivElement | null };
 
-export function GroupMemberPicker({ group, members, inherited, onChange, onGroupChange, readOnlySettings, onChainEditingChange, footerTarget }: Props) {
+export function GroupMemberPicker({ group, members, inherited, onChange, readOnlySettings, onChainEditingChange, footerTarget }: Props) {
   const { draft, setDraft, groups, groupName, nodeSetName, profileNodeSets } = useProfile();
   const [category, setCategory] = useState<'node' | 'group' | 'builtin'>(() => draft.nodeSets.some(s => s.output === 'inline') ? 'node' : 'builtin');
   const [source, setSource] = useState('');
@@ -28,7 +28,8 @@ export function GroupMemberPicker({ group, members, inherited, onChange, onGroup
   const inline = profileNodeSets.filter(s => output(s.ref) === 'inline');
   const providers = profileNodeSets.filter(s => output(s.ref) === 'provider');
   const active = inline.find(s => nodeSetKey(s.ref) === source) ?? inline[0];
-  const nodes = useNodeList(category === 'node' ? active?.ref : undefined, useDebouncedValue(search, 200));
+  const nodeQuery = useNodeList(category === 'node' ? active?.ref : undefined, useDebouncedValue(search, 200));
+  const nodes = useModalPresentation(nodeQuery);
   const inheritedKeys = new Set(inherited.map(memberKey));
   const selectedKeys = new Set(members.map(memberKey));
   const effective = [...inherited, ...members];
@@ -99,11 +100,6 @@ export function GroupMemberPicker({ group, members, inherited, onChange, onGroup
       <Segmented label="Provider 范围" value={allProviders ? 'all' : 'selected'} options={[{ value: 'selected', label: '指定 Provider', disabled: inherited.some(m => m.kind === 'all' && m.scope !== 'proxies') }, { value: 'all', label: '全部 Provider', disabled: inherited.some(m => m.kind === 'nodeset') }]} onChange={v => setRange(v === 'all', allInline)} />
       {allProviders ? <p className="m-0 text-[12px] text-ink-muted">包含本订阅所有 Provider，并随其节点更新。</p> : <div className="flex flex-wrap gap-2">{providers.map(p => { const m: GroupMember = { kind: 'nodeset', ref: p.ref }; const k = memberKey(m); return <label key={k} className={cx("flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-[13px]", inheritedKeys.has(k) || selectedKeys.has(k) ? "border-brand bg-accent-soft" : "border-line")}><input type="checkbox" aria-label={`引用 Provider ${p.name}`} className="accent-brand" checked={inheritedKeys.has(k) || selectedKeys.has(k)} disabled={inheritedKeys.has(k)} onChange={e => choose(m, e.target.checked)} />{p.name}{inheritedKeys.has(k) && <Badge>模板</Badge>}</label>; })}{!providers.length && <span className="text-[12px] text-ink-muted">尚未加入 Provider 节点集。</span>}</div>}
       <fieldset disabled={inherited.some(m => m.kind === 'all' && m.scope !== 'providers')} className="m-0 border-0 p-0"><label className="flex items-center gap-2 text-[13px]"><Switch disabled={inherited.some(m => m.kind === 'all' && m.scope !== 'providers') || !inline.length} label="自动包含全部 Inline 节点" checked={allInline} onChange={v => setRange(allProviders, v)} />同时自动包含全部 Inline 节点</label></fieldset>
-      <fieldset disabled={readOnlySettings} className="m-0 grid gap-3 border-0 p-0 sm:grid-cols-2">
-        <Field label="保留名称（filter）">{id => <Input id={id} placeholder={readOnlySettings ? "模板未设置，保留全部名称" : "按正则表达式筛选动态成员的节点名称，留空保留全部"} value={group.filter ?? ''} onChange={e => onGroupChange({ filter: e.target.value || undefined })} />}</Field>
-        <Field label="排除名称（exclude-filter）">{id => <Input id={id} placeholder={readOnlySettings ? "模板未设置，不排除名称" : "排除动态成员中名称匹配此正则表达式的节点"} value={group.excludeFilter ?? ''} onChange={e => onGroupChange({ excludeFilter: e.target.value || undefined })} />}</Field>
-        <Field label="排除协议">{id => <ExcludeTypeSelect disabled={readOnlySettings} id={id} value={group.excludeType} onChange={excludeType => onGroupChange({ excludeType })} />}</Field>
-      </fieldset>
       <p className="m-0 text-[12px] text-ink-muted">{readOnlySettings ? '筛选条件继承模板。' : ''}所有动态来源共享这套筛选；filter 不筛选手动加入的固定成员。</p>
       {!!previewSets.length && <div className="grid gap-3 rounded-lg bg-ground p-3 sm:grid-cols-2">{previewSets.map(s => <div key={nodeSetKey(s.ref)} className="flex min-w-0 flex-col gap-2"><strong className="text-[12px]">{s.name} · 当前快照</strong><MatchPreview nodeSet={s.ref} filter={group.filter} excludeFilter={group.excludeFilter} excludeType={group.excludeType} max={6} /></div>)}</div>}
     </section>;

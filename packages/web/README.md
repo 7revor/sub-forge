@@ -45,17 +45,23 @@ SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 
 ## 编辑方式
 
-表单为主、原始配置为辅（[docs/09](../../docs/09-frontend-forms-plan.md)）：模板通过 YAML 弹窗修改同一份页面草稿；本地节点、基础设置与预设可以在「表单」与「原始配置（mihomo YAML）」之间切换；有效的未知扩展字段在「其他字段」中按键值编辑。
+所有弹窗统一通过 `createModal` 定义的静态 `show(data)` 调用并返回 Promise；简单交互用 `Frame.modal.confirm / alert / success / error / prompt`。页面不维护弹窗开关、不挂载弹窗。唯一 `ModalRoot` 继承 Router / QueryClient。DTO 与确认结果深拷贝，取消不提交，退场实际卸载后才交付结果，异步失败保留草稿；禁止其他弹窗封装。详见 [规范与示例](../../docs/18-unified-modals.md)。
+
+浏览器逐帧回归入口为 `test/dialog-exit.html`（Vite 开发服务，仅供验收），覆盖编辑、Frame 提示、只读预览、异步、嵌套、路由和无动画。
+
+策略组弹窗仅默认展示名称、类型和成员，测速参数、负载策略、筛选、排除协议及订阅额外字段统一放入默认收起的“高级设置”。
+
+表单为主、原始配置为辅（[docs/09](../../docs/09-frontend-forms-plan.md)）：模板通过 YAML 弹窗独立编辑，点击保存后更新页面草稿；本地节点、基础设置与预设可以在「表单」与「原始配置（mihomo YAML）」之间切换；有效的未知扩展字段在「其他字段」中按键值编辑。
 
 YAML 输入统一使用 `YamlTextarea`：浅色背景、等宽字体、键名 / 字符串 / 数字 / 布尔与空值 / 注释 / 锚点与标签高亮。覆盖双向编辑器、分组 YAML、模板导入、基础设置原样片段、自动识别为 YAML 的本地规则，以及其他字段的 YAML 值。高亮复用已有 `yaml` 的 CST 解析器，不改写输入；保留原生选择、撤销、粘贴、标签关联与校验反馈，长行横向滚动、多行纵向滚动、可调整高度。非 YAML 的备注、规则和脚本输入继续使用普通文本框。
 
-模板 YAML 弹窗只允许合法内容应用到页面草稿，无效输入会保留并提示错误；取消时确认放弃。其余双向编辑器允许缺项、字段类型错误或 YAML 语法错误时返回表单：只保留能可靠解析的有效字段，清空无效字段，逐项提示被忽略的内容。重复键保留第一项；列表保留有效条目；未知扩展字段保留；无法确定含义的损坏片段不猜测修复。再次切回原始视图时显示清理后的 YAML。原始视图尚有解析错误时仍禁止保存；返回表单后可继续补齐，保存 / 发布仍执行必填项与业务校验。批量节点导入保持严格校验。
+模板 YAML 弹窗只允许合法内容应用到页面草稿，无效输入会保留并提示错误；取消时丢弃未保存输入。其余双向编辑器允许缺项、字段类型错误或 YAML 语法错误时返回表单：只保留能可靠解析的有效字段，清空无效字段，逐项提示被忽略的内容。重复键保留第一项；列表保留有效条目；未知扩展字段保留；无法确定含义的损坏片段不猜测修复。再次切回原始视图时显示清理后的 YAML。原始视图尚有解析错误时仍禁止保存；返回表单后可继续补齐，保存 / 发布仍执行必填项与业务校验。批量节点导入保持严格校验。
 
 Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步骤跳转；返回表单恢复有效字段后解除拦截，也可直接修复原文或明确放弃。节点与预设不会把无效原文显示为“已保存”。模板 YAML 导出使用 `sub-forge-group` / `sub-forge-rule` 注释保留稳定 ID，因此改名或改匹配内容仍能关联已有个人覆盖。模板 YAML 应用前检查组字段、规则和出口引用，不通过时保持页面草稿不变。复制组或规则时建议删除复制项的 ID 注释；恢复解析会忽略重复注释并保证 ID 唯一。
 
 全局 blank 使用 `Empty.tsx` 的公共 `Empty`（由 `ui.tsx` 导出），包括列表、详情、预览、功能占位和下拉无结果。说明与空框间距由 `Card description` 或 `gap-4` 保证 16 px，不依赖默认段落 margin。尺寸、适用范围与设计稿待同步项见 [空状态规范](../../docs/14-empty-state-guidelines.md)。
 
-公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` 与删除确认 `DeleteDialog`）、`dialogs`（重命名、添加节点集）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
+公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` （内部调用 `Frame.modal.confirm`））、`dialogs`（节点集选择的静态入口）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
 
 公共展示与业务表单的复用边界：
 
@@ -63,7 +69,7 @@ Profile 基础设置的无效 YAML 同时阻止分区 / 侧栏导航与向导步
 - `CodePreview`、`Notice`、`NodeSetCount`、`SourceFetchStatus`、`Card subtitle`：统一预览、提示、节点计数、拉取状态与卡片标题说明。`ReportList` 可由调用方提供定位操作。
 - `GroupSettingsFields`、`MatcherEditor`、`OptionalBoolean`：模板与配置订阅共用字段；权限、继承和覆盖写入仍由页面负责。布尔值区分未设置、开启和关闭，数值 `0` 保留。规则匹配类型切换清理旧类型专属字段。
 - `NamedCreateDialog`：本地分组与预设共用名称校验、回车提交、重复提交保护和错误展示。`ExtraFields.validateName` 同时用于新增和重命名，调用方通过业务校验函数限制字段，不依赖 DOM 事件捕获。
-- `useLeaveGuard` / `LeaveDialog`：模板、本地节点及预设有未保存修改或无效 YAML 时保护路由跳转与刷新；合法内容可以保存后离开，无效内容需继续编辑或明确放弃。Profile 保持仅无效 YAML 阻断的原策略。
+- `useLeaveGuard`（内部调用统一 `LeaveModal.show`）：模板、本地节点及预设有未保存修改或无效 YAML 时保护路由跳转与刷新；合法内容可以保存后离开，无效内容需继续编辑或明确放弃。Profile 保持仅无效 YAML 阻断的原策略。
 - `hooks/documentQueries` 集中定义 token、访问日志和快照查询；`usePipelinePreview` 供订阅源与组合使用；`useDebouncedValue` 复用普通值防抖。节点集标识、匹配项切换、拉取状态及删除错误归入 `domain/`，时间与流量格式化归入 `utils/format.ts`。
 
 本次抽取的验收范围与截图见 [公共组件验收记录](../../research/verification/shared-components-20261029/README.md)。
@@ -216,7 +222,7 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 
 ## 公共弹层与动效
 
-全站弹窗直接组合 `src/components/ui/` 中的 shadcn 官方 Dialog / AlertDialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。不再保留自定义 Modal、动画常量、焦点恢复函数或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
+历史入口已被统一静态调用取代，底层仍使用 shadcn 官方 Dialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。业务弹窗仅使用 `src/modals` 统一运行时管理会话与焦点；不再保留平行 Modal、动画常量或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
 
 `listbox.tsx` 仅保留业务选项映射、空值编码、异步搜索与分页；单选采用官方 Select 默认定位，多选采用官方 DropdownMenuCheckboxItem，自由输入候选与异步查询由官方 Command + Popover 组合。页面通过组件属性传入业务状态、内容和必要的宽高约束。官方 neutral 主题与既有页面品牌色分开命名，避免同名 accent / muted 变量覆盖官方组件。`components.json`、TypeScript 和 Vite 路径别名已配置。
 
@@ -231,7 +237,7 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 
 验证包含 schema 中文提示覆盖、空 Select、零值、false 与清空删除的回归测试，以及 Codex 内置浏览器的发布、回显和 YAML 检查。后端和核心模型无需迁移。
 
-2026-10-30 合并适配：缓存刷新任务使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。
+2026-10-30 合并适配：缓存刷新任务现通过统一静态入口使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。
 
 
 ### 2026-10-30：规则卡片与操作间距
@@ -242,6 +248,12 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
 
 2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。
+
+### 2026-10-30：三处共用规则编辑
+
+RuleCard、RuleEditShell、LocalRulesInput 统一规则增强、模板和订阅；点击正文预览、铅笔弹窗编辑，移除复制地址。增强下方始终显示合并结果。本地多条共用出口，弹窗取消不改草稿，空内容不能应用；绑定继承规则只读。
+
+useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；只响应新增远程项、应用 YAML 导入和列表手动检测。标记离开页面清空，旧请求不能恢复；关联仍由用户明确点击，并重新校验当前索引。保存状态比较使用稳定键顺序，避免接口回写字段顺序变化导致虚假未保存提示。截图和全部验证见 `research/verification/unified-rule-cards-20261030/README.md`。
 
 2026-10-30 订阅弹窗整合：固定正文滚动与底部操作，单节点前置复用组弹窗底栏；全 Provider 优先引用，循环候选说明原因。显式传递 disabled，并保留公共 Select 必填中文 placeholder、clearable 和 false/0 语义。验收见 research/verification/subscription-dialog-merge-20261030/README.md。
 
@@ -254,3 +266,32 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 2026-10-30 代理链文本列表替代上述流量卡片：每条链与策略组、规则使用相同的紧凑分隔行，仅展示「前置 → 落地」，移除单条链的大卡片、节点卡片、本机与互联网。命中结果、落地数量和问题紧接在文本后，编辑与删除为行尾图标；长内容省略但可通过悬浮提示读取全文，窄屏结果可换行。外部画布仍待同步，本轮未重试登录。
 
 2026-10-30 订阅名称与模板设置合并：新建、详情共用页面顶部一张卡片，桌面左右、窄屏上下排列。名称同时作为客户端显示名，移除输出设置中重复的名称输入。模板摘要、使用模板与管理关联入口同处一张卡片，沿用草稿转换；名称必填，详情清空后提示并禁用保存。外部画布沿用同日登录受限记录，本轮未重试或编辑，待同步此布局。
+
+2026-10-30 刷新弹窗：取得任务完整资源列表后打开，按原顺序原位显示等待、刷新中、成功、失败和中断；完成时不追加卡片。客户端更新说明和订阅生成状态预留位置，长错误单行省略并保留全文提示，维持刷新前后的高度。后端任务同时提供逐项状态，旧任务按 `ok` 兼容展示。验收见 `research/verification/refresh-stable-list-20261030/`。
+
+
+2026-10-30 刷新展示调整：节点订阅、组合、规则和订阅主列表统一显示“上次刷新时间”，置于操作列前；节点旧“上次拉取”列由此替代。时间取当前依赖资源最近的成功刷新时间，失败不使用 lastAttemptAt；多资源成功时间不一致时取最大 lastSuccessAt，逐项时间保留在悬停提示中，是否存在失败仍由资源缓存状态单独显示。无成功记录或纯本地资源显示破折号。刷新弹窗（包括节点）移除客户端更新说明，将进度、完成统计及中断状态统一放在资源列表和订阅生成结果下方；保持完整资源列表、原位更新与固定状态行，不在完成时移动统计位置。复用同一资源状态查询，不额外请求快照历史。
+
+
+2026-10-30 处理链布局：订阅源详情沿用系统统一的 1280px 最大内容宽度并居中，基础设置的名称和地址在宽屏并排。下方处理链与编辑预览改为等高双栏并填满剩余高度，左栏约占 28%，右栏承载参数和输入输出；添加处理器固定在左栏底部，步骤与节点表各自滚动。短屏保留 360px 的可操作高度，必要时页面滚动；小于 1024px 时上下排列。总览与普通步骤行统一至少 66px 高。隐藏默认自动“去重 · 加序号”行及其独立查看入口，经过步骤标签仅列显式处理器；后台自动去重、最终节点数与最终名称保持不变，用户主动添加的去重处理器仍可编辑。以 CSS Grid/Flex 传递高度，移除依赖固定底部像素和表格位置的视口测量脚本；不改变公共页面滚动行为。
+
+
+2026-10-30 单一状态列：订阅源主列表移除独立快照“状态”列，统一资源状态列改名为“状态”，只显示一份正常、刷新中、首次待拉取或失败及旧缓存状态。上次刷新时间仍位于操作列前；失败不覆盖成功时间。列表不再为重复状态额外请求快照历史，详情和总览所需的快照接口继续保留。服务端资源状态接口、核心模型与示例种子不变。
+
+2026-10-30 全局图标修正：buttonClass 使用项目已有 cn，正确合并 padding 等 Tailwind 冲突；基础层为 Lucide 图标设 flex-shrink: 0。规则卡片不再需要 px-0! 局部补丁，其他图标维持各自声明尺寸。通知位置按用户要求暂不调整；整合最新订阅弹窗及刷新修复，验证见 research/verification/global-icons-merge-20261030/README.md。
+
+2026-10-30 本地规则多行输入移除蓝色焦点装饰；移除编辑弹窗及导入反馈中重复的保存提示，并删除 saveHint 透传参数。单选、错误校验、应用及保存流程沿用现有逻辑。
+
+
+2026-10-30 合并补充：处理链输入输出表格左右各留 16px，与面板边框分开；保留独立滚动、等高双栏和统一步骤行高。整合主分支已有的规则卡片、按钮图标及编辑提示修改，文档冲突保留双方追加内容。此次间距调整不改变服务端接口、核心模型、数据库或示例种子。
+
+2026-10-30 宽度更正：撤销订阅源详情的横向满宽要求，恢复公共页面的 1280px 最大宽度及响应式两侧间距，仅处理链与预览纵向填满剩余空间。等高双栏、独立滚动和表格左右 16px 留白保留；服务端接口、核心模型、数据库与示例种子无变更。
+
+2026-10-30 处理链总览行精简：左侧仅显示「总览」，图标与普通步骤序号对齐，标题与步骤名称对齐；右侧预览保留「总览 · 原始 → 最终」。仅调整前端布局与文案，服务端接口、领域模型和示例种子不变。
+
+
+2026-10-30 三页卡片规格统一：RoutingCard / RoutingCardIcon / RoutingCardActions 共享紧凑尺寸，TemplateGroupsEditor 与 RuleCard 使用同一外观。RoutingTargetMenu 提供固定宽度文字加箭头的 Dropdown 出口选择，TemplateTargetSelect 仅在添加成员场景继续使用表单 Select。卡片本地规则前缀及隐藏开关的重复文字已移除。
+
+2026-10-30 未选中总览交互：替代此前左侧总览行的展示与对齐要求，处理链列表只列处理器；初始未选中及点击处理链编辑器外部时，右侧显示原始 → 最终总览。左侧列表、右侧参数编辑与预览、其下拉浮层均属于编辑器内部，内部操作保持选中；总览的步骤链接仍能定位处理器。服务端接口、核心模型与示例种子不变。
+
+2026-10-30 输入输出独立列表：替代逐节点配对表和顺序切换要求，总览与单步预览均为左侧输入原顺序、右侧输出实际顺序，两侧独立编号和滚动。删除排列方式切换、仅变化筛选、对应箭头、位置变化、逐行命中和经过步骤列；数量不同时不补齐新增或移除占位，空侧显示「没有节点」。保留处理链选择、顶部统计和 16px 两侧留白；服务端 origins 与统计计算仍保留，API、核心模型和示例种子不变。

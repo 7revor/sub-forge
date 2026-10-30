@@ -1,36 +1,20 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog.tsx';
+import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 import { matchesNameSearch } from '@sub-forge/core';
 import { NODE_SET_LABEL, sameNodeSet as same, nodeSetKey } from '../domain/nodeSet.ts';
 // 通用对话框（设计稿「对话框与危险操作」）：重命名、添加节点集。
 
 import type { NodeSetID } from '@sub-forge/core';
-import { useEffect, useState } from 'react';
 import { Button, Empty, Input, } from './ui.tsx';
 
-export function RenameDialog({ open, title, name, onClose, onRename }: { open: boolean; title: string; name: string; onClose: () => void; onRename: (name: string) => void }) {
-  const [value, setValue] = useState(name);
-  useEffect(() => { if (open) setValue(name); }, [open, name]);
-  const ok = !!value.trim() && value.trim() !== name;
-  return (
-    <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-ink-muted">名称</span>
-        <Input placeholder="填写新的名称，便于区分和查找" autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && ok) { onRename(value.trim()); onClose(); } }} /></label>
-    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ok} onClick={() => { onRename(value.trim()); onClose(); }}>确定</Button></>}</DialogFooter></DialogContent></Dialog>
-  );
-}
-
-
 /** 搜索 + 多选；已加入的置灰，不能自选（如组合不能加入自己） */
-export function NodeSetPickerDialog({ open, title = '添加节点集', options, added, onClose, onAdd, hint }: {
-  open: boolean; title?: string; options: { ref: NodeSetID; name: string }[]; added: NodeSetID[];
-  onClose: () => void; onAdd: (refs: NodeSetID[]) => void; hint?: string;
-}) {
-  const [q, setQ] = useState('');
-  const [picked, setPicked] = useState<NodeSetID[]>([]);
-  useEffect(() => { if (open) { setQ(''); setPicked([]); } }, [open]);
+export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref: NodeSetID; name: string }[]; added: NodeSetID[]; hint?: string }, NodeSetID[]>(function NodeSetModal({ data: { title = '添加节点集', options, added, hint }, modal }) {
+  const [q, setQ] = useModalDraft('');
+  const [picked, setPicked] = useModalDraft<NodeSetID[]>([]);
+  const onClose = modal.cancel;
+  const onAdd = modal.confirm;
   const shown = options.filter((o) => matchesNameSearch(o.name, q));
   return (
-    <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{title}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Input aria-label="搜索节点集" placeholder="搜索订阅源、组合、本地节点组" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex max-h-[360px] flex-col overflow-y-auto rounded-lg border border-line">
         {shown.map((o) => {
@@ -47,6 +31,6 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
         {!shown.length && <div className="p-3"><Empty title={options.length ? '没有匹配的节点集' : '还没有可加入的节点集'} /></div>}
       </div>
       {hint && <span className="text-[12px] leading-relaxed text-ink-muted">{hint}</span>}
-    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); onClose(); }}>加入 {picked.length || ''} 个</Button></>}</DialogFooter></DialogContent></Dialog>
+    </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); }}>加入 {picked.length || ''} 个</Button></>}</ModalFooter></ModalContent>
   );
-}
+});

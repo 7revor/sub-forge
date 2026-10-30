@@ -1,3 +1,4 @@
+import { useModalPresentation } from '../../modals/index.tsx';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChainRule, NodeSetID, Target } from '@sub-forge/core';
@@ -17,7 +18,7 @@ const emptyVia = (kind: SourceKind, nodeSet = emptySet): Target => ({ kind: 'nod
 
 function InlineNodes({ nodeSet, selected, label, onSelect }: { nodeSet?: NodeSetID; selected?: string; label: string; onSelect: (name: string) => void }) {
   const [search, setSearch] = useState('');
-  const nodes = useNodeList(nodeSet, useDebouncedValue(search, 200));
+  const nodes = useModalPresentation(useNodeList(nodeSet, useDebouncedValue(search, 200)));
   return <>
     <Field label={`搜索${label}`}>{id => <Input id={id} disabled={!nodeSet} placeholder={`输入名称查找${label}，再点选一个节点`} value={search} onChange={e => setSearch(e.target.value)} />}</Field>
     {nodeSet && <div aria-label={`${label}候选`} className="max-h-36 overflow-y-auto rounded-md border border-line">
@@ -32,7 +33,7 @@ function InlineNodes({ nodeSet, selected, label, onSelect }: { nodeSet?: NodeSet
 }
 
 function ProviderMatch({ via }: { via: Extract<Target, { kind: 'node' }> }) {
-  const nodes = useNodeList(via.ref.nodeSet);
+  const nodes = useModalPresentation(useNodeList(via.ref.nodeSet));
   const pattern = 'regex' in via.ref.match ? via.ref.match.regex : exactNodeFilter(via.ref.match.exact);
   const result = resolveRef(nodes.data?.nodes ?? [], via.ref.match);
   return <div aria-live="polite" className="rounded-md bg-ground px-3 py-2 text-[12px] leading-relaxed">
@@ -65,7 +66,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, landingLabel, o
   const choose = (via: Target) => setChain({ ...chain, via });
   const viaLabel = chain.via.kind === 'group' ? (chain.via.groupId ? groupName(chain.via.groupId) : '待选前置') : chain.via.kind === 'node' ? (chain.via.ref.nodeSet.id && ('exact' in chain.via.ref.match ? chain.via.ref.match.exact : chain.via.ref.match.regex) ? targetLabel(chain.via, groupName, nodeSetName) : '待选前置') : chain.via.name;
   const landingText = landingLabel ?? landingNodeName(chain.landing) ?? (chain.landing.nodeSet.id ? `${nodeSetName(chain.landing.nodeSet)}${!fixedLanding && !legacyLanding && landingKind === 'inline' ? ' · 待选节点' : whole ? ' · 全部节点' : ' · 原筛选范围'}` : '待选落地');
-  const actions = <><span className="mr-auto w-full self-center text-[12px] text-ink-muted sm:w-auto">保存订阅后生效</span>{onRemove && <Button className="text-err" onClick={onRemove}>移除前置</Button>}<Button onClick={onCancel}>取消{footerTarget ? '前置' : ''}</Button><Button variant="primary" disabled={!!error || overridden} onClick={() => onApply(chain)}>{footerTarget ? '应用前置' : '应用代理链'}</Button></>;
+  const actions = <>{onRemove && <Button className="text-err" onClick={onRemove}>移除前置</Button>}<Button onClick={onCancel}>取消{footerTarget ? '前置' : ''}</Button><Button variant="primary" disabled={!!error || overridden} onClick={() => onApply(chain)}>{footerTarget ? '应用前置' : '应用代理链'}</Button></>;
   return <section aria-label="代理链设置" className={footerTarget ? 'flex min-w-0 flex-col' : 'flex min-h-0 flex-1 flex-col overflow-hidden'}>
     <div className={footerTarget ? 'flex flex-col gap-5' : 'flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4'}>
       <div aria-label="流量路径" className="rounded-md bg-ground px-3 py-2 text-[12px] leading-relaxed break-words">本机 → <strong>{viaLabel}</strong> → <strong>{landingText}</strong> → 目标</div>

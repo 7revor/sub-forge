@@ -1,8 +1,8 @@
 import type { NodeSetID } from '@sub-forge/core';
 import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
 import { targetLabel } from '../../components/pickers.tsx';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from '../../components/ui/alert-dialog.tsx';
+import { Frame } from '../../modals/Frame.tsx';
+import { notifySuccess } from '../../feedback.ts';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
@@ -16,7 +16,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type TokenItem } from '../../api.ts';
-import { DeleteDialog } from '../../components/DetailActions.tsx';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
@@ -37,13 +36,11 @@ export function TabOverview() {
   const tokens = useQuery(tokenOptions(draft.id));
   const log = useQuery(accessLogOptions(draft.id));
   const refreshTokens = () => qc.invalidateQueries({ queryKey: ['tokens', draft.id] });
-  const [label, setLabel] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [resetting, setResetting] = useState<TokenItem>();
-  const [deleting, setDeleting] = useState<TokenItem>();
-  const create = useMutation({ meta: { successMessage: '订阅链接已创建' }, mutationFn: () => api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}), onSuccess: () => { setLabel(''); setAdding(false); void refreshTokens(); } });
-  const reset = useMutation({ meta: { successMessage: '订阅链接已重置' }, mutationFn: (t: string) => api('POST', `/profiles/${draft.id}/tokens/${t}/reset`), onSuccess: () => { setResetting(undefined); void refreshTokens(); } });
-  const remove = useMutation({ meta: { successMessage: '订阅链接已删除' }, mutationFn: (t: string) => api('DELETE', `/profiles/${draft.id}/tokens/${t}`), onSuccess: () => { setDeleting(undefined); void refreshTokens(); } });
+  const create = async () => { const result = await Frame.modal.prompt({ title: '新增订阅链接', label: '设备备注', placeholder: '填写订阅链接的标识名称', minLength: 0, confirmLabel: '创建链接' }, { submit: async label => { await api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}); } }); if (result.status === 'confirmed') { notifySuccess('订阅链接已创建'); void refreshTokens(); } };
+  const manage = async (token: TokenItem, reset: boolean) => {
+    const result = await Frame.modal.confirm({ title: reset ? `重置「${token.label || '未命名设备'}」的 token？` : `删除订阅链接「${token.label || '未命名设备'}」？`, description: reset ? '旧链接立即失效，这台设备需要导入新链接才能继续更新。' : '使用它的设备将无法更新。', confirmLabel: reset ? '重置' : '删除', danger: true }, { submit: async () => { await api(reset ? 'POST' : 'DELETE', `/profiles/${draft.id}/tokens/${token.token}${reset ? '/reset' : ''}`); } });
+    if (result.status === 'confirmed') { notifySuccess(reset ? '订阅链接已重置' : '订阅链接已删除'); void refreshTokens(); }
+  };
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
   const sources = allNodeSets.filter((n) => n.ref.type === 'source' && draft.nodeSets.some((p) => p.ref.type === 'source' && p.ref.id === n.ref.id));
   const rows = log.data ?? [];
@@ -56,8 +53,7 @@ export function TabOverview() {
       <div className="grid grid-cols-1 gap-5">
         <Card className="min-w-0"
           title={`订阅链接`}
-          actions={<Button onClick={() => setAdding(true)}><Plus size={15} />新增链接</Button>}>
-          <ErrorAlert error={reset.error ?? remove.error} />
+          actions={<Button onClick={create}><Plus size={15} />新增链接</Button>}>
           {!tokens.data?.length ? <Empty title="还没有订阅链接" /> : (
             <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
               {tokens.data.map((t) => {
@@ -72,8 +68,8 @@ export function TabOverview() {
                     <div className="flex gap-1.5">
                       <CopyButton className="h-9" text={t.url}><Copy size={13} />复制</CopyButton>
                       <CopyButton className="h-9" text={`${t.url}?target=stash&platform=ios`}>复制 Stash 链接</CopyButton>
-                      <Button className="h-9 text-err" onClick={() => setResetting(t)}><RotateCcw size={13} />重置 token</Button>
-                      <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => { remove.reset(); setDeleting(t); }}><Trash2 size={14} /></Button>
+                      <Button className="h-9 text-err" onClick={() => void manage(t, true)}><RotateCcw size={13} />重置 token</Button>
+                      <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => void manage(t, false)}><Trash2 size={14} /></Button>
                     </div>
                   </li>
                 );
@@ -119,17 +115,7 @@ export function TabOverview() {
           </tbody>
         </table>
       </Card>
-      <DeleteDialog title={`删除订阅链接「${deleting?.label || '未命名设备'}」？`} open={!!deleting} pending={remove.isPending} error={remove.error}
-        onClose={() => setDeleting(undefined)} onConfirm={() => { if (deleting) remove.mutate(deleting.token); }}>
-        使用它的设备将无法更新。
-      </DeleteDialog>
-      <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"新增订阅链接"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <Field label="设备备注">{(id) => <Input placeholder="填写订阅链接的标识名称" id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>
-        <ErrorAlert error={create.error} />
-      </div><DialogFooter>{<><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建链接'}</Button></>}</DialogFooter></DialogContent></Dialog>
-      <AlertDialog open={!!resetting} onOpenChange={next => { if (!next) (() => setResetting(undefined))(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{`重置「${resetting?.label || '未命名设备'}」的 token？`}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
-        <span className="text-[13.5px] leading-relaxed">旧链接立即失效，这台设备需要导入新链接才能继续更新。</span>
-      </div></AlertDialogDescription><AlertDialogFooter>{<><AlertDialogCancel>取消</AlertDialogCancel><Button className="border-err bg-err text-white hover:bg-[#912018]" disabled={reset.isPending} onClick={() => resetting && reset.mutate(resetting.token)}>{reset.isPending ? '重置中…' : '重置'}</Button></>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
+
     </>
   );
 }
@@ -206,34 +192,32 @@ export function TabBase() {
 /** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
 export function TabNodeSets() {
   const { draft, setDraft, allNodeSets, nodeSetName, groupName } = useProfile();
-  const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<NodeSetID>();
-  const affected = removing ? draft.chains.filter(c => chainUsesNodeSet(c, removing)) : [];
+  const remove = async (ref: NodeSetID) => {
+    const affected = draft.chains.filter(c => chainUsesNodeSet(c, ref));
+    if (affected.length) {
+      const chains = affected.map(c => `${targetLabel(c.via, groupName, nodeSetName)} → ${nodeSetName(c.landing.nodeSet)} · ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}`).join('\n');
+      const result = await Frame.modal.confirm({ title: `移出节点集「${nodeSetName(ref)}」？`, description: `以下 ${affected.length} 条代理链引用了此节点集，将一起移除。保存订阅后生效。\n\n${chains}`, confirmLabel: '移出并移除代理链', danger: true });
+      if (result.status !== 'confirmed') return;
+    }
+    setDraft(removeProfileNodeSet(draft, ref));
+  };
   const chained = new Set(draft.chains.map((c) => `${c.landing.nodeSet.type}:${c.landing.nodeSet.id}`));
 
   return (
     <>
       <Card title="节点来源" subtitle="选择输出方式后，可在下方设置代理链与策略组。"
-        actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="pb-1">
+        actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={15} />添加节点集</Button>} bodyClass="pb-1">
         {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : <ul className="m-0 list-none p-0">
           {draft.nodeSets.map((n, i) => <li key={`${n.ref.type}:${n.ref.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line-2 px-4 py-3">
             <div className="flex min-w-0 flex-[1_1_180px] flex-col gap-1"><span className="truncate text-[13.5px] font-medium">{nodeSetName(n.ref)}</span>
               <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
             </div>
             <Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} />
-            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => { if (draft.chains.some(c => chainUsesNodeSet(c, n.ref))) setRemoving(n.ref); else setDraft(removeProfileNodeSet(draft, n.ref)); }}><Trash2 size={14} /></Button>
+            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => void remove(n.ref)}><Trash2 size={14} /></Button>
           </li>)}
         </ul>}
       </Card>
-      <AlertDialog open={!!removing} onOpenChange={open => { if (!open) setRemoving(undefined); }}><AlertDialogContent>
-        <AlertDialogHeader><AlertDialogTitle>移出节点集「{removing && nodeSetName(removing)}」？</AlertDialogTitle>
-          <AlertDialogDescription>以下 {affected.length} 条代理链引用了此节点集，将一起移除。保存订阅后生效。</AlertDialogDescription>
-        </AlertDialogHeader>
-        <ul className="m-0 max-h-60 list-none space-y-2 overflow-y-auto p-0 text-[13px]">{affected.map(c => <li key={c.id} className="rounded-md bg-ground px-3 py-2">{targetLabel(c.via, groupName, nodeSetName)} → {nodeSetName(c.landing.nodeSet)} · {landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}</li>)}</ul>
-        <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><Button variant="danger-solid" onClick={() => { if (removing) setDraft(removeProfileNodeSet(draft, removing)); setRemoving(undefined); }}>移出并移除代理链</Button></AlertDialogFooter>
-      </AlertDialogContent></AlertDialog>
-      <NodeSetPickerDialog open={adding} options={allNodeSets} added={draft.nodeSets.map((n) => n.ref)} onClose={() => setAdding(false)}
-        onAdd={(refs) => setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...refs.map((ref) => ({ ref, output: 'provider' as const }))] })} />
+
     </>
   );
 }

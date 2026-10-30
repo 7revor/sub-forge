@@ -1,6 +1,13 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@layer base {
+  /* 图标保留声明尺寸；空间不足时由文字和容器处理，避免被 flex 压成窄条。 */
+  .lucide {
+    flex-shrink: 0;
+  }
+}
+
 /* 设计稿配色（Claude Design 画布「Sub-Forge 前端页面设计」） */
 @theme {
   --color-ink: #15181d;
@@ -131,6 +138,80 @@ body {
   max-width: var(--page-content-width);
   min-width: 0;
   margin-inline: auto;
+}
+
+/* 沿用公共页面限宽；基础设置之下的处理链与预览只在纵向共享剩余高度。 */
+
+.pipeline-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pipeline-steps,
+.pipeline-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pipeline-steps > *,
+.pipeline-preview > * {
+  flex-shrink: 0;
+}
+
+.pipeline-step-scroll,
+.pipeline-mapping-scroll {
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.pipeline-step-scroll {
+  max-height: 28rem;
+}
+
+.pipeline-mapping-scroll {
+  max-height: 32rem;
+}
+
+@media (min-width: 1024px) {
+  .source-detail-content {
+    height: 100%;
+  }
+
+  .pipeline-workspace {
+    grid-template-columns: minmax(260px, 28%) minmax(0, 1fr);
+    height: max(360px, calc(100dvh - 420px));
+  }
+
+  .source-detail-content > .pipeline-workspace {
+    flex: 1 0 360px;
+    height: auto;
+  }
+
+  .pipeline-steps {
+    overflow: hidden;
+  }
+
+  .pipeline-step-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .pipeline-preview {
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .pipeline-mapping-scroll {
+    flex: 1 0 160px;
+    max-height: none;
+  }
 }
 
 /* 全局滚动条：透明轨道，浅色内容与深色导航分别提供滑块配色。 */

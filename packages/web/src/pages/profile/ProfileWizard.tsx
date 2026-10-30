@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button, ErrorAlert, PageHeader, PageScroll } from '../../components/ui.tsx';
-import { LeaveDialog } from '../../components/LeaveDialog.tsx';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard.ts';
 import { useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { draftIssues } from '../template/model.ts';
@@ -16,15 +15,16 @@ export function ProfileWizard() {
   const [initial] = useState<ProfileDoc>(() => ({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: preset ? { mode: 'bound', templateId: preset, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }));
   const [draft, setDraft] = useState(initial);
   const { ctx, template } = useProfileCtx(draft, setDraft);
-  const { blocker, leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial) || !ctx!.baseValid);
+  const { blocker, leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial) || !ctx!.baseValid, undefined, () => ({ what: '新建订阅', canSave, saveLabel: '创建并离开', onSave: () => finish(true) }));
   const templateReady = draft.routing?.mode !== 'bound' || (!!template.data && !template.isError);
   const body = draft.routing?.mode === 'independent' ? draft.routing.config : { groups: template.data?.groups ?? [], rules: draft.routing?.prependRules ?? [], final: template.data?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const } };
   const issues = draftIssues(body);
   const canSave = !!draft.name.trim() && ctx!.baseValid && templateReady && !issues.length && !save.isPending;
-  const finish = (done?: () => void) => {
+  const finish = async (leaving = false) => {
     if (!canSave) return;
     const { id: _id, ...profile } = draft;
-    save.mutate({ ...profile, name: profile.name.trim() }, { onSuccess: p => done ? done() : leave(`/profiles/${p.id}/overview`) });
+    const p = await save.mutateAsync({ ...profile, name: profile.name.trim() });
+    if (!leaving) leave(`/profiles/${p.id}/overview`);
   };
   return <ProfileContext.Provider value={ctx!}>
     <PageHeader crumbs={<><Link to="/profiles" className="text-ink-muted no-underline">配置订阅</Link> / 新建</>} title="新建配置订阅" actions={<Button variant="primary" disabled={!canSave} onClick={() => finish()}>{save.isPending ? '正在创建…' : '创建订阅'}</Button>}>
@@ -42,6 +42,5 @@ export function ProfileWizard() {
         {!!issues.length && <p role="status" className="m-0 text-[13px] text-err">{issues[0]!.message}（{issues.length} 项待补全）</p>}
       </fieldset>
     </PageScroll>
-    <LeaveDialog blocker={blocker} what="新建订阅" canSave={canSave} pending={save.isPending} error={save.error} saveLabel="创建并离开" onSave={finish} />
   </ProfileContext.Provider>;
 }

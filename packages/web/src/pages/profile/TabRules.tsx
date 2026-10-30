@@ -1,4 +1,5 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
+import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
+import { profileModalData, useModalProfile, type ProfileModalData } from './modalProfile.ts';
 import { ProfileRulesEditor } from './ProfileRoutingEditors.tsx';
 import { matchesNameSearch } from '@sub-forge/core';
 import { ruleToLine } from '../../components/rule.ts';
@@ -6,7 +7,7 @@ import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { Notice } from '../../components/Notice.tsx';
 // 绑定模板规则只读；前置单条规则与独立规则复用全局编辑器。
 
-import { withIpOptions, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
+import { localRulesError, withIpOptions, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
@@ -14,7 +15,7 @@ import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Badge, Button, Card, Empty, FieldError, Field, Input, Select, Switch, cx } from '../../components/ui.tsx';
 import { useRuleSetRefs } from '../../hooks.ts';
-import { useProfile } from './context.ts';
+import { useProfile, ProfileContext } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
 
 export function ruleText(r: RuleIR): string {
@@ -24,6 +25,7 @@ export function ruleText(r: RuleIR): string {
 function useMatcherLabel() {
   const rulesets = useRuleSetRefs().data ?? [];
   return (m: Matcher): { kind: string; text: string } => {
+    if (m.kind === 'local') return { kind: '本地规则', text: m.content };
     if (m.kind === 'rule') return { kind: '静态规则', text: ruleText(m.rule) };
     if (m.remote) return { kind: '远程 URL', text: m.remote.url };
     return { kind: '系统规则集', text: m.repository?.name ?? `本地 · ${rulesets.find((r) => r.id === m.id)?.name ?? m.id}` };
@@ -38,7 +40,7 @@ function privateRuleError(rule: RuleEntry): string | undefined {
     const match = 'exact' in ref.match ? ref.match.exact : ref.match.regex;
     if (!ref.nodeSet.id || !match.trim()) return '请选择规则出口。';
   }
-  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : matcher.remote ? '请填写远程规则 URL。' : '请选择规则集。';
+  return matcher.kind === 'local' ? localRulesError(matcher) ?? clientOverridesError(matcher.overrides ?? []) : matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : matcher.remote ? '请填写远程规则 URL。' : '请选择规则集。';
 }
 
 function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEntry; onChange: (value: RuleEntry) => void; single?: boolean }) {
@@ -59,32 +61,33 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
       <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={value.options?.src === true}
         onChange={(src) => onChange({ ...value, options: { ...value.options, src } })} />src</label>
     </div>}
-    {matcher.kind === 'rule' && <details>
+    {matcher.kind !== 'ruleset' && <details>
       <summary className="cursor-pointer text-[13px] font-medium">客户端覆盖（{matcher.overrides?.length ?? 0} 条）</summary>
       <div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={(overrides) => onChange({ ...value, matcher: { ...matcher, overrides } })} /></div>
     </details>}
   </div>;
 }
 
-function ExtraRuleModal({ open, onClose, onAdd, prepend = false }: { open: boolean; onClose: () => void; onAdd: (anchor: ExtraRule['anchor'], rule: RuleEntry) => void; prepend?: boolean }) {
-  const { template } = useProfile();
-  const [anchor, setAnchor] = useState('top');
-  const [rule, setRule] = useState<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }));
-  useEffect(() => { if (open) { setAnchor('top'); setRule({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }); } }, [open]);
+const ExtraRuleModal = createModal<ProfileModalData & { prepend: boolean }, ExtraRule>(function ExtraRuleForm({ data, modal }) {
+  const { ctx } = useModalProfile(data);
+  const { template } = ctx;
+  const { prepend } = data;
+  const [anchor, setAnchor] = useModalDraft('top');
+  const [rule, setRule] = useModalDraft<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }));
   const error = privateRuleError(rule);
-  return <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{prepend ? "添加前置规则" : "插入规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+  return <ProfileContext.Provider value={ctx}><ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{prepend ? "添加前置规则" : "插入规则"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
     {!prepend && <Field label="位置">{(id) => <Select placeholder="选择新规则插入的位置" id={id} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
       <option value="top">最前面</option><option value="bottom">最后面（MATCH 之前）</option>
       {(template?.rules ?? []).map((r, i) => <option key={`b${r.id}`} value={`before:${r.id}`}>模板规则 #{i + 1} 之前</option>)}
       {(template?.rules ?? []).map((r, i) => <option key={`a${r.id}`} value={`after:${r.id}`}>模板规则 #{i + 1} 之后</option>)}
     </Select>}</Field>}
-    <PrivateRuleFields single={prepend} value={rule} onChange={setRule} />
+    <PrivateRuleFields single={prepend} value={rule} onChange={next => setRule(structuredClone(next))} />
     <FieldError error={error} />
-  </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
+  </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
     const position: ExtraRule['anchor'] = prepend ? 'top' : anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
-    onAdd(position, rule); onClose();
-  }}>插入</Button></>}</DialogFooter></DialogContent></Dialog>;
-}
+    modal.confirm({ anchor: position, rule });
+  }}>保存</Button></>}</ModalFooter></ModalContent></ProfileContext.Provider>;
+});
 
 function PrivateRuleEdit({ rule, onApply, onClose, single = false }: { rule: RuleEntry; onApply: (rule: RuleEntry) => void; onClose: () => void; single?: boolean }) {
   const [value, setValue] = useState(rule);
@@ -102,9 +105,13 @@ export function TabRules() {
 }
 
 function LegacyRules() {
-  const { draft, template, patchOverlay, groupOptions, groupName, profileNodeSets, nodeSetName } = useProfile();
+  const profile = useProfile();
+  const { draft, template, patchOverlay, groupOptions, groupName, profileNodeSets, nodeSetName } = profile;
+  const add = async (prepend: boolean) => {
+    const result = await ExtraRuleModal.show({ ...profileModalData(profile), prepend });
+    if (result.status === 'confirmed') patchOverlay(o => ({ ...o, extraRules: prepend ? [result.data, ...(o.extraRules ?? [])] : [...(o.extraRules ?? []), result.data] }));
+  };
   const label = useMatcherLabel();
-  const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string>();
   const [search, setSearch] = useState('');
   const bound = draft.routing?.mode === 'bound';
@@ -120,7 +127,7 @@ function LegacyRules() {
   }));
 
   if (bound) return <>
-    <Card title="前置规则" actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加前置规则</Button>}>
+    <Card title="前置规则" actions={<Button onClick={() => void add(true)}><Plus size={15} />添加前置规则</Button>}>
       {!prependRules.length ? <Empty title="没有前置规则" /> : <SortableList items={prependRules} getKey={rule => rule.id}
         onReorder={prependRules => patchOverlay(o => ({ ...o, extraRules: [...prependRules].reverse().map(rule => ({ anchor: 'top', rule })) }))}
         renderItem={(rule, index, handle) => <div className="border-t border-line-2">
@@ -147,13 +154,12 @@ function LegacyRules() {
         <span className="font-mono">MATCH</span><span className="min-w-0 break-words text-right text-ink-2">{targetLabel(final, groupName, nodeSetName)}</span>
       </div>
     </Card>
-    <ExtraRuleModal open={adding} prepend onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay(o => ({ ...o, extraRules: [{ anchor, rule }, ...(o.extraRules ?? [])] }))} />
   </>;
 
   return <>
     {orphans.length > 0 && <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[13px]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span></Notice>}
     <Card title={`规则（自上而下匹配）`}
-      actions={<Button onClick={() => setAdding(true)}><Plus size={15} />插入规则</Button>}>
+      actions={<Button onClick={() => void add(false)}><Plus size={15} />插入规则</Button>}>
       {!rows.length ? <Empty title="没有规则" description="未匹配的流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
         onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraRules: ruleRowsToExtraRules(ordered, o.extraRules) }))}
         renderItem={(r, i, handle) => {
@@ -193,6 +199,5 @@ function LegacyRules() {
         {template && draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _, ...rest } = o; return rest; })}>还原为模板</Button>}
       </div>
     </Card>
-    <ExtraRuleModal open={adding} onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />
   </>;
 }

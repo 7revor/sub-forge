@@ -102,7 +102,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           emitted.current = { value: imported.value, canonical: canonical.text };
           onValidityChange?.(true);
           onChange(imported.value);
-          notifySuccess(imported.notes?.join('；') || '已导入配置，保存后生效');
+          notifySuccess(imported.notes?.join('；') || '已导入配置');
         }} onChange={(event) => {
           const raw = event.target.value;
           setText(raw);

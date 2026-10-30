@@ -1,6 +1,7 @@
+import { LocalRulesInput } from './LocalRulesInput.tsx';
+import { ruleToLine } from './rule.ts';
 import { remoteRuleMatcher, type Matcher, type RuleIR } from '@sub-forge/core';
 import { changeMatcherKind } from '../domain/matcher.ts';
-import { RuleEditor } from './RuleEditor.tsx';
 import { Field, Input, Select } from './ui.tsx';
 import { RemoteRulePicker } from './RemoteRulePicker.tsx';
 import { RuleSetPicker } from './RuleSetPicker.tsx';
@@ -12,22 +13,21 @@ export function MatcherEditor({ value, onChange, rulesets, ruleValue, onRuleChan
   fixedKind?: boolean;
   directRemote?: boolean;
 }) {
-  const changeRule = (rule: RuleIR) => {
-    if (value.kind !== 'rule') return;
-    if (onRuleChange) onRuleChange(rule);
-    else onChange({ ...value, rule });
-  };
-  const selectedKind = value.kind === 'ruleset' && value.remote ? 'remote' : value.kind;
+  const selectedKind = value.kind === 'ruleset' && value.remote ? 'remote' : value.kind === 'rule' ? 'local' : value.kind;
   const changeKind = (kind: string) => {
-    if (kind === 'remote') onChange({ kind: 'ruleset', id: '', remote: { url: '' } });
+    if (kind === 'local') onChange({ kind: 'local', content: '' });
+    else if (kind === 'remote') onChange({ kind: 'ruleset', id: '', remote: { url: '' } });
     else if (kind === 'ruleset' && selectedKind === 'remote') onChange({ kind: 'ruleset', id: '' });
     else onChange(changeMatcherKind(value, kind as Matcher['kind']));
   };
   return <div className="flex min-w-0 flex-col gap-4 [&>*]:min-w-0">
-    {!fixedKind && <Field label="匹配类型">{(id) => <Select placeholder="选择单条规则、规则集或远程规则来源" id={id} value={selectedKind} className="text-[13px]" onChange={(event) => changeKind(event.target.value)}>
-      <option value="rule">静态规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
+    {!fixedKind && <Field label="匹配类型">{(id) => <Select placeholder="选择本地规则、规则集或远程规则来源" id={id} value={selectedKind} className="text-[13px]" onChange={(event) => changeKind(event.target.value)}>
+      <option value="local">本地规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
     </Select>}</Field>}
-    {value.kind === 'rule' ? <Field label="规则内容">{id => <RuleEditor id={id} value={ruleValue ?? value.rule} onChange={changeRule} />}</Field>
+    {value.kind === 'local' || value.kind === 'rule' ? <Field label="本地规则" hint="每行一条，同一卡片共用出口，按输入顺序执行。">{id => <LocalRulesInput id={id}
+      value={value.kind === 'local' ? value.content : ruleToLine(ruleValue ?? value.rule)} onChange={content => onChange(value.kind === 'local' ? { ...value, content } : {
+        kind: 'local', content, ...(value.overrides ? { overrides: value.overrides } : {}), ...(value.rule.type === 'RAW' && value.rule.client ? { client: value.rule.client } : {}),
+      })} />}</Field>
       : value.remote ? <Field label="规则地址">{id => directRemote ? <Input id={id} type="url" className="min-w-0 font-mono" spellCheck={false} value={value.remote!.url} placeholder="远程规则文件的 HTTP 或 HTTPS 地址" onChange={event => {
         const url = event.target.value;
         let matcher: Matcher;

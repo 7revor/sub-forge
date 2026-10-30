@@ -1,3 +1,4 @@
+import { localRulesError } from '@sub-forge/core';
 import { normalizeRulePresence } from '../rule-presence.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
@@ -58,6 +59,10 @@ function checkRegex(pattern: unknown, where: string, flags = ''): void {
 function checkRawRules(value: unknown, where: string): void {
   if (Array.isArray(value)) { value.forEach(item => checkRawRules(item, where)); return; }
   if (!isObj(value)) return;
+  if (value.kind === 'local') {
+    const error = localRulesError(value);
+    if (error) throw bad(`${where}：${error}`);
+  }
   if (value.type === 'RAW') {
     if (value.client !== undefined && !['mihomo', 'surge', 'stash'].includes(value.client as string)) throw bad(`${where}：RAW 客户端不合法`);
     if (typeof value.text !== 'string') throw bad(`${where}：RAW 内容必须是字符串`);

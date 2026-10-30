@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import type { ReportItem } from '@sub-forge/core';
+import { cn } from 'cn';
 
 export { ErrorAlert } from './FeedbackHost.tsx';
 export { Empty } from './Empty.tsx';
@@ -19,7 +20,7 @@ const BTN: Record<BtnVariant, string> = {
 };
 
 /** 按钮样式；链接需要长得像按钮时（如表格行的「编辑」）也用它 */
-export const buttonClass = (variant: BtnVariant = 'default', size: 'sm' | 'md' = 'md', className?: string) => cx(
+export const buttonClass = (variant: BtnVariant = 'default', size: 'sm' | 'md' = 'md', className?: string) => cn(
   'inline-flex items-center justify-center gap-2 rounded-lg border font-medium whitespace-nowrap no-underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
   size === 'sm' ? 'h-8 px-2.5 text-[12.5px]' : 'h-10 px-3.5 text-[13.5px]',
   BTN[variant],

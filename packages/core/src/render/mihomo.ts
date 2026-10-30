@@ -1,3 +1,4 @@
+import { expandLocalRules, localRulesError } from '../rules/local.ts';
 import { resolveProfileRouting } from '../template/routing.ts';
 import { sourceKey, sourceLabel, type RuleSetInputs } from '../rules/expand.ts';
 import { convertRuleDocuments, prepareRuleDocument, type RuleDocument } from '../rules/convert.ts';
@@ -341,8 +342,12 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     const target = resolveTarget(r.target, where);
     if (target === undefined) continue;
     const m = r.matcher;
-    if (m.kind === 'rule') {
-      for (const rule of applyOverrides(m.rule, m.overrides, ctx)) {
+    if (m.kind === 'rule' || m.kind === 'local') {
+      if (m.kind === 'local') {
+        const error = localRulesError(m);
+        if (error) { report.error('rule.invalid-local', error, where); continue; }
+      }
+      for (const rule of m.kind === 'local' ? expandLocalRules(m, ctx) : applyOverrides(m.rule, m.overrides, ctx)) {
         const l = lowerRule(withIpOptions(rule, r.options ?? {}), ctx);
         if (l.kind === 'drop') { report.info('rule.dropped', l.reason, where); continue; }
         if (l.note) report.info('rule.degraded', l.note, where);
