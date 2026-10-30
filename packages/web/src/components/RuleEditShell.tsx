@@ -7,7 +7,7 @@ export function RuleEditShell({ title, description, error, children, onApply, on
   tall?: boolean; title: string; description: string; error?: string; children: ReactNode; onApply: () => void; onClose: () => void;
 }) {
   return <>
-    <ModalContent className={cx('flex min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg', tall ? 'h-[min(600px,85dvh)]' : 'h-[min(460px,85dvh)]')}>
+    <ModalContent className={cx('flex max-h-[85dvh] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg', tall && 'h-[min(600px,85dvh)]')}>
       <ModalHeader className="shrink-0 border-b border-line-2 px-5 py-4 text-left sm:px-6">
         <ModalTitle className="pr-6 text-[16px] leading-6">{title}</ModalTitle>
         <ModalDescription className="text-[12.5px]">{description}</ModalDescription>
