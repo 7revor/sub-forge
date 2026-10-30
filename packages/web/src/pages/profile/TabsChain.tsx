@@ -24,8 +24,8 @@ function usePreview() {
 
 function Hop({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
   return (
-    <div className={`flex min-w-0 flex-col gap-0.5 rounded-lg border bg-panel px-3 py-2 ${accent ? 'border-[#a9bbea]' : 'border-[#d5d9e0]'}`}>
-      <span className="text-[11.5px] text-ink-muted">{k}</span><span className="text-[13px] font-medium [overflow-wrap:anywhere]">{v}</span>
+    <div aria-label={`${k}：${v}`} title={`${k}：${v}`} className={`min-w-0 max-w-full rounded-lg border bg-panel px-3 py-2 ${accent ? 'border-[#a9bbea]' : 'border-[#d5d9e0]'}`}>
+      <span className="block truncate text-[13px] font-medium">{v}</span>
     </div>
   );
 }
@@ -61,7 +61,7 @@ export function TabChains() {
                   <ArrowRight size={18} className="text-faint" aria-hidden="true" />
                   <Hop k="前置节点" v={targetLabel(c.via, groupName, nodeSetName)} accent />
                   <ArrowRight size={18} className="text-faint" aria-hidden="true" />
-                  <Hop k={`落地 · ${nodeSetName(c.landing.nodeSet)}`} v={landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')} />
+                  <Hop k={`落地 · ${nodeSetName(c.landing.nodeSet)}`} v={landingNodeName(c.landing) ?? `${nodeSetName(c.landing.nodeSet)} · ${c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点'}`} />
                   <ArrowRight size={18} className="text-faint" aria-hidden="true" />
                   <Hop k="目标" v="互联网" />
                 </div>
