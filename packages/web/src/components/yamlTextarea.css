@@ -74,3 +74,23 @@
   .yaml-textarea-highlight { display: none; }
   .yaml-textarea > textarea { color: CanvasText; -webkit-text-fill-color: CanvasText; caret-color: CanvasText; }
 }
+
+
+/* 可选行号仅按换行计数，不解析配置。三层共享行高，滚动保持对齐。 */
+.yaml-textarea-numbered > textarea,
+.yaml-textarea-numbered > .yaml-textarea-highlight { padding-left: 60px; }
+.yaml-textarea-gutter {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 1;
+  width: 48px;
+  margin: 0;
+  padding: 10px 12px 10px 0;
+  overflow: hidden;
+  background: #fafbfc;
+  color: var(--color-faint);
+  font: inherit;
+  text-align: right;
+  pointer-events: none;
+  user-select: none;
+}

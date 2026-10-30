@@ -24,7 +24,7 @@ export function TabProfileInfo() {
   const collections = useList('collections');
   const sources = allNodeSets.filter(n => n.ref.type === 'source');
   const selected = trafficSourceIds(draft, collections.data ?? []);
-  return <section aria-label="订阅基本信息" className="grid min-w-0 gap-4 rounded-[10px] border border-line bg-panel p-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.2fr]">
+  return <section aria-label="订阅基本信息" className="grid min-w-0 gap-5 pt-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.2fr]">
     <div className="min-w-0">
       <Field label="订阅名称">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} aria-invalid={!!draft.id && !draft.name.trim()} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
       {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-[12px] text-err">请填写订阅名称</p>}
@@ -42,19 +42,19 @@ export function TabProfileInfo() {
 export function TabBase() {
   const { draft, setDraft } = useProfile();
   const enabled = draft.base !== undefined && draft.base.enabled !== false;
-  return <section aria-label="基础配置追加" className="min-w-0 rounded-[10px] border border-line bg-panel">
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
+  return <section aria-label="基础配置追加" className="min-w-0 border-t border-line pt-5">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 className="m-0 text-[15px] font-semibold">配置追加</h2>
       <div className="flex items-center gap-2.5">
-        <span className="text-[12.5px] text-ink-2">{enabled ? '已启用' : '未启用'}</span>
+        <span className="text-[12.5px] text-ink-2">启用</span>
         <Switch label="启用基础配置追加" checked={enabled} onChange={value => setDraft({ ...draft, base: { ...draft.base, enabled: value } })} />
       </div>
     </div>
-    {!enabled && <p className="m-0 px-4 pb-5 text-[13px] text-ink-muted sm:px-5">启用后编辑追加配置。</p>}
+    {!enabled && <p className="m-0 pb-1 text-[13px] text-ink-muted">启用后编辑追加配置。</p>}
     <div hidden={!enabled}>
       <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />
     </div>
-    {!!draft.migrationNotes?.length && <details className="px-4 pb-4 text-[12px] sm:px-5">
+    {!!draft.migrationNotes?.length && <details className="mt-4 text-[12px]">
       <summary className="w-fit cursor-pointer text-warn">配置迁移记录（{draft.migrationNotes.length}）</summary>
       <div className="mt-2 space-y-2 leading-relaxed text-ink-muted">{draft.migrationNotes.map((note, i) => <p key={i} className="m-0">{note}</p>)}</div>
     </details>}

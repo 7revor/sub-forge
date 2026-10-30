@@ -35,7 +35,7 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
     </div>
     <PageScroll>
       <fieldset disabled={disabled} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
-        <div role="tabpanel" id={`${id}-basic-panel`} aria-labelledby={`${id}-basic-tab`} hidden={active !== 'basic'} className={active === 'basic' ? 'flex min-w-0 flex-col gap-5' : undefined}>
+        <div role="tabpanel" id={`${id}-basic-panel`} aria-labelledby={`${id}-basic-tab`} hidden={active !== 'basic'} className={active === 'basic' ? 'flex min-w-0 flex-col gap-6 rounded-[10px] border border-line bg-panel p-4 sm:p-5' : undefined}>
           <TabProfileInfo />
           <section ref={el => { sections.current.base = el; }} className="flex scroll-mt-1 flex-col gap-4">
             <TabBase />
