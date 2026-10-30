@@ -172,7 +172,7 @@ export function TabGroups() {
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
               <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                <fieldset disabled={bound} className="contents"><GroupSettingsFields value={eff} onChange={setField} defaultStrategy="consistent-hashing" /></fieldset>
+                <fieldset disabled={bound} className="contents"><GroupSettingsFields value={eff} onChange={setField} /></fieldset>
               </div>
 
               <div className="flex flex-col gap-2.5">
