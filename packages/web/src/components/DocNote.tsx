@@ -7,5 +7,5 @@ export function NoteField({ value, onChange }: { value: string | undefined; onCh
 }
 
 export function NoteCell({ note }: { note?: string }) {
-  return <span className="block min-w-[140px] max-w-[320px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-ink-2">{note?.trim() ? note : '—'}</span>;
+  return <span className="block min-w-[140px] max-w-[320px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-ink-2">{note?.trim() ? note : '无'}</span>;
 }
