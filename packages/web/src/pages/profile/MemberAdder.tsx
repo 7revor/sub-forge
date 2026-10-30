@@ -39,7 +39,7 @@ export function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember)
       {kind === 'group' && <Select aria-label="组" className="w-auto min-w-40" value={groupId || groups[0]?.id || ''} onChange={(e) => setGroupId(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>}
       {kind === 'builtin' && <Select aria-label="内置策略" className="w-auto" value={builtin} onChange={(e) => setBuiltin(e.target.value as Builtin)}>{BUILTINS.map((b) => <option key={b}>{b}</option>)}</Select>}
       {kind === 'node' && <NodePicker label="节点" value={node.ref} nodeSets={profileNodeSets} onChange={(ref) => setNode({ kind: 'node', ref })} />}
-      {kind === 'all' && <Select aria-label="全部节点范围" className="w-auto" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}><option value="all">全部</option><option value="proxies">本地节点</option><option value="providers">provider</option></Select>}
+      {kind === 'all' && <Select aria-label="全部节点范围" className="w-auto" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}><option value="all">全部</option><option value="proxies">本地节点</option><option value="providers">Provider</option></Select>}
       <Button size="sm" disabled={!canAdd} onClick={add}><Plus size={14} />添加成员</Button>
     </div>
   );
