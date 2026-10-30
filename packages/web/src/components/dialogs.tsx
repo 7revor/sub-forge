@@ -1,21 +1,21 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog.tsx';
 import { matchesNameSearch } from '@sub-forge/core';
 import { NODE_SET_LABEL, sameNodeSet as same, nodeSetKey } from '../domain/nodeSet.ts';
 // 通用对话框（设计稿「对话框与危险操作」）：重命名、添加节点集。
 
 import type { NodeSetID } from '@sub-forge/core';
 import { useEffect, useState } from 'react';
-import { Button, Empty, Input, Modal } from './ui.tsx';
+import { Button, Empty, Input, } from './ui.tsx';
 
 export function RenameDialog({ open, title, name, onClose, onRename }: { open: boolean; title: string; name: string; onClose: () => void; onRename: (name: string) => void }) {
   const [value, setValue] = useState(name);
   useEffect(() => { if (open) setValue(name); }, [open, name]);
   const ok = !!value.trim() && value.trim() !== name;
   return (
-    <Modal title={title} open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ok} onClick={() => { onRename(value.trim()); onClose(); }}>确定</Button></>}>
-      <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">名称</span>
+    <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+      <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-ink-muted">名称</span>
         <Input autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && ok) { onRename(value.trim()); onClose(); } }} /></label>
-    </Modal>
+    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ok} onClick={() => { onRename(value.trim()); onClose(); }}>确定</Button></>}</DialogFooter></DialogContent></Dialog>
   );
 }
 
@@ -30,8 +30,7 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
   useEffect(() => { if (open) { setQ(''); setPicked([]); } }, [open]);
   const shown = options.filter((o) => matchesNameSearch(o.name, q));
   return (
-    <Modal title={title} open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); onClose(); }}>加入 {picked.length || ''} 个</Button></>}>
+    <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Input aria-label="搜索节点集" placeholder="搜索订阅源、组合、本地节点组" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex max-h-[360px] flex-col overflow-y-auto rounded-lg border border-line">
         {shown.map((o) => {
@@ -41,13 +40,13 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
             <label key={nodeSetKey(o.ref)} className={`flex items-center gap-2.5 border-b border-line-2 px-3 py-2.5 last:border-0 ${isAdded ? 'text-faint' : 'cursor-pointer hover:bg-ground'}`}>
               <input type="checkbox" disabled={isAdded} checked={on || isAdded} onChange={(e) => setPicked(e.target.checked ? [...picked, o.ref] : picked.filter((p) => !same(p, o.ref)))} />
               <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{o.name}</span>
-              <span className="text-[12px] text-muted">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>
+              <span className="text-[12px] text-ink-muted">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>
             </label>
           );
         })}
         {!shown.length && <div className="p-3"><Empty title={options.length ? '没有匹配的节点集' : '还没有可加入的节点集'} /></div>}
       </div>
-      {hint && <span className="text-[12px] leading-relaxed text-muted">{hint}</span>}
-    </Modal>
+      {hint && <span className="text-[12px] leading-relaxed text-ink-muted">{hint}</span>}
+    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); onClose(); }}>加入 {picked.length || ''} 个</Button></>}</DialogFooter></DialogContent></Dialog>
   );
 }

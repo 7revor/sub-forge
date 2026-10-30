@@ -44,7 +44,7 @@ export function CollectionEdit() {
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const preview = usePipelinePreview('collections', e.isNew ? undefined : e.id, e.draft?.pipeline, e.draft?.members);
-  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const d = e.draft;
   const set = (p: Partial<Collection>) => e.setDraft({ ...d, ...p });
   const options = all.filter((n) => !(n.ref.type === 'collection' && n.ref.id === d.id));
@@ -59,7 +59,7 @@ export function CollectionEdit() {
       actionItems={[{ label: '重命名', onSelect: () => setRenaming(true) }]}
       badges={<>
         <Badge>{d.members.length} 个成员{preview.data ? ` · 合并后 ${preview.data.input} 个节点` : ''}</Badge>
-        {!e.isNew && <Badge>被配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-accent">{p.name}</Link></span>) : '还没有'}</Badge>}
+        {!e.isNew && <Badge>被配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-brand">{p.name}</Link></span>) : '还没有'}</Badge>}
       </>}>
       <Card title="基本信息">
         {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
@@ -71,11 +71,11 @@ export function CollectionEdit() {
         bodyClass="overflow-x-auto pb-1">
         {!d.members.length ? <div className="px-4 pb-4"><Empty title="还没有成员" /></div> : (
           <div className="min-w-[900px]">
-            <div className={cx(GRID, 'border-y border-line py-2 text-[12px] font-medium text-muted')}><span /><span>成员</span><span>类型</span><span>节点</span><span>前缀</span><span>后缀</span><span>拉取失败时</span><span /></div>
+            <div className={cx(GRID, 'border-y border-line py-2 text-[12px] font-medium text-ink-muted')}><span /><span>成员</span><span>类型</span><span>节点</span><span>前缀</span><span>后缀</span><span>拉取失败时</span><span /></div>
             <SortableList items={d.members} onReorder={(members) => set({ members })} renderItem={(m, i, handle) => (
               <div className={cx(GRID, 'border-b border-line-2 py-2.5')}>
                 {handle}
-                <Link to={nodeSetPath(m.ref)} className="truncate text-[13.5px] font-medium text-ink no-underline hover:text-accent">{nameOf(m.ref)}</Link>
+                <Link to={nodeSetPath(m.ref)} className="truncate text-[13.5px] font-medium text-ink no-underline hover:text-brand">{nameOf(m.ref)}</Link>
                 <span className="text-[12.5px] text-ink-2">{NODE_SET_LABEL[m.ref.type]}</span>
                 <NodeSetCount nodeSet={m.ref} />
                 <Input aria-label={`${nameOf(m.ref)} 前缀`} className="h-[34px] font-mono text-[12.5px]" value={m.prefix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, prefix: x.target.value || undefined } : y)) })} />
@@ -89,7 +89,7 @@ export function CollectionEdit() {
             )} />
           </div>
         )}
-        {d.members.length > 0 && <p className="mx-4 mt-2 mb-3 text-[12px] text-muted">失败策略暂不生效，拉取失败时使用快照。</p>}
+        {d.members.length > 0 && <p className="mx-4 mt-2 mb-3 text-[12px] text-ink-muted">失败策略暂不生效，拉取失败时使用快照。</p>}
       </Card>
 
       {!e.isNew && (

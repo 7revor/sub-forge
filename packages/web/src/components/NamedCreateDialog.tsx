@@ -1,5 +1,6 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog.tsx';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { Button, ErrorAlert, Field, Input, Modal } from './ui.tsx';
+import { Button, ErrorAlert, Field, Input, } from './ui.tsx';
 
 /** 创建请求和跳转由调用方负责；按钮和回车共用一次提交入口。 */
 export function NamedCreateDialog({ open, onClose, title, label = '名称', placeholder, hint, pending, error, onCreate, onReset, children }: {
@@ -13,10 +14,7 @@ export function NamedCreateDialog({ open, onClose, title, label = '名称', plac
   const formId = useId();
   useEffect(() => { if (open) { setName(''); setSubmitError(undefined); onReset(); } }, [open, onReset]);
   const close = () => { if (!pending && !submitting.current) onClose(); };
-  return <Modal title={title} open={open} onClose={close} footer={<>
-    <Button disabled={pending} onClick={close}>取消</Button>
-    <Button type="submit" form={formId} variant="primary" disabled={!name.trim() || pending}>{pending ? '创建中…' : '创建'}</Button>
-  </>}>
+  return <Dialog open={open} onOpenChange={next => { if (!next) (close)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
     <form id={formId} className="flex flex-col gap-3.5" onSubmit={async (event) => {
       event.preventDefault();
       if (!name.trim() || pending || submitting.current) return;
@@ -28,8 +26,11 @@ export function NamedCreateDialog({ open, onClose, title, label = '名称', plac
     }}>
       <Field label={label}>{(id) => <Input id={id} autoFocus required disabled={pending} placeholder={placeholder} value={name} onChange={(event) => setName(event.target.value)} />}</Field>
       {children}
-      {hint && <span className="text-[12px] text-muted">{hint}</span>}
+      {hint && <span className="text-[12px] text-ink-muted">{hint}</span>}
       <ErrorAlert error={submitError ?? error} />
     </form>
-  </Modal>;
+  </div><DialogFooter>{<>
+    <Button disabled={pending} onClick={close}>取消</Button>
+    <Button type="submit" form={formId} variant="primary" disabled={!name.trim() || pending}>{pending ? '创建中…' : '创建'}</Button>
+  </>}</DialogFooter></DialogContent></Dialog>;
 }

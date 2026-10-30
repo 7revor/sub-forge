@@ -87,10 +87,10 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
         {renderForm()}
       </> : <>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[13px] text-muted">{rawLabel}</span>
+          <span className="text-[13px] text-ink-muted">{rawLabel}</span>
           <CopyButton size="sm" text={text} />
         </div>
-        {rawHint && <span className="text-[12px] leading-relaxed text-muted">{rawHint}</span>}
+        {rawHint && <span className="text-[12px] leading-relaxed text-ink-muted">{rawHint}</span>}
         <YamlTextarea aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
           const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
           if (!imported) return;
@@ -121,7 +121,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           }
         }} />
         <FieldError error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
-        {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[13px] text-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
+        {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[13px] text-ink-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
       </>}
     </div>
   </div>;

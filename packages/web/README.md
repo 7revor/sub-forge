@@ -207,6 +207,10 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 
 ## 公共弹层与动效
 
-全站弹层沿用 shadcn/ui Radix 版的标准动效，公共封装在 `src/components/primitives/overlays.tsx`：编辑与预览使用 Dialog，危险操作与错误使用 AlertDialog，单选使用 Select，多选／输入候选／异步搜索／规则诊断使用 Popover，处理器菜单使用 DropdownMenu，通知使用 Sonner。
+全站弹窗直接组合 `src/components/ui/` 中的 shadcn 官方 Dialog / AlertDialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。不再保留自定义 Modal、动画常量、焦点恢复函数或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
 
-关键帧统一来自 `tw-animate-css`，退场卸载交给 Radix，不再添加业务关键帧或用固定时长计时器卸载弹层。保留系统减少动态效果支持；业务页面继续调用现有 `Modal`、`Select`、`Combobox` 和 feedback API。验收见 [2026-10-30 记录](../../research/verification/ui-library-motion-20261030/README.md)。
+`listbox.tsx` 仅保留业务选项映射、空值编码、异步搜索与分页；单选采用官方 Select 默认定位，多选采用官方 DropdownMenuCheckboxItem，自由输入候选与异步查询由官方 Command + Popover 组合。页面通过组件属性传入业务状态、内容和必要的宽高约束。官方 neutral 主题与既有页面品牌色分开命名，避免同名 accent / muted 变量覆盖官方组件。`components.json`、TypeScript 和 Vite 路径别名已配置。
+
+合并包含依赖变化的分支后，先在主工作区执行 `pnpm install --frozen-lockfile`，再启动 `pnpm --filter @sub-forge/web dev`。依赖目录应属于当前工作区，不能复用其他 worktree 的 node_modules；若安装期间 Vite 正在运行，应重启开发服务以清除旧依赖解析缓存。
+
+本次不改变后端接口、领域模型和示例种子；视觉验收见 [官方组件迁移记录](../../research/verification/shadcn-official-20261030/README.md)。

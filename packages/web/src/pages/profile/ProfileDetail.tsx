@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
 import { acceptProfileSave, modeLabel, syncProfileDraft } from './routing.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { CopyButton } from '../../components/CopyButton.tsx';
@@ -8,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router';
 import { DeleteAction } from '../../components/DetailActions.tsx';
-import { Badge, Button, buttonClass, ErrorAlert, Modal, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
+import { Badge, Button, buttonClass, ErrorAlert, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
 import { TemplateCard } from './TemplateCard.tsx';
 import { useDeleteDoc, useDoc, useList, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
@@ -45,7 +46,7 @@ export function ProfileDetail() {
 
   const { ctx, template } = useProfileCtx(draft, setDraft);
 
-  if (!draft || !ctx) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!draft || !ctx) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const dirty = !ctx.baseValid || JSON.stringify(draft) !== JSON.stringify(doc.data);
   const discard = () => { setDraft(doc.data); ctx.resetBaseEditor(); };
   const preset = presets.data?.find((p) => p.id === draft.base?.presetId);
@@ -59,7 +60,7 @@ export function ProfileDetail() {
   return (
     <ProfileContext.Provider value={ctx}>
       <div className="flex flex-col gap-2.5">
-        <PageHeader crumbs={<><Link to="/profiles" className="text-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
+        <PageHeader crumbs={<><Link to="/profiles" className="text-ink-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
           actions={<>
             {dirty && <Button onClick={discard}>放弃修改</Button>}
             <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
@@ -79,14 +80,14 @@ export function ProfileDetail() {
         </PageHeader>
         <nav aria-label="Profile 分区" className="flex flex-wrap border-b border-line">
           {TABS.map(([key, label]) => (
-            <NavLink key={key} to={`/profiles/${id}/${key}`} className={() => cx('mr-5 inline-flex h-11 items-center border-b-2 px-1 text-[14px] no-underline', tab === key ? 'border-accent font-semibold text-ink' : 'border-transparent text-muted hover:text-ink')} aria-current={tab === key ? 'page' : undefined}>
+            <NavLink key={key} to={`/profiles/${id}/${key}`} className={() => cx('mr-5 inline-flex h-11 items-center border-b-2 px-1 text-[14px] no-underline', tab === key ? 'border-brand font-semibold text-ink' : 'border-transparent text-ink-muted hover:text-ink')} aria-current={tab === key ? 'page' : undefined}>
               {label}
             </NavLink>
           ))}
         </nav>
       </div>
       <ErrorAlert error={save.error ?? dup.error} />
-      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-accent" href={`/api/profiles/${draft.id}/migration-backup`} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
+      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={`/api/profiles/${draft.id}/migration-backup`} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
       <ProfileEditGuard valid={ctx.baseValid} onDiscard={discard} />
       {template.error && <ErrorAlert error={template.error} />}
 
@@ -100,9 +101,9 @@ export function ProfileDetail() {
         {tab === 'preview' && <TabPreview />}
 
       </PageScroll>
-      <Modal title="模板关联" open={tplOpen} onClose={() => setTplOpen(false)} footer={<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}>
+      <Dialog open={tplOpen} onOpenChange={next => { if (!next) (() => setTplOpen(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"模板关联"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         <TemplateCard bare />
-      </Modal>
+      </div><DialogFooter>{<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}</DialogFooter></DialogContent></Dialog>
     </ProfileContext.Provider>
   );
 }

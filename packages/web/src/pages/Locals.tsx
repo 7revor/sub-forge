@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { LeaveDialog } from '../components/LeaveDialog.tsx';
@@ -19,12 +20,12 @@ import { inspectLocalNodeYaml } from '../convert/localNodeYaml.ts';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { groupFromYaml, groupToYaml, proxyToYaml } from '../convert/proxyYaml.ts';
 import { DeleteAction, DeleteDialog, ActionButtons } from '../components/DetailActions.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, Modal, PageHeader, cx, td, th } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
 
 const EMPTY: LocalProxyGroup = { id: '', name: '', proxies: [] };
-const crumbLink = 'text-muted no-underline';
+const crumbLink = 'text-ink-muted no-underline';
 
 function NewGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ export function LocalEdit() {
   const [deletingNode, setDeletingNode] = useState<number>();
   const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew);
   if (e.isNew) return <Navigate to="/locals" replace />;
-  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const d = e.draft;
   const validName = !!d.name.trim();
   const setProxies = (proxies: LocalProxy[]) => e.setDraft({ ...d, proxies });
@@ -116,15 +117,14 @@ export function LocalEdit() {
         )}
       </Card>
 
-      <Modal title="分组 YAML" open={groupText !== undefined} onClose={() => setGroupText(undefined)} wide
-        footer={<><Button onClick={() => setGroupText(undefined)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {
-          if (groupResult?.ok) { setProxies(groupResult.value); setGroupText(undefined); }
-        }}>应用到分组</Button></>}>
+      <Dialog open={groupText !== undefined} onOpenChange={next => { if (!next) (() => setGroupText(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"分组 YAML"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         <Field label="整个分组的 proxies 列表">
           {(id) => <YamlTextarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
         </Field>
         <FieldError error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
-      </Modal>
+      </div><DialogFooter>{<><Button onClick={() => setGroupText(undefined)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {
+          if (groupResult?.ok) { setProxies(groupResult.value); setGroupText(undefined); }
+        }}>应用到分组</Button></>}</DialogFooter></DialogContent></Dialog>
       <DeleteDialog open={deletingNode !== undefined} title={`删除节点「${deletingNode === undefined ? '' : d.proxies[deletingNode]?.name ?? ''}」？`} error={e.save.error} pending={e.save.isPending}
         onClose={() => setDeletingNode(undefined)}
         onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>
@@ -141,7 +141,7 @@ export function LocalNodeEdit() {
   const { id, index } = useParams();
   const doc = useDoc('locals', id);
   if (doc.error) return <ErrorAlert error={doc.error} />;
-  if (!doc.data) return <div className="text-muted">加载中…</div>;
+  if (!doc.data) return <div className="text-ink-muted">加载中…</div>;
   const idx = Number(index);
   if (index !== 'new' && !(Number.isInteger(idx) && idx >= 0 && idx < doc.data.proxies.length)) return <Navigate to={`/locals/${id}`} replace />;
   return <LocalNodeEditor key={`${id}-${index}`} group={doc.data} index={index === 'new' ? 'new' : idx} />;

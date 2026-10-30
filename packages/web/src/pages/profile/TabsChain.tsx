@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
 import { persistedProfile } from './routing.ts';
 import { CodePreview } from '../../components/CodePreview.tsx';
 // 代理链（链规则 + 依赖节点面板，REF-03 / REF-07）与预览（按平台查看最终配置与渲染报告）。
@@ -9,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { NodeSetSelect, TargetPicker, targetLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Modal, ReportList, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, ReportList, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 const STRATEGIES: { value: RefStrategy; label: string }[] = [{ value: 'wrap', label: '包装组' }, { value: 'copy', label: '复制到本地' }, { value: 'inline', label: '整体内联' }];
@@ -22,7 +23,7 @@ function usePreview() {
 function Hop({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
   return (
     <div className={`flex min-w-0 flex-col gap-0.5 rounded-lg border bg-panel px-3 py-2 ${accent ? 'border-[#a9bbea]' : 'border-[#d5d9e0]'}`}>
-      <span className="text-[11.5px] text-muted">{k}</span><span className="text-[13px] font-medium">{v}</span>
+      <span className="text-[11.5px] text-ink-muted">{k}</span><span className="text-[13px] font-medium">{v}</span>
     </div>
   );
 }
@@ -94,7 +95,7 @@ export function TabChains() {
             <tbody>
               {preview.data.dependencies.map((d) => (
                 <tr key={d.refKey}>
-                  <td className={td}><div className="flex flex-col gap-0.5"><span className="font-medium">{d.node}</span><span className="text-[12px] text-muted">{d.nodeSet}</span></div></td>
+                  <td className={td}><div className="flex flex-col gap-0.5"><span className="font-medium">{d.node}</span><span className="text-[12px] text-ink-muted">{d.nodeSet}</span></div></td>
                   <td className={cx(td, 'font-mono text-[12.5px]')}>{d.output}</td>
                   <td className={cx(td, 'text-[12.5px] text-ink-2')}>{d.usedBy.join('、')}</td>
                   <td className={td}><Segmented label="解析策略" value={perRef[d.refKey] ?? draft.refPolicy.default} options={STRATEGIES}
@@ -104,26 +105,25 @@ export function TabChains() {
             </tbody>
           </table>
         )}
-        {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-muted">依赖节点不可用时拒绝连接。</p>}
+        {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-ink-muted">依赖节点不可用时拒绝连接。</p>}
       </Card>
-      <Modal title={editing?.index === -1 ? '添加链规则' : `编辑链规则 #${(editing?.index ?? 0) + 1}`} open={!!editing} onClose={() => setEditing(undefined)}
-        footer={<><Button onClick={() => setEditing(undefined)}>取消</Button><Button variant="primary" onClick={commit}>{editing?.index === -1 ? '添加' : '保存链规则'}</Button></>}>
+      <Dialog open={!!editing} onOpenChange={next => { if (!next) (() => setEditing(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{editing?.index === -1 ? '添加链规则' : `编辑链规则 #${(editing?.index ?? 0) + 1}`}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         {editing && (() => {
           const c = editing.chain;
           const put = (chain: ChainRule) => setEditing({ ...editing, chain });
           return <>
-            <span className="text-[12.5px] font-medium text-muted">落地（哪些节点经由前置出去）</span>
+            <span className="text-[12.5px] font-medium text-ink-muted">落地（哪些节点经由前置出去）</span>
             <div className="grid grid-cols-2 gap-3">
               <Field label="节点集">{() => <NodeSetSelect label="落地节点集" value={c.landing.nodeSet} options={profileNodeSets} onChange={(nodeSet) => put({ ...c, landing: { ...c.landing, nodeSet } })} />}</Field>
               <Field label="筛选（正则，留空为全部）">{(id) => <Input id={id} className="font-mono" value={c.landing.filter ?? ''} onChange={(e) => put({ ...c, landing: { ...c.landing, filter: e.target.value || undefined } })} />}</Field>
               <Field label="排除（正则）" className="col-span-2">{(id) => <Input id={id} className="font-mono" value={c.landing.excludeFilter ?? ''} onChange={(e) => put({ ...c, landing: { ...c.landing, excludeFilter: e.target.value || undefined } })} />}</Field>
             </div>
             <MatchPreview nodeSet={c.landing.nodeSet} filter={c.landing.filter} excludeFilter={c.landing.excludeFilter} />
-            <div className="flex flex-col gap-1.5 border-t border-line-2 pt-3"><span className="text-[12.5px] font-medium text-muted">前置</span>
+            <div className="flex flex-col gap-1.5 border-t border-line-2 pt-3"><span className="text-[12.5px] font-medium text-ink-muted">前置</span>
               <TargetPicker label="前置" value={c.via} onChange={(via) => put({ ...c, via })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
           </>;
         })()}
-      </Modal>
+      </div><DialogFooter>{<><Button onClick={() => setEditing(undefined)}>取消</Button><Button variant="primary" onClick={commit}>{editing?.index === -1 ? '添加' : '保存链规则'}</Button></>}</DialogFooter></DialogContent></Dialog>
     </>
   );
 }
@@ -160,17 +160,17 @@ export function TabPreview() {
           <Select className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{platforms.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
         <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
         <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml}>导出文件</Button>
-        <span className="text-[12.5px] text-muted">当前草稿预览</span>
+        <span className="text-[12.5px] text-ink-muted">当前草稿预览</span>
       </div>
       <ErrorAlert error={preview.error} />
-      {client === 'stash' && <p className="text-[12.5px] text-muted">Stash 节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
+      {client === 'stash' && <p className="text-[12.5px] text-ink-muted">Stash 节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
       {current && (
         <div className="flex flex-wrap items-start gap-5">
           <CodePreview label="最终配置" className="flex-[999_1_560px] rounded-[10px]" title={`config.yaml · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="max-h-[720px] p-4 text-[12.5px] leading-[1.75]" />
           <section aria-label="渲染报告" className="flex min-w-0 flex-[1_1_340px] flex-col gap-3">
             <div className="grid grid-cols-3 gap-2">
               {[['错误', count('error'), 'text-err'], ['告警', count('warn'), 'text-warn'], ['提示', count('info'), 'text-accent-ink']].map(([t, n, c]) => (
-                <div key={t as string} className="flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel px-3 py-2.5"><span className="text-[12px] text-muted">{t}</span><span className={`text-[22px] font-semibold ${c}`}>{n}</span></div>
+                <div key={t as string} className="flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel px-3 py-2.5"><span className="text-[12px] text-ink-muted">{t}</span><span className={`text-[22px] font-semibold ${c}`}>{n}</span></div>
               ))}
             </div>
             <Card title="渲染报告" bodyClass="px-4 pb-2">

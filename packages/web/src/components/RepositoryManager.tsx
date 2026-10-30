@@ -20,13 +20,13 @@ export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: 
           <thead className="sticky top-0 z-10 bg-panel"><tr>{['仓库名称', '分支', '规则数', '更新时间', '状态', ...(admin ? ['操作'] : [])].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
           <tbody>{repos.map(r => <Fragment key={r.id}>
             <tr>
-              <td className={td}><a href={r.url} target="_blank" rel="noreferrer" className="break-all font-medium text-ink hover:text-accent">{r.name}</a>
-                {r.pending && r.builtAt && <div className="mt-1 text-[12px] text-muted">新配置待同步，搜索仍使用上次成功索引。</div>}
+              <td className={td}><a href={r.url} target="_blank" rel="noreferrer" className="break-all font-medium text-ink hover:text-brand">{r.name}</a>
+                {r.pending && r.builtAt && <div className="mt-1 text-[12px] text-ink-muted">新配置待同步，搜索仍使用上次成功索引。</div>}
                 {r.error && <div className="mt-1 max-w-sm break-words text-[12px] text-err">{r.error}{r.builtAt ? '（保留上次索引）' : ''}</div>}
               </td>
               <td className={td}><span className="break-all">{r.refs.join('、')}</span></td>
               <td className={`${td} tabular-nums`}>{r.entries}</td>
-              <td className={`${td} whitespace-nowrap text-muted`}>{r.builtAt ? formatTime(r.builtAt).slice(5) : '—'}</td>
+              <td className={`${td} whitespace-nowrap text-ink-muted`}>{r.builtAt ? formatTime(r.builtAt).slice(5) : '—'}</td>
               <td className={td}><Badge tone={!r.enabled ? 'neutral' : r.error ? 'err' : r.builtAt ? 'ok' : 'neutral'}>{!r.enabled ? '已停用' : r.indexing ? '更新中…' : r.error ? '更新失败' : r.builtAt ? '已索引' : '待索引'}</Badge></td>
               {admin && <td className={`${td} w-px`}><div className="flex gap-2"><Button size="sm" disabled={!r.enabled || r.indexing || refresh.isPending} onClick={() => refresh.mutate(r.id)}>更新索引</Button><Button size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button><Link to={`/rule-repo/${encodeURIComponent(r.id)}/edit${search}`} className={buttonClass('default', 'sm')}>编辑</Link><Button size="sm" variant="ghost" aria-label={`删除 ${r.name}`} disabled={r.indexing || remove.isPending} onClick={() => { remove.reset(); setDeleting(r); }}><Trash2 size={14} />删除</Button></div></td>}
             </tr>

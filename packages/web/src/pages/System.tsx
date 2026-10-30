@@ -1,3 +1,4 @@
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from '../components/ui/alert-dialog.tsx';
 // 系统（设计稿「管理员 · 系统」）：SSRF 白名单、mihomo 配置校验、规则集合、备份与恢复。
 // 服务端尚未实现：读接口返回空数据并带 pending，保存、导出、恢复返回 501。
 
@@ -6,7 +7,7 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { api, type SystemInfo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, Input, Modal, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
 export function System() {
   const qc = useQueryClient();
@@ -19,7 +20,7 @@ export function System() {
   const backup = useMutation({ meta: { successMessage: '备份已导出' }, mutationFn: () => api('POST', '/system/backup') });
   const restore = useMutation({ meta: { successMessage: '备份已恢复' }, mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
 
-  if (!draft) return info.error ? <ErrorAlert error={info.error} /> : <div className="text-muted">加载中…</div>;
+  if (!draft) return info.error ? <ErrorAlert error={info.error} /> : <div className="text-ink-muted">加载中…</div>;
   const dirty = JSON.stringify(draft) !== JSON.stringify(info.data);
   const verify = draft.verify ?? { enabled: false };
 
@@ -36,7 +37,7 @@ export function System() {
               <div className="flex flex-col">
                 {draft.ssrfAllow.map((a, i) => (
                   <div key={a.value} className="flex items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="font-mono text-[13px]">{a.value}</span>{a.note && <span className="text-[12px] text-muted">{a.note}</span>}</span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="font-mono text-[13px]">{a.value}</span>{a.note && <span className="text-[12px] text-ink-muted">{a.note}</span>}</span>
                     <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${a.value}`} onClick={() => setDraft({ ...draft, ssrfAllow: draft.ssrfAllow.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
                   </div>
                 ))}
@@ -51,14 +52,14 @@ export function System() {
             <Card title="配置校验">
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="flex flex-col gap-0.5"><span className="text-[13.5px] font-medium">渲染后用内置 mihomo 执行 -t</span><span className="text-[12.5px] text-muted">失败时返回上一份成功版本并告警</span></span>
+                  <span className="flex flex-col gap-0.5"><span className="text-[13.5px] font-medium">渲染后用内置 mihomo 执行 -t</span><span className="text-[12.5px] text-ink-muted">失败时返回上一份成功版本并告警</span></span>
                   <Switch label="mihomo 校验" checked={verify.enabled} onChange={(enabled) => setDraft({ ...draft, verify: { ...verify, enabled } })} />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge>{verify.version ? `内置 mihomo ${verify.version}` : '未检测到 mihomo'}</Badge>
                   {verify.checks24h !== undefined && <Badge tone={verify.fails24h ? 'warn' : 'neutral'}>近 24 小时校验 {verify.checks24h} 次 · 失败 {verify.fails24h ?? 0} 次</Badge>}
                 </div>
-                <span className="text-[12px] leading-relaxed text-muted">引用校验始终开启。</span>
+                <span className="text-[12px] leading-relaxed text-ink-muted">引用校验始终开启。</span>
               </div>
             </Card>
           </div>
@@ -66,7 +67,7 @@ export function System() {
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
             <Card title="规则集合">
               <div className="flex flex-col gap-3">
-                <Link to="/rule-repo" className="text-[13px] text-accent">前往规则集合管理仓库与索引 →</Link>
+                <Link to="/rule-repo" className="text-[13px] text-brand">前往规则集合管理仓库与索引 →</Link>
               </div>
             </Card>
 
@@ -79,7 +80,7 @@ export function System() {
                     从文件恢复…<input type="file" accept="application/json" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { restore.reset(); setRestoreFile(f); } e.target.value = ''; }} />
                   </label>
                 </div>
-                <span className="text-[12.5px] text-muted">{draft.lastBackup ? `上次导出：${formatTime(draft.lastBackup.at).slice(5)} · ${formatBytes(draft.lastBackup.size)}` : '还没有导出过'}</span>
+                <span className="text-[12.5px] text-ink-muted">{draft.lastBackup ? `上次导出：${formatTime(draft.lastBackup.at).slice(5)} · ${formatBytes(draft.lastBackup.size)}` : '还没有导出过'}</span>
                 <ErrorAlert error={backup.error ?? restore.error} />
               </div>
             </Card>
@@ -87,13 +88,13 @@ export function System() {
         </div>
 
       </PageScroll>
-      <Modal alert title="恢复备份？" open={!!restoreFile} onClose={() => { if (!restore.isPending) setRestoreFile(undefined); }} footer={<>
-        <Button disabled={restore.isPending} onClick={() => setRestoreFile(undefined)}>取消</Button>
-        <Button variant="danger-solid" disabled={restore.isPending} onClick={() => { if (restoreFile) restore.mutate(restoreFile, { onSuccess: () => setRestoreFile(undefined) }); }}>{restore.isPending ? '恢复中…' : '恢复'}</Button>
-      </>}>
+      <AlertDialog open={!!restoreFile} onOpenChange={next => { if (!next) (() => { if (!restore.isPending) setRestoreFile(undefined); })(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{"恢复备份？"}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
         <span className="text-[13.5px] leading-relaxed">恢复会覆盖当前全部配置。</span>
-        <span className="break-all text-[13px] text-muted">{restoreFile?.name}</span>
-      </Modal>
+        <span className="break-all text-[13px] text-ink-muted">{restoreFile?.name}</span>
+      </div></AlertDialogDescription><AlertDialogFooter>{<>
+        <AlertDialogCancel disabled={restore.isPending}>取消</AlertDialogCancel>
+        <Button variant="danger-solid" disabled={restore.isPending} onClick={() => { if (restoreFile) restore.mutate(restoreFile, { onSuccess: () => setRestoreFile(undefined) }); }}>{restore.isPending ? '恢复中…' : '恢复'}</Button>
+      </>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
 
     </>
   );

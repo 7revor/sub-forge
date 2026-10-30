@@ -58,7 +58,7 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
       </div>
       {replacements && <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2 pl-8">
-          <span className="text-[12.5px] font-medium text-muted">{action === 'append' ? '追加规则' : '替换为'}</span>
+          <span className="text-[12.5px] font-medium text-ink-muted">{action === 'append' ? '追加规则' : '替换为'}</span>
           <Button size="sm" variant="ghost" onClick={() => setRules([...replacements, rawRuleFromText('')])}><Plus size={14} />添加{ruleLabel}规则</Button>
         </div>
         <div className="flex flex-col gap-3 pl-8">
@@ -73,7 +73,7 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
     </div>;
   };
   return <div className="flex flex-col gap-3">
-    {!single && <p className="m-0 text-[12.5px] text-muted">命中第一条匹配的覆盖</p>}
+    {!single && <p className="m-0 text-[12.5px] text-ink-muted">命中第一条匹配的覆盖</p>}
     {single ? value.map((override, i) => <div key={i}>{render(override, i)}</div>) : <SortableList items={value} onReorder={onChange}
       renderItem={(override, i, handle) => <div className="my-2 flex items-start gap-2 rounded-lg border border-line p-3">{handle}{render(override, i)}</div>} />}
     {!single && <FieldError error={clientOverridesError(value)} />}

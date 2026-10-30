@@ -214,6 +214,6 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 2026-10-29：模板策略组主行末尾提供铅笔与垃圾桶按钮，与规则行操作对齐。行末与编辑弹窗内删除共用确认弹窗及既有 removeGroup 逻辑；取消不修改草稿。领域模型、服务端与种子不变，外部画布待同步。
 
-## 2026-10-30：全局采用组件库弹层与默认动效
+## 2026-10-30：全局直接使用 shadcn 官方组件
 
-通用弹窗、确认框、错误、单选、多选、自由输入候选、异步来源搜索、规则诊断、处理器菜单及通知已统一采用 shadcn/ui Radix 方案与 Sonner。删除手写关键帧、固定退场计时器与旧 Presence。配色与业务选择规则保留，遮罩和面板分离，嵌套焦点与系统减少动态效果已验证。后端接口、领域模型、输出和示例种子不变。本轮未编辑外部画布，待同步规范见 docs/13；实际验收与截图见 `research/verification/ui-library-motion-20261030/`。
+此项替代此前基于 Radix 手动适配的弹层。官方 Dialog、AlertDialog、Select、DropdownMenu、Popover、Command、Sonner 与 Button 源码落在 `packages/web/src/components/ui/`，只更改导入路径。编辑、预览、确认、错误、规则诊断与搜索等所有弹层入口均直接调用官方组件；不覆盖默认动画参数、默认定位或默认通知外观。旧 Modal / overlays 及自定义焦点恢复删除。页面仅保留业务状态、内容、数据映射和必要的容器宽高约束。后端接口、领域模型、输出与示例种子不变；外部画布本轮未编辑，待同步见 docs/13。验收见 `research/verification/shadcn-official-20261030/`。

@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
 import { withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
@@ -7,7 +8,7 @@ import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { targetLabel } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
-import { Button, Card, Empty, ErrorAlert, Field, FieldError, Modal, buttonClass, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, ErrorAlert, Field, FieldError, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
@@ -18,7 +19,7 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(100px,10vw,140px)_64px]';
 
 function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCtx; repos: NamedRef[] }) {
-  const sourceClass = 'shrink-0 text-[12px] text-muted';
+  const sourceClass = 'shrink-0 text-[12px] text-ink-muted';
   const lineClass = 'flex min-w-0 items-center gap-2 text-[12.5px]';
   if (matcher.kind === 'rule') {
     const line = ruleToLine(matcher.rule);
@@ -33,7 +34,7 @@ function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCt
         const file = source.repository!;
         return <span key={source.id} className={cx(lineClass, 'flex-wrap gap-y-1 sm:flex-nowrap')} title={`${name} · ${file.ref} · ${file.path}`}>
           <span className="max-w-[60%] shrink-0 truncate sm:max-w-[35%]">{name}</span><span className="shrink-0 text-faint">·</span>
-          <span className="max-w-[25%] shrink-0 truncate font-mono text-muted">{file.ref}</span><span className="hidden shrink-0 text-faint sm:inline">·</span>
+          <span className="max-w-[25%] shrink-0 truncate font-mono text-ink-muted">{file.ref}</span><span className="hidden shrink-0 text-faint sm:inline">·</span>
           <span dir="rtl" className="min-w-0 basis-full truncate text-left font-mono sm:basis-auto"><bdi dir="ltr">{file.path}</bdi></span>
         </span>;
       })}</span>
@@ -112,31 +113,30 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       <SortableList items={value.rules} getKey={r => r.id} isLocked={() => readOnly} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
         const error = report.some(item => item.level === 'error' && item.where === `rule:${r.id}`);
         return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
-          <span className="flex items-center text-[12px] text-muted">{handle}{i + 1}</span>
-          <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer text-left hover:text-accent"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
+          <span className="flex items-center text-[12px] text-ink-muted">{handle}{i + 1}</span>
+          <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer text-left hover:text-brand"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
           <span title={targetLabel(r.target, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center text-ink-2 sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</span>
           {!readOnly && <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
             <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
             <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
           </div>}
-          {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && repositoryMatches.matches[r.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="col-span-full flex flex-wrap items-center gap-2 pl-6 text-[12px] text-muted">
+          {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && repositoryMatches.matches[r.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="col-span-full flex flex-wrap items-center gap-2 pl-6 text-[12px] text-ink-muted">
             <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
             <Button size="sm" disabled={!!linkingRule} onClick={() => void linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)}>关联仓库文件</Button>
           </div>)}
         </div>;
       }} />
       {!hideFinal && <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
-        <span className="pl-6 text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
+        <span className="pl-6 text-ink-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
         <span title={targetLabel(value.final, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</span>
         {!readOnly && <Button size="sm" variant="ghost" className="col-start-3 row-start-1 justify-self-start px-1.5 sm:col-start-5" aria-label="编辑 MATCH" onClick={() => onSelect('final')}><Pencil size={14} /></Button>}
       </div>}
     </Card>
-    <Modal title="引用规则" open={adding} onClose={() => setAdding(false)} wide footer={<Button onClick={() => setAdding(false)}>取消</Button>}>
+    <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"引用规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" onSelect={matcher => { add(matcher); setAdding(false); }} />}</Field>
-    </Modal>
-    <Modal title={rule ? `编辑第 ${value.rules.indexOf(rule) + 1} 条规则` : 'MATCH 出口'} open={!!rule || selected === 'final'} onClose={close} wide
-      footer={<><span className="mr-auto self-center text-[12px] text-muted">{saveHint}</span><Button variant="primary" onClick={close}>完成</Button></>}>
+    </div><DialogFooter>{<Button onClick={() => setAdding(false)}>取消</Button>}</DialogFooter></DialogContent></Dialog>
+    <Dialog open={!!rule || selected === 'final'} onOpenChange={next => { if (!next) (close)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{rule ? `编辑第 ${value.rules.indexOf(rule) + 1} 条规则` : 'MATCH 出口'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       {rule ? <>
         <ItemIssues report={report} where={`rule:${rule.id}`} />
         <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}>
@@ -151,11 +151,11 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         <Field label="出口">{() => renderTarget ? renderTarget(rule.target, target => update({ ...rule, target })) : <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={target => update({ ...rule, target })} />}</Field>
         {renderOptions?.(rule, update)}
       </> : <>
-        <span className="text-[13px] text-muted">以上规则均未匹配时使用。</span>
+        <span className="text-[13px] text-ink-muted">以上规则均未匹配时使用。</span>
         {renderTarget ? renderTarget(value.final, final => onChange({ ...value, final })) : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}
         <ItemIssues report={report} where="final" />
       </>}
-    </Modal>
+    </div><DialogFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button variant="primary" onClick={close}>完成</Button></>}</DialogFooter></DialogContent></Dialog>
     <RuleSourcePreview matcher={preview} onClose={() => setPreview(undefined)} />
   </>;
 }

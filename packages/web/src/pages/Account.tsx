@@ -26,9 +26,9 @@ export function Account() {
         <div className="flex flex-wrap items-start gap-5">
           <Card title="当前用户" className="min-w-0 flex-[1_1_360px]">
             <div className="flex flex-col">
-              <div className={kv}><span className="text-muted">用户名</span><span>{me?.username}</span></div>
-              <div className={kv}><span className="text-muted">角色</span><span>{me?.role === 'admin' ? '管理员' : '普通用户'}</span></div>
-              <div className={kv}><span className="text-muted">脚本处理器</span><span>{scripts ? '可以编写' : '未授权 · 需要管理员开启'}</span></div>
+              <div className={kv}><span className="text-ink-muted">用户名</span><span>{me?.username}</span></div>
+              <div className={kv}><span className="text-ink-muted">角色</span><span>{me?.role === 'admin' ? '管理员' : '普通用户'}</span></div>
+              <div className={kv}><span className="text-ink-muted">脚本处理器</span><span>{scripts ? '可以编写' : '未授权 · 需要管理员开启'}</span></div>
             </div>
           </Card>
           <Card title="修改密码" className="min-w-0 flex-[1_1_360px]">
