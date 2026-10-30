@@ -10,7 +10,9 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
   value: string; options: TargetOption[]; onChange: (value: string) => void; label: string; placeholder: string;
 }) {
   const selected = options.find(option => option.value === value);
-  const sections = options.reduce<{ label?: string; options: TargetOption[] }[]>((sections, option) => {
+  // 历史内置值仍可回显，菜单只提供直连与拒绝作为新选择。
+  const available = options.filter(option => !option.value.startsWith('builtin:') || option.value === 'builtin:DIRECT' || option.value === 'builtin:REJECT');
+  const sections = available.reduce<{ label?: string; options: TargetOption[] }[]>((sections, option) => {
     const last = sections.at(-1);
     if (last && last.label === option.group) last.options.push(option);
     else sections.push({ label: option.group, options: [option] });
