@@ -5,11 +5,11 @@ import { proxyPlaceholders } from '../schemas/placeholders.ts';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
 // 左侧步骤列表（拖拽排序、节点数变化、添加处理器菜单）；自动去重仅计入最终输出。
 // 右侧选中步骤的参数（灰底区域）+ 启用开关 / 删除，下方是这一步输入 → 输出的逐节点对照；
-// 列表顶部的「总览」对照原始节点与整条处理链跑完后的结果。
+// 未选择步骤时展示原始节点与最终结果的总览；点击编辑器之外取消选择。
 
 import { DEFAULT_USELESS_PATTERNS, type OperatorStep } from '@sub-forge/core';
-import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ExtraFields } from './ExtraFields.tsx';
 import { patternHits, regexError, renameHits, rowHit, setFieldsError, updateSetField } from './pipelineForm.ts';
 import { mapRows, mapStats, removedAtStep, renamedAtSteps, rowChanged, type MapRow } from './pipelineMap.ts';
@@ -325,7 +325,7 @@ function resultText(t: TraceStep): string {
   return parts.join('，');
 }
 
-/** 左侧列表中「总览」的序号；自动去重不作为可选步骤展示。 */
+/** 未选择处理器时展示总览；自动去重不作为可选步骤展示。 */
 const OVERVIEW = -1;
 
 type Side = { names: string[]; origins: (number | null)[] };
@@ -405,6 +405,15 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   const [ids, setIds] = useState<string[]>(() => steps.map((_, i) => `s${i}`));
   const [seq, setSeq] = useState(steps.length);
   const [selected, setSelected] = useState(OVERVIEW);
+  // React 捕获阶段同时覆盖参数下拉等 Portal，避免内部操作被当作外部点击。
+  const internalClicks = useRef(new WeakSet<Event>());
+  useEffect(() => {
+    const clearSelection = (event: MouseEvent) => {
+      if (!internalClicks.current.has(event)) setSelected(OVERVIEW);
+    };
+    document.addEventListener('click', clearSelection);
+    return () => document.removeEventListener('click', clearSelection);
+  }, []);
   const [mapOptions, setMapOptions] = useState<MapOptions>({ order: 'out', changedOnly: false });
   const keys = ids.length === steps.length ? ids : steps.map((_, i) => ids[i] ?? `x${i}`);
   const add = (op: OperatorStep['op']) => {
@@ -443,19 +452,8 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   const overviewStats = useMemo(() => (sides && finalSide ? mapStats(mapRows(sides[0]!, finalSide)) : undefined), [sides, finalSide]);
   const stepName = (k: number) => (k >= steps.length ? '自动去重' : OP_LABEL[steps[k]!.op]);
 
-  const overviewRow = (
-    <button type="button" onClick={() => setSelected(OVERVIEW)} aria-current={mode === 'overview' || undefined}
-      className={cx('flex min-h-[66px] w-full cursor-pointer items-center gap-3 border-t border-line-2 py-3 pr-4 pl-10 text-left', mode === 'overview' ? 'bg-accent-soft' : 'bg-panel hover:bg-[#fafbfc]')}>
-      <span aria-hidden="true" className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md', mode === 'overview' ? 'bg-brand text-white' : 'bg-[#ebedf1] text-ink-2')}><ArrowLeftRight size={13} /></span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[13.5px] font-medium">总览</span>
-      </span>
-      {preview && <span className="shrink-0 font-mono text-[12.5px] text-ink-2">{preview.input} → {last ? last.after : preview.input}</span>}
-    </button>
-  );
-
   return (
-    <div className="pipeline-workspace">
+    <div className="pipeline-workspace" onClickCapture={(event) => internalClicks.current.add(event.nativeEvent)}>
       <ErrorAlert error={previewError} />
       <section aria-label={title} className="pipeline-steps rounded-[10px] border border-line bg-panel pt-4 pb-2">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 pb-3">
@@ -463,7 +461,6 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           <span className="text-[12.5px] text-ink-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
         <div className="pipeline-step-scroll">
-        {overviewRow}
         <SortableList items={steps.map((s, i) => ({ step: s, id: keys[i]! }))} getKey={(item) => item.id}
           onReorder={(items, { to }) => {
             setIds(items.map((item) => item.id));
