@@ -47,3 +47,7 @@ export * from './nodeset/chain.ts';
 export * from './base/common.ts';
 
 export * from './import/loon.ts';
+export * from './rules/provider-name.ts';
+
+export { surgeProxyLine } from './render/surge-proxy.ts';
+export { loonProxyLine } from './render/loon-proxy.ts';

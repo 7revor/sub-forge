@@ -1,3 +1,4 @@
+import { ruleBodies } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Matcher } from '@sub-forge/core';
 import { setupRuleReferences } from './rule-reference-fixture.ts';
@@ -10,18 +11,18 @@ const setup = async () => { const h = await setupRuleReferences(); envs.push(h);
 const template = (matcher: Matcher) => ({ name: '引用验收', groups: [], rules: [{ id: 'r', matcher, target: { kind: 'builtin', name: 'REJECT' } }], final: { kind: 'builtin', name: 'DIRECT' } });
 
 describe('模板统一规则引用', () => {
-  it('平级搜索同名候选，精确匹配优先，分页不重不漏，隔离私有规则集', async () => {
+  it('平级搜索同名候选，精确匹配优先，分页不重不漏，公共规则增强跨用户可见', async () => {
     const h = await setup();
     for (let i = 0; i < 35; i++) h.store.put('ruleset', { id: `more-${i}`, name: `Google ${i}`, sources: [] }, h.user.id);
     const first = await h.admin.get('/api/rule-options/search?q=google&limit=30');
     const second = await h.admin.get('/api/rule-options/search?q=google&limit=30&offset=30');
-    expect(first.json.total).toBe(37);
+    expect(first.json.total).toBe(38);
     expect(first.json.items.slice(0, 2).map((x: { label: string }) => x.label).sort()).toEqual(['Google.list', '本地 · Google']);
     const all = [...first.json.items, ...second.json.items];
-    expect(new Set(all.map(x => x.value)).size).toBe(37);
-    expect(all.some(x => x.label.includes('私有'))).toBe(false);
-    expect((await h.admin.post('/api/rule-options/resolve', { source: 'local', id: 'private-google' })).status).toBe(400);
-    expect((await h.admin.post('/api/templates/new/publish', template({ kind: 'ruleset', id: 'private-google' }))).status).toBe(400);
+    expect(new Set(all.map(x => x.value)).size).toBe(38);
+    expect(all.some(x => x.label.includes('私有'))).toBe(true);
+    expect((await h.admin.post('/api/rule-options/resolve', { source: 'local', id: 'private-google' })).status).toBe(200);
+    expect((await h.admin.post('/api/templates/new/publish', template({ kind: 'ruleset', id: 'private-google' }))).status).toBe(201);
     expect((await client(h.app).get('/api/rule-options/search')).status).toBe(401);
     expect((await h.admin.get('/api/rule-options/search?offset=-1')).status).toBe(400);
   });
@@ -48,7 +49,7 @@ describe('模板统一规则引用', () => {
     expect(rendered.ok).toBe(true);
     if (!rendered.ok) return;
     expect(rendered.render.yaml).toContain('RULE-SET');
-    expect(Object.values(rendered.render.rulesets).join('\n')).toContain('google.example.test');
+    expect(Object.values(ruleBodies(h.store, rendered.render)).join('\n')).toContain('google.example.test');
     expect(h.store.list('ruleset')).toHaveLength(2);
     expect((await h.admin.del('/api/rule-repos/blackmatrix7')).status).toBe(409);
   });

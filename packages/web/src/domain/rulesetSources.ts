@@ -23,7 +23,7 @@ export function rulesetSourceState(sources: RuleSetSourceDoc[], results: SourceR
   const error = required.map(i => {
     const r = results[i];
     if (r?.error) return r.error;
-    if (r?.data && (!r.data.status.ok || (r.data.content === undefined && !r.data.status.passthrough))) {
+    if (r?.data && (!r.data.status.ok || (r.data.content === undefined && !r.data.status.binary))) {
       return r.data.status.error ?? '来源正文尚未读取成功';
     }
     return undefined;

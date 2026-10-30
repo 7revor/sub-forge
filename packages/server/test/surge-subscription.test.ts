@@ -21,7 +21,7 @@ async function scenario() {
     routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }],
       rules: [{ id: 'rs', matcher: remoteRuleMatcher(url), target: { kind: 'group', groupId: 'g' } }, { id: 'proc', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Example' } }, target: { kind: 'group', groupId: 'g' } }], final: { kind: 'builtin', name: 'DIRECT' } } } };
   const saved = await alice.post('/api/profiles', draft); expect(saved.status, saved.text).toBe(201);
-  const profile = saved.json.item, token = env.store.createToken(profile.id).token;
+  const profile = saved.json.item, token = env.store.createToken(user.id).token;
   return { ...env, user, alice, bob, profile, draft, token };
 }
 const resourceUrl = (text: string) => {
@@ -32,20 +32,20 @@ const resourceUrl = (text: string) => {
 describe('Surge 主订阅和 API', () => {
   it('完整 INI 使用独立基础配置、正确 MIME、客户端与平台规则资源', async () => {
     const h = await scenario();
-    const res = await h.app.request('/sub/' + h.token, { headers: { 'user-agent': 'Surge iOS/3412' } });
+    const res = await h.app.request('/sub/' + h.token + '/' + h.profile.id, { headers: { 'user-agent': 'Surge iOS/3412' } });
     expect(res.status).toBe(200); expect(res.headers.get('content-type')).toContain('text/plain');
     const text = await res.text();
-    expect(text).toContain('#!MANAGED-CONFIG https://sub.test/sub/' + h.token + '?target=surge&platform=ios interval=86400 strict=false');
+    expect(text).toContain('#!MANAGED-CONFIG https://sub.test/sub/' + h.token + '/' + h.profile.id + '?target=surge&platform=ios interval=86400 strict=false');
     expect(text).toContain('[General]\nipv6 = false\nloglevel = notify\ntest-timeout = 5');
     expect(text).not.toMatch(/mixed-port|allow-lan|PROCESS-NAME/);
     expect(text).toContain('节点 = trojan, example.test, 443, password="example"');
     expect(text).toContain('FINAL,DIRECT');
     const url = resourceUrl(text), file = await h.app.request(url);
-    expect(url).toContain('target=surge'); expect(file.status).toBe(200);
+    expect(url).toContain('/r/' + h.token + '/'); expect(file.status).toBe(200);
     expect(await file.text()).toContain('DOMAIN,example.test,extended-matching');
-    expect((await h.app.request(url.replace('target=surge', 'target=mihomo'))).status).toBe(404);
-    expect((await h.app.request(url.replace('platform=ios', 'platform=macos'))).status).toBe(404);
-    const mac = await h.app.request('/sub/' + h.token + '?target=surge&platform=macos');
+    expect(await (await h.app.request(url + '?target=mihomo')).text()).toContain('DOMAIN,example.test,extended-matching');
+    expect(await (await h.app.request(url + '?platform=macos')).text()).not.toContain('PROCESS-NAME');
+    const mac = await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=surge&platform=macos');
     expect(await mac.text()).toContain('PROCESS-NAME,Example,代理');
     h.store.deleteToken(h.token);
     expect((await h.app.request(url)).status).toBe(404);
@@ -64,12 +64,12 @@ describe('Surge 主订阅和 API', () => {
   });
   it('拒绝未知客户端、非法平台、越界基础段和换行，不影响 YAML 配置', async () => {
     const h = await scenario();
-    expect((await h.app.request('/sub/' + h.token + '?target=unknown')).status).toBe(400);
-    expect((await h.app.request('/sub/' + h.token + '?target=surge&platform=linux')).status).toBe(400);
+    expect((await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=unknown')).status).toBe(400);
+    expect((await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=surge&platform=linux')).status).toBe(400);
     expect((await h.alice.post('/api/profiles/preview', { profile: h.profile, client: 'surge', platform: 'android' })).status).toBe(400);
     expect((await h.alice.post('/api/presets', { name: '非法', mihomo: {}, surge: { proxies: [] } })).status).toBe(400);
     expect((await h.alice.post('/api/profiles', { ...h.draft, base: { surgePatch: { general: { loglevel: 'notify\n[Rule]' } } } })).status).toBe(400);
-    const mihomo = await h.app.request('/sub/' + h.token + '?target=mihomo');
+    const mihomo = await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=mihomo');
     expect(mihomo.status).toBe(200); expect(await mihomo.text()).toContain('mixed-port: 7890');
   });
   it('失败只使用 Surge 同平台 last-good，不调用 Mihomo 校验器验证 INI', async () => {

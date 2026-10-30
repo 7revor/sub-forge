@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
+import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
+import { api } from '../api.ts';
 import { RuleCard } from '../components/RuleCard.tsx';
 import { RuleSourcePreview } from '../components/RuleSourcePreview.tsx';
 import { RulesetSourceDialog } from '../components/RulesetSourceDialog.tsx';
@@ -24,8 +27,8 @@ import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
 import { localRuleLines } from '@sub-forge/core';
 
-const isPassthrough = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
-const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '')[0]?.text ?? '尚未填写');
+const isBinary = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
+const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '').map(line => line.text).join(',') || '尚未填写');
 
 function sourceSummary(rs: RuleSetDoc): string {
   const remote = rs.sources.filter((s) => s.kind === 'remote').length;
@@ -63,6 +66,8 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 /** 规则集（设计稿「规则集」）：来源 → 客户端改写（整个规则集）→ 输出预览，每块独占一行 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
+  const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', `/rulesets/${e.id}`).then(r => r.writable) });
+  const canEdit = e.isNew || permission.data === true;
   const [linking, setLinking] = useState<string>();
   const [linkError, setLinkError] = useState<string>();
   const matches = useRepositoryUrlMatches();
@@ -95,16 +100,21 @@ export function RulesetEdit() {
     } catch (cause) { setLinkError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setLinking(undefined); }
   };
-  return <DetailShell listPath="/rulesets" listLabel="增强集合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
+  return <DetailShell canEdit={canEdit} listPath="/rulesets" listLabel="增强集合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
+    extraActions={!e.isNew && <ResourceLinkButton kind="rulesets" id={d.id} name={d.name} disabled={e.dirty} />}
     onSave={() => {
       if (error) { alertError(error); return; }
       e.submit(x => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' }) }));
     }} saveError={e.save.error} onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
     badges={!e.isNew && <Badge>{sourceSummary(d)}</Badge>}>
+    {!canEdit && <p className="text-[13px] text-ink-muted">公共规则增强 · 仅创建者或管理员可以修改</p>}
+    <fieldset disabled={!canEdit} className="contents">
     <Card title="基本信息" bodyClass="flex flex-col gap-4 px-4 pb-4">
       <Field label="名称">{id => <Input placeholder="填写用于区分规则集的名称" id={id} autoFocus={e.isNew} value={d.name} onChange={event => set({ name: event.target.value })} />}</Field>
       <NoteField value={d.note} onChange={note => set({ note })} />
     </Card>
+    </fieldset>
+    {canEdit ? <>
     <Card title="来源" actions={<Button size="sm" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>}>
       <ErrorAlert error={matches.error} /><FieldError error={linkError} />
       <div role="group" aria-label="添加规则来源" className="grid grid-cols-3 gap-2">
@@ -120,8 +130,11 @@ export function RulesetEdit() {
         <span title={sourceLabel(s)}>{sourceLabel(s)}</span>
       </RuleCard>} />
     </Card>
+    </> : <Card title="来源（只读）"><div className="flex flex-col gap-2">{d.sources.map((source, i) => <Button key={source.id} onClick={() => void RuleSourcePreview.show({ source: { rulesetId: e.id, source } })}>查看来源 {i + 1} · {sourceLabel(source)}</Button>)}</div></Card>}
+    <fieldset disabled={!canEdit} className="contents">
     <RulesetOverrides value={d.overrides ?? []} legacySources={d.sources} onChange={overrides => set({ overrides: overrides.length ? overrides : undefined })}
       onRemoveLegacy={id => set({ sources: d.sources.map(s => s.id === id ? { ...s, overrides: undefined } : s) })} />
+    </fieldset>
     <Card className="min-w-0" title="合并结果（只读）">
       <RulesetPreview key={e.id} inputs={sources.inputs} ready={sources.ready} sourceReading={sources.reading} onRefreshSources={sources.refresh}
         overrides={d.overrides} sourceError={sources.error} sourceNames={Object.fromEntries(d.sources.map(s => [s.id, sourceLabel(s)]))} />
@@ -130,7 +143,7 @@ export function RulesetEdit() {
 }
 
 function SourceStatus({ src, status, loading }: { src: RuleSetSourceDoc; status?: RulesetSourceStatus; loading: boolean }) {
-  if (isPassthrough(src)) return <Badge>透传</Badge>;
+  if (isBinary(src)) return <Badge>二进制托管</Badge>;
   if (!status) return loading ? <Badge>检查中…</Badge> : null;
   if (status.error) return <span title={status.error}><Badge tone="err">{src.kind === 'remote' ? '拉取失败' : '无法读取'}</Badge></span>;
   if (status.rules === undefined) return null;

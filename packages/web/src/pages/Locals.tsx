@@ -1,5 +1,6 @@
 import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 import { Frame } from '../modals/Frame.tsx';
+import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
@@ -68,6 +69,7 @@ export function LocalEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / {e.doc.data?.name}</>}
         title={d.name || '未命名'}
         actions={<>
+          <ResourceLinkButton kind="locals" id={d.id} name={d.name} disabled={e.dirty} />
           <ActionButtons items={[{ label: '分组 YAML', onSelect: async () => { const result = await LocalGroupYamlModal.show({ proxies: d.proxies }); if (result.status === 'confirmed') setProxies(result.data); } }]} />
           <Button variant="primary" onClick={() => e.submit((draft) => ({ ...draft, name: draft.name.trim() }))} disabled={e.save.isPending || !e.dirty || !validName}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
           <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}

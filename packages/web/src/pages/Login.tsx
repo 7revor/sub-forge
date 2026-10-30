@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { api, type User } from '../api.ts';
 import { LogoMark } from '../components/LogoMark.tsx';
 import { Button, Field, Input } from '../components/ui.tsx';
+import { setSession } from '../session.ts';
 
 export function Login() {
   const [username, setUsername] = useState('');
@@ -19,7 +20,7 @@ export function Login() {
     setBusy(true);
     try {
       const { user } = await api<{ user: User }>('POST', '/auth/login', { username, password });
-      qc.setQueryData(['me'], user);
+      setSession(qc, user);
       navigate(from === '/login' ? '/' : from, { replace: true });
     } catch (err) {
       alertError(err);

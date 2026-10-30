@@ -5,7 +5,8 @@ import { expandLocalRules, localRulesError } from '../rules/local.ts';
 import { resolveProfileRouting } from '../template/routing.ts';
 import { sourceKey, sourceLabel, type RuleSetInputs } from '../rules/expand.ts';
 import { convertRuleDocuments, prepareRuleDocument, type RuleDocument } from '../rules/convert.ts';
-import { ruleSetDelivery } from '../rules/delivery.ts';
+import { managedRuleDelivery } from '../rules/delivery.ts';
+import { allocateRuleProviderNames, ruleProviderName } from '../rules/provider-name.ts';
 // mihomo 渲染（docs/03 §3 ②–⑥、§4）：模板合并 → 节点集 → 依赖解析 → 规则展开 → 引用校验 → YAML。
 // 纯函数：所有外部数据（快照、模板、规则集）由调用方传入。
 
@@ -15,7 +16,7 @@ import { Report, type ReportItem } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
 import { isYamlRuleUrl, type Behavior } from '../rules/parse.ts';
 import { type EffectiveGroup } from '../template/merge.ts';
-import type { GroupMember, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template, Client } from '../types.ts';
+import type { GroupMember, Matcher, RuleEntry, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template, Client } from '../types.ts';
 import { shortHash } from '../util/hash.ts';
 import { compileUserRegex, exactNameRegex } from '../util/regex.ts';
 import { stringifySurge, surgeBenchmarks } from './surge-config.ts';
@@ -29,13 +30,14 @@ export type UrlBuilder = {
   /** Profile 专属 provider 地址（/p/:token/:key?v=） */
   provider(nodeSetKey: string, version: string): string;
   /** 转换后的规则集地址（/r/:token/:key） */
-  ruleset(key: string, remoteUrl?: string): string;
+  ruleset(key: string, reference?: RuleResourceReference): string;
 };
+
+export type RuleResourceReference = { matcher: Extract<Matcher, { kind: 'ruleset' }>; options?: RuleEntry['options'] };
 
 export type RenderInput = {
   common?: import('../base/common.ts').CommonBase;
   resourceIntervalSec?: number;
-  managedResources?: boolean;
   profile: Profile;
   template?: Template;
   nodeSets: NodeSetInputs;
@@ -66,7 +68,7 @@ export type ChainResolution = {
 };
 
 export type ProviderOutput = { name: string; version: string; yaml: string };
-export type RulesetOutput = { behavior: Behavior; text: string; remoteUrl?: string };
+export type RulesetOutput = { behavior: Behavior; text: string; providerName?: string };
 
 export type MihomoRenderResult = {
   config: Record<string, unknown>;
@@ -386,8 +388,17 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   for (const chain of profile.chains) if (!chainCounts.get(chain.id)?.landingCount) report.warn('chain.no-landing', '没有命中落地节点，请检查落地来源或筛选范围', `chain:${chain.id}`);
 
   // ---------- 规则 ----------
+  const ruleResourceKey = (id: string, options?: RuleEntry['options']) => `rs_${safeId(id)}${options?.src ? '_src' : ''}`;
+  const requestedNames = new Map<string, string>();
+  for (const r of eff.rules) {
+    const m = r.matcher;
+    if (r.enabled === false || m.kind !== 'ruleset') continue;
+    const rs = input.rules.rulesets[m.id];
+    if (rs) requestedNames.set(ruleResourceKey(m.id, r.options), ruleProviderName(m, rs));
+  }
+  const providerDisplayNames = allocateRuleProviderNames(requestedNames);
   const ruleLines: string[] = [];
-  const ruleProviders: Record<string, Record<string, unknown>> = {};
+  const ruleProviders: Record<string, Record<string, unknown>> = Object.create(null);
   const rulesets: Record<string, RulesetOutput> = {};
 
   for (const r of eff.rules) {
@@ -410,15 +421,17 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       continue;
     }
     // 不同规则级选项可能改变 classical 正文或 CIDR 分段，不能共用同名 provider。
-    const base = `rs_${safeId(m.id)}${r.options?.src ? '_src' : ''}`;
+    const base = ruleResourceKey(m.id, r.options);
+    const providerName = providerDisplayNames.get(base)!;
+    const reference: RuleResourceReference = { matcher: m, ...(r.options?.src ? { options: { src: true } } : {}) };
     const rs = input.rules.rulesets[m.id];
     if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${m.id}`); continue; }
     const enabled = rs.sources.filter(s => s.enabled !== false);
-    if (isIniClient(client) && enabled.some(s => s.format === 'mrs' || s.format === 'srs')) {
-      report.error(client + '.binary-rules', client + ' 需要文本规则来源，不能直接使用 MRS 或 SRS', where);
-      continue;
+    const delivery = managedRuleDelivery(rs, ctx, r.options);
+    if (delivery.mode === 'unsupported') {
+      report.error('ruleset.conversion-unavailable', delivery.reason, where); continue;
     }
-    if (input.managedResources && enabled.some(s => s.format === 'mrs' || s.format === 'srs')) {
+    if (delivery.format === 'mrs') {
       const src = enabled[0]!;
       const body = input.rules.snapshots[sourceKey(rs.id,src.id)];
       if (enabled.length !== 1 || src.format !== 'mrs' || !['domain','ipcidr'].includes(src.behavior ?? '') || rs.overrides?.length || src.overrides?.length || r.options?.src || !body?.startsWith('#subforge-binary-mrs\n')) {
@@ -426,9 +439,9 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         continue;
       }
       const key = `${base}_binary`, file = `${key}.mrs`;
-      rulesets[file] = { behavior: src.behavior as Behavior, text: body };
-      ruleProviders[key] = { type:'http',behavior:src.behavior,format:'mrs',url:input.urls.ruleset(file),interval:input.resourceIntervalSec ?? RULESET_INTERVAL,...(client === 'mihomo' ? {proxy:FETCH_VIA} : {}) };
-      ruleLines.push(`RULE-SET,${key},${target}`);
+      rulesets[file] = { behavior: src.behavior as Behavior, text: body, providerName };
+      ruleProviders[providerName] = { type:'http',behavior:src.behavior,format:'mrs',url:input.urls.ruleset(file, reference),interval:input.resourceIntervalSec ?? RULESET_INTERVAL,...(client === 'mihomo' ? {proxy:FETCH_VIA} : {}) };
+      ruleLines.push(`RULE-SET,${providerName},${target}`);
       continue;
     }
     // 只解析一次：校验、输出方式判断和正文转换共用容错文档。
@@ -437,7 +450,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
       const binary = src.format === 'mrs' || src.format === 'srs';
       if (binary && isYamlRuleUrl(src.url)) {
-        report.error('ruleset.conversion-requires-managed', `${label}的 YAML 规则只能转换为 LIST 托管，不能透传`, where);
+        report.error('ruleset.conversion-requires-managed', `${label}的 YAML 规则只能转换为 LIST 托管，不能标记为二进制`, where);
         continue;
       }
       const content = src.kind === 'local' ? src.content ?? '' : input.rules.snapshots[sourceKey(rs.id, src.id)];
@@ -448,21 +461,10 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       const document = prepareRuleDocument(content ?? '', src);
       documents.set(src.id, document);
       // 保留远程错误页面保护，不能把失败响应当作空分流配置下发。
-      if (src.kind === 'remote' && !document.passthrough && !document.parsed) {
+      if (src.kind === 'remote' && !document.binary && !document.parsed) {
         report.error('ruleset.invalid-content', `${label}的远程快照没有可用规则，请重新拉取`, where);
       }
       if (document.diagnostics.length) report.info('ruleset.rejected-lines', `${label}有 ${document.diagnostics.length} 行无法解析`, where);
-    }
-    const delivery = m.remote || input.managedResources || isIniClient(client) ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
-    if (delivery.mode === 'unsupported') {
-      report.error('ruleset.conversion-unavailable', delivery.reason, where);
-      continue;
-    }
-    if (delivery.mode === 'original') {
-      const key = `${base}_original`;
-      ruleProviders[key] ??= { type: 'http', behavior: delivery.behavior, format: delivery.format, url: delivery.url, interval: input.resourceIntervalSec ?? RULESET_INTERVAL };
-      ruleLines.push(`RULE-SET,${key},${target}`);
-      continue;
     }
     // 所有需要处理的来源统一为一个 classical LIST，IP 选项保留在对应行内。
     const key = `${base}_classical`;
@@ -475,10 +477,10 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         continue;
       }
       if (!converted.lines.length) continue;
-      rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', ...(m.remote ? { remoteUrl: m.remote.url } : {}) };
-      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
+      rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', providerName };
+      ruleProviders[providerName] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, reference), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
     }
-    ruleLines.push(`RULE-SET,${key},${target}`);
+    ruleLines.push(`RULE-SET,${providerName},${target}`);
   }
   const finalName = resolveTarget(eff.final, 'final') ?? 'DIRECT';
   ruleLines.push(`MATCH,${finalName}`);
@@ -489,7 +491,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   // ---------- 输出 ----------
   const inlineProxies = [...sets.values()].filter(s => s.output === 'inline').flatMap(s => s.nodes).map(stripNode);
   const providers: Record<string, ProviderOutput> = {};
-  const proxyProviders: Record<string, Record<string, unknown>> = {};
+  const proxyProviders: Record<string, Record<string, unknown>> = Object.create(null);
   for (const s of sets.values()) {
     if (s.output !== 'provider') continue;
     const yaml = stringify({ proxies: s.nodes.map(stripNode) }, { lineWidth: 0 });

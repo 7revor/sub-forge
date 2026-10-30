@@ -1,6 +1,6 @@
 import { acceptProfileSave, modeLabel, syncProfileDraft } from './routing.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
-import { CopyButton } from '../../components/CopyButton.tsx';
+import { formatRelativeTime } from '../../utils/format.ts';
 // 与新建共用单页编辑，旧分区链接保留为页内定位入口。
 
 import { useQuery } from '@tanstack/react-query';
@@ -56,7 +56,6 @@ export function ProfileDetail() {
           actions={<>
             {dirty && <Button onClick={discard}>放弃修改</Button>}
             <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
-            {!dirty && <CopyButton text={subscriptionUrl ?? ''} disabled={!subscriptionUrl} title={subscriptionUrl ? undefined : '正在加载订阅链接'}>复制订阅链接</CopyButton>}
             <Button variant="primary" disabled={!validName || !ctx.baseValid || !dirty || save.isPending} onClick={() => { if (validName && ctx.baseValid) save.mutate({ ...draft, name: draft.name.trim() }, { onSuccess: saved => setDraft(current => acceptProfileSave(current, draft, saved)) }); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
             <DeleteAction what="配置订阅" name={draft.name} body="它的订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
               onReset={del.reset} onDelete={() => del.mutateAsync(draft.id)} onDeleted={() => navigate('/profiles')} />
@@ -68,6 +67,16 @@ export function ProfileDetail() {
           {warnings > 0 && <Link to={`/profiles/${id}/preview`} className="rounded-full bg-warn-soft px-2.5 py-1 text-[12.5px] text-[#8f4508] no-underline hover:underline">{warnings} 条告警</Link>}
           {dirty && <Badge tone="warn">有未保存的修改</Badge>}
         </PageHeader>
+        <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px]">
+          <span className="shrink-0 text-ink-muted">订阅链接</span>
+          {subscriptionUrl ? <>
+            <a href={subscriptionUrl} target="_blank" rel="noreferrer" className="min-w-0 break-all font-mono text-accent-ink no-underline hover:underline">{subscriptionUrl}</a>
+            <span className="text-ink-muted">{log.data?.[0] ? `最近访问 ${formatRelativeTime(log.data[0].at)}` : '从未访问'} · 自动适配客户端</span>
+          </> : tokens.isPending ? <span className="text-ink-muted">正在加载订阅链接…</span> : <>
+            <span role="alert" className="text-err">{tokens.error?.message ?? '暂未获取到订阅链接'}</span>
+            <Button size="sm" onClick={() => void tokens.refetch()}>重新加载链接</Button>
+          </>}
+        </div>
       </div>
       <ErrorAlert error={save.error ?? dup.error} />
       {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={`/api/profiles/${draft.id}/migration-backup`} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}

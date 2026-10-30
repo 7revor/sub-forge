@@ -101,6 +101,7 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     }
 
     store = new Store(':memory:');
+    const user = store.createUser({ username: 'e2e-user', passwordHash: 'fixture', role: 'user' });
     const seed: Seed = {
       sources: [
         { id: 'airport', name: '机场', url: `http://localhost:${ports.airport}/sub`, pipeline: [{ op: 'filter.useless' }, { op: 'flag', mode: 'add' }] },
@@ -108,9 +109,9 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
       locals: [{ id: 'land', name: '落地源', proxies: [{ name: '落地', type: 'socks5', server: '127.0.0.1', port: ports.exit }] }],
       templates: [{ id: 'tpl', version: 1, groups: [{ id: 'land', name: '落地组', type: 'select', members: [] }], rules: [], final: { kind: 'group', groupId: 'land' } }],
       profiles: [profile('p-provider', 'provider', '^落地$'), profile('p-inline', 'inline')],
-      tokens: [{ token: 'tk-provider', profileId: 'p-provider' }, { token: 'tk-inline', profileId: 'p-inline' }],
+      tokens: [{ token: 'tk-user', userId: user.id }],
     };
-    store.importSeed(seed);
+    store.importSeed(seed, user.id);
     // 机场在本机，用 localhost 验证生产路径上允许域名解析到回环地址。
     snapshots = new SnapshotService(store, createUpstreamFetcher({ allow: parseAllowList([]) }));
     const renderer = new RenderService(store, snapshots, { publicUrl: `http://127.0.0.1:${ports.api}` });
@@ -132,10 +133,10 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
   });
 
   it.each([
-    ['落地在 provider（前置注入到本服务下发的 provider 内容）', 'tk-provider'],
-    ['落地内联', 'tk-inline'],
-  ])('%s', async (_title, token) => {
-    const sub = await httpGet(`http://127.0.0.1:${ports.api}/sub/${token}`, { ua: 'clash.meta' });
+    ['落地在 provider（前置注入到本服务下发的 provider 内容）', 'p-provider'],
+    ['落地内联', 'p-inline'],
+  ])('%s', async (_title, profileId) => {
+    const sub = await httpGet(`http://127.0.0.1:${ports.api}/sub/tk-user/${profileId}`, { ua: 'clash.meta' });
     expect(sub.status, sub.body).toBe(200);
 
     const mixed = await freePort();
@@ -166,11 +167,11 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     expect(entry.log().slice(e0)).toContain(`127.0.0.1:${ports.exit}`);
     expect(exit.log().slice(x0)).toContain(`127.0.0.1:${ports.target}`);
     // 客户端从本服务下载了 provider
-    expect(served.slice(before).some((p) => p.startsWith(`/p/${token}/`))).toBe(true);
+    expect(served.slice(before).some((p) => p.startsWith(`/p/tk-user/${profileId}/`))).toBe(true);
   }, 60000);
 
   it('订阅响应头带上游流量信息，访问日志记录识别结果', async () => {
-    const res = await new Promise<http.IncomingMessage>((resolve) => http.get(`http://127.0.0.1:${ports.api}/sub/tk-inline`, { headers: { 'user-agent': 'FlClash/v0.8.80 clash-verge Platform/android' } }, resolve));
+    const res = await new Promise<http.IncomingMessage>((resolve) => http.get(`http://127.0.0.1:${ports.api}/sub/tk-user/p-inline`, { headers: { 'user-agent': 'FlClash/v0.8.80 clash-verge Platform/android' } }, resolve));
     res.resume();
     expect(res.headers['subscription-userinfo']).toBe('upload=10; download=20; total=1000; expire=1900000000');
     expect(store.recentAccess('p-inline')[0]).toMatchObject({ client: 'mihomo', platform: 'android', status: 200 });

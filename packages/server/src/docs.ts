@@ -36,7 +36,9 @@ export type ProfileDoc = Profile & {
   userinfo?: { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
 };
 
-export type TokenDoc = { token: string; profileId: string; label?: string };
+export type TokenDoc = { token: string; userId: string; createdAt?: number };
+/** 旧种子仅用于导入时关联所有者，不继续发行旧订阅凭证。 */
+export type LegacyTokenDoc = { token: string; profileId: string; label?: string };
 
 /** 种子文件：一次性导入全部文档 */
 export type Seed = {
@@ -50,7 +52,7 @@ export type Seed = {
   presets?: PresetDoc[];
   templates?: TemplateVersionDoc[];
   profiles?: ProfileDoc[];
-  tokens?: TokenDoc[];
+  tokens?: (TokenDoc | LegacyTokenDoc)[];
 };
 
 export type DocKind = 'source' | 'collection' | 'local' | 'ruleset' | 'preset' | 'profile';

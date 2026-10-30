@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readdirSync, rmdirSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,7 +27,7 @@ describe('移除 GitHub 凭据', () => {
     let store = new Store(path, { cipher });
     try {
       store.put('source', { id: 's1', name: '保留的来源', url: 'https://example.test/sub', pipeline: [] }, 'alice');
-      store.putToken({ token: 'subscription-token', profileId: 'profile-1' });
+      issueProfileToken(store, { token: 'subscription-token', profileId: 'profile-1' });
       if (version >= 12) {
         store.db.exec('CREATE TABLE server_secrets (name TEXT PRIMARY KEY, value TEXT NOT NULL)');
         store.db.prepare('INSERT INTO server_secrets VALUES (?, ?)').run('github-index-token', cipher.encrypt('obsolete-test-token'));
@@ -34,10 +35,10 @@ describe('移除 GitHub 凭据', () => {
       store.db.pragma(`user_version = ${version}`);
       store.close(); store = new Store(path, { cipher });
       for (let i = 0; i < 2; i++) {
-        expect(store.db.pragma('user_version', { simple: true })).toBe(22);
+        expect(store.db.pragma('user_version', { simple: true })).toBe(23);
         expect(store.db.prepare("SELECT name FROM sqlite_master WHERE name = 'server_secrets'").get()).toBeUndefined();
         expect(store.getWithOwner('source', 's1')).toMatchObject({ owner: 'alice', doc: { name: '保留的来源' } });
-        expect(store.listTokens('profile-1')[0]?.token).toBe('subscription-token');
+        expect(store.getToken('subscription-token')?.token).toBe('subscription-token');
         store.close(); store = new Store(path, { cipher });
       }
     } finally {

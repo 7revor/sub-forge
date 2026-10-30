@@ -139,13 +139,13 @@
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
 | RS-01 | 来源：一个规则集可引用**多个**来源，每个来源是本地编辑的规则或远程 URL（带缓存与失败快照，同 SRC-02/03）；来源可排序、单独启用 / 停用（2026-10-29 起，取代原单一来源） | P0 |
-| RS-02 | 可解析格式：Surge/Clash classical 文本（`TYPE,value[,options]`）、Surge `DOMAIN-SET`、mihomo rule-provider YAML（`payload:`，behavior=classical/domain/ipcidr）、纯域名/纯 CIDR 文本；sing-box 源格式 JSON 为 P2；`mrs` / `srs` 二进制只做**透传**不解析 | P0 |
+| RS-02 | 可解析格式：Surge/Clash classical 文本（`TYPE,value[,options]`）、Surge `DOMAIN-SET`、mihomo rule-provider YAML（`payload:`，behavior=classical/domain/ipcidr）、纯域名/纯 CIDR 文本；sing-box 源格式 JSON 为 P2；`mrs` 二进制仅支持单一合法来源原字节托管，`srs` 暂不支持 | P0 |
 | RS-03 | 解析后统一为规则中间表示（IR），记录无法解析/不支持的行；`USER-AGENT` 正常解析，仅 Surge 输出，mihomo 按客户端不支持处理（2026-10-29） | P0 |
 | RS-04 | 支持逻辑规则 `AND / OR / NOT`（作为单条规则） | P1 |
 | RS-05 | 规则集对外提供转换后的下载地址（按客户端/behavior 输出），供配置中的 rule-provider / RULE-SET 引用（2026-10-29：规则集页面不再单独展示下载地址，实际地址以配置订阅「预览」为准） | P0 |
 | RS-07 | 2026-10-29 首期已接通内置索引、名称搜索、筛选、预览与文本变体导入；动态变体引用、自定义仓库待实现。**内置规则仓库**：可搜索内置 GitHub 规则仓库（blackmatrix7、zydou 等）并直接引用，按客户端自动挑选变体，详见 [08](08-rule-repository-index.md) | P0 |
 | RS-08 | 编辑交互（2026-10-29）：新建与编辑共用同一页面，来源列表是页面第一块、直接编辑，不再有「编辑来源」对话框或单独的新建表单；点选某个来源时下方预览该来源的输出（本地规则在来源配置内实时编辑，预览只读），不选中时预览合并后的最终规则，可点击「查看合并结果」返回；切换来源不显示上一来源的旧结果。不支持行的徽标支持悬停、键盘聚焦和点击查看行号、原文、原因，点击可固定浮层，Escape、关闭按钮或点击外部关闭；预览跟随未保存的草稿 | P0 |
-| RS-06 | 远程规则集"直接透传原 URL"模式：当无改写且格式与目标客户端兼容时，配置中直接引用上游 URL，减轻服务端压力 | P1 |
+| RS-06 | 远程规则集统一全局托管：公共原文与转换产物共享缓存，同资源并发请求合并，不下发上游 URL | P1 |
 
 #### 4.5.2 规则包 RuleBundle（需求"多合一"）
 
@@ -269,7 +269,7 @@
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
 | PRF-01 | 上述向导 + 之后可在单页中修改各部分 | P0 |
-| PRF-02 | 订阅链接：保存后自动生成唯一的 `/sub/<token>`，所有设备共用；根据 UA 自动输出 Mihomo 或 Stash，兼容显式参数；普通保存保持链接，复制配置生成新链接；浏览器直接显示 Mihomo YAML。Surge 尚未实现 | P0 |
+| PRF-02 | 订阅链接：保存后提供 `/sub/<用户token>/<配置ID>`，所有设备共用；根据 UA 自动输出 Mihomo 或 Stash，兼容显式参数；普通保存保持链接，复制配置共享用户 token，配置 ID 使链接不同；浏览器直接显示 Mihomo YAML。Surge 尚未实现 | P0 |
 | PRF-03 | Profile 是"模板引用 + 覆盖层"，**不保存渲染结果**（只做缓存）；模板/基础预设/节点集任何一方变化，下次请求即反映 | P0 |
 | PRF-04 | 覆盖层孤儿处理：模板删除了某组/规则后，对应的覆盖项标为"孤儿"，不输出，在 Profile 页提示用户清理 | P0 |
 | PRF-05 | 规则出口改为单节点时，可选范围仅限本 Profile 已加入的 NodeSet 中的节点 | P0 |
@@ -318,9 +318,9 @@
 
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
-| OUT-01 | **主配置** `GET /sub/:token`：mihomo 输出 YAML；Surge 输出 conf，**首行**为 `#!MANAGED-CONFIG <本订阅地址> interval=<秒> strict=false`，每次下发都必须带这一行（否则 Surge 会把它退化为普通配置）。`interval` 取系统资源缓存时间，默认 86400 | P0 |
+| OUT-01 | **主配置** `GET /sub/:token/:profile`：mihomo 输出 YAML；Surge 输出 conf，**首行**为 `#!MANAGED-CONFIG <本订阅地址> interval=<秒> strict=false`，每次下发都必须带这一行（否则 Surge 会把它退化为普通配置）。`interval` 取系统资源缓存时间，默认 86400 | P0 |
 | OUT-02 | **响应头**：<br>· `subscription-userinfo: upload=<B>; download=<B>; total=<B>; expire=<unix 秒>`，内容按 SRC-05 的设置（汇总或取某个源）；没有流量信息时不输出<br>· `profile-update-interval: <小时>`，与 OUT-01 的间隔一致<br>· `content-disposition: inline; filename*=UTF-8''<Profile 名>`，保留客户端中的订阅显示名，浏览器以纯文本直接显示 YAML<br>各客户端是否读取这些头待采集（07 C4），不影响输出 | P0 |
-| OUT-03 | **外部节点集** `GET /p/:token/:nodeSetKey`：mihomo 输出 `proxies:` YAML；Surge 输出逐行 `[Proxy]` 格式（不带段标题）。URL 带内容版本 `?v=`（REF-11） | P0 |
+| OUT-03 | **外部节点集** `GET /p/:token/:profile/:nodeSetKey`：mihomo 输出 `proxies:` YAML；Surge 输出逐行 `[Proxy]` 格式（不带段标题）。URL 带内容版本 `?v=`（REF-11） | P0 |
 | OUT-04 | **规则集** `GET /r/:token/:rulesetKey`：按 `behavior`、`format` 输出（RS-05）；托管的仓库规则保留来源注释与许可证声明（R2） | P0 |
 | OUT-05 | **失败处理**：渲染失败或校验失败时返回上一份成功结果（REF-08、TPL-12），HTTP 200；从未成功渲染过时返回 HTTP 503 与纯文本错误说明，不返回半成品配置 | P0 |
 | OUT-06 | token 无效或已重置：返回 HTTP 404，不暴露 Profile 是否存在 | P0 |
@@ -623,3 +623,5 @@ RS-07 扩展：管理员添加、启停、更新、删除公开 GitHub 仓库；
 2026-10-30 拖动阴影修正：全站可排序行的阴影绘制在实际卡片/行元素上，随其 border-radius 显示，不再绘制在外层直角定位容器上。保留拖动反馈，结束/取消后恢复原样；不统一覆盖各页面自身圆角。
 
 2026-10-30 处理器参数区重设计：全部 12 种处理类型移除灰色底块；正则、改名及优先级复用规则集 RoutingCard 的白底浅边卡片，简单选项改用无底色单选项。处理器、正则、改名规则、优先级、自定义协议及快捷设置其他字段的添加动作放在对应列表上方；处理器菜单以分隔线、组标题和缩进区分过滤、改名、排序、其他。保留输入输出独立顺序、未选中总览、等高布局、校验与保存语义。 此项替代此前参数区灰底和底部添加入口的布局要求。 验收见 research/verification/pipeline-parameter-layout-20261030/README.md。
+
+2026-10-30 资源模型统一：每用户一个 token；规则集合与规则增强全站公共读取，节点源及配置订阅按用户归属鉴权。节点与规则统一托管，整集代理链也在服务端写入节点；移除原 URL 透传及 provider 级 override.dialer-proxy 策略。公共规则产物按规则身份和输出变体共享，不按订阅复制。可读名称、生命周期、迁移和测试契约见 [全局托管与鉴权](19-managed-resources.md)。

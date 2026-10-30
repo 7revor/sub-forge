@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,7 +15,7 @@ import { Store } from '../src/store.ts';
 const template = (version = 1, name = '旧前置'): TemplateVersionDoc => ({ id: 't', name: '模板', version, groups: [{ id: 'g', name, type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [{ id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'group', groupId: 'g' } }], final: { kind: 'group', groupId: 'g' } });
 const profile: ProfileDoc = { id: 'p', name: 'P', template: { id: 't', follow: 'latest' }, nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'provider' }], overlay: { groupPatches: { g: { addMembers: [{ kind: 'builtin', name: 'REJECT' }] } } }, chains: [{ id: 'c', landing: { nodeSet: { type: 'source', id: 's' }, filter: '^落地' }, via: { kind: 'group', groupId: 'g' } }], refPolicy: { default: 'wrap' } };
 const path = (url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; };
-const urls = (cfg: any) => ({ provider: cfg['proxy-providers'].S.url as string, ruleset: cfg['rule-providers'].rs_rs_classical.url as string });
+const urls = (cfg: any) => ({ provider: cfg['proxy-providers'].S.url as string, ruleset: cfg['rule-providers'].R.url as string });
 const version = (url: string) => new URL(url).searchParams.get('v');
 function harness(store = new Store(':memory:')) {
   let now = 1000;
@@ -23,7 +24,7 @@ function harness(store = new Store(':memory:')) {
   const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test' });
   const app = createApp({ store, renderer, snapshots });
   const get = (url: string) => app.request(path(url));
-  const main = async (suffix = '') => parse(await (await get(`/sub/token${suffix}`)).text());
+  const main = async (suffix = '') => parse(await (await get(`/sub/token/p${suffix}`)).text());
   return { store, renderer, snapshots, app, bodies, get, main, advance: () => { now += 100_000_000; } };
 }
 function seed(store: Store) {
@@ -31,7 +32,7 @@ function seed(store: Store) {
   store.put('ruleset', { id: 'rs', name: 'R', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://example.test/rules' }] });
   store.putTemplateVersion(template());
   store.put('profile', structuredClone(profile));
-  store.putToken({ token: 'token', profileId: 'p' });
+  issueProfileToken(store, { token: 'token', profileId: 'p' });
 }
 
 describe('订阅结构版本与独立刷新', () => {
@@ -43,14 +44,14 @@ describe('订阅结构版本与独立刷新', () => {
     const newMain = await h.main('?platform=macos');
     const newUrls = urls(newMain);
     expect(version(oldUrls.provider)).not.toBe(version(newUrls.provider));
-    expect(version(newUrls.provider)).toBe(version(newUrls.ruleset));
+    expect(newUrls.ruleset).toBe(oldUrls.ruleset);
     expect(newMain['proxy-groups'][0]).toMatchObject({ name: '新前置', proxies: ['DIRECT', 'REJECT'] });
     expect(parse(await (await h.get(oldUrls.provider)).text()).proxies[0]['dialer-proxy']).toBe('旧前置');
     expect(parse(await (await h.get(newUrls.provider)).text()).proxies[0]['dialer-proxy']).toBe('新前置');
     // 修改规则定义后旧资源仍存在，新模板可采用不同的规则集桶。
     h.store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'IP-CIDR,203.0.113.0/24' }] });
-    expect(version(urls(await h.main()).ruleset)).not.toBe(version(oldUrls.ruleset));
-    expect(await (await h.get(oldUrls.ruleset)).text()).toBe('DOMAIN,old.example.test\n');
+    expect(urls(await h.main('?platform=macos')).ruleset).toBe(oldUrls.ruleset);
+    expect(await (await h.get(oldUrls.ruleset)).text()).toBe('IP-CIDR,203.0.113.0/24\n');
   });
 
   it('锁定模板版本不会随模板发布改变', async () => {
@@ -81,10 +82,10 @@ describe('订阅结构版本与独立刷新', () => {
     const whole = { ...structuredClone(profile), chains: [{ ...profile.chains[0]!, landing: { nodeSet: profile.chains[0]!.landing.nodeSet } }] };
     h.store.put('profile', whole);
     h.store.put('profile', { ...structuredClone(whole), id: 'p2', chains: [{ ...whole.chains[0]!, via: { kind: 'builtin', name: 'DIRECT' } }] });
-    h.store.putToken({ token: 'token2', profileId: 'p2' });
+    h.store.db.prepare("UPDATE docs SET owner = ? WHERE kind='profile' AND id='p2'").run(h.store.getToken('token')!.userId);
     const first = await h.main(); const old = urls(first);
     expect(first['proxy-providers'].S.override).toBeUndefined();
-    const second = parse(await (await h.get('/sub/token2')).text());
+    const second = parse(await (await h.get('/sub/token/p2')).text());
     expect(parse(await (await h.get(urls(second).provider)).text()).proxies[0]['dialer-proxy']).toBe('DIRECT');
     expect(parse(await (await h.get(old.provider)).text()).proxies[0]['dialer-proxy']).toBe('旧前置');
     h.bodies.source += '  - { name: 新落地, type: socks5, server: new.test, port: 1080 }\n'; h.advance();
@@ -104,7 +105,7 @@ describe('订阅结构版本与独立刷新', () => {
     const missing = new URL(old.provider); missing.searchParams.set('v', '0'.repeat(32));
     expect((await h.get(missing.toString())).status).toBe(404);
     h.store.deleteToken('token');
-    for (const url of [old.provider, old.ruleset, '/sub/token']) expect((await h.get(url)).status).toBe(404);
+    for (const url of [old.provider, old.ruleset, '/sub/token/p']) expect((await h.get(url)).status).toBe(404);
   });
 
   it('保留最近 32 个结构版本，过期地址明确失效而不返回新结构', async () => {
@@ -145,12 +146,12 @@ describe('订阅结构版本与独立刷新', () => {
     } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('升级前无 platform 的 provider 地址可从旧 macOS last-good 恢复', async () => {
+  it('旧版 provider 路径和短版本均拒绝访问', async () => {
     const h = harness(); seed(h.store);
-    const legacy: StoredRender = { yaml: `proxy-providers:\n  S:\n    url: https://sub.test/p/${TOKEN_PLACEHOLDER}/source%3As?v=1234abcd\n`, providers: { 'source:s': 'proxies: []\n' }, rulesets: {}, warnings: 0 };
+    const legacy: StoredRender = { yaml: `proxy-providers:\n  S:\n    url: https://sub.test/p/${TOKEN_PLACEHOLDER}/source%3As?v=1234abcd\n`, providers: { 'source:s': 'proxies: []\n' }, ruleResources: [], nodeDependencies: [], warnings: 0 };
     h.store.putLastGood('p', 'mihomo:macos', legacy);
     await h.main('?platform=macos');
-    expect(await (await h.get('/p/token/source%3As?v=1234abcd')).text()).toBe('proxies: []\n');
+    expect((await h.get('/p/token/source%3As?v=1234abcd')).status).toBe(404);
     expect((await h.get('/p/token/source%3As?v=deadbeef')).status).toBe(404);
   });
 });

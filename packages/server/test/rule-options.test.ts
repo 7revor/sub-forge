@@ -56,7 +56,7 @@ describe('物理文件平铺搜索与分页', () => {
     expect(searched.items).toHaveLength(2);
     expect(searched.items.map((item: { value: string }) => JSON.parse(item.value).file.path)).toEqual(['rule/Clash/China/file-34.list', 'rule/Surge/China/file-34.list']);
     expect(searched.items[0]).toMatchObject({ label: 'file-34.list', hint: 'blackmatrix7/ios_rule_script · rule/Clash/China/' });
-    expect((await h.admin.get('/api/rule-options/search?offset=999')).json).toMatchObject({ items: [], total: 71 });
+    expect((await h.admin.get('/api/rule-options/search?offset=999')).json).toMatchObject({ items: [], total: 72 });
     expect(full).not.toHaveBeenCalled();
     expect(h.reads).toEqual([]);
     full.mockRestore();
@@ -164,7 +164,7 @@ describe('物理文件平铺搜索与分页', () => {
     expect(new Set(page.items.map((item: { value: string }) => item.value)).size).toBe(2);
   });
 
-  it('本地候选共用分页，鉴权、私有隔离与分页上限保持有效', async () => {
+  it('本地候选共用分页，鉴权、公共共享与分页上限保持有效', async () => {
     const h = await setup();
     const local = h.store.get('ruleset', 'local-google')!;
     for (let i = 0; i < 65; i++) h.store.put('ruleset', { ...local, id: `local-${i}`, name: `候选 ${String(i).padStart(2, '0')}` }, h.user.id);
@@ -172,7 +172,7 @@ describe('物理文件平铺搜索与分页', () => {
     expect(first).toMatchObject({ total: 65, nextOffset: 30 });
     expect(first.items).toHaveLength(30);
     expect((await h.admin.get('/api/rule-options/search?q=候选&offset=60')).json.items).toHaveLength(5);
-    expect((await h.admin.get('/api/rule-options/search?q=私有')).json.total).toBe(0);
+    expect((await h.admin.get('/api/rule-options/search?q=私有')).json.total).toBe(1);
     expect((await client(h.app).get('/api/rule-options/search')).status).toBe(401);
     for (const query of ['offset=-1', 'offset=1.2', 'offset=9007199254740992', 'limit=0', 'limit=101', 'limit=abc', 'scope=bad']) {
       expect((await h.admin.get(`/api/rule-options/search?${query}`)).status, query).toBe(400);

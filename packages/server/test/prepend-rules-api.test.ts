@@ -31,8 +31,8 @@ describe('绑定模板订阅的前置规则接口', () => {
     expect(preview.status).toBe(200); expect(preview.json.ok).toBe(true);
     const dep = preview.json.dependencies[0];
     expect(dep).toMatchObject({ node: '远端节点', strategy: 'wrap', usedBy: ['rule:pre-node'] });
-    const token = (await alice.post(`/api/profiles/${profile.id}/tokens`)).json.item.token;
-    const yaml = parse(await (await app.request(`/sub/${token}`)).text());
+    const token = (await alice.get(`/api/profiles/${profile.id}/link`)).json.item.token;
+    const yaml = parse(await (await app.request(`/sub/${token}/${profile.id}`)).text());
     expect(yaml.rules).toEqual(['DOMAIN,pre-first.example.test,DIRECT', `DOMAIN,pre-node.example.test,${dep.output}`, 'DOMAIN-SUFFIX,example.test,默认组', 'MATCH,默认组']);
     expect(yaml['proxy-groups']).toContainEqual(expect.objectContaining({ name: dep.output, hidden: true }));
     const rendered = await renderer.render(profile.id, { client: 'mihomo' });

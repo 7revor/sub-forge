@@ -33,7 +33,7 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 // ---------- 接口返回的类型 ----------
 
 export type User = { id: string; username: string; role: 'admin' | 'user'; disabled: boolean; scriptAllowed: boolean; createdAt: number };
-export type TokenItem = { token: string; profileId: string; label?: string; createdAt: number; url: string };
+export type TokenItem = { token: string; userId: string; createdAt: number; url: string };
 export type AccessLogRow = { at: number; ua: string; client: string; platform?: string; status: number; ms: number; warnings: number; source: string; token: string };
 export type SnapshotMeta = { id: number; url: string; fetchedAt: number; ok: boolean; status?: number; hash?: string; userinfo?: { upload?: number; download?: number; total?: number; expire?: number }; error?: string };
 export type NodeBrief = { name: string; type: string; server: string; port: number };
@@ -45,15 +45,15 @@ export type ProfilePreview = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: stri
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; forceable?: boolean; issues: ReportItem[] };
 export type RejectedRuleDetail = { line: number; text: string; reason: string };
 /** 规则集预览中每个来源的拉取 / 解析状态；不支持的行最多返回前 100 条详情 */
-export type RulesetSourceStatus = { format?: string; behavior?: string; conversion?: 'yaml-to-list'; id: string; ok: boolean; error?: string; fetchedAt?: number; stale?: boolean; passthrough?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRuleDetail[] };
+export type RulesetSourceStatus = { format?: string; behavior?: string; conversion?: 'yaml-to-list'; id: string; ok: boolean; error?: string; fetchedAt?: number; stale?: boolean; binary?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRuleDetail[] };
 export type RulesetPreview = {
   delivery?: { mode: 'original'; format: string; behavior: string } | { mode: 'managed' } | { mode: 'unsupported'; reason: string };
   sources: RulesetSourceStatus[];
-  passthrough: boolean; lines: string[]; total?: number;
+  binary: boolean; lines: string[]; total?: number;
   dropped: { rule: string; reason: string }[]; notes?: string[]; rejected: { line: number; text: string; reason: string }[]; error?: string;
   /** 只在合并结果中出现 */
   stats?: { domain: number; classical: number; ipcidr: number; total: number; duplicates: number };
-  passthroughSources?: { sourceId: string; name: string; format: string }[];
+  binarySources?: { sourceId: string; name: string; format: string }[];
 };
 
 // ---------- 仓库与系统接口；Pending 标注的功能仍为占位（见 docs/11） ----------

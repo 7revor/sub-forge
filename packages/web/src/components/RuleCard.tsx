@@ -13,7 +13,7 @@ export function RuleCard({ handle, icon, children, count, hint, target, readOnly
 }) {
   return <RoutingCard id={id} invalid={invalid} className={layoutClass}>
     {handle}
-    <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg transition-colors hover:bg-ground ${contentClass}`}>
+    <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg ${contentClass}`}>
       <RoutingCardIcon>{icon}</RoutingCardIcon>
       <span className="min-w-0 truncate font-medium">{children}</span>
     </button>

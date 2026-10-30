@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { ResourceService } from '../src/resources.ts';
@@ -12,7 +13,7 @@ async function setup(){
   h.store.put('collection',{id:'c',name:'组合',members:[{ref:{type:'source',id:'s'}},{ref:{type:'source',id:'s'}}],pipeline:[]},user.id);
   h.store.put('ruleset',{id:'r',name:'规则',sources:[{id:'a',kind:'remote',url:'https://rules.test',format:'auto'},{id:'off',kind:'remote',url:'https://disabled.test',format:'auto',enabled:false}]},user.id);
   h.store.put('profile',{id:'p',name:'订阅',nodeSets:[{ref:{type:'collection',id:'c'},output:'provider'}],chains:[],refPolicy:{default:'wrap'},overlay:{extraRules:[{anchor:'top',rule:{id:'r',matcher:{kind:'ruleset',id:'r'},target:{kind:'builtin',name:'DIRECT'}}}]}},user.id);
-  h.store.putToken({token:'t',profileId:'p'});
+  issueProfileToken(h.store, {token:'t',profileId:'p'});
   return {...h,api,user,calls,fail:()=>{failed=true;}};
 }
 async function done(api:Awaited<ReturnType<typeof setup>>['api'],id:string){
@@ -100,7 +101,7 @@ describe('资源刷新任务',()=>{
     expect(failedState).toMatchObject({lastSuccessAt:lastSuccess,available:true,error:'模拟失败'});
     expect(failedState.lastAttemptAt).toBeGreaterThan(lastSuccess);
     expect((await h.api.get('/api/sources/s/cache')).json.items[0].lastSuccessAt).toBeGreaterThan(lastSuccess);
-    const sub=await h.app.request('/sub/t');const cfg=parse(await sub.text());
+    const sub=await h.app.request('/sub/t/p');const cfg=parse(await sub.text());
     expect(sub.headers.get('profile-update-interval')).toBe('24');
     for(const p of Object.values(cfg['rule-providers']) as any[])expect(p.url).toContain('https://sub.test/r/');
     for(const p of Object.values(cfg['proxy-providers']) as any[])expect(p.interval).toBe(86400);
@@ -128,8 +129,8 @@ it('MRS 校验成功后原样托管，损坏的新响应不会覆盖上次成功
   const h=setupApp({fetcher});active.push(h);
   h.store.put('ruleset',{id:'r',name:'二进制',sources:[{id:'m',kind:'remote',format:'mrs',behavior:'domain',url:'https://mrs.test'}]});
   h.store.put('profile',{id:'p',name:'MRS',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{extraRules:[{anchor:'top',rule:{id:'r',matcher:{kind:'ruleset',id:'r'},target:{kind:'builtin',name:'DIRECT'}}}]}});
-  h.store.putToken({token:'binary',profileId:'p'});
-  const sub=await h.app.request('/sub/binary');expect(sub.status).toBe(200);
+  issueProfileToken(h.store, {token:'binary',profileId:'p'});
+  const sub=await h.app.request('/sub/binary/p');expect(sub.status).toBe(200);
   const provider=Object.values(parse(await sub.text())['rule-providers'])[0] as {url:string;format:string};
   expect(provider.format).toBe('mrs');const url=new URL(provider.url);
   const res=await h.app.request(url.pathname+url.search);expect(Buffer.from(await res.arrayBuffer())).toEqual(bytes);

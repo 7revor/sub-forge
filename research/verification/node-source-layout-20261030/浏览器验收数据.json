@@ -1,0 +1,64 @@
+{
+  "desktop": {
+    "before": {
+      "columns": "24px 32px 310px 310px 140px 68px",
+      "metadata": "自建落地本地节点组 · 2 个节点ProviderInline",
+      "parts": [
+        {
+          "text": "自建落地",
+          "width": 310,
+          "x": 354
+        },
+        {
+          "text": "ProviderInline",
+          "width": 140,
+          "x": 990
+        },
+        {
+          "text": "",
+          "width": 32,
+          "x": 1174
+        }
+      ],
+      "width": 1280
+    },
+    "after": {
+      "columns": "24px 32px 310px 310px 140px 68px",
+      "parts": [
+        {
+          "text": "自建落地",
+          "width": 310,
+          "x": 354
+        },
+        {
+          "text": "ProviderInline",
+          "width": 140,
+          "x": 990
+        },
+        {
+          "text": "",
+          "width": 32,
+          "x": 1174
+        }
+      ]
+    }
+  },
+  "mobile": {
+    "before": {
+      "width": 140,
+      "x": 114
+    },
+    "after": {
+      "x": 114,
+      "width": 140
+    },
+    "viewport": 390,
+    "documentWidth": 390,
+    "modalWidth": 358
+  },
+  "lifecycle": {
+    "dialogs": 0,
+    "exit": "退场验收：9 项通过：自建落地 · 节点预览全部 2 / 2 个节点🇺🇸 GCP [01]；120 帧；高度 248px，标题、正文、输入值保持一致通过：自建落地 · 节点预览全部 2 / 2 个节点🇺🇸 GCP [01]；121 帧；高度 248px，标题、正文、输入值保持一致通过：自建落地 · 节点预览全部 2 / 2 个节点🇺🇸 GCP [01]；121 帧；高度 248px，标题、正文、输入值保持一致通过：自建落地 · 节点预览全部 2 / 2 个节点🇺🇸 GCP [01]；116 帧；高度 248px，标题、正文、输入值保持一致通过：直接点选代理链退场本机 → 🇸🇬 新加坡 → 🇸🇬 新加坡 → ；121 帧；高度 680px，标题、正文、输入值保持一致通过：自建落地 · 节点预览全部 2 / 2 个节点🇺🇸 GCP [01]；121 帧；高度 248px，标题、正文、输入值保持一致通过：嵌套草稿与路由验收打开子弹窗打开嵌套节点预览切换路由取消保存Close；121 帧；高度 383px，标题、正文、输入值保持一致通过：嵌套草稿与路由验收打开子弹窗打开嵌套节点预览切换路由取消保存Close；121 帧；高度 383px，标题、正文、输入值保持一致通过：保存失败后重试名称取消处理中…模拟保存失败，请重试Close；121 帧；高度 238px，标题、正文、输入值保持一致",
+    "outcomes": "Promise 结果：9 项{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"navigation\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"confirmed\",\"data\":\"保留我的草稿\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}"
+  }
+}

@@ -22,7 +22,7 @@ IP-ASN,AS62041
 UNKNOWN,Notion*
 AND,((DOMAIN,a.com),(DST-PORT,443))`;
     const r = parseRuleSetContent(text);
-    if (r.passthrough) throw new Error('unexpected');
+    if (r.binary) throw new Error('unexpected');
     expect(r.format).toBe('classical');
     expect(r.rules.map((x) => x.rule)).toMatchSnapshot();
     expect(r.rejected.map((x) => [x.line, x.reason])).toEqual([
@@ -49,23 +49,23 @@ AND,((DOMAIN,a.com),(DST-PORT,443))`;
     const ip = parseRuleSetContent('1.1.1.0/24\n2001:db8::/32\n');
     const yml = parseRuleSetContent("payload:\n  - '+.google.com'\n  - 'www.youtube.com'\n");
     const cls = parseRuleSetContent("payload:\n  - DOMAIN-SUFFIX,x.com\n  - IP-CIDR,1.0.0.0/8,no-resolve\n");
-    const pick = (r: ReturnType<typeof parseRuleSetContent>) => (r.passthrough ? [] : r.rules.map((x) => x.rule));
+    const pick = (r: ReturnType<typeof parseRuleSetContent>) => (r.binary ? [] : r.rules.map((x) => x.rule));
     expect(pick(ds)).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'apple.com' }, { type: 'DOMAIN', value: 'icloud.com' }]);
     expect(pick(ip)).toEqual([{ type: 'IP-CIDR', value: '1.1.1.0/24' }, { type: 'IP-CIDR6', value: '2001:db8::/32' }]);
     expect(pick(yml)).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'google.com' }, { type: 'DOMAIN', value: 'www.youtube.com' }]);
     expect(pick(cls)).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'x.com' }, { type: 'IP-CIDR', value: '1.0.0.0/8', noResolve: true }]);
   });
 
-  it('带引号或流式 YAML payload 自动转换，不能作为二进制透传', () => {
+  it('带引号或流式 YAML payload 自动转换，不能作为二进制托管', () => {
     for (const body of ['"payload": ["+.example.com"]', '{payload: ["+.example.com"]}']) {
       const parsed = parseRuleSetContent(body);
-      expect(parsed).toMatchObject({ passthrough: false, conversion: 'yaml-to-list', rules: [{ rule: { type: 'DOMAIN-SUFFIX', value: 'example.com' } }] });
-      expect(() => parseRuleSetContent(body, 'mrs')).toThrow('不能透传');
+      expect(parsed).toMatchObject({ binary: false, conversion: 'yaml-to-list', rules: [{ rule: { type: 'DOMAIN-SUFFIX', value: 'example.com' } }] });
+      expect(() => parseRuleSetContent(body, 'mrs')).toThrow('不能标记为二进制');
     }
   });
 
-  it('mrs / srs 透传不解析', () => {
-    expect(parseRuleSetContent('', 'mrs')).toEqual({ passthrough: true, format: 'mrs' });
+  it('mrs / srs 识别为二进制，不解析文本', () => {
+    expect(parseRuleSetContent('', 'mrs')).toEqual({ binary: true, format: 'mrs' });
   });
 });
 
@@ -128,13 +128,13 @@ describe('规则集多来源', () => {
     snapshots: { [sourceKey('fin', 'remote')]: 'DOMAIN,remote.example.com' },
   };
 
-  it('按 behavior 拆分、去重、忽略旧 no-resolve 开关、mrs 透传、读远程快照', () => {
+  it('按 behavior 拆分、去重、忽略旧 no-resolve 开关、mrs 二进制标记、读远程快照', () => {
     const report = new Report();
     const b = expandRuleSet('fin', inputs, { client: 'mihomo' }, report);
     expect(b.domain).toEqual([{ type: 'DOMAIN-SUFFIX', value: 'paypal.com' }, { type: 'DOMAIN-SUFFIX', value: 'stripe.com' }, { type: 'DOMAIN', value: 'paypal.com' }, { type: 'DOMAIN', value: 'remote.example.com' }]);
     expect(b.classical).toEqual([{ type: 'DOMAIN-KEYWORD', value: 'paypal' }]);
     expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '64.4.240.0/21' }]);
-    expect(b.passthrough).toEqual([{ sourceId: 'broker', name: '券商', format: 'mrs', url: 'https://example.com/broker.mrs', behavior: 'ipcidr' }]);
+    expect(b.binary).toEqual([{ sourceId: 'broker', name: '券商', format: 'mrs', url: 'https://example.com/broker.mrs', behavior: 'ipcidr' }]);
     expect(b).toMatchObject({ total: 7, duplicates: 1 });
     expect(report.items).toEqual([]);
   });
@@ -173,11 +173,11 @@ describe('规则集组级内容改写', () => {
     ],
   } }, snapshots: { 'r/b': 'DOMAIN,same.test\nDOMAIN,remote.test' } });
 
-  it('所有来源按内容匹配，平台优先级、替换后去重、忽略独立 no-resolve 且保留二进制透传', () => {
+  it('所有来源按内容匹配，平台优先级、替换后去重、忽略独立 no-resolve 且保留二进制托管', () => {
     const b = expandRuleSet('r', make(), { client: 'mihomo', platform: 'android' }, new Report());
     expect(b.domain.map((r) => 'value' in r && r.value)).toEqual(['keep.test', 'remote.test']);
     expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24' }]);
-    expect(b).toMatchObject({ total: 4, duplicates: 1, passthrough: [{ sourceId: 'binary' }] });
+    expect(b).toMatchObject({ total: 4, duplicates: 1, binary: [{ sourceId: 'binary' }] });
   });
 
   it('丢弃整组所有匹配项，其他客户端与不匹配内容保持原样', () => {

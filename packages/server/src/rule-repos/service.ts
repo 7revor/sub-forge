@@ -124,7 +124,7 @@ export class RuleRepoService {
   fileResource(id:string,ref:string,path:string) {
     this.assertEnabled(id);
     if (!findRuleFile(this.store.db,id,ref,path) || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中');
-    return {kind:'ruleset' as const,id:`repository-file:${id}:${ref}:${path}`,name:path,url:rawUrl(this.definition(id,true),{ref,path,format:'auto'}),options:{format:'auto' as const,scope:'public-repository'}};
+    return {kind:'ruleset' as const,id:`repository-file:${id}:${ref}:${path}`,name:path,url:rawUrl(this.definition(id,true),{ref,path,format:'auto'}),options:{format:'auto' as const,scope:'public-rules'}};
   }
   /** 只调度已实际读取的公开正文，不预抓取整库文件。失效索引不再自动拉取。 */
   cachedResources() {
@@ -150,7 +150,7 @@ export class RuleRepoService {
     const content = await this.readFile(definition, file);
     this.assertSnapshot(id, version);
     return { repo: id, entry: node.entry ?? undefined, ref, path, name: path.split('/').at(-1)!, content,
-      ...(this.snapshots ? {cache:this.snapshots.status('ruleset',`repository-file:${id}:${ref}:${path}`,rawUrl(definition,file),{format:'auto',scope:'public-repository'})} : {}),
+      ...(this.snapshots ? {cache:this.snapshots.status('ruleset',`repository-file:${id}:${ref}:${path}`,rawUrl(definition,file),{format:'auto',scope:'public-rules'})} : {}),
       url: rawUrl(definition, file), upstream: upstreamUrl(definition, file), license: definition.license };
   }
   async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
@@ -164,7 +164,7 @@ export class RuleRepoService {
     const definition = this.definition(repo, true);
     const body = await this.readFile(definition, file);
     const parsed = parseRuleSourceContent(body, { ...file, repository: { repo, entry: path, ref: file.ref, path: file.path } });
-    if (parsed.passthrough || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
+    if (parsed.binary || !parsed.rules.length) throw bad('所选文件没有可解析的文本规则');
     const current = find();
     if (JSON.stringify(current.file) !== JSON.stringify(file) || JSON.stringify(this.definition(repo, true)) !== JSON.stringify(definition)) throw new HttpError(409, '索引已更新，请重新选择文件');
     return { name: current.file.path.split('/').at(-1)!.replace(/\.[^.]+$/, ''), sources: [{ kind: 'remote' as const,
@@ -320,7 +320,7 @@ export class RuleRepoService {
     this.assertEnabled(repo.id);
     if (this.snapshots && isIndexedRuleFile(file.path)) {
       const url=rawUrl(repo,file);
-      const result=await this.snapshots.get('ruleset',`repository-file:${repo.id}:${file.ref}:${file.path}`,url,{format:'auto',scope:'public-repository'});
+      const result=await this.snapshots.get('ruleset',`repository-file:${repo.id}:${file.ref}:${file.path}`,url,{format:'auto',scope:'public-rules'});
       if (!result.snapshot?.body) throw new Error(result.error ?? '没有可用规则缓存');
       return result.snapshot.body;
     }
@@ -434,7 +434,7 @@ export class RuleRepoService {
         for (const file of variant.files) {
           const body = await this.readFile(repo, file);
           const parsed = parseRuleSourceContent(body, { ...file, repository: { repo: id, entry: path, ref: file.ref, path: file.path } });
-          if (parsed.passthrough || !parsed.rules.length) throw new Error('文件中没有可解析的规则');
+          if (parsed.binary || !parsed.rules.length) throw new Error('文件中没有可解析的规则');
           rejected += parsed.rejected.length;
           rejectedDetails.push(...parsed.rejected.slice(0, Math.max(0, 50 - rejectedDetails.length)).map(r => ({ ...r, text: r.text.slice(0, 500) })));
           for (const rule of parsed.rules) keys.add(ruleKey(rule.rule));

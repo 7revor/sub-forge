@@ -53,7 +53,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 规则来源可带 `repository: { repo, entry, ref, path }` 表示仓库文件关联；仍为远程来源，URL 约束由服务端负责，内核解析、合并、去重不变。
 
-文本来源统一通过 `parseRuleSourceContent` 按内容识别，旧 format 不再强制指定解析器（仅保留域名方言与二进制兼容）。预览始终解析为规则 IR；`ruleSetDelivery` 判断原格式透传或托管转换。单一启用远程来源、无覆写、IP 选项处理或自定义 UA，且目标客户端支持原内容时直接引用上游，并设置实际 format 和 behavior；否则生成一个 `.list`（text/classical）。拒绝行、方言转换也触发托管。旧 MRS/SRS 无解码能力，无法转换时明确失败。`conversion: yaml-to-list` 仅作为旧版预览解析诊断兼容，是否托管以 delivery 为准。仓库仍只索引 list/txt。
+文本来源统一通过 `parseRuleSourceContent` 按内容识别，旧 format 仅保留域名方言与二进制兼容。`managedRuleDelivery` 只判断输出是否可生成；文本一律解析、处理后托管为 classical LIST，单一合法 MRS 来源原字节托管，SRS 明确拒绝。已移除原 URL 透传分支；`conversion: yaml-to-list` 只表示来源转换诊断。仓库仍只索引 list/txt。
 
 模板的 `ruleset` 匹配项支持可选 `repository` 文件映射。调用方在渲染前将本地与仓库引用统一为 `RuleSetInputs`；内核继续按同一规则管线处理，不负责访问 GitHub。没有 repository 的旧 ID 引用保持兼容。
 
@@ -64,7 +64,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 2026-10-29 规则集前端移除整组 no-resolve 配置入口；核心保留 `RuleSet.noResolve` 以兼容历史数据，规则本身和模板引用的选项处理不变。
 
 
-2026-10-29：mihomo 转换时，PROCESS-NAME-WILDCARD / PROCESS-PATH-WILDCARD / DOMAIN-WILDCARD 按 lowercase 值去重，保留首条原始写法及行位；名称与路径不混合，精确、正则与 Surge 保持原行为。合并转换与展开共用去重键；来源原文预览保留重复行。远程文件存在 wildcard 重复时触发托管 LIST，避免原文件直连绕过去重。
+2026-10-29：mihomo 转换时，PROCESS-NAME-WILDCARD / PROCESS-PATH-WILDCARD / DOMAIN-WILDCARD 按 lowercase 值去重，保留首条原始写法及行位；名称与路径不混合，精确、正则与 Surge 保持原行为。合并转换与展开共用去重键；来源原文预览保留重复行。远程文件统一托管为 LIST，保留相同的 wildcard 去重语义。
 
 
 2026-10-29：RAW 支持可选 client；未指定时在目标客户端原样输出，旧客户端限定保持兼容。单条规则允许未收录类型与逻辑文本，不经过结构化规则解析 / 翻译；拒绝空白和换行。末尾 no-resolve / src 在 Lowering 拆分，拼接时排在出口之后，旧选项合并不重复。RAW wildcard 与结构化 wildcard 共用 mihomo lowercase 去重键。
@@ -97,7 +97,7 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 
 ## 服务端统一资源缓存接入（2026-10-30）
 
-`RenderInput.managedResources` 启用统一托管；`resourceIntervalSec` 指定 provider 间隔，服务端总是传入系统值。文本统一 classical LIST，符合限制的 MRS 原字节托管，SRS 报错。内核独立调用保留旧默认参数兼容性；生产策略由服务端确定。
+统一托管为内核固定行为，已移除 `RenderInput.managedResources` 开关及旧默认透传分支。`resourceIntervalSec` 指定 provider 间隔，服务端传入系统值。规则 provider 展示名与内部文件键分离，规则增强用原名、直接 URL 用无扩展名文件名，重名稳定加后缀。用户鉴权、公共产物共享与生命周期见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
 
 ### 2026-10-30：本地规则分组
 

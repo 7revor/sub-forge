@@ -1,0 +1,66 @@
+{
+  "modals": [
+    {
+      "name": "01-节点预览",
+      "buttons": [
+        "Close"
+      ],
+      "clip": {
+        "height": 191.5,
+        "width": 464,
+        "x": 408,
+        "y": 264.25
+      },
+      "height": 175.5,
+      "paddingBottom": "48px",
+      "paddingTop": "24px"
+    },
+    {
+      "name": "02-规则预览",
+      "buttons": [
+        "Close"
+      ],
+      "clip": {
+        "height": 656,
+        "width": 816,
+        "x": 232,
+        "y": 32
+      },
+      "height": 640,
+      "paddingBottom": "48px",
+      "paddingTop": "24px"
+    },
+    {
+      "name": "03-刷新缓存",
+      "buttons": [
+        "Close"
+      ],
+      "clip": {
+        "height": 222,
+        "width": 688,
+        "x": 296,
+        "y": 249
+      },
+      "height": 206,
+      "paddingBottom": "48px",
+      "paddingTop": "24px"
+    }
+  ],
+  "reducedMotion": [
+    {
+      "name": "节点列表退场",
+      "animation": "none",
+      "paddingBottom": "48px"
+    },
+    {
+      "name": "静态规则预览",
+      "animation": "none",
+      "paddingBottom": "48px"
+    }
+  ],
+  "lifecycle": {
+    "dialogs": 0,
+    "exit": "退场验收：10 项通过：自建落地 · 节点预览全部 1 / 1 个节点🇺🇸 GCP [01]；121 帧；高度 176px，标题、正文、输入值保持一致通过：自建落地 · 节点预览全部 1 / 1 个节点🇺🇸 GCP [01]；120 帧；高度 176px，标题、正文、输入值保持一致通过：自建落地 · 节点预览全部 1 / 1 个节点🇺🇸 GCP [01]；120 帧；高度 176px，标题、正文、输入值保持一致通过：规则预览本地规则1DOMAIN,exit.example.testClo；120 帧；高度 640px，标题、正文、输入值保持一致通过：规则预览本地规则1DOMAIN,exit.example.testClo；121 帧；高度 640px，标题、正文、输入值保持一致通过：规则预览本地规则1DOMAIN,exit.example.testClo；120 帧；高度 640px，标题、正文、输入值保持一致通过：自建落地 · 节点预览全部 1 / 1 个节点🇺🇸 GCP [01]；121 帧；高度 176px，标题、正文、输入值保持一致通过：嵌套草稿与路由验收打开子弹窗打开嵌套节点预览切换路由取消保存Close；121 帧；高度 383px，标题、正文、输入值保持一致通过：嵌套草稿与路由验收打开子弹窗打开嵌套节点预览切换路由取消保存Close；121 帧；高度 383px，标题、正文、输入值保持一致通过：保存失败后重试名称取消处理中…模拟保存失败，请重试Close；120 帧；高度 238px，标题、正文、输入值保持一致",
+    "outcomes": "Promise 结果：11 项{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"navigation\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"confirmed\",\"data\":\"保留我的草稿\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}{\"status\":\"cancelled\",\"reason\":\"dismissed\"}"
+  }
+}

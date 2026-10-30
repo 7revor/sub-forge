@@ -16,8 +16,8 @@ it('完整导入预览不落库不联网，保存资源归当前用户，Loon �
     expect(saved.status, saved.text).toBe(201); expect(fetched).toBe(0);
     for (const kind of ['profile','source','collection','local'] as const) for (const doc of h.store.list(kind)) expect(h.store.getWithOwner(kind, doc.id)?.owner).toBe(alice.id);
     const id = saved.json.item.id; expect((await other.get('/api/profiles/' + id)).status).toBe(404);
-    const token = h.store.listTokens(id)[0]!.token;
-    const out = await h.app.request('/sub/' + token + '?target=loon');
+    const token = h.store.userToken(alice.id)!.token;
+    const out = await h.app.request('/sub/' + token + '/' + id + '?target=loon');
     expect(out.status).toBe(200); expect(await out.text()).toContain('[Proxy Chain]'); expect(fetched).toBe(1);
     const incompatible = await h.renderer.render(id, { client: 'mihomo' }); expect(incompatible.ok).toBe(false);
   } finally { await h.snapshots.settled(); h.store.close(); }
@@ -25,12 +25,14 @@ it('完整导入预览不落库不联网，保存资源归当前用户，Loon �
 it('导入失败整体回滚，未知段、链环与缺少最终出口不能绕过预览直接保存', async () => {
   const h = setupApp();
   try {
-    await addUser(h.store, 'alice'); const api = client(h.app); await api.login('alice');
+    const alice = await addUser(h.store, 'alice'); const api = client(h.app); await api.login('alice');
+    const originalToken = h.store.userToken(alice.id);
     for (const text of [loonFull + '\n[Script]\nscript=example', loonFull.replace('命名链 = 入口,落地', '命名链 = 科学上网,落地'), loonFull.replace('FINAL,科学上网', ''), loonFull.replace('https://subscription.example.test/list', 'https://'), loonFull.replace('[Remote Filter]', '额外来源 = https://?\n[Remote Filter]')]) {
       const result = await api.post('/api/profiles/import/loon', { name: '不能导入', text, save: true });
       expect(result.status, result.text).toBe(400);
       for (const kind of ['profile','source','local','collection'] as const) expect(h.store.list(kind)).toEqual([]);
-      expect(h.store.db.prepare('SELECT count(*) AS n FROM sub_tokens').get()).toEqual({ n: 0 });
+      expect(h.store.db.prepare('SELECT count(*) AS n FROM user_tokens').get()).toEqual({ n: 1 });
+      expect(h.store.userToken(alice.id)).toEqual(originalToken);
     }
     expect((await client(h.app).post('/api/profiles/import/loon', { name: '未登录', text: loonFull })).status).toBe(401);
   } finally { await h.snapshots.settled(); h.store.close(); }

@@ -35,7 +35,7 @@ export type DocMap = {
 export type Kind = keyof DocMap;
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<{ user: User }>('GET', '/me').then((r) => r.user), retry: false, staleTime: 0 });
-/** 引用候选包含管理员维护的公共规则集，维护列表仍只显示自己的文档。 */
+/** 规则增强全站公共读取和引用；维护页面按创建者或管理员身份决定写权限。 */
 export const useRuleSetRefs = () => useQuery({ queryKey: ['ruleset-refs'], queryFn: () => api<{ items: { id: string; name: string }[] }>('GET', '/rule-options/locals').then(r => r.items) });
 
 export function useList<K extends Kind>(kind: K) {

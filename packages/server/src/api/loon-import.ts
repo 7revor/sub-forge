@@ -36,7 +36,7 @@ export function loonImportRoutes(store: Store) {
     if (!body.save) return c.json({ plan, clients, remoteChecked: false });
     if (plan.report.some(r => r.level === 'error')) return c.json({ error: '请先修复导入诊断中的错误', report: plan.report }, 400);
     const profile = store.db.transaction(() => {
-      // 新随机 ID，全部引用只来自规划；后续验证失败会整体回滚，包括自动创建的订阅令牌。
+      // 新随机 ID，全部引用只来自规划；后续验证失败整体回滚，沿用现有用户令牌。
       for (const source of plan.sources) store.put('source', validateDoc('source', source, source.id, user, store), user.id);
       for (const local of plan.locals) store.put('local', validateDoc('local', local, local.id, user, store), user.id);
       for (const collection of plan.collections) store.put('collection', validateDoc('collection', collection, collection.id, user, store), user.id);

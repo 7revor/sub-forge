@@ -9,6 +9,7 @@ import { api, onUnauthorized } from './api.ts';
 import { LogoMark } from './components/LogoMark.tsx';
 import { cx } from './components/ui.tsx';
 import { useMe } from './hooks.ts';
+import { setSession } from './session.ts';
 
 type NavItem = { to: string; label: string; admin?: boolean; end?: boolean };
 const NAV: { title?: string; items: NavItem[] }[] = [
@@ -39,7 +40,7 @@ export function AppLayout() {
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   useEffect(() => onUnauthorized(() => {
-    qc.setQueryData(['me'], null);
+    setSession(qc, null);
     navigate('/login', { replace: true, state: { from: location.pathname } });
   }), [qc, navigate, location.pathname]);
 
@@ -60,7 +61,7 @@ export function AppLayout() {
   const logout = async () => {
     try {
       await api('POST', '/auth/logout');
-      qc.clear();
+      setSession(qc, null);
       navigate('/login', { replace: true });
     } catch (error) { alertError(error); }
   };

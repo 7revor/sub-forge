@@ -24,7 +24,7 @@ async function scenario() {
       { id: 'proc', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Example' } }, target: { kind: 'group', groupId: 'g' } },
     ], final: { kind: 'builtin', name: 'DIRECT' } } } };
   const saved = await alice.post('/api/profiles', draft); expect(saved.status, saved.text).toBe(201);
-  const profile = saved.json.item, token = h.store.createToken(profile.id).token;
+  const profile = saved.json.item, token = h.store.createToken(user.id).token;
   return { ...h, user, alice, bob, draft, profile, token };
 }
 describe('Loon 订阅与管理接口', () => {
@@ -36,18 +36,18 @@ describe('Loon 订阅与管理接口', () => {
     expect(() => detectClient('Loon', { platform: 'unknown' })).toThrow();
   });
   it('主配置是完整 INI，节点按快照内联，基础设置隔离、规则顺序和平台差异有效', async () => {
-    const h = await scenario(), res = await h.app.request('/sub/' + h.token, { headers: { 'user-agent': 'Loon/3.5.3' } });
+    const h = await scenario(), res = await h.app.request('/sub/' + h.token + '/' + h.profile.id, { headers: { 'user-agent': 'Loon/3.5.3' } });
     expect(res.status).toBe(200); expect(res.headers.get('content-type')).toContain('text/plain');
     const text = await res.text();
     expect(text).toContain('[General]\nip-mode = v4-only\nallow-wifi-access = false\ntest-timeout = 5');
     expect(text).toContain('节点 = trojan, example.test, 443, "example", transport=tcp');
     expect(text).toContain('[Rule]\nDOMAIN,before.test,DIRECT\nDOMAIN,remote.test,代理\nIP-CIDR,192.0.2.0/24,代理,no-resolve\nFINAL,DIRECT');
     expect(text).not.toMatch(/mixed-port|loglevel|ipv6 =|PROCESS-NAME|Remote Rule|RULE-SET|__SF_/);
-    const mac = await h.app.request('/sub/' + h.token + '?target=loon&platform=macos');
+    const mac = await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=loon&platform=macos');
     expect(await mac.text()).toContain('PROCESS-NAME,Example,代理');
     expect(h.store.recentAccess(h.profile.id).map(x => x.client)).toContain('loon');
-    expect((await h.app.request('/sub/' + h.token + '?target=loon&platform=linux')).status).toBe(400);
-    h.store.deleteToken(h.token); expect((await h.app.request('/sub/' + h.token + '?target=loon')).status).toBe(404);
+    expect((await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=loon&platform=linux')).status).toBe(400);
+    h.store.deleteToken(h.token); expect((await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=loon')).status).toBe(404);
   });
   it('两种预览、规则转换与 Loon 专用改写有效，用户隔离和基础校验有效', async () => {
     const h = await scenario();

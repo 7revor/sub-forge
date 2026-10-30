@@ -61,7 +61,7 @@ async function main(): Promise<void> {
       const owner = arg2 ? store.getUserAuth(arg2) : undefined;
       if (arg2 && !owner) throw new Error(`用户 ${arg2} 不存在`);
       store.importSeed(JSON.parse(readFileSync(arg, 'utf8')) as Seed, owner?.id ?? null);
-      console.log(`已导入 ${arg} → ${dbPath}${owner ? `（归属 ${owner.username}）` : '（无归属，登录后不可见，仅订阅接口可用）'}`);
+      console.log(`已导入 ${arg} → ${dbPath}${owner ? `（归属 ${owner.username}）` : '（私有文档无归属，无法通过用户令牌访问；请指定用户名）'}`);
     } finally {
       store.close();
     }
