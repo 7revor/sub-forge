@@ -1,19 +1,26 @@
 import type { ReactNode } from 'react';
 import { CornerDownRight, LockKeyhole } from 'lucide-react';
 import { RoutingCard, RoutingCardActions, RoutingCardIcon } from './RoutingCard.tsx';
+import type { RulePreviewLink } from '../domain/rulePreview.ts';
 
 const targetClass = 'w-[112px] min-w-0 shrink-0';
 const layoutClass = 'grid grid-cols-[24px_minmax(0,1fr)_60px] sm:flex sm:flex-wrap';
 const contentClass = 'flex min-w-0 items-center gap-2 text-left sm:flex-[1_1_160px]';
 
 /** 规则增强、模板与订阅共用：正文预览，铅笔编辑，操作不会触发预览。 */
-export function RuleCard({ handle, icon, children, count, hint, target, readOnly, invalid, previewHref, externalPreview, onPreview, onEdit, onDelete, label, id }: {
+export function RuleCard({ handle, icon, children, count, hint, target, readOnly, invalid, previewLinks = [], externalPreview, onPreview, onEdit, onDelete, label, id }: {
   handle: ReactNode; icon: ReactNode; children: ReactNode; count?: ReactNode; hint?: ReactNode; target?: ReactNode;
-  readOnly?: boolean; invalid?: boolean; previewHref?: string; externalPreview?: boolean; onPreview: () => void; onEdit: () => void; onDelete: () => void; label: string; id?: string;
+  readOnly?: boolean; invalid?: boolean; previewLinks?: RulePreviewLink[]; externalPreview?: boolean; onPreview: () => void; onEdit: () => void; onDelete: () => void; label: string; id?: string;
 }) {
   return <RoutingCard id={id} invalid={invalid} className={layoutClass}>
     {handle}
-    {externalPreview ? <a href={previewHref} target="_blank" rel="noreferrer noopener" aria-label={`打开${label}的文件`} aria-disabled={!previewHref} title={previewHref ? '在新标签页查看已保存的规则源文件' : '保存后可打开规则文件'} className={`cursor-pointer rounded-lg no-underline ${contentClass}`}><RoutingCardIcon>{icon}</RoutingCardIcon><span className="min-w-0 truncate font-medium">{children}</span></a> : <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg ${contentClass}`}>
+    {externalPreview ? <div className={`${contentClass} flex-col items-stretch`}>
+      {(previewLinks.length ? previewLinks : [{ href: undefined, label: undefined, title: undefined }]).map((link, index) => <a key={index} href={link.href} target="_blank" rel="noreferrer noopener"
+        aria-label={`打开${label}的文件${previewLinks.length > 1 ? ` ${index + 1}` : ''}`} aria-disabled={!link.href}
+        title={link.href ? link.title ?? '在新标签页查看源文件' : '请填写有效的源文件地址'} className="flex min-w-0 cursor-pointer items-center gap-2 rounded-lg no-underline">
+        <RoutingCardIcon>{icon}</RoutingCardIcon><span className="min-w-0 truncate font-medium">{previewLinks.length > 1 ? link.label : children}</span>
+      </a>)}
+    </div> : <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg ${contentClass}`}>
       <RoutingCardIcon>{icon}</RoutingCardIcon>
       <span className="min-w-0 truncate font-medium">{children}</span>
     </button>}

@@ -1,4 +1,4 @@
-import { useFileToken, ruleFileHref, type RuleFileContext } from '../../hooks/useFileLink.ts';
+import { rulePreviewLinks } from '../../domain/rulePreview.ts';
 import { type Matcher, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
 import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -23,14 +23,13 @@ export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
   return ctx.rulesets.find(r => r.id === matcher.id)?.name ?? matcher.id ?? '增强集合';
 }
 
-export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValidationReady, readOnly = false, title = '规则', hideFinal = false, staticOnly = false, renderTarget, extendedOptions, importedUrls, previewContext }: {
+export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValidationReady, readOnly = false, title = '规则', hideFinal = false, staticOnly = false, renderTarget, extendedOptions, importedUrls }: {
   value: TemplateBody; onChange: (value: TemplateBody) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
   readOnly?: boolean; title?: string; hideFinal?: boolean; staticOnly?: boolean; importedUrls?: string[];
   renderTarget?: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => ReactNode;
-  extendedOptions?: boolean; previewContext?: RuleFileContext;
+  extendedOptions?: boolean;
 }) {
-  const token = useFileToken();
   const [linkError, setLinkError] = useState<string>();
   const [linkingRule, setLinkingRule] = useState<string>();
   const currentValue = useRef(value);
@@ -83,7 +82,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
           hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
           target={readOnly ? <span className="block truncate px-1.5 text-[13px]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
-          externalPreview={!local} previewHref={ruleFileHref(token, previewContext, r.id, matcher)} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
+          externalPreview={!local} previewLinks={rulePreviewLinks(matcher)} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);
           }}><span title={label}>{label}</span></RuleCard>;

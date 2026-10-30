@@ -201,7 +201,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
           </div>
         </section>
         <TemplateGroupsEditor value={body} onChange={updateBody} report={report} />
-        <TemplateRulesEditor previewContext={{ kind: 'templates', id }} importedUrls={importedUrls} value={body} onChange={updateBody} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
+        <TemplateRulesEditor importedUrls={importedUrls} value={body} onChange={updateBody} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
     </PageScroll>
 
