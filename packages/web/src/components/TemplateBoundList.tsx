@@ -23,11 +23,11 @@ export function TemplateBoundList<T extends { id: string }>({ items, templateIds
   if (!templateIds) return <SortableList items={items} getKey={item => item.id} isLocked={isLocked} canDrop={canDrop} onReorder={next => onReorder(next)} renderItem={renderItem} />;
   const rows = templateListItems(items, templateIds, templateStart);
   const reorder = (next: TemplateListItem<T>[]) => { const result = flattenTemplateItems(next); onReorder(result.items, result.templateStart); };
-  return <SortableList items={rows} getKey={row => row.kind === 'template' ? 'template:block' : `custom:${row.item.id}`} isLocked={row => row.kind === 'template'} onReorder={reorder} renderItem={(row, _index, handle) => {
+  return <SortableList draggingClassName="[&_[data-routing-card]]:shadow-md" items={rows} getKey={row => row.kind === 'template' ? 'template:block' : `custom:${row.item.id}`} isLocked={row => row.kind === 'template'} onReorder={reorder} renderItem={(row, _index, handle) => {
     if (row.kind === 'template') return <section aria-label={`模板${label}整体`} className="min-h-2">
       {row.items.map(item => <div key={item.id}>{renderItem(item, items.indexOf(item), <span className="grid h-8 w-6 place-items-center text-ink-muted" aria-label="跟随模板"><LockKeyhole size={16} /></span>)}</div>)}
     </section>;
-    return <div className="[&_[data-routing-card]]:border-emerald-500/30 [&_[data-routing-card]]:bg-emerald-500/5">
+    return <div className="[&_[data-routing-card]]:border-emerald-500/30 [&_[data-routing-card]]:bg-[color-mix(in_oklab,var(--color-emerald-500)_5%,var(--color-panel))]">
       {renderItem(row.item, items.indexOf(row.item), handle)}
     </div>;
   }} />;
