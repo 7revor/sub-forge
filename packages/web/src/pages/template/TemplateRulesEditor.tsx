@@ -12,12 +12,13 @@ import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
+import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
-import { RuleEditDialog, repositoryHintClass } from './RuleEditDialog.tsx';
+import { RuleEditDialog } from './RuleEditDialog.tsx';
 import { applyRuleDraft } from './ruleDraft.ts';
 
-const columns = 'grid grid-cols-[36px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[36px_minmax(0,1fr)_16px_clamp(140px,14vw,200px)_64px]';
+const columns = 'grid grid-cols-[36px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[36px_minmax(0,1fr)_16px_136px_64px]';
 
 function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCtx; repos: NamedRef[] }) {
   const sourceClass = 'shrink-0 text-[12px] text-ink-muted';
@@ -108,7 +109,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
           <span className="flex items-center text-[12px] text-ink-muted">{handle}{i + 1}</span>
           <div className="flex min-w-0 items-center gap-2">
             <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer overflow-hidden text-left hover:text-brand"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
-            {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && repositoryMatches.matches[r.matcher.remote.url]?.map(match => <button key={`${match.repo}:${match.ref}:${match.path}`} type="button" className={repositoryHintClass} title={`匹配到仓库文件：${match.hint}`} disabled={!!linkingRule} onClick={() => void linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)}>关联仓库文件</button>)}
+            {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 条规则可关联仓库文件`} matches={repositoryMatches.matches[r.matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)} />}
           </div>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
           <div className="col-start-2 row-start-2 min-w-0 text-ink-2 sm:col-auto sm:row-auto [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:min-w-0 [&_button[role=combobox]]:text-[12.5px]">
@@ -129,7 +130,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       </div>}
     </Card>
     <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"引用规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" onSelect={matcher => { add(matcher); setAdding(false); }} />}</Field>
+      <Field label="规则来源" className="sm:max-w-[400px]">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" placeholder="选择规则集合或增强集合" modal onSelect={matcher => { add(matcher); setAdding(false); }} />}</Field>
     </div><DialogFooter>{<Button onClick={() => setAdding(false)}>取消</Button>}</DialogFooter></DialogContent></Dialog>
     {!readOnly && rule && <RuleEditDialog key={rule.id} rule={rule} index={value.rules.indexOf(rule)} ctx={ctx} staticOnly={staticOnly} adding={newRule?.id === rule.id} saveHint={saveHint} renderOptions={renderOptions} onClose={close} onSave={draft => {
       onChange(applyRuleDraft(currentValue.current, draft, newRule?.id === draft.id));
