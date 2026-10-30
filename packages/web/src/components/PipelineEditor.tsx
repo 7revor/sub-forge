@@ -1,3 +1,4 @@
+import { DropdownMenu, DropdownMenuContent } from './primitives/overlays.tsx';
 import { alertError } from '../feedback.ts';
 import { OptionalBoolean } from './OptionalBoolean.tsx';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
@@ -272,32 +273,18 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
 }
 
 function AddMenu({ onAdd }: { onAdd: (op: OperatorStep['op']) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open]);
-  return (
-    <div ref={ref} className="flex flex-col gap-2 border-t border-line-2 px-4 pt-3 pb-2">
-      <Button className="w-full border-dashed" aria-expanded={open} onClick={() => setOpen(!open)}><Plus size={16} />添加处理器</Button>
-      {open && (
-        <div role="menu" aria-label="选择处理器" className="popover-panel flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.10)]">
-          {OP_GROUPS.map((g) => <div key={g.title} className="flex flex-col gap-0.5">
-            <div className="px-2.5 pt-2 pb-1 text-[11px] tracking-[.08em] text-faint">{g.title}</div>
-            {g.ops.map((op) => <button key={op} type="button" role="menuitem" onClick={() => { onAdd(op); setOpen(false); }}
-              className="flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 text-left hover:bg-ground">
-              <span className="text-[13.5px] font-medium">{OP_LABEL[op]}</span>
-            </button>)}
-          </div>)}
-        </div>
-      )}
-    </div>
-  );
+  return <div className="border-t border-line-2 px-4 pt-3 pb-2">
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger asChild><Button className="w-full border-dashed"><Plus size={16} />添加处理器</Button></DropdownMenu.Trigger>
+      <DropdownMenuContent aria-label="选择处理器" align="start" className="w-[max(240px,var(--radix-dropdown-menu-trigger-width))]">
+        {OP_GROUPS.map(group => <DropdownMenu.Group key={group.title}>
+          <DropdownMenu.Label className="px-2.5 pt-2 pb-1 text-[11px] tracking-[.08em] text-faint">{group.title}</DropdownMenu.Label>
+          {group.ops.map(op => <DropdownMenu.Item key={op} onSelect={() => onAdd(op)}
+            className="flex cursor-pointer rounded-md px-2.5 py-2 text-[13.5px] font-medium outline-none data-[highlighted]:bg-ground">{OP_LABEL[op]}</DropdownMenu.Item>)}
+        </DropdownMenu.Group>)}
+      </DropdownMenuContent>
+    </DropdownMenu.Root>
+  </div>;
 }
 
 function StepCount({ trace }: { trace?: TraceStep }) {

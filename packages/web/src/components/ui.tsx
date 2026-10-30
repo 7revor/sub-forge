@@ -1,7 +1,6 @@
 // 基础组件：按设计稿的配色与尺寸（触控目标 ≥ 36–44px）。
 
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
-import { createPortal } from 'react-dom';
 import type { ReportItem } from '@sub-forge/core';
 import { X } from 'lucide-react';
 
@@ -10,7 +9,7 @@ export { Empty } from './Empty.tsx';
 export { cx } from './cx.ts';
 export { Select, Combobox, type SelectProps, type ComboOption } from './listbox.tsx';
 import { cx } from './cx.ts';
-import { Presence } from './Presence.tsx';
+import { AlertDialog, Dialog, overlayMotion, panelMotion, restoreOverlayFocus } from './primitives/overlays.tsx';
 
 type BtnVariant = 'primary' | 'default' | 'danger' | 'danger-solid' | 'ghost';
 const BTN: Record<BtnVariant, string> = {
@@ -167,58 +166,42 @@ export function FieldError({ error }: { error: unknown }) {
   return <div role="alert" className="rounded-lg bg-err-soft px-3 py-2.5 text-[13px] text-[#8f2a1f]">{error instanceof Error ? error.message : String(error)}</div>;
 }
 
-type ModalProps = { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean };
+type ModalProps = { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; alert?: boolean };
 
 export function Modal(props: ModalProps) {
-  return <Presence open={props.open}>{open => <ModalContent {...props} open={open} />}</Presence>;
-}
-
-function ModalContent({ title, open, onClose, children, footer, wide }: ModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // 在子元素 autoFocus 执行前记录入口，退场时才能把焦点还给触发按钮。
+  const { open, onClose, alert = false } = props;
+  const Root = alert ? AlertDialog.Root : Dialog.Root;
+  const Portal = alert ? AlertDialog.Portal : Dialog.Portal;
+  const Overlay = alert ? AlertDialog.Overlay : Dialog.Overlay;
+  const Content = alert ? AlertDialog.Content : Dialog.Content;
+  const Title = alert ? AlertDialog.Title : Dialog.Title;
+  const Close = alert ? AlertDialog.Cancel : Dialog.Close;
+  const retained = useRef(props);
   const previousFocus = useRef<Element | null>(null);
   const wasOpen = useRef(false);
+  if (open) retained.current = props;
   if (open && !wasOpen.current) previousFocus.current = document.activeElement;
   wasOpen.current = open;
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!open || !dialog) return;
-    const previous = previousFocus.current;
-    const focusable = () => [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')].filter(element => element.getClientRects().length > 0);
-    (dialog.querySelector<HTMLElement>('input:not(:disabled), textarea:not(:disabled)') ?? focusable()[0] ?? dialog).focus();
-    const onKey = (e: KeyboardEvent) => {
-      // 弹层只处理自身顶层的键盘操作，保留下拉菜单和确认框的 Escape 行为。
-      if (e.defaultPrevented || [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter(element => !element.closest('[inert]')).at(-1) !== dialog || document.querySelector('dialog[open][role="alertdialog"]')) return;
-      if (e.key === 'Escape') { e.preventDefault(); closeRef.current(); }
-      if (e.key === 'Tab') {
-        const items = focusable();
-        const first = items[0] ?? dialog, last = items.at(-1) ?? dialog;
-        if (e.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
-        else if (!e.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
-    };
-  }, [open]);
-  // 挂到 body，避免页面限宽、裁切或定位祖先影响全屏遮罩。
-  // 设计稿「对话框与危险操作」：标题 + 关闭、内容、灰底操作栏；宽度 560（表单）/ 720（粘贴、YAML）
-  return createPortal(
-    <div data-state={open ? 'open' : 'closed'} inert={!open} className="modal-overlay fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={cx('modal-panel flex max-h-full min-h-0 w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
+  const { title, children, footer, wide } = retained.current;
+  const body = <div className="flex min-h-0 flex-col gap-3.5 overflow-auto overscroll-contain px-5 pt-2 pb-[18px]">{children}</div>;
+  return <Root open={open} onOpenChange={next => { if (!next) onClose(); }}>
+    <Portal>
+      <Overlay data-slot={alert ? 'alert-dialog-overlay' : 'dialog-overlay'} className={cx('fixed inset-0 z-50 bg-[rgba(20,23,28,.42)]', overlayMotion)} />
+      <Content data-slot={alert ? 'alert-dialog-content' : 'dialog-content'} {...(!alert ? { 'aria-describedby': undefined } : {})}
+        onCloseAutoFocus={event => {
+          event.preventDefault();
+          restoreOverlayFocus(previousFocus.current);
+        }}
+        className={cx('fixed top-[10dvh] left-1/2 z-50 flex max-h-[calc(90dvh-1rem)] min-h-0 w-[calc(100%-2rem)] -translate-x-1/2 flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)] outline-none', panelMotion, wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
         <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-[18px] pb-2">
-          <h2 className="m-0 text-base font-semibold">{title}</h2>
-          <button type="button" aria-label="关闭" onClick={onClose} className="grid h-8 w-8 cursor-pointer place-items-center rounded-md text-muted hover:bg-ground hover:text-ink"><X size={16} /></button>
+          <Title className="m-0 text-base font-semibold">{title}</Title>
+          <Close asChild><button type="button" aria-label="关闭" className="grid h-8 w-8 cursor-pointer place-items-center rounded-md text-muted hover:bg-ground hover:text-ink"><X size={16} /></button></Close>
         </div>
-        <div className="flex min-h-0 flex-col gap-3.5 overflow-auto overscroll-contain px-5 pt-2 pb-[18px]">{children}</div>
+        {alert ? <AlertDialog.Description asChild>{body}</AlertDialog.Description> : body}
         {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2 rounded-b-xl border-t border-line-2 bg-[#fafbfc] px-5 py-3.5">{footer}</div>}
-      </div>
-    </div>, document.body
-  );
+      </Content>
+    </Portal>
+  </Root>;
 }
 
 /** 渲染报告条目列表；定位入口保持为可键盘操作的按钮。 */

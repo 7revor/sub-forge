@@ -7,10 +7,10 @@ import { PagedOptionList, type OptionLoader } from './OptionPage.tsx';
 
 import { ChevronDown } from 'lucide-react';
 import {
-  Children, Fragment, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState,
+  Children, Fragment, isValidElement, useEffect, useId, useRef, useState,
   type HTMLAttributes, type KeyboardEvent, type ReactElement, type ReactNode, type RefObject,
 } from 'react';
-import { createPortal } from 'react-dom';
+import { Popover, PopoverContent, SelectPrimitive, floatingMotion } from './primitives/overlays.tsx';
 import { cx } from './cx.ts';
 
 const fieldCls = 'h-[38px] w-full rounded-lg border border-[#d5d9e0] bg-panel px-3 text-[13px] text-ink';
@@ -40,63 +40,30 @@ function collect(children: ReactNode, group?: string, out: Opt[] = []): Opt[] {
   return out;
 }
 
-/** 跟随触发元素定位的弹层：下方空间不够时翻到上方，滚动、缩放时重新定位 */
-function usePopoverPos(anchor: RefObject<HTMLElement | null>, open: boolean, preferredWidth?: number, preferredHeight = 300) {
-  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; width: number; maxHeight: number } | null>(null);
-  useLayoutEffect(() => {
-    if (!open) return;
-    const place = () => {
-      const r = anchor.current?.getBoundingClientRect();
-      if (!r) return;
-      const below = window.innerHeight - r.bottom - 8;
-      const above = r.top - 8;
-      const up = below < preferredHeight && above > below;
-      const width = preferredWidth ? Math.min(preferredWidth, window.innerWidth - 16) : r.width;
-      const left = preferredWidth ? Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) : r.left;
-      setPos({ left, width, maxHeight: Math.min(preferredHeight, up ? above : below) - 4, ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
-    };
-    place();
-    window.addEventListener('scroll', place, true);
-    window.addEventListener('resize', place);
-    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
-  }, [anchor, open, preferredWidth, preferredHeight]);
-  return pos;
-}
-
-function useOutside(refs: RefObject<HTMLElement | null>[], open: boolean, close: () => void) {
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!refs.some((r) => r.current?.contains(e.target as Node))) close(); };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  });
-}
-
-function OptionList({ id, opts, active, selected, pos, listRef, label, onPick, onHover, empty }: {
-  id: string; opts: Opt[]; active: number; selected?: string | readonly string[]; pos: NonNullable<ReturnType<typeof usePopoverPos>>; listRef: RefObject<HTMLDivElement | null>;
-  label?: string; onPick: (o: Opt) => void; onHover: (i: number) => void; empty?: ReactNode;
+function OptionList({ id, opts, active, selected, listRef, label, onPick, onHover, empty, inputRef }: {
+  id: string; opts: Opt[]; active: number; selected?: string | readonly string[]; listRef: RefObject<HTMLDivElement | null>;
+  label?: string; onPick: (o: Opt) => void; onHover: (i: number) => void; empty?: ReactNode; inputRef?: RefObject<HTMLInputElement | null>;
 }) {
   useEffect(() => { listRef.current?.querySelector(`[data-i="${active}"]`)?.scrollIntoView({ block: 'nearest' }); }, [active, listRef]);
   const isSelected = (value: string) => typeof selected === 'string' ? selected === value : selected?.includes(value);
-  return createPortal(
-    <div ref={listRef} id={id} role="listbox" aria-label={label} aria-multiselectable={Array.isArray(selected) || undefined}
-      style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: pos.width, maxHeight: pos.maxHeight }}
-      className="popover-panel fixed z-[60] max-w-[min(480px,calc(100vw-16px))] overflow-y-auto rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.12)]"
-      onMouseDown={(e) => e.preventDefault()}>
-      {!opts.length && <Empty size="compact" title={empty ?? '没有选项'} />}
-      {opts.map((o, i) => <Fragment key={`${o.group ?? ''}\u0000${o.value}\u0000${i}`}>
-        {o.group && o.group !== opts[i - 1]?.group && <div role="presentation" className="px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-faint">{o.group}</div>}
-        <div id={`${id}-${i}`} data-i={i} role="option" aria-selected={isSelected(o.value) ?? false} aria-disabled={o.disabled || undefined}
-          onMouseEnter={() => onHover(i)} onClick={() => !o.disabled && onPick(o)}
-          className={cx('flex min-h-9 cursor-pointer flex-col justify-center rounded-md px-2.5 py-1.5 text-[13px]',
-            i === active && 'bg-ground', isSelected(o.value) && 'font-medium text-accent-ink', o.disabled && 'cursor-not-allowed opacity-45')}>
-          <span className="truncate">{Array.isArray(selected) && <span aria-hidden="true" className="mr-2">{isSelected(o.value) ? '✓' : '　'}</span>}{o.label}</span>
-          {o.hint && <span className="truncate text-[11.5px] font-normal text-muted">{o.hint}</span>}
-        </div>
-      </Fragment>)}
-    </div>,
-    document.body,
-  );
+  return <PopoverContent ref={listRef} id={id} role="listbox" aria-label={label} aria-multiselectable={Array.isArray(selected) || undefined}
+    onOpenAutoFocus={event => event.preventDefault()}
+    onCloseAutoFocus={event => { if (inputRef) event.preventDefault(); }}
+    onInteractOutside={event => { if (inputRef?.current === event.target) event.preventDefault(); }}
+    style={{ minWidth: 'var(--radix-popover-trigger-width)', maxHeight: 'min(300px, var(--radix-popover-content-available-height))' }}
+    className="max-w-[calc(100vw-16px)] overflow-y-auto p-1.5" onMouseDown={event => event.preventDefault()}>
+    {!opts.length && <Empty size="compact" title={empty ?? '没有选项'} />}
+    {opts.map((o, i) => <Fragment key={`${o.group ?? ''}\u0000${o.value}\u0000${i}`}>
+      {o.group && o.group !== opts[i - 1]?.group && <div role="presentation" className="px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-faint">{o.group}</div>}
+      <div id={`${id}-${i}`} data-i={i} role="option" aria-selected={isSelected(o.value) ?? false} aria-disabled={o.disabled || undefined}
+        onMouseEnter={() => onHover(i)} onClick={() => !o.disabled && onPick(o)}
+        className={cx('flex min-h-9 cursor-pointer flex-col justify-center rounded-md px-2.5 py-1.5 text-[13px]',
+          i === active && 'bg-ground', isSelected(o.value) && 'font-medium text-accent-ink', o.disabled && 'cursor-not-allowed opacity-45')}>
+        <span className="truncate">{Array.isArray(selected) && <span aria-hidden="true" className="mr-2">{isSelected(o.value) ? '✓' : '　'}</span>}{o.label}</span>
+        {o.hint && <span className="truncate text-[11.5px] font-normal text-muted">{o.hint}</span>}
+      </div>
+    </Fragment>)}
+  </PopoverContent>;
 }
 
 export type SelectProps = Omit<HTMLAttributes<HTMLButtonElement>, 'onChange' | 'children'> & {
@@ -107,55 +74,30 @@ export type SelectProps = Omit<HTMLAttributes<HTMLButtonElement>, 'onChange' | '
 export function Select({ value, onChange, disabled, children, placeholder = '请选择', className, id, onKeyDown, ...rest }: SelectProps) {
   const opts = collect(children);
   const current = value == null ? '' : String(value);
-  const selIdx = opts.findIndex((o) => o.value === current);
+  const selected = opts.find(option => option.value === current);
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
-  const btn = useRef<HTMLButtonElement>(null);
-  const list = useRef<HTMLDivElement>(null);
-  const listId = useId();
-  const pos = usePopoverPos(btn, open);
-  const typed = useRef({ s: '', t: 0 });
-  useOutside([btn, list], open, () => setOpen(false));
-
-  const enabled = (i: number) => { const o = opts[i]; return !!o && !o.disabled; };
-  const show = () => { setActive(selIdx >= 0 ? selIdx : opts.findIndex((o) => !o.disabled)); setOpen(true); };
-  const pick = (o: Opt) => { setOpen(false); btn.current?.focus(); if (o.value !== current) onChange?.({ target: { value: o.value } }); };
-  const step = (from: number, dir: 1 | -1) => { for (let i = from + dir; i >= 0 && i < opts.length; i += dir) if (enabled(i)) return i; return from; };
-
-  const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {
-    onKeyDown?.(e);
-    if (disabled) return;
-    if (!open) {
-      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); show(); }
-      return;
-    }
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); }
-    else if (e.key === 'Tab') setOpen(false);
-    else if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => step(a, 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => step(a, -1)); }
-    else if (e.key === 'Home') { e.preventDefault(); setActive(step(-1, 1)); }
-    else if (e.key === 'End') { e.preventDefault(); setActive(step(opts.length, -1)); }
-    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const o = opts[active]; if (o && !o.disabled) pick(o); }
-    else if (e.key.length === 1) {
-      // 键入首字母跳转
-      const now = Date.now();
-      typed.current = { s: (now - typed.current.t < 600 ? typed.current.s : '') + e.key.toLowerCase(), t: now };
-      const hit = opts.findIndex((o, i) => enabled(i) && o.text.toLowerCase().startsWith(typed.current.s));
-      if (hit >= 0) setActive(hit);
-    }
-  };
-
-  const sel = opts[selIdx];
-  return <>
-    <button {...rest} ref={btn} id={id} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined}
-      aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined} disabled={disabled}
-      onClick={() => (open ? setOpen(false) : show())} onKeyDown={onKey}
+  // Radix 把空字符串保留给占位状态；编码后仍支持业务里的“清空”选项。
+  const encode = (value: string) => `value:${value}`;
+  return <SelectPrimitive.Root open={open} onOpenChange={setOpen} value={selected ? encode(current) : ''} disabled={disabled}
+    onValueChange={next => { const value = next.slice(6); if (value !== current) onChange?.({ target: { value } }); }}>
+    <SelectPrimitive.Trigger {...rest} id={id} onKeyDown={onKeyDown}
       className={cx(fieldCls, 'inline-flex min-w-0 cursor-pointer items-center gap-2 text-left disabled:cursor-not-allowed disabled:bg-ground disabled:text-faint', open && 'border-accent', className)}>
-      <span className={cx('min-w-0 flex-1 truncate', !sel && 'text-faint')}>{sel ? sel.label : placeholder}</span>
-      <ChevronDown size={15} aria-hidden className={cx('shrink-0 text-muted transition-transform', open && 'rotate-180')} />
-    </button>
-    {open && pos && <OptionList id={listId} opts={opts} active={active} selected={current} pos={pos} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} />}
-  </>;
+      <span className={cx('min-w-0 flex-1 truncate', !selected && 'text-faint')}><SelectPrimitive.Value placeholder={placeholder}>{selected?.label}</SelectPrimitive.Value></span>
+      <SelectPrimitive.Icon asChild><ChevronDown size={15} aria-hidden className={cx('shrink-0 text-muted transition-transform', open && 'rotate-180')} /></SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+    <SelectPrimitive.Portal><SelectPrimitive.Content data-slot="select-content" position="popper" align="start" sideOffset={4} collisionPadding={8}
+      aria-label={rest['aria-label']}
+      className={cx('z-[60] max-h-[min(300px,var(--radix-select-content-available-height))] min-w-(--radix-select-trigger-width) max-w-[calc(100vw-16px)] origin-(--radix-select-content-transform-origin) overflow-hidden rounded-[10px] border border-line bg-panel p-1.5 text-ink shadow-[0_8px_24px_rgba(20,23,28,.12)]', floatingMotion)}>
+      <SelectPrimitive.Viewport>{!opts.length && <Empty size="compact" title="没有选项" />}{opts.map((option, i) => <Fragment key={`${option.value}-${i}`}>
+        {option.group && option.group !== opts[i - 1]?.group && <div role="presentation" className="px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-faint">{option.group}</div>}
+        <SelectPrimitive.Item value={encode(option.value)} disabled={option.disabled} textValue={option.text}
+          className="flex min-h-9 cursor-pointer flex-col justify-center rounded-md px-2.5 py-1.5 text-[13px] outline-none data-[highlighted]:bg-ground data-[state=checked]:font-medium data-[state=checked]:text-accent-ink data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45">
+          <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
+          {option.hint && <span className="text-[11.5px] font-normal text-muted">{option.hint}</span>}
+        </SelectPrimitive.Item>
+      </Fragment>)}</SelectPrimitive.Viewport>
+    </SelectPrimitive.Content></SelectPrimitive.Portal>
+  </SelectPrimitive.Root>;
 }
 
 export type ComboOption = { value: string; label?: ReactNode; hint?: ReactNode };
@@ -170,8 +112,6 @@ export function MultiSelect({ value, onChange, children, placeholder = '请选�
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const listId = useId();
-  const pos = usePopoverPos(btn, open);
-  useOutside([btn, list], open, () => setOpen(false));
   const pick = (option: Opt) => {
     if (option.disabled) return;
     onChange(!option.value ? [] : value.includes(option.value) ? value.filter(item => item !== option.value) : [...value, option.value]);
@@ -181,10 +121,10 @@ export function MultiSelect({ value, onChange, children, placeholder = '请选�
     for (let i = active + direction; i >= 0 && i < opts.length; i += direction) if (!opts[i]?.disabled) { setActive(i); return; }
   };
   const show = () => { setActive(value.length ? opts.findIndex(option => value.includes(option.value)) : -1); setOpen(true); };
-  return <>
-    <button {...rest} id={id} ref={btn} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open}
+  return <Popover.Root open={open} onOpenChange={next => { if (next) show(); else setOpen(false); }}>
+    <Popover.Trigger asChild><button {...rest} id={id} ref={btn} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open}
       aria-controls={open ? listId : undefined} aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined} disabled={disabled}
-      onClick={() => open ? setOpen(false) : show()} onKeyDown={event => {
+      onKeyDown={event => {
         rest.onKeyDown?.(event);
         if (disabled) return;
         if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); show(); return; }
@@ -199,9 +139,9 @@ export function MultiSelect({ value, onChange, children, placeholder = '请选�
       className={cx(fieldCls, 'inline-flex min-w-0 cursor-pointer items-center gap-2 text-left disabled:opacity-50', open && 'border-accent', className)}>
       <span className={cx('min-w-0 flex-1 truncate', !value.length && 'text-faint')}>{value.length ? opts.filter(option => value.includes(option.value)).map(option => option.text).join('、') : placeholder}</span>
       <ChevronDown size={15} aria-hidden className={cx('shrink-0 text-muted', open && 'rotate-180')} />
-    </button>
-    {open && pos && <OptionList id={listId} opts={opts} active={active} selected={value} pos={pos} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} />}
-  </>;
+    </button></Popover.Trigger>
+    <OptionList id={listId} opts={opts} active={active} selected={value} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} />
+  </Popover.Root>;
 }
 
 /** 可输入的下拉：输入框里可以填列表中没有的值，弹层按输入内容筛选候选项（替代 datalist） */
@@ -214,8 +154,6 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const listId = useId();
-  const pos = usePopoverPos(input, open);
-  useOutside([input, list], open, () => setOpen(false));
   const q = filtering ? normalizeNameSearch(value) : '';
   const opts: Opt[] = options.map((o) => ({ value: o.value, label: o.label ?? o.value, text: o.value, hint: o.hint }))
     .filter((o) => matchesNameSearch(o.text, q));
@@ -229,8 +167,8 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
     else if (e.key === 'Escape' && open) { e.preventDefault(); e.stopPropagation(); setOpen(false); }
     else if (e.key === 'Tab') setOpen(false);
   };
-  return <>
-    <div className={cx('relative min-w-0', className)}>
+  return <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Anchor asChild><div className={cx('relative min-w-0', className)}>
       <input {...rest} ref={input} type="text" role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={open ? listId : undefined}
         aria-activedescendant={open && active >= 0 && opts[active] ? `${listId}-${active}` : undefined}
         autoComplete="off" disabled={disabled} placeholder={placeholder} value={value}
@@ -240,9 +178,9 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
         onKeyDown={onKey}
         className={cx(fieldCls, 'pr-8 placeholder:text-faint', open && 'border-accent')} />
       <ChevronDown size={15} aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted" />
-    </div>
-    {open && pos && <OptionList id={listId} opts={opts} active={active} selected={value} pos={pos} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} empty={empty} />}
-  </>;
+    </div></Popover.Anchor>
+    <OptionList id={listId} opts={opts} active={active} selected={value} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} empty={empty} inputRef={input} />
+  </Popover.Root>;
 }
 
 /** 打开后按页读取两行候选；搜索防抖期间卸载旧结果，避免误选。 */
@@ -256,24 +194,22 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
   const btn = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const popupId = useId();
-  const pos = usePopoverPos(btn, open, 560, 420);
   const close = () => { setOpen(false); btn.current?.focus(); };
   const show = () => { setQuery(''); setOpen(true); };
-  useOutside([btn, popup], open, () => setOpen(false));
-  return <>
-    <button ref={btn} id={id} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? popupId : undefined}
+  return <Popover.Root open={open} onOpenChange={next => { if (next) show(); else setOpen(false); }}>
+    <Popover.Trigger asChild><button ref={btn} id={id} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? popupId : undefined}
       disabled={disabled} className={triggerClassName ?? cx(fieldCls, 'inline-flex items-center gap-2 text-left disabled:opacity-50')}
-      onClick={() => open ? close() : show()} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); show(); } }}>
+      onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); show(); } }}>
       {triggerIcon}<span title={label} className={cx('min-w-0 truncate', !triggerClassName && 'flex-1')}>{label}</span>{!triggerClassName && <ChevronDown size={15} />}
-    </button>
-    {open && pos && createPortal(<div ref={popup} id={popupId} role="dialog" aria-label={ariaLabel}
-      style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
-      className="popover-panel fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
+    </button></Popover.Trigger>
+    <PopoverContent ref={popup} id={popupId} role="dialog" aria-label={ariaLabel}
+      style={{ maxHeight: 'min(420px, var(--radix-popover-content-available-height))' }}
+      className="flex w-[min(560px,calc(100vw-16px))] flex-col overflow-hidden"
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
       <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query}
         className={fieldCls} onChange={event => setQuery(event.target.value)}
         onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); popup.current?.querySelector<HTMLButtonElement>('button[role="option"]:not(:disabled)')?.focus(); } }} /></div>
       {query !== debounced ? <div role="status" className="p-4 text-[13px] text-muted">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { close(); onChange(value); }} />}
-    </div>, document.body)}
-  </>;
+    </PopoverContent>
+  </Popover.Root>;
 }

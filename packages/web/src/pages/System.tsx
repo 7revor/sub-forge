@@ -87,7 +87,7 @@ export function System() {
         </div>
 
       </PageScroll>
-      <Modal title="恢复备份？" open={!!restoreFile} onClose={() => { if (!restore.isPending) setRestoreFile(undefined); }} footer={<>
+      <Modal alert title="恢复备份？" open={!!restoreFile} onClose={() => { if (!restore.isPending) setRestoreFile(undefined); }} footer={<>
         <Button disabled={restore.isPending} onClick={() => setRestoreFile(undefined)}>取消</Button>
         <Button variant="danger-solid" disabled={restore.isPending} onClick={() => { if (restoreFile) restore.mutate(restoreFile, { onSuccess: () => setRestoreFile(undefined) }); }}>{restore.isPending ? '恢复中…' : '恢复'}</Button>
       </>}>

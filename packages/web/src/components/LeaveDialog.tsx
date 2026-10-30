@@ -7,7 +7,7 @@ export function LeaveDialog({ blocker, what, canSave, pending, error, onSave, on
 }) {
   const blocked = blocker.state === 'blocked';
   const stay = () => { if (blocked && !pending) blocker.reset(); };
-  return <Modal title="离开前保存修改？" open={blocked} onClose={stay} footer={<>
+  return <Modal alert title="离开前保存修改？" open={blocked} onClose={stay} footer={<>
     <Button disabled={pending} onClick={() => { if (blocked) { onDiscard?.(); blocker.proceed(); } }}>放弃修改</Button>
     <Button disabled={pending} onClick={stay}>继续编辑</Button>
     <Button variant="primary" disabled={!canSave || pending} onClick={() => onSave(() => { if (blocker.state === 'blocked') blocker.proceed(); })}>{pending ? '保存中…' : saveLabel}</Button>

@@ -17,7 +17,7 @@ export function DeleteDialog({ open, title, children, error, pending, onClose, o
 }) {
   const reason = deleteErrorText(error);
   return (
-    <Modal title={title} open={open} onClose={onClose}
+    <Modal alert title={title} open={open} onClose={onClose}
       footer={<><Button onClick={onClose}>取消</Button><Button variant="danger-solid" disabled={pending || !!reason} onClick={onConfirm}>{pending ? '删除中…' : '删除'}</Button></>}>
       {children && <div className="text-[13.5px] leading-relaxed">{children}</div>}
       {open && <ErrorAlert error={error} />}
