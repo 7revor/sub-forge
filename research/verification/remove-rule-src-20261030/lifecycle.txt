@@ -1,0 +1,21 @@
+内置浏览器验收结果摘录
+来源：本次会话中验收页最终可访问性树的可见内容。
+页面：http://127.0.0.1:5236/test/dialog-exit.html?route=next
+
+StrictMode 已启用；最终“无动画（减少动态效果）”已勾选。
+
+Promise 结果：5 项
+1. {"status":"cancelled","reason":"dismissed"}
+2. {"status":"cancelled","reason":"dismissed"}
+3. {"status":"confirmed","data":"保留我的草稿"}
+4. {"status":"cancelled","reason":"navigation"}
+5. {"status":"cancelled","reason":"dismissed"}
+
+退场验收：5 项全部通过
+1. 添加规则：121 帧，高度 287px，标题、正文、输入值保持一致。
+2. 添加规则：12 帧，高度 287px，标题、正文、输入值保持一致。
+3. 保存失败后重试：12 帧，高度 238px，标题、正文、输入值保持一致。
+4. 子弹窗：12 帧，高度 203px，标题、正文、输入值保持一致。
+5. 嵌套草稿与路由验收：12 帧，高度 383px，标题、正文、输入值保持一致。
+
+无动画场景没有退场采样帧，其取消结果已记录在第 5 个 Promise 中。
