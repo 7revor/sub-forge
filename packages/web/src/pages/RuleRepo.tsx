@@ -20,7 +20,7 @@ type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
 
 const FILE_COLUMNS = [
   { header: '文件名', width: 220 }, { header: '路径', width: 320 }, { header: '仓库', width: 180 },
-  { header: '分支', width: 100 }, { header: '操作', width: 130 },
+  { header: '分支', width: 100 }, { header: '操作', width: 224 },
 ];
 
 function RepositoryFileLoading({ failed }: { failed: boolean }) {
