@@ -1,8 +1,6 @@
 import type { GroupSpec } from '../types.ts';
 import type { Report } from '../report.ts';
 import type { MihomoRenderResult } from './mihomo.ts';
-import { composeRule } from '../rules/client.ts';
-import { rawRuleParts } from '../rules/raw.ts';
 import { iniName, iniValue, stringifyIniBase } from './ini-format.ts';
 import { loonProxyLine } from './loon-proxy.ts';
 
@@ -39,7 +37,7 @@ function loonGroup(group: Fields, report: Report): string {
   return name + ' = ' + fields.join(', ');
 }
 
-/** 所有规则集原位置展开，避免 [Remote Rule] 与本地规则具有不同优先级。 */
+/** 所有分流规则按列表顺序托管；[Rule] 仅保留最终兜底。 */
 export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rulesets' | 'report'>): string {
   const { config, report } = result;
   try {
@@ -58,16 +56,18 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       const line = loonProxyLine(copy, report); return line ? [line] : [];
     });
     const groups = (config['proxy-groups'] as Fields[]).map(group => loonGroup(group, report));
+    const remoteRules: string[] = [];
+    const providers = (config['rule-providers'] ?? {}) as Record<string, Fields>;
     const rules = (config.rules as string[]).flatMap(line => {
       if (/[\r\n\u2028\u2029\0]/.test(line)) throw new Error('规则不能包含换行或空字符');
       if (line.startsWith('MATCH,')) return ['FINAL,' + iniName(line.slice(6))];
       const match = /^RULE-SET,([^,]+),(.+)$/.exec(line);
-      if (!match) return [line];
-      const file = Object.values(result.rulesets).find(resource => resource.providerName === match[1]) ?? result.rulesets[match[1] + '.list'];
-      if (!file) throw new Error('Loon 缺少可内嵌的规则文本');
-      const target = iniName(match[2]);
-      return file.text.split(/\r?\n/).filter(rule => rule.trim() && !rule.trimStart().startsWith('#')).map(rule => composeRule(rawRuleParts(rule), target));
+      if (!match) throw new Error('Loon 分流规则必须使用托管链接');
+      const url = providers[match[1]!]?.url;
+      if (typeof url !== 'string' || !url.trim()) throw new Error('Loon 缺少托管规则地址');
+      remoteRules.push(iniValue(url) + ',policy=' + iniName(match[2]) + ',enabled=true');
+      return [];
     });
-    return [base.trim(), '[Proxy]', ...proxies, ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ''].filter((s, i) => i !== 0 || s).join('\n');
+    return [base.trim(), '[Proxy]', ...proxies, ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ...(remoteRules.length ? ['', '[Remote Rule]', ...remoteRules] : []), ''].filter((s, i) => i !== 0 || s).join('\n');
   } catch (cause) { report.error('loon.format', cause instanceof Error ? cause.message : 'Loon 配置格式不合法'); return ''; }
 }

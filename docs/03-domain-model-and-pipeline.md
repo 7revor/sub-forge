@@ -264,7 +264,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 - Surge 将节点级 `dialer-proxy` 转成 `underlying-proxy`；QUIC 端口跳跃与代理链不能同时使用，冲突时报错。
 - Loon 尚未适配代理链。链配置或上游前置引用会阻止发布，不删除前置后输出直连节点。
 - 四类组均以筛选后的成员名称输出，无成员补 REJECT。节点更新随主订阅刷新生效。
-- Surge 规则集采用版本化托管 LIST，独立文件导出时展开；Loon 在原规则位置内嵌转换结果，避免本地/远程来源优先级重排。
+- Surge 规则集采用版本化托管 LIST，独立文件导出时展开；Loon 将手写规则与规则集按列表顺序统一输出为 `[Remote Rule]` 托管链接，`[Rule]` 仅保留 `FINAL`，避免本地/远程来源跨段重排。手写规则属于订阅私有产物。
 - `Client` 增加 `loon`；`BaseSettings.loon`、`Profile.base.loonPatch` 与其他客户端配置隔离。完整范围、限制和测试证据见 [19](19-client-conversion.md)。
 
 ## 5. 模板 ⊕ 覆盖层 合并

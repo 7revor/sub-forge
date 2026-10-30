@@ -3,6 +3,7 @@ import { serve } from '@hono/node-server';
 import { resolve } from 'node:path';
 import { remoteRuleMatcher, type Matcher } from '@sub-forge/core';
 import { createApp } from '../src/app.ts';
+import { RenderService } from '../src/render.ts';
 import { setupRuleReferences } from './rule-reference-fixture.ts';
 
 const env = await setupRuleReferences();
@@ -29,7 +30,8 @@ for (const bound of [false, true]) env.store.put('profile', {
   routing: bound ? { mode: 'bound', templateId: 'preview-template', groupAdditions: {} } : { mode: 'independent', config },
 }, env.user.id);
 const publicUrl = 'http://127.0.0.1:5248';
-const app = createApp({ ...env, ruleRepos: env.repos, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(env.store, env.snapshots, { publicUrl });
+const app = createApp({ ...env, renderer, ruleRepos: env.repos, publicUrl, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5248 });
 console.log(`源文件预览验收：${publicUrl}；账号 reference-admin，密码 password-123`);
 let stopping = false;

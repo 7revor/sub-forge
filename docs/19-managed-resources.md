@@ -99,3 +99,7 @@ v25 在事务中清空含旧链接的 last-good 和结构版本，移除曾错�
 这是不兼容的地址迁移：所有客户端必须重新复制主订阅/独立资源链接，刷新主订阅后取得新 provider 地址。旧地址一律停止服务，不保留任何 URL 重写或兼容下载入口。
 
 验证记录见 [查询参数资源入口验收](../research/verification/query-resource-routes-20261030/README.md)。
+
+## Loon 手写规则托管
+
+Loon 手写规则、仓库引用、远程引用及增强引用全部按列表顺序输出 `[Remote Rule]`，`[Rule]` 只保留 `FINAL`。手写规则经客户端改写后以每个列表项为单位存入订阅私有正文，复用 `/subs/ruleset?profile=P&key=K&version=V&target=loon&platform=…&token=T`；不进入公共资源表。现有所有者、版本和令牌检查继续生效，移除、禁用或修改匹配定义后清理历史私有产物。公共仓库和增强规则保持现有 `/resources/repo`、`/resources/ruleset` 边界。

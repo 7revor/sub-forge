@@ -30,14 +30,7 @@ it.each(['mihomo', 'stash', 'surge', 'loon'])('%s：预览选项直达源文件�
   expect(response.status, body).toBe(200);
   const links = [...new Set(body.match(/https:\/\/sub\.test\/(?:resources|subs)\/[^\s"',]+/g))]
     .map(link => new URL(link)).filter(url => url.pathname !== '/subs/profile');
-  if (target === 'loon') {
-    // Loon 按原位置展开以保留规则顺序，不能为统一链接而改成远程规则段。
-    expect(links).toEqual([]);
-    expect(body).toContain('DOMAIN,source.example.test,DIRECT');
-    expect(body).toContain('DOMAIN,local.example.test,DIRECT');
-    expect(body).not.toContain(raw);
-    return;
-  }
+  if (target === 'loon') expect(body).not.toMatch(/DOMAIN,|USER-AGENT,/);
   expect(links.map(url => url.pathname).sort()).toEqual(['/resources/repo', '/resources/ruleset', '/subs/ruleset']);
   for (const link of links) {
     expect(link.searchParams.get('token')).toBe(token);
