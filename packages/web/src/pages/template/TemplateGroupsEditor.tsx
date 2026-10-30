@@ -39,7 +39,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
     if (result.status === 'confirmed') onChange(removeGroup(value, group.id));
   };
   return <>
-    <Card title="策略组" subtitle={`${value.groups.length} 个`} actions={!readOnly && <>
+    <Card title="策略组" actions={!readOnly && <>
       <Button size="sm" disabled={REGION_GROUPS.every(region => value.groups.some(g => g.name === region.name))} onClick={() => {
         const added = createRegionGroups(value.groups);
         onChange({ ...value, groups: [...value.groups, ...added] });

@@ -15,7 +15,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 来源正文打开只读预览，编辑使用统一弹窗；下方始终显示合并结果。
 
-import { FileText, Globe, Link2, ScanSearch } from 'lucide-react';
+import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
@@ -53,7 +53,6 @@ export function RulesetList() {
 const newLocal = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'local', format: 'auto', content: '' });
 const newRemote = (): RuleSetSourceDoc => ({ id: newId('src'), kind: 'remote', format: 'auto', url: '' });
 const EMPTY_RS: RuleSetDoc = { id: '', name: '', sources: [] };
-const sourceActionClass = buttonClass('default', 'sm', 'w-full min-w-0 whitespace-normal max-sm:gap-1.5 max-sm:px-2');
 
 function rulesetError(d: RuleSetDoc): string | undefined {
   if (!d.name.trim()) return '请填写名称。';
@@ -121,13 +120,13 @@ export function RulesetEdit() {
     </Card>
     </fieldset>
     {canEdit ? <>
-    <Card title="来源" actions={<Button size="sm" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>}>
+    <Card title="来源" actions={<>
+      <Button size="sm" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>
+      <Button size="sm" className="gap-1" aria-label="添加本地规则" onClick={() => void edit({ source: newLocal(), adding: true })}><Plus size={15} />本地规则</Button>
+      <Button size="sm" className="gap-1" onClick={() => void edit({ source: newRemote(), adding: true })}><Plus size={15} />远程链接</Button>
+      <Button size="sm" className="gap-1" onClick={() => void edit({ source: newRemote(), adding: true, repository: true })}><Plus size={15} />引用规则</Button>
+    </>}>
       <ErrorAlert error={matches.error} /><FieldError error={linkError} />
-      <div role="group" aria-label="添加规则来源" className="grid grid-cols-3 gap-2">
-        <Button size="sm" className={sourceActionClass} onClick={() => void edit({ source: newRemote(), adding: true, repository: true })}><Link2 size={14} className="hidden sm:block" />关联规则集合</Button>
-        <Button size="sm" className={sourceActionClass} onClick={() => void edit({ source: newRemote(), adding: true })}><Globe size={14} className="hidden sm:block" />添加远程地址</Button>
-        <Button size="sm" className={sourceActionClass} onClick={() => void edit({ source: newLocal(), adding: true })}><FileText size={14} className="hidden sm:block" />添加本地规则</Button>
-      </div>
       <SortableList items={d.sources} getKey={s => s.id} onReorder={sources => set({ sources })} renderItem={(s, i, handle) => <RuleCard label={`第 ${i + 1} 项来源`} handle={handle}
         icon={s.repository ? <Link2 size={16} /> : s.kind === 'remote' ? <Globe size={16} /> : <FileText size={16} />}
         count={<SourceStatus src={s} status={status.get(s.id)} loading={sources.loading.has(s.id)} />}
