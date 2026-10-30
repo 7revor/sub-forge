@@ -1,0 +1,1372 @@
+[
+  {
+    "label": "订阅桌面",
+    "icons": [
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 120.5
+        },
+        "height": 15,
+        "name": "添加节点集",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "移除 图标验收节点",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 81.5
+        },
+        "height": 14,
+        "name": "新增组",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 120
+        },
+        "height": 15,
+        "name": "检测仓库关联",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 95
+        },
+        "height": 15,
+        "name": "添加本地规则",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 644
+        },
+        "height": 18,
+        "name": "预览第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "第 1 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 2 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 588.796875
+        },
+        "height": 18,
+        "name": "预览第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "第 2 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "MATCH 出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 120.5
+        },
+        "height": 15,
+        "name": "添加链规则",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "删除链规则 1",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "height": 18,
+        "name": "lucide lucide-arrow-right text-faint",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "height": 18,
+        "name": "lucide lucide-arrow-right text-faint",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "height": 18,
+        "name": "lucide lucide-arrow-right text-faint",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 92
+        },
+        "height": 16,
+        "name": "包装组",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 107
+        },
+        "height": 15,
+        "name": "新增链接",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px 14px",
+          "width": 78
+        },
+        "height": 13,
+        "name": "复制",
+        "shrink": "0",
+        "width": 13
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px 14px",
+          "width": 118.1953125
+        },
+        "height": 13,
+        "name": "重置 token",
+        "shrink": "0",
+        "width": 13
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 36
+        },
+        "height": 14,
+        "name": "删除链接 图标验收链接",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 946
+        },
+        "height": 16,
+        "name": "汇总全部订阅源",
+        "shrink": "0",
+        "width": 16
+      }
+    ]
+  },
+  {
+    "label": "订阅窄屏",
+    "icons": [
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 20,
+        "name": "展开菜单",
+        "shrink": "0",
+        "width": 20
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 120.5
+        },
+        "height": 15,
+        "name": "添加节点集",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "移除 图标验收节点",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 81.5
+        },
+        "height": 14,
+        "name": "新增组",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 120
+        },
+        "height": 15,
+        "name": "检测仓库关联",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 95
+        },
+        "height": 15,
+        "name": "添加本地规则",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 262
+        },
+        "height": 18,
+        "name": "预览第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 262
+        },
+        "height": 16,
+        "name": "第 1 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 2 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 262
+        },
+        "height": 18,
+        "name": "预览第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 262
+        },
+        "height": 16,
+        "name": "第 2 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "MATCH 出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 120.5
+        },
+        "height": 15,
+        "name": "添加链规则",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "删除链规则 1",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "height": 18,
+        "name": "lucide lucide-arrow-right text-faint",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "height": 18,
+        "name": "lucide lucide-arrow-right text-faint",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "height": 18,
+        "name": "lucide lucide-arrow-right text-faint",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 92
+        },
+        "height": 16,
+        "name": "包装组",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 107
+        },
+        "height": 15,
+        "name": "新增链接",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px 14px",
+          "width": 78
+        },
+        "height": 13,
+        "name": "复制",
+        "shrink": "0",
+        "width": 13
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px 14px",
+          "width": 118.1953125
+        },
+        "height": 13,
+        "name": "重置 token",
+        "shrink": "0",
+        "width": 13
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 36
+        },
+        "height": 14,
+        "name": "删除链接 图标验收链接",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 320
+        },
+        "height": 16,
+        "name": "汇总全部订阅源",
+        "shrink": "0",
+        "width": 16
+      }
+    ]
+  },
+  {
+    "label": "组合与处理链桌面",
+    "icons": [
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 107
+        },
+        "height": 15,
+        "name": "添加成员",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 158.328125
+        },
+        "height": 16,
+        "name": "图标验收节点 拉取失败时",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "移除 图标验收节点",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 47,
+          "padding": "12px 16px",
+          "width": 358.0625
+        },
+        "height": 13,
+        "name": "总览 · 原始 → 最终1 → 1",
+        "shrink": "0",
+        "width": 13
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 326.0625
+        },
+        "height": 16,
+        "name": "添加处理器",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 94
+        },
+        "height": 14,
+        "name": "删除步骤",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "删除规则 1",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 94
+        },
+        "height": 14,
+        "name": "添加规则",
+        "shrink": "0",
+        "width": 14
+      }
+    ]
+  },
+  {
+    "label": "组合与处理链窄屏",
+    "icons": [
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 20,
+        "name": "展开菜单",
+        "shrink": "0",
+        "width": 20
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 107
+        },
+        "height": 15,
+        "name": "添加成员",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 143
+        },
+        "height": 16,
+        "name": "图标验收节点 拉取失败时",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "移除 图标验收节点",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 47,
+          "padding": "12px 16px",
+          "width": 352
+        },
+        "height": 13,
+        "name": "总览 · 原始 → 最终1 → 1",
+        "shrink": "0",
+        "width": 13
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 320
+        },
+        "height": 16,
+        "name": "添加处理器",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 94
+        },
+        "height": 14,
+        "name": "删除步骤",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 32
+        },
+        "height": 14,
+        "name": "删除规则 1",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 94
+        },
+        "height": 14,
+        "name": "添加规则",
+        "shrink": "0",
+        "width": 14
+      }
+    ]
+  },
+  {
+    "label": "模板桌面",
+    "icons": [
+      {
+        "height": 14,
+        "name": "lucide lucide-pencil shrink-0 text-ink-muted",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 81.5
+        },
+        "height": 14,
+        "name": "新增组",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 120
+        },
+        "height": 15,
+        "name": "检测仓库关联",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 95
+        },
+        "height": 15,
+        "name": "添加本地规则",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 644
+        },
+        "height": 18,
+        "name": "预览第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "第 1 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 2 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 588.796875
+        },
+        "height": 18,
+        "name": "预览第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "第 2 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "MATCH 出口",
+        "shrink": "0",
+        "width": 16
+      }
+    ]
+  },
+  {
+    "label": "本地编辑弹窗",
+    "icons": [
+      {
+        "height": 14,
+        "name": "lucide lucide-pencil shrink-0 text-ink-muted",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 81.5
+        },
+        "height": 14,
+        "name": "新增组",
+        "shrink": "0",
+        "width": 14
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 120
+        },
+        "height": 15,
+        "name": "检测仓库关联",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 95
+        },
+        "height": 15,
+        "name": "添加本地规则",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 644
+        },
+        "height": 18,
+        "name": "预览第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "第 1 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 1 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 2 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 588.796875
+        },
+        "height": 18,
+        "name": "预览第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "第 2 项规则出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 2 项规则",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 136
+        },
+        "height": 16,
+        "name": "MATCH 出口",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "8px 12px",
+          "width": 462
+        },
+        "height": 16,
+        "name": "本地规则",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 16,
+          "padding": "0px",
+          "width": 16
+        },
+        "height": 16,
+        "name": "Close",
+        "shrink": "0",
+        "width": 16
+      }
+    ]
+  },
+  {
+    "label": "增强集合桌面",
+    "icons": [
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px 10px",
+          "width": 120
+        },
+        "height": 15,
+        "name": "检测仓库关联",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 310
+        },
+        "height": 15,
+        "name": "关联规则集合",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 310
+        },
+        "height": 15,
+        "name": "添加远程地址",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 310
+        },
+        "height": 15,
+        "name": "添加本地规则",
+        "shrink": "0",
+        "width": 15
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 1 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 792
+        },
+        "height": 18,
+        "name": "预览第 1 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 1 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 1 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 2 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 792
+        },
+        "height": 18,
+        "name": "预览第 2 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 2 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 2 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 32,
+          "padding": "0px",
+          "width": 24
+        },
+        "height": 16,
+        "name": "拖动第 3 项",
+        "shrink": "0",
+        "width": 16
+      },
+      {
+        "button": {
+          "height": 36,
+          "padding": "0px",
+          "width": 792
+        },
+        "height": 18,
+        "name": "预览第 3 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "编辑第 3 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px",
+          "width": 40
+        },
+        "height": 18,
+        "name": "删除第 3 项来源",
+        "shrink": "0",
+        "width": 18
+      },
+      {
+        "button": {
+          "height": 40,
+          "padding": "0px 14px",
+          "width": 107
+        },
+        "height": 15,
+        "name": "添加改写",
+        "shrink": "0",
+        "width": 15
+      }
+    ]
+  }
+]

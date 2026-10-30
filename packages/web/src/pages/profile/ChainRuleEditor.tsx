@@ -25,7 +25,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, landingLabel, o
   const overridden = !whole && draft.chains.some(c => c.id !== chain.id && nodeSetKey(c.landing.nodeSet) === nodeSetKey(chain.landing.nodeSet) && !c.landing.filter && !c.landing.excludeFilter);
   const error = chainInputError(chain) ?? (draft.chains.some(c => c.id !== chain.id && sameLanding(c.landing, chain.landing)) ? '该落地范围已有前置规则，请编辑已有规则' : undefined);
   const choose = (via: Target) => setChain({ ...chain, via });
-  const actions = <><span className="mr-auto w-full self-center text-[12px] text-ink-muted sm:w-auto">保存订阅后生效</span>{onRemove && <Button className="text-err" onClick={onRemove}>移除前置</Button>}<Button onClick={onCancel}>取消{footerTarget ? '前置' : ''}</Button><Button variant="primary" disabled={!!error || overridden} onClick={() => onApply(chain)}>应用前置</Button></>;
+  const actions = <>{onRemove && <Button className="text-err" onClick={onRemove}>移除前置</Button>}<Button onClick={onCancel}>取消{footerTarget ? '前置' : ''}</Button><Button variant="primary" disabled={!!error || overridden} onClick={() => onApply(chain)}>应用前置</Button></>;
   return <section aria-label="前置设置" className={footerTarget ? 'flex min-w-0 flex-col' : 'flex min-h-0 flex-1 flex-col overflow-hidden'}>
     <div className={footerTarget ? 'flex flex-col gap-4' : 'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4'}>
     {fixedLanding ? <div className="text-[13px]"><strong>{landingLabel ?? nodeSetName(chain.landing.nodeSet)}</strong><span className="ml-2 text-ink-muted">{whole ? '全部节点' : '指定节点'}</span></div> : <>
@@ -58,7 +58,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, landingLabel, o
     {overridden && <p role="alert" className="m-0 text-[12px] text-warn">已有整集前置会覆盖此设置。请先在「代理链」中将整集规则改为按节点配置。</p>}
     {error && <p role="status" className={`m-0 text-[12px] ${error.startsWith('请选择') ? 'text-ink-muted' : 'text-err'}`}>{error}</p>}
     </div>
-    {footerTarget ? createPortal(actions, footerTarget) : <div data-slot="dialog-footer" className="flex h-[105px] shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line bg-ground px-5 py-3 sm:h-[65px]">{actions}</div>}
+    {footerTarget ? createPortal(actions, footerTarget) : <div data-slot="dialog-footer" className="flex h-[65px] shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line bg-ground px-5 py-3">{actions}</div>}
   </section>;
 }
 

@@ -52,7 +52,7 @@ export function proxyFromPaste(text: string): RawResult<LocalProxy> | undefined 
     if (parsed.failures.length) throw new Error(parsed.failures.map((f) => f.reason).join('；'));
     if (parsed.proxies.length !== 1) throw new Error('未识别到节点，请粘贴受支持的单节点配置');
     const { _source, _origName, _key, upstreamDialer, ...fields } = parsed.proxies[0]!;
-    const notes = ['已转换为 Mihomo YAML，保存后生效。'];
+    const notes = ['已转换为 Mihomo YAML。'];
     for (const key of CHAIN_KEYS) {
       if (!(key in fields)) continue;
       delete fields[key];

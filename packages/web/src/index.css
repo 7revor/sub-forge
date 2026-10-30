@@ -1,6 +1,13 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@layer base {
+  /* 图标保留声明尺寸；空间不足时由文字和容器处理，避免被 flex 压成窄条。 */
+  .lucide {
+    flex-shrink: 0;
+  }
+}
+
 /* 设计稿配色（Claude Design 画布「Sub-Forge 前端页面设计」） */
 @theme {
   --color-ink: #15181d;

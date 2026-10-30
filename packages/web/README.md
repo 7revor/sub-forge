@@ -243,6 +243,12 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 
 2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。
 
+### 2026-10-30：三处共用规则编辑
+
+RuleCard、RuleEditShell、LocalRulesInput 统一规则增强、模板和订阅；点击正文预览、铅笔弹窗编辑，移除复制地址。增强下方始终显示合并结果。本地多条共用出口，弹窗取消不改草稿，空内容不能应用；绑定继承规则只读。
+
+useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；只响应新增远程项、应用 YAML 导入和列表手动检测。标记离开页面清空，旧请求不能恢复；关联仍由用户明确点击，并重新校验当前索引。保存状态比较使用稳定键顺序，避免接口回写字段顺序变化导致虚假未保存提示。截图和全部验证见 `research/verification/unified-rule-cards-20261030/README.md`。
+
 2026-10-30 订阅弹窗整合：固定正文滚动与底部操作，单节点前置复用组弹窗底栏；全 Provider 优先引用，循环候选说明原因。显式传递 disabled，并保留公共 Select 必填中文 placeholder、clearable 和 false/0 语义。验收见 research/verification/subscription-dialog-merge-20261030/README.md。
 
 2026-10-30 刷新弹窗：取得任务完整资源列表后打开，按原顺序原位显示等待、刷新中、成功、失败和中断；完成时不追加卡片。客户端更新说明和订阅生成状态预留位置，长错误单行省略并保留全文提示，维持刷新前后的高度。后端任务同时提供逐项状态，旧任务按 `ok` 兼容展示。验收见 `research/verification/refresh-stable-list-20261030/`。
@@ -255,3 +261,7 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 
 
 2026-10-30 单一状态列：订阅源主列表移除独立快照“状态”列，统一资源状态列改名为“状态”，只显示一份正常、刷新中、首次待拉取或失败及旧缓存状态。上次刷新时间仍位于操作列前；失败不覆盖成功时间。列表不再为重复状态额外请求快照历史，详情和总览所需的快照接口继续保留。服务端资源状态接口、核心模型与示例种子不变。
+
+2026-10-30 全局图标修正：buttonClass 使用项目已有 cn，正确合并 padding 等 Tailwind 冲突；基础层为 Lucide 图标设 flex-shrink: 0。规则卡片不再需要 px-0! 局部补丁，其他图标维持各自声明尺寸。通知位置按用户要求暂不调整；整合最新订阅弹窗及刷新修复，验证见 research/verification/global-icons-merge-20261030/README.md。
+
+2026-10-30 本地规则多行输入移除蓝色焦点装饰；移除编辑弹窗及导入反馈中重复的保存提示，并删除 saveHint 透传参数。单选、错误校验、应用及保存流程沿用现有逻辑。

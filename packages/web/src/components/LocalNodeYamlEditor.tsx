@@ -61,7 +61,7 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
         if (!imported.ok) { alertError(`未导入：${imported.error}`); return; }
         const keepYaml = !/^[{\[]/.test(input.trim()) && inspectLocalNodeYaml(input).ok;
         const after = keepYaml ? input : proxyToYaml(imported.value);
-        apply(after, keepYaml ? '已导入 YAML，保存后生效。' : imported.notes?.join('；') || '已转换为 YAML，保存后生效。');
+        apply(after, keepYaml ? '已导入 YAML。' : imported.notes?.join('；') || '已转换为 YAML。');
       }} />
     <section aria-label="节点信息" className="rounded-xl border border-line bg-[#f8fafc] p-4 flex flex-col gap-3">
       <div id="local-node-status" role="status" className="flex flex-wrap items-center gap-2">

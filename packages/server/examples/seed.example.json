@@ -54,7 +54,7 @@
         { "id": "ai", "name": "🤖 AI 服务", "type": "select", "members": [] }
       ],
       "rules": [
-        { "id": "r-direct", "matcher": { "kind": "rule", "rule": { "type": "DOMAIN-SUFFIX", "value": "example.test" } }, "target": { "kind": "builtin", "name": "DIRECT" } },
+        { "id": "r-direct", "matcher": { "kind": "local", "content": "# 同一卡片的本地规则共用出口\nDOMAIN-SUFFIX,example.test\nDOMAIN-SUFFIX,example.invalid" }, "target": { "kind": "builtin", "name": "DIRECT" } },
         { "id": "r-ai", "matcher": { "kind": "ruleset", "id": "ai" }, "target": { "kind": "group", "groupId": "ai" } }
       ],
       "final": { "kind": "group", "groupId": "sel" }
@@ -130,11 +130,8 @@
             {
               "id": "r-direct",
               "matcher": {
-                "kind": "rule",
-                "rule": {
-                  "type": "DOMAIN-SUFFIX",
-                  "value": "example.test"
-                }
+                "kind": "local",
+                "content": "# 同一卡片的本地规则共用出口\nDOMAIN-SUFFIX,example.test\nDOMAIN-SUFFIX,example.invalid"
               },
               "target": {
                 "kind": "builtin",
