@@ -55,5 +55,18 @@ exports[`规则解析 > classical 文本：统一 mihomo 与 Surge 写法，记�
     "type": "IP-ASN",
     "value": "62041",
   },
+  {
+    "children": [
+      {
+        "type": "DOMAIN",
+        "value": "a.com",
+      },
+      {
+        "type": "DST-PORT",
+        "value": "443",
+      },
+    ],
+    "type": "AND",
+  },
 ]
 `;

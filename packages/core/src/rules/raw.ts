@@ -5,12 +5,13 @@ export function rawRuleError(text: string): string | undefined {
   return undefined;
 }
 
-export function rawRuleParts(text: string): { text: string; noResolve?: boolean; src?: boolean } {
+export function rawRuleParts(text: string): { text: string; noResolve?: boolean; src?: boolean; extendedMatching?: boolean } {
   let matching = text.trim();
-  const flags: { noResolve?: boolean; src?: boolean } = {};
-  for (let match; (match = /,\s*(no-resolve|src)\s*$/i.exec(matching));) {
+  const flags: { noResolve?: boolean; src?: boolean; extendedMatching?: boolean } = {};
+  for (let match; (match = /,\s*(no-resolve|src|extended-matching)\s*$/i.exec(matching));) {
     if (match[1]!.toLowerCase() === 'no-resolve') flags.noResolve = true;
-    else flags.src = true;
+    else if (match[1]!.toLowerCase() === 'src') flags.src = true;
+    else flags.extendedMatching = true;
     matching = matching.slice(0, match.index);
   }
   return { text: matching, ...flags };

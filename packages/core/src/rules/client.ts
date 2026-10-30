@@ -6,15 +6,15 @@ import { rawRuleError, rawRuleParts } from './raw.ts';
 export type ClientCtx = { client: Client; platform?: Platform };
 
 export type LoweredRule =
-  | { kind: 'ok'; text: string; noResolve?: boolean; src?: boolean; note?: string }
+  | { kind: 'ok'; text: string; noResolve?: boolean; src?: boolean; extendedMatching?: boolean; note?: string }
   | { kind: 'drop'; reason: string };
 
 /**
  * 拼出完整规则行。mihomo 与 Surge 都把 no-resolve 写在出口之后：`IP-CIDR,x,Policy,no-resolve`；
  * 规则集文件内没有出口：`IP-CIDR,x,no-resolve`。
  */
-export function composeRule(l: { text: string; noResolve?: boolean; src?: boolean }, target?: string): string {
-  return `${l.text}${target === undefined ? '' : `,${target}`}${l.noResolve ? ',no-resolve' : ''}${l.src ? ',src' : ''}`;
+export function composeRule(l: { text: string; noResolve?: boolean; src?: boolean; extendedMatching?: boolean }, target?: string): string {
+  return `${l.text}${target === undefined ? '' : `,${target}`}${l.noResolve ? ',no-resolve' : ''}${l.src ? ',src' : ''}${l.extendedMatching ? ',extended-matching' : ''}`;
 }
 
 /** 仅叠加 src；no-resolve 始终来自规则原文，忽略历史独立开关。 */
@@ -72,8 +72,9 @@ const nr = (r: { noResolve?: boolean }) => (r.noResolve ? { noResolve: true } : 
 function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
     case 'USER-AGENT':
-      return { kind: 'drop', reason: 'mihomo 不支持 USER-AGENT' };
-    case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
+    case 'URL-REGEX':
+      return { kind: 'drop', reason: `mihomo 不支持 ${rule.type}` };
+    case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP': case 'SRC-IP-CIDR':
       return { kind: 'ok', text: `${rule.type},${rule.value}`, ...nr(rule), ...(rule.src ? { src: true } : {}) };
     case 'NETWORK':
       return { kind: 'ok', text: `NETWORK,${rule.value}` };
@@ -83,7 +84,7 @@ function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
       return { kind: 'ok', text: `${base}${suffix},${rule.value}` };
     }
     case 'AND': case 'OR': case 'NOT':
-      return { kind: 'drop', reason: '逻辑规则暂不支持（P1）' };
+      return lowerLogical(rule, ctx);
     case 'RAW':
       return lowerRaw(rule, ctx);
     default:
@@ -93,7 +94,7 @@ function lowerMihomo(rule: RuleIR, ctx: ClientCtx): LoweredRule {
 
 function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
-    case 'DOMAIN': case 'DOMAIN-SUFFIX': case 'DOMAIN-KEYWORD': case 'DOMAIN-WILDCARD': case 'USER-AGENT':
+    case 'DOMAIN': case 'DOMAIN-SUFFIX': case 'DOMAIN-KEYWORD': case 'DOMAIN-WILDCARD': case 'USER-AGENT': case 'URL-REGEX':
       return { kind: 'ok', text: `${rule.type},${rule.value}` };
     case 'DOMAIN-REGEX':
       return { kind: 'drop', reason: 'Surge 不支持 DOMAIN-REGEX' };
@@ -122,7 +123,7 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
         : { kind: 'ok', text: `PROCESS-NAME,${wc}`, note: `进程正则 ${rule.value} 降级为通配 ${wc}` };
     }
     case 'AND': case 'OR': case 'NOT':
-      return { kind: 'drop', reason: '逻辑规则暂不支持（P1）' };
+      return lowerLogical(rule, ctx);
     case 'RAW':
       return lowerRaw(rule, ctx);
   }
@@ -132,7 +133,9 @@ function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
     case 'RAW': return lowerRaw(rule, ctx);
     case 'AND': case 'OR': case 'NOT':
-      return { kind: 'drop', reason: '逻辑规则暂不支持（P1）' };
+      return lowerLogical(rule, ctx);
+    case 'URL-REGEX':
+      return { kind: 'drop', reason: 'Stash 尚未适配 URL-REGEX' };
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
       if (rule.src) return rule.type === 'IP-CIDR' || rule.type === 'IP-CIDR6'
         ? { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'src 转换为 Stash 的 SRC-IP（需 iOS 3.7 / macOS 4.4 或更新版本）' }
@@ -165,9 +168,26 @@ function lowerRaw(rule: Extract<RuleIR, { type: 'RAW' }>, ctx: ClientCtx): Lower
 
 /** 规则匹配部分（不含出口）的客户端写法 */
 export function lowerRule(rule: RuleIR, ctx: ClientCtx): LoweredRule {
+  if (rule.extendedMatching) {
+    if (ctx.client !== 'surge') return { kind: 'drop', reason: `${ctx.client} 不支持 extended-matching，不能改变匹配语义` };
+    if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'URL-REGEX', 'RAW'].includes(rule.type)) return { kind: 'drop', reason: `${rule.type} 不支持 extended-matching` };
+    const lowered = lowerRule({ ...rule, extendedMatching: false }, ctx);
+    return lowered.kind === 'ok' ? { ...lowered, extendedMatching: true } : lowered;
+  }
   switch (ctx.client) {
     case 'mihomo': return lowerMihomo(rule, ctx);
     case 'surge': return lowerSurge(rule, ctx);
     case 'stash': return lowerStash(rule, ctx);
   }
+}
+
+/** 任一子条件不可表达时丢弃整条逻辑规则，不能删除子条件后放宽匹配。 */
+function lowerLogical(rule: Extract<RuleIR, { type: 'AND' | 'OR' | 'NOT' }>, ctx: ClientCtx): LoweredRule {
+  if (!rule.children.length || (rule.type === 'NOT' && rule.children.length !== 1)) return { kind: 'drop', reason: '逻辑规则子条件数量不合法' };
+  const children = rule.children.map(child => lowerRule(child, ctx));
+  const failure = children.find(child => child.kind === 'drop');
+  if (failure?.kind === 'drop') return { kind: 'drop', reason: `${rule.type} 子条件无法转换：${failure.reason}` };
+  const accepted = children.filter((child): child is Extract<LoweredRule, { kind: 'ok' }> => child.kind === 'ok');
+  const notes = accepted.flatMap(child => child.note ? [child.note] : []);
+  return { kind: 'ok', text: `${rule.type},(${accepted.map(child => `(${composeRule(child)})`).join(',')})`, ...(notes.length ? { note: notes.join('；') } : {}) };
 }
