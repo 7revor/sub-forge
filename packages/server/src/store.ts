@@ -154,6 +154,8 @@ export class Store {
 
   configurationRevision = 0;
   readonly listeners = new Set<() => void>();
+  /** 在途资源读取用短期监听器撤销，避免相同 ID 删除后重建造成旧请求复活。 */
+  readonly invalidationListeners = new Set<(kind: DocKind | 'shared-rule', id: string) => void>();
   eventsClosed = false;
   closeEvents(): void { this.eventsClosed = true; this.changed(); }
   changed(): void { for (const listener of this.listeners) listener(); }
@@ -168,9 +170,15 @@ export class Store {
     this.changed();
   }
   /** 相同权限、地址与读取参数共享一份成功原文。绑定不改变文档归属。 */
-  bindResource(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string, migrateLegacy = true): string {
+  resourceKey(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string): string {
     const owner = scope ?? this.getWithOwner(kind, id)?.owner ?? `reference:${id}`;
-    const resource = 'resource:' + this.cipher.hmac(JSON.stringify([kind, owner, url, options]));
+    return 'resource:' + this.cipher.hmac(JSON.stringify([kind, owner, url, options]));
+  }
+  resourceBinding(kind: SnapshotOwner, id: string, url: string): string | undefined {
+    return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind, id, this.cipher.hmac(url)) as { resource: string } | undefined)?.resource;
+  }
+  bindResource(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string, migrateLegacy = true): string {
+    const resource = this.resourceKey(kind, id, url, options, scope);
     const urlHash = this.cipher.hmac(url);
     const prior = this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,urlHash) as { resource: string } | undefined;
     if (prior?.resource === resource) return resource;
@@ -241,7 +249,7 @@ export class Store {
   private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
     return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,this.cipher.hmac(url)) as {resource:string}|undefined)?.resource ?? id;
   }
-  close(): void { this.closeEvents(); this.listeners.clear(); this.db.close(); }
+  close(): void { this.closeEvents(); this.listeners.clear(); this.invalidationListeners.clear(); this.db.close(); }
 
   /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包；v7：客户端改写绑定来源；v8 及以前：订阅地址可能保存在 urls 数组） */
   private migrate(): void {
@@ -619,14 +627,17 @@ export class Store {
 
   delete(kind: DocKind, id: string): boolean {
     this.configurationRevision++;
-    return this.db.transaction(() => {
+    const removed = this.db.transaction(() => {
       if (kind === 'source' || kind === 'ruleset') this.dropResourceBindings(kind,id);
       const removed = this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
+      this.deleteDocumentJobs(kind, id);
       if (kind === 'profile') this.deleteProfileData(id);
       if (kind === 'ruleset') this.db.prepare('DELETE FROM shared_rule_resources WHERE ruleset_id = ?').run(id);
       this.pruneResourceBindings();
       return removed;
     })();
+    for (const listener of this.invalidationListeners) listener(kind, id);
+    return removed;
   }
 
   // ---------- 当前模板（沿用旧表结构；版本列仅兼容旧数据迁移，新写入固定为 1） ----------
@@ -725,13 +736,16 @@ export class Store {
       this.db.prepare('DELETE FROM render_generations WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM access_log WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM profile_migration_backups WHERE profile_id = ?').run(profileId);
-      if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'refresh_jobs'").get()) {
-        for (const row of this.db.prepare('SELECT id,data FROM refresh_jobs').all() as { id: string; data: string }[]) {
-          const job = JSON.parse(this.cipher.decrypt(row.data));
-          if (job.kind === 'profile' && job.documentId === profileId) this.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
-        }
-      }
+      this.deleteDocumentJobs('profile', profileId);
     })();
+  }
+
+  private deleteDocumentJobs(kind: string, id: string): void {
+    if (!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'refresh_jobs'").get()) return;
+    for (const row of this.db.prepare('SELECT id,data FROM refresh_jobs').all() as { id: string; data: string }[]) {
+      const job = JSON.parse(this.cipher.decrypt(row.data));
+      if (job.kind === kind && job.documentId === id) this.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
+    }
   }
 
   putSharedRule(key: string, rulesetId: string, data: unknown): void {
@@ -749,6 +763,7 @@ export class Store {
   deleteSharedRule(key: string): void {
     this.configurationRevision++;
     this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(key);
+    for (const listener of this.invalidationListeners) listener('shared-rule', key);
     this.pruneResourceBindings();
   }
 

@@ -34,7 +34,7 @@ const MIME: Record<string, string> = {
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.map': 'application/json',
 };
 /** 这些前缀属于接口，不回落到前端页面 */
-const RESERVED = ['/api/', '/sub/', '/p/', '/r/', '/nodes/'];
+const RESERVED = ['/api/', '/sub/', '/p/', '/r/', '/rules/', '/nodes/'];
 
 /** 托管前端：/assets 下的文件名带内容哈希，可长期缓存；index.html 不缓存 */
 function serveWeb(app: Hono, webDir: string) {
@@ -133,12 +133,14 @@ export function createApp(deps: AppDeps) {
     const key = c.req.param('key');
     if (!version) return notFound(c);
     const retained = renderer.getVersion(profileId, target, version);
-    if (!retained || !renderer.canReadNodes(retained, t.userId) || retained.providers[key] === undefined) return notFound(c);
+    if (!retained || !renderer.canReadNodes(retained, t.userId) || typeof retained.providers[key] !== 'string') return notFound(c);
     const outcome = await renderer.render(profileId, target);
     if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     if (!outcome.ok && outcome.accessDenied) return notFound(c);
     const selected = renderer.getVersion(profileId, target, version) ?? retained;
-    if (!renderer.canReadNodes(selected, t.userId)) return notFound(c);
+    if (!renderer.canReadNodes(selected, t.userId) || typeof selected.providers[key] !== 'string') return notFound(c);
+    const traffic = userinfoHeader(selected.providerUserinfo?.[key]);
+    if (traffic) c.header('subscription-userinfo', traffic);
     c.header('content-type', 'text/yaml; charset=utf-8');
     return c.body(selected.providers[key]!.replaceAll(TOKEN_PLACEHOLDER, token));
   });
@@ -166,8 +168,38 @@ export function createApp(deps: AppDeps) {
     }
   });
 
+  /** 增强集合的独立共享入口；客户端变体仍复用公共产物，与配置订阅无关。 */
+  app.get('/rules/:token/:id', async c => {
+    c.header('cache-control', 'no-store'); c.header('vary', 'User-Agent');
+    const token = c.req.param('token'), id = c.req.param('id');
+    const user = store.getActiveToken(token);
+    if (!user || !store.get('ruleset', id)) return notFound(c);
+    const target = detectClient(c.req.header('user-agent') ?? '', c.req.query());
+    if (target.client === 'surge') return c.text('Surge 规则订阅输出尚未开放，请使用规则转换预览', 501);
+    if (target.client === 'stash' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('Stash 平台仅支持 ios 或 macos', 400);
+    const reference = { matcher: { kind: 'ruleset' as const, id } };
+    const output = { client: target.client, ...(target.platform ? { platform: target.platform } : {}) };
+    try {
+      const body = await renderer.sharedRules.readReference(reference, output);
+      if (store.getActiveToken(token)?.userId !== user.userId || !store.get('ruleset', id) || body === undefined) return notFound(c);
+      const resource = store.getSharedRule<{ error?: string }>(renderer.sharedRules.key(reference, output));
+      if (!resource) return notFound(c);
+      if (resource.error) c.header('x-sub-forge-warning', 'last-good-rule');
+      if (body.startsWith('#subforge-binary-mrs\n')) {
+        c.header('content-type', 'application/octet-stream');
+        return c.body(Buffer.from(body.slice('#subforge-binary-mrs\n'.length), 'base64'));
+      }
+      c.header('content-type', 'text/plain; charset=utf-8');
+      return c.body(body);
+    } catch (error) {
+      if (store.getActiveToken(token)?.userId !== user.userId || !store.get('ruleset', id)) return notFound(c);
+      return c.text(`规则资源暂时不可用：${error instanceof Error ? error.message : String(error)}`, 503);
+    }
+  });
+
   app.get('/nodes/:token/:kind/:id', async c => {
     c.header('cache-control', 'no-store');
+    c.header('vary', 'User-Agent');
     const token = c.req.param('token');
     const user = store.getActiveToken(token);
     const kind = c.req.param('kind');
@@ -175,11 +207,19 @@ export function createApp(deps: AppDeps) {
     if (!user || !['source', 'collection', 'local'].includes(kind)) return notFound(c);
     const type = kind as 'source' | 'collection' | 'local';
     if (store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+    const target = detectClient(c.req.header('user-agent') ?? '', c.req.query());
+    if (target.client === 'surge') return c.text('Surge 节点订阅输出尚未实现', 501);
+    if (target.client === 'stash' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('Stash 平台仅支持 ios 或 macos', 400);
     try {
-      const body = await renderer.nodeSet({ type, id }, user.userId);
+      const result = await renderer.nodeSet({ type, id }, user.userId, { client: target.client, ...(target.platform ? { platform: target.platform } : {}) });
       if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+      const traffic = userinfoHeader(result.userinfo);
+      if (traffic) c.header('subscription-userinfo', traffic);
+      c.header('profile-update-interval', String(Math.max(1, Math.round(store.resourceCacheTtlSec / 3600))));
+      c.header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(store.get(type, id)!.name)}`);
       c.header('content-type', 'text/yaml; charset=utf-8');
-      return c.body(body);
+      c.header('x-content-type-options', 'nosniff');
+      return c.body(result.yaml);
     } catch (error) {
       if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
       if (error instanceof ResourceAccessError) return notFound(c);

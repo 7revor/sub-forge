@@ -1,4 +1,5 @@
 import { ResourceAccessError } from '../resource-access.ts';
+import { resourceLinkRoutes } from './resource-links.ts';
 import { ResourceService } from '../resources.ts';
 import { resourceRoutes } from './resources.ts';
 import { systemRoutes } from './system.ts';
@@ -59,6 +60,7 @@ export function createApi(deps: ApiDeps) {
   api.route('/', ruleOptionRoutes(deps.store, repos));
 
   api.route('/', resourceRoutes(deps.store,resources,repos));
+  api.route('/', resourceLinkRoutes(deps.store, deps.renderer, deps.publicUrl));
   api.route('/', systemRoutes(deps.store));
   api.route('/', pendingRoutes());
   api.route('/', nodeProbeRoutes(deps.nodeProbe));

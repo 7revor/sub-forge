@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 import { api } from '../api.ts';
 import { RuleCard } from '../components/RuleCard.tsx';
 import { RuleSourcePreview } from '../components/RuleSourcePreview.tsx';
@@ -100,6 +101,7 @@ export function RulesetEdit() {
     finally { setLinking(undefined); }
   };
   return <DetailShell canEdit={canEdit} listPath="/rulesets" listLabel="增强集合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
+    extraActions={!e.isNew && <ResourceLinkButton kind="rulesets" id={d.id} name={d.name} disabled={e.dirty} />}
     onSave={() => {
       if (error) { alertError(error); return; }
       e.submit(x => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' }) }));

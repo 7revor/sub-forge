@@ -17,6 +17,7 @@ export function Account() {
       const result = await api<{ item: { token: string } }>('POST', '/me/token/reset', { token: expected });
       qc.setQueryData(['user-token'], result.item.token);
       await qc.invalidateQueries({ queryKey: ['subscription-link'] });
+      await qc.invalidateQueries({ queryKey: ['resource-link'] });
     } });
   };
   const [current, setCurrent] = useState('');

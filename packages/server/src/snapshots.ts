@@ -48,6 +48,11 @@ export class SnapshotService {
     const migrateLegacy = compatible && (!scope || !saved?.owner || scope === saved.owner || kind === 'ruleset' && scope === 'public-rules');
     return this.store.bindResource(kind, id, url, options, scope, !!migrateLegacy);
   }
+  /** 排队任务只检查现有绑定，不能因为检查状态重新绑定已删除的来源。 */
+  isBound(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): boolean {
+    const { scope, ...options } = this.options(kind, id, url, opts);
+    return this.store.resourceBinding(kind, id, url) === this.store.resourceKey(kind, id, url, options, scope);
+  }
   private revision(snapshot: SnapshotRow): string {
     const success = this.store.latestSnapshot(snapshot.ownerKind,snapshot.ownerId,snapshot.url);
     const attempt = this.store.latestSnapshot(snapshot.ownerKind,snapshot.ownerId,snapshot.url,false);

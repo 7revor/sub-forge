@@ -6,6 +6,7 @@ import { profileTemplate } from './profile-routing.ts';
 // 这样重置订阅链接后仍可复用同一 Profile 的缓存与"上一份成功结果"。
 
 import { createHash } from 'node:crypto';
+import { stringify } from 'yaml';
 import {
   resolveProfileRouting, Report, renderMihomo, renderStash, exportStashConfig, sourceKey, sourceLabel, stableStringify,
   type RuleResourceReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
@@ -26,6 +27,7 @@ export type StoredRender = {
   generation?: string;
   yaml: string;
   providers: Record<string, string>;
+  providerUserinfo?: Record<string, TrafficInfo>;
   nodeDependencies: NodeSetID[];
   ruleResources: string[];
   userinfo?: TrafficInfo;
@@ -54,6 +56,22 @@ function sumTraffic(infos: Iterable<TrafficInfo>): TrafficInfo | undefined {
     if (u.expire !== undefined) sum.expire = sum.expire === undefined ? u.expire : Math.min(sum.expire, u.expire);
   }
   return Object.keys(sum).length ? sum : undefined;
+}
+
+/** 同一个上游地址只计一次，重复组合成员或重复源文档不重复累计流量。 */
+function nodeTraffic(ref: NodeSetID, inputs: NodeSetInputs, infos: Map<string, TrafficInfo>): TrafficInfo | undefined {
+  const seen = new Set<string>(), byUrl = new Map<string, TrafficInfo>();
+  const visit = (ref: NodeSetID) => {
+    const key = `${ref.type}:${ref.id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (ref.type === 'collection') inputs.collections[ref.id]?.members.forEach(m => visit(m.ref));
+    if (ref.type === 'source') {
+      const source = inputs.sources[ref.id], info = infos.get(ref.id);
+      if (source && info) byUrl.set(source.url, info);
+    }
+  };
+  visit(ref); return sumTraffic(byUrl.values());
 }
 
 function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -175,6 +193,7 @@ export class RenderService {
       for (const src of rs.sources) {
         if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
         const r = await this.snapshots.get('ruleset', rs.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
+        checkCurrent();
         if (r.snapshot) usedSnapshots.push({snapshot:r.snapshot,revision:r.revision});
         if (r.snapshot?.body !== undefined) {
           rules.snapshots[sourceKey(rs.id, src.id)] = r.snapshot.body;
@@ -244,6 +263,10 @@ export class RenderService {
         ...Object.keys(nodeSets.locals).map(id => ({ type: 'local' as const, id })),
       ],
       providers: Object.fromEntries(Object.entries(result.providers).map(([k, p]) => [k, p.yaml])),
+      providerUserinfo: Object.fromEntries(profile.nodeSets.flatMap(({ ref }) => {
+        const info = nodeTraffic(ref, nodeSets, userinfoBySource);
+        return info ? [[`${ref.type}:${ref.id}`, info]] : [];
+      })),
       ruleResources: [...new Set([...sharedReferences.values()].map(ref => this.sharedRules.key(ref, target)))],
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
@@ -265,6 +288,7 @@ export class RenderService {
    * 返回的 hashes 用作缓存键的一部分（用快照哈希而不是正文）。
    */
   async loadNodeSets(refs: NodeSetID[], owner?: string | null): Promise<{ inputs: NodeSetInputs; userinfo: Map<string, TrafficInfo>; hashes: string[]; report: ReportItem[]; snapshots: {snapshot:SnapshotRow;revision?:string}[] }> {
+    const configurationRevision = this.store.configurationRevision;
     const { inputs, sources } = this.collectNodeSets(refs, owner);
     const userinfo = new Map<string, TrafficInfo>();
     const hashes: string[] = [];
@@ -272,6 +296,7 @@ export class RenderService {
     const report: ReportItem[] = [];
     for (const src of sources) {
       const r = await this.snapshots.get('source', src.id, src.url, {});
+      if (configurationRevision !== this.store.configurationRevision) throw new ConcurrentRenderChange('节点依赖在拉取期间变化，请重试');
       if (r.snapshot) snapshots.push({snapshot:r.snapshot,revision:r.revision});
       if (r.snapshot?.body !== undefined) {
         inputs.snapshots[src.id] = [r.snapshot.body];
@@ -283,19 +308,20 @@ export class RenderService {
     return { inputs, userinfo, hashes, report, snapshots };
   }
 
-  async nodeSet(ref: NodeSetID, owner: string): Promise<string> {
+  async nodeSet(ref: NodeSetID, owner: string, target: Target = { client: 'mihomo' }): Promise<{ yaml: string; userinfo?: TrafficInfo }> {
     if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
     const revision = this.store.configurationRevision;
     const loaded = await this.loadNodeSets([ref], owner);
     if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
     if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
-    const result = renderMihomo({
-      profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'provider' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
+    const result = (target.client === 'stash' ? renderStash : renderMihomo)({
+      profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
+      platform: target.platform,
       nodeSets: loaded.inputs, rules: { rulesets: {}, snapshots: {} }, urls: { provider: key => key, ruleset: key => key },
     });
     const errors = [...loaded.report, ...result.report.items].filter(i => i.level === 'error');
     if (errors.length) throw new Error(errors.map(i => i.message).join('；'));
-    return result.providers[`${ref.type}:${ref.id}`]!.yaml;
+    return { yaml: stringify({ proxies: result.config.proxies ?? [] }, { lineWidth: 0 }), userinfo: nodeTraffic(ref, loaded.inputs, loaded.userinfo) };
   }
 
   collectNodeSets(refs: NodeSetID[], owner?: string | null): { inputs: NodeSetInputs; sources: SourceDoc[] } {

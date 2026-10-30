@@ -50,7 +50,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
       if (filter) include = compileUserRegex(filter);
       if (excludeFilter) exclude = compileUserRegex(excludeFilter);
     } catch (error) { throw bad(error instanceof Error ? error.message : String(error)); }
-    const loaded = await renderer.loadNodeSets([ref]);
+    const loaded = await renderer.loadNodeSets([ref], c.get('user').id);
     const report = new Report();
     const nodes = new NodeSetResolver(loaded.inputs, report).resolve(ref).filter(node => matchesNameSearch(node.name, query));
     // 先在完整列表筛选，再截断展示，避免第 5000 个以后的节点无法被找到。
@@ -103,10 +103,10 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
 
     const ref: NodeSetID = { type: kind, id: doc.id };
     const sourceChanged = kind === 'source' && (doc as SourceDoc).url !== (saved as SourceDoc).url;
-    const loaded = sourceChanged ? await renderer.loadNodeSets([])
+    const loaded = sourceChanged ? await renderer.loadNodeSets([], user.id)
       : kind === 'collection'
-      ? await renderer.loadNodeSets((doc as Collection).members.map((m) => m.ref))
-      : await renderer.loadNodeSets([ref]);
+      ? await renderer.loadNodeSets((doc as Collection).members.map((m) => m.ref), user.id)
+      : await renderer.loadNodeSets([ref], user.id);
     const report = new Report();
     let input: ProxyIR[];
     let failures: { line: string; reason: string }[] = [];
