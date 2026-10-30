@@ -1,12 +1,15 @@
 import type { MiddlewareHandler } from 'hono';
+import type { HttpBindings } from '@hono/node-server';
+import { getConnInfo } from '@hono/node-server/conninfo';
+import { parseTrustedProxies, resolveClientAddress } from './net/client-ip.ts';
 import { detectClient, InvalidClientTarget } from './client.ts';
 import type { SharedRuleRecord } from './shared-rules.ts';
 import type { AccessKind, Store } from './store.ts';
 
-export type DownloadEnv = { Variables: { accessResult: { source: string; warnings: number }; accessResource: { kind: AccessKind; resourceId: string; resourceName: string } } };
+export type DownloadEnv = { Bindings: Partial<HttpBindings>; Variables: { accessResult: { source: string; warnings: number }; accessResource: { kind: AccessKind; resourceId: string; resourceName: string } } };
 
 /** 只覆盖下载入口；归属由实际凭证决定，与资源创建人、登录会话无关。 */
-export function accessLogger(store: Store, now: () => number): MiddlewareHandler<DownloadEnv> {
+export function accessLogger(store: Store, now: () => number, trustedProxies = parseTrustedProxies()): MiddlewareHandler<DownloadEnv> {
   return async (c, next) => {
     const match = /^\/(sub|p|r|rules|nodes)\/([^/]+)\/([^/]+)(?:\/([^/]+))?$/.exec(c.req.path);
     const file = /^\/api\/files\/([^/]+)\/(?:repository|(?:templates|profiles)\/[^/]+\/rules\/[^/]+)$/.exec(c.req.path);
@@ -19,6 +22,7 @@ export function accessLogger(store: Store, now: () => number): MiddlewareHandler
     const user = store.getActiveToken(token);
     if (!user) return next();
     const started = now();
+    const address = resolveClientAddress(c.env?.incoming ? getConnInfo(c).remote.address : undefined, c.req.header('x-forwarded-for'), trustedProxies);
     const ua = c.req.header('user-agent') ?? '';
     let client = '未知', platform: string | undefined;
     try {
@@ -52,7 +56,7 @@ export function accessLogger(store: Store, now: () => number): MiddlewareHandler
     }
     const result = c.get('accessResult');
     const fallback = !!c.res.headers.get('x-sub-forge-warning');
-    store.logAccess({ token, profileId, kind, resourceId, resourceName, method: c.req.method, at: started, ua, client, ...(platform ? { platform } : {}),
+    store.logAccess({ ...address, token, profileId, kind, resourceId, resourceName, method: c.req.method, at: started, ua, client, ...(platform ? { platform } : {}),
       status: c.res.status, ms: Math.max(0, now() - started), warnings: result?.warnings ?? (fallback ? 1 : 0), source: result?.source ?? (c.res.status >= 400 ? 'failed' : fallback ? 'last-good' : route === 'file' ? 'file' : 'managed') });
   };
 }

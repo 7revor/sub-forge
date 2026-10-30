@@ -1,5 +1,6 @@
 // 管理接口测试用的小工具：带 cookie 的请求客户端、内存数据库上的完整应用。
 
+import { parseTrustedProxies } from '../src/net/client-ip.ts';
 import { createApp } from '../src/app.ts';
 import { hashPassword } from '../src/crypto.ts';
 import type { UpstreamFetcher } from '../src/net/upstream.ts';
@@ -7,14 +8,14 @@ import { RenderService } from '../src/render.ts';
 import { SnapshotService } from '../src/snapshots.ts';
 import { Store, type Role } from '../src/store.ts';
 
-export function setupApp(opts: { fetcher?: UpstreamFetcher; now?: () => number } = {}) {
+export function setupApp(opts: { fetcher?: UpstreamFetcher; now?: () => number; trustedProxies?: string } = {}) {
   let t = 1_700_000_000_000;
   const now = opts.now ?? (() => t);
   const store = new Store(':memory:', { now });
   const fetcher: UpstreamFetcher = opts.fetcher ?? (async (url) => { throw new Error(`测试中未提供 ${url}`); });
   const snapshots = new SnapshotService(store, fetcher, now);
   const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test' });
-  const app = createApp({ store, renderer, snapshots, now, publicUrl: 'https://sub.test' });
+  const app = createApp({ store, renderer, snapshots, now, publicUrl: 'https://sub.test', trustedProxies: parseTrustedProxies(opts.trustedProxies) });
   return { store, app, snapshots, renderer, advance: (ms: number) => { t += ms; } };
 }
 

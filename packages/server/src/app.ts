@@ -1,4 +1,5 @@
 import { accessLogger, type DownloadEnv } from './access-log.ts';
+import type { BlockList } from 'node:net';
 // 订阅接口（OUT-01 – OUT-06）：
 //   GET /sub/:token/:profile          主配置
 //   GET /p/:token/:profile/:key       Profile 专属 provider 内容
@@ -28,6 +29,7 @@ const notFound = (c: Context) => c.body(null, 404);
 export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'>> & {
   /** 前端构建产物目录（packages/web/dist）；设置后托管静态文件，其余路径回落到 index.html */
   webDir?: string;
+  trustedProxies?: BlockList;
 };
 
 const MIME: Record<string, string> = {
@@ -64,7 +66,7 @@ export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
   const now = deps.now ?? Date.now;
   const app = new Hono<DownloadEnv>();
-  app.use('*', accessLogger(store, now));
+  app.use('*', accessLogger(store, now, deps.trustedProxies));
 
   app.get('/healthz', (c) => c.text('ok'));
   app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' }));

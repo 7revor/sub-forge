@@ -21,7 +21,7 @@ pnpm --filter @sub-forge/server start
 
 ```bash
 docker build -f docker/Dockerfile -t sub-forge .
-docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
+docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
   -e PUBLIC_URL=https://sub.example.com \
   -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD='请改成强密码' \
   sub-forge
@@ -30,6 +30,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - 以非 root 用户运行；数据库与密钥文件 `secret.key`（0600）放在 `/data`，备份时两者一起备份，丢了密钥就无法解密数据。
 - 最终运行镜像在构建时通过 apt 安装 `git` 和 `ca-certificates`，宿主机无需安装 Git，容器启动时无需安装软件。可运行 `docker run --rm --entrypoint git sub-forge --version` 检查。默认 Git 缓存位于 `/data/rule-repo-cache`，上述 `/data` 卷会一并持久化；自定义 `SUBFORGE_REPO_CACHE` 时须保证该目录可由容器的 node 用户写入并单独挂载。
 - 首次启动且没有用户时按 `SUBFORGE_ADMIN_*` 创建管理员，之后可以去掉这两个变量。
+- 真实 IP 来源、可信代理配置及 Docker / Nginx / CDN 透传见 [部署与访问日志 IP](../../docs/20-deployment-client-ip.md)。默认只记录连接来源；反向代理部署需按该说明设置 `SUBFORGE_TRUSTED_PROXIES`。
 - 对外请放在 HTTPS 反向代理之后；`PUBLIC_URL` 为 https 时会话 cookie 带 `Secure`。
 
 | 环境变量 | 默认值 | 说明 |
@@ -40,6 +41,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `SUBFORGE_ADMIN_USERNAME` / `SUBFORGE_ADMIN_PASSWORD` | 空 | 首次启动时创建管理员；`create-admin` 命令也从 `SUBFORGE_ADMIN_PASSWORD` 取密码 |
 | `HOST` / `PORT` | `127.0.0.1` / `8080`（镜像中 HOST 为 `0.0.0.0`） | 监听地址 |
 | `PUBLIC_URL` | `http://HOST:PORT` | 对外地址，用于生成订阅、provider 与规则集链接；未设置时启动会告警 |
+| `SUBFORGE_TRUSTED_PROXIES` | 空（不信任转发头） | 逗号分隔的可信代理 IP / CIDR；仅解析可信链上的 X-Forwarded-For，详见部署说明 |
 | `ALLOWED_ORIGINS` | 空 | 逗号分隔，允许跨源调用管理接口的 Origin（如前端开发服务器） |
 | `SSRF_ALLOW` | 空 | 逗号分隔的字面 IP / CIDR 白名单；兼容接受主机名，域名本身已默认放行 |
 | `MIHOMO_BIN` | 空 | 设置后每次渲染都执行 `mihomo -t` 校验，失败时返回上一份成功结果 |

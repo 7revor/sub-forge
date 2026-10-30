@@ -34,7 +34,7 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export type User = { id: string; username: string; role: 'admin' | 'user'; disabled: boolean; scriptAllowed: boolean; createdAt: number };
 export type TokenItem = { token: string; userId: string; createdAt: number; url: string };
-export type AccessLogRow = { at: number; ua: string; client: string; platform?: string; status: number; ms: number; warnings: number; source: string; token: string };
+export type AccessLogRow = { clientIp?: string | null; peerIp?: string | null; ipSource?: 'socket' | 'x-forwarded-for' | 'unknown'; at: number; ua: string; client: string; platform?: string; status: number; ms: number; warnings: number; source: string; token: string };
 export type UserAccessLogRow = Omit<AccessLogRow, 'token'> & { id: number; kind: 'subscription' | 'nodes' | 'rule-collection' | 'enhancement'; resourceId: string; resourceName: string; method: string };
 export type SnapshotMeta = { id: number; url: string; fetchedAt: number; ok: boolean; status?: number; hash?: string; userinfo?: { upload?: number; download?: number; total?: number; expire?: number }; error?: string };
 export type NodeBrief = { name: string; type: string; server: string; port: number };
