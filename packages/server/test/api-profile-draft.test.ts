@@ -21,9 +21,6 @@ describe('未保存 Profile 草稿预览', () => {
     const putLast = vi.spyOn(store, 'putLastGood');
     const getLast = vi.spyOn(store, 'getLastGood');
     const log = vi.spyOn(store, 'logAccess');
-    const cache = Reflect.get(renderer, 'cache') as Map<string, unknown>;
-    const cacheGet = vi.spyOn(cache, 'get');
-    const cacheSet = vi.spyOn(cache, 'set');
     const res = await alice.post('/api/profiles/preview', {
       profile: { ...draft, id: '某个已保存文档', nodeSets: [{ ref: { type: 'local', id: local.id }, output: 'provider' }] }, platform: 'macos',
     });
@@ -35,7 +32,7 @@ describe('未保存 Profile 草稿预览', () => {
     expect(res.json.yaml).not.toContain('__SF_TOKEN__');
     expect(store.list('profile')).toEqual([]);
     expect(get.mock.calls.some(([kind]) => kind === 'profile')).toBe(false);
-    for (const spy of [put, putLast, getLast, log, cacheGet, cacheSet]) expect(spy).not.toHaveBeenCalled();
+    for (const spy of [put, putLast, getLast, log]) expect(spy).not.toHaveBeenCalled();
   });
 
   it('引用别人的节点集时返回 400', async () => {

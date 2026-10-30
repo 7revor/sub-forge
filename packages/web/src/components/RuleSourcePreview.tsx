@@ -14,7 +14,7 @@ export function RuleSourcePreview({ matcher: selected, onClose }: { matcher?: Ma
   const matcher = selected ?? retained.current;
   const preview = useQuery({
     queryKey: ['rule-matcher-source', matcher],
-    enabled: !!selected && matcher.kind === 'ruleset', retry: false, staleTime: 60_000,
+    enabled: !!selected && matcher.kind === 'ruleset', retry: false, staleTime: 0,
     queryFn: () => api<{ name: string; content: string; sources: number }>('POST', '/rules/matcher-source', { matcher }),
   });
   const single = matcher.kind === 'rule';

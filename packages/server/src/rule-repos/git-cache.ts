@@ -15,6 +15,7 @@ export interface RepoCache {
   read(repo: RepoDefinition, commit: string, path: string): Promise<string>;
   remove(id: string): Promise<void>;
   stop(): Promise<void>;
+  compact?(repo:RepoDefinition,revisions:Record<string,string>):Promise<void>;
 }
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 export class GitRepoCache implements RepoCache {
@@ -102,6 +103,12 @@ export class GitRepoCache implements RepoCache {
   sync(repo: RepoDefinition) {
     return this.locked(repo, async dir => {
       await this.run(dir, ['init', '--bare', '--quiet']);
+      // 首次升级时保护上次成功索引可能引用的提交；失败的同步不移动保护引用。
+      const protectedRefs=await this.run(dir,['for-each-ref','--format=%(refname)','refs/retained/']);
+      if(!protectedRefs.trim()) {
+        const existing=await this.run(dir,['for-each-ref','--format=%(objectname) %(refname)','refs/cache/']);
+        for(const line of existing.trim().split('\n').filter(Boolean)) {const [sha,ref]=line.split(' ');await this.run(dir,['update-ref',ref!.replace('refs/cache/','refs/retained/'),sha!]);}
+      }
       const url = `https://github.com/${repo.owner}/${repo.repo}.git`;
       await this.run(dir, ['config', 'remote.origin.url', url]);
       await this.run(dir, ['config', 'remote.origin.promisor', 'true']);
@@ -116,6 +123,19 @@ export class GitRepoCache implements RepoCache {
         revisions[ref] = sha;
       }
       return revisions;
+    });
+  }
+  compact(repo:RepoDefinition,revisions:Record<string,string>) {
+    return this.locked(repo,async dir=>{
+      const keep=new Set<string>();
+      for(const [ref,sha] of Object.entries(revisions)) {
+        const retained=`refs/retained/${hash(ref)}`;keep.add(retained);keep.add(`refs/cache/${hash(ref)}`);
+        await this.run(dir,['update-ref',retained,sha]);
+      }
+      const refs=await this.run(dir,['for-each-ref','--format=%(refname)','refs/retained/','refs/cache/']);
+      for(const ref of refs.trim().split('\n').filter(Boolean))if(!keep.has(ref))await this.run(dir,['update-ref','-d',ref]);
+      await this.run(dir,['reflog','expire','--expire=now','--all']);
+      await this.run(dir,['gc','--prune=now']);
     });
   }
   files(repo: RepoDefinition, commit: string) {

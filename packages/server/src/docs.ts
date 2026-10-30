@@ -6,11 +6,11 @@ export type FetchOptions = {
   /** 拉取时使用的 User-Agent */
   ua?: string;
   timeoutMs?: number;
-  /** 自动更新间隔，超过后在下次读取时后台刷新 */
+  /** 仅兼容旧导入；保存时移除，运行时统一使用系统资源缓存时间。 */
   ttlSec?: number;
 };
 
-/** 节点订阅源仅配置自动更新间隔，拉取身份和超时固定。 */
+/** 节点订阅源旧字段兼容类型；拉取身份和超时固定，缓存周期由系统管理。 */
 export type SourceFetchOptions = Pick<FetchOptions, 'ttlSec'>;
 export type SourceDoc = Source & { fetch?: SourceFetchOptions };
 /** 远程来源各自带拉取参数 */
@@ -30,7 +30,7 @@ export type ProfileDoc = Profile & {
   template?: { id: string; follow: 'latest' | { pinned: number } };
   /** 不设置表示不输出基础设置（使用客户端默认） */
   base?: { presetId?: string; patch?: Record<string, unknown>; stashPatch?: Record<string, unknown> };
-  /** 订阅更新间隔（秒），写入 profile-update-interval，默认 86400（OUT-01 / OUT-02） */
+  /** 仅兼容旧导入；保存时移除，下发间隔取系统资源缓存时间。 */
   updateIntervalSec?: number;
   /** subscription-userinfo 的来源（SRC-05） */
   userinfo?: { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };

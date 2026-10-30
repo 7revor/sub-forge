@@ -1,3 +1,4 @@
+import { ResourceService } from './resources.ts';
 import { profileMigrationPlan } from './profile-migration-plan.ts';
 // 命令行入口：
 //   tsx src/cli.ts create-admin <用户名>          创建管理员，密码取自 SUBFORGE_ADMIN_PASSWORD
@@ -89,15 +90,17 @@ async function start(): Promise<void> {
     publicUrl,
     ...(env.MIHOMO_BIN ? { verify: mihomoVerifier(env.MIHOMO_BIN, env.MIHOMO_DIR) } : {}),
   });
-  const ruleRepos = new RuleRepoService(store, fetcher, Date.now, new GitRepoCache(env.SUBFORGE_REPO_CACHE ?? join(dirname(dbPath), 'rule-repo-cache')));
+  const ruleRepos = new RuleRepoService(store, fetcher, Date.now, new GitRepoCache(env.SUBFORGE_REPO_CACHE ?? join(dirname(dbPath), 'rule-repo-cache')), snapshots);
   const nodeProbe = env.MIHOMO_BIN ? createNodeProbe(env.MIHOMO_BIN, { allow: parseAllowList((env.SSRF_ALLOW ?? '').split(',')) }) : undefined;
+  const resources = new ResourceService(store,snapshots,renderer);
   const app = createApp({
-    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe,
+    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe, resources,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   });
   ruleRepos.start();
+  resources.start();
   store.pruneAccessLog();
   const prune = setInterval(() => store.pruneAccessLog(), DAY_MS);
   prune.unref();
@@ -110,9 +113,15 @@ async function start(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     clearInterval(prune);
+    store.closeEvents();
     // 立即停止接收请求并取消探测；同时等待所有清理，避免先前未等待的 close 拒绝。
     const closed = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
-    const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop()]);
+    // SSE 已主动结束；仍未退出的连接最多保留 10 秒，避免僵持连接阻塞进程回收。
+    const drainDeadline = setTimeout(() => {
+      if ('closeAllConnections' in server) server.closeAllConnections();
+    }, 10_000);
+    const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop(), resources.stop()]);
+    clearTimeout(drainDeadline);
     await snapshots.settled();
     store.close();
     const errors = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');

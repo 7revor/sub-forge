@@ -7,7 +7,7 @@ import { NodeSetCount } from '../components/NodeSetCount.tsx';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api } from '../api.ts';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
@@ -77,16 +77,12 @@ function BasicSettings({ draft, set }: {
     <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
       <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
         <Field label="名称" className="min-w-0 sm:col-span-2">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
-        <Field label="自动更新时间（小时）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min={5 / 60} step="any" className="font-mono" inputMode="decimal" placeholder="上游订阅的更新间隔，留空为 24 小时" value={draft.fetch?.ttlSec === undefined ? '' : String(draft.fetch.ttlSec / 3600)} onCommit={(value) => {
-          const ttlSec = value.trim() && Number.isFinite(Number(value)) ? Math.round(Number(value) * 3600) : undefined;
-          set({ fetch: ttlSec === undefined ? undefined : { ttlSec } });
-        }} />}</Field>
         <Field label="订阅地址" className="col-span-full min-w-0">{(id) =>
           <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
       </div>
       <NoteField value={draft.note} onChange={(note) => set({ note })} />
-      <p className="m-0 text-[12px] leading-relaxed text-ink-muted">默认 24 小时，最短 5 分钟。超过间隔后，下次读取时后台更新；失败时继续使用上次成功内容。</p>
+      <p className="m-0 text-[12px] leading-relaxed text-ink-muted">缓存时间由管理员在系统中统一设置；到期自动拉取，失败时继续使用上次成功内容。</p>
     </Card>
   );
 }
@@ -101,7 +97,8 @@ export function SourceEdit() {
   const del = useDeleteDoc('sources');
   const [draft, setDraft] = useState<SourceDoc>();
   const [deleting, setDeleting] = useState(false);
-  useEffect(() => { if (doc.data) setDraft(doc.data); }, [doc.data]);
+  const previous=useRef<SourceDoc|undefined>(undefined);
+  useEffect(()=>{if(doc.data){const before=previous.current;previous.current=doc.data;setDraft(current=>!current||current.id!==doc.data!.id||JSON.stringify(current)===JSON.stringify(before)?doc.data:current);}},[doc.data]);
   const source = useMemo(() => draft ? { url: draft.url.trim(), fetch: draft.fetch ?? {} } : undefined, [draft?.url, draft?.fetch]);
   const preview = usePipelinePreview('sources', id === 'new' ? undefined : id, draft?.pipeline, undefined, source);
   const state = useSourceFetchState(doc.data);
@@ -129,7 +126,7 @@ export function SourceEdit() {
   const set = (patch: Partial<SourceDoc>) => setDraft({ ...draft, ...patch });
   const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
   const submit = () => {
-    save.mutate({ ...draft, name: draft.name.trim(), url: draft.url.trim() });
+    save.mutate({ ...draft, name: draft.name.trim(), url: draft.url.trim() },{onSuccess:item=>setDraft(item)});
   };
   const u = state.lastOk?.userinfo;
   const openDelete = () => { del.reset(); setDeleting(true); };

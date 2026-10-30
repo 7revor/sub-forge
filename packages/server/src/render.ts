@@ -1,3 +1,4 @@
+import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
 // 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 缓存；失败时返回上一份成功结果（OUT-05 / TPL-12）。
 // 渲染结果与 token 无关：地址里先写占位符，下发时再替换成请求所用的 token，
@@ -10,7 +11,7 @@ import {
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
 import type { SnapshotService } from './snapshots.ts';
-import type { Store, TrafficInfo } from './store.ts';
+import type { Store, TrafficInfo, SnapshotRow } from './store.ts';
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
@@ -32,7 +33,7 @@ export type StoredRender = {
 
 export type RenderOutcome =
   | { ok: true; source: 'fresh' | 'cache' | 'last-good'; render: StoredRender; report: ReportItem[] }
-  | { ok: false; message: string; report: ReportItem[] };
+  | { ok: false; message: string; report: ReportItem[]; accessDenied?: true };
 
 export type Verifier = (yaml: string) => Promise<{ ok: boolean; output: string }>;
 
@@ -44,8 +45,6 @@ export type RenderServiceOptions = {
   cacheSize?: number;
 };
 
-const SOURCE_TTL_SEC = 86400;
-const RULESET_TTL_SEC = 86400;
 
 /** 流量累加，缺失字段不补零，到期时间取已知的最早值。 */
 function sumTraffic(infos: Iterable<TrafficInfo>): TrafficInfo | undefined {
@@ -68,6 +67,8 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
   return out;
 }
 
+class ConcurrentRenderChange extends Error {}
+
 type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
 
 export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
@@ -75,7 +76,7 @@ export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; 
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
 export class RenderService {
-  private readonly cache = new Map<string, { render: StoredRender; report: ReportItem[] }>();
+
 
   constructor(
     private readonly store: Store,
@@ -90,11 +91,13 @@ export class RenderService {
       this.preserveLegacy(profileId, target);
       attempt = await this.attempt(profileId, target, pre);
     } catch (e) {
+      if (e instanceof ResourceAccessError) return { ok: false, accessDenied: true, message: e.message, report: pre };
       // 内核抛出的异常（如依赖解析不收敛）也按渲染失败处理，走兜底
       attempt = { report: pre, failure: `渲染异常：${(e as Error).message}` };
     }
     if (attempt.render) return { ok: true, source: attempt.from ?? 'fresh', render: attempt.render, report: attempt.report };
 
+    if (!this.store.get('profile', profileId)) return { ok: false, message: 'Profile 不存在', report: attempt.report };
     const last = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
     if (last) return { ok: true, source: 'last-good', render: last.data, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
     return { ok: false, message: attempt.failure ?? '渲染失败', report: attempt.report };
@@ -133,7 +136,7 @@ export class RenderService {
    * 预演：不读写缓存、不更新"上一份成功结果"。用于 Profile 预览，以及模板发布前对现有 Profile 的试渲染（TPL-07 ②）。
    * template 传入时代替 Profile 当前引用的模板版本。
    */
-  async preview(profileId: string, target: Target, overrides: { profile?: ProfileDoc; template?: TemplateVersionDoc } = {}): Promise<PreviewOutcome> {
+  async preview(profileId: string, target: Target, overrides: { profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<PreviewOutcome> {
     const pre: ReportItem[] = [];
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
@@ -146,28 +149,49 @@ export class RenderService {
   }
 
   /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不读写渲染缓存、last-good 或访问日志。 */
-  async previewDraft(profile: ProfileDoc, target: Target): Promise<PreviewOutcome> {
-    return this.preview('', target, { profile: { ...profile, id: '' } });
+  async previewDraft(profile: ProfileDoc, target: Target, owner?: string): Promise<PreviewOutcome> {
+    return this.preview('', target, { profile: { ...profile, id: '' }, owner });
   }
 
-  private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc } = {}): Promise<Attempt> {
+  private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<Attempt> {
+    for (let retry = 0; ; retry++) {
+      const start = pre.length;
+      try { return await this.attemptOnce(profileId, target, pre, opts); }
+      catch (error) {
+        if (!(error instanceof ConcurrentRenderChange) || retry >= 2) throw error;
+        pre.splice(start);
+      }
+    }
+  }
+
+  private async attemptOnce(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string }): Promise<Attempt> {
+    const configurationRevision = this.store.configurationRevision;
+    const usedSnapshots: {snapshot:SnapshotRow;revision?:string}[] = [];
+    const checkCurrent = () => {
+      if (configurationRevision !== this.store.configurationRevision || usedSnapshots.some(row => !this.snapshots.isCurrent(row.snapshot,row.revision))) {
+        throw new ConcurrentRenderChange('生成期间配置或资源已变化，请重试');
+      }
+    };
     const profile = opts.profile ?? this.store.get('profile', profileId);
     if (!profile) return { report: pre, failure: 'Profile 不存在' };
 
     const template = profile.routing?.mode === 'independent' ? undefined : opts.template ?? profileTemplate(profile, (id, v) => this.store.getTemplate(id, v));
     if (profile.template && !template) pre.push({ level: 'error', code: 'template.missing', message: `模板 ${profile.template.id} 不存在` });
 
-    const loaded = await this.loadNodeSets(profile.nodeSets.map((n) => n.ref));
+    const owner = this.store.getWithOwner('profile', profileId)?.owner ?? opts.owner;
+    const loaded = await this.loadNodeSets(profile.nodeSets.map((n) => n.ref), owner);
+    usedSnapshots.push(...loaded.snapshots);
     const nodeSets = loaded.inputs;
     const userinfoBySource = loaded.userinfo;
     const snapshotHashes = loaded.hashes;
     pre.push(...loaded.report);
 
-    const rules = this.collectRules(profile, template);
+    const rules = this.collectRules(profile, template, owner);
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
       for (const src of rs.sources) {
-        if (src.enabled === false || src.kind !== 'remote' || !src.url || src.format === 'mrs' || src.format === 'srs') continue;
-        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ttlSec: src.fetch?.ttlSec ?? RULESET_TTL_SEC, ...src.fetch, format: src.format });
+        if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
+        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: (src.repository && !src.fetch?.ua) || rs.id.startsWith('repo:') ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? this.store.getWithOwner('profile',profileId)?.owner ?? opts.owner });
+        if (r.snapshot) usedSnapshots.push({snapshot:r.snapshot,revision:r.revision});
         if (r.snapshot?.body !== undefined) {
           rules.snapshots[sourceKey(rs.id, src.id)] = r.snapshot.body;
           snapshotHashes.push(`${rs.id}|${src.url}|${r.snapshot.hash}`);
@@ -176,6 +200,7 @@ export class RenderService {
       }
     }
 
+    checkCurrent();
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
     if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
     const base = profile.base ? target.client === 'stash'
@@ -183,26 +208,10 @@ export class RenderService {
       : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource);
 
-    const key = stableHash(stableStringify({
-      profile, template, base, target, snapshotHashes,
-      sources: nodeSets.sources, collections: nodeSets.collections, locals: nodeSets.locals,
-      rulesets: rules.rulesets,
-    }));
-    const hit = opts.dry ? undefined : this.cache.get(key);
-    if (hit && !pre.some(i => i.level === 'error')) {
-      // 配置内容未变时仍使用最新快照的流量和本次拉取告警，不把元信息固化在 YAML 缓存中。
-      const report = [...pre, ...hit.report];
-      const { userinfo: _oldUserinfo, ...content } = hit.render;
-      const render: StoredRender = { ...content, warnings: report.filter(i => i.level === 'warn').length, ...(userinfo ? { userinfo } : {}) };
-      this.cache.delete(key); this.cache.set(key, { render, report: hit.report });
-      this.remember(profileId, target, render);
-      return { from: 'cache', render, report };
-    }
-
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const qs = `${target.client === 'stash' ? '&target=stash' : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
     const result = (target.client === 'stash' ? renderStash : renderMihomo)({
-      profile, nodeSets, rules,
+      profile, nodeSets, rules, managedResources:true, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
@@ -230,12 +239,14 @@ export class RenderService {
 
     if (this.opts.verify && target.client === 'mihomo') {
       const v = await this.opts.verify(result.yaml.replaceAll(TOKEN_PLACEHOLDER, 'verify'));
+      checkCurrent();
       if (!v.ok) {
         report.push({ level: 'error', code: 'verify.mihomo', message: `mihomo -t 校验失败：${v.output.trim().split('\n').slice(-3).join(' ')}` });
         return { report, result, failure: 'mihomo -t 校验失败' };
       }
     }
 
+    checkCurrent();
     const render: StoredRender = {
       generation,
       yaml: result.yaml,
@@ -246,8 +257,7 @@ export class RenderService {
       ...(userinfo ? { userinfo } : {}),
     };
     if (opts.dry) return { from: 'fresh', render, report, result };
-    this.cache.set(key, { render, report: result.report.items });
-    while (this.cache.size > (this.opts.cacheSize ?? 256)) this.cache.delete(this.cache.keys().next().value!);
+
     this.remember(profileId, target, render);
     return { from: 'fresh', render, report };
   }
@@ -256,13 +266,15 @@ export class RenderService {
    * 收集节点集（含组合成员，递归）并取得远程订阅源的快照。处理链逐步预览也用它。
    * 返回的 hashes 用作缓存键的一部分（用快照哈希而不是正文）。
    */
-  async loadNodeSets(refs: NodeSetID[]): Promise<{ inputs: NodeSetInputs; userinfo: Map<string, TrafficInfo>; hashes: string[]; report: ReportItem[] }> {
-    const { inputs, sources } = this.collectNodeSets(refs);
+  async loadNodeSets(refs: NodeSetID[], owner?: string | null): Promise<{ inputs: NodeSetInputs; userinfo: Map<string, TrafficInfo>; hashes: string[]; report: ReportItem[]; snapshots: {snapshot:SnapshotRow;revision?:string}[] }> {
+    const { inputs, sources } = this.collectNodeSets(refs, owner);
     const userinfo = new Map<string, TrafficInfo>();
     const hashes: string[] = [];
+    const snapshots: {snapshot:SnapshotRow;revision?:string}[] = [];
     const report: ReportItem[] = [];
     for (const src of sources) {
-      const r = await this.snapshots.get('source', src.id, src.url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
+      const r = await this.snapshots.get('source', src.id, src.url, {});
+      if (r.snapshot) snapshots.push({snapshot:r.snapshot,revision:r.revision});
       if (r.snapshot?.body !== undefined) {
         inputs.snapshots[src.id] = [r.snapshot.body];
         hashes.push(`${src.id}|${src.url}|${r.snapshot.hash}`);
@@ -270,29 +282,35 @@ export class RenderService {
       }
       if (r.error) report.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
     }
-    return { inputs, userinfo, hashes, report };
+    return { inputs, userinfo, hashes, report, snapshots };
   }
 
-  private collectNodeSets(refs: NodeSetID[]): { inputs: NodeSetInputs; sources: SourceDoc[] } {
+  collectNodeSets(refs: NodeSetID[], owner?: string | null): { inputs: NodeSetInputs; sources: SourceDoc[] } {
     const inputs: NodeSetInputs = { sources: {}, collections: {}, locals: {}, snapshots: {} };
     const seen = new Set<string>();
-    const walk = (ref: NodeSetID) => {
+    const walk = (ref: NodeSetID, expectedOwner?: string | null) => {
+      const row = this.store.getWithOwner(ref.type, ref.id);
+      if (row && expectedOwner && row.owner !== expectedOwner) throw new ResourceAccessError();
       const k = `${ref.type}:${ref.id}`;
       if (seen.has(k)) return;
       seen.add(k);
       if (ref.type === 'source') { const d = this.store.get('source', ref.id); if (d) inputs.sources[d.id] = d; }
       else if (ref.type === 'local') { const d = this.store.get('local', ref.id); if (d) inputs.locals[d.id] = d; }
-      else { const d = this.store.get('collection', ref.id); if (d) { inputs.collections[d.id] = d; d.members.forEach((m) => walk(m.ref)); } }
+      else { const d = this.store.get('collection', ref.id); if (d) { inputs.collections[d.id] = d; d.members.forEach((m) => walk(m.ref, expectedOwner)); } }
     };
-    refs.forEach(walk);
+    refs.forEach(ref => walk(ref, owner ?? this.store.getWithOwner(ref.type, ref.id)?.owner));
     return { inputs, sources: Object.values(inputs.sources) as SourceDoc[] };
   }
 
   /** 模板规则与 Profile 私有规则引用到的规则集 */
-  private collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RuleSetInputs {
+  collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined, owner = this.store.getWithOwner('profile', profile.id)?.owner): RuleSetInputs {
     const out: RuleSetInputs = { rulesets: {}, snapshots: {} };
     const visit = (m: Matcher) => {
       if (m.kind !== 'ruleset') return;
+      if (!m.remote && !m.repository && owner) {
+        const row = this.store.getWithOwner('ruleset', m.id);
+        if (row?.owner && row.owner !== owner && this.store.getUser(row.owner)?.role !== 'admin') throw new ResourceAccessError();
+      }
       const d = resolveRuleSetReference(m, this.store);
       if (d) out.rulesets[m.id] = d;
     };

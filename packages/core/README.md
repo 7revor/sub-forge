@@ -96,3 +96,7 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 
 
 2026-10-30 表单空值约定：中文 placeholder 不进入领域模型或渲染结果。未配置字段继续省略、覆盖继续按既有规则继承；显式 false / 0 不等于未配置。IR、渲染逻辑与示例种子不变。
+
+## 服务端统一资源缓存接入（2026-10-30）
+
+`RenderInput.managedResources` 启用统一托管；`resourceIntervalSec` 指定 provider 间隔，服务端总是传入系统值。文本统一 classical LIST，符合限制的 MRS 原字节托管，SRS 报错。内核独立调用保留旧默认参数兼容性；生产策略由服务端确定。

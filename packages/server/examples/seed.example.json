@@ -4,7 +4,6 @@
       "id": "remote-example",
       "name": "远程订阅（示例，需改成真实地址）",
       "url": "https://[YOUR-SUBSCRIPTION-URL]",
-      "fetch": { "ua": "clash.meta", "ttlSec": 3600 },
       "pipeline": [
         { "op": "filter.useless" },
         { "op": "rename.regex", "rules": [{ "pattern": "^香港\\s*(\\d+).*$", "replace": "HK-$1" }, { "pattern": "^日本\\s*(\\d+).*$", "replace": "JP-$1" }, { "pattern": "^摩尔多瓦\\s*(\\d+).*$", "replace": "MD-$1" }] },

@@ -35,7 +35,7 @@ const queryClient = new QueryClient({
     queries: {
       // 401 / 403 / 404 重试没有意义
       retry: (n, err) => !(err instanceof ApiError && err.status < 500) && n < 2,
-      refetchOnWindowFocus: false,
+      staleTime: 0, gcTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: 'always', refetchOnReconnect: 'always',
     },
   },
 });

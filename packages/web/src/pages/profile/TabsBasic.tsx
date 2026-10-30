@@ -1,3 +1,7 @@
+import type { ChainRule } from '@sub-forge/core';
+import { ChainRuleEditor, chainForLanding } from './ChainRuleEditor.tsx';
+import { nodeSetKey, putChain } from './memberModel.ts';
+import { targetLabel } from '../../components/pickers.tsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from '../../components/ui/alert-dialog.tsx';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
@@ -80,11 +84,7 @@ export function TabOverview() {
         </Card>
         <Card title="输出设置" className="min-w-0">
           <div className="flex flex-col gap-3.5">
-            <Field label="更新间隔">{(id) => (
-              <Select placeholder="选择客户端自动更新订阅的间隔" id={id} value={String(draft.updateIntervalSec ?? 86400)} onChange={(e) => setDraft({ ...draft, updateIntervalSec: Number(e.target.value) })}>
-                {[[86400, '24 小时'], [43200, '12 小时'], [21600, '6 小时'], [3600, '1 小时']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </Select>
-            )}</Field>
+            <p className="text-[13px] text-muted">更新间隔由管理员在系统中统一设置。</p>
             <Field label="流量 / 到期信息">{(id) => (
               <Select placeholder="选择订阅流量与到期信息的来源" id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={(e) => {
                 const v = e.target.value;
@@ -207,8 +207,9 @@ export function TabBase() {
 
 /** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
 export function TabNodeSets() {
-  const { draft, setDraft, allNodeSets, nodeSetName } = useProfile();
+  const { draft, setDraft, allNodeSets, nodeSetName, groupName } = useProfile();
   const [adding, setAdding] = useState(false);
+  const [editingChain, setEditingChain] = useState<ChainRule>();
   const chained = new Set(draft.chains.map((c) => `${c.landing.nodeSet.type}:${c.landing.nodeSet.id}`));
 
   return (
@@ -221,10 +222,12 @@ export function TabNodeSets() {
               <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
             </div>
             <Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} />
+            <Button size="sm" onClick={() => setEditingChain(chainForLanding(draft.chains, { nodeSet: n.ref }))}>{(() => { const c = draft.chains.find(c => nodeSetKey(c.landing.nodeSet) === nodeSetKey(n.ref) && !c.landing.filter && !c.landing.excludeFilter); return c ? `整集前置：${targetLabel(c.via, groupName, nodeSetName)}` : '设置整集前置'; })()}</Button>
             <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
           </li>)}
         </ul>}
       </Card>
+      <Dialog open={!!editingChain} onOpenChange={open => { if (!open) setEditingChain(undefined); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>节点集前置</DialogTitle></DialogHeader>{editingChain && <ChainRuleEditor key={editingChain.id} initial={editingChain} fixedLanding onCancel={() => setEditingChain(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); setEditingChain(undefined); }} onRemove={draft.chains.some(c => c.id === editingChain.id) ? () => { setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== editingChain.id) }); setEditingChain(undefined); } : undefined} />}</DialogContent></Dialog>
       <NodeSetPickerDialog open={adding} options={allNodeSets} added={draft.nodeSets.map((n) => n.ref)} onClose={() => setAdding(false)}
         onAdd={(refs) => setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...refs.map((ref) => ({ ref, output: 'provider' as const }))] })} />
     </>

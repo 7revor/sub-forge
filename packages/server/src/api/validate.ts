@@ -9,7 +9,6 @@ import { compileUserRegex, findCollectionCycles, isYamlRuleUrl, rawRuleError, ty
 import type { DocKind, DocTypes, RuleSetDoc } from '../docs.ts';
 import type { Store, User } from '../store.ts';
 import { normalizeRuleSet, promoteRuleSetOverrides } from '../legacy-rules.ts';
-import { MIN_TTL_SEC } from '../snapshots.ts';
 import { normalizeSourceFetch, sourceUrl } from '../source-url.ts';
 import { bad, isStr } from './common.ts';
 import { checkRuleSetReference, type RuleSetMatcher } from '../ruleset-reference.ts';
@@ -73,7 +72,6 @@ export function checkFetch(fetch: unknown, source = false): void {
   if (!isObj(fetch)) throw bad('拉取参数格式错误');
   if (!source && fetch.ua !== undefined && typeof fetch.ua !== 'string') throw bad('User-Agent 必须是字符串');
   if (!source && fetch.timeoutMs !== undefined && !(typeof fetch.timeoutMs === 'number' && Number.isSafeInteger(fetch.timeoutMs) && fetch.timeoutMs > 0 && fetch.timeoutMs <= 4294967295)) throw bad('超时必须是正整数毫秒，且不超过 4294967295');
-  if (fetch.ttlSec !== undefined && !(typeof fetch.ttlSec === 'number' && Number.isFinite(fetch.ttlSec) && fetch.ttlSec >= MIN_TTL_SEC)) throw bad(`${source ? '自动更新时间' : '快照有效期'}不能短于 ${MIN_TTL_SEC / 60} 分钟`);
 }
 
 function checkPipeline(steps: unknown, where: string, user: User): void {
@@ -324,6 +322,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       }
       break;
     }
+  }
+  delete doc.updateIntervalSec;
+  if (kind === 'ruleset') for (const source of (doc.sources ?? []) as {fetch?:Record<string,unknown>}[]) {
+    if (source.fetch) { delete source.fetch.ttlSec;if(!Object.keys(source.fetch).length)delete source.fetch; }
   }
   return doc as unknown as DocTypes[K];
 }

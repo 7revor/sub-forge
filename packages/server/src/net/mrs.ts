@@ -89,7 +89,7 @@ function ipRanges(r: Reader): string[] {
 }
 
 /** 以压缩魔数识别 MRS，不依赖 URL 扩展名；解码后的 classical 文本继续走统一转换器。 */
-export async function decodeRuleBytes(bytes: Buffer): Promise<string> {
+export async function decodeRuleBytes(bytes: Buffer, expectedBehavior?: 'domain' | 'ipcidr' | 'classical'): Promise<string> {
   if (bytes.subarray(0, 3).toString('ascii') === 'SRS') throw new Error('暂不支持 SRS 二进制规则，请使用文本或 YAML 来源');
   if (bytes.length < 4 || bytes.readUInt32LE(0) !== 0xfd2fb528) return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   if (typeof zlib.zstdDecompress !== 'function') throw new Error('MRS 转换需要 Node.js 22.15 或更新版本');
@@ -97,6 +97,7 @@ export async function decodeRuleBytes(bytes: Buffer): Promise<string> {
   const r = new Reader(decoded);
   if (!r.bytes(4).equals(Buffer.from([77, 82, 83, 1]))) throw invalid();
   const behavior = r.byte();
+  if (expectedBehavior && (expectedBehavior === 'domain' ? behavior !== 0 : expectedBehavior === 'ipcidr' ? behavior !== 1 : true)) throw new Error('MRS 实际类型与配置的 behavior 不一致');
   r.length(MAX_RULES); // 原始条数用于元数据，实际输出独立设上限。
   r.bytes(r.length()); // 保留字段。
   const lines = behavior === 0 ? domains(r) : behavior === 1 ? ipRanges(r) : (() => { throw invalid(); })();

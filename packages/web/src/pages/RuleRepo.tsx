@@ -1,3 +1,4 @@
+import { RefreshCacheButton } from '../components/ResourceCache.tsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
 // 文件搜索分页读取数据库索引，点击表格中的文件后弹窗预览原文。
 import { nameSearchRanges } from '@sub-forge/core';
@@ -12,7 +13,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleRepo, type RepoFilePreview } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
-import { Badge, Button, ErrorAlert, Input, PageHeader, td, th } from '../components/ui.tsx';
+import { Badge, Button, ErrorAlert, Input, PageHeader, formatTime, td, th } from '../components/ui.tsx';
 
 const loadFiles = ruleOptionsLoader('repository');
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
@@ -22,7 +23,7 @@ function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos:
   return <>
     <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
       <table aria-label="规则文件" aria-busy={page.isFetching} className="w-full min-w-[640px] border-collapse">
-        <thead className="sticky top-0 z-10 bg-panel"><tr>{['文件名', '路径', '仓库', '分支'].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
+        <thead className="sticky top-0 z-10 bg-panel"><tr>{['文件名', '路径', '仓库', '分支', '操作'].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
         <tbody>{page.options.map(option => {
           const selection = JSON.parse(option.value) as RepositoryFile;
           const repoName = repos.find(repo => repo.id === selection.repo)?.name ?? selection.repo;
@@ -35,6 +36,7 @@ function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos:
             <td className={`${td} break-all font-mono text-[12px] text-ink-muted`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></td>
             <td className={`${td} text-ink-muted`}>{repoName}</td>
             <td className={`${td} text-ink-muted`}>{selection.file.ref}</td>
+            <td className={td}><RefreshCacheButton kind="repository-file" id={selection.file.path} name={option.label} endpoint="/rule-repos/file-refresh" body={{repo:selection.repo,ref:selection.file.ref,path:selection.file.path}}/></td>
           </tr>;
         })}</tbody>
       </table>
@@ -94,6 +96,7 @@ export function RuleRepoPage() {
             <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-brand">打开原文件</a>
             <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>
           </div>}
+          {file?.cache?.error && !preview.isFetching && <p role="status" className="text-[13px] text-amber-700">拉取失败：{file.cache.error}；正在显示上次成功内容（{file.cache.lastSuccessAt ? formatTime(file.cache.lastSuccessAt) : '时间未知'}）。</p>}
           <ErrorAlert error={preview.error ?? create.error} />
           {preview.isError && <Button size="sm" onClick={() => void preview.refetch()}>重试读取文件</Button>}
         </div>

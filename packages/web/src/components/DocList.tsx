@@ -1,3 +1,4 @@
+import { RefreshCacheButton, ResourceCacheStatus } from './ResourceCache.tsx';
 // 文档列表：服务端搜索与分页，搜索栏和分页器固定，表格占满剩余高度并独立滚动。
 // 空列表保留分页和搜索；每行操作为「删除」「编辑」，删除先弹确认。
 
@@ -33,6 +34,8 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
     ? <Button variant={variant} size={size} onClick={onCreate}>{size === 'md' && <Plus size={16} />}新建{name}</Button>
     : <Link to={`/${kind}/new`} className={buttonClass(variant, size)}>{size === 'md' && <Plus size={16} />}新建{name}</Link>;
   const rows = list.data?.items ?? [];
+  const refreshable=['sources','collections','rulesets','profiles'].includes(kind);
+  const canRefresh=(d:DocMap[K])=>kind!=='rulesets'||(d as DocMap['rulesets']).sources.some(s=>s.kind==='remote'&&s.enabled!==false);
   return (
     <>
       <PageHeader title={title} subtitle={intro} actions={canCreate && createButton('md', 'primary')} />
@@ -47,7 +50,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
             <div className="p-4"><Empty title={q.trim() ? `没有名称包含「${q.trim()}」的${name}` : `还没有${name}`} description={!q.trim() && empty} action={!q.trim() && canCreate && createButton('sm', 'default')} /></div>
           ) : (
             <table className="w-full border-collapse">
-              <thead><tr>{columns.map((c) => <th key={c.header} className={cx(th, 'px-3.5')}>{c.header}</th>)}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
+              <thead><tr>{columns.map((c) => <th key={c.header} className={cx(th, 'px-3.5')}>{c.header}</th>)}{refreshable && <th className={th}>资源缓存</th>}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
               <tbody>
                 {rows.map((d) => (
                   <DocTableRow key={d.id} to={`/${kind}/${d.id}`}>
@@ -56,7 +59,9 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                         {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}>{c.cell(d)}</Link> : c.cell(d)}
                       </td>
                     ))}
+                    {refreshable && <td className={td}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
                     <td className={cx(td, 'text-right whitespace-nowrap')}>
+                      {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
                       <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} className="mr-2" onClick={() => { del.reset(); setDeleting(d); }}>删除</Button>
                       <DocActionLink to={`/${kind}/${d.id}`} name={d.name} />
                     </td>

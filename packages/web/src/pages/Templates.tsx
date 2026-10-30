@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stableStringify, type ReportItem } from '@sub-forge/core';
 import { Pencil, Plus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
@@ -125,10 +125,22 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const locate = (where: string) => {
     if (where.startsWith('group:')) { setGroup(where.slice(6)); setRule(undefined); }
     if (where.startsWith('rule:')) { setRule(where.slice(5)); setGroup(undefined); }
-    if (where === 'final') setRule('final');
+    if (where === 'final') {
+      setRule(undefined);
+      document.getElementById('template-rule-final')?.querySelector('button')?.focus();
+    }
   };
 
-  // 只同步最初读取及保存结果；后台重新获取数据不会覆盖尚未保存的页面草稿。
+  // 实时通知更新未编辑页面，保留已经修改的草稿及 YAML 输入。
+  const previousInitial = useRef(initial);
+  useEffect(() => {
+    if (initial === previousInitial.current) return;
+    previousInitial.current = initial;
+    if (initial && !dirty && !yamlDirty) {
+      const next = draftFromTemplate(initial);
+      setBase(next); setDraft(next);
+    }
+  }, [initial, dirty, yamlDirty]);
   useEffect(() => {
     if (!draft.name.trim() || draftIssues(draft.body).length) return;
     let active = true;

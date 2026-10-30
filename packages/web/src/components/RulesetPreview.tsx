@@ -28,7 +28,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
   const body = { inputs, sourceId, ...process, client: t.client, platform: t.platform };
   const settled = JSON.stringify(process) === JSON.stringify({ overrides });
   const preview = useQuery({
-    queryKey: ['rule-conversion', body], enabled: ready && settled, retry: false, staleTime: 60_000,
+    queryKey: ['rule-conversion', body], enabled: ready && settled, retry: false, staleTime: 0,
     queryFn: () => api<Result>('POST', '/rules/convert', body),
     placeholderData: (previous, query) => {
       // 切换来源不能把旧来源内容当作新来源展示；客户端切换允许保留并明确标注旧结果。
@@ -48,7 +48,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
     : pending ? result ? `正在更新，暂显示上次${previousLabel ? ` ${previousLabel}` : ''}结果…` : '正在加载规则…'
     : preview.error ? `更新失败，暂显示上次${previousLabel ? ` ${previousLabel} ` : ''}结果。`
     : result?.delivery.mode === 'unsupported' ? result.delivery.reason
-    : result?.passthrough ? '二进制来源由客户端读取，无法展示文本。' : null;
+    : result?.passthrough ? 'MRS 由服务端缓存并原样托管，无法展示文本；SRS 暂不支持。' : null;
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
     <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
       {TARGETS.map(x => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}

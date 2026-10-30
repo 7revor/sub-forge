@@ -53,10 +53,10 @@ describe('来源获取与服务端转换分离', () => {
     expect(ios.json.stats).toMatchObject({ rejected: 1, unsupported: 1, output: 2 });
     expect(calls).toHaveLength(1);
     await alice.post('/api/rulesets/source', { source: { ...remote, name: '重命名' } });
-    expect(calls).toHaveLength(1);
-    await alice.post('/api/rulesets/source', { source: { ...remote, fetch: { ua: 'different' } } });
     expect(calls).toHaveLength(2);
-    expect(calls[1]!.ua).toBe('different');
+    await alice.post('/api/rulesets/source', { source: { ...remote, fetch: { ua: 'different' } } });
+    expect(calls).toHaveLength(3);
+    expect(calls[2]!.ua).toBe('different');
   });
 
   it('已保存来源 GET 鉴权，草稿不落快照，用户缓存相互隔离', async () => {
