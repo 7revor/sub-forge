@@ -47,8 +47,8 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
     const proxies = (config.proxies as Fields[]).flatMap(node => {
       const copy = { ...node };
       if (copy['dialer-proxy'] !== undefined) {
-        let internal = String(node.name) + ' · 链落地', i = 2;
-        while (names.has(internal)) internal = String(node.name) + ' · 链落地 ' + i++;
+        let internal = String(node.name) + '_链落地', i = 2;
+        while (names.has(internal)) internal = String(node.name) + '_链落地_' + i++;
         names.add(internal);
         chains.push(iniName(node.name) + ' = ' + iniName(String(node['dialer-proxy'])) + ', ' + iniName(internal) + (node.udp === undefined ? '' : ', udp=' + iniValue(node.udp)));
         copy.name = internal; delete copy['dialer-proxy'];

@@ -9,13 +9,14 @@ function fixture(result = plan()) {
 }
 it('导入全部配置段，保留原落地、两个独立命名链与 VLESS SNI', () => {
   const p = plan(); expect(p.report.filter(r => r.level === 'error')).toEqual([]);
+  expect(p.locals[0]!.name).toBe('导入样例_本地节点');
   expect(p.profile.chains).toHaveLength(2); expect(p.locals[0]!.proxies.map(n => n.name)).toEqual(['入口', '落地', '命名链', '地区链']);
   expect(p.locals[0]!.proxies[0]).toHaveProperty('servername', 'tls.example.test');
   expect(p.profile.base.common).toEqual({ dnsServers: ['223.5.5.5'], testUrl: 'https://example.test/204', testTimeoutMs: 3000 });
   const f = fixture(p), before = JSON.stringify(f), out = renderLoon(f);
   expect(out.report.items.filter(r => r.level === 'error')).toEqual([]);
-  expect(out.yaml).toContain('[Proxy Chain]\n命名链 = 入口, 命名链 · 链落地, udp=true');
-  expect(out.yaml).toContain('地区链 = 香港节点, 地区链 · 链落地, udp=true');
+  expect(out.yaml).toContain('[Proxy Chain]\n命名链 = 入口, 命名链_链落地, udp=true');
+  expect(out.yaml).toContain('地区链 = 香港节点, 地区链_链落地, udp=true');
   expect(out.yaml).toContain('落地 = Shadowsocks, exit.example.test');
   expect(out.yaml).toContain('香港节点 = select, 香港远程');
   expect(out.yaml).toContain('url=https://example.test/204');
@@ -39,6 +40,28 @@ it('完整 Loon 输出可重新导入，保留链与规则，不把链当作普�
   const text = renderLoon(fixture()).yaml;
   const next = plan(text); expect(next.report.filter(r => r.level === 'error')).toEqual([]);
   expect(next.profile.chains).toHaveLength(2);
+});
+it('链落地辅助名称使用下划线避让已有节点和策略组，引用及往返导入保持一致', () => {
+  const text = loonFull
+    .replace('[Proxy]\n', '[Proxy]\n命名链_链落地 = Shadowsocks,reserved.example.test,8388,aes-128-gcm,"example"\n')
+    .replace('[Proxy Group]\n', '[Proxy Group]\n命名链_链落地_2 = select,DIRECT\n');
+  const out = renderLoon(fixture(plan(text)));
+  expect(out.report.hasErrors).toBe(false);
+  expect(out.yaml).toContain('命名链_链落地 = Shadowsocks, reserved.example.test');
+  expect(out.yaml).toContain('命名链_链落地_2 = select, DIRECT');
+  expect(out.yaml).toContain('命名链_链落地_3 = Shadowsocks, exit.example.test');
+  expect(out.yaml).toContain('命名链 = 入口, 命名链_链落地_3, udp=true');
+  expect(out.yaml).not.toContain(' · ');
+  const next = plan(out.yaml);
+  expect(next.report.filter(r => r.level === 'error')).toEqual([]);
+  expect(next.profile.chains).toHaveLength(2);
+});
+it('辅助后缀使用下划线，用户原有名称中的间隔号和 emoji 保持原样', () => {
+  const name = '🇺🇸 GCP · 自定义';
+  const out = renderLoon(fixture(plan(loonFull.replaceAll('命名链', name))));
+  expect(out.report.hasErrors).toBe(false);
+  expect(out.yaml).toContain(name + '_链落地 = Shadowsocks, exit.example.test');
+  expect(out.yaml).toContain(name + ' = 入口, ' + name + '_链落地, udp=true');
 });
 it.each([
   ['FINAL,科学上网', ''], ['科学上网 = select,命名链', '科学上网 = select,Test'],
