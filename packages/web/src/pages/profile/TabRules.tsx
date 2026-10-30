@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, FieldError, Field, Input, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, FieldError, Field, Input, Select, cx } from '../../components/ui.tsx';
 import { useRuleSetRefs } from '../../hooks.ts';
 import { useProfile, ProfileContext } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
@@ -57,10 +57,6 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
       }} onChange={(matcher) => onChange({ ...value, matcher })} />
     <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-ink-muted">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
-    {matcher.kind === 'ruleset' && <div className="flex flex-wrap gap-5">
-      <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={value.options?.src === true}
-        onChange={(src) => onChange({ ...value, options: { ...value.options, src } })} />src</label>
-    </div>}
     {matcher.kind !== 'ruleset' && <details>
       <summary className="cursor-pointer text-[13px] font-medium">客户端覆盖（{matcher.overrides?.length ?? 0} 条）</summary>
       <div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={(overrides) => onChange({ ...value, matcher: { ...matcher, overrides } })} /></div>
