@@ -100,3 +100,5 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 ## 服务端统一资源缓存接入（2026-10-30）
 
 `RenderInput.managedResources` 启用统一托管；`resourceIntervalSec` 指定 provider 间隔，服务端总是传入系统值。文本统一 classical LIST，符合限制的 MRS 原字节托管，SRS 报错。内核独立调用保留旧默认参数兼容性；生产策略由服务端确定。
+
+2026-10-30 刷新进度列表调整仅涉及服务端任务状态与前端展示，核心资源依赖、IR、渲染行为及示例种子保持原有格式。

@@ -9,7 +9,8 @@ import type { SnapshotFetchOptions, SnapshotService } from './snapshots.ts';
 import type { SnapshotOwner, Store } from './store.ts';
 
 export type Resource = { kind:SnapshotOwner; id:string; name:string; url:string; options:SnapshotFetchOptions };
-export type RefreshResult = { name:string; ok:boolean; available:boolean; error?:string };
+// 旧任务仅含已完成结果，没有 state；新任务从创建起保留完整、有序的资源列表。
+export type RefreshResult = { name:string; state?:'pending'|'running'|'done'|'interrupted'; ok?:boolean; available:boolean; error?:string };
 export type RefreshJob = { id:string; owner:string; kind:string; documentId:string; state:'running'|'done'|'interrupted'; total:number; completed:number; results:RefreshResult[]; render?:{ok:boolean;error?:string}; error?:string };
 export class ResourceService {
   private readonly running = new Map<string, Promise<void>>();
@@ -22,7 +23,12 @@ export class ResourceService {
     store.db.exec('CREATE TABLE IF NOT EXISTS refresh_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL, at INTEGER NOT NULL)');
     for (const row of store.db.prepare('SELECT data FROM refresh_jobs').all() as {data:string}[]) {
       const job = JSON.parse(store.cipher.decrypt(row.data)) as RefreshJob;
-      if (job.state === 'running') { job.state = 'interrupted';job.error = '服务重启，刷新任务已中断，请重新刷新';this.save(job); }
+      if (job.state === 'running') { job.state = 'interrupted';job.error = '服务重启，刷新任务已中断，请重新刷新';this.interruptPending(job);this.save(job); }
+    }
+  }
+  private interruptPending(job:RefreshJob) {
+    for (const result of job.results) {
+      if (result.ok === undefined) result.state = 'interrupted';
     }
   }
   private save(job:RefreshJob) {
@@ -71,10 +77,13 @@ export class ResourceService {
       ...this.store.listLatestTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,'public-template'))),
     ]);
   }
-  private async each(resources:Resource[],read:(r:Resource)=>Promise<void>) {
+  private async each(resources:Resource[],read:(r:Resource,index:number)=>Promise<void>) {
     let next = 0;
     const results = await Promise.allSettled(Array.from({length:Math.min(4,resources.length)},async()=>{
-      while (!this.stopping && next < resources.length) await read(resources[next++]!);
+      while (!this.stopping && next < resources.length) {
+        const index = next++;
+        await read(resources[index]!,index);
+      }
     }));
     const errors = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
     if (errors.length) throw new AggregateError(errors.map(r => r.reason), '资源刷新执行失败');
@@ -86,17 +95,19 @@ export class ResourceService {
     const resources = this.unique(explicit ?? this.collect(kind,id));
     const dependencyKey = (items:Resource[]) => JSON.stringify(this.unique(items).map(r=>this.snapshots.identity(r.kind,r.id,r.url,r.options)).sort());
     const initialDependencies = dependencyKey(resources);
-    const job:RefreshJob = {id:randomId(),owner,kind,documentId:id,state:'running',total:resources.length,completed:0,results:[]};
+    const job:RefreshJob = {id:randomId(),owner,kind,documentId:id,state:'running',total:resources.length,completed:0,results:resources.map(r=>({name:r.name,state:'pending',available:this.snapshots.status(r.kind,r.id,r.url,r.options).available}))};
     this.save(job);
     const work = (async()=>{
-      await this.each(resources,async r=>{
+      await this.each(resources,async (r,index)=>{
         if (!explicit) {
           const root = this.store.getWithOwner(kind as 'source'|'collection'|'ruleset'|'profile', id);
           if (!root || root.owner !== owner) throw new ResourceAccessError();
           if (dependencyKey(this.collect(kind,id)) !== initialDependencies) throw new Error('刷新期间资源配置已变化，请重新刷新');
         }
+        const item = job.results[index]!;
+        item.state = 'running';this.save(job);
         const result = await this.snapshots.refresh(r.kind,r.id,r.url,r.options);
-        job.results.push({name:r.name,ok:result.ok,available:!!this.store.latestSnapshot(r.kind,result.ownerId,r.url),error:result.error});
+        Object.assign(item,{state:'done',ok:result.ok,available:!!this.store.latestSnapshot(r.kind,result.ownerId,r.url),error:result.error});
         job.completed++; this.save(job);
       });
       if (this.stopping) { job.state='interrupted';job.error='服务关闭，刷新任务已中断';return; }
@@ -119,7 +130,7 @@ export class ResourceService {
         job.state='interrupted';job.error='刷新期间资源配置已变化，请重新刷新';return;
       }
       job.state='done';
-    })().catch(error=>{job.state='interrupted';job.error=error instanceof Error?error.message:String(error);}).finally(()=>{this.save(job);this.running.delete(job.id);});
+    })().catch(error=>{job.state='interrupted';job.error=error instanceof Error?error.message:String(error);}).finally(()=>{if(job.state==='interrupted')this.interruptPending(job);this.save(job);this.running.delete(job.id);});
     this.running.set(job.id,work);
     return job;
   }

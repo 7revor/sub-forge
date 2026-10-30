@@ -1,0 +1,226 @@
+{
+  "start": {
+    "height": 576,
+    "rows": [
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · stripe.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · wise.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · schwab.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · ibkr.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · paypal.txt",
+        "state": "等待刷新"
+      }
+    ],
+    "status": "正在刷新：0 / 5",
+    "width": 672
+  },
+  "partial": {
+    "height": 576,
+    "rows": [
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · stripe.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · wise.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · schwab.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · ibkr.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · paypal.txt",
+        "state": "刷新中…"
+      }
+    ],
+    "status": "正在刷新：1 / 5",
+    "width": 672
+  },
+  "done": {
+    "height": 576,
+    "rows": [
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · stripe.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · wise.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · schwab.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · ibkr.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · paypal.txt",
+        "state": "拉取成功"
+      }
+    ],
+    "status": "已完成：5 项成功，0 项失败",
+    "width": 672
+  },
+  "retry": {
+    "height": 576,
+    "rows": [
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · stripe.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · wise.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · schwab.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · ibkr.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · paypal.txt",
+        "state": "等待刷新"
+      }
+    ],
+    "status": "正在刷新：0 / 5",
+    "width": 672
+  },
+  "failed": {
+    "height": 576,
+    "rows": [
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · stripe.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · wise.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · schwab.txt",
+        "state": "模拟远程规则服务暂时不可用，错误详情较长时仍保持单行状态，可悬停查看完整信息 · 继续使用上次成功内容"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · ibkr.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · paypal.txt",
+        "state": "拉取成功"
+      }
+    ],
+    "status": "已完成：4 项成功，1 项失败",
+    "width": 672
+  },
+  "profileStart": {
+    "height": 609,
+    "rows": [
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · stripe.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · wise.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · schwab.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · ibkr.txt",
+        "state": "刷新中…"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · paypal.txt",
+        "state": "等待刷新"
+      }
+    ],
+    "status": "正在刷新：0 / 5",
+    "width": 672
+  },
+  "profileDone": {
+    "height": 609,
+    "rows": [
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · stripe.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · wise.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · schwab.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · ibkr.txt",
+        "state": "拉取成功"
+      },
+      {
+        "height": 65,
+        "name": "Finance / v2fly-domain-list · paypal.txt",
+        "state": "拉取成功"
+      }
+    ],
+    "status": "已完成：5 项成功，0 项失败",
+    "width": 672
+  }
+}
