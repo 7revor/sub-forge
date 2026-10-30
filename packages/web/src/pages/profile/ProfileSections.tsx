@@ -20,7 +20,7 @@ export function ProfileSections({ initialSection, routingReady = true, before, o
   return <>
     <nav aria-label="订阅页内导航" className="sticky top-0 z-10 -mt-1 flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-ground py-2">
       {SECTIONS.map(([key, label]) => <Button key={key} variant="ghost" size="sm" className="shrink-0" onClick={() => jump(key)}>{label}</Button>)}
-      {overview && <Button variant="ghost" size="sm" className="shrink-0" onClick={() => jump('overview')}>订阅链接</Button>}
+      {overview && <Button variant="ghost" size="sm" className="shrink-0" onClick={() => jump('overview')}>输出与访问</Button>}
     </nav>
     {before}
     <section ref={el => { sections.current.nodesets = el; }} className="scroll-mt-16"><TabNodeSets /></section>
@@ -31,6 +31,6 @@ export function ProfileSections({ initialSection, routingReady = true, before, o
     </>}
     <details ref={el => { sections.current.base = el; }} open={baseOpen} onToggle={e => setBaseOpen(e.currentTarget.open)} className="scroll-mt-16 rounded-lg border border-line bg-panel p-4"><summary className="cursor-pointer text-[14px] font-semibold">基础设置</summary><div className="mt-4 flex flex-col gap-4"><TabBase /></div></details>
     <details ref={el => { sections.current.preview = el; }} open={previewOpen} onToggle={e => setPreviewOpen(e.currentTarget.open)} className="scroll-mt-16 rounded-lg border border-line bg-panel p-4"><summary className="cursor-pointer text-[14px] font-semibold">预览配置</summary>{previewOpen && <div className="mt-4 flex flex-col gap-4"><TabPreview /></div>}</details>
-    {overview && <section ref={el => { sections.current.overview = el; }} className="flex scroll-mt-16 flex-col gap-4"><h2 className="m-0 text-[15px] font-semibold">订阅链接与输出</h2>{overview}</section>}
+    {overview && <section ref={el => { sections.current.overview = el; }} className="flex scroll-mt-16 flex-col gap-4"><h2 className="m-0 text-[15px] font-semibold">输出与访问</h2>{overview}</section>}
   </>;
 }

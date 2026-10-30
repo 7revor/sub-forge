@@ -6,16 +6,15 @@ import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chain
 import { Frame } from '../../modals/Frame.tsx';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
-import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
+import { accessLogOptions } from '../../hooks/documentQueries.ts';
 import { Notice } from '../../components/Notice.tsx';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
 import { NodeSetPreviewModal } from '../../components/NodeSetPreviewModal.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
-import { CopyButton } from '../../components/CopyButton.tsx';
-// Profile 标签：概览（订阅链接、输出设置、访问日志）、基础设置、节点集。
+// Profile 标签：概览（输出设置、访问日志）、基础设置、节点集。
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Copy, Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
+import { Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
@@ -30,34 +29,18 @@ import { useProfile } from './context.ts';
 
 const SOURCE_TEXT: Record<string, string> = { fresh: '未命中', cache: '命中', 'last-good': '上次成功结果', failed: '失败', unsupported: '不支持' };
 
-/** 概览（设计稿「Profile · 概览」）：订阅链接、输出设置、访问日志 */
+/** 概览（设计稿「Profile · 概览」）：输出设置、访问日志 */
 export function TabOverview() {
   const { draft, setDraft, allNodeSets } = useProfile();
-  const tokens = useQuery(tokenOptions(draft.id));
   const log = useQuery(accessLogOptions(draft.id));
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
   const sources = allNodeSets.filter((n) => n.ref.type === 'source' && draft.nodeSets.some((p) => p.ref.type === 'source' && p.ref.id === n.ref.id));
   const rows = log.data ?? [];
-  const subscription = tokens.data?.[0];
-  const lastSeen = rows[0]?.at;
   const lastGood = rows.find((r) => r.status === 200 && (r.source === 'fresh' || r.source === 'cache'));
 
   return (
     <>
       <div className="grid grid-cols-1 gap-5">
-        <Card className="min-w-0" title="订阅链接">
-          <ErrorAlert error={tokens.error} />
-          {subscription ? (
-            <div className="flex flex-col gap-3">
-              <p className="m-0 text-[13px] text-ink-muted">所有设备使用同一链接，自动适配 Mihomo、Surge、Loon 或 Stash；浏览器打开显示 Mihomo 配置。</p>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <a className="min-w-0 flex-[1_1_280px] break-all rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px] text-accent-ink hover:underline" href={subscription.url} target="_blank" rel="noreferrer">{subscription.url}</a>
-                <CopyButton className="h-9" text={subscription.url}><Copy size={13} />复制链接</CopyButton>
-              </div>
-              <span className="text-[12px] text-ink-muted">{lastSeen ? `最近访问 ${formatRelativeTime(lastSeen)}` : '从未访问'}</span>
-            </div>
-          ) : tokens.isPending ? <p className="m-0 text-[13px] text-ink-muted">正在加载订阅链接…</p> : <Button onClick={() => void tokens.refetch()}>重新加载链接</Button>}
-        </Card>
         <Card title="输出设置" className="min-w-0">
           <div className="flex flex-col gap-3.5">
             <p className="text-[13px] text-muted">更新间隔由管理员在系统中统一设置。</p>
