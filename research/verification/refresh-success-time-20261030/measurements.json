@@ -1,0 +1,37 @@
+{
+  "nodeRunning": {
+    "height": 238,
+    "text": "刷新缓存 · 测试节点订阅\n测试节点订阅\n刷新中…\n\n正在刷新：0 / 1\n\n关闭\nClose"
+  },
+  "nodeDone": {
+    "height": 238,
+    "text": "刷新缓存 · 测试节点订阅\n测试节点订阅\n拉取成功\n\n已完成：1 项成功，0 项失败\n\n关闭\nClose"
+  },
+  "nodeSuccess": "名称\t备注\t地址\t节点\t状态\t资源缓存\t上次刷新时间\t\n操作\n\n测试节点订阅\t\t\nhttps://fixture.test/nodes.txt\n\t1\t正常\t1 项可用\t2026-10-30 10:50\t\n刷新缓存\n删除\n编辑",
+  "nodeFailed": {
+    "height": 238,
+    "text": "刷新缓存 · 测试节点订阅\n测试节点订阅\n模拟远程资源服务暂时不可用，错误详情较长时仍保持单行状态，可悬停查看完整信息 · 继续使用上次成功内容\n\n已完成：0 项成功，1 项失败\n\n关闭\nClose"
+  },
+  "nodeAfterFailure": "名称\t备注\t地址\t节点\t状态\t资源缓存\t上次刷新时间\t\n操作\n\n测试节点订阅\t\t\nhttps://fixture.test/nodes.txt\n\t1\t拉取失败 · 使用上次成功内容\t1 项失败 · 使用旧缓存\t2026-10-30 10:50\t\n刷新缓存\n删除\n编辑",
+  "rulesBefore": "名称\t备注\t来源\t资源缓存\t上次刷新时间\t\n操作\n\nFinance\t\n—\n\t5 个远程\t待首次拉取\t—\t\n刷新缓存\n删除\n编辑\n\n本地规则\t\n—\n\t1 个本地\t本地资源\t—\t\n删除\n编辑",
+  "rulesRunning": {
+    "height": 546,
+    "text": "刷新缓存 · Finance\nFinance / v2fly-domain-list · stripe.txt\n刷新中…\nFinance / v2fly-domain-list · wise.txt\n刷新中…\nFinance / v2fly-domain-list · schwab.txt\n刷新中…\nFinance / v2fly-domain-list · ibkr.txt\n刷新中…\nFinance / v2fly-domain-list · paypal.txt\n等待刷新\n\n正在刷新：0 / 5\n\n关闭\nClose"
+  },
+  "rulesDone": {
+    "height": 546,
+    "text": "刷新缓存 · Finance\nFinance / v2fly-domain-list · stripe.txt\n拉取成功\nFinance / v2fly-domain-list · wise.txt\n拉取成功\nFinance / v2fly-domain-list · schwab.txt\n拉取成功\nFinance / v2fly-domain-list · ibkr.txt\n拉取成功\nFinance / v2fly-domain-list · paypal.txt\n拉取成功\n\n已完成：5 项成功，0 项失败\n\n关闭\nClose"
+  },
+  "rulesAfter": "名称\t备注\t来源\t资源缓存\t上次刷新时间\t\n操作\n\nFinance\t\n—\n\t5 个远程\t5 项可用\t2026-10-30 10:52\t\n刷新缓存\n删除\n编辑\n\n本地规则\t\n—\n\t1 个本地\t本地资源\t—\t\n删除\n编辑",
+  "collectionList": "名称\t备注\t成员\t处理链\t资源缓存\t上次刷新时间\t\n操作\n\n测试节点组合\t\n—\n\t1\t0 步\t1 项失败 · 使用旧缓存\t2026-10-30 10:50\t\n刷新缓存\n删除\n编辑",
+  "profileList": "名称\t模式\t节点集\t代理链\t资源缓存\t上次刷新时间\t\n操作\n\nFinance 订阅\t独立配置\t0\t0\t5 项可用\t2026-10-30 10:52\t\n刷新全部资源\n删除\n编辑",
+  "profileRunning": {
+    "height": 579,
+    "text": "刷新缓存 · Finance 订阅\nFinance / v2fly-domain-list · stripe.txt\n刷新中…\nFinance / v2fly-domain-list · wise.txt\n刷新中…\nFinance / v2fly-domain-list · schwab.txt\n刷新中…\nFinance / v2fly-domain-list · ibkr.txt\n刷新中…\nFinance / v2fly-domain-list · paypal.txt\n等待刷新\n\n等待资源刷新后重新生成订阅配置\n\n正在刷新：0 / 5\n\n关闭\nClose"
+  },
+  "profileDone": {
+    "height": 579,
+    "text": "刷新缓存 · Finance 订阅\nFinance / v2fly-domain-list · stripe.txt\n拉取成功\nFinance / v2fly-domain-list · wise.txt\n拉取成功\nFinance / v2fly-domain-list · schwab.txt\n拉取成功\nFinance / v2fly-domain-list · ibkr.txt\n拉取成功\nFinance / v2fly-domain-list · paypal.txt\n拉取成功\n\n订阅配置已重新生成\n\n已完成：5 项成功，0 项失败\n\n关闭\nClose"
+  },
+  "logs": []
+}

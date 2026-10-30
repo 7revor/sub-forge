@@ -80,9 +80,16 @@ describe('资源刷新任务',()=>{
     const h=await setup();
     let started=await h.api.post('/api/sources/s/refresh-cache');expect(started.status).toBe(202);await done(h.api,started.json.job.id);expect(h.calls).toEqual(['https://node.test']);
     h.calls.length=0;started=await h.api.post('/api/rulesets/r/refresh-cache');await done(h.api,started.json.job.id);expect(h.calls).toEqual(['https://rules.test']);
+    const lastSuccess=(await h.api.get('/api/rulesets/r/cache')).json.items[0].lastSuccessAt;
+    expect(lastSuccess).toBeTypeOf('number');
+    h.advance(1000);
     h.calls.length=0;h.fail();started=await h.api.post('/api/profiles/p/refresh-cache');const job=await done(h.api,started.json.job.id);
     expect(job.total).toBe(2);expect(job.completed).toBe(2);expect(job.results.filter((r:any)=>!r.ok)).toHaveLength(1);expect(job.render.ok).toBe(true);
     expect(h.calls.sort()).toEqual(['https://node.test','https://rules.test']);
+    const failedState=(await h.api.get('/api/rulesets/r/cache')).json.items[0];
+    expect(failedState).toMatchObject({lastSuccessAt:lastSuccess,available:true,error:'模拟失败'});
+    expect(failedState.lastAttemptAt).toBeGreaterThan(lastSuccess);
+    expect((await h.api.get('/api/sources/s/cache')).json.items[0].lastSuccessAt).toBeGreaterThan(lastSuccess);
     const sub=await h.app.request('/sub/t');const cfg=parse(await sub.text());
     expect(sub.headers.get('profile-update-interval')).toBe('24');
     for(const p of Object.values(cfg['rule-providers']) as any[])expect(p.url).toContain('https://sub.test/r/');

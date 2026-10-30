@@ -22,11 +22,6 @@ function SourceState({ source }: { source: SourceDoc }) {
   return <SourceFetchStatus state={s} />;
 }
 
-function SourceLast({ source }: { source: SourceDoc }) {
-  const s = useSourceFetchState(source);
-  return <span className="text-ink-2">{s.lastOk ? formatTime(s.lastOk.fetchedAt).slice(5) : '—'}</span>;
-}
-
 const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢复。';
 
 export function SourceList() {
@@ -40,7 +35,6 @@ export function SourceList() {
           { header: '备注', cell: (s) => s.note?.trim() ? <NoteCell note={s.note} /> : null },
           { header: '地址', cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[12px] text-ink-2">{s.url}</span> },
           { header: '节点', cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
-          { header: '上次拉取', cell: (s) => <SourceLast source={s} /> },
           { header: '状态', cell: (s) => <SourceState source={s} /> },
         ]} />
       <NewSourceModal open={creating} onClose={() => setCreating(false)} />

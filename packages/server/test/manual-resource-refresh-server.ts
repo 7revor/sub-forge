@@ -11,10 +11,14 @@ let releaseAll=false;
 let failing=false;
 const env=setupApp({now:Date.now,fetcher:async url=>{
   if(!releaseAll)await new Promise<void>(resolve=>pending.set(url,resolve));
-  if(failing && url.endsWith('/schwab.txt'))throw new Error('模拟远程规则服务暂时不可用，错误详情较长时仍保持单行状态，可悬停查看完整信息');
+  if(failing && (url.endsWith('/schwab.txt') || url.endsWith('/nodes.txt')))throw new Error('模拟远程资源服务暂时不可用，错误详情较长时仍保持单行状态，可悬停查看完整信息');
+  if(url.endsWith('/nodes.txt'))return {status:200,body:'proxies:\n  - {name: 测试节点, type: ss, server: example.test, port: 443, cipher: aes-128-gcm, password: fixture-only}'};
   return {status:200,body:'DOMAIN,example.test'};
 }});
 const user=await addUser(env.store,'refresh-admin','admin');
+env.store.put('source',{id:'nodes',name:'测试节点订阅',url:'https://fixture.test/nodes.txt',pipeline:[]},user.id);
+env.store.put('collection',{id:'node-group',name:'测试节点组合',members:[{ref:{type:'source',id:'nodes'}}],pipeline:[]},user.id);
+env.store.put('ruleset',{id:'local',name:'本地规则',sources:[{id:'local',kind:'local',content:'DOMAIN,local.test',format:'auto'}]},user.id);
 env.store.put('ruleset',{id:'finance',name:'Finance',sources:['stripe','wise','schwab','ibkr','paypal'].map(name=>({id:name,name:`v2fly-domain-list · ${name}.txt`,kind:'remote',url:`https://fixture.test/${name}.txt`,format:'auto'}))},user.id);
 env.store.put('profile',{id:'finance-profile',name:'Finance 订阅',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{extraRules:[{anchor:'top',rule:{id:'finance-rule',matcher:{kind:'ruleset',id:'finance'},target:{kind:'builtin',name:'DIRECT'}}}]}},user.id);
 const resources=new ResourceService(env.store,env.snapshots,env.renderer);
