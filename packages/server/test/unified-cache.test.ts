@@ -44,3 +44,19 @@ describe('统一资源缓存', () => {
     t.store.close();
   });
 });
+
+it('关闭服务时终止事件等待；旧缓存设置在保存时移除', async () => {
+  const t = setupApp();
+  const admin = await addUser(t.store, 'admin', 'admin');
+  const api = client(t.app); const login = await api.login('admin');
+  const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+  const response = await t.app.request('/api/events', { headers: { cookie } });
+  const reader = response.body!.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toContain('event: changed');
+  t.store.closeEvents();
+  expect((await reader.read()).done).toBe(true);
+  expect(t.store.listeners.size).toBe(0);
+  t.store.put('source', { id:'old',name:'旧来源',url:'https://old.test',pipeline:[],fetch:{ttlSec:300} }, admin.id);
+  expect(t.store.get('source','old')?.fetch).toBeUndefined();
+  t.store.close();
+});

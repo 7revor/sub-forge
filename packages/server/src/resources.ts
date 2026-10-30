@@ -1,7 +1,7 @@
 // 资源调度与手动刷新使用同一依赖收集和状态。任务持久化，重启后明确标记中断。
 import type { NodeSetID } from '@sub-forge/core';
 import { profileTemplate } from './profile-routing.ts';
-import type { RuleSetDoc } from './docs.ts';
+import type { ProfileDoc, RuleSetDoc } from './docs.ts';
 import { randomId } from './crypto.ts';
 import type { RenderService } from './render.ts';
 import type { SnapshotFetchOptions, SnapshotService } from './snapshots.ts';
@@ -56,7 +56,7 @@ export class ResourceService {
       ...this.store.list('source').flatMap(s=>this.collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>this.collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>this.collect('profile',p.id)),
-      ...this.store.listLatestTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],overlay:{},template:{id:t.id,follow:'latest'}} as never,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,'public-template'))),
+      ...this.store.listLatestTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,'public-template'))),
     ]);
   }
   private async each(resources:Resource[],read:(r:Resource)=>Promise<void>) {
@@ -70,6 +70,8 @@ export class ResourceService {
     const existing = this.store.db.prepare('SELECT data FROM refresh_jobs WHERE owner = ? ORDER BY at DESC').all(owner) as {data:string}[];
     for (const row of existing) { const j = JSON.parse(this.store.cipher.decrypt(row.data)) as RefreshJob;if(j.state==='running' && j.kind===kind && j.documentId===id) return j; }
     const resources = this.unique(explicit ?? this.collect(kind,id));
+    const dependencyKey = (items:Resource[]) => JSON.stringify(this.unique(items).map(r=>this.snapshots.identity(r.kind,r.id,r.url,r.options)).sort());
+    const initialDependencies = dependencyKey(resources);
     const job:RefreshJob = {id:randomId(),owner,kind,documentId:id,state:'running',total:resources.length,completed:0,results:[]};
     this.save(job);
     const work = (async()=>{
@@ -79,6 +81,9 @@ export class ResourceService {
         job.completed++; this.save(job);
       });
       if (this.stopping) { job.state='interrupted';job.error='服务关闭，刷新任务已中断';return; }
+      if (!explicit && dependencyKey(this.collect(kind,id)) !== initialDependencies) {
+        job.state='interrupted';job.error='刷新期间资源配置已变化，请重新刷新';return;
+      }
       if (kind === 'profile') {
         // 按已发布的目标重建，同时保证默认 Mihomo 配置可立即获取。
         const targets = this.store.db.prepare('SELECT target FROM last_good WHERE profile_id = ?').all(id) as {target:string}[];

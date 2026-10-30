@@ -113,6 +113,7 @@ async function start(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     clearInterval(prune);
+    store.closeEvents();
     // 立即停止接收请求并取消探测；同时等待所有清理，避免先前未等待的 close 拒绝。
     const closed = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop(), resources.stop()]);

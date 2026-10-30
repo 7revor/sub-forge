@@ -30,7 +30,7 @@ export class RuleConverter {
     // 无法解析的输入仍以注释呈现；不能让输出方式判定阻断其他有效来源。
     const invalid = scope.sources.filter(s => s.enabled !== false).some(s => documents.get(s.id)?.diagnostics.some(x => x.kind === 'invalid'));
     const delivery = invalid ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(scope, { rulesets: { [rs.id]: scope }, snapshots }, ctx, undefined, documents);
-    return { ...convertRuleDocuments(rs, documents, ctx, { sourceId }), delivery,
+    return { ...convertRuleDocuments(rs, documents, ctx, { sourceId }), delivery: delivery.mode === 'unsupported' ? delivery : {mode:'managed',format:'text',behavior:'classical'},
       passthrough: scope.sources.length > 0 && scope.sources.every(s => ['mrs', 'srs'].includes(s.format)) };
   }
 }

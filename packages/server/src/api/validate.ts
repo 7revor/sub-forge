@@ -9,7 +9,6 @@ import { compileUserRegex, findCollectionCycles, isYamlRuleUrl, rawRuleError, ty
 import type { DocKind, DocTypes, RuleSetDoc } from '../docs.ts';
 import type { Store, User } from '../store.ts';
 import { normalizeRuleSet, promoteRuleSetOverrides } from '../legacy-rules.ts';
-import { MIN_TTL_SEC } from '../snapshots.ts';
 import { normalizeSourceFetch, sourceUrl } from '../source-url.ts';
 import { bad, isStr } from './common.ts';
 import { checkRuleSetReference, type RuleSetMatcher } from '../ruleset-reference.ts';
@@ -323,6 +322,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       }
       break;
     }
+  }
+  delete doc.updateIntervalSec;
+  if (kind === 'ruleset') for (const source of (doc.sources ?? []) as {fetch?:Record<string,unknown>}[]) {
+    if (source.fetch) { delete source.fetch.ttlSec;if(!Object.keys(source.fetch).length)delete source.fetch; }
   }
   return doc as unknown as DocTypes[K];
 }

@@ -38,10 +38,10 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(output).toContain('IP-CIDR,192.0.2.0/24,no-resolve');
       expect(published.json.item.rules[0].options?.noResolve).toBeUndefined();
       expect(download.headers.get('content-type')).toContain('text/plain');
-      expect(calls).toEqual([url]);
+      expect(calls).toEqual([url,url]); // 模板校验与个人订阅使用隔离的资源范围
       const edited = new URL(provider.url); edited.searchParams.set('url', 'https://unrelated.test/list');
       expect((await h.app.request(edited.href)).status).toBe(404);
-      expect(calls).toEqual([url]);
+      expect(calls).toEqual([url,url]); // 模板校验与个人订阅使用隔离的资源范围
       const other = h.store.createToken('unrelated').token;
       edited.searchParams.set('url', url); edited.searchParams.set('token', other);
       expect((await h.app.request(edited.href)).status).toBe(404);
@@ -116,7 +116,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       const result=await c.get(path); expect(result.status).toBe(200);
       expect(result.text).toBe('DOMAIN-SUFFIX,example.test\nDOMAIN,exact.test\n');
       expect(result.headers.get('content-disposition')).toContain('rules.list');
-      expect((await c.get(path+'&target=surge')).status).toBe(200); expect(calls).toBe(1);
+      expect((await c.get(path+'&target=surge')).status).toBe(200); expect(calls).toBe(2);
       expect((await c.get('/api/rules/convert?url=file%3A%2F%2Fetc%2Fpasswd')).status).toBe(400);
       expect((await c.get(path+'&target=invalid')).status).toBe(400);
       body='<html>error page</html>';

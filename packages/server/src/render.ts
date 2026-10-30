@@ -45,7 +45,6 @@ export type RenderServiceOptions = {
 };
 
 const SOURCE_TTL_SEC = 86400;
-const RULESET_TTL_SEC = 86400;
 
 /** 流量累加，缺失字段不补零，到期时间取已知的最早值。 */
 function sumTraffic(infos: Iterable<TrafficInfo>): TrafficInfo | undefined {
@@ -167,7 +166,7 @@ export class RenderService {
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
       for (const src of rs.sources) {
         if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
-        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ttlSec: src.fetch?.ttlSec ?? RULESET_TTL_SEC, ...src.fetch, format: src.format, scope: (src.repository && !src.fetch?.ua) || rs.id.startsWith('repo:') ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? this.store.getWithOwner('profile',profileId)?.owner ?? undefined });
+        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ...src.fetch, format: src.format, scope: (src.repository && !src.fetch?.ua) || rs.id.startsWith('repo:') ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? this.store.getWithOwner('profile',profileId)?.owner ?? undefined });
         if (r.snapshot?.body !== undefined) {
           rules.snapshots[sourceKey(rs.id, src.id)] = r.snapshot.body;
           snapshotHashes.push(`${rs.id}|${src.url}|${r.snapshot.hash}`);

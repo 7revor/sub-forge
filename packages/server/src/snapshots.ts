@@ -6,8 +6,6 @@ import type { FetchOptions } from './docs.ts';
 import { DEFAULT_TIMEOUT_MS, DEFAULT_UA, type UpstreamFetcher } from './net/upstream.ts';
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 
-export const MIN_TTL_SEC = 300;
-
 const SOURCE_REQUEST_OPTIONS = { ua: DEFAULT_UA, timeoutMs: DEFAULT_TIMEOUT_MS };
 
 export type SnapshotResult = { snapshot?: SnapshotRow; stale: boolean; error?: string };
@@ -98,7 +96,7 @@ export class SnapshotService {
       latest = this.store.latestSnapshot(kind,status.resource,url);
       return { snapshot:latest,stale:!row.ok && !!latest,error:row.ok ? undefined : row.error };
     }
-    return { snapshot:latest,stale:!!status.error,error:status.error };
+    return { snapshot:latest,stale:!!status.error && !!latest,error:status.error };
   }
   async peek(url: string, opts: SnapshotFetchOptions = {}): Promise<{ body?: string; error?: string }> {
     const result = await this.peekRuleContent(url,opts);

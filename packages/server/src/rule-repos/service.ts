@@ -350,6 +350,7 @@ export class RuleRepoService {
         this.details.clear();
         this.upgradeLegacySources();
       }
+      await this.cache.compact?.(repo,revisions);
       this.store.db.prepare('UPDATE rule_repos SET checked_at = ?, error = NULL WHERE id = ?').run(this.now(), id);
       this.store.changed();
     } catch (error) {

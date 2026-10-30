@@ -145,6 +145,8 @@ export class Store {
   }
 
   readonly listeners = new Set<() => void>();
+  eventsClosed = false;
+  closeEvents(): void { this.eventsClosed = true; this.changed(); }
   changed(): void { for (const listener of this.listeners) listener(); }
   get resourceCacheTtlSec(): number {
     const row = this.db.prepare("SELECT value FROM system_settings WHERE name = 'resourceCacheTtlSec'").get() as { value: string } | undefined;
@@ -177,7 +179,7 @@ export class Store {
   private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
     return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,this.cipher.hmac(url)) as {resource:string}|undefined)?.resource ?? id;
   }
-  close(): void { this.listeners.clear(); this.db.close(); }
+  close(): void { this.closeEvents(); this.listeners.clear(); this.db.close(); }
 
   /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包；v7：客户端改写绑定来源；v8 及以前：订阅地址可能保存在 urls 数组） */
   private migrate(): void {
@@ -545,6 +547,7 @@ export class Store {
       this.db.prepare('INSERT INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
         .run(t.id, 1, JSON.stringify(current), this.now());
     })();
+    this.changed();
   }
 
   /** 正常读取当前模板；version 参数仅供旧数据迁移时解析历史引用。 */
