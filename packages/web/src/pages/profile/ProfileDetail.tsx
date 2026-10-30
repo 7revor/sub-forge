@@ -65,7 +65,7 @@ export function ProfileDetail() {
             <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
             {!dirty && tab !== 'overview' && <CopyButton text={firstUrl ?? ''} disabled={!firstUrl} title={firstUrl ? undefined : '先在「概览」新增订阅链接'}>复制订阅链接</CopyButton>}
             {tab !== 'preview' && !dirty && ['overview', 'groups', 'rules', 'chains'].includes(tab) && <Link to={`/profiles/${id}/preview`} className={buttonClass('primary')}>预览配置</Link>}
-            <Button onClick={() => setTplOpen(true)}>模板与模式</Button>
+            <Button onClick={() => setTplOpen(true)}>模板关联</Button>
             {(dirty || !['overview', 'preview'].includes(tab)) && <Button variant="primary" disabled={!ctx.baseValid || !dirty || save.isPending} onClick={() => { if (ctx.baseValid) save.mutate(draft, { onSuccess: saved => setDraft(current => acceptProfileSave(current, draft, saved)) }); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>}
             <DeleteAction what="配置订阅" name={draft.name} body="它的所有订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
               onReset={del.reset} onDelete={() => del.mutate(draft.id, { onSuccess: () => navigate('/profiles') })} />
@@ -100,7 +100,7 @@ export function ProfileDetail() {
         {tab === 'preview' && <TabPreview />}
 
       </PageScroll>
-      <Modal title="模板与模式" open={tplOpen} onClose={() => setTplOpen(false)} footer={<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}>
+      <Modal title="模板关联" open={tplOpen} onClose={() => setTplOpen(false)} footer={<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}>
         <TemplateCard bare />
       </Modal>
     </ProfileContext.Provider>

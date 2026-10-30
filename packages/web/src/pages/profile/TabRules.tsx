@@ -1,3 +1,4 @@
+import { ProfileRulesEditor } from './ProfileRoutingEditors.tsx';
 import { matchesNameSearch } from '@sub-forge/core';
 import { ruleToLine } from '../../components/rule.ts';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
@@ -94,6 +95,11 @@ function PrivateRuleEdit({ rule, onApply, onClose, single = false }: { rule: Rul
 }
 
 export function TabRules() {
+  const { draft } = useProfile();
+  return draft.routing ? <ProfileRulesEditor /> : <LegacyRules />;
+}
+
+function LegacyRules() {
   const { draft, template, patchOverlay, groupOptions, groupName, profileNodeSets, nodeSetName } = useProfile();
   const label = useMatcherLabel();
   const [adding, setAdding] = useState(false);
