@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { notifySuccess } from '../feedback.ts';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, PendingNotice, Select, Switch, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, PendingNotice, Select, Switch, listMono, listTd, listTh, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
 import { ListActions } from '../components/ListActions.tsx';
 
@@ -34,25 +34,25 @@ export function Users() {
       <PageScroll>
         <Card bodyClass="overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse">
-            <thead><tr><th className={th}>用户</th><th className={th}>角色</th><th className={th}>配置订阅</th><th className={th}>订阅源</th><th className={th}>最近订阅请求</th><th className={th}>脚本编写权限</th><th className={th}>状态</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
+            <thead><tr><th className={listTh}>用户</th><th className={listTh}>角色</th><th className={listTh}>配置订阅</th><th className={listTh}>订阅源</th><th className={listTh}>最近订阅请求</th><th className={listTh}>脚本编写权限</th><th className={listTh}>状态</th><th className={cx(listTh, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
             <tbody>
               {list.map((u) => {
                 const self = u.id === me?.id;
                 const s = st(u.id);
                 return (
                   <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
-                    <td className={cx(td, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-ink-muted">（我）</span>}</td>
-                    <td className={td}>
-                      <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
+                    <td className={cx(listTd, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-ink-muted">（我）</span>}</td>
+                    <td className={listTd}>
+                      <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} className="h-8 w-28 data-[size=default]:h-8" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
                         <option value="user">用户</option><option value="admin">管理员</option>
                       </Select>
                     </td>
-                    <td className={cx(td, 'font-mono')}>{s?.profiles ?? '—'}</td>
-                    <td className={cx(td, 'font-mono')}>{s?.sources ?? '—'}</td>
-                    <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</td>
-                    <td className={td}>{u.role === 'admin' ? <span className="text-[12.5px] text-ink-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
-                    <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
-                    <td className={td}>
+                    <td className={cx(listTd, listMono)}>{s?.profiles ?? '—'}</td>
+                    <td className={cx(listTd, listMono)}>{s?.sources ?? '—'}</td>
+                    <td className={cx(listTd, 'whitespace-nowrap text-ink-2')}>{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</td>
+                    <td className={listTd}>{u.role === 'admin' ? <span className="text-[12.5px] text-ink-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
+                    <td className={listTd}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
+                    <td className={listTd}>
                       <ListActions>
                         <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `重置 ${u.username} 的密码`, label: '新密码', description: '至少 8 位；该用户的所有登录会失效', placeholder: '设置至少 8 位的新密码', type: 'password', minLength: 8, confirmLabel: '重置' }, { submit: async password => { await api('PATCH', `/users/${u.id}`, { password }); } }); if (result.status === 'confirmed') { notifySuccess('密码已重置'); void refresh(); } }}>重置密码</Button>
                         {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}

@@ -15,7 +15,7 @@ import { NodeSetPickerDialog } from '../components/dialogs.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { SortableList } from '../components/SortableList.tsx';
 import { useNodeSetNames } from '../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Select, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Select, cx, listMono } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useList } from '../hooks.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
@@ -26,8 +26,8 @@ export function CollectionList() {
       columns={[
         { header: '名称', cell: (c) => c.name },
         { header: '备注', cell: (c) => <NoteCell note={c.note} /> },
-        { header: '成员', width: 80, cell: (c) => <span className="font-mono">{c.members.length}</span> },
-        { header: '处理链', width: 88, cell: (c) => <span className="font-mono">{c.pipeline.length} 步</span> },
+        { header: '成员', width: 80, cell: (c) => <span className={listMono}>{c.members.length}</span> },
+        { header: '处理链', width: 88, cell: (c) => <span className={listMono}>{c.pipeline.length} 步</span> },
       ]} />
   );
 }

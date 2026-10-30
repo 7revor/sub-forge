@@ -34,7 +34,7 @@ export function SourceList() {
         columns={[
           { header: '名称', width: 160, cell: (s) => s.name },
           { header: '备注', width: 168, cell: (s) => <NoteCell note={s.note} /> },
-          { header: '地址', width: 200, cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[12px] text-ink-2">{s.url}</span> },
+          { header: '地址', width: 200, cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[13px] text-ink-2">{s.url}</span> },
           { header: '节点', width: 68, cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
         ]} />
     </>

@@ -212,6 +212,11 @@ export const mono = 'font-mono';
 /** 表格首尾内容与分隔线均保留 24px 留白。 */
 export const th = 'table-cell-divider first:pl-6 last:pr-6 px-3 py-2.5 text-left text-[12px] font-medium whitespace-nowrap text-ink-muted';
 export const td = 'table-cell-divider first:pl-6 last:pr-6 px-3 py-2.5 align-middle text-[13px]';
+/** 侧边栏入口列表页的统一表格尺寸：表头 12px、单元格 13.5px、左右 14px，带 32px 行操作时行高 57px。 */
+export const listTh = cx(th, 'px-3.5');
+export const listTd = 'table-cell-divider first:pl-6 last:pr-6 px-3.5 py-3 align-middle text-[13.5px]';
+/** 列表中的数字、路径等等宽内容统一 13px。 */
+export const listMono = 'font-mono text-[13px]';
 
 export { formatTime, formatBytes } from '../utils/format.ts';
 
