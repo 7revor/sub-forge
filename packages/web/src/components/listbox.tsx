@@ -56,7 +56,7 @@ export function Select({ value, onChange, disabled, children, placeholder, clear
   }, []);
   const select = <ShadcnSelect value={selected ? `value:${current}` : ''} disabled={disabled}
     onValueChange={next => { const value = next.slice(6); if (value !== current) onChange?.({ target: { value } }); }}>
-    <SelectTrigger {...rest} ref={triggerRef} title={selected?.text ?? placeholder} style={clearable ? undefined : style}
+    <SelectTrigger {...rest} disabled={disabled} ref={triggerRef} title={selected?.text ?? placeholder} style={clearable ? undefined : style}
       className={cx('w-full', clearable ? 'h-full min-h-9' : className, clearable && current !== '' && 'pr-16')}><SelectValue placeholder={placeholder}>{selected?.label}</SelectValue></SelectTrigger>
     <SelectContent aria-label={rest['aria-label']}>
       {groups.map((group, i) => <SelectGroup key={i}>

@@ -248,3 +248,7 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 RuleCard、RuleEditShell、LocalRulesInput 统一规则增强、模板和订阅；点击正文预览、铅笔弹窗编辑，移除复制地址。增强下方始终显示合并结果。本地多条共用出口，弹窗取消不改草稿，空内容不能应用；绑定继承规则只读。
 
 useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；只响应新增远程项、应用 YAML 导入和列表手动检测。标记离开页面清空，旧请求不能恢复；关联仍由用户明确点击，并重新校验当前索引。保存状态比较使用稳定键顺序，避免接口回写字段顺序变化导致虚假未保存提示。截图和全部验证见 `research/verification/unified-rule-cards-20261030/README.md`。
+
+2026-10-30 订阅弹窗整合：固定正文滚动与底部操作，单节点前置复用组弹窗底栏；全 Provider 优先引用，循环候选说明原因。显式传递 disabled，并保留公共 Select 必填中文 placeholder、clearable 和 false/0 语义。验收见 research/verification/subscription-dialog-merge-20261030/README.md。
+
+2026-10-30 刷新弹窗：取得任务完整资源列表后打开，按原顺序原位显示等待、刷新中、成功、失败和中断；完成时不追加卡片。客户端更新说明和订阅生成状态预留位置，长错误单行省略并保留全文提示，维持刷新前后的高度。后端任务同时提供逐项状态，旧任务按 `ok` 兼容展示。验收见 `research/verification/refresh-stable-list-20261030/`。

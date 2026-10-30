@@ -101,7 +101,7 @@ export function TabChains() {
         )}
         {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-ink-muted">依赖节点不可用时拒绝连接。</p>}
       </Card>
-      <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(undefined); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{editing?.index === -1 ? '添加前置规则' : '编辑前置规则'}</DialogTitle></DialogHeader>{editing && <ChainRuleEditor key={editing.chain.id} initial={editing.chain} onCancel={() => setEditing(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); preview.reset(); setEditing(undefined); }} />}</DialogContent></Dialog>
+      <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(undefined); }}><DialogContent className="flex h-[min(680px,calc(100dvh-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl" aria-describedby={undefined}><DialogHeader className="shrink-0 border-b border-line px-5 py-4"><DialogTitle>{editing?.index === -1 ? '添加前置规则' : '编辑前置规则'}</DialogTitle></DialogHeader>{editing && <ChainRuleEditor key={editing.chain.id} initial={editing.chain} onCancel={() => setEditing(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); preview.reset(); setEditing(undefined); }} />}</DialogContent></Dialog>
     </>
   );
 }

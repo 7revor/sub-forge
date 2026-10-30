@@ -104,3 +104,7 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 ### 2026-10-30：本地规则分组
 
 Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整行注释后依序展开 RAW，所有行共用 RuleEntry 出口。客户端覆盖对整组执行一次；旧 rule 与单行 RAW 保持兼容。绑定前置规则支持 local；Mihomo/Stash 共用实现。见 `src/rules/local.ts` 与 `test/local-rules.test.ts`。
+
+2026-10-30 订阅弹窗整合不改变渲染、Provider 前置、循环保护或客户端转换语义；空值提示仅存在于前端，false 与 0 保持真实值。领域模型与示例种子无需迁移。
+
+2026-10-30 刷新进度列表调整仅涉及服务端任务状态与前端展示，核心资源依赖、IR、渲染行为及示例种子保持原有格式。

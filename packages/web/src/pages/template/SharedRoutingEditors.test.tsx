@@ -23,7 +23,7 @@ describe('模板与订阅共享编辑器的权限边界', () => {
     expect(html).toContain('本订阅的节点集');
     expect(html).not.toContain('新增组');
     expect(html).not.toContain('删除策略组');
-    expect(html).not.toContain('role="switch"');
+    expect(html).toMatch(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/);
     expect(html).not.toContain('aria-label="拖动');
   });
   it('模板和独立订阅保留结构编辑能力', () => {

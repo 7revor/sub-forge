@@ -1,0 +1,478 @@
+[
+  {
+    "name": "成员填充",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  },
+  {
+    "name": "策略组候选",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  },
+  {
+    "name": "模板组设置",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  },
+  {
+    "name": "前置 Provider",
+    "apply": {
+      "bottom": 687,
+      "height": 40,
+      "left": 871,
+      "right": 955,
+      "top": 647,
+      "width": 84,
+      "x": 871,
+      "y": 647
+    },
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    }
+  },
+  {
+    "name": "前置组",
+    "apply": {
+      "bottom": 687,
+      "height": 40,
+      "left": 871,
+      "right": 955,
+      "top": 647,
+      "width": 84,
+      "x": 871,
+      "y": 647
+    },
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    }
+  },
+  {
+    "name": "前置直连",
+    "apply": {
+      "bottom": 687,
+      "height": 40,
+      "left": 871,
+      "right": 955,
+      "top": 647,
+      "width": 84,
+      "x": 871,
+      "y": 647
+    },
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    }
+  },
+  {
+    "name": "已选择前置",
+    "apply": {
+      "bottom": 687,
+      "height": 40,
+      "left": 871,
+      "right": 955,
+      "top": 647,
+      "width": 84,
+      "x": 871,
+      "y": 647
+    },
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    }
+  },
+  {
+    "name": "模板关联初始",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    },
+    "footer": {
+      "bottom": 699,
+      "height": 65,
+      "left": 305,
+      "right": 975,
+      "top": 634,
+      "width": 670,
+      "x": 305,
+      "y": 634
+    }
+  },
+  {
+    "name": "模板改变",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    },
+    "footer": {
+      "bottom": 699,
+      "height": 65,
+      "left": 305,
+      "right": 975,
+      "top": 634,
+      "width": 670,
+      "x": 305,
+      "y": 634
+    }
+  },
+  {
+    "name": "解除关联选项",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    },
+    "footer": {
+      "bottom": 699,
+      "height": 65,
+      "left": 305,
+      "right": 975,
+      "top": 634,
+      "width": 670,
+      "x": 305,
+      "y": 634
+    }
+  },
+  {
+    "name": "成员前置编辑前",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  },
+  {
+    "name": "成员前置编辑中",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  },
+  {
+    "name": "窄屏模板初始",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 762,
+      "height": 680,
+      "left": 16,
+      "right": 374,
+      "top": 82,
+      "width": 358,
+      "x": 16,
+      "y": 82
+    },
+    "footer": {
+      "bottom": 761,
+      "height": 105,
+      "left": 17,
+      "right": 373,
+      "top": 656,
+      "width": 356,
+      "x": 17,
+      "y": 656
+    }
+  },
+  {
+    "name": "窄屏模板复制",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 762,
+      "height": 680,
+      "left": 16,
+      "right": 374,
+      "top": 82,
+      "width": 358,
+      "x": 16,
+      "y": 82
+    },
+    "footer": {
+      "bottom": 761,
+      "height": 105,
+      "left": 17,
+      "right": 373,
+      "top": 656,
+      "width": 356,
+      "x": 17,
+      "y": 656
+    }
+  },
+  {
+    "name": "窄屏成员",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 822,
+      "height": 800,
+      "left": 16,
+      "right": 374,
+      "top": 22,
+      "width": 358,
+      "x": 16,
+      "y": 22
+    },
+    "footer": {
+      "bottom": 821,
+      "height": 105,
+      "left": 17,
+      "right": 373,
+      "top": 716,
+      "width": 356,
+      "x": 17,
+      "y": 716
+    }
+  },
+  {
+    "name": "窄屏无搜索结果",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 822,
+      "height": 800,
+      "left": 16,
+      "right": 374,
+      "top": 22,
+      "width": 358,
+      "x": 16,
+      "y": 22
+    },
+    "footer": {
+      "bottom": 821,
+      "height": 105,
+      "left": 17,
+      "right": 373,
+      "top": 716,
+      "width": 356,
+      "x": 17,
+      "y": 716
+    }
+  },
+  {
+    "name": "窄屏滚动后",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 822,
+      "height": 800,
+      "left": 16,
+      "right": 374,
+      "top": 22,
+      "width": 358,
+      "x": 16,
+      "y": 22
+    },
+    "footer": {
+      "bottom": 821,
+      "height": 105,
+      "left": 17,
+      "right": 373,
+      "top": 716,
+      "width": 356,
+      "x": 17,
+      "y": 716
+    }
+  },
+  {
+    "name": "窄屏前置",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 762,
+      "height": 680,
+      "left": 16,
+      "right": 374,
+      "top": 82,
+      "width": 358,
+      "x": 16,
+      "y": 82
+    },
+    "footer": {
+      "bottom": 761,
+      "height": 105,
+      "left": 17,
+      "right": 373,
+      "top": 656,
+      "width": 356,
+      "x": 17,
+      "y": 656
+    }
+  },
+  {
+    "name": "窄屏前置直连",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 762,
+      "height": 680,
+      "left": 16,
+      "right": 374,
+      "top": 82,
+      "width": 358,
+      "x": 16,
+      "y": 82
+    },
+    "footer": {
+      "bottom": 761,
+      "height": 105,
+      "left": 17,
+      "right": 373,
+      "top": 656,
+      "width": 356,
+      "x": 17,
+      "y": 656
+    }
+  },
+  {
+    "name": "全 Provider 优先引用",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  }
+]

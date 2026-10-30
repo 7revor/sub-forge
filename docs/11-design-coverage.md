@@ -236,6 +236,8 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 2026-10-30 合并适配：缓存刷新任务弹窗直接使用主分支官方 Dialog，保留默认动画和主题命名，并隔离弹窗与列表行点击事件。内置浏览器已验证刷新、内容点击与关闭；外部画布同步状态不变。
 
+2026-10-30 刷新列表稳定高度：弹窗取得完整任务列表后打开，所有子规则预先展示；等待、刷新中、成功、失败、中断在同一行切换，顺序与行数不变。底部说明始终展示，订阅生成状态预留一行，不修改公共 Dialog 高度限制和动画。前后端已同步，核心 IR 与示例种子无需修改。本轮访问外部设计画布仍显示“Sign in to view this page”，画布未编辑；待同步细节见 docs/13，[验收记录和截图](../research/verification/refresh-stable-list-20261030/README.md)保留实际实现证据。本项没有后端待实现接口。
+
 
 ### 2026-10-30：规则卡片与操作间距
 
@@ -257,3 +259,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 后端与领域已同步支持 local 分组、整组覆盖和兼容旧单条，示例种子已更新，无后端待实现项。本节替代旧卡片外点击切合并、复制地址及行内展开交互。
 
 本任务在内置浏览器访问外部 Claude Design 画布，仍显示 “Sign in to view this page”，**外部设计稿同步未完成**。待同步画法与文案见 [docs/13](13-design-canvas-sync.md)，实际实现截图与验证见 [验收记录](../research/verification/unified-rule-cards-20261030/README.md)。
+
+2026-10-30 订阅弹窗复查合并：成员填充、组设置、模板关联及前置弹窗已实现固定容器、固定操作和正确禁用状态；清空、false/0、保存回显在内置浏览器复核。后端复用现有转换/保存接口，无新增待实现接口。外部画布本轮未编辑，保留待同步状态；证据见 research/verification/subscription-dialog-merge-20261030/README.md。
