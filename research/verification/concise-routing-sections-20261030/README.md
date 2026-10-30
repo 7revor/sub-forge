@@ -19,3 +19,14 @@
 - 临时服务已停止，临时验收脚本已删除。
 
 截图：`sources.png` 为来源操作栏，`template.png` 为模板，`profile.png` 与 `profile-nodes.png` 为订阅分区，`sources-mobile.png` 为窄屏布局。
+
+## 整页按钮协调复验
+
+- 内核改写的「添加改写」从默认 40px 改为与来源操作一致的 32px，图标间距同步。
+- 合并结果的内核选择复用公共小按钮，统一为 32px 高、12.5px 字号、相同圆角和 8px 按钮间距；选中态继续用品牌色区分。
+- 页首保存、复制和删除保留 40px 页面操作层级，页内操作保持 32px。
+- 构建（含类型检查）通过，单测 348 通过、2 跳过，仍只有既有包体积提示。
+- 内置浏览器实测来源按钮、添加改写、四个预览内核按钮均为 32px 高、12.5px 字号、10px 计算圆角。
+- 验证新增改写、添加和删除替换规则、切换 Surge / Mihomo；移除测试改写后恢复「已保存」。
+- 390×844 窄屏的展开表单与操作栏可用，文档宽度和视口宽度均为 390px；视口已恢复，临时服务已停止。
+- 新截图：`buttons-coordinated.png`、`buttons-override-expanded.png`、`buttons-mobile-expanded.png`、`buttons-mobile.png`。
