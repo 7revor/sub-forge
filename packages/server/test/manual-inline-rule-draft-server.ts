@@ -6,6 +6,10 @@ import { createApp } from '../src/app.ts';
 import { setupRuleReferences } from './rule-reference-fixture.ts';
 
 const env = await setupRuleReferences();
+for (let index = 0; index < 35; index++) env.store.put('ruleset', {
+  id: `sample-${index}`, name: `分页验收 ${String(index).padStart(2, '0')}`,
+  sources: [{ id: 'local', kind: 'local', format: 'auto', content: `DOMAIN,sample-${index}.example.test` }],
+}, env.user.id);
 const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
 const template = { id: 'inline-hint', name: '规则布局验收', version: 1, groups: [
   { id: 'direct', name: '🎯 国内网络', type: 'select' as const, members: [direct] },

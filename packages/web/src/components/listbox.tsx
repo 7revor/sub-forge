@@ -41,10 +41,11 @@ export type SelectProps = Omit<HTMLAttributes<HTMLButtonElement>, 'onChange' | '
 };
 
 /** 仅将既有业务 option 数据转换为官方 SelectItem，保留空值选项。 */
-export function Select({ value, onChange, disabled, children, placeholder = '请选择', className, ...rest }: SelectProps) {
+export function Select({ value, onChange, disabled, children, placeholder, className, ...rest }: SelectProps) {
   const opts = collect(children);
   const current = value == null ? '' : String(value);
-  const selected = opts.find(option => option.value === current);
+  const selected = opts.find(option => option.value === current && !(option.value === '' && option.disabled));
+  const emptyHint = placeholder ?? opts.find(option => option.value === '' && option.disabled)?.text ?? '请选择';
   const groups = opts.reduce<{ label?: string; options: Opt[] }[]>((groups, option) => {
     const last = groups.at(-1);
     if (last && last.label === option.group) last.options.push(option);
@@ -53,11 +54,11 @@ export function Select({ value, onChange, disabled, children, placeholder = '请
   }, []);
   return <ShadcnSelect value={selected ? `value:${current}` : ''} disabled={disabled}
     onValueChange={next => { const value = next.slice(6); if (value !== current) onChange?.({ target: { value } }); }}>
-    <SelectTrigger {...rest} className={cx('w-full', className)}><SelectValue placeholder={placeholder}>{selected?.label}</SelectValue></SelectTrigger>
+    <SelectTrigger {...rest} className={cx('w-full', className)}><SelectValue placeholder={emptyHint}>{selected?.label}</SelectValue></SelectTrigger>
     <SelectContent aria-label={rest['aria-label']}>
       {groups.map((group, i) => <SelectGroup key={i}>
         {group.label && <SelectLabel>{group.label}</SelectLabel>}
-        {group.options.map((option, j) => <SelectItem key={`${option.value}-${j}`} value={`value:${option.value}`} disabled={option.disabled} textValue={option.text}>
+        {group.options.filter(option => !(option.value === '' && option.disabled)).map((option, j) => <SelectItem key={`${option.value}-${j}`} value={`value:${option.value}`} disabled={option.disabled} textValue={option.text}>
           <span>{option.label}{option.hint && <span className="block text-xs text-muted-foreground">{option.hint}</span>}</span>
         </SelectItem>)}
       </SelectGroup>)}
@@ -119,20 +120,24 @@ export function Combobox({ value, onChange, options, className, placeholder, dis
 }
 
 /** 搜索与分页属于业务数据；浮层和候选交互使用官方 Popover/Command。 */
-export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon }: {
+export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, disabled, id, triggerClassName, triggerIcon, valueLabel, placeholder, modal = false }: {
   loadOptions: OptionLoader; onChange: (value: string) => void;
   label: string; ariaLabel?: string; disabled?: boolean; id?: string; triggerClassName?: string; triggerIcon?: ReactNode;
+  valueLabel?: string; placeholder?: string; modal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const debounced = useDebouncedValue(query, 250);
-  return <Popover open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}>
+  const displayLabel = valueLabel ?? placeholder ?? label;
+  const isPlaceholder = !!placeholder && !valueLabel;
+  return <Popover modal={modal} open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}>
     <PopoverTrigger asChild><Button type="button" id={id} variant="outline" role="combobox" aria-label={ariaLabel} aria-expanded={open}
-      disabled={disabled} className={triggerClassName ?? 'w-full justify-between'}>
-      {triggerIcon}<span title={label} className="min-w-0 truncate">{label}</span>{!triggerClassName && <ChevronDown />}
+      disabled={disabled} data-placeholder={isPlaceholder ? '' : undefined} className={cx(triggerClassName ?? 'h-9 w-full justify-between text-[13px]', isPlaceholder && 'font-normal text-ink-muted')}>
+      {triggerIcon}<span title={displayLabel} className="min-w-0 truncate">{displayLabel}</span>{!triggerClassName && <ChevronDown />}
     </Button></PopoverTrigger>
-    <PopoverContent className="w-[min(560px,calc(100vw-2rem))] p-0" aria-label={ariaLabel}>
-      <Command shouldFilter={false}>
+    <PopoverContent align="start" collisionPadding={12} className="flex w-[min(400px,calc(100vw-2rem))] max-h-[min(320px,var(--radix-popover-content-available-height))] flex-col overflow-hidden p-0"
+      style={placeholder ? { width: 'min(400px, var(--radix-popover-trigger-width))' } : undefined} aria-label={ariaLabel} onInteractOutside={() => setOpen(false)}>
+      <Command shouldFilter={false} className="min-h-0 [&_[data-slot=command-input-wrapper]]:shrink-0 [&_[data-slot=command-list]]:min-h-0 [&_[data-slot=command-list]]:max-h-[240px] [&_[data-slot=command-list]]:flex-1">
         <CommandInput aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query} onValueChange={setQuery} />
         {query !== debounced ? <div role="status" className="p-4 text-sm text-muted-foreground">搜索中…</div> : <PagedOptionList key={query} loadOptions={loadOptions} query={query} onSelect={value => { setOpen(false); onChange(value); }} />}
       </Command>
