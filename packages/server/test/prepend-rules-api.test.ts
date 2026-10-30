@@ -26,13 +26,13 @@ describe('绑定模板订阅的前置规则接口', () => {
     const created = await alice.post('/api/profiles', draft);
     expect(created.status).toBe(201);
     const profile = created.json.item;
-    expect((await alice.get(`/api/profiles/${profile.id}`)).json.item.routing.prependRules).toEqual(draft.routing.prependRules);
+    expect((await alice.get(`/api/profiles?id=${profile.id}`)).json.item.routing.prependRules).toEqual(draft.routing.prependRules);
     const preview = await alice.post('/api/profiles/preview', { profile });
     expect(preview.status).toBe(200); expect(preview.json.ok).toBe(true);
     const dep = preview.json.dependencies[0];
     expect(dep).toMatchObject({ node: '远端节点', strategy: 'wrap', usedBy: ['rule:pre-node'] });
-    const token = (await alice.get(`/api/profiles/${profile.id}/link`)).json.item.token;
-    const yaml = parse(await (await app.request(`/sub/${token}/${profile.id}`)).text());
+    const token = (await alice.get(`/api/profiles/link?id=${profile.id}`)).json.item.token;
+    const yaml = parse(await (await app.request(`/subs/profile?token=${token}&id=${profile.id}`)).text());
     expect(yaml.rules).toEqual(['DOMAIN,pre-first.example.test,DIRECT', `DOMAIN,pre-node.example.test,${dep.output}`, 'DOMAIN-SUFFIX,example.test,默认组', 'MATCH,默认组']);
     expect(yaml['proxy-groups']).toContainEqual(expect.objectContaining({ name: dep.output, hidden: true }));
     const rendered = await renderer.render(profile.id, { client: 'mihomo' });
@@ -44,7 +44,7 @@ describe('绑定模板订阅的前置规则接口', () => {
     draft.routing.prependRules[0]!.target = { kind: 'group', groupId: 'g' };
     let profile = (await alice.post('/api/profiles', draft)).json.item;
     expect((await admin.post(`/api/templates/${t.id}/publish`, { ...template, rules: [rule('new-template'), ...template.rules] })).status).toBe(200);
-    profile = (await alice.get(`/api/profiles/${profile.id}`)).json.item;
+    profile = (await alice.get(`/api/profiles?id=${profile.id}`)).json.item;
     const preview = await alice.post('/api/profiles/preview', { profile });
     expect(parse(preview.json.yaml).rules.slice(0, 3)).toEqual(['DOMAIN,pre-first.example.test,默认组', expect.stringMatching(/^DOMAIN,pre-node/), 'DOMAIN,new-template.example.test,DIRECT']);
     const converted = await alice.post('/api/profiles/routing/convert', { profile, mode: 'independent', currentTemplateVersion: 2 });
@@ -69,7 +69,7 @@ describe('绑定模板订阅的前置规则接口', () => {
       expect(response.status).toBe(409);
       expect(response.json.details.impact[0].forceable).toBe(false);
     }
-    expect((await admin.get(`/api/templates/${t.id}`)).json.item).toEqual(t);
+    expect((await admin.get(`/api/templates?id=${t.id}`)).json.item).toEqual(t);
   });
 
   it('拒绝前置规则集、非法规则、插入位置及模板覆盖，保存失败不落库', async () => {

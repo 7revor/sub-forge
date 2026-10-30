@@ -20,13 +20,14 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       const p = await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], overlay: {}, ...routing });
       expect(p.status, p.text).toBe(201);
       const token = h.store.createToken(user.id).token;
-      const main = await h.app.request(`/sub/${token}/${p.json.item.id}`);
+      const main = await h.app.request(`/subs/profile?token=${token}&id=${p.json.item.id}`);
       expect(main.status).toBe(200);
       const config = parse(await main.text());
       const provider = Object.values(config['rule-providers'])[0] as { url: string; format: string; behavior: string };
       expect(provider).toMatchObject({ format: 'text', behavior: 'classical' });
       const nested = new URL(provider.url);
-      expect(nested.pathname).toMatch(/\/r\/[^/]+\/[0-9a-f]{64}$/);
+      expect(nested.pathname).toBe('/subs/ruleset');
+      expect(nested.searchParams.get('key')).toMatch(/^[0-9a-f]{64}$/);
       expect(nested.searchParams.get('url')).toBeNull();
       expect(h.store.list('ruleset')).toEqual([]);
       const download = await h.app.request(provider.url);
@@ -38,17 +39,17 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(output).toContain('IP-CIDR,192.0.2.0/24,no-resolve');
       expect(published.json.item.rules[0].options?.noResolve).toBeUndefined();
       expect(download.headers.get('content-type')).toContain('text/plain');
-      expect(calls).toEqual([url]); // 公共规则原文跨模板与订阅共享
+      expect(calls).toEqual([url, url]); // 模板内部读取与订阅私有原文分别绑定
       const edited = new URL(provider.url); edited.searchParams.set('url', 'https://unrelated.test/list');
-      expect(await (await h.app.request(edited.href)).text()).toBe(output);
-      expect(calls).toEqual([url]); // 公共规则原文跨模板与订阅共享
+      expect((await h.app.request(edited.href)).status).toBe(400);
+      expect(calls).toEqual([url, url]); // 模板内部读取与订阅私有原文分别绑定
       const otherUser = await addUser(h.store, 'other');
       const other = h.store.userToken(otherUser.id)!.token;
-      expect((await h.app.request(provider.url.replace(token, other))).status).toBe(200);
-      expect((await h.app.request(`/api/rules/convert?token=${token}&url=${encodeURIComponent(url)}`)).status).toBe(404);
+      expect((await h.app.request(provider.url.replace(token, other))).status).toBe(404);
+      expect((await h.app.request(`/api/rules/convert?token=${token}&url=${encodeURIComponent(url)}`)).status).toBe(401);
       const changed = await c.post(`/api/templates/${published.json.item.id}/publish`, draft(remoteRuleMatcher('https://example.test/new.list')));
       expect(changed.status, changed.text).toBe(200);
-      expect((await h.app.request(provider.url)).status).toBe(200);
+      expect((await h.app.request(provider.url)).status).toBe(404);
       expect(h.store.list('ruleset')).toEqual([]);
       h.store.deleteToken(token);
       expect((await h.app.request(provider.url)).status).toBe(404);
@@ -75,7 +76,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(internal.json.item.routing.config.rules[0].matcher).toEqual({ kind:'ruleset',id:'system' });
       expect(external.json.item.routing.config.rules[0].matcher.remote).toEqual({ url });
       const token = h.store.createToken(alice.id).token;
-      const config = parse(await (await h.app.request(`/sub/${token}/${external.json.item.id}`)).text());
+      const config = parse(await (await h.app.request(`/subs/profile?token=${token}&id=${external.json.item.id}`)).text());
       const provider = Object.values(config['rule-providers'])[0] as { url: string };
       expect(new URL(provider.url).searchParams.get('url')).toBeNull();
       expect(await (await h.app.request(provider.url)).text()).toContain('DOMAIN,example.test');
@@ -99,7 +100,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(saved.status, saved.text).toBe(200);
       expect((await c.post(`/api/templates/${published.json.item.id}/publish`, draft(remoteRuleMatcher('https://example.test/changed.list')))).status).toBe(200);
       const token = h.store.createToken(user.id).token;
-      const config = parse(await (await h.app.request(`/sub/${token}/${profile.json.item.id}`)).text());
+      const config = parse(await (await h.app.request(`/subs/profile?token=${token}&id=${profile.json.item.id}`)).text());
       const provider = Object.values(config['rule-providers'])[0] as { url: string };
       expect(new URL(provider.url).searchParams.get('url')).toBeNull();
       expect(await (await h.app.request(provider.url)).text()).toContain('DOMAIN,example.test');

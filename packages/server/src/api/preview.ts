@@ -1,8 +1,9 @@
+import { requiredQuery } from '../query.ts';
 // 编辑器用的预览接口：
 //   POST /api/sources/:id/refresh            立即拉取（SRC-03 快照）
-//   GET  /api/sources/:id/snapshots          快照历史（不含正文）
+//   GET  /api/sources/snapshots?id=...          快照历史（不含正文）
 //   POST /api/{sources,collections}/:id/pipeline-preview   处理链逐步预览（SRC-06），支持拉取参数与成员草稿
-//   GET  /api/nodesets/:type/:id/nodes      已保存处理链之后的节点列表
+//   GET  /api/nodesets/nodes?type=...&id=...      已保存处理链之后的节点列表
 
 import {
   compileUserRegex, matchesNameSearch, NodeSetResolver, parseContent, Report, runPipeline,
@@ -35,12 +36,12 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     return row.doc;
   };
 
-  app.get('/nodesets/:type/:id/nodes', async (c) => {
-    const type = c.req.param('type');
+  app.get('/nodesets/nodes', async (c) => {
+    const type = requiredQuery(c, 'type');
     const query = c.req.query('q') ?? '';
     if (query.length > 200) throw bad('关键词最多 200 个字符');
     if (type !== 'source' && type !== 'collection' && type !== 'local') throw bad('type 只能是 source、collection 或 local');
-    const doc = own(type, c.req.param('id'), c.get('user').id);
+    const doc = own(type, requiredQuery(c, 'id'), c.get('user').id);
     const ref: NodeSetID = { type, id: doc.id };
     const filter = c.req.query('filter') ?? '';
     const excludeFilter = c.req.query('excludeFilter') ?? '';
@@ -70,8 +71,8 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     return c.json({ items: [{ url: src.url, ok: r.ok, fetchedAt: r.fetchedAt, ...(r.error ? { error: r.error } : {}), ...(r.userinfo ? { userinfo: r.userinfo } : {}) }] });
   });
 
-  app.get('/sources/:id/snapshots', (c) => {
-    const src = own('source', c.req.param('id'), c.get('user').id);
+  app.get('/sources/snapshots', (c) => {
+    const src = own('source', requiredQuery(c, 'id'), c.get('user').id);
     return c.json({ items: store.snapshotHistory('source', src.id) });
   });
 

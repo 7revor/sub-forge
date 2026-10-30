@@ -28,7 +28,7 @@ describe('未保存 Profile 草稿预览', () => {
     expect(res.json).toMatchObject({ ok: true, report: [], dependencies: [] });
     const yaml = parse(res.json.yaml);
     expect(yaml.rules).toContain('MATCH,DIRECT');
-    expect(JSON.stringify(yaml['proxy-providers'])).toContain('/p/{token}/');
+    expect(JSON.stringify(yaml['proxy-providers'])).toContain('token={token}');
     expect(res.json.yaml).not.toContain('__SF_TOKEN__');
     expect(store.list('profile')).toEqual([]);
     expect(get.mock.calls.some(([kind]) => kind === 'profile')).toBe(false);

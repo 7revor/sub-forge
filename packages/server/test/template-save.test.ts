@@ -35,7 +35,7 @@ it('直接保存当前模板，不保留历史；旧草稿和无版本请求按�
     expect(env.store.getTemplate(first.id)?.name).toBe('模板');
     expect(env.store.getTemplate(first.id)).not.toHaveProperty('version');
     expect(env.store.db.prepare('SELECT COUNT(*) n FROM template_versions').get()).toEqual({ n: 1 });
-    expect((await admin.get(`/api/templates/${first.id}`)).json).not.toHaveProperty('versions');
+    expect((await admin.get(`/api/templates?id=${first.id}`)).json).not.toHaveProperty('versions');
     expect((await admin.get(`/api/templates/${first.id}/versions/1`)).status).toBe(404);
   } finally { env.store.close(); }
 });
@@ -76,7 +76,7 @@ it('v18 升级先展开旧锁定订阅，再清理历史；绑定、归属、链
     store.put('profile', { ...rest, id: 'bound', routing: { mode: 'bound', templateId: 't', groupAdditions: {} } }, 'owner');
     issueProfileToken(store, { token: 'unchanged', profileId: 'pinned' });
     store.db.pragma('user_version = 18'); store.close(); store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(24);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(25);
     expect(store.getWithOwner('profile', 'pinned')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { routing: { mode: 'independent', config: { groups: [{ name: '组1' }] } } } });
     expect(store.get('profile', 'bound')?.routing).toMatchObject({ mode: 'bound', templateId: 't' });
     expect(store.getTemplate('t')).toMatchObject({ groups: [{ name: '组2' }] });
@@ -127,7 +127,7 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
     issueProfileToken(store, { token: 'same-token', profileId: 'p' });
     store.putLastGood('p', 'mihomo', { yaml: '原成功内容' });
     store.db.pragma('user_version = 19'); store.close(); store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(24);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(25);
     expect(store.getTemplate('t')).toEqual({ ...template, id: 't' });
     const profile = store.getWithOwner('profile', 'p');
     expect(profile).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { routing: oldProfile.routing } });

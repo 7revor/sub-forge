@@ -35,7 +35,7 @@ describe('移除 GitHub 凭据', () => {
       store.db.pragma(`user_version = ${version}`);
       store.close(); store = new Store(path, { cipher });
       for (let i = 0; i < 2; i++) {
-        expect(store.db.pragma('user_version', { simple: true })).toBe(24);
+        expect(store.db.pragma('user_version', { simple: true })).toBe(25);
         expect(store.db.prepare("SELECT name FROM sqlite_master WHERE name = 'server_secrets'").get()).toBeUndefined();
         expect(store.getWithOwner('source', 's1')).toMatchObject({ owner: 'alice', doc: { name: '保留的来源' } });
         expect(store.getToken('subscription-token')?.token).toBe('subscription-token');

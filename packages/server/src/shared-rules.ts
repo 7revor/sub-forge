@@ -34,6 +34,7 @@ export class SharedRuleService {
     return hash({ version: 1, rs, target, options: canonical(reference).options, bodies: rs.sources.filter(s => s.enabled !== false).map(s => s.kind === 'local' ? s.content : rules.snapshots[sourceKey(rs.id, s.id)]) });
   }
   register(reference: RuleResourceReference, target: Target, rs: RuleSetDoc, rules: RuleSetInputs, body: string): void {
+    if (reference.matcher.remote) throw new Error('订阅专属规则不能注册为公共资源');
     const delivery = managedRuleDelivery(rs, target, reference.options);
     if (delivery.mode !== 'managed') throw new Error(delivery.reason);
     this.store.putSharedRule(this.key(reference, target), rs.id, {
@@ -46,6 +47,7 @@ export class SharedRuleService {
   }
   /** 独立增强链接首次访问时才生成；未成功的产物不写入公共资源表。 */
   readReference(reference: RuleResourceReference, target: Target): Promise<string | undefined> {
+    if (reference.matcher.remote) return Promise.resolve(undefined);
     const rs = resolveRuleSetReference(reference.matcher, this.store);
     if (!rs) return Promise.resolve(undefined);
     const delivery = managedRuleDelivery(rs, target, reference.options);
@@ -57,8 +59,10 @@ export class SharedRuleService {
     if (pending) return pending;
     const saved = this.store.getSharedRule<SharedRuleRecord>(key);
     const reference = (saved ?? initial)?.reference;
+    const repositories = new Set(reference ? resolveRuleSetReference(reference.matcher, this.store)?.sources.flatMap(source => source.repository ? [source.repository.repo] : []) : []);
+    if (reference?.matcher.repository) repositories.add(reference.matcher.repository.repo);
     let cancelled = false;
-    const invalidate = (kind: string, id: string) => { if (kind === 'shared-rule' && id === key || kind === 'ruleset' && id === reference?.matcher.id) cancelled = true; };
+    const invalidate = (kind: string, id: string) => { if (kind === 'shared-rule' && id === key || kind === 'ruleset' && id === reference?.matcher.id || kind === 'repository' && repositories.has(id)) cancelled = true; };
     this.store.invalidationListeners.add(invalidate);
     const work = this.compile(key, () => cancelled, 0, saved ? undefined : initial).catch(error => {
       if (cancelled) return undefined;
@@ -79,7 +83,7 @@ export class SharedRuleService {
   private async compile(key: string, cancelled: () => boolean, attempt = 0, initial?: SharedRuleRecord): Promise<string | undefined> {
     if (cancelled()) return undefined;
     const record = this.store.getSharedRule<SharedRuleRecord>(key) ?? initial;
-    if (!record) return undefined;
+    if (!record || record.reference.matcher.remote) return undefined;
     const rs = resolveRuleSetReference(record.reference.matcher, this.store);
     if (!rs) { this.store.deleteSharedRule(key); return undefined; }
     const delivery = managedRuleDelivery(rs, record.target, record.reference.options);

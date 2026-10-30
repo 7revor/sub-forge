@@ -1,3 +1,4 @@
+import { queryUrl } from '@sub-forge/core';
 import { profileEditorOverlay } from '@sub-forge/core';
 import { persistedProfile, updateEditorOverlay } from './routing.ts';
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
@@ -56,7 +57,7 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
   const template = useQuery({
     queryKey: ['template', templateId],
     enabled: !!templateId,
-    queryFn: () => api<{ item: TemplateDoc }>('GET', `/templates/${templateId}`),
+    queryFn: () => api<{ item: TemplateDoc }>('GET', queryUrl('/templates', { id: templateId })),
     select: result => result.item,
   });
   const { all, nameOf } = useNodeSetNames();

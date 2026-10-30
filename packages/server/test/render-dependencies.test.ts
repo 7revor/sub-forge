@@ -30,7 +30,7 @@ describe('仅拉取实际启用的规则依赖', () => {
     ['私有规则锚点失效', { extraRules: [{ anchor: { after: 'missing' }, rule }] }, undefined],
   ])('%s 不访问坏上游且订阅仍可用', async (_name, overlay, tpl) => {
     const h = setup(overlay, tpl);
-    const res = await h.app.request('/sub/token/p');
+    const res = await h.app.request('/subs/profile?token=token&id=p');
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('MATCH,DIRECT');
     expect(h.calls).toEqual([]);
@@ -50,7 +50,7 @@ describe('仅拉取实际启用的规则依赖', () => {
 
   it('覆盖层重新启用模板规则后恢复拉取，失败时不会伪装成功', async () => {
     const h = setup({ rulePatches: { r: { enabled: true } } }, { ...template, rules: [{ ...rule, enabled: false }] });
-    expect((await h.app.request('/sub/token/p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(503);
     expect(h.calls).toEqual(['https://rules.example.test/bad']);
   });
 
@@ -59,7 +59,7 @@ describe('仅拉取实际启用的规则依赖', () => {
       { anchor: 'top', rule: { ...rule, enabled: false } },
       { anchor: 'bottom', rule: { ...rule, id: 'active' } },
     ] });
-    expect((await h.app.request('/sub/token/p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(503);
     expect(h.calls).toHaveLength(1);
   });
 });

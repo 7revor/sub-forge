@@ -28,13 +28,13 @@ describe('单地址订阅源的失败回退', () => {
   it('单个 URL 从未成功时返回 503', async () => {
     const h = setup(good);
     h.responses[good] = new Error('模拟失败');
-    expect((await h.app.request('/sub/token/p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(503);
     expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
   });
 
   it('当前拉取失败时继续输出该 URL 的成功快照', async () => {
     const h = setup(good);
-    expect((await h.app.request('/sub/token/p')).status).toBe(200);
+    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(200);
     h.responses[good] = new Error('已用地址也不可用'); h.advance(1000);
     await h.snapshots.refresh('source', 's', good);
     const res = await h.renderer.render('p', { client: 'mihomo' });
@@ -47,7 +47,7 @@ describe('单地址订阅源的失败回退', () => {
 
   it('先有成功结果，后来换成完全不可用的地址时返回上一份成功配置', async () => {
     const h = setup(good);
-    const before = await (await h.app.request('/sub/token/p')).text();
+    const before = await (await h.app.request('/subs/profile?token=token&id=p')).text();
     h.store.put('source', { ...h.store.get('source', 's')!, url: bad });
     const res = await h.renderer.render('p', { client: 'mihomo' });
     expect(res.ok && res.source).toBe('last-good');
@@ -59,6 +59,6 @@ describe('单地址订阅源的失败回退', () => {
     h.store.put('source', { id: 'failed', name: '失败成员', url: bad, pipeline: [] });
     h.store.put('collection', { id: 'c', name: '组合', members: [{ ref: { type: 'source', id: 's' } }, { ref: { type: 'source', id: 'failed' } }], pipeline: [] });
     h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: [{ ref: { type: 'collection', id: 'c' }, output: 'inline' }] });
-    expect((await h.app.request('/sub/token/p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(503);
   });
 });

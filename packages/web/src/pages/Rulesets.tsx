@@ -1,4 +1,5 @@
 import { sourcePreviewHref } from '../domain/rulePreview.ts';
+import { queryUrl } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 import { api } from '../api.ts';
@@ -70,7 +71,7 @@ export function RulesetEdit() {
   const previewRef = useCallback((element: HTMLDivElement | null) => {
     if (element && window.location.hash === '#preview') element.scrollIntoView();
   }, [e.id]);
-  const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', `/rulesets/${e.id}`).then(r => r.writable) });
+  const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', queryUrl('/rulesets', { id: e.id })).then(r => r.writable) });
   const canEdit = e.isNew || permission.data === true;
   const [linking, setLinking] = useState<string>();
   const [linkError, setLinkError] = useState<string>();

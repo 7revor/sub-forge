@@ -251,6 +251,7 @@ export class RuleRepoService {
         this.store.db.prepare('DELETE FROM rule_repo_catalog WHERE repo = ?').run(id);
         this.store.db.prepare('DELETE FROM rule_repos WHERE id = ?').run(id);
       })();
+      this.store.invalidateRepository(id);
       this.details.clear();
     } finally { this.editing.delete(id); }
   }
@@ -260,6 +261,7 @@ export class RuleRepoService {
     this.definition(id);
     if (this.editing.has(id)) throw new HttpError(409, '仓库配置正在更新');
     this.store.db.prepare('UPDATE rule_repos SET enabled = ? WHERE id = ?').run(Number(enabled), id);
+    this.store.invalidateRepository(id);
   }
   private snapshotVersion(id: string) {
     return JSON.stringify(this.store.db.prepare('SELECT indexed_definition, revisions, built_at FROM rule_repos WHERE id = ?').get(id));
@@ -318,17 +320,27 @@ export class RuleRepoService {
   private async readFile(repo: RepoDefinition, file: RepoFile): Promise<string> {
     if (this.stopped) throw new HttpError(409,'索引服务已停止');
     this.assertEnabled(repo.id);
-    if (this.snapshots && isIndexedRuleFile(file.path)) {
-      const url=rawUrl(repo,file);
-      const result=await this.snapshots.get('ruleset',`repository-file:${repo.id}:${file.ref}:${file.path}`,url,{format:'auto',scope:'public-rules'});
-      if (!result.snapshot?.body) throw new Error(result.error ?? '没有可用规则缓存');
-      return result.snapshot.body;
-    }
-    if (file.commit) return this.cache.read(repo, file.commit, file.path);
-    // 迁移前的旧索引仍可使用；首次 Git 同步后每个文件均携带固定提交。
-    const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
-    if (response.status !== 200) throw new Error(`规则文件读取失败：HTTP ${response.status}`);
-    return response.body;
+    let invalidated = false;
+    const invalidate = (kind: string, id: string) => { if (kind === 'repository' && id === repo.id) invalidated = true; };
+    this.store.invalidationListeners.add(invalidate);
+    try {
+      let content: string;
+      if (this.snapshots && isIndexedRuleFile(file.path)) {
+        const result = await this.snapshots.get('ruleset', `repository-file:${repo.id}:${file.ref}:${file.path}`, rawUrl(repo, file), { format: 'auto', scope: 'public-rules' });
+        if (!result.snapshot?.body) throw new Error(result.error ?? '没有可用规则缓存');
+        content = result.snapshot.body;
+      } else if (file.commit) content = await this.cache.read(repo, file.commit, file.path);
+      else {
+        // 迁移前的旧索引仍可使用；首次 Git 同步后每个文件均携带固定提交。
+        const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
+        if (response.status !== 200) throw new Error(`规则文件读取失败：HTTP ${response.status}`);
+        content = response.body;
+      }
+      // 停用后重新启用也属于撤销；不能让后续 status() 重新建立已清除的绑定。
+      if (invalidated) throw notFound('仓库文件');
+      this.assertEnabled(repo.id);
+      return content;
+    } finally { this.store.invalidationListeners.delete(invalidate); }
   }
   refresh(id: string): Promise<void> {
     this.assertEnabled(id);
@@ -360,6 +372,7 @@ export class RuleRepoService {
           this.store.db.prepare('INSERT OR REPLACE INTO rule_repo_catalog (repo, data) VALUES (?, ?)').run(id, JSON.stringify(catalog));
           this.store.db.prepare('UPDATE rule_repos SET built_at = ?, revisions = ?, indexed_definition = ? WHERE id = ?').run(this.now(), JSON.stringify(revisions), JSON.stringify(repo), id);
         })();
+        this.store.invalidateRepository(id);
         this.details.clear();
         this.upgradeLegacySources();
       }

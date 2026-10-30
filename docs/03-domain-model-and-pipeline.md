@@ -204,9 +204,10 @@ Inline 点选前置保存具体来源与 `match.exact`；点选落地保存具�
 
 | 地址 | 用途 |
 | --- | --- |
-| `GET /sub/:token/:profile` | Profile 主配置（UA 识别客户端） |
-| `GET /p/:token/:profile/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
-| `GET /r/:token/:resourceKey` | 公共规则产物，资源键确定规则身份、处理参数与客户端/平台；不依赖订阅 |
+| `GET /subs/profile?id=P&token=T` | Profile 主配置（UA 识别客户端） |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&version=V&token=T` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
+| `GET /resources/ruleset?key=K&token=T`、`GET /resources/repo?key=K&token=T` | 公共规则产物，与订阅无关 |
+| `GET /subs/ruleset?profile=P&key=K&version=V&token=T` | 订阅专属远程规则；模板不提供 token 入口 |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
 
@@ -241,7 +242,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 5. ChainRule 的落地侧：
    - 落地 NodeSet 为 inline → 直接给匹配节点写 dialer-proxy
    - 落地 NodeSet 为 provider →
-       在 /p/:token/P 的订阅专属内容中给匹配节点注入 dialer-proxy；整集规则覆盖局部规则。
+       在 /subs/nodes?kind=provider&profile=P 的订阅专属内容中给匹配节点注入 dialer-proxy；整集规则覆盖局部规则。
 6. 上游自带 dialer-proxy 的节点（REF-04）：
    - 其前置名在同一 NodeSet 中 → 视为 NodeRef(同 NodeSet, exact) 走步骤 3–4
    - 在其他地方找不到 → report.warn，并按 fallback 处理（默认移除该字段）

@@ -1,3 +1,4 @@
+import { queryUrl } from '@sub-forge/core';
 import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stableStringify, type ReportItem } from '@sub-forge/core';
@@ -82,7 +83,7 @@ function emptyTemplate(): TemplateDraft {
 /** 旧详情、编辑和发布书签统一落到同一个页面。 */
 export function TemplateEdit() {
   const { id = 'new', tab } = useParams();
-  const tpl = useQuery({ queryKey: ['template', id], enabled: id !== 'new' && !tab, queryFn: () => api<TemplateResponse>('GET', `/templates/${encodeURIComponent(id)}`) });
+  const tpl = useQuery({ queryKey: ['template', id], enabled: id !== 'new' && !tab, queryFn: () => api<TemplateResponse>('GET', queryUrl('/templates', { id })) });
   if (tab) return <Navigate to={`/templates/${encodeURIComponent(id)}`} replace />;
   if (id !== 'new' && !tpl.data) return tpl.error ? <ErrorAlert error={tpl.error} /> : <div className="text-ink-muted">加载中…</div>;
   return <TemplatePage key={id} id={id} initial={tpl.data?.item} />;

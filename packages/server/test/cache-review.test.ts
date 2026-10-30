@@ -1,3 +1,4 @@
+import { ruleBinding } from '../src/rule-binding.ts';
 import { ruleBodies } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, expect, it } from 'vitest';
@@ -9,12 +10,12 @@ afterEach(async () => { for (const h of active.splice(0)) { await h.snapshots.se
 function setup(options: Parameters<typeof setupApp>[0] = {}) { const h = setupApp(options); active.push(h); return h; }
 function gate() { let release!: () => void; const promise = new Promise<void>(r => { release = r; }); return { promise, release }; }
 const profile = (id = 'p') => ({ id, name: '订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' as const }, overlay: { extraRules: [{ anchor: 'top' as const, rule: { id: 'r', matcher: remoteRuleMatcher('https://rules.test/a'), target: { kind: 'builtin' as const, name: 'DIRECT' as const } } }] } });
-it('公共远程规则原文跨用户共享，同用户再次预览复用', async () => {
+it('未保存的私有远程规则草稿不跨用户共享，预览完成即清理缓存', async () => {
   let calls = 0; const h = setup({ fetcher: async () => ({ status: 200, body: `DOMAIN,user${++calls}.test` }) });
   await addUser(h.store, 'a'); await addUser(h.store, 'b'); const a = client(h.app), b = client(h.app); await a.login('a'); await b.login('b');
   expect((await a.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true);
-  expect((await b.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true); expect(calls).toBe(1);
-  await a.post('/api/profiles/preview', { profile: profile() }); expect(calls).toBe(1);
+  expect((await b.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true); expect(calls).toBe(2);
+  await a.post('/api/profiles/preview', { profile: profile() }); expect(calls).toBe(3);
 });
 it('隐式 MRS 格式采用相同拉取参数，文本不能伪装成 MRS', async () => {
   const { readFile } = await import('node:fs/promises'); const { createUpstreamFetcher } = await import('../src/net/upstream.ts'); const { parseAllowList } = await import('../src/net/ssrf.ts');
@@ -32,7 +33,7 @@ it('渲染校验期间更新配置与快照，旧任务不能覆盖新结果', a
   const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify: async () => { if (++verified === 1) { entered.release(); await held.promise; } return { ok: true, output: '' }; } });
   const old = renderer.render('p', { client: 'mihomo' }); await entered.promise;
   body = 'DOMAIN,new.test'; h.store.put('profile', { ...profile(), name: '新订阅' });
-  await h.snapshots.refresh('ruleset', profile().overlay.extraRules[0]!.rule.matcher.id, 'https://rules.test/a');
+  await h.snapshots.refresh('ruleset', ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id, 'https://rules.test/a', { scope: 'profile:p' });
   await renderer.render('p', { client: 'mihomo' }); held.release(); await old;
   const saved = h.store.getLastGood<import('../src/render.ts').StoredRender>('p', 'mihomo:any')!;
   expect(Object.values(ruleBodies(h.store, saved.data)).join('')).toContain('new.test');
@@ -45,7 +46,7 @@ it('渲染等待中删除订阅，不得重新写成功配置', async () => {
 it('等待刷新时撤销 token，完成后不得下发内容', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,secret.test' }; } });
   h.store.put('profile', profile()); issueProfileToken(h.store, { token: 'old-token', profileId: 'p' });
-  const pending = h.app.request('/sub/old-token/p'); await entered.promise; h.store.deleteToken('old-token'); held.release(); expect((await pending).status).toBe(404);
+  const pending = h.app.request('/subs/profile?token=old-token&id=p'); await entered.promise; h.store.deleteToken('old-token'); held.release(); expect((await pending).status).toBe(404);
 });
 it('旧快照首次绑定不得被不同 UA 的草稿冒用', async () => {
   let calls = 0; const h = setup({ fetcher: async () => { calls++; return { status: 200, body: 'DOMAIN,new.test' }; } });
@@ -66,7 +67,7 @@ it('只刷新快照时，延迟完成的旧校验也不能回写旧原文', asyn
   const h = setup({ fetcher: async () => ({status:200,body}) }); h.store.put('profile',profile());
   const renderer = new RenderService(h.store,h.snapshots,{publicUrl:'https://sub.test',verify:async()=>{if(++calls===1){entered.release();await held.promise;}return {ok:true,output:''};}});
   const pending = renderer.render('p',{client:'mihomo'}); await entered.promise;
-  body='DOMAIN,new.test'; await h.snapshots.refresh('ruleset',profile().overlay.extraRules[0]!.rule.matcher.id,'https://rules.test/a');
+  body='DOMAIN,new.test'; await h.snapshots.refresh('ruleset',ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id,'https://rules.test/a',{scope:'profile:p'});
   held.release(); const result=await pending;
   expect(result.ok && Object.values(ruleBodies(h.store, result.render)).join('')).toContain('new.test');
 });
@@ -76,7 +77,7 @@ it('已保存组合的嵌套依赖不能跨用户读取或刷新', async () => {
   h.store.put('source',{id:'foreign',name:'其他用户节点',url:'https://node.test',pipeline:[]},b.id);
   // 模拟旧数据或引用权限变化；不能只在保存时检查权限。
   h.store.put('collection',{id:'collection',name:'组合',members:[{ref:{type:'source',id:'foreign'}}],pipeline:[]},a.id);
-  expect((await api.get('/api/collections/collection/cache')).status).toBe(404);
+  expect((await api.get('/api/collections/cache?id=collection')).status).toBe(404);
   expect((await api.post('/api/collections/collection/refresh-cache')).status).toBe(404);
   expect(calls).toBe(0);
 });
@@ -152,8 +153,8 @@ it('已删除来源的在途旧响应不会重新留下孤立缓存', async () =
 it.each(['provider'])('等待刷新时撤销 token，%s 入口也拒绝已保留的旧版本',async route=>{
   const entered=gate(),held=gate();let block=false;const h=setup({fetcher:async()=>{if(block){entered.release();await held.promise;}return {status:200,body:'DOMAIN,private.test'};}});
   h.store.put('profile',profile());issueProfileToken(h.store, {token:'token',profileId:'p'});const result=await h.renderer.render('p',{client:'mihomo'});if(!result.ok)throw new Error('准备失败');
-  const key=result.render.ruleResources[0]!;const version=result.render.generation!;block=true;h.advance(86400001);
-  const url=route==='provider'?`/r/token/${key}?v=${version}`:`/api/rules/convert?${new URLSearchParams({url:'https://rules.test/a',token:'token',key,v:version})}`;
+  const key=Object.keys(result.render.privateRules!)[0]!;const version=result.render.generation!;block=true;h.advance(86400001);
+  const url=route==='provider'?`/subs/ruleset?profile=p&token=token&key=${key}&version=${version}`:`/api/rules/convert?${new URLSearchParams({url:'https://rules.test/a',token:'token',key,v:version})}`;
   const pending=h.app.request(url);await entered.promise;h.store.deleteToken('token');held.release();expect((await pending).status).toBe(404);
 });
 it('校验期间新发生的拉取失败不会丢失告警，仍使用最后成功内容', async () => {
@@ -161,7 +162,7 @@ it('校验期间新发生的拉取失败不会丢失告警，仍使用最后成�
   const h=setup({fetcher:async()=>{if(fail)throw new Error('最新失败');return {status:200,body:'DOMAIN,retained.test'};}});h.store.put('profile',profile());
   const renderer=new RenderService(h.store,h.snapshots,{publicUrl:'https://sub.test',verify:async()=>{if(++verified===1){entered.release();await held.promise;}return {ok:true,output:''};}});
   const pending=renderer.render('p',{client:'mihomo'});await entered.promise;fail=true;
-  await h.snapshots.refresh('ruleset',profile().overlay.extraRules[0]!.rule.matcher.id,'https://rules.test/a');held.release();
+  await h.snapshots.refresh('ruleset',ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id,'https://rules.test/a',{scope:'profile:p'});held.release();
   const result=await pending;expect(result.ok).toBe(true);expect(result.report).toContainEqual(expect.objectContaining({code:'ruleset.fetch-failed',level:'warn'}));
   expect(result.ok&&Object.values(ruleBodies(h.store, result.render)).join('')).toContain('retained.test');
 });

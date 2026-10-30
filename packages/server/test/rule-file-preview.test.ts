@@ -4,7 +4,7 @@ import { client } from './helpers.ts';
 
 const envs: Awaited<ReturnType<typeof setupRuleReferences>>[] = [];
 afterEach(async () => { for (const env of envs.splice(0)) await env.stop(); });
-const setup = async () => { const env = await setupRuleReferences(); envs.push(env); return env; };
+const setup = async (options: { cacheSnapshots?: boolean } = {}) => { const env = await setupRuleReferences(options); envs.push(env); return env; };
 const url = (path: string, ref = 'master') => `/api/rule-repos/file-preview?${new URLSearchParams({ repo: 'blackmatrix7', ref, path })}`;
 
 describe('仓库单文件原文预览', () => {
@@ -60,11 +60,52 @@ describe('仓库单文件原文预览', () => {
 it('带 token 的仓库文件读取按访问者记录，GET 和 HEAD 归入规则集合', async () => {
   const h = await setup();
   const token = h.store.userToken(h.privateUser.id)!.token;
-  const path = `/api/files/${token}/repository?${new URLSearchParams({ repo: 'blackmatrix7', ref: 'master', path: 'rule/Surge/Google/Google.list' })}`;
+  const path = `/resources/repo?token=${token}&${new URLSearchParams({ id: 'blackmatrix7', ref: 'master', path: 'rule/Surge/Google/Google.list' })}`;
   for (const method of ['GET', 'HEAD']) expect((await h.app.request(path, { method })).status).toBe(200);
   const page = { page: 1, pageSize: 20, q: '' };
   expect(h.store.userAccessPage(h.user.id, page).total).toBe(0);
   const result = h.store.userAccessPage(h.privateUser.id, page);
   expect(result.total).toBe(2);
   expect(result.items).toMatchObject([{ kind: 'rule-collection', resourceName: 'Google.list', method: 'HEAD', source: 'file' }, { kind: 'rule-collection', method: 'GET' }]);
+});
+
+const rawRepositoryUrl = (token: string) => `/resources/repo?${new URLSearchParams({ id: 'blackmatrix7', ref: 'master', path: 'rule/Surge/Google/Google.list', token })}`;
+
+it.each(['disable', 'remove-index', 'delete'])('仓库 %s 清除公共产物、原文绑定和无引用快照，旧链接不可访问', async action => {
+  const h = await setup({ cacheSnapshots: true });
+  const token = h.store.userToken(h.privateUser.id)!.token;
+  const matcher = await h.resolve(), reference = { matcher }, target = { client: 'mihomo' as const };
+  expect(await h.renderer.sharedRules.readReference(reference, target)).toContain('google.example.test');
+  const key = h.renderer.sharedRules.key(reference, target);
+  const raw = rawRepositoryUrl(token);
+  expect((await h.app.request(raw)).status).toBe(200);
+  expect(h.store.listSharedRules()).toHaveLength(1);
+  expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM resource_bindings').get()).toEqual({ n: 2 });
+  if (action === 'disable') h.repos.setEnabled('blackmatrix7', false);
+  else if (action === 'delete') await h.repos.removeCustom('blackmatrix7');
+  else { h.setPaths([]); await h.repos.refresh('blackmatrix7'); }
+  expect(h.store.listSharedRules()).toHaveLength(0);
+  expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
+  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
+  expect((await h.app.request(`/resources/repo?key=${key}&token=${token}`)).status).toBe(404);
+  expect((await h.app.request(raw)).status).toBe(action === 'remove-index' ? 400 : 404);
+});
+
+it.each(['raw', 'first-compile'])('仓库停用后重新启用不恢复在途 %s 请求或旧缓存', async mode => {
+  const h = await setup({ cacheSnapshots: true });
+  const token = h.store.userToken(h.privateUser.id)!.token;
+  let started!: () => void, release!: () => void;
+  const began = new Promise<void>(resolve => { started = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  h.setBeforeFetch(async () => { started(); await gate; });
+  const matcher = await h.resolve();
+  const pending = mode === 'raw' ? h.app.request(rawRepositoryUrl(token)) : h.renderer.sharedRules.readReference({ matcher }, { client: 'mihomo' });
+  await began;
+  h.repos.setEnabled('blackmatrix7', false); h.repos.setEnabled('blackmatrix7', true); release();
+  const result = await pending;
+  if (mode === 'raw') expect((result as Response).status).toBe(404);
+  else expect(result).toBeUndefined();
+  expect(h.store.listSharedRules()).toEqual([]);
+  expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
+  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });
