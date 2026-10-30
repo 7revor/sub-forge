@@ -6,11 +6,12 @@ import { usePagedList } from '../hooks/usePagedList.ts';
 import { Pagination } from './Pagination.tsx';
 import { ListTable, ListTableLoading } from './ListTable.tsx';
 import { ListActions } from './ListActions.tsx';
+import { SearchInput } from './SearchInput.tsx';
 import { Plus } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useDeleteDoc, type DocMap, type Kind } from '../hooks.ts';
-import { Button, buttonClass, cx, Empty, ErrorAlert, Input, PageHeader, td } from './ui.tsx';
+import { Button, buttonClass, cx, Empty, ErrorAlert, PageHeader, td } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { Frame } from '../modals/Frame.tsx';
 import { ResourceLinkButton } from './ResourceLinkButton.tsx';
@@ -49,8 +50,8 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
       <PageHeader title={title} subtitle={intro} actions={canCreate && createButton('md', 'primary')} />
       <ErrorAlert error={list.error} />
       <section className="list-panel" aria-busy={list.isFetching}>
-        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3.5">
-          <Input aria-label={`搜索${name}`} placeholder="搜索名称" className="min-w-0 max-w-[280px]" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+          <SearchInput aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-80" value={q} onChange={(e) => setQ(e.target.value)} />
           <span className={cx('shrink-0 text-[12.5px] text-ink-muted', !list.isFetching && 'invisible')}>加载中…</span>
         </div>
         <div key={`${list.page}-${list.pageSize}-${q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">

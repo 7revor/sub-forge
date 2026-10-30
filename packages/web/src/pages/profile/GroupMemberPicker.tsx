@@ -9,7 +9,8 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { BUILTINS, memberLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Empty, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, Button, Empty, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
+import { SearchInput } from '../../components/SearchInput.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, exactNodeFilter, memberKey, nodeSetKey, toggleMember, putChain } from './memberModel.ts';
 import { ChainRuleEditor, chainForLanding } from './ChainRuleEditor.tsx';
@@ -66,7 +67,7 @@ export function GroupMemberPicker({ group, members, inherited, onChange, readOnl
         <div className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-line">
           <div className="flex flex-col gap-2 border-b border-line p-2"><Segmented label="成员分类" value={category} options={[{ value: 'node', label: 'Inline 节点', disabled: !inline.length, title: !inline.length ? '本订阅没有 Inline 节点集' : undefined }, { value: 'group', label: '策略组' }, { value: 'builtin', label: '内置策略' }]} onChange={c => { setCategory(c); setSearch(''); }} />
             {category === 'node' && !!inline.length && <Select placeholder="选择要浏览并添加成员的 Inline 节点集" aria-label="Inline 节点集" value={active ? nodeSetKey(active.ref) : ''} onChange={e => { setSource(e.target.value); setSearch(''); }}>{inline.map(s => <option key={nodeSetKey(s.ref)} value={nodeSetKey(s.ref)}>{s.name}</option>)}</Select>}
-            <Input aria-label="搜索候选成员" placeholder={category === 'node' ? '搜索节点名称' : category === 'group' ? '搜索策略组名称' : '搜索内置策略，如 DIRECT'} value={search} onChange={e => setSearch(e.target.value)} />
+            <SearchInput aria-label="搜索候选成员" placeholder={category === 'node' ? '搜索节点名称' : category === 'group' ? '搜索策略组名称' : '搜索内置策略，如 DIRECT'} value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className={cx("max-h-56 min-h-40 overflow-y-auto p-2", category === 'builtin' && 'grid grid-cols-2 content-start gap-1')}>
             {category === 'node' && <><>{nodes.error && <div role="alert" className="p-2 text-[12px] text-err">节点加载失败：{nodes.error.message}<Button size="sm" variant="ghost" onClick={() => void nodes.refetch()}>重新加载</Button></div>}</>{!active && <Empty variant="plain" title="还没有 Inline 节点集" description="在订阅的节点来源中，将所需节点集设为 Inline。" />}{nodes.isLoading && <p className="text-[13px] text-ink-muted">正在加载节点…</p>}{nodes.data?.nodes.map(n => candidate(nodeMember(n.name), n.name, n.type.toUpperCase()))}{active && nodes.data && !nodes.data.nodes.length && <Empty variant="plain" title="没有匹配节点" />}{nodes.data?.truncated && <p className="text-[12px] text-ink-muted">仅展示部分结果，请搜索缩小范围。</p>}</>}

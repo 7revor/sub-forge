@@ -13,7 +13,8 @@ import { useEffect, useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, FieldError, Field, Input, Select, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, FieldError, Field, Select, cx } from '../../components/ui.tsx';
+import { SearchInput } from '../../components/SearchInput.tsx';
 import { useRuleSetRefs } from '../../hooks.ts';
 import { useProfile, ProfileContext } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
@@ -138,7 +139,7 @@ function LegacyRules() {
         </div>} />}
     </Card>
     <Card title="模板规则" subtitle="顺序与出口跟随模板更新" bodyClass="flex flex-col gap-4 px-4 pb-4">
-      <Input aria-label="搜索规则" placeholder="搜索规则或出口" value={search} onChange={e => setSearch(e.target.value)} />
+      <SearchInput aria-label="搜索规则" placeholder="搜索规则或出口" value={search} onChange={e => setSearch(e.target.value)} />
       <div className="divide-y divide-line-2">
         {(template?.rules ?? []).filter(r => matchesNameSearch(`${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`, search)).map(r => <div key={r.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 py-3 text-[13px] sm:grid-cols-[auto_minmax(0,1fr)_minmax(80px,auto)]">
           <Badge>模板</Badge>
