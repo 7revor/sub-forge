@@ -29,9 +29,9 @@ export function ResourceCacheStatus({kind,id}:{kind:string;id:string}) {
   const state=useResourceCacheState(kind,id);
   if(state.error)return <span className="text-[12px] text-red-600">状态读取失败</span>;
   if(!state.data)return <span className="text-ink-muted">读取中…</span>;
-  const items=state.data.items, failed=items.filter(r=>r.error), missing=items.filter(r=>!r.available);
+  const items=state.data.items, failed=items.filter(r=>r.error), missing=items.filter(r=>!r.available), refreshing=items.some(r=>r.refreshing);
   return <span title={items.map(r=>`${r.name}：最后成功 ${r.lastSuccessAt?formatTime(r.lastSuccessAt):'无'}；下次拉取 ${r.nextFetchAt?formatTime(r.nextFetchAt):'待拉取'}${r.error?`；${r.error}`:''}`).join('\n')}>
-    <Badge tone={failed.length||missing.length?'warn':'neutral'}>{!items.length?'本地资源':items.some(r=>r.refreshing)?'刷新中':failed.length?`${failed.length} 项失败${missing.length?' · 有资源不可用':' · 使用旧缓存'}`:missing.length?'待首次拉取':`${items.length} 项可用`}</Badge>
+    <Badge tone={refreshing?'neutral':failed.length||missing.length?'warn':items.length?'ok':'neutral'}>{!items.length?'本地资源':refreshing?'刷新中':failed.length?`${failed.length} 项失败${missing.length?' · 有资源不可用':' · 使用旧缓存'}`:missing.length?'待首次拉取':kind==='sources'?'正常':`${items.length} 项可用`}</Badge>
   </span>;
 }
 export function RefreshCacheButton({kind,id,name,endpoint,body,disabled=false}:{kind:string;id:string;name:string;endpoint?:string;body?:unknown;disabled?:boolean}) {

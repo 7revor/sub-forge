@@ -50,7 +50,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
             <div className="p-4"><Empty title={q.trim() ? `没有名称包含「${q.trim()}」的${name}` : `还没有${name}`} description={!q.trim() && empty} action={!q.trim() && canCreate && createButton('sm', 'default')} /></div>
           ) : (
             <table className="w-full border-collapse">
-              <thead><tr>{columns.map((c) => <th key={c.header} className={cx(th, 'px-3.5')}>{c.header}</th>)}{refreshable && <><th className={th}>资源缓存</th><th className={th}>上次刷新时间</th></>}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
+              <thead><tr>{columns.map((c) => <th key={c.header} className={cx(th, 'px-3.5')}>{c.header}</th>)}{refreshable && <><th className={th}>状态</th><th className={th}>上次刷新时间</th></>}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
               <tbody>
                 {rows.map((d) => (
                   <DocTableRow key={d.id} to={`/${kind}/${d.id}`}>

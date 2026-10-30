@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
-import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展示最近拉取状态。
 
@@ -17,11 +16,6 @@ import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
-function SourceState({ source }: { source: SourceDoc }) {
-  const s = useSourceFetchState(source);
-  return <SourceFetchStatus state={s} />;
-}
-
 const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢复。';
 
 export function SourceList() {
@@ -35,7 +29,6 @@ export function SourceList() {
           { header: '备注', cell: (s) => s.note?.trim() ? <NoteCell note={s.note} /> : null },
           { header: '地址', cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[12px] text-ink-2">{s.url}</span> },
           { header: '节点', cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
-          { header: '状态', cell: (s) => <SourceState source={s} /> },
         ]} />
       <NewSourceModal open={creating} onClose={() => setCreating(false)} />
     </>
