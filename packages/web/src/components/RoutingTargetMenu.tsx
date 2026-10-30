@@ -28,8 +28,8 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
       <DropdownMenuRadioGroup value={value} onValueChange={next => { if (next !== value) onChange(next); }}>
         {sections.map((section, i) => <Fragment key={i}>
           {i > 0 && <DropdownMenuSeparator />}
-          {section.label && <DropdownMenuLabel className="text-[12px] text-ink-muted">{section.label}</DropdownMenuLabel>}
-          {section.options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value} textValue={option.label} className="text-[13px]">
+          {section.label && <DropdownMenuLabel className="px-3 text-[12px] text-ink-muted">{section.label}</DropdownMenuLabel>}
+          {section.options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value} textValue={option.label} className="px-3 text-[13px]">
             <span className="min-w-0 break-words">{option.label}</span>
           </DropdownMenuRadioItem>)}
         </Fragment>)}
