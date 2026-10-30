@@ -198,6 +198,5 @@
         }
       }
     }
-  ],
-  "tokens": [{"token": "demo-token", "profileId": "demo", "label": "演示"}, {"token": "demo-bound-token", "profileId": "demo-bound", "label": "绑定模板演示"}]
+  ]
 }

@@ -1,3 +1,5 @@
+import { ruleBodies } from './helpers.ts';
+import { issueProfileToken } from './helpers.ts';
 import { afterEach, expect, it } from 'vitest';
 import { remoteRuleMatcher } from '@sub-forge/core';
 import { RenderService } from '../src/render.ts';
@@ -7,12 +9,12 @@ afterEach(async () => { for (const h of active.splice(0)) { await h.snapshots.se
 function setup(options: Parameters<typeof setupApp>[0] = {}) { const h = setupApp(options); active.push(h); return h; }
 function gate() { let release!: () => void; const promise = new Promise<void>(r => { release = r; }); return { promise, release }; }
 const profile = (id = 'p') => ({ id, name: '订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' as const }, overlay: { extraRules: [{ anchor: 'top' as const, rule: { id: 'r', matcher: remoteRuleMatcher('https://rules.test/a'), target: { kind: 'builtin' as const, name: 'DIRECT' as const } } }] } });
-it('新建订阅草稿的远程缓存按用户隔离，同用户再次预览复用', async () => {
+it('公共远程规则原文跨用户共享，同用户再次预览复用', async () => {
   let calls = 0; const h = setup({ fetcher: async () => ({ status: 200, body: `DOMAIN,user${++calls}.test` }) });
   await addUser(h.store, 'a'); await addUser(h.store, 'b'); const a = client(h.app), b = client(h.app); await a.login('a'); await b.login('b');
   expect((await a.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true);
-  expect((await b.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true); expect(calls).toBe(2);
-  await a.post('/api/profiles/preview', { profile: profile() }); expect(calls).toBe(2);
+  expect((await b.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true); expect(calls).toBe(1);
+  await a.post('/api/profiles/preview', { profile: profile() }); expect(calls).toBe(1);
 });
 it('隐式 MRS 格式采用相同拉取参数，文本不能伪装成 MRS', async () => {
   const { readFile } = await import('node:fs/promises'); const { createUpstreamFetcher } = await import('../src/net/upstream.ts'); const { parseAllowList } = await import('../src/net/ssrf.ts');
@@ -32,8 +34,8 @@ it('渲染校验期间更新配置与快照，旧任务不能覆盖新结果', a
   body = 'DOMAIN,new.test'; h.store.put('profile', { ...profile(), name: '新订阅' });
   await h.snapshots.refresh('ruleset', profile().overlay.extraRules[0]!.rule.matcher.id, 'https://rules.test/a');
   await renderer.render('p', { client: 'mihomo' }); held.release(); await old;
-  const saved = h.store.getLastGood<{ rulesets: Record<string, string> }>('p', 'mihomo:any')!;
-  expect(Object.values(saved.data.rulesets).join('')).toContain('new.test');
+  const saved = h.store.getLastGood<import('../src/render.ts').StoredRender>('p', 'mihomo:any')!;
+  expect(Object.values(ruleBodies(h.store, saved.data)).join('')).toContain('new.test');
 });
 it('渲染等待中删除订阅，不得重新写成功配置', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,a.test' }; } });
@@ -42,8 +44,8 @@ it('渲染等待中删除订阅，不得重新写成功配置', async () => {
 });
 it('等待刷新时撤销 token，完成后不得下发内容', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,secret.test' }; } });
-  h.store.put('profile', profile()); h.store.putToken({ token: 'old-token', profileId: 'p' });
-  const pending = h.app.request('/sub/old-token'); await entered.promise; h.store.deleteToken('old-token'); held.release(); expect((await pending).status).toBe(404);
+  h.store.put('profile', profile()); issueProfileToken(h.store, { token: 'old-token', profileId: 'p' });
+  const pending = h.app.request('/sub/old-token/p'); await entered.promise; h.store.deleteToken('old-token'); held.release(); expect((await pending).status).toBe(404);
 });
 it('旧快照首次绑定不得被不同 UA 的草稿冒用', async () => {
   let calls = 0; const h = setup({ fetcher: async () => { calls++; return { status: 200, body: 'DOMAIN,new.test' }; } });
@@ -66,7 +68,7 @@ it('只刷新快照时，延迟完成的旧校验也不能回写旧原文', asyn
   const pending = renderer.render('p',{client:'mihomo'}); await entered.promise;
   body='DOMAIN,new.test'; await h.snapshots.refresh('ruleset',profile().overlay.extraRules[0]!.rule.matcher.id,'https://rules.test/a');
   held.release(); const result=await pending;
-  expect(result.ok && Object.values(result.render.rulesets).join('')).toContain('new.test');
+  expect(result.ok && Object.values(ruleBodies(h.store, result.render)).join('')).toContain('new.test');
 });
 it('已保存组合的嵌套依赖不能跨用户读取或刷新', async () => {
   let calls=0; const h=setup({fetcher:async()=>{calls++;return {status:200,body:'trojan://test@node.test:443#secret'};}});
@@ -78,15 +80,15 @@ it('已保存组合的嵌套依赖不能跨用户读取或刷新', async () => {
   expect((await api.post('/api/collections/collection/refresh-cache')).status).toBe(404);
   expect(calls).toBe(0);
 });
-it('公共规则失去管理员归属后，旧成功结果也不得绕过权限', async () => {
+it('公共规则作者角色变化不影响全站读取', async () => {
   const h=setup({fetcher:async()=>({status:200,body:'DOMAIN,secret.test'})}); const admin=await addUser(h.store,'admin','admin'), user=await addUser(h.store,'user');
   const api=client(h.app);await api.login('user');
   h.store.put('ruleset',{id:'shared',name:'公共规则',sources:[{id:'s',kind:'remote',format:'auto',url:'https://rules.test/a'}]},admin.id);
   h.store.put('profile',{...profile(),overlay:{extraRules:[{anchor:'top',rule:{id:'r',matcher:{kind:'ruleset',id:'shared'},target:{kind:'builtin',name:'DIRECT'}}}]}},user.id);
   expect((await h.renderer.render('p',{client:'mihomo'})).ok).toBe(true);
   h.store.updateUser(admin.id,{role:'user'});
-  expect((await api.post('/api/profiles/p/refresh-cache')).status).toBe(404);
-  expect(await h.renderer.render('p',{client:'mihomo'})).toMatchObject({ok:false,accessDenied:true});
+  expect((await api.post('/api/profiles/p/refresh-cache')).status).toBe(202);
+  expect(await h.renderer.render('p',{client:'mihomo'})).toMatchObject({ok:true});
 });
 it('MRS 内容类型与声明不符时拒绝更新', async () => {
   const {readFile}=await import('node:fs/promises');const {createUpstreamFetcher}=await import('../src/net/upstream.ts');const {parseAllowList}=await import('../src/net/ssrf.ts');
@@ -147,10 +149,10 @@ it('已删除来源的在途旧响应不会重新留下孤立缓存', async () =
   const pending=h.snapshots.refresh('source','s','https://old.test');await entered.promise;h.store.delete('source','s');held.release();await pending;
   expect(h.store.latestSnapshot('source',resource,'https://old.test')).toBeUndefined();
 });
-it.each(['provider','convert'])('等待刷新时撤销 token，%s 入口也拒绝已保留的旧版本',async route=>{
+it.each(['provider'])('等待刷新时撤销 token，%s 入口也拒绝已保留的旧版本',async route=>{
   const entered=gate(),held=gate();let block=false;const h=setup({fetcher:async()=>{if(block){entered.release();await held.promise;}return {status:200,body:'DOMAIN,private.test'};}});
-  h.store.put('profile',profile());h.store.putToken({token:'token',profileId:'p'});const result=await h.renderer.render('p',{client:'mihomo'});if(!result.ok)throw new Error('准备失败');
-  const key=Object.keys(result.render.rulesets)[0]!;const version=result.render.generation!;block=true;h.advance(86400001);
+  h.store.put('profile',profile());issueProfileToken(h.store, {token:'token',profileId:'p'});const result=await h.renderer.render('p',{client:'mihomo'});if(!result.ok)throw new Error('准备失败');
+  const key=result.render.ruleResources[0]!;const version=result.render.generation!;block=true;h.advance(86400001);
   const url=route==='provider'?`/r/token/${key}?v=${version}`:`/api/rules/convert?${new URLSearchParams({url:'https://rules.test/a',token:'token',key,v:version})}`;
   const pending=h.app.request(url);await entered.promise;h.store.deleteToken('token');held.release();expect((await pending).status).toBe(404);
 });
@@ -161,5 +163,5 @@ it('校验期间新发生的拉取失败不会丢失告警，仍使用最后成�
   const pending=renderer.render('p',{client:'mihomo'});await entered.promise;fail=true;
   await h.snapshots.refresh('ruleset',profile().overlay.extraRules[0]!.rule.matcher.id,'https://rules.test/a');held.release();
   const result=await pending;expect(result.ok).toBe(true);expect(result.report).toContainEqual(expect.objectContaining({code:'ruleset.fetch-failed',level:'warn'}));
-  expect(result.ok&&Object.values(result.render.rulesets).join('')).toContain('retained.test');
+  expect(result.ok&&Object.values(ruleBodies(h.store, result.render)).join('')).toContain('retained.test');
 });

@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,15 +34,15 @@ describe('规则存在即生效', () => {
         { id: 'off', kind: 'local', format: 'auto', content: 'DOMAIN,source-off.test', enabled: false },
       ] }, 'owner');
       store.put('source', { id: 'nodes', name: '节点源', url: 'https://nodes.test/sub', pipeline: [{ op: 'filter.useless', enabled: false }] }, 'owner');
-      store.putToken({ token: 'same-token', profileId: 'p' });
+      issueProfileToken(store, { token: 'same-token', profileId: 'p' });
       const output = (id: string) => renderMihomo({ profile: store.get('profile', id)!, template: store.getTemplate('t'), nodeSets: { sources: {}, collections: {}, locals: {}, snapshots: {} },
         rules: { rulesets: { rs: store.get('ruleset', 'rs')! }, snapshots: {} }, urls: { provider: key => key, ruleset: key => key } }).yaml;
       const before = ['p', 'independent'].map(output);
       store.db.pragma('user_version = 16'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(22);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(23);
       expect(['p', 'independent'].map(output)).toEqual(before);
       expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
-      expect(store.getToken('same-token')?.profileId).toBe('p');
+      expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'p')?.owner);
       expect(store.listLatestTemplates()).toHaveLength(1);
       expect(store.getTemplate('t')).not.toHaveProperty('version');
       expect(store.getTemplate('t')!.rules).toEqual([rule('on'), { id: 'set', matcher: { kind: 'ruleset', id: 'rs' }, target: direct }]);

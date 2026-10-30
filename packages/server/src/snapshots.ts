@@ -17,7 +17,7 @@ export function unusableBody(kind: SnapshotOwner, id: string, body: string, form
   if (kind === 'ruleset') {
     try {
       const parsed = parseRuleSourceContent(body, { format });
-      if (parsed.passthrough || parsed.rules.length) return undefined;
+      if (parsed.binary || parsed.rules.length) return undefined;
       return `上游内容中没有可用规则（${parsed.rejected.length} 行无法解析）`;
     } catch (e) {
       return `规则集内容无法解析：${(e as Error).message}`;
@@ -36,7 +36,7 @@ export class SnapshotService {
     if (kind === 'source') return { ...SOURCE_REQUEST_OPTIONS, scope: opts.scope };
     const source = this.store.get('ruleset', id)?.sources.find(s => s.url === url);
     const format = opts.format ?? source?.format ?? 'auto';
-    return { ...(format === 'mrs' ? { behavior: opts.behavior ?? source?.behavior } : {}), ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format, scope: opts.scope };
+    return { ...(format === 'mrs' ? { behavior: opts.behavior ?? source?.behavior } : {}), ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format, scope: 'public-rules' };
   }
   identity(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): string {
     const { scope, ...options } = this.options(kind, id, url, opts);
@@ -45,8 +45,13 @@ export class SnapshotService {
     const compatible = !sources?.length ? !options.ua || options.ua === DEFAULT_UA : sources.every(source =>
       options.ua === (source.fetch?.ua ?? DEFAULT_UA) && options.timeoutMs === (source.fetch?.timeoutMs ?? DEFAULT_TIMEOUT_MS) && options.format === source.format && (options.format !== 'mrs' || options.behavior === source.behavior));
     // 升级旧快照时不能把旧参数或旧权限的正文绑定到本次草稿读取身份。
-    const migrateLegacy = compatible && (!scope || !saved?.owner || scope === saved.owner || scope === 'public-repository' && sources?.every(s => !!s.repository && !s.fetch?.ua));
+    const migrateLegacy = compatible && (!scope || !saved?.owner || scope === saved.owner || kind === 'ruleset' && scope === 'public-rules');
     return this.store.bindResource(kind, id, url, options, scope, !!migrateLegacy);
+  }
+  /** 排队任务只检查现有绑定，不能因为检查状态重新绑定已删除的来源。 */
+  isBound(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): boolean {
+    const { scope, ...options } = this.options(kind, id, url, opts);
+    return this.store.resourceBinding(kind, id, url) === this.store.resourceKey(kind, id, url, options, scope);
   }
   private revision(snapshot: SnapshotRow): string {
     const success = this.store.latestSnapshot(snapshot.ownerKind,snapshot.ownerId,snapshot.url);
@@ -83,7 +88,6 @@ export class SnapshotService {
     const resource = this.identity(kind,id,url,opts);
     const running = this.inflight.get(resource);
     if (running) return running;
-    const documentExisted = !!this.store.get(kind,id);
     const p = (async () => {
       // 先进入微任务，确保同步失败也能正确清理在途表。
       await Promise.resolve();
@@ -107,12 +111,8 @@ export class SnapshotService {
         return this.store.addSnapshot({ ownerKind:kind,ownerId:resource,url,fetchedAt:Math.max(this.now(),(previous?.fetchedAt ?? -1)+1),ok:false,error:(error as Error).message });
       } finally {
         this.inflight.delete(resource);
-        // 临时引用和同 URL 的不同读取参数可能并发，不把它们误当已删除文档。
-        if (documentExisted) {
-          const doc = this.store.get(kind,id);
-          const stillReferenced = doc && ('url' in doc ? doc.url === url : doc.sources.some(s => s.url === url));
-          if (!stillReferenced) this.store.pruneUnusedResource(resource);
-        }
+        // 删除时已撤销绑定；晚到的拉取不能复活无引用的缓存。
+        this.store.pruneUnusedResource(resource);
         this.store.changed();
       }
     })();
@@ -124,7 +124,9 @@ export class SnapshotService {
     let latest = this.store.latestSnapshot(kind,status.resource,url);
     if (policy.refresh || status.nextFetchAt === undefined || this.now() >= status.nextFetchAt || status.refreshing) {
       const row = await this.refresh(kind,id,url,opts);
-      latest = this.store.latestSnapshot(kind,status.resource,url);
+      // 在途校验可以使用本次成功响应的副本；引用被清理时不重新落库。
+      // 正式下载的资源存在性和归属由调用方在 await 后复核。
+      latest = this.store.latestSnapshot(kind,status.resource,url) ?? (row.ok ? row : undefined);
       return { snapshot:latest,revision:latest ? this.revision(latest) : undefined,stale:!row.ok && !!latest,error:row.ok ? undefined : row.error };
     }
     return { snapshot:latest,revision:latest ? this.revision(latest) : undefined,stale:!!status.error && !!latest,error:status.error };

@@ -1,3 +1,5 @@
+import type { SharedRuleRecord } from './shared-rules.ts';
+import { resolveRuleSetReference } from './ruleset-reference.ts';
 import { ResourceAccessError } from './resource-access.ts';
 // 资源调度与手动刷新使用同一依赖收集和状态。任务持久化，重启后明确标记中断。
 import type { NodeSetID } from '@sub-forge/core';
@@ -11,7 +13,7 @@ import type { SnapshotOwner, Store } from './store.ts';
 export type Resource = { kind:SnapshotOwner; id:string; name:string; url:string; options:SnapshotFetchOptions };
 // 旧任务仅含已完成结果，没有 state；新任务从创建起保留完整、有序的资源列表。
 export type RefreshResult = { name:string; state?:'pending'|'running'|'done'|'interrupted'; ok?:boolean; available:boolean; error?:string };
-export type RefreshJob = { id:string; owner:string; kind:string; documentId:string; state:'running'|'done'|'interrupted'; total:number; completed:number; results:RefreshResult[]; render?:{ok:boolean;error?:string}; error?:string };
+export type RefreshJob = { id:string; owner:string; kind:string; documentId:string; documentBound?:boolean; state:'running'|'done'|'interrupted'; total:number; completed:number; results:RefreshResult[]; render?:{ok:boolean;error?:string}; error?:string };
 export class ResourceService {
   private readonly running = new Map<string, Promise<void>>();
   private timer?: ReturnType<typeof setInterval>;
@@ -32,6 +34,7 @@ export class ResourceService {
     }
   }
   private save(job:RefreshJob) {
+    if (job.documentBound !== false && ['profile', 'source', 'collection', 'ruleset'].includes(job.kind) && !this.store.get(job.kind as 'profile' | 'source' | 'collection' | 'ruleset', job.documentId)) return;
     this.store.db.prepare('INSERT OR REPLACE INTO refresh_jobs VALUES (?,?,?,?)').run(job.id,job.owner,this.store.cipher.encrypt(JSON.stringify(job)),this.now());
     this.store.changed();
   }
@@ -40,7 +43,7 @@ export class ResourceService {
     return row ? JSON.parse(this.store.cipher.decrypt(row.data)) : undefined;
   }
   ruleResources(rs:RuleSetDoc,scope?:string):Resource[] {
-    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:rs.id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:s.repository && !s.fetch?.ua ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? scope}}));
+    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:rs.id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:'public-rules'}}));
   }
   nodeResources(refs:NodeSetID[], owner?:string|null):Resource[] {
     return this.renderer.collectNodeSets(refs,owner).sources.map(s=>({kind:'source',id:s.id,name:s.name,url:s.url,options:{}}));
@@ -71,6 +74,7 @@ export class ResourceService {
     };
     return this.unique([
       ...this.additionalResources(),
+      ...this.store.listSharedRules<SharedRuleRecord>().flatMap(r => { const rs = resolveRuleSetReference(r.data.reference.matcher, this.store); return rs ? this.ruleResources(rs) : []; }),
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
@@ -95,18 +99,23 @@ export class ResourceService {
     const resources = this.unique(explicit ?? this.collect(kind,id));
     const dependencyKey = (items:Resource[]) => JSON.stringify(this.unique(items).map(r=>this.snapshots.identity(r.kind,r.id,r.url,r.options)).sort());
     const initialDependencies = dependencyKey(resources);
-    const job:RefreshJob = {id:randomId(),owner,kind,documentId:id,state:'running',total:resources.length,completed:0,results:resources.map(r=>({name:r.name,state:'pending',available:this.snapshots.status(r.kind,r.id,r.url,r.options).available}))};
+    const job:RefreshJob = {id:randomId(),owner,kind,documentId:id,documentBound:!explicit,state:'running',total:resources.length,completed:0,results:resources.map(r=>({name:r.name,state:'pending',available:this.snapshots.status(r.kind,r.id,r.url,r.options).available}))};
     this.save(job);
+    let cancelled = false;
+    const invalidate = (deletedKind:string,deletedId:string) => { if (!explicit && deletedKind === kind && deletedId === id) cancelled = true; };
+    this.store.invalidationListeners.add(invalidate);
     const work = (async()=>{
       await this.each(resources,async (r,index)=>{
+        if (cancelled) throw new Error('刷新对象已删除');
         if (!explicit) {
           const root = this.store.getWithOwner(kind as 'source'|'collection'|'ruleset'|'profile', id);
-          if (!root || root.owner !== owner) throw new ResourceAccessError();
+          if (!root || kind !== 'ruleset' && root.owner !== owner) throw new ResourceAccessError();
           if (dependencyKey(this.collect(kind,id)) !== initialDependencies) throw new Error('刷新期间资源配置已变化，请重新刷新');
         }
         const item = job.results[index]!;
         item.state = 'running';this.save(job);
         const result = await this.snapshots.refresh(r.kind,r.id,r.url,r.options);
+        if (cancelled) throw new Error('刷新对象已删除');
         Object.assign(item,{state:'done',ok:result.ok,available:!!this.store.latestSnapshot(r.kind,result.ownerId,r.url),error:result.error});
         job.completed++; this.save(job);
       });
@@ -130,7 +139,7 @@ export class ResourceService {
         job.state='interrupted';job.error='刷新期间资源配置已变化，请重新刷新';return;
       }
       job.state='done';
-    })().catch(error=>{job.state='interrupted';job.error=error instanceof Error?error.message:String(error);}).finally(()=>{if(job.state==='interrupted')this.interruptPending(job);this.save(job);this.running.delete(job.id);});
+    })().catch(error=>{job.state='interrupted';job.error=error instanceof Error?error.message:String(error);}).finally(()=>{if(job.state==='interrupted')this.interruptPending(job);if(!cancelled)this.save(job);this.running.delete(job.id);this.store.invalidationListeners.delete(invalidate);});
     this.running.set(job.id,work);
     return job;
   }
@@ -139,9 +148,11 @@ export class ResourceService {
     if (this.ticking) return this.ticking;
     const work = (async()=>{
       await this.each(this.all(),async r=>{
+        if (!this.snapshots.isBound(r.kind, r.id, r.url, r.options)) return;
         const status=this.snapshots.status(r.kind,r.id,r.url,r.options);
         if(status.nextFetchAt===undefined || this.now()>=status.nextFetchAt) await this.snapshots.get(r.kind,r.id,r.url,r.options);
       });
+      this.store.pruneResourceBindings();
       this.store.db.prepare('DELETE FROM refresh_jobs WHERE at < ?').run(this.now()-7*86400000);
     })().finally(()=>{this.ticking=undefined;});
     this.ticking=work;return work;

@@ -5,7 +5,6 @@ import { remoteRuleMatcher, type ClientCtx, type Platform } from '@sub-forge/cor
 import { checkRuleSetReference, resolveRuleSetReference, type RuleSetMatcher } from '../ruleset-reference.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../docs.ts';
 import type { SnapshotService } from '../snapshots.ts';
-import type { RenderService } from '../render.ts';
 import type { Store } from '../store.ts';
 import { RuleConverter, type ConversionInput } from '../rule-converter.ts';
 import { RuleSourceService } from '../rule-source.ts';
@@ -36,19 +35,19 @@ function source(value: unknown): RuleSetSourceDoc {
   }
   return s;
 }
-export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, renderer: RenderService) {
+export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
   const app = new Hono<ApiEnv>();
   const converter = new RuleConverter();
   const getter = new RuleSourceService(snapshots, converter);
   for (const path of ['/rulesets/preview', '/rulesets/source', '/rules/convert', '/rules/matcher-source', '/rulesets/:id/sources/:source/content']) {
-    app.use(path, (c, next) => path === '/rules/convert' && c.req.method === 'GET' && c.req.query('token') ? next() : requireUser(c, next));
+    app.use(path, (c, next) => c.req.query('token') ? Promise.reject(notFound()) : requireUser(c, next));
     app.use(path, bodyLimit({ maxSize: 16 * 1024 * 1024 }));
   }
   const own = (id: unknown, userId: string): RuleSetDoc | undefined => {
     if (id === undefined) return undefined;
     if (typeof id !== 'string') throw bad('规则集 id 不合法');
     const row = store.getWithOwner('ruleset', id);
-    if (!row || row.owner !== userId) throw notFound('规则集');
+    if (!row) throw notFound('规则集');
     return row.doc;
   };
   // 模板中的规则引用预览完整源文件，不转换、不裁剪，也不应用客户端改写。
@@ -112,7 +111,7 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
       notes: result.diagnostics.filter(d => d.kind === 'degraded').map(d => d.reason),
     });
   });
-  // GET 供 URL 嵌套下载使用；登录会话可转换任意外部 URL，订阅 token 只允许自己的已生成资源。
+  // GET 仅供登录用户预览外部 URL；正式下载统一走公共托管资源入口。
   app.get('/rules/convert', async c => {
     let matcher: ReturnType<typeof remoteRuleMatcher>;
     try { matcher = remoteRuleMatcher(c.req.query('url') ?? ''); }
@@ -129,25 +128,6 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
       c.header('content-disposition', 'attachment; filename="rules.list"');
       return c.text(body);
     };
-    const token = c.req.query('token');
-    if (token) {
-      const active = store.getActiveToken(token);
-      if (!active || (client !== 'mihomo' && client !== 'stash' && client !== 'surge' && client !== 'loon')) throw notFound();
-      const key = c.req.query('key');
-      const version = c.req.query('v');
-      if (!key || !version) throw bad('订阅转换链接缺少资源键或版本');
-      const target = { client: client as ClientCtx['client'], ...(platform ? { platform: platform as Platform } : {}) };
-      const retained = renderer.getVersion(active.profileId, target, version);
-      // 在发起任何刷新之前检查 URL 与版本归属，防止把订阅链接用成任意地址代理。
-      if (!retained || retained.remoteRuleUrls?.[key] !== url) throw notFound();
-      const outcome = await renderer.render(active.profileId, target);
-      if (!outcome.ok && outcome.accessDenied) throw notFound();
-      if (store.getActiveToken(token)?.profileId !== active.profileId) throw notFound();
-      const selected = renderer.getVersion(active.profileId, target, version) ?? retained;
-      const body = selected.rulesets[key];
-      if (selected.remoteRuleUrls?.[key] !== url || body === undefined) throw notFound();
-      return send(body);
-    }
     const src: RuleSetSourceDoc = { id: 'remote', kind: 'remote', url, format: 'auto' };
     const loaded = await getter.get(c.get('user').id, src);
     if (loaded.content === undefined || loaded.status.error) throw new HttpError(502, loaded.status.error ?? '远程规则读取失败');

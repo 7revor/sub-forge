@@ -1,3 +1,5 @@
+import { ruleBodies } from './helpers.ts';
+import { issueProfileToken } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { addUser, client, setupApp } from './helpers.ts';
@@ -25,12 +27,12 @@ describe('自动格式贯通预览、保存与下载', () => {
       const saved = await c.post('/api/rulesets', draft);
       expect(saved.status).toBe(201);
       h.store.put('profile', { id: 'p', name: '下载', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: saved.json.item.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } }, user.id);
-      h.store.putToken({ token: 'test', profileId: 'p' });
-      const config = parse(await (await h.app.request('/sub/test')).text());
+      issueProfileToken(h.store, { token: 'test', profileId: 'p' });
+      const config = parse(await (await h.app.request('/sub/test/p')).text());
       const provider = (Object.values(config['rule-providers']) as { url: string; format: string }[])[0]!;
       expect(provider.format).toBe('text');
       const url = new URL(provider.url);
-      expect(url.pathname).toMatch(/\.list$/);
+      expect(url.pathname).toMatch(/\/[0-9a-f]{64}$/);
       const download = await h.app.request(url.pathname + url.search);
       expect(download.status).toBe(200);
       expect((await download.text()).trim().split('\n')).toEqual(preview.json.lines);
@@ -51,20 +53,20 @@ describe('自动格式贯通预览、保存与下载', () => {
       expect(saved.json.item.sources[0].format).toBe('auto');
       const id = saved.json.item.id;
       h.store.put('profile', { id: 'p', name: '下载', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } }, user.id);
-      h.store.putToken({ token: 'test', profileId: 'p' });
-      const original = parse(await (await h.app.request('/sub/test')).text());
+      issueProfileToken(h.store, { token: 'test', profileId: 'p' });
+      const original = parse(await (await h.app.request('/sub/test/p')).text());
       expect(Object.values(original['rule-providers'])).toEqual([expect.objectContaining({ format: 'text', behavior: 'classical', url: expect.stringContaining('/r/') })]);
       // 增加本地来源后切换到一个 LIST；已有来源格式不需要手动改动。
       const merged = { ...saved.json.item, sources: [...saved.json.item.sources, { id: 'local', kind: 'local', content: 'DOMAIN,local.test' }] };
       expect((await c.put(`/api/rulesets/${id}`, merged)).status).toBe(200);
       const mergedPre = await c.post('/api/rulesets/preview', { id, ruleset: merged });
       expect(mergedPre.json.delivery.mode).toBe('managed');
-      const config = parse(await (await h.app.request('/sub/test')).text());
+      const config = parse(await (await h.app.request('/sub/test/p')).text());
       const providers = Object.values(config['rule-providers']) as { url: string; behavior: string; format: string }[];
       expect(providers).toHaveLength(1);
       expect(providers[0]).toMatchObject({ behavior: 'classical', format: 'text' });
       const url = new URL(providers[0]!.url);
-      expect(url.pathname).toMatch(/\.list$/);
+      expect(url.pathname).toMatch(/\/[0-9a-f]{64}$/);
       const download = await h.app.request(url.pathname + url.search);
       expect(download.status).toBe(200);
       expect((await download.text()).trim().split('\n')).toEqual(mergedPre.json.lines);
@@ -81,15 +83,15 @@ describe('自动格式贯通预览、保存与下载', () => {
       const before = await h.renderer.render('p', { client: 'mihomo' });
       expect(before.ok).toBe(true);
       if (!before.ok) throw new Error(before.message);
-      expect(parse(before.render.yaml)['rule-providers'].rs_r_classical).toMatchObject({ format: 'text', behavior: 'classical' });
+      expect(parse(before.render.yaml)['rule-providers']['旧设置']).toMatchObject({ format: 'text', behavior: 'classical' });
       body = '192.0.2.0/24';
       await h.snapshots.refresh('ruleset', 'r', 'https://example.test/no-extension', { format: 'ipcidr' });
       const after = await h.renderer.render('p', { client: 'mihomo' });
       expect(after.ok).toBe(true);
       if (!after.ok) throw new Error(after.message);
-      expect(parse(after.render.yaml)['rule-providers'].rs_r_classical).toMatchObject({ format: 'text', behavior: 'classical' });
+      expect(parse(after.render.yaml)['rule-providers']['旧设置']).toMatchObject({ format: 'text', behavior: 'classical' });
       expect(after.render.generation).toBe(before.render.generation);
-      expect(after.render.rulesets['rs_r_classical.list']).toContain('192.0.2.0/24');
+      expect(ruleBodies(h.store, after.render)['rs_r_classical.list']).toContain('192.0.2.0/24');
     } finally { await h.snapshots.settled(); h.store.close(); }
   });
   it('输入未完成的本地 YAML 时按来源报告错误，不阻断其他来源预览', async () => {

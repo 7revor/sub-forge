@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -59,8 +60,8 @@ describe('Store', () => {
 
   it('token、最近一次成功渲染、访问日志', () => {
     const s = new Store(':memory:', { now: () => 42 });
-    s.putToken({ token: 'tk', profileId: 'p', label: 'Mac' });
-    expect(s.getToken('tk')).toEqual({ token: 'tk', profileId: 'p', label: 'Mac' });
+    issueProfileToken(s, { token: 'tk', profileId: 'p' });
+    expect(s.getToken('tk')).toEqual({ token: 'tk', userId: 'fixture-user' });
     s.putLastGood('p', 'mihomo', { yaml: 'a' });
     expect(s.getLastGood('p', 'mihomo')).toEqual({ renderedAt: 42, data: { yaml: 'a' } });
     s.logAccess({ token: 'tk', profileId: 'p', at: 1, ua: 'clash.meta', client: 'mihomo', status: 200, ms: 3, warnings: 0, source: 'fresh' });
@@ -109,11 +110,12 @@ describe('加密与迁移', () => {
     s.put('source', { id: 'a', name: 'A', url: 'https://secret.example.com/sub?token=xyz', pipeline: [] }, 'u1');
     const url = 'https://secret.example.com/sub?token=xyz';
     s.addSnapshot({ ownerKind: 'source', ownerId: 'a', url, fetchedAt: 1, ok: true, body: 'password: hunter2', error: `连接 ${url} 失败` });
-    const t = s.createToken('p', 'Mac');
+    const user = s.createUser({ username: 'fixture', passwordHash: 'fixture', role: 'user' });
+    const t = s.createToken(user.id);
     const dump = JSON.stringify([
       s.db.prepare('SELECT * FROM docs').all(),
       s.db.prepare('SELECT * FROM snapshots').all(),
-      s.db.prepare('SELECT * FROM sub_tokens').all(),
+      s.db.prepare('SELECT * FROM user_tokens').all(),
     ]);
     expect(dump).not.toContain('secret.example.com');
     expect(dump).not.toContain('hunter2');
@@ -122,8 +124,8 @@ describe('加密与迁移', () => {
     expect(s.getWithOwner('source', 'a')!.owner).toBe('u1');
     expect(s.latestSnapshot('source', 'a', url)).toMatchObject({ url, body: 'password: hunter2', error: `连接 ${url} 失败` });
     expect(s.snapshotHistory('source', 'a')[0]!.url).toBe(url);
-    expect(s.getToken(t.token)).toEqual({ token: t.token, profileId: 'p', label: 'Mac' });
-    expect(s.listTokens('p').map((x) => x.token)).toEqual([t.token]);
+    expect(s.getToken(t.token)).toEqual({ token: t.token, userId: user.id });
+    expect([s.userToken(user.id)?.token]).toEqual([t.token]);
   });
 
   it('旧版数据库（docs 无 owner、token 明文）自动升级', () => {
@@ -137,7 +139,7 @@ describe('加密与迁移', () => {
     old.close();
     const s = new Store(file, { cipher: new Cipher(randomBytes(32)) });
     expect(s.get('profile', 'p')!.name).toBe('旧');
-    expect(s.getToken('old-token')).toEqual({ token: 'old-token', profileId: 'p' });
+    expect(s.getToken('old-token')).toBeUndefined();
     s.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -192,7 +194,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(22);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(23);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
@@ -225,7 +227,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(22);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(23);
     expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list' }] });
     expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [{ match: 'DOMAIN,a.test', override: overrides[0]!.override }] });
     expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', sources: [
@@ -245,7 +247,7 @@ describe('加密与迁移', () => {
     const migratedRulesets = s.list('ruleset');
     s.close();
     const reopened = new Store(file, { cipher });
-    expect(reopened.db.pragma('user_version', { simple: true })).toBe(22);
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(23);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
     expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });

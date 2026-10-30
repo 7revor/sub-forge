@@ -1,0 +1,11 @@
+
+> sub-forge@ typecheck /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources
+> pnpm -r typecheck
+
+Scope: 3 of 4 workspace projects
+packages/core typecheck$ tsc --noEmit
+packages/core typecheck: Done
+packages/server typecheck$ tsc --noEmit
+packages/web typecheck$ tsc --noEmit
+packages/server typecheck: Done
+packages/web typecheck: Done

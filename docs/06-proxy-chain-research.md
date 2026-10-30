@@ -93,7 +93,7 @@ provider 内的节点不参与这一步。它们的 `dialer-proxy` 在加载时*
 | 落地集合 | 写法 | 说明 |
 | --- | --- | --- |
 | 本地节点 | 直接写入 `proxies[i].dialer-proxy` | — |
-| provider 整源同一前置 | `proxy-providers.P.override.dialer-proxy: X` | provider 内容可以复用、不必按 Profile 区分 |
+| provider 整源同一前置 | 在本服务的订阅专属 provider 中给每个节点写入 `dialer-proxy: X` | 与局部链使用同一服务端处理路径；不再输出 provider 级 override |
 | provider 中部分节点 | 本服务下发 **Profile 专属** provider 内容，只在命中的节点上加 `dialer-proxy: X` | `X` 是本 Profile 的组名，所以 provider 内容必须按 Profile 生成 |
 
 ## 3. 必须处理的风险

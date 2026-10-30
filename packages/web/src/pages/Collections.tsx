@@ -1,4 +1,5 @@
 import { Frame } from '../modals/Frame.tsx';
+import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 import { NODE_SET_LABEL, nodeSetPath } from '../domain/nodeSet.ts';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
 // 组合（设计稿「组合」）：有序引用多个节点集，成员可加前后缀；成员各自跑完处理链后合并，再跑组合自身的处理链（COL-01–04）。
@@ -54,6 +55,7 @@ export function CollectionEdit() {
   const usedBy = (profiles.data ?? []).filter((p) => p.nodeSets.some((n) => n.ref.type === 'collection' && n.ref.id === d.id));
   return (
     <DetailShell {...shell} onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
+      extraActions={!e.isNew && <ResourceLinkButton kind="collections" id={d.id} name={d.name} disabled={e.dirty} />}
       actionItems={[{ label: '重命名', onSelect: async () => { const result = await Frame.modal.prompt({ title: '重命名组合', initialValue: d.name, unchangedValue: d.name, placeholder: '填写新的组合名称' }); if (result.status === 'confirmed') set({ name: result.data }); } }]}
       badges={<>
         <Badge>{d.members.length} 个成员{preview.data ? ` · 合并后 ${preview.data.input} 个节点` : ''}</Badge>

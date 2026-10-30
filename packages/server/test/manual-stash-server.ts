@@ -20,7 +20,7 @@ store.importSeed({
     groups: [{ id: 'proxy', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'demo' } }] }],
     rules: [{ id: 'rules', matcher: { kind: 'ruleset', id: 'paypal' }, target: { kind: 'group', groupId: 'proxy' } }], final: direct,
   } } }],
-  tokens: [{ token: 'stash-demo-token', profileId: 'stash-demo', label: '验收设备' }],
+  tokens: [{ token: 'stash-demo-token', userId: user.id }],
 }, user.id);
 const snapshots = new SnapshotService(store, async url => { throw new Error(`验收禁止访问上游：${url}`); });
 const publicUrl = 'http://127.0.0.1:5198';

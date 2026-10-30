@@ -1,3 +1,4 @@
+import { ruleBodies } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { addUser, client, setupApp } from './helpers.ts';
@@ -12,7 +13,7 @@ describe('远程 YAML 转换为托管 LIST', () => {
       const doc = { name: 'YAML 转 LIST', sources: [source] };
       const preview = await c.post('/api/rulesets/preview', { ruleset: doc, source: 'yaml', client: 'mihomo' });
       expect(preview.status).toBe(200);
-      expect(preview.json).toMatchObject({ passthrough: false, sources: [{ conversion: 'yaml-to-list', rules: 3, rejected: 1 }] });
+      expect(preview.json).toMatchObject({ binary: false, sources: [{ conversion: 'yaml-to-list', rules: 3, rejected: 1 }] });
       expect(preview.json.lines).toContain('DOMAIN,example.com');
       expect(preview.json.lines).toContain('IP-CIDR,10.0.0.0/8,no-resolve');
       const saved = await c.post('/api/rulesets', doc); expect(saved.status).toBe(201);
@@ -26,24 +27,24 @@ describe('远程 YAML 转换为托管 LIST', () => {
       expect(providers).toHaveLength(1);
       expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub.test/r/'))).toBe(true);
       expect(rendered.render.yaml).not.toContain(source.url);
-      expect(Object.values(rendered.render.rulesets).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
-      expect(Object.values(rendered.render.rulesets).join('')).toContain('# [YAML 原文] payload:');
-      expect(Object.values(rendered.render.rulesets).join('')).toContain('UNKNOWN,Unsupported*');
+      expect(Object.values(ruleBodies(h.store, rendered.render)).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
+      expect(Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('# [YAML 原文] payload:');
+      expect(Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('UNKNOWN,Unsupported*');
       expect((await c.get(`/api/rulesets/${id}`)).json.item.sources[0].url).toBe(source.url);
     } finally { h.store.close(); }
   });
-  it('保存、草稿预览拒绝将 YAML 地址标为 mrs/srs 透传', async () => {
+  it('保存、草稿预览拒绝将 YAML 地址标为 mrs/srs 二进制', async () => {
     const h = setupApp();
     try {
       await addUser(h.store,'alice'); const c=client(h.app); await c.login('alice');
       for (const format of ['mrs','srs']) {
-        const ruleset={name:'禁止透传',sources:[{id:'s',kind:'remote',url:'https://example.com/input.YML?download=1',format,behavior:'domain'}]};
+        const ruleset={name:'禁止伪装二进制',sources:[{id:'s',kind:'remote',url:'https://example.com/input.YML?download=1',format,behavior:'domain'}]};
         expect((await c.post('/api/rulesets',ruleset)).status).toBe(400);
         expect((await c.post('/api/rulesets/preview',{ruleset,client:'mihomo'})).status).toBe(400);
       }
     } finally { h.store.close(); }
   });
-  it('无扩展名的既有 YAML 来源仍不可改为二进制透传', async () => {
+  it('无扩展名的既有 YAML 来源仍不可改为二进制托管', async () => {
     const h = setupApp();
     try {
       await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');

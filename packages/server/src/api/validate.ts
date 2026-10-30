@@ -143,13 +143,8 @@ export class RefChecker {
     return !!row && row.owner === this.user.id;
   }
 
-  /** 规则集：自己的，或管理员名下的公共规则集（模板由管理员维护，会引用这些） */
-  ruleVisible(id: string): boolean {
-    const row = this.store.getWithOwner('ruleset', id);
-    if (!row) return false;
-    if (row.owner === this.user.id) return true;
-    return row.owner !== null && this.store.getUser(row.owner)?.role === 'admin';
-  }
+  /** 所有已登录用户均可引用公共规则增强；写权限由管理接口检查。 */
+  ruleVisible(id: string): boolean { return !!this.store.get('ruleset', id); }
 
   nodeSet(ref: unknown, where: string): NodeSetID {
     if (!isObj(ref) || !NODESET_KINDS.has(ref.type as string) || !isStr(ref.id)) throw bad(`${where}：节点集引用格式错误`);
@@ -176,7 +171,7 @@ export class RefChecker {
 
 /** 草稿预览与持久化共用仓库关联约束；不限制普通远程来源输入中的未完成地址。 */
 export function checkRepositorySource(src: Record<string, unknown>, prior: { repository?: unknown; url?: string; format?: string } | undefined, store: Store, at: string) {
-  if ((src.format === 'mrs' || src.format === 'srs') && typeof src.url === 'string' && (isYamlRuleUrl(src.url) || (prior?.url === src.url && prior.format === 'yaml'))) throw bad(`${at}：YAML 规则只能自动转换为 LIST 托管，不能透传`);
+  if ((src.format === 'mrs' || src.format === 'srs') && typeof src.url === 'string' && (isYamlRuleUrl(src.url) || (prior?.url === src.url && prior.format === 'yaml'))) throw bad(`${at}：YAML 规则只能自动转换为 LIST 托管，不能标记为二进制`);
   const link = src.repository;
   const sameLink = (a: unknown, b: unknown) => isObj(a) && isObj(b) && ['repo', 'entry', 'ref', 'path'].every(k => a[k] === b[k]);
   if (prior?.repository && (!sameLink(link, prior.repository) || src.kind !== 'remote' || src.url !== prior.url)) throw bad(`${at}：关联来源的地址不可修改，请删除后重新关联`);

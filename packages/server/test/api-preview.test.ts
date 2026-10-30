@@ -1,3 +1,4 @@
+import { ruleBodies } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import type { UpstreamFetcher } from '../src/net/upstream.ts';
 import { addUser, client, serve, setupApp } from './helpers.ts';
@@ -191,10 +192,10 @@ describe('规则集预览（CR-05）', () => {
     expect(activeLines(saved.json.lines)).toEqual(['DOMAIN,remote.test']);
   });
 
-  it('别人的规则集不能借 id 读快照', async () => {
+  it('任意登录用户可以预览公共规则增强', async () => {
     const { alice, bob } = await scenario();
     const id = (await alice.post('/api/rulesets', { name: 'A', sources: [local('a', 'DOMAIN,a.test')] })).json.item.id;
-    expect((await bob.post('/api/rulesets/preview', { id, ruleset: { name: 'A', sources: [] }, client: 'mihomo' })).status).toBe(404);
+    expect((await bob.post('/api/rulesets/preview', { id, ruleset: { name: 'A', sources: [] }, client: 'mihomo' })).status).toBe(200);
   });
 });
 
@@ -302,7 +303,7 @@ describe('节点集最终节点列表', () => {
 
 describe('规则集组级改写保存与预览', () => {
   it('保存、重新读取、各来源预览、合并预览和实际渲染都应用同一组级改写', async () => {
-    const { alice, renderer } = await scenario(serve({ 'https://example.test/rules': 'DOMAIN,same.test\nDOMAIN,remote.test' }));
+    const { alice, renderer, store } = await scenario(serve({ 'https://example.test/rules': 'DOMAIN,same.test\nDOMAIN,remote.test' }));
     const overrides = [{ match: 'DOMAIN,same.test', override: { when: { client: 'mihomo' }, action: { replace: [{ type: 'DOMAIN', value: 'changed.test' }] } } }];
     const created = await alice.post('/api/rulesets', { name: '整组', sources: [
       { id: 'a', kind: 'local', format: 'auto', content: 'DOMAIN,same.test' },
@@ -323,18 +324,18 @@ describe('规则集组级改写保存与预览', () => {
     const profile = await alice.post('/api/profiles', { name: '改写输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
-    expect(rendered.ok && Object.values(rendered.render.rulesets).join('')).toContain('changed.test');
-    expect(rendered.ok && activeLines(Object.values(rendered.render.rulesets).join('\n').split('\n')).join('\n')).not.toContain('same.test');
+    expect(rendered.ok && Object.values(ruleBodies(store, rendered.render)).join('')).toContain('changed.test');
+    expect(rendered.ok && activeLines(Object.values(ruleBodies(store, rendered.render)).join('\n').split('\n')).join('\n')).not.toContain('same.test');
     const removed = await alice.put(`/api/rulesets/${rs.id}`, { ...rs, overrides: [] });
     const restored = await alice.post('/api/rulesets/preview', { ruleset: removed.json.item, client: 'mihomo' });
     expect(restored.json.lines).toContain('DOMAIN,same.test');
     const rerendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
-    expect(rerendered.ok && Object.values(rerendered.render.rulesets).join('')).toContain('same.test');
-    expect(rerendered.ok && Object.values(rerendered.render.rulesets).join('')).not.toContain('changed.test');
+    expect(rerendered.ok && Object.values(ruleBodies(store, rerendered.render)).join('')).toContain('same.test');
+    expect(rerendered.ok && Object.values(ruleBodies(store, rerendered.render)).join('')).not.toContain('changed.test');
   });
 
   it('追加不需要内容匹配，保存重读、合并预览与实际渲染一致', async () => {
-    const { alice, renderer } = await scenario();
+    const { alice, renderer, store } = await scenario();
     const overrides = [{ override: { when: { client: 'mihomo' }, action: { append: [{ type: 'DOMAIN', value: 'added.test' }] } } }];
     const created = await alice.post('/api/rulesets', { name: '追加', sources: [
       { id: 'a', kind: 'local', format: 'auto', content: 'DOMAIN,keep.test' },
@@ -350,7 +351,7 @@ describe('规则集组级改写保存与预览', () => {
     const profile = await alice.post('/api/profiles', { name: '追加输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
-    expect(rendered.ok && Object.values(rendered.render.rulesets).join('')).toContain('added.test');
+    expect(rendered.ok && Object.values(ruleBodies(store, rendered.render)).join('')).toContain('added.test');
   });
 
   it('保存与草稿预览拒绝行号、空内容和无效动作，避免保存后丢失改写或渲染崩溃', async () => {
