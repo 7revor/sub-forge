@@ -231,3 +231,6 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 ### 2026-10-30：规则卡片与操作间距
 
 仓库关联来源隐藏地址/格式的第二行，名称垂直居中，选中不改变高度；来源卡片外 pointerdown 取消选择。文档列表操作使用 flex gap-2 统一按钮间距。验收见 `research/verification/rule-card-interactions-20261030/`。
+
+
+2026-10-30：规则格式标签统一显示 Classical、Domain-set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。

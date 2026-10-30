@@ -21,7 +21,7 @@ import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
 
-const FORMAT_TEXT: Record<string, string> = { auto: '待识别', classical: 'classical 文本', 'domain-set': '域名文本', domain: '域名文本', ipcidr: 'CIDR 文本', yaml: 'YAML', mrs: 'MRS', srs: 'SRS' };
+const FORMAT_TEXT: Record<string, string> = { auto: '待识别', classical: 'Classical', 'domain-set': 'Domain-set', domain: 'Domain', ipcidr: 'CIDR', yaml: 'YAML', mrs: 'MRS', srs: 'SRS' };
 const isPassthrough = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
 const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : '本地规则');
 
