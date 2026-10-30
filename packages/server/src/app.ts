@@ -169,10 +169,10 @@ export function createApp(deps: AppDeps) {
     return c.body(outcome.render.yaml.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
-  /** 私有节点产物同时检查用户归属与主配置结构版本。 */
+  /** 私有节点产物按当前配置生成，并检查用户归属。 */
   app.get('/subs/nodes', async (c, next) => {
     if (c.req.query('kind') !== 'provider') return next();
-    allowedQuery(c, ['kind', 'profile', 'id', 'version', 'hash', 'target', 'platform', 'app', 'token']);
+    allowedQuery(c, ['kind', 'profile', 'id', 'target', 'platform', 'app', 'token']);
     c.header('cache-control', 'no-store');
     const token = c.req.query('token')!;
     const t = store.getActiveToken(token);
@@ -186,15 +186,11 @@ export function createApp(deps: AppDeps) {
     if (client !== 'mihomo' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
     let target: Target;
     try { target = detectClient('', { target: client, platform, app: c.req.query('app') }); } catch (error) { if (error instanceof InvalidClientTarget) return notFound(c); throw error; }
-    const version = c.req.query('version');
     const key = requiredQuery(c, 'id');
-    if (!version) return notFound(c);
-    const retained = renderer.getVersion(profileId, target, version);
-    if (!retained || !renderer.canReadNodes(retained, t.userId) || typeof retained.providers[key] !== 'string') return notFound(c);
     const outcome = await renderer.render(profileId, target);
     if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
-    if (!outcome.ok && outcome.accessDenied) return notFound(c);
-    const selected = renderer.getVersion(profileId, target, version) ?? retained;
+    if (!outcome.ok) return outcome.accessDenied ? notFound(c) : c.text(`节点暂时不可用：${outcome.message}`, 503);
+    const selected = outcome.render;
     if (!renderer.canReadNodes(selected, t.userId) || typeof selected.providers[key] !== 'string') return notFound(c);
     const traffic = userinfoHeader(selected.providerUserinfo?.[key]);
     if (traffic) c.header('subscription-userinfo', traffic);

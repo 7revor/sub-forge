@@ -92,7 +92,7 @@ describe('自动格式贯通预览、保存与下载', () => {
       expect(after.ok).toBe(true);
       if (!after.ok) throw new Error(after.message);
       expect(parse(after.render.yaml)['rule-providers']['旧设置']).toMatchObject({ format: 'text', behavior: 'classical' });
-      expect(after.render.generation).toBe(before.render.generation);
+      expect(parse(after.render.yaml)['rule-providers']['旧设置'].url).toBe(parse(before.render.yaml)['rule-providers']['旧设置'].url);
       expect(ruleBodies(h.store, after.render)['rs_r_classical.list']).toContain('192.0.2.0/24');
     } finally { await h.snapshots.settled(); h.store.close(); }
   });

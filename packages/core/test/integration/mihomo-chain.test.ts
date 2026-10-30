@@ -149,7 +149,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
       },
       rules: { rulesets: {}, snapshots: {} },
       urls: {
-        provider: (key, v) => `http://127.0.0.1:${ports.files}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
+        provider: key => `http://127.0.0.1:${ports.files}/p/TOKEN/${encodeURIComponent(key)}`,
         ruleset: (key) => `http://127.0.0.1:${ports.files}/r/TOKEN/${key}`,
       },
       base: testYaml({ 'log-level': 'debug', ipv6: false, 'geodata-mode': false, 'geo-auto-update': false }),

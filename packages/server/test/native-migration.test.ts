@@ -8,7 +8,7 @@ import { resolveNativeBase } from '@sub-forge/core';
 import { Store } from '../src/store.ts';
 import { Cipher } from '../src/crypto.ts';
 
-it('v24 一次迁移原生配置、备份公共字段及平台改写，重启后不再次改写原文', () => {
+it.each([24, 27])('v%d 一次迁移原生配置、备份公共字段及平台改写，重启后不再次改写原文', version => {
   const dir = mkdtempSync(join(tmpdir(), 'sf-native-')), file = join(dir, 'test.db'), cipher = new Cipher(randomBytes(32));
   let store = new Store(file, { cipher });
   try {
@@ -16,7 +16,7 @@ it('v24 一次迁移原生配置、备份公共字段及平台改写，重启后
     const ruleset = { id: 'r', name: '旧规则', sources: [{ id: 's', kind: 'local', content: 'PROCESS-NAME,Example', format: 'auto' }], overrides: [{ match: 'PROCESS-NAME,Example', override: { when: { client: 'surge', platform: 'ios' }, action: { drop: true } } }, { match: 'PROCESS-NAME,Example', override: { when: { client: 'mihomo' }, action: { drop: true } } }] };
     const profile = { id: 'sub', name: '已有订阅', nodeSets: [], base: { presetId: 'p', enabled: false } };
     for (const [kind, doc] of [['preset', preset], ['profile', profile], ['ruleset', ruleset]] as const) store.db.prepare('INSERT INTO docs (kind,id,owner,data,updated_at) VALUES (?,?,?,?,?)').run(kind, doc.id, 'owner', cipher.encrypt(JSON.stringify(doc)), 123);
-    store.db.pragma('user_version = 24'); store.close(); store = new Store(file, { cipher });
+    store.db.pragma(`user_version = ${version}`); store.close(); store = new Store(file, { cipher });
     const migrated = store.get('profile', 'sub')!;
     expect(store.get('preset', 'p')).toBeUndefined();
     expect(migrated.base).not.toHaveProperty('presetId');

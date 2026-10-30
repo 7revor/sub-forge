@@ -84,7 +84,8 @@ describe('订阅接口', () => {
     expect(cfg['allow-lan']).toBe(true);
     const nodes = new URL(cfg['proxy-providers']['机场 A'].url);
     expect(nodes.pathname).toBe('/subs/nodes');
-    expect(Object.fromEntries(nodes.searchParams)).toMatchObject({ kind: 'provider', profile: 'p1', id: 'source:air', token: 'tk-mac', platform: 'macos', version: expect.stringMatching(/^[0-9a-f]{32}$/), hash: expect.stringMatching(/^[0-9a-f]{8}$/) });
+    expect(Object.fromEntries(nodes.searchParams)).toEqual({ kind: 'provider', profile: 'p1', id: 'source:air', token: 'tk-mac', platform: 'macos', target: 'mihomo', app: 'clash-verge' });
+    expect(nodes.searchParams.has('version')).toBe(false);
     const rules = new URL(cfg['rule-providers'].Telegram.url);
     expect(rules.pathname).toBe('/resources/ruleset');
     expect(Object.fromEntries(rules.searchParams)).toEqual({ token: 'tk-mac', key: expect.stringMatching(/^[0-9a-f]{64}$/) });

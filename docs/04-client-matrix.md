@@ -9,7 +9,7 @@
 | 能力 | mihomo | Surge | 输出策略 |
 | --- | --- | --- | --- |
 | 本地节点 | `proxies:` | `[Proxy]` | inline 输出 |
-| 外部节点集 | `proxy-providers:`（`type: http`，指向 `/subs/nodes?kind=provider&profile=P&id=K&version=V&token=T`；**不写 `path`**，见 §1.1） | 组参数 `policy-path=<url>`，内容为逐行 `[Proxy]` 格式；`update-interval=<秒>`（默认 86400） | Mihomo 输出 provider；本项目 Surge 将快照内联，不采用 policy-path |
+| 外部节点集 | `proxy-providers:`（`type: http`，指向 `/subs/nodes?kind=provider&profile=P&id=K&token=T`；**不写 `path`**，见 §1.1） | 组参数 `policy-path=<url>`，内容为逐行 `[Proxy]` 格式；`update-interval=<秒>`（默认 86400） | Mihomo 输出 provider；本项目 Surge 将快照内联，不采用 policy-path |
 | provider 统一改写 | `override`（含 `dialer-proxy`、`additional-prefix/suffix`、`udp`、`skip-cert-verify` 等） | 组参数 `external-policy-modifier="k=v,..."`（只作用于 `policy-path` 成员）、`external-policy-name-prefix` | 改名、改参数一律在服务端处理链中完成，两端都不依赖客户端侧改写（06 §3） |
 | provider 过滤 | provider 级 `filter` / `exclude-filter` / `exclude-type` | 组级 `policy-regex-filter` | 优先用服务端处理链，不依赖客户端过滤 |
 | 链式代理（节点级） | 节点 `dialer-proxy: <组或节点名>`（`relay` 组已废弃） | 节点 `underlying-proxy=<节点或组名>`，只能写在 `[Proxy]` 中的节点上 | 见 03 §4 |
@@ -18,7 +18,7 @@
 
 ### 1.1 mihomo provider 不写 `path`
 
-http provider 不写 `path` 时，缓存路径由 URL 哈希决定，URL 一变（如 `?v=` 变化）客户端重载主配置即重新下载；显式写了 `path` 时，缓存文件在 `interval` 内不会重新下载（07 M8 实测）。REF-11 依赖前一种行为，因此 Lowering **不输出 `path`**。
+http provider 不写 `path`，由客户端管理缓存位置。下载 URL 不带 `version` 或 `hash`，服务端每次返回当前节点内容；客户端按 `interval` 定时或手动刷新节点。更新主订阅不再通过改变 URL 强制重新下载节点。
 
 ### 1.2 Surge 协议对照
 

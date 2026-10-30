@@ -35,10 +35,9 @@ describe('no-resolve 以内容为准', () => {
       store.put('profile', { ...base, id: 'legacy', overlay: { extraRules: rules.map(rule => ({ anchor: 'top' as const, rule })) } }, 'owner');
       issueProfileToken(store, { token: 'same-token', profileId: 'bound' });
       const historical = { rulesets: { 'old.list': 'IP-CIDR,198.51.100.0/24,no-resolve\n' } };
-      store.putRenderGeneration('bound', 'mihomo', 'old-version', historical);
       store.putLastGood('bound', 'mihomo', historical);
       store.db.pragma('user_version = 17'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(27);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(28);
       expect(store.getWithOwner('ruleset', 'rs')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { sources: [source] } });
       expect(store.get('ruleset', 'rs')).not.toHaveProperty('noResolve');
       expect(store.listLatestTemplates()).toHaveLength(1);
@@ -49,7 +48,6 @@ describe('no-resolve 以内容为准', () => {
       expect(store.get('profile', 'legacy')!.routing).toMatchObject({ mode: 'independent', config: { rules: [...cleaned].reverse() } });
       expect(store.getWithOwner('profile', 'bound')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
       expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'bound')?.owner);
-      expect(store.getRenderGeneration('bound', 'mihomo', 'old-version')).toBeUndefined();
       expect(store.getLastGood('bound', 'mihomo')).toBeUndefined();
       const snapshot = [store.list('profile'), store.list('ruleset'), store.listLatestTemplates()];
       store.close(); store = new Store(file, { cipher });

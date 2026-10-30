@@ -49,7 +49,7 @@ export const RULES: RenderInput['rules'] = {
 };
 
 export const urls: RenderInput['urls'] = {
-  provider: (key, v) => `https://sub.example.com/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
+  provider: key => `https://sub.example.com/p/TOKEN/${encodeURIComponent(key)}`,
   ruleset: (key) => `https://sub.example.com/r/TOKEN/${key}`,
 };
 

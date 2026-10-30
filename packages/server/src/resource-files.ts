@@ -114,16 +114,15 @@ export function subscriptionRuleRoutes(store: Store, renderer: RenderService, sn
         return matcher?.kind === 'ruleset' && matcher.remote ? matcher : undefined;
       }, `profile:${profileId}`, { kind: 'profile', id: profileId });
     }
-    allowedQuery(c, ['profile', 'key', 'version', 'target', 'platform', 'app', 'token']);
-    const key = requiredQuery(c, 'key'), version = requiredQuery(c, 'version'), output = target(c, true);
-    const retained = renderer.getVersion(profileId, output, version)?.privateRules?.[key];
-    if (!retained || !renderer.canReadRule(profileId, retained.reference)) return c.body(null, 404);
+    allowedQuery(c, ['profile', 'key', 'target', 'platform', 'app', 'token']);
+    const key = requiredQuery(c, 'key'), output = target(c, true);
     const result = await renderer.render(profileId, output);
-    if (!owned() || !renderer.canReadRule(profileId, retained.reference)) return c.body(null, 404);
-    const selected = renderer.getVersion(profileId, output, version)?.privateRules?.[key];
-    if (!selected) return c.body(null, 404);
+    if (!owned()) return c.body(null, 404);
+    if (!result.ok) return result.accessDenied ? c.body(null, 404) : c.text(`规则暂时不可用：${result.message}`, 503);
+    const selected = result.render.privateRules?.[key];
+    if (!selected || !renderer.canReadRule(profileId, selected.reference)) return c.body(null, 404);
     c.set('accessResource', { kind: 'rule-collection', resourceId: key, resourceName: store.get('profile', profileId)!.name + ' · 专属规则' });
-    if (!result.ok || result.source === 'last-good') c.header('x-sub-forge-warning', 'last-good-rule');
+    if (result.source === 'last-good') c.header('x-sub-forge-warning', 'last-good-rule');
     return ruleBody(c, selected.body);
   });
   return app;

@@ -1,5 +1,6 @@
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import type { StoredRender } from '../src/render.ts';
 import type { TrafficInfo } from '../src/store.ts';
 import { setupApp } from './helpers.ts';
@@ -28,7 +29,7 @@ function setup() {
 }
 
 describe('订阅流量与渲染缓存', () => {
-  it('正文不变时重新生成配置，但响应头、last-good 与保留版本使用新流量', async () => {
+  it('正文不变时重新生成配置，响应头、last-good 与节点资源使用新流量', async () => {
     const h = setup();
     const first = await h.app.request('/subs/profile?token=token&id=p');
     const yaml = await first.text();
@@ -40,8 +41,8 @@ describe('订阅流量与渲染缓存', () => {
     expect(h.store.recentAccess('p')[0]?.source).toBe('fresh');
     const last = h.store.getLastGood<StoredRender>('p', 'mihomo:any')!;
     expect(last.data.userinfo).toEqual(h.traffic[a]);
-    expect(h.renderer.getVersion('p', { client: 'mihomo' }, last.data.generation!)?.userinfo).toEqual(h.traffic[a]);
-    expect(h.store.db.prepare('SELECT version FROM render_generations').all()).toHaveLength(1);
+    const provider = await h.app.request(parse(yaml)['proxy-providers']['源'].url);
+    expect(provider.headers.get('subscription-userinfo')).toBe('download=80; total=1000; expire=2000000000');
     h.store.put('profile', { ...h.store.get('profile', 'p')!, overlay: { final: { kind: 'group', groupId: 'missing' } } });
     const fallback = await h.renderer.render('p', { client: 'mihomo' });
     expect(fallback.ok && fallback.source).toBe('last-good');

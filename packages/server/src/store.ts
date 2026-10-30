@@ -6,7 +6,7 @@ import { Report, resolveProfileRouting, stableStringify } from '@sub-forge/core'
 import type { ClientAddress } from './net/client-ip.ts';
 import { normalizeRulePresence } from './rule-presence.ts';
 import { migrateProfile, profileTemplate, stripProfileRevisions } from './profile-routing.ts';
-// SQLite 存储。保存文档、快照与最近成功的配置版本；旧客户端按版本取兼容资源。
+// SQLite 存储。保存文档、快照与最近一次成功的渲染结果。
 // 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
 
 import Database from 'better-sqlite3';
@@ -58,9 +58,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 27;
-/** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
-const KEEP_RENDER_GENERATIONS = 32;
+const SCHEMA_VERSION = 28;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS native_migration_backups (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
@@ -113,10 +111,6 @@ CREATE TABLE IF NOT EXISTS last_good (
   profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL,
   PRIMARY KEY (profile_id, target)
 );
-CREATE TABLE IF NOT EXISTS render_generations (
-  profile_id TEXT NOT NULL, target TEXT NOT NULL, version TEXT NOT NULL, sequence INTEGER NOT NULL, data TEXT NOT NULL,
-  PRIMARY KEY (profile_id, target, version)
-);
 CREATE TABLE IF NOT EXISTS access_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   token TEXT NOT NULL, profile_id TEXT NOT NULL, at INTEGER NOT NULL, ua TEXT NOT NULL,
@@ -142,7 +136,7 @@ type RawUser = { id: string; username: string; password_hash: string; role: Role
 
 const toUser = (r: RawUser): User => ({ id: r.id, username: r.username, role: r.role, disabled: r.disabled === 1, scriptAllowed: r.script_allowed === 1, createdAt: r.created_at });
 
-/** 有归属的文档种类；模板与预设由管理员维护，所有人可读 */
+/** 有归属的文档种类；模板由管理员维护，所有人可引用 */
 export const OWNED_KINDS = ['source', 'collection', 'local', 'ruleset', 'profile'] as const;
 
 export type StoreOptions = { now?: () => number; cipher?: Cipher };
@@ -224,17 +218,15 @@ export class Store {
     }
   }
   private prunePrivateRules(profileId: string): void {
-    // 订阅/模板移除专属引用时连同历史正文清理，不能保留可被旧版本再次读出的私有产物。
-    for (const table of ['last_good', 'render_generations']) {
-      for (const row of this.db.prepare(`SELECT rowid, profile_id, data FROM ${table} WHERE profile_id = ?`).all(profileId) as { rowid: number; profile_id: string; data: string }[]) {
-        const render = JSON.parse(this.cipher.decrypt(row.data)) as import('./render.ts').StoredRender;
-        const privateRules = Object.values(render.privateRules ?? {});
-        if (!privateRules.length) continue;
-        const profile = this.get('profile', row.profile_id);
-        const template = profile ? profileTemplate(profile, (id, version) => this.getTemplate(id, version)) : undefined;
-        const rules = profile ? resolveProfileRouting(profile, template, new Report()).rules : [];
-        if (privateRules.some(saved => !rules.some(rule => rule.enabled !== false && stableStringify(rule.matcher) === stableStringify(saved.reference.matcher) && !!rule.options?.src === !!saved.reference.options?.src))) this.db.prepare(`DELETE FROM ${table} WHERE rowid = ?`).run(row.rowid);
-      }
+    // 订阅/模板移除专属引用时清理兜底正文。
+    for (const row of this.db.prepare('SELECT rowid, data FROM last_good WHERE profile_id = ?').all(profileId) as { rowid: number; data: string }[]) {
+      const render = JSON.parse(this.cipher.decrypt(row.data)) as import('./render.ts').StoredRender;
+      const privateRules = Object.values(render.privateRules ?? {});
+      if (!privateRules.length) continue;
+      const profile = this.get('profile', profileId);
+      const template = profile ? profileTemplate(profile, (id, version) => this.getTemplate(id, version)) : undefined;
+      const rules = profile ? resolveProfileRouting(profile, template, new Report()).rules : [];
+      if (privateRules.some(saved => !rules.some(rule => rule.enabled !== false && stableStringify(rule.matcher) === stableStringify(saved.reference.matcher) && !!rule.options?.src === !!saved.reference.options?.src))) this.db.prepare('DELETE FROM last_good WHERE rowid = ?').run(row.rowid);
     }
   }
 
@@ -402,7 +394,7 @@ export class Store {
       if (version < 23) {
         // 不能把仅能访问某个订阅的旧凭证升级为用户全部私有资源的通行证。
         for (const user of this.listUsers()) this.createToken(user.id);
-        this.db.exec('DROP TABLE sub_tokens; DELETE FROM last_good; DELETE FROM render_generations;');
+        this.db.exec('DROP TABLE sub_tokens; DELETE FROM last_good;');
         this.pruneResourceBindings();
       }
       if (version < 24) {
@@ -415,7 +407,7 @@ export class Store {
       }
       if (version < 25) {
         // 旧配置中的路径 token 地址全部失效，不能用 last-good 再下发旧入口。
-        this.db.exec('DELETE FROM last_good; DELETE FROM render_generations');
+        this.db.exec('DELETE FROM last_good');
         for (const row of this.listSharedRules<{ reference: { matcher: { remote?: unknown } } }>()) {
           if (row.data.reference.matcher.remote) this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
         }
@@ -427,7 +419,11 @@ export class Store {
           if (!columns.has(name)) this.db.exec(`ALTER TABLE access_log ADD COLUMN ${name} ${definition}`);
         }
       }
-      if (version < 27) this.migrateNativeConfigs();
+      if (version < 27) {
+        // 移除结构版本历史，同时清空仍携带 version 下载地址的旧渲染结果。
+        this.db.exec('DROP TABLE IF EXISTS render_generations; DELETE FROM last_good');
+      }
+      if (version < 28) this.migrateNativeConfigs();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -664,7 +660,7 @@ export class Store {
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('preset', row.id, row.data, this.now());
     }
     this.db.exec("DELETE FROM docs WHERE kind = 'preset'");
-    // 清理可回退主配置，历史节点/规则资源继续服务已经下发的订阅地址。
+    // 清理旧基础转换产物；节点和规则按当前订阅重新生成。
     this.db.exec('DELETE FROM last_good');
   }
 
@@ -841,7 +837,6 @@ export class Store {
   deleteProfileData(profileId: string): void {
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(profileId);
-      this.db.prepare('DELETE FROM render_generations WHERE profile_id = ?').run(profileId);
       // 访问记录独立保留 30 天；删除资源不抹除用户自己的历史。
       this.db.prepare('DELETE FROM profile_migration_backups WHERE profile_id = ?').run(profileId);
       this.deleteDocumentJobs('profile', profileId);
@@ -954,22 +949,6 @@ export class Store {
   getLastGood<T>(profileId: string, target: string): { renderedAt: number; data: T } | undefined {
     const row = this.db.prepare('SELECT rendered_at, data FROM last_good WHERE profile_id = ? AND target = ?').get(profileId, target) as { rendered_at: number; data: string } | undefined;
     return row ? { renderedAt: row.rendered_at, data: JSON.parse(this.cipher.decrypt(row.data)) as T } : undefined;
-  }
-
-  putRenderGeneration(profileId: string, target: string, version: string, data: unknown): void {
-    this.db.transaction(() => {
-      const row = this.db.prepare('SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM render_generations WHERE profile_id = ? AND target = ?').get(profileId, target) as { next: number };
-      this.db.prepare('INSERT INTO render_generations (profile_id, target, version, sequence, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT (profile_id, target, version) DO UPDATE SET sequence = excluded.sequence, data = excluded.data')
-        .run(profileId, target, version, row.next, this.cipher.encrypt(JSON.stringify(data)));
-      this.db.prepare(`DELETE FROM render_generations WHERE profile_id = ? AND target = ? AND version NOT IN (
-        SELECT version FROM render_generations WHERE profile_id = ? AND target = ? ORDER BY sequence DESC LIMIT ?)`)
-        .run(profileId, target, profileId, target, KEEP_RENDER_GENERATIONS);
-    })();
-  }
-
-  getRenderGeneration<T>(profileId: string, target: string, version: string): T | undefined {
-    const row = this.db.prepare('SELECT data FROM render_generations WHERE profile_id = ? AND target = ? AND version = ?').get(profileId, target, version) as { data: string } | undefined;
-    return row ? JSON.parse(this.cipher.decrypt(row.data)) as T : undefined;
   }
 
   // ---------- 访问日志 ----------
