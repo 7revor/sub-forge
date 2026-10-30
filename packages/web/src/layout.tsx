@@ -16,7 +16,7 @@ type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 const NAV: { id: string; title: string; admin?: boolean; items: NavItem[] }[] = [
   { id: 'workspace', title: '工作台', items: [{ to: '/', label: '总览', icon: House }, { to: '/profiles', label: '配置订阅', icon: Rss }] },
   { id: 'nodes', title: '节点资源', items: [{ to: '/sources', label: '订阅源', icon: Link2 }, { to: '/locals', label: '本地节点', icon: Monitor }, { to: '/collections', label: '节点组合', icon: Layers }] },
-  { id: 'rules', title: '规则资源', items: [{ to: '/rule-repo', label: '规则集合', icon: FolderGit2 }, { to: '/rulesets', label: '增强集合', icon: ListFilter }] },
+  { id: 'rules', title: '规则资源', items: [{ to: '/rule-repo', label: '仓库管理', icon: FolderGit2 }, { to: '/rulesets', label: '规则集合', icon: ListFilter }] },
   { id: 'admin', title: '系统管理', admin: true, items: [{ to: '/templates', label: '模板', icon: FileCode2, end: true }, { to: '/users', label: '用户', icon: Users }, { to: '/system', label: '系统', icon: Settings2 }] },
 ];
 
