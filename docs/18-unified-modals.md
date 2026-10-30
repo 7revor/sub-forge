@@ -35,7 +35,7 @@ if (name.status === 'confirmed') setDraft({ ...value, name: name.data });
 
 ## 检查与范围
 
-`controller.test.ts` 检查深拷贝、取消路径、一次结算、防重、失败重试、导航与晚到响应；`architecture.test.ts` 扫描业务直接引用底层 Dialog、原生提示、页面挂载业务弹窗和自行创建弹窗根。工具栏布局 Portal 不是弹窗；仅允许已识别的工具栏挂载用途。
+`controller.test.ts` 检查深拷贝、取消路径、一次结算、防重、失败重试、导航与晚到响应；`architecture.test.ts` 扫描业务直接引用底层 Dialog、原生提示、页面挂载业务弹窗和自行创建弹窗根。`RuleEditShell` 只复用会话内的表单布局，不创建 Root、可见状态或生命周期，不能单独挂载到页面。工具栏布局 Portal 不是弹窗；仅允许已识别的工具栏挂载用途。
 
 内置浏览器通过 `packages/web/test/dialog-exit.html` 逐帧验证关闭到实际卸载的高度、文本、输入值，并检查 StrictMode、无动画、嵌套和路由。业务页面使用虚构数据与内存后端验收。不得改用独立 Playwright 或其他浏览器。
 

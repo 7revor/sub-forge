@@ -117,7 +117,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const updateBody = (body: TemplateBody) => setDraft(current => ({ ...current, body }));
   const locate = (where: string) => {
     if (where.startsWith('group:')) document.getElementById(`template-group-${where.slice(6)}`)?.querySelector<HTMLButtonElement>('button[aria-label^="编辑"]')?.click();
-    if (where.startsWith('rule:')) document.getElementById(`template-rule-${where.slice(5)}`)?.querySelector<HTMLButtonElement>('button[aria-label^="设置"]')?.click();
+    if (where.startsWith('rule:')) document.getElementById(`template-rule-${where.slice(5)}`)?.querySelector<HTMLButtonElement>('button[aria-label^="编辑"]')?.click();
     if (where === 'final') {
       document.getElementById('template-rule-final')?.querySelector('button')?.focus();
     }
@@ -161,9 +161,10 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   useEffect(() => { save.reset(); if (dirty) setSavedWarnings([]); }, [draft]); // 草稿变化后清除上一次保存结果。
   const failure = save.error instanceof ApiError && save.error.details && typeof save.error.details === 'object' ? save.error.details as { report?: ReportItem[]; impact?: ImpactEntry[] } : undefined;
   const canSave = !!draft.name.trim() && !errors.length && !currentValidation?.error && !save.isPending;
+  const [importedUrls, setImportedUrls] = useState<string[]>();
   const openYaml = async () => {
     const result = await TemplateYamlModal.show({ body, ctx });
-    if (result.status === 'confirmed') updateBody(result.data);
+    if (result.status === 'confirmed') { updateBody(result.data); setImportedUrls([...result.data.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []), ...(result.data.ruleProviders ?? []).map(p => p.url)]); }
   };
 
   return <>
@@ -197,7 +198,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
           </div>
         </section>
         <TemplateGroupsEditor value={body} onChange={updateBody} report={report} />
-        <TemplateRulesEditor value={body} onChange={updateBody} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
+        <TemplateRulesEditor importedUrls={importedUrls} value={body} onChange={updateBody} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
     </PageScroll>
 

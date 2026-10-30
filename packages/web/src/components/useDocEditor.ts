@@ -1,6 +1,7 @@
 // 文档详情页的通用状态：加载 → 草稿 → 保存 / 删除；新建时 id 为 new，保存后跳转到真实 id。
 
 import { useEffect, useRef, useState } from 'react';
+import { stableStringify } from '@sub-forge/core';
 import { useNavigate, useParams } from 'react-router';
 import { useDeleteDoc, useDoc, useSaveDoc, type DocMap, type Kind } from '../hooks.ts';
 
@@ -13,10 +14,10 @@ export function useDocEditor<K extends Kind>(kind: K, empty: DocMap[K]) {
   const del = useDeleteDoc(kind);
   const [draft, setDraft] = useState<DocMap[K] | undefined>(isNew ? empty : undefined);
   const previous=useRef<DocMap[K]|undefined>(undefined);
-  useEffect(()=>{if(doc.data){const before=previous.current;previous.current=doc.data;setDraft(current=>!current||current.id!==doc.data!.id||JSON.stringify(current)===JSON.stringify(before)?doc.data:current);}},[doc.data]);
+  useEffect(()=>{if(doc.data){const before=previous.current;previous.current=doc.data;setDraft(current=>!current||current.id!==doc.data!.id||stableStringify(current)===stableStringify(before)?doc.data:current);}},[doc.data]);
   useEffect(() => { if (isNew) setDraft(empty); }, [isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dirty = isNew || JSON.stringify(draft) !== JSON.stringify(doc.data);
+  const dirty = isNew || stableStringify(draft) !== stableStringify(doc.data);
   const submit = (transform: (d: DocMap[K]) => Partial<DocMap[K]> = (d) => d) => {
     if (!draft) return;
     const body = transform(draft) as Partial<DocMap[K]> & { id?: string };

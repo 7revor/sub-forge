@@ -7,7 +7,7 @@ import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { Notice } from '../../components/Notice.tsx';
 // 绑定模板规则只读；前置单条规则与独立规则复用全局编辑器。
 
-import { withIpOptions, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
+import { localRulesError, withIpOptions, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
@@ -25,6 +25,7 @@ export function ruleText(r: RuleIR): string {
 function useMatcherLabel() {
   const rulesets = useRuleSetRefs().data ?? [];
   return (m: Matcher): { kind: string; text: string } => {
+    if (m.kind === 'local') return { kind: '本地规则', text: m.content };
     if (m.kind === 'rule') return { kind: '静态规则', text: ruleText(m.rule) };
     if (m.remote) return { kind: '远程 URL', text: m.remote.url };
     return { kind: '系统规则集', text: m.repository?.name ?? `本地 · ${rulesets.find((r) => r.id === m.id)?.name ?? m.id}` };
@@ -39,7 +40,7 @@ function privateRuleError(rule: RuleEntry): string | undefined {
     const match = 'exact' in ref.match ? ref.match.exact : ref.match.regex;
     if (!ref.nodeSet.id || !match.trim()) return '请选择规则出口。';
   }
-  return matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : matcher.remote ? '请填写远程规则 URL。' : '请选择规则集。';
+  return matcher.kind === 'local' ? localRulesError(matcher) ?? clientOverridesError(matcher.overrides ?? []) : matcher.kind === 'rule' ? ruleInputError(matcher.rule) ?? clientOverridesError(matcher.overrides ?? []) : matcher.id ? undefined : matcher.remote ? '请填写远程规则 URL。' : '请选择规则集。';
 }
 
 function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEntry; onChange: (value: RuleEntry) => void; single?: boolean }) {
@@ -60,7 +61,7 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
       <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={value.options?.src === true}
         onChange={(src) => onChange({ ...value, options: { ...value.options, src } })} />src</label>
     </div>}
-    {matcher.kind === 'rule' && <details>
+    {matcher.kind !== 'ruleset' && <details>
       <summary className="cursor-pointer text-[13px] font-medium">客户端覆盖（{matcher.overrides?.length ?? 0} 条）</summary>
       <div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={(overrides) => onChange({ ...value, matcher: { ...matcher, overrides } })} /></div>
     </details>}

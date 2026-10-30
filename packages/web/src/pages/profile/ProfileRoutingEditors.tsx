@@ -51,7 +51,7 @@ export function ProfileRulesEditor() {
   return <>
     <ErrorAlert error={rulesets.error} />
     <TemplateRulesEditor {...props} value={body} onChange={update} report={draftIssues(body)} readOnly={bound} title={bound ? '模板规则' : '规则'} />
-    {bound && <details className="rounded-[10px] border border-line bg-panel p-4"><summary className="cursor-pointer text-[13px] font-medium">本订阅的前置规则（{prepend.rules.length} 条）<span className="ml-2 font-normal text-ink-muted">可选，优先于模板匹配</span></summary><div className="mt-4">
+    {bound && <details className="rounded-[10px] border border-line bg-panel p-4"><summary className="cursor-pointer text-[13px] font-medium">本订阅的前置规则（{prepend.rules.length} 项）<span className="ml-2 font-normal text-ink-muted">可选，优先于模板匹配</span></summary><div className="mt-4">
       <TemplateRulesEditor {...props} value={prepend} onChange={next => { if (draft.routing?.mode === 'bound') setDraft({ ...draft, routing: { ...draft.routing, prependRules: next.rules } }); }} report={draftIssues(prepend)} title="前置规则" staticOnly hideFinal />
     </div></details>}
   </>;

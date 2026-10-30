@@ -1,4 +1,4 @@
-import { composeRule, lowerRule, parseRuleLine, remoteRuleMatcher, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
+import { expandLocalRules, localRulesError, composeRule, lowerRule, parseRuleLine, remoteRuleMatcher, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
 import { Document, isAlias, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
 import { recoverYaml } from './recoverYaml.ts';
 import { parseYamlDocument } from './yamlDocument.ts';
@@ -17,6 +17,7 @@ const filterFields = { filter: 'filter', 'exclude-filter': 'excludeFilter', 'exc
 const knownFields = new Set(['name', 'type', 'proxies', 'strategy', 'hidden', 'icon', 'empty-fallback', ...Object.keys(testFields), ...Object.keys(filterFields)]);
 const nodeField = (key: string) => key === 'use' || key.startsWith('include-all');
 const referenceField = 'x-sub-forge-rulesets';
+const localField = 'x-sub-forge-local-rules';
 
 function rulesetAlias(m: Extract<Matcher, { kind: 'ruleset' }>, ctx: ConvertCtx): string {
   if (m.repository || m.remote) return m.id;
@@ -70,24 +71,32 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     const provider = m.remote && t.ruleProviders?.find(p => p.name === r.providerName && p.url === m.remote!.url);
     return provider ? provider.name : rulesetAlias(m, ctx);
   };
-  const lines = t.rules.map((r) => {
+  const exported: { rule: RuleEntry; line: string }[] = [];
+  const localGroups: { offset: number; entry: RuleEntry; lines: string[] }[] = [];
+  for (const r of t.rules) {
     const m = r.matcher;
-    const lowered = m.kind === 'rule' ? lowerMatcher(m) : {
-      text: `RULE-SET,${providerAlias(r)}`,
-    };
-    return composeRule({ ...lowered, src: ('src' in lowered && lowered.src) || r.options?.src }, targetName(r.target, t.groups));
-  });
+    const entries: RuleEntry[] = m.kind === 'local' ? expandLocalRules(m).map((rule, i) => ({ ...r, id: i ? `${r.id}:line:${i}` : r.id, matcher: { kind: 'rule', rule: rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule } })) : [r];
+    const offset = exported.length;
+    const lines = entries.map(entry => {
+      const lowered = entry.matcher.kind === 'rule' ? lowerMatcher(entry.matcher) : { text: `RULE-SET,${providerAlias(entry)}` };
+      const line = composeRule({ ...lowered, src: ('src' in lowered && lowered.src) || entry.options?.src }, targetName(entry.target, t.groups));
+      exported.push({ rule: entry, line });
+      return line;
+    });
+    if (m.kind === 'local') localGroups.push({ offset, entry: r, lines });
+  }
+  const lines = exported.map(item => item.line);
   lines.push(`MATCH,${targetName(t.final, t.groups)}`);
   const references = Object.fromEntries(t.rules.flatMap(r => r.matcher.kind === 'ruleset' ? [[providerAlias(r), r.matcher]] : []));
   const providers = new Map((t.ruleProviders ?? []).map(p => [p.name, { type: 'http', url: p.url }]));
-  const doc = new Document({ 'proxy-groups': groups, ...(t.ruleProviders?.length ? { 'rule-providers': providers } : {}), rules: lines, ...(Object.keys(references).length ? { [referenceField]: references } : {}) });
+  const doc = new Document({ 'proxy-groups': groups, ...(t.ruleProviders?.length ? { 'rule-providers': providers } : {}), rules: lines, ...(localGroups.length ? { [localField]: localGroups } : {}), ...(Object.keys(references).length ? { [referenceField]: references } : {}) });
   const groupNodes = doc.get('proxy-groups', true);
   if (isSeq(groupNodes)) t.groups.forEach((g, i) => {
     const item = groupNodes.items[i];
     if (isNode(item)) item.commentBefore = ` sub-forge-group: ${encodeURIComponent(g.id)}`;
   });
   const rules = doc.get('rules', true);
-  if (isSeq(rules)) t.rules.forEach((r, i) => {
+  if (isSeq(rules)) exported.forEach(({ rule: r }, i) => {
     const item = rules.items[i];
     if (isNode(item)) item.commentBefore = ` sub-forge-rule: ${encodeURIComponent(r.id)}`;
   });
@@ -96,6 +105,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
 
 // no-resolve 和 src 属于选项；修改选项或出口不应使覆盖层失去规则 ID。
 function matcherKey(m: Matcher): string {
+  if (m.kind === 'local') return `local:${stableStringify(m)}`;
   if (m.kind !== 'rule') return `${m.kind}:${m.id}${m.repository ? `:${stableStringify(m.repository)}` : m.remote ? `:${m.remote.url}` : ''}`;
   const lowered = lowerRule(m.rule, { client: 'mihomo' });
   return `rule:${lowered.kind === 'ok' ? lowered.text : JSON.stringify(m.rule)}`;
@@ -167,17 +177,20 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       }
       doc.set('rules', previous.get('rules', true));
       if (previous.has(referenceField)) doc.set(referenceField, previous.get(referenceField, true));
+      if (previous.has(localField)) doc.set(localField, previous.get(localField, true));
     }
     if (fragment && doc.has('rules') && !doc.has('proxy-groups')) {
       const previous = parseDocument(templateToYaml(current, ctx));
       doc.set('proxy-groups', previous.get('proxy-groups', true));
       if (previous.has(referenceField)) doc.set(referenceField, previous.get(referenceField, true));
+      if (previous.has(localField)) doc.set(localField, previous.get(localField, true));
     }
     if (providerOnly) {
       const previous = parseDocument(templateToYaml(current, ctx));
       doc.set('proxy-groups', previous.get('proxy-groups', true));
       doc.set('rules', previous.get('rules', true));
       if (previous.has(referenceField)) doc.set(referenceField, previous.get(referenceField, true));
+      if (previous.has(localField)) doc.set(localField, previous.get(localField, true));
     }
     const notes: string[] = recovered?.notes ?? [];
     const attempt = (action: () => void) => {
@@ -241,7 +254,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       else ruleProviders[previous] = provider;
     });
     if (external.size) notes.push(`已读取 ${external.size} 个远程规则 URL，格式自动识别，输出为 LIST`);
-    const ignored = doc.contents.items.map((p) => String(p.key)).filter((key) => !['proxy-groups', 'rules', 'rule-providers', referenceField].includes(key));
+    const ignored = doc.contents.items.map((p) => String(p.key)).filter((key) => !['proxy-groups', 'rules', 'rule-providers', referenceField, localField].includes(key));
     if (ignored.length) notes.push(`已忽略：${ignored.join('、')}（仅导入 proxy-groups、rules 和 rule-providers 的 URL）`);
     const groupNodes = expand(doc.get('proxy-groups', true));
     if (isSeq(groupNodes)) groupNodes.items = groupNodes.items.map(node => expand(node) as typeof node);
@@ -373,6 +386,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
     locate(ruleNodes);
     attempt(() => { if (ruleNodes !== undefined && !isSeq(ruleNodes)) throw new Error('rules 必须是列表'); });
     const rules: RuleEntry[] = [];
+    const parsedByIndex = new Map<number, RuleEntry>();
     const used = new Set<string>();
     let final: Target | undefined;
     for (const [index, node] of (isSeq(ruleNodes) ? ruleNodes.items : []).entries()) {
@@ -439,13 +453,34 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
         if (old) used.add(old.id);
         const r: RuleEntry = { id: old?.id ?? newId('r'), ...restoreRule(matcher, old, flags.includes('no-resolve'), flags.includes('src')), target };
         if (type === 'RULE-SET' && matcher.kind === 'ruleset' && ruleProviders.some(p => p.name === parts[1] && p.url === matcher.remote?.url)) r.providerName = parts[1]!;
-        rules.push(r);
+        rules.push(r); parsedByIndex.set(index, r);
       } catch (err) {
         const message = `第 ${index + 1} 条规则「${original}」：${err instanceof Error ? err.message : String(err)}`;
         if (!recover) throw new Error(message);
         notes.push(`已忽略 ${message}`);
       }
     }
+    // 分组信息仅用于编辑器往返；正文被改动时按实际 YAML 单行导入，绝不覆盖用户修改。
+    const localNode = doc.get(localField, true);
+    if (localNode !== undefined && !isSeq(localNode)) throw new Error('本地规则分组必须是列表');
+    const restoredIds = new Set<string>();
+    if (isSeq(localNode)) for (const item of localNode.items) attempt(() => {
+      const saved = isMap(item) ? item.toJSON() as { offset: number; entry: RuleEntry; lines: string[] } : undefined;
+      if (!saved || !Number.isSafeInteger(saved.offset) || saved.offset < 0 || saved.entry?.matcher?.kind !== 'local' || typeof saved.entry.id !== 'string' || !saved.entry.id || !Array.isArray(saved.lines) || !saved.lines.length || saved.lines.some(line => typeof line !== 'string')) throw new Error('本地规则分组格式错误');
+      const error = localRulesError(saved.entry.matcher);
+      if (error) throw new Error(error);
+      const entries = saved.lines.map((_, i) => parsedByIndex.get(saved.offset + i));
+      const first = entries[0];
+      const index = first ? rules.indexOf(first) : -1;
+      const originalLines = isSeq(ruleNodes) ? ruleNodes.items.slice(saved.offset, saved.offset + saved.lines.length).map(node => isScalar(node) ? node.value : undefined) : [];
+      const expected = expandLocalRules(saved.entry.matcher).map(rule => composeRule({ ...lowerMatcher({ kind: 'rule', rule: rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule }), src: saved.entry.options?.src || rawRuleParts(rule.type === 'RAW' ? rule.text : '').src }, first ? targetName(first.target, groups) : ''));
+      if (index < 0 || entries.some((entry, i) => !entry || rules[index + i] !== entry) || stableStringify(expected) !== stableStringify(saved.lines) || stableStringify(originalLines) !== stableStringify(saved.lines)) {
+        notes.push('本地规则分组正文已修改，按当前 YAML 中的独立规则导入'); return;
+      }
+      if (restoredIds.has(saved.entry.id) || rules.some(rule => !entries.includes(rule) && rule.id === saved.entry.id)) throw new Error('本地规则分组 ID 重复');
+      restoredIds.add(saved.entry.id);
+      rules.splice(index, entries.length, { ...saved.entry, target: first!.target });
+    });
     if (providerOnly) {
       for (const [name, matcher] of external) {
         if (rules.some(rule => matcherKey(rule.matcher) === matcherKey(matcher))) continue;
