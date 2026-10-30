@@ -31,7 +31,7 @@ export const mihomoBaseGroups: FieldGroup[] = [
     field('sniffer.parse-pure-ip', 'bool'), field('sniffer.override-destination', 'bool'),
   ] },
   { title: 'TUN', fields: [
-    field('tun.enable', 'bool'), field('tun.stack', 'enum', ['system', 'gvisor', 'mixed']),
+    field('tun.enable', 'bool'), field('tun.stack', 'enum', ['system', 'gvisor', 'mixed', 'mips']),
     field('tun.auto-route', 'bool'), field('tun.auto-detect-interface', 'bool'), field('tun.strict-route', 'bool'),
     field('tun.dns-hijack', 'lines'), field('tun.mtu', 'number'),
   ] },

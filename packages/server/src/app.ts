@@ -1,3 +1,4 @@
+import { accessLogger, type DownloadEnv } from './access-log.ts';
 // 订阅接口（OUT-01 – OUT-06）：
 //   GET /sub/:token/:profile          主配置
 //   GET /p/:token/:profile/:key       Profile 专属 provider 内容
@@ -37,7 +38,7 @@ const MIME: Record<string, string> = {
 const RESERVED = ['/api/', '/sub/', '/p/', '/r/', '/rules/', '/nodes/'];
 
 /** 托管前端：/assets 下的文件名带内容哈希，可长期缓存；index.html 不缓存 */
-function serveWeb(app: Hono, webDir: string) {
+function serveWeb(app: Hono<DownloadEnv>, webDir: string) {
   const root = resolve(webDir);
   const send = async (c: Context, file: string, immutable: boolean) => {
     const body = await readFile(file);
@@ -62,7 +63,8 @@ function serveWeb(app: Hono, webDir: string) {
 export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
   const now = deps.now ?? Date.now;
-  const app = new Hono();
+  const app = new Hono<DownloadEnv>();
+  app.use('*', accessLogger(store, now));
 
   app.get('/healthz', (c) => c.text('ok'));
   app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' }));
@@ -70,7 +72,6 @@ export function createApp(deps: AppDeps) {
   app.get('/sub/:token/:profile', async (c) => {
     c.header('cache-control', 'no-store');
     c.header('vary', 'User-Agent');
-    const started = now();
     const token = c.req.param('token');
     const t = store.getActiveToken(token);
     if (!t) return notFound(c);
@@ -83,23 +84,20 @@ export function createApp(deps: AppDeps) {
     try { detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform') }); }
     catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
 
-    const log = (status: number, outcome?: RenderOutcome) => store.logAccess({
-      token, profileId: profileId, at: started, ua, client: `${detected.client}${detected.by === 'default' ? '?' : ''}`,
-      ...(detected.platform ? { platform: detected.platform } : {}),
-      status, ms: now() - started,
+    const setAccessResult = (outcome?: RenderOutcome) => c.set('accessResult', {
       warnings: outcome?.ok ? outcome.render.warnings : 0,
       source: outcome ? (outcome.ok ? outcome.source : 'failed') : 'unsupported',
     });
 
     if (detected.client !== 'mihomo' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
-      log(400); return c.text('该客户端平台仅支持 ios 或 macos', 400);
+      setAccessResult(); return c.text('该客户端平台仅支持 ios 或 macos', 400);
     }
 
     const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
     if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     if (outcome.ok && !renderer.canReadNodes(outcome.render, t.userId)) return notFound(c);
     if (!outcome.ok) {
-      log(503, outcome);
+      setAccessResult(outcome);
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
     }
     const interval = store.resourceCacheTtlSec;
@@ -110,7 +108,7 @@ export function createApp(deps: AppDeps) {
     c.header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(profile.name)}`);
     const ui = userinfoHeader(outcome.render.userinfo);
     if (ui) c.header('subscription-userinfo', ui);
-    log(200, outcome);
+    setAccessResult(outcome);
     return c.body(outcome.render.yaml.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
@@ -140,7 +138,9 @@ export function createApp(deps: AppDeps) {
     if (!renderer.canReadNodes(selected, t.userId) || typeof selected.providers[key] !== 'string') return notFound(c);
     const traffic = userinfoHeader(selected.providerUserinfo?.[key]);
     if (traffic) c.header('subscription-userinfo', traffic);
-    c.header('content-type', 'text/yaml; charset=utf-8');
+    c.header('content-type', 'text/plain; charset=utf-8');
+    c.header('content-disposition', 'inline');
+    c.header('x-content-type-options', 'nosniff');
     return c.body(selected.providers[key]!.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
@@ -218,7 +218,7 @@ export function createApp(deps: AppDeps) {
       if (traffic) c.header('subscription-userinfo', traffic);
       c.header('profile-update-interval', String(Math.max(1, Math.round(store.resourceCacheTtlSec / 3600))));
       c.header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(store.get(type, id)!.name)}`);
-      c.header('content-type', 'text/yaml; charset=utf-8');
+      c.header('content-type', 'text/plain; charset=utf-8');
       c.header('x-content-type-options', 'nosniff');
       return c.body(result.yaml);
     } catch (error) {

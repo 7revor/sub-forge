@@ -30,6 +30,10 @@ export type SnapshotRow = {
   error?: string;
 };
 
+export const ACCESS_KINDS = ['subscription', 'nodes', 'rule-collection', 'enhancement'] as const;
+export type AccessKind = typeof ACCESS_KINDS[number];
+export type UserAccessLogRow = Omit<AccessLogRow, 'token'> & { id: number; kind: AccessKind; resourceId: string; resourceName: string; method: string };
+
 export type AccessLogRow = {
   token: string;
   profileId: string;
@@ -48,7 +52,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 23;
+const SCHEMA_VERSION = 24;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -357,6 +361,14 @@ export class Store {
         for (const user of this.listUsers()) this.createToken(user.id);
         this.db.exec('DROP TABLE sub_tokens; DELETE FROM last_good; DELETE FROM render_generations;');
         this.pruneResourceBindings();
+      }
+      if (version < 24) {
+        const columns = new Set((this.db.prepare('PRAGMA table_info(access_log)').all() as { name: string }[]).map(column => column.name));
+        for (const [name, definition] of Object.entries({ user_id: 'TEXT', kind: "TEXT NOT NULL DEFAULT 'subscription'", resource_id: "TEXT NOT NULL DEFAULT ''", resource_name: "TEXT NOT NULL DEFAULT ''", method: "TEXT NOT NULL DEFAULT 'GET'" })) {
+          if (!columns.has(name)) this.db.exec(`ALTER TABLE access_log ADD COLUMN ${name} ${definition}`);
+        }
+        // 旧日志只有截断的 token 摘要，不能可靠确定访问者；保留原记录，不猜测用户归属。
+        this.db.exec('CREATE INDEX IF NOT EXISTS access_log_user_time ON access_log (user_id, at DESC, id DESC); CREATE INDEX IF NOT EXISTS access_log_user_kind ON access_log (user_id, kind, at DESC, id DESC)');
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
@@ -734,7 +746,7 @@ export class Store {
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(profileId);
       this.db.prepare('DELETE FROM render_generations WHERE profile_id = ?').run(profileId);
-      this.db.prepare('DELETE FROM access_log WHERE profile_id = ?').run(profileId);
+      // 访问记录独立保留 30 天；删除资源不抹除用户自己的历史。
       this.db.prepare('DELETE FROM profile_migration_backups WHERE profile_id = ?').run(profileId);
       this.deleteDocumentJobs('profile', profileId);
     })();
@@ -867,13 +879,25 @@ export class Store {
   // ---------- 访问日志 ----------
 
   /** token 只记录 HMAC 前 8 位，日志里不出现可用的订阅地址 */
-  logAccess(r: AccessLogRow): void {
-    this.db.prepare('INSERT INTO access_log (token, profile_id, at, ua, client, platform, status, ms, warnings, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(this.cipher.hmac(r.token).slice(0, 8), r.profileId, r.at, r.ua, r.client, r.platform ?? null, r.status, r.ms, r.warnings, r.source);
+  logAccess(r: AccessLogRow & { kind?: AccessKind; resourceId?: string; resourceName?: string; method?: string }): void {
+    const user = this.getActiveToken(r.token);
+    if (!user) return;
+    this.db.prepare('INSERT INTO access_log (token, profile_id, at, ua, client, platform, status, ms, warnings, source, user_id, kind, resource_id, resource_name, method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(this.cipher.hmac(r.token).slice(0, 8), r.profileId, r.at, r.ua.replaceAll(r.token, '[令牌]').slice(0, 512), r.client, r.platform ?? null, r.status, r.ms, r.warnings, r.source,
+        user.userId, r.kind ?? 'subscription', (r.resourceId ?? r.profileId).replaceAll(r.token, '[令牌]').slice(0, 512), (r.resourceName ?? '').replaceAll(r.token, '[令牌]').slice(0, 200), r.method ?? 'GET');
+  }
+
+  userAccessPage(userId: string, options: PageOptions, kind?: AccessKind): PageResult<UserAccessLogRow> {
+    const where = 'user_id = ? AND at >= ?' + (kind ? ' AND kind = ?' : '');
+    const args = [userId, this.now() - 30 * 86400_000, ...(kind ? [kind] : [])];
+    const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM access_log WHERE ${where}`).get(...args) as { n: number }).n;
+    const meta = pageMeta(total, options);
+    const rows = this.db.prepare(`SELECT id, profile_id AS profileId, at, ua, client, platform, status, ms, warnings, source, kind, resource_id AS resourceId, resource_name AS resourceName, method FROM access_log WHERE ${where} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`).all(...args, meta.pageSize, (meta.page - 1) * meta.pageSize) as UserAccessLogRow[];
+    return { ...meta, items: rows };
   }
 
   recentAccess(profileId: string, limit = 50): AccessLogRow[] {
-    const rows = this.db.prepare('SELECT token, profile_id, at, ua, client, platform, status, ms, warnings, source FROM access_log WHERE profile_id = ? ORDER BY at DESC, id DESC LIMIT ?')
+    const rows = this.db.prepare("SELECT token, profile_id, at, ua, client, platform, status, ms, warnings, source FROM access_log WHERE profile_id = ? AND kind = 'subscription' ORDER BY at DESC, id DESC LIMIT ?")
       .all(profileId, limit) as { token: string; profile_id: string; at: number; ua: string; client: string; platform: string | null; status: number; ms: number; warnings: number; source: string }[];
     return rows.map((r) => {
       const row: AccessLogRow = { token: r.token, profileId: r.profile_id, at: r.at, ua: r.ua, client: r.client, status: r.status, ms: r.ms, warnings: r.warnings, source: r.source };

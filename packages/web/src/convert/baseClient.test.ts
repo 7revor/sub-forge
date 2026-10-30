@@ -20,3 +20,10 @@ describe('客户端基础配置编辑', () => {
     expect(editor.fromRaw(editor.toRaw(value))).toEqual({ ok: true, value });
   });
 });
+it('公共配置原文校验和恢复不把非法字段变成有效草稿', () => {
+  const editor = baseEditorFor('common'), previous = { dnsIpv6: false, httpPort: 0 };
+  expect(editor.fromRaw(editor.toRaw(previous))).toEqual({ ok: true, value: previous });
+  expect(editor.fromRaw('unknown: true').ok).toBe(false);
+  expect(editor.recoverForm('unknown: true', previous)).toMatchObject({ value: previous, notes: [expect.stringContaining('未知公共字段')] });
+  expect(basePatchKey('common')).toBe('common');
+});

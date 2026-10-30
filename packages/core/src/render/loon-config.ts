@@ -22,10 +22,11 @@ function loonGroup(group: Fields, report: Report): string {
   const name = iniName(group.name), type = String(group.type);
   const fields = [type, ...[...new Set(group.proxies as string[] ?? [])].map(iniName)];
   const add = (key: string, value: unknown) => { if (value !== undefined) fields.push(key + '=' + iniValue(value)); };
+  add('url', group.url);
   if (type !== 'select') {
-    add('url', group.url); add('interval', group.interval);
+    add('interval', group.interval);
     if (type === 'url-test') add('tolerance', group.tolerance);
-    else add('max-timeout', group.timeout);
+    else add('max-timeout', group['max-timeout'] ?? group.timeout);
   }
   add('img-url', group.icon);
   if (type === 'load-balance' && group.strategy !== undefined) {
@@ -43,7 +44,19 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
   const { config, report } = result;
   try {
     const base = stringifyIniBase({ ...(config.general ? { general: config.general } : {}), ...(config.host ? { host: config.host } : {}) });
-    const proxies = (config.proxies as Fields[]).flatMap(node => { const line = loonProxyLine(node, report); return line ? [line] : []; });
+    const names = new Set([...(config.proxies as Fields[]).map(n => String(n.name)), ...(config['proxy-groups'] as Fields[]).map(g => String(g.name))]);
+    const chains: string[] = [];
+    const proxies = (config.proxies as Fields[]).flatMap(node => {
+      const copy = { ...node };
+      if (copy['dialer-proxy'] !== undefined) {
+        let internal = String(node.name) + ' · 链落地', i = 2;
+        while (names.has(internal)) internal = String(node.name) + ' · 链落地 ' + i++;
+        names.add(internal);
+        chains.push(iniName(node.name) + ' = ' + iniName(String(node['dialer-proxy'])) + ', ' + iniName(internal) + (node.udp === undefined ? '' : ', udp=' + iniValue(node.udp)));
+        copy.name = internal; delete copy['dialer-proxy'];
+      }
+      const line = loonProxyLine(copy, report); return line ? [line] : [];
+    });
     const groups = (config['proxy-groups'] as Fields[]).map(group => loonGroup(group, report));
     const rules = (config.rules as string[]).flatMap(line => {
       if (/[\r\n\u2028\u2029\0]/.test(line)) throw new Error('规则不能包含换行或空字符');
@@ -55,6 +68,6 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       const target = iniName(match[2]);
       return file.text.split(/\r?\n/).filter(rule => rule.trim() && !rule.trimStart().startsWith('#')).map(rule => composeRule(rawRuleParts(rule), target));
     });
-    return [base.trim(), '[Proxy]', ...proxies, '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ''].filter((s, i) => i !== 0 || s).join('\n');
+    return [base.trim(), '[Proxy]', ...proxies, ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ''].filter((s, i) => i !== 0 || s).join('\n');
   } catch (cause) { report.error('loon.format', cause instanceof Error ? cause.message : 'Loon 配置格式不合法'); return ''; }
 }

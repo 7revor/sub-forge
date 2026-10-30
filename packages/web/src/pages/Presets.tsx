@@ -1,3 +1,4 @@
+import { BaseExtract } from '../components/BaseExtract.tsx';
 // 基础设置预设（BS-03）：列表管理预设，独立详情页编辑配置并查看引用方。
 // 保存即发布新版本，引用它的配置订阅随之更新，它们自己覆盖的项保持不变。
 
@@ -49,7 +50,7 @@ export function PresetEdit() {
   const profiles = useList('profiles');
   const [rawValid, setRawValid] = useState(true);
   const [mode, setMode] = useState<EditorMode>('form');
-  const [client, setClient] = useState<'mihomo' | 'surge' | 'stash' | 'loon'>('mihomo');
+  const [client, setClient] = useState<'common' | 'mihomo' | 'surge' | 'stash' | 'loon'>('common');
   const [editorRevision, setEditorRevision] = useState(0);
   const dirty = !!e.draft && (e.dirty || !rawValid);
   const { blocker, leave } = useLeaveGuard(!e.isNew && dirty, undefined, () => ({ what: `预设「${d.name}」`, canSave: rawValid, saveLabel: '发布并离开', onSave: () => e.save.mutateAsync({ ...d, version: d.version + 1 }), onDiscard: discard }));
@@ -85,9 +86,11 @@ export function PresetEdit() {
             <div className="flex flex-wrap items-center justify-between gap-2.5">
               <h2 className="m-0 text-[17px] font-semibold">基础设置</h2>
               <div className="flex flex-wrap items-center gap-2">
-                <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
+                <Segmented label="客户端" value={client} options={[{ value: 'common', label: '公共项' }, { value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
               </div>
             </div>
+            <p className="text-[13px] text-ink-muted">公共项先生成，各端专用覆盖最后生效。无法等价转换的选项请留在专用覆盖。</p>
+            {client !== 'common' && <BaseExtract client={client} value={d[client] ?? {}} common={d.common} disabled={!rawValid} onApply={(common, native) => { e.setDraft({ ...d, common, [client]: native }); setEditorRevision(v => v + 1); }} />}
             {<DualEditor key={`${d.id}-${client}-${editorRevision}`} value={d[client] ?? {}} onChange={(value) => e.setDraft({ ...d, [client]: value })} mode={mode} onModeChange={setMode}
               toRaw={editor.toRaw} fromRaw={editor.fromRaw} recoverForm={(text) => editor.recoverForm(text, d[client] ?? {})} onValidityChange={setRawValid} rawLabel={`${client} · ${editor.format}`}
               renderForm={() => <SchemaForm groups={editor.groups} value={baseToForm(d[client] ?? {})} extra collapsible

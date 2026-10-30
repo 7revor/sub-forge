@@ -127,7 +127,7 @@ export function loonProxyLine(node: Fields, report: Report): string | undefined 
       if (profile) { add('tls-profile', profile); report.info('loon.fingerprint', 'TLS 指纹映射为 Loon 的 ' + profile + '，具体握手由客户端版本决定', where); }
       else error('Loon 无法表达此客户端指纹 ' + String(fingerprint));
     }
-    if (value('dialer-proxy') !== undefined) error('Loon 尚未适配代理链，不能移除前置后直接连接');
+    if (value('dialer-proxy') !== undefined) error('Loon 节点不能单独携带 dialer-proxy，请通过完整配置输出 [Proxy Chain]');
     for (const key of Object.keys(node)) if (!key.startsWith('_') && !used.has(key)) error('Loon 尚未适配节点参数 ' + key + '，请在处理链中移除或改写');
     return name + ' = ' + fields.join(', ');
   } catch (cause) { error(cause instanceof Error ? cause.message : '节点格式错误'); return undefined; }

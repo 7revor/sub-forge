@@ -1,0 +1,9 @@
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/subscription-tabs-access-log/packages/server
+
+
+ Test Files  3 passed (3)
+      Tests  22 passed (22)
+   Start at  14:46:45
+   Duration  1.09s (transform 837ms, setup 0ms, import 1.39s, tests 793ms, environment 0ms)
+

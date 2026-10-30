@@ -1,3 +1,4 @@
+import { BaseExtract } from '../../components/BaseExtract.tsx';
 import { RoutingCard, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { appendProviderGroup } from './providerGroup.ts';
@@ -5,20 +6,18 @@ import type { NodeSetID } from '@sub-forge/core';
 import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
 import { Frame } from '../../modals/Frame.tsx';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
-import { formatRelativeTime } from '../../utils/format.ts';
-import { accessLogOptions } from '../../hooks/documentQueries.ts';
 import { Notice } from '../../components/Notice.tsx';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
-import { NodeSetPreviewModal } from '../../components/NodeSetPreviewModal.tsx';
+import { ResourceFileLink } from '../../components/ResourceLinkButton.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
-// Profile 标签：概览（输出设置、访问日志）、基础设置、节点集。
+// 订阅页共用的基本设置、输出设置和节点配置。
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
@@ -27,70 +26,37 @@ import { baseEditorFor, basePatchKey } from '../../convert/baseClient.ts';
 import { baseFromForm, baseToForm } from '../../schemas/mihomoBase.ts';
 import { useProfile } from './context.ts';
 
-const SOURCE_TEXT: Record<string, string> = { fresh: '未命中', cache: '命中', 'last-good': '上次成功结果', failed: '失败', unsupported: '不支持' };
-
-/** 概览（设计稿「Profile · 概览」）：输出设置、访问日志 */
-export function TabOverview() {
+/** 输出设置与基本信息放在同一个标签页。 */
+export function TabOutput() {
   const { draft, setDraft, allNodeSets } = useProfile();
-  const log = useQuery(accessLogOptions(draft.id));
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
-  const sources = allNodeSets.filter((n) => n.ref.type === 'source' && draft.nodeSets.some((p) => p.ref.type === 'source' && p.ref.id === n.ref.id));
-  const rows = log.data ?? [];
-  const lastGood = rows.find((r) => r.status === 200 && (r.source === 'fresh' || r.source === 'cache'));
-
-  return (
-    <>
-      <div className="grid grid-cols-1 gap-5">
-        <Card title="输出设置" className="min-w-0">
-          <div className="flex flex-col gap-3.5">
-            <p className="text-[13px] text-muted">更新间隔由管理员在系统中统一设置。</p>
-            <Field label="流量 / 到期信息">{(id) => (
-              <Select placeholder="选择订阅流量与到期信息的来源" id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={(e) => {
-                const v = e.target.value;
-                setDraft({ ...draft, userinfo: v.startsWith('source:') ? { mode: 'source', sourceId: v.slice(7) } : { mode: v as 'sum' | 'none' } });
-              }}>
-                <option value="sum">汇总全部订阅源</option>
-                {sources.map((s) => <option key={s.ref.id} value={`source:${s.ref.id}`}>取「{s.name}」</option>)}
-                <option value="none">不输出</option>
-              </Select>
-            )}</Field>
-            {lastGood
-              ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）</div>
-              : <Empty title="还没有成功渲染过" />}
-          </div>
-        </Card>
-      </div>
-      <Card title="访问日志" actions={<span className="text-[12.5px] text-ink-muted">保留 30 天</span>} bodyClass="overflow-x-auto">
-        <table className="w-full min-w-[860px] border-collapse">
-          <thead><tr><th className={th}>时间</th><th className={th}>识别结果</th><th className={th}>User-Agent</th><th className={th}>耗时</th><th className={th}>缓存</th><th className={th}>告警</th></tr></thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i}>
-                <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{formatTime(r.at).slice(5)}</td>
-                <td className={cx(td, 'font-medium')}>{r.client}{r.platform ? ` · ${r.platform}` : ''}{r.status !== 200 && <Badge tone="err" className="ml-2">{r.status}</Badge>}</td>
-                <td className={cx(td, 'max-w-[280px] truncate font-mono text-[12px] text-ink-muted')}>{r.ua}</td>
-                <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{r.ms >= 1000 ? `${(r.ms / 1000).toFixed(2)} s` : `${r.ms} ms`}</td>
-                <td className={td}>{SOURCE_TEXT[r.source] ?? r.source}</td>
-                <td className={td}><Badge tone={r.warnings ? 'warn' : 'neutral'}>{r.warnings}</Badge></td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td className={td} colSpan={6}><Empty title="还没有访问记录" /></td></tr>}
-          </tbody>
-        </table>
-      </Card>
-
-    </>
-  );
+  const sources = allNodeSets.filter(n => n.ref.type === 'source' && draft.nodeSets.some(p => p.ref.type === 'source' && p.ref.id === n.ref.id));
+  return <Card title="输出设置" className="min-w-0">
+    <div className="flex flex-col gap-3.5">
+      <Field label="流量 / 到期信息">{id => <Select placeholder="选择订阅流量与到期信息的来源" id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={e => {
+        const value = e.target.value;
+        setDraft({ ...draft, userinfo: value.startsWith('source:') ? { mode: 'source', sourceId: value.slice(7) } : { mode: value as 'sum' | 'none' } });
+      }}>
+        <option value="sum">汇总全部订阅源</option>
+        {sources.map(s => <option key={s.ref.id} value={`source:${s.ref.id}`}>取「{s.name}」</option>)}
+        <option value="none">不输出</option>
+      </Select>}</Field>
+      <p className="m-0 text-[12.5px] text-ink-muted">更新间隔由管理员在系统中统一设置。</p>
+    </div>
+  </Card>;
 }
+
+const EMPTY_BASE_PATCH: Record<string, unknown> = Object.freeze({});
 
 /** 基础设置（设计稿「Profile · 基础设置」）：来源条、进程规则提醒、按客户端分区的覆盖项、原样片段 */
 export function TabBase() {
   const { draft, setDraft, baseValid, setBaseValid, baseEditorKey, template } = useProfile();
   const presets = useList('presets').data ?? [];
-  const [client, setClient] = useState<'mihomo' | 'surge' | 'stash' | 'loon'>('mihomo');
+  const [client, setClient] = useState<'common' | 'mihomo' | 'surge' | 'stash' | 'loon'>('common');
   const preset = presets.find((p) => p.id === draft.base?.presetId);
   const mode = draft.base === undefined ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
-  const patch = draft.base?.[basePatchKey(client)] ?? {};
+  // 空覆盖项保持引用稳定，校验状态变化不能被编辑器误判成外部重置。
+  const patch: Record<string, unknown> = draft.base?.[basePatchKey(client)] ?? EMPTY_BASE_PATCH;
   const inherited = preset?.[client] ?? {};
   const editor = baseEditorFor(client);
   const groups = editor.groups;
@@ -107,7 +73,7 @@ export function TabBase() {
           <Segmented label="基础设置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '完全自定义' }, { value: 'none', label: '不输出' }]}
             onChange={(m) => {
               if (m === 'none') { const { base: _b, ...rest } = draft; setDraft(rest); }
-              else if (m === 'custom') setDraft({ ...draft, base: { patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, loonPatch: draft.base?.loonPatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
+              else if (m === 'custom') setDraft({ ...draft, base: { common: draft.base?.common, patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, loonPatch: draft.base?.loonPatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
               else setDraft({ ...draft, base: { ...(draft.base ?? {}), presetId: presets[0]?.id ?? '' } });
             }} />
         </fieldset>
@@ -125,7 +91,9 @@ export function TabBase() {
       {mode !== 'none' && (
         <div className="flex flex-wrap items-start gap-5">
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
-            <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
+            <Segmented label="客户端" value={client} options={[{ value: 'common', label: '公共项' }, { value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
+            <p className="text-[13px] text-ink-muted">合并顺序：预设公共项 → 本订阅公共项 → 预设客户端覆盖 → 本订阅客户端覆盖。</p>
+            {client !== 'common' && <BaseExtract client={client} value={patch} common={draft.base?.common} disabled={!baseValid} onApply={(common, native) => setDraft({ ...draft, base: { ...draft.base, common, [basePatchKey(client)]: native } })} />}
             {(
               <DualEditor key={`${draft.id}:${client}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
                 toRaw={editor.toRaw} fromRaw={editor.fromRaw} recoverForm={(text) => editor.recoverForm(text, patch)} rawLabel={`${mode === 'preset' ? '覆盖项' : client} ${editor.format}`}
@@ -169,7 +137,7 @@ export function TabNodeSets() {
         actions={<Button size="sm" onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={14} />添加节点集</Button>}>
         {!draft.nodeSets.length ? <Empty title="还没有节点集" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[24px_32px_minmax(0,1fr)_68px] md:grid-cols-[24px_32px_minmax(0,1fr)_minmax(0,1fr)_140px_68px]">
           {handle}<RoutingCardIcon><Boxes size={16} /></RoutingCardIcon>
-          <button type="button" aria-label={`预览 ${nodeSetName(n.ref)} 的节点`} onClick={() => void NodeSetPreviewModal.show({ nodeSet: n.ref, name: nodeSetName(n.ref) })} className="min-w-0 cursor-pointer truncate rounded text-left font-medium hover:text-brand hover:underline focus-visible:outline-brand">{nodeSetName(n.ref)}</button>
+          <ResourceFileLink kind={n.ref.type === 'source' ? 'sources' : n.ref.type === 'collection' ? 'collections' : 'locals'} id={n.ref.id} name={nodeSetName(n.ref)} className="min-w-0 cursor-pointer truncate rounded text-left font-medium no-underline hover:text-brand hover:underline focus-visible:outline-brand" />
           <span className="col-start-3 row-start-2 min-w-0 truncate text-ink-2 md:col-auto md:row-auto">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span>
           <div className="col-span-2 col-start-3 row-start-3 w-[140px] md:col-auto md:row-auto [&>div]:w-full [&_button]:flex-1 [&_button]:px-0"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>
           <div className="col-start-4 row-start-1 grid w-[68px] grid-cols-2 gap-1 md:col-auto md:row-auto">
