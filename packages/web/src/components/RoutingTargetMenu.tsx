@@ -24,12 +24,12 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
       <span className={cx('min-w-0 flex-1 truncate', !selected && 'text-ink-muted')}>{selected?.label ?? placeholder}</span>
       <ChevronDown size={14} className="shrink-0 text-faint" aria-hidden />
     </button></DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[min(360px,calc(100vw-2rem))]" aria-label={label}>
+    <DropdownMenuContent align="end" className="min-w-[min(240px,calc(100vw-2rem))] max-w-[min(400px,calc(100vw-2rem))] p-2" aria-label={label}>
       <DropdownMenuRadioGroup value={value} onValueChange={next => { if (next !== value) onChange(next); }}>
         {sections.map((section, i) => <Fragment key={i}>
           {i > 0 && <DropdownMenuSeparator />}
-          {section.label && <DropdownMenuLabel className="text-[12px] text-ink-muted">{section.label}</DropdownMenuLabel>}
-          {section.options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value} textValue={option.label} className="text-[13px]">
+          {section.label && <DropdownMenuLabel className="px-3 py-2 text-[12px] text-ink-muted">{section.label}</DropdownMenuLabel>}
+          {section.options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value} textValue={option.label} className="px-3 py-2.5 text-[13px]">
             <span className="min-w-0 break-words">{option.label}</span>
           </DropdownMenuRadioItem>)}
         </Fragment>)}
