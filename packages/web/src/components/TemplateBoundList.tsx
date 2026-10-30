@@ -24,10 +24,8 @@ export function TemplateBoundList<T extends { id: string }>({ items, templateIds
   const rows = templateListItems(items, templateIds, templateStart);
   const reorder = (next: TemplateListItem<T>[]) => { const result = flattenTemplateItems(next); onReorder(result.items, result.templateStart); };
   return <SortableList items={rows} getKey={row => row.kind === 'template' ? 'template:block' : `custom:${row.item.id}`} isLocked={row => row.kind === 'template'} onReorder={reorder} renderItem={(row, _index, handle) => {
-    if (row.kind === 'template') return <section aria-label={`模板${label}整体`} className="my-3 rounded-lg border border-dashed border-line bg-ground p-3">
-      <div className="mb-2 flex items-center gap-2 text-[12px] text-ink-muted"><LockKeyhole size={14} />模板{label} · {row.items.length} 项</div>
+    if (row.kind === 'template') return <section aria-label={`模板${label}整体`} className="min-h-2">
       {row.items.map(item => <div key={item.id}>{renderItem(item, items.indexOf(item), <span className="grid h-8 w-6 place-items-center text-ink-muted" aria-label="跟随模板"><LockKeyhole size={16} /></span>)}</div>)}
-      {!row.items.length && <p className="m-0 text-[13px] text-ink-muted">模板暂无{label}。</p>}
     </section>;
     return <div className="[&_[data-routing-card]]:border-emerald-500/30 [&_[data-routing-card]]:bg-emerald-500/5">
       {renderItem(row.item, items.indexOf(row.item), handle)}
