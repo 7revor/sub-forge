@@ -10,6 +10,7 @@ import { CodePreview } from '../components/CodePreview.tsx';
 import { HighlightedText } from '../components/HighlightedText.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useDialogDraft } from '../hooks/useDialogDraft.ts';
+import { useDialogPresentation } from '../hooks/useDialogPresentation.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleRepo, type RepoFilePreview } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
@@ -61,9 +62,11 @@ export function RuleRepoPage() {
   useEffect(() => {
     if (selected && repos.data && !repos.data.repos.some(repo => repo.id === selected.repo && repo.enabled)) setSelected(undefined);
   }, [repos.data, selected]);
-  const preview = useQuery({ queryKey: ['rule-repos', 'file-preview', dialogFile?.repo, dialogFile?.file.ref, dialogFile?.file.path, revision], enabled: !!selected, retry: false,
+  const previewQuery = useQuery({ queryKey: ['rule-repos', 'file-preview', dialogFile?.repo, dialogFile?.file.ref, dialogFile?.file.path, revision], enabled: !!selected, retry: false,
     queryFn: () => api<{ item: RepoFilePreview }>('GET', `/rule-repos/file-preview?${new URLSearchParams({ repo: dialogFile!.repo, ref: dialogFile!.file.ref, path: dialogFile!.file.path })}`).then(result => result.item),
   });
+  const preview = useDialogPresentation(!!selected, previewQuery);
+  const repoName = useDialogPresentation(!!selected, repos.data?.repos.find(repo => repo.id === dialogFile?.repo)?.name ?? dialogFile?.repo);
   const create = useMutation({ meta: { successMessage: ruleset ? '规则文件已加入增强集合' : '增强集合已创建' },
     mutationFn: (file: RepoFilePreview) => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: file.repo, path: file.entry, file: { ref: file.ref, path: file.path }, ...(ruleset ? { ruleset } : {}) }),
     onSuccess: async result => { await qc.invalidateQueries({ queryKey: ['rulesets'] }); navigate(ruleset ? `/rulesets/${ruleset}` : `/rulesets/${result.item.id}`); },
@@ -91,7 +94,7 @@ export function RuleRepoPage() {
             <h2 className="m-0 break-all text-[17px] font-semibold">{dialogFile.file.path.split('/').at(-1)}</h2>
             <Badge>分支：{dialogFile.file.ref}</Badge>
           </div>
-          <span className="break-all font-mono text-[12px] text-ink-muted">{repos.data?.repos.find(repo => repo.id === dialogFile.repo)?.name ?? dialogFile.repo} · {dialogFile.file.path}</span>
+          <span className="break-all font-mono text-[12px] text-ink-muted">{repoName} · {dialogFile.file.path}</span>
           {file && !preview.isFetching && !preview.isError && <div className="flex flex-wrap items-center gap-3 text-[12px]">
             <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-brand">打开原文件</a>
             <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>

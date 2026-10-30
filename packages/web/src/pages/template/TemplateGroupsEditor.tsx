@@ -13,6 +13,7 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { draftIssues, removeGroup } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
+import { useDialogPresentation } from '../../hooks/useDialogPresentation.ts';
 
 const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_56px_64px]';
 
@@ -32,7 +33,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
     setGroup(current => current ? { ...current, ...structuredClone(patch) } : current);
   };
   const close = () => { onSelect(undefined); setDeleting(undefined); };
-  const dialogReport = group ? draftIssues({ ...value, groups: value.groups.some(g => g.id === group.id) ? value.groups.map(g => g.id === group.id ? group : g) : [...value.groups, group] }) : [];
+  const dialogReport = useDialogPresentation(open, group ? draftIssues({ ...value, groups: value.groups.some(g => g.id === group.id) ? value.groups.map(g => g.id === group.id ? group : g) : [...value.groups, group] }) : []);
   const save = () => {
     if (!group) return;
     if (!readOnly) {

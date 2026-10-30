@@ -6,6 +6,7 @@ import { resolveRepositoryUrlMatch, useRepositoryUrlMatches } from '../hooks/use
 import { RulesetPreview } from './RulesetPreview.tsx';
 import { Button, Field, FieldError, Input, buttonClass } from './ui.tsx';
 import { useDialogDraft } from '../hooks/useDialogDraft.ts';
+import { useDialogPresentation } from '../hooks/useDialogPresentation.ts';
 
 type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
 function RemoteRuleDialog({ open, value, onSelect, onClose }: { open: boolean; value?: string; onSelect: (matcher: RuleSetMatcher) => void; onClose: () => void }) {
@@ -18,9 +19,11 @@ function RemoteRuleDialog({ open, value, onSelect, onClose }: { open: boolean; v
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState<string>();
   useEffect(() => { if (open) { setPreviewUrl(undefined); setLinkError(undefined); } }, [open]);
-  const repositoryMatches = useRepositoryUrlMatches(open && matcher?.remote ? [matcher.remote.url] : []);
+  const repositoryQuery = useRepositoryUrlMatches(open && matcher?.remote ? [matcher.remote.url] : []);
+  const repositoryMatches = useDialogPresentation(open, repositoryQuery);
   const source = { id: 'remote', kind: 'remote' as const, format: 'auto' as const, url: previewUrl };
-  const loaded = useRulesetSources(undefined, previewUrl ? { id: '', name: '', sources: [source] } : undefined);
+  const sourceQuery = useRulesetSources(undefined, previewUrl ? { id: '', name: '', sources: [source] } : undefined);
+  const loaded = useDialogPresentation(open, sourceQuery);
   return <Dialog open={open} onOpenChange={next => { if (!next && !linking) onClose(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"远程链接"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
     <Field label="规则地址">{id => <Input id={id} type="url" disabled={linking} value={url} placeholder="https://example.com/rules.yaml" onChange={e => { setUrl(e.target.value); setRepositoryMatcher(undefined); setPreviewUrl(undefined); setLinkError(undefined); }} />}</Field>
     <p className="m-0 text-[13px] text-ink-muted">直接引用自己或第三方维护的规则，自动识别格式并输出 .list。</p>

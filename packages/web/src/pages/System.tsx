@@ -7,6 +7,7 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { api, type SystemInfo } from '../api.ts';
+import { useDialogPresentation } from '../hooks/useDialogPresentation.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
 export function System() {
@@ -19,6 +20,7 @@ export function System() {
   const save = useMutation({ meta: { successMessage: '系统设置已保存' }, mutationFn: (body: SystemInfo) => api('PUT', '/system', body), onSuccess: () => qc.invalidateQueries({ queryKey: ['system'] }) });
   const backup = useMutation({ meta: { successMessage: '备份已导出' }, mutationFn: () => api('POST', '/system/backup') });
   const restore = useMutation({ meta: { successMessage: '备份已恢复' }, mutationFn: (file: File) => file.text().then((text) => api('POST', '/system/restore', JSON.parse(text) as unknown)) });
+  const restoreView = useDialogPresentation(!!restoreFile, { name: restoreFile?.name, pending: restore.isPending });
 
   if (!draft) return info.error ? <ErrorAlert error={info.error} /> : <div className="text-ink-muted">加载中…</div>;
   const dirty = JSON.stringify(draft) !== JSON.stringify(info.data);
@@ -90,10 +92,10 @@ export function System() {
       </PageScroll>
       <AlertDialog open={!!restoreFile} onOpenChange={next => { if (!next) (() => { if (!restore.isPending) setRestoreFile(undefined); })(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{"恢复备份？"}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
         <span className="text-[13.5px] leading-relaxed">恢复会覆盖当前全部配置。</span>
-        <span className="break-all text-[13px] text-ink-muted">{restoreFile?.name}</span>
+        <span className="break-all text-[13px] text-ink-muted">{restoreView.name}</span>
       </div></AlertDialogDescription><AlertDialogFooter>{<>
-        <AlertDialogCancel disabled={restore.isPending}>取消</AlertDialogCancel>
-        <Button variant="danger-solid" disabled={restore.isPending} onClick={() => { if (restoreFile) restore.mutate(restoreFile, { onSuccess: () => setRestoreFile(undefined) }); }}>{restore.isPending ? '恢复中…' : '恢复'}</Button>
+        <AlertDialogCancel disabled={restoreView.pending}>取消</AlertDialogCancel>
+        <Button variant="danger-solid" disabled={restoreView.pending} onClick={() => { if (restoreFile) restore.mutate(restoreFile, { onSuccess: () => setRestoreFile(undefined) }); }}>{restoreView.pending ? '恢复中…' : '恢复'}</Button>
       </>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
 
     </>

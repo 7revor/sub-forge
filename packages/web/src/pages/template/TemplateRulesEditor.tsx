@@ -16,6 +16,7 @@ import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
+import { useDialogPresentation } from '../../hooks/useDialogPresentation.ts';
 import { draftIssues } from './model.ts';
 
 const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(100px,10vw,140px)_64px]';
@@ -135,7 +136,8 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     finally { setDraftLinking(false); }
   };
   const draftRemoteUrls = editing && rule?.matcher.kind === 'ruleset' && rule.matcher.remote ? [rule.matcher.remote.url] : [];
-  const draftRepositoryMatches = useRepositoryUrlMatches(draftRemoteUrls);
+  const draftRepositoryQuery = useRepositoryUrlMatches(draftRemoteUrls);
+  const draftRepositoryMatches = useDialogPresentation(editing, draftRepositoryQuery);
   return <>
     <Card title={title} subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={!readOnly && <>
       <Button size="sm" aria-label="添加静态规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />静态规则</Button>

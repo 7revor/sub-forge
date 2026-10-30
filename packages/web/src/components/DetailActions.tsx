@@ -4,6 +4,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { useState, type ReactNode } from 'react';
 import { deleteErrorText } from '../domain/deleteError.ts';
 import { Button, ErrorAlert, } from './ui.tsx';
+import { useDialogPresentation } from '../hooks/useDialogPresentation.ts';
 
 export type ActionItem = { label: string; onSelect: () => void };
 
@@ -16,12 +17,13 @@ export function ActionButtons({ items }: { items: ActionItem[] }) {
 export function DeleteDialog({ open, title, children, error, pending, onClose, onConfirm }: {
   open: boolean; title: string; children?: ReactNode; error?: unknown; pending?: boolean; onClose: () => void; onConfirm: () => void;
 }) {
-  const reason = deleteErrorText(error);
+  const view = useDialogPresentation(open, { title, children, error, pending });
+  const reason = deleteErrorText(view.error);
   return (
-    <AlertDialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{title}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
-      {children && <div className="text-[13.5px] leading-relaxed">{children}</div>}
-      {open && <ErrorAlert error={error} />}
-    </div></AlertDialogDescription><AlertDialogFooter>{<><AlertDialogCancel>取消</AlertDialogCancel><Button variant="danger-solid" disabled={pending || !!reason} onClick={onConfirm}>{pending ? '删除中…' : '删除'}</Button></>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{view.title}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
+      {view.children && <div className="text-[13.5px] leading-relaxed">{view.children}</div>}
+      <ErrorAlert error={view.error} />
+    </div></AlertDialogDescription><AlertDialogFooter>{<><AlertDialogCancel>取消</AlertDialogCancel><Button variant="danger-solid" disabled={view.pending || !!reason} onClick={onConfirm}>{view.pending ? '删除中…' : '删除'}</Button></>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
   );
 }
 
