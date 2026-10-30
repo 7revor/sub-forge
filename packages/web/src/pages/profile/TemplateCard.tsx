@@ -37,7 +37,7 @@ const TemplateAssociationModal = createModal<ProfileModalData, ProfileDoc>(funct
     return { ...converted.item, name: draft.name };
   });
   const options = [
-    { value: 'bound' as const, title: '跟随模板更新', text: '策略组和规则由模板维护，在订阅中填充节点。' },
+    { value: 'bound' as const, title: '跟随模板更新', text: '模板组和规则自动更新，可在订阅中追加独立组。' },
     { value: 'copy' as const, title: '复制后独立维护', text: '复制所选模板的策略组和规则，之后在本订阅中修改。' },
     ...(currentId ? [{ value: 'detach' as const, title: '解除关联', text: '保留当前策略组、成员和规则，之后独立维护。' }] : []),
   ];
@@ -90,7 +90,7 @@ export function TemplateCard() {
           <div className="flex min-w-0 flex-wrap items-center gap-2"><span className="text-[14px] font-semibold [overflow-wrap:anywhere]">{currentId ? <Link className="text-ink no-underline hover:text-brand" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link> : '独立配置'}</span><Badge tone={currentId ? 'accent' : 'neutral'}>{currentId ? '跟随模板更新' : '由本订阅维护'}</Badge></div>
           <Button size="sm" onClick={() => void edit()}>{currentId ? '管理模板关联' : '使用模板'}</Button>
         </div>
-        <p className="m-0 text-[12.5px] leading-relaxed text-ink-muted">{currentId ? '策略组和规则由模板维护；节点填充仅用于本订阅。模板保存后，下次刷新订阅时更新。' : initialized ? `复制自「${initialized.name ?? initialized.templateId}」，后续修改互不影响。` : '直接编辑策略组和规则，也可以选择模板作为起点。'}</p>
+        <p className="m-0 text-[12.5px] leading-relaxed text-ink-muted">{currentId ? '模板组和规则随模板更新；节点填充与独立组仅用于本订阅，并在模板更新后保留。' : initialized ? `复制自「${initialized.name ?? initialized.templateId}」，后续修改互不影响。` : '直接编辑策略组和规则，也可以选择模板作为起点。'}</p>
       </div>
     </section>
   </>;

@@ -274,6 +274,8 @@ export type ProfileRouting =
     mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]>;
     /** 按显示顺序优先于全部模板规则，仅允许本地单条或多条规则。 */
     prependRules?: RuleEntry[];
+    /** 本订阅独立维护的策略组，追加于模板组末尾。 */
+    extraGroups?: GroupSpec[];
   }
   | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version?: number; name?: string } };
 

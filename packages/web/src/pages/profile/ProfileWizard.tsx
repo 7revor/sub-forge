@@ -17,7 +17,7 @@ export function ProfileWizard() {
   const { ctx, template } = useProfileCtx(draft, setDraft);
   const { blocker, leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial) || !ctx!.baseValid, undefined, () => ({ what: '新建订阅', canSave, saveLabel: '创建并离开', onSave: () => finish(true) }));
   const templateReady = draft.routing?.mode !== 'bound' || (!!template.data && !template.isError);
-  const body = draft.routing?.mode === 'independent' ? draft.routing.config : { groups: template.data?.groups ?? [], rules: draft.routing?.prependRules ?? [], final: template.data?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const } };
+  const body = draft.routing?.mode === 'independent' ? draft.routing.config : { groups: [...(template.data?.groups ?? []), ...(draft.routing?.extraGroups ?? [])], rules: draft.routing?.prependRules ?? [], final: template.data?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const } };
   const issues = draftIssues(body);
   const canSave = !!draft.name.trim() && ctx!.baseValid && templateReady && !issues.length && !save.isPending;
   const finish = async (leaving = false) => {

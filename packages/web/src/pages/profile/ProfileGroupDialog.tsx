@@ -19,17 +19,19 @@ export const ProfileGroupDialog = createModal<ProfileModalData & { groupId: stri
   const [footerTarget, setFooterTarget] = useState<HTMLDivElement | null>(null);
   const [chainEditing, setChainEditing] = useModalDraft(false);
   const routing = working.routing!;
-  const bound = routing.mode === 'bound';
-  const group = (bound ? ctx?.template?.groups : routing.config.groups)?.find(g => g.id === groupId);
+  const group = ctx?.groups.find(g => g.id === groupId);
+  const bound = routing.mode === 'bound' && group?.origin === 'template';
   if (!ctx || !group) throw new Error('策略组不存在，请重新打开');
-  const members = bound ? routing.groupAdditions[group.id] ?? [] : group.members;
+  const members = bound && routing.mode === 'bound' ? routing.groupAdditions[group.id] ?? [] : group.members;
   const inherited = bound ? group.members : [];
   const patch = (value: Partial<GroupSpec>) => {
+    if (routing.mode === 'bound' && !bound) setWorking({ ...working, routing: { ...routing, extraGroups: (routing.extraGroups ?? []).map(g => g.id === groupId ? { ...g, ...value } : g) } });
     if (routing.mode === 'independent') setWorking({ ...working, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === groupId ? { ...g, ...value } : g) } } });
   };
-  const setMembers = (next: GroupSpec['members']) => bound ? setWorking({ ...working, routing: { ...routing, groupAdditions: { ...routing.groupAdditions, [groupId]: next } } }) : patch({ members: next });
-  const body = routing.mode === 'independent' ? routing.config : { groups: ctx.template?.groups ?? [], rules: [], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
+  const setMembers = (next: GroupSpec['members']) => bound && routing.mode === 'bound' ? setWorking({ ...working, routing: { ...routing, groupAdditions: { ...routing.groupAdditions, [groupId]: next } } }) : patch({ members: next });
+  const body = routing.mode === 'independent' ? routing.config : { groups: ctx.groups, rules: [], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
   const errors = draftIssues(body).filter(r => r.where === `group:${groupId}` && r.level === 'error');
+  if (ctx.groups.some(g => g.id !== group.id && g.name.trim() === group.name.trim())) errors.push({ level: 'error', code: 'group.name', message: '策略组名称不能重复' });
   for (const [name, value] of [['filter', group.filter], ['exclude-filter', group.excludeFilter]]) {
     if (value) try { compileUserRegex(value); } catch (error) { errors.push({ level: 'error', code: 'group.filter', message: `${name} 无效：${(error as Error).message}` }); }
   }

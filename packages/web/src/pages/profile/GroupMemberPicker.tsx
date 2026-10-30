@@ -1,3 +1,4 @@
+import { useChainNames } from './useChainNames.ts';
 import { chainSources } from '@sub-forge/core';
 import { useModalPresentation } from '../../modals/index.tsx';
 import type { ChainRule, GroupMember, GroupSpec } from '@sub-forge/core';
@@ -7,7 +8,7 @@ import { useNodeList } from '../../hooks.ts';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { BUILTINS, memberLabel, targetLabel } from '../../components/pickers.tsx';
+import { BUILTINS, memberLabel } from '../../components/pickers.tsx';
 import { Badge, Button, Empty, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, exactNodeFilter, memberKey, nodeSetKey, toggleMember, putChain } from './memberModel.ts';
@@ -20,10 +21,9 @@ export function GroupMemberPicker({ group, members, inherited, onChange, readOnl
   const [category, setCategory] = useState<'node' | 'group' | 'builtin'>(() => draft.nodeSets.some(s => s.output === 'inline') ? 'node' : 'builtin');
   const [source, setSource] = useState('');
   const [search, setSearch] = useState('');
-  const [editingName, setEditingName] = useState<string>();
   const [editingChain, setEditingChain] = useState<ChainRule>();
   const chainSection = useRef<HTMLDivElement>(null);
-  const editChain = (chain?: ChainRule, name?: string) => { setEditingName(name); setEditingChain(chain); onChainEditingChange(!!chain); };
+  const editChain = (chain?: ChainRule) => { setEditingChain(chain); onChainEditingChange(!!chain); };
   useEffect(() => { if (editingChain) chainSection.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [editingChain]);
   const output = (ref: { type: string; id: string }) => draft.nodeSets.find(s => nodeSetKey(s.ref) === `${ref.type}:${ref.id}`)?.output;
   const inline = profileNodeSets.filter(s => output(s.ref) === 'inline');
@@ -88,7 +88,7 @@ export function GroupMemberPicker({ group, members, inherited, onChange, readOnl
               const exact = landing ? relevant.find(c => c.landing.filter === landing.filter && !c.landing.excludeFilter) : undefined;
               return <div className="border-b border-line-2 py-2 last:border-0"><div className="flex items-center gap-1">{handle}<span className="min-w-0 flex-1 break-words text-[13px] font-medium">{label.text}</span><Button size="sm" variant="ghost" aria-label={`移除 ${label.text}`} onClick={() => onChange([...fixed.filter((_, j) => i !== j), ...dynamic])}><X size={14} /></Button></div>
                 {legacyProvider && <p className="ml-7 text-[12px] text-warn">历史 Provider 节点引用。请在动态成员中引用 Provider，或将节点集切换为 Inline。</p>}
-                {landing && !legacyProvider && <Button size="sm" variant="ghost" className="ml-5 max-w-[calc(100%-20px)] whitespace-normal text-left text-brand" disabled={!!whole} onClick={() => editChain(chainForLanding(draft.chains, landing), label.text)}><Link2 size={13} className="shrink-0" />{whole ? `整集前置：${targetLabel(whole.via, groupName, nodeSetName)}` : exact ? `前置：${targetLabel(exact.via, groupName, nodeSetName)}` : relevant.length ? '查看 / 设置节点前置' : '设置前置'}</Button>}
+                {landing && !legacyProvider && <Button size="sm" variant="ghost" className="ml-5 max-w-[calc(100%-20px)] whitespace-normal text-left text-brand" disabled={!!whole} onClick={() => editChain(chainForLanding(draft.chains, landing))}><Link2 size={13} className="shrink-0" />{whole ? <>整集前置：<ChainViaName chain={whole} /></> : exact ? <>前置：<ChainViaName chain={exact} /></> : relevant.length ? '查看 / 设置节点前置' : '设置前置'}</Button>}
               </div>;
             }} />
             {!fixed.length && !fixedInherited.length && <Empty variant="plain" title="尚未添加固定成员" description="勾选左侧成员即可添加；Provider 在动态成员中配置。" />}
@@ -107,7 +107,11 @@ export function GroupMemberPicker({ group, members, inherited, onChange, readOnl
   return <div className="flex min-w-0 flex-col gap-5">
     {providerFirst && dynamicSection}
     {fixedSection}
-    {editingChain && <div ref={chainSection} className="border-t border-line pt-4"><h3 className="mt-0 mb-3 text-[14px] font-semibold">设置节点前置</h3><ChainRuleEditor landingLabel={editingName} footerTarget={footerTarget} key={editingChain.id} initial={editingChain} fixedLanding onCancel={() => editChain(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); editChain(undefined); }} onRemove={draft.chains.some(c => c.id === editingChain.id) ? () => { setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== editingChain.id) }); editChain(undefined); } : undefined} /></div>}
+    {editingChain && <div ref={chainSection} className="border-t border-line pt-4"><h3 className="mt-0 mb-3 text-[14px] font-semibold">设置节点前置</h3><ChainRuleEditor footerTarget={footerTarget} key={editingChain.id} initial={editingChain} fixedLanding onCancel={() => editChain(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); editChain(undefined); }} onRemove={draft.chains.some(c => c.id === editingChain.id) ? () => { setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== editingChain.id) }); editChain(undefined); } : undefined} /></div>}
     {!providerFirst && dynamicSection}
   </div>;
+}
+
+function ChainViaName({ chain }: { chain: ChainRule }) {
+  return useChainNames(chain).via;
 }
