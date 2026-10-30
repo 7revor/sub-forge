@@ -1,0 +1,3426 @@
+{
+  "metadata": {
+    "date": "2026-10-30T05:26:44.380Z",
+    "scope": "生成器及离线语法；没有真实连接验收；ok 不代表全部字段已获客户端语义确认",
+    "sourceCommit": "d398e37006f7d66fb89a900464b18428f6ca7be0",
+    "surgeVersion": "6.9.1",
+    "mihomoVersion": "Mihomo Meta v1.19.32 darwin arm64 with go1.22.12 Wed Sep 30 17:01:48 UTC 2026\nUse tags: with_gvisor"
+  },
+  "summary": {
+    "mihomo": {
+      "generator": {
+        "ok": 74,
+        "warning": 0,
+        "omitted": 3,
+        "error": 0
+      },
+      "official": {
+        "passed": 74,
+        "failed": 0,
+        "not-run": 3
+      }
+    },
+    "surge": {
+      "generator": {
+        "ok": 55,
+        "warning": 5,
+        "omitted": 4,
+        "error": 13
+      },
+      "official": {
+        "passed": 60,
+        "failed": 0,
+        "not-run": 17
+      }
+    },
+    "loon": {
+      "generator": {
+        "ok": 56,
+        "warning": 3,
+        "omitted": 7,
+        "error": 11
+      },
+      "official": {
+        "passed": 0,
+        "failed": 0,
+        "not-run": 77
+      }
+    },
+    "stash": {
+      "generator": {
+        "ok": 67,
+        "warning": 0,
+        "omitted": 4,
+        "error": 6
+      },
+      "official": {
+        "passed": 0,
+        "failed": 0,
+        "not-run": 77
+      }
+    }
+  },
+  "examples": {
+    "mihomo": {
+      "status": "passed"
+    },
+    "surge": {
+      "status": "passed"
+    },
+    "loon": {
+      "status": "not-run",
+      "reason": "没有配置该客户端官方校验器"
+    },
+    "stash": {
+      "status": "not-run",
+      "reason": "没有配置该客户端官方校验器"
+    }
+  },
+  "negativeControl": {
+    "status": "failed",
+    "output": "Failed: 文件 surge.conf 中第 10 行存在无效配置\n行内容: DEST-PORT,80/443,DIRECT (SGSettingsModelErrorDomain:0)\n"
+  },
+  "rows": [
+    {
+      "id": "ss-aes128",
+      "category": "节点",
+      "label": "SS aes-128-gcm",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "ss-aes256",
+      "category": "节点",
+      "label": "SS aes-256-gcm",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "ss-chacha",
+      "category": "节点",
+      "label": "SS chacha20-ietf-poly1305",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "ss-obfs",
+      "category": "节点",
+      "label": "SS simple-obfs（http/Host）",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "ss-shadowtls",
+      "category": "节点",
+      "label": "SS ShadowTLS",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配该 Shadowsocks 插件",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "ss-v2ray",
+      "category": "节点",
+      "label": "SS v2ray-plugin",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配该 Shadowsocks 插件",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.proxy",
+              "message": "Loon 尚未适配该 Shadowsocks 插件",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vmess-tcp",
+      "category": "节点",
+      "label": "VMess AEAD TCP/TLS",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vmess-ws",
+      "category": "节点",
+      "label": "VMess AEAD WS/TLS + 单个 Host/path",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vmess-header",
+      "category": "节点",
+      "label": "VMess WS 自定义 X-Test 请求头",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.proxy",
+              "message": "Loon 无法保留自定义传输请求头 X-Test",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vmess-alterid",
+      "category": "节点",
+      "label": "VMess alterId=64",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge VMess 仅支持 alterId=0",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vmess-none",
+      "category": "节点",
+      "label": "VMess cipher=none",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge VMess 不支持此加密方式",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vmess-grpc",
+      "category": "节点",
+      "label": "VMess gRPC",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 该协议不支持当前传输方式 grpc",
+              "where": "proxy:测试节点"
+            },
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配节点参数 grpc-opts，请在处理链中移除或改写",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.proxy",
+              "message": "Loon 不支持该传输方式 grpc",
+              "where": "proxy:测试节点"
+            },
+            {
+              "level": "error",
+              "code": "loon.proxy",
+              "message": "Loon 尚未适配节点参数 grpc-opts，请在处理链中移除或改写",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "trojan-tcp",
+      "category": "节点",
+      "label": "Trojan TCP/TLS",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "trojan-tls",
+      "category": "节点",
+      "label": "Trojan SNI、证书校验、ALPN",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "trojan-udp",
+      "category": "节点",
+      "label": "Trojan 显式 udp=true、tfo=false",
+      "caveat": "Stash 的 tfo 仅透传、官方未确认；各端 QUIC/UDP 默认行为不同，不能宣称等价",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "trojan-ws",
+      "category": "节点",
+      "label": "Trojan WebSocket",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 该协议不支持当前传输方式 ws",
+              "where": "proxy:测试节点"
+            },
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配节点参数 ws-opts，请在处理链中移除或改写",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "http",
+      "category": "节点",
+      "label": "HTTP 认证",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "https",
+      "category": "节点",
+      "label": "HTTPS 认证与 SNI",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "socks",
+      "category": "节点",
+      "label": "SOCKS5 认证",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "socks-tls",
+      "category": "节点",
+      "label": "SOCKS5 TLS",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "anytls",
+      "category": "节点",
+      "label": "AnyTLS 基础认证/SNI",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "hy2",
+      "category": "节点",
+      "label": "Hysteria2 基础认证/SNI",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "hy2-down",
+      "category": "节点",
+      "label": "Hysteria2 下行 100 Mbps",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "hy2-obfs",
+      "category": "节点",
+      "label": "Hysteria2 Salamander",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "hy2-ports",
+      "category": "节点",
+      "label": "Hysteria2 端口跳跃",
+      "caveat": "端口和秒单位已核对官方格式；未验证真实转发",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "hy2-up",
+      "category": "节点",
+      "label": "Hysteria2 上行限制",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "warning",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "surge.bandwidth",
+              "message": "Surge Hysteria2 不输出上传带宽限制",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "warning",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "loon.bandwidth",
+              "message": "Loon Hysteria2 不输出上传带宽限制",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vless",
+      "category": "节点",
+      "label": "VLESS TLS",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配协议 vless",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "vless-reality",
+      "category": "节点",
+      "label": "VLESS Reality/Vision",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配节点参数 reality-opts，不能静默移除",
+              "where": "proxy:测试节点"
+            },
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配协议 vless",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "tuic",
+      "category": "节点",
+      "label": "TUIC v5",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.proxy",
+              "message": "Loon 尚未适配协议 tuic",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "snell",
+      "category": "节点",
+      "label": "Snell v3",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.proxy",
+              "message": "Loon 尚未适配协议 snell",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "ssr",
+      "category": "节点",
+      "label": "ShadowsocksR",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配协议 ssr",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "fingerprint",
+      "category": "节点",
+      "label": "client-fingerprint=chrome",
+      "caveat": "Loon 映射有说明；不承诺握手字节一致",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "warning",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "surge.fingerprint",
+              "message": "Surge 不提供相同的 ClientHello 指纹选择，已省略 client-fingerprint",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "loon.fingerprint",
+              "message": "TLS 指纹映射为 Loon 的 chrome，具体握手由客户端版本决定",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "ip-version",
+      "category": "节点",
+      "label": "节点 ip-version=ipv4",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "stash.proxy-option",
+              "message": "Stash 尚未适配节点参数 ip-version",
+              "where": "proxy:测试节点"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "smux",
+      "category": "节点",
+      "label": "节点 smux",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.proxy",
+              "message": "Surge 尚未适配节点参数 smux，请在处理链中移除或改写",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.proxy",
+              "message": "Loon 尚未适配节点参数 smux，请在处理链中移除或改写",
+              "where": "proxy:测试节点"
+            }
+          ]
+        },
+        "stash": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "stash.proxy-option",
+              "message": "Stash 尚未适配节点参数 smux",
+              "where": "proxy:测试节点"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "select",
+      "category": "策略组",
+      "label": "select 与节点成员",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "nested",
+      "category": "策略组",
+      "label": "嵌套策略组",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "url-test",
+      "category": "策略组",
+      "label": "url-test + url/interval/timeout/tolerance",
+      "caveat": "多组共享节点需统一测速参数，Loon 超时全局统一；选择结果可能不同",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "fallback",
+      "category": "策略组",
+      "label": "fallback + url/interval/timeout",
+      "caveat": "跨端测速和可用性判定存在差异",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "balance-hash",
+      "category": "策略组",
+      "label": "load-balance consistent-hashing",
+      "caveat": "只保留按目标主机稳定选节点的意图，哈希算法不保证相同",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "balance-round",
+      "category": "策略组",
+      "label": "load-balance round-robin",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.group-strategy",
+              "message": "组「代理」的 round-robin 无法等价映射为 Surge 负载均衡",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "balance-sticky",
+      "category": "策略组",
+      "label": "load-balance sticky-sessions",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.group-strategy",
+              "message": "组「代理」的 sticky-sessions 无法等价映射为 Surge 负载均衡",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.group-strategy",
+              "message": "Loon 不支持 sticky-sessions 负载均衡",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "stash": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "stash.group-strategy",
+              "message": "Stash 不支持 sticky-sessions 负载均衡",
+              "where": "group:all"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "lazy",
+      "category": "策略组",
+      "label": "url-test lazy=true",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "warning",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "surge.group-option",
+              "message": "Surge 不支持组参数 lazy，已省略",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "loon": {
+          "status": "warning",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "loon.group-option",
+              "message": "Loon 尚未适配策略组参数 lazy，已省略",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "expected-status",
+      "category": "策略组",
+      "label": "expected-status=204",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "warning",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "surge.group-option",
+              "message": "Surge 不支持组参数 expected-status，已省略",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.group-option",
+              "message": "Loon 尚未适配策略组参数 expected-status",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "stash": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "stash.group-test",
+              "message": "Stash 尚未适配组「代理」的最大失败次数或预期状态码",
+              "where": "group:all"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "max-failures",
+      "category": "策略组",
+      "label": "max-failed-times=3",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "warning",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "surge.group-option",
+              "message": "Surge 不支持组参数 max-failed-times，已省略",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.group-option",
+              "message": "Loon 尚未适配策略组参数 max-failed-times",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "stash": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "stash.group-test",
+              "message": "Stash 尚未适配组「代理」的最大失败次数或预期状态码",
+              "where": "group:all"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "hidden",
+      "category": "策略组",
+      "label": "hidden=true",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "warning",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "warn",
+              "code": "loon.group-option",
+              "message": "Loon 尚未适配策略组参数 hidden，已省略",
+              "where": "group:代理"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "icon",
+      "category": "策略组",
+      "label": "icon URL",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "extra",
+      "category": "策略组",
+      "label": "扩展字段 disable-udp",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "surge.group-option",
+              "message": "Surge 尚未适配策略组扩展参数 disable-udp",
+              "where": "group:all"
+            }
+          ]
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.group-option",
+              "message": "Loon 尚未适配策略组扩展参数 disable-udp，请使用结构化字段",
+              "where": "group:all"
+            }
+          ]
+        },
+        "stash": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "stash.group-option",
+              "message": "Stash 尚未适配策略组参数 disable-udp，请移除或使用已支持的配置",
+              "where": "group:all"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "pass",
+      "category": "策略组",
+      "label": "PASS 成员",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "error",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "error",
+              "code": "loon.policy",
+              "message": "Loon 不支持 PASS 策略",
+              "where": "group:all"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-domain",
+      "category": "规则",
+      "label": "DOMAIN,example.test",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-suffix",
+      "category": "规则",
+      "label": "DOMAIN-SUFFIX,example.test",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-keyword",
+      "category": "规则",
+      "label": "DOMAIN-KEYWORD,example",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-wildcard",
+      "category": "规则",
+      "label": "DOMAIN-WILDCARD,*.example.test",
+      "caveat": "Loon 需 Build 1008+；复杂 wildcard 语法需逐端核对",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.degraded",
+              "message": "Loon 域名通配规则需要 Build 1008 或更新版本",
+              "where": "rule:rule-wildcard"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-cidr",
+      "category": "规则",
+      "label": "IP-CIDR,192.0.2.0/24",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-cidr6",
+      "category": "规则",
+      "label": "IP-CIDR6,2001:db8::/32",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-no-resolve",
+      "category": "规则",
+      "label": "IP-CIDR,192.0.2.0/24,no-resolve",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-asn",
+      "category": "规则",
+      "label": "IP-ASN,13335,no-resolve",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-geoip",
+      "category": "规则",
+      "label": "GEOIP,CN,no-resolve",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-port",
+      "category": "规则",
+      "label": "DST-PORT,443",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-src-port",
+      "category": "规则",
+      "label": "SRC-PORT,12345",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.degraded",
+              "message": "Stash SRC-PORT 需要 iOS 3.7 / macOS 4.4 或更新版本",
+              "where": "rule:rule-src-port"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rule-port-range",
+      "category": "规则",
+      "label": "DST-PORT,8000-9000",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-port-list",
+      "category": "规则",
+      "label": "DST-PORT,80/443",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-src-port-list",
+      "category": "规则",
+      "label": "SRC-PORT,80/443",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.degraded",
+              "message": "Stash SRC-PORT 需要 iOS 3.7 / macOS 4.4 或更新版本",
+              "where": "rule:rule-src-port-list"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rule-nested-port-list",
+      "category": "规则",
+      "label": "AND,((DOMAIN,a.test),(NOT,((DST-PORT,80/443))))",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-tcp",
+      "category": "规则",
+      "label": "NETWORK,tcp",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-udp",
+      "category": "规则",
+      "label": "NETWORK,udp",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-and",
+      "category": "规则",
+      "label": "AND,((DOMAIN-SUFFIX,example.test),(DST-PORT,443))",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-or",
+      "category": "规则",
+      "label": "OR,((DOMAIN,a.test),(DOMAIN,b.test))",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-not",
+      "category": "规则",
+      "label": "NOT,((DOMAIN,a.test))",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-geosite",
+      "category": "规则",
+      "label": "GEOSITE,cn",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Surge 不支持 GEOSITE",
+              "where": "rule:rule-geosite"
+            }
+          ]
+        },
+        "loon": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Loon 尚未适配 GEOSITE",
+              "where": "rule:rule-geosite"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-regex",
+      "category": "规则",
+      "label": "DOMAIN-REGEX",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Surge 不支持 DOMAIN-REGEX",
+              "where": "rule:rule-regex"
+            }
+          ]
+        },
+        "loon": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Loon 尚未适配 DOMAIN-REGEX",
+              "where": "rule:rule-regex"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-srcip",
+      "category": "规则",
+      "label": "SRC-IP-CIDR",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Loon 尚未适配 SRC-IP-CIDR",
+              "where": "rule:rule-srcip"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.degraded",
+              "message": "Stash SRC-IP 需要 iOS 3.7 / macOS 4.4 或更新版本",
+              "where": "rule:rule-srcip"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rule-src",
+      "category": "规则",
+      "label": "IP-CIDR src",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.degraded",
+              "message": "src 转换为 Surge 的 SRC-IP",
+              "where": "rule:rule-src"
+            }
+          ]
+        },
+        "loon": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Loon 尚未适配源 IP 匹配，不能丢弃 src 后转换为目标 IP",
+              "where": "rule:rule-src"
+            }
+          ]
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.degraded",
+              "message": "src 转换为 Stash 的 SRC-IP（需 iOS 3.7 / macOS 4.4 或更新版本）",
+              "where": "rule:rule-src"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rule-process",
+      "category": "规则",
+      "label": "PROCESS-NAME（iOS）",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Surge iOS 不支持进程规则",
+              "where": "rule:rule-process"
+            }
+          ]
+        },
+        "loon": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Loon 进程规则仅支持 macOS",
+              "where": "rule:rule-process"
+            }
+          ]
+        },
+        "stash": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Stash 进程规则仅支持 macOS",
+              "where": "rule:rule-process"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rule-proc-regex",
+      "category": "规则",
+      "label": "复杂进程正则（macOS）",
+      "targets": {
+        "mihomo": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "surge": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "进程正则 ^(Foo|Bar)[0-9]+$ 无法转为 Surge 通配",
+              "where": "rule:process"
+            }
+          ]
+        },
+        "loon": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "该进程表达式无法等价转换为 Loon 名称或完整路径匹配",
+              "where": "rule:process"
+            }
+          ]
+        },
+        "stash": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "进程正则 ^(Foo|Bar)[0-9]+$ 无法转为 Stash 通配",
+              "where": "rule:process"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rule-ua",
+      "category": "规则",
+      "label": "USER-AGENT（非 Mihomo 通用项）",
+      "targets": {
+        "mihomo": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "mihomo 不支持 USER-AGENT",
+              "where": "rule:rule-ua"
+            }
+          ]
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "rule-urlregex",
+      "category": "规则",
+      "label": "URL-REGEX（非 Mihomo 通用项）",
+      "targets": {
+        "mihomo": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "mihomo 不支持 URL-REGEX",
+              "where": "rule:rule-urlregex"
+            }
+          ]
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "ok",
+          "official": {
+            "status": "not-run",
+            "reason": "没有配置该客户端官方校验器"
+          },
+          "diagnostics": []
+        },
+        "stash": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "Stash 尚未适配 URL-REGEX",
+              "where": "rule:rule-urlregex"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rule-extended",
+      "category": "规则",
+      "label": "extended-matching（Surge 专用）",
+      "targets": {
+        "mihomo": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "mihomo 不支持 extended-matching，不能改变匹配语义",
+              "where": "rule:rule-extended"
+            }
+          ]
+        },
+        "surge": {
+          "status": "ok",
+          "official": {
+            "status": "passed"
+          },
+          "diagnostics": []
+        },
+        "loon": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "loon 不支持 extended-matching，不能改变匹配语义",
+              "where": "rule:rule-extended"
+            }
+          ]
+        },
+        "stash": {
+          "status": "omitted",
+          "official": {
+            "status": "not-run",
+            "reason": "生成失败或规则已被省略，不能验证原输入"
+          },
+          "diagnostics": [
+            {
+              "level": "info",
+              "code": "rule.dropped",
+              "message": "stash 不支持 extended-matching，不能改变匹配语义",
+              "where": "rule:rule-extended"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
