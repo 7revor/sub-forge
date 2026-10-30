@@ -445,10 +445,10 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
   const overviewRow = (
     <button type="button" onClick={() => setSelected(OVERVIEW)} aria-current={mode === 'overview' || undefined}
-      className={cx('flex min-h-[66px] w-full cursor-pointer items-center gap-3 border-t border-line-2 py-3 pr-4 pl-4 text-left', mode === 'overview' ? 'bg-accent-soft' : 'bg-panel hover:bg-[#fafbfc]')}>
+      className={cx('flex min-h-[66px] w-full cursor-pointer items-center gap-3 border-t border-line-2 py-3 pr-4 pl-10 text-left', mode === 'overview' ? 'bg-accent-soft' : 'bg-panel hover:bg-[#fafbfc]')}>
       <span aria-hidden="true" className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md', mode === 'overview' ? 'bg-brand text-white' : 'bg-[#ebedf1] text-ink-2')}><ArrowLeftRight size={13} /></span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[13.5px] font-medium">总览 · 原始 → 最终</span>
+        <span className="text-[13.5px] font-medium">总览</span>
       </span>
       {preview && <span className="shrink-0 font-mono text-[12.5px] text-ink-2">{preview.input} → {last ? last.after : preview.input}</span>}
     </button>
