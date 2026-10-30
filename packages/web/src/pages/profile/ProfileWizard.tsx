@@ -11,7 +11,7 @@ import { ProfileSections } from './ProfileSections.tsx';
 export function ProfileWizard() {
   const save = useSaveDoc('profiles');
   const preset = useSearchParams()[0].get('template');
-  const [initial] = useState<ProfileDoc>(() => ({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: preset ? { mode: 'bound', templateId: preset, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }));
+  const [initial] = useState<ProfileDoc>(() => ({ id: '', name: '', userinfo: { mode: 'sources', sourceIds: [] }, nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: preset ? { mode: 'bound', templateId: preset, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }));
   const [draft, setDraft] = useState(initial);
   const { ctx, template } = useProfileCtx(draft, setDraft);
   const { leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial), undefined, () => ({ what: '新建订阅', canSave, saveLabel: '创建并离开', onSave: () => finish(true) }));

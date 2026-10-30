@@ -287,6 +287,15 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (!isObj(n) || (n.output !== 'provider' && n.output !== 'inline')) throw bad(`节点集 ${i + 1} 的输出方式只能是 provider 或 inline`);
         refs.nodeSet(n.ref, `节点集 ${i + 1}`);
       });
+      if (doc.userinfo !== undefined) {
+        const u = doc.userinfo;
+        if (!isObj(u) || !['sources', 'source', 'sum', 'none'].includes(String(u.mode))) throw bad('流量信息来源格式错误');
+        if (u.mode === 'sources') {
+          if (!Array.isArray(u.sourceIds) || !u.sourceIds.every(id => isStr(id))) throw bad('流量信息来源必须是节点订阅 ID 数组');
+          u.sourceIds = [...new Set(u.sourceIds)];
+          (u.sourceIds as string[]).forEach(id => refs.nodeSet({ type: 'source', id }, '流量信息来源'));
+        } else if (u.mode === 'source') refs.nodeSet({ type: 'source', id: u.sourceId }, '流量信息来源');
+      }
       if (doc.template !== undefined) {
         if (!isObj(doc.template) || !isStr(doc.template.id) || !store.getTemplate(doc.template.id)) throw bad('模板不存在');
         const f = doc.template.follow;
@@ -344,7 +353,7 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
   if (kind === 'source' || kind === 'collection' || kind === 'local') {
     for (const c of store.list('collection', ownerId)) if (c.members.some((m) => isRef(m.ref))) hits.push(`组合「${c.name}」`);
     for (const p of store.list('profile', ownerId)) {
-      if (p.nodeSets.some((n) => isRef(n.ref)) || contains([p.overlay, p.routing, p.chains], 'type')) hits.push(`配置订阅「${p.name}」`);
+      if (p.nodeSets.some((n) => isRef(n.ref)) || contains([p.overlay, p.routing, p.chains], 'type') || (kind === 'source' && (p.userinfo?.mode === 'sources' ? p.userinfo.sourceIds.includes(id) : p.userinfo?.mode === 'source' && p.userinfo.sourceId === id))) hits.push(`配置订阅「${p.name}」`);
     }
     for (const l of store.list('local', ownerId)) if (contains(l.proxies, 'type')) hits.push(`本地节点组「${l.name}」`);
   }

@@ -21,7 +21,7 @@ export type ProfileDoc = import('@sub-forge/core').Profile & {
   base?: import('@sub-forge/core').ProfileBase;
   migrationNotes?: string[];
   updateIntervalSec?: number;
-  userinfo?: { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
+  userinfo?: { mode: 'sources'; sourceIds: string[] } | { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
 };
 
 export type DocMap = {

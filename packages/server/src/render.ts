@@ -202,7 +202,13 @@ export class RenderService {
     if (profile.template && !template) pre.push({ level: 'error', code: 'template.missing', message: `模板 ${profile.template.id} 不存在` });
 
     const owner = this.store.getWithOwner('profile', profileId)?.owner ?? opts.owner;
-    const loaded = await this.loadNodeSets(profile.nodeSets.map((n) => n.ref), owner);
+    const trafficRefs: NodeSetID[] = profile.userinfo?.mode === 'sources'
+      ? profile.userinfo.sourceIds.map(id => ({ type: 'source', id })) : [];
+    for (const ref of trafficRefs) {
+      const row = this.store.getWithOwner('source', ref.id);
+      if (!row || (owner && row.owner !== owner)) throw new ResourceAccessError();
+    }
+    const loaded = await this.loadNodeSets([...profile.nodeSets.map(n => n.ref), ...trafficRefs], owner);
     usedSnapshots.push(...loaded.snapshots);
     const nodeSets = loaded.inputs;
     const userinfoBySource = loaded.userinfo;
@@ -228,7 +234,7 @@ export class RenderService {
     checkCurrent();
     for (const note of profile.migrationNotes ?? []) pre.push({ level: 'warn', code: 'base.migrated', message: note });
     const base = profile.base && profile.base.enabled !== false ? resolveNativeBase(target.client, target.app, profile.base) : undefined;
-    const userinfo = this.userinfo(profile, userinfoBySource);
+    const userinfo = this.userinfo(profile, userinfoBySource, nodeSets);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const output = { target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER };
@@ -374,10 +380,16 @@ export class RenderService {
     return out;
   }
 
-  private userinfo(profile: ProfileDoc, bySource: Map<string, TrafficInfo>): TrafficInfo | undefined {
+  private userinfo(profile: ProfileDoc, bySource: Map<string, TrafficInfo>, inputs: NodeSetInputs): TrafficInfo | undefined {
     const mode = profile.userinfo ?? { mode: 'sum' };
     if (mode.mode === 'none') return undefined;
     if (mode.mode === 'source') return bySource.get(mode.sourceId);
-    return sumTraffic(bySource.values());
+    const ids = mode.mode === 'sources' ? mode.sourceIds : [...bySource.keys()];
+    const byUrl = new Map<string, TrafficInfo>();
+    for (const id of ids) {
+      const info = bySource.get(id), source = inputs.sources[id];
+      if (info && source) byUrl.set(source.url, info);
+    }
+    return sumTraffic(byUrl.values());
   }
 }

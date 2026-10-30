@@ -1,3 +1,6 @@
+import { MultiSelect } from '../../components/listbox.tsx';
+import { useList } from '../../hooks.ts';
+import { trafficSourceIds } from './traffic.ts';
 import { NativeBaseEditor } from '../../components/NativeBaseEditor.tsx';
 import { RoutingCard, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
@@ -12,27 +15,25 @@ import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 
 import { Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Button, Card, Empty, Field, Input, Segmented, Select, Switch, Textarea } from '../../components/ui.tsx';
+import { Button, Card, Empty, Field, Input, Segmented, Switch, Textarea } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 /** 名称、备注和流量信息放在同一行，配置原文使用独立编辑区。 */
 export function TabProfileInfo() {
   const { draft, setDraft, allNodeSets } = useProfile();
-  const userinfo = draft.userinfo ?? { mode: 'sum' as const };
-  const sources = allNodeSets.filter(n => n.ref.type === 'source' && draft.nodeSets.some(p => p.ref.type === 'source' && p.ref.id === n.ref.id));
+  const collections = useList('collections');
+  const sources = allNodeSets.filter(n => n.ref.type === 'source');
+  const selected = trafficSourceIds(draft, collections.data ?? []);
   return <section aria-label="订阅基本信息" className="grid min-w-0 gap-4 rounded-[10px] border border-line bg-panel p-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.2fr]">
     <div className="min-w-0">
       <Field label="订阅名称">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} aria-invalid={!!draft.id && !draft.name.trim()} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
       {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-[12px] text-err">请填写订阅名称</p>}
     </div>
-    <Field label="流量 / 到期信息" className="min-w-0">{id => <Select placeholder="选择订阅流量与到期信息的来源" id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={e => {
-      const value = e.target.value;
-      setDraft({ ...draft, userinfo: value.startsWith('source:') ? { mode: 'source', sourceId: value.slice(7) } : { mode: value as 'sum' | 'none' } });
-    }}>
-      <option value="sum">汇总全部订阅源</option>
-      {sources.map(s => <option key={s.ref.id} value={`source:${s.ref.id}`}>取「{s.name}」</option>)}
-      <option value="none">不输出</option>
-    </Select>}</Field>
+    <Field label="流量 / 到期信息" className="min-w-0">{id => <MultiSelect placeholder="选择节点订阅（可多选）" id={id} value={selected}
+      onChange={sourceIds => setDraft({ ...draft, userinfo: { mode: 'sources', sourceIds } })}>
+      {sources.map(s => <option key={s.ref.id} value={s.ref.id}>{s.name}</option>)}
+      {selected.filter(id => !sources.some(s => s.ref.id === id)).map(id => <option key={id} value={id}>已不存在：{id}</option>)}
+    </MultiSelect>}</Field>
     <Field label="备注" className="min-w-0 sm:col-span-2 xl:col-span-1">{id => <Textarea id={id} rows={1} className="min-h-[38px] resize-y" placeholder="记录用途或说明（可选）" value={draft.note ?? ''} onChange={e => setDraft({ ...draft, note: e.target.value })} />}</Field>
   </section>;
 }
