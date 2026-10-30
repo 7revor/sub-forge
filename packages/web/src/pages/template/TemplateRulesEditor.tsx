@@ -7,7 +7,7 @@ import { ruleToLine } from '../../components/rule.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, FieldError } from '../../components/ui.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
-import { RuleCard } from '../../components/RuleCard.tsx';
+import { RuleCard, RuleCardFooter } from '../../components/RuleCard.tsx';
 import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
@@ -80,17 +80,15 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           icon={local ? <FileText size={16} /> : matcher.remote ? <Globe size={16} /> : <Link2 size={16} />}
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
           hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
-          target={readOnly ? <span className="block truncate text-center text-[13px]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
+          target={readOnly ? <span className="block truncate px-1.5 text-[13px]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
           onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);
           }}><span title={label}>{label}</span></RuleCard>;
       }} />
-      {!hideFinal && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line-2 pt-3 text-[13px]">
-        <span className="font-mono">MATCH</span>
-        <div id="template-rule-final" className="w-[136px] min-w-0">
-          {readOnly ? <span>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}
-        </div><ItemIssues report={report} where="final" />
+      {!hideFinal && <div className="mt-3 border-t border-line-2 pt-3">
+        <RuleCardFooter targetId="template-rule-final" target={readOnly ? <span className="block truncate px-1.5" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}>MATCH</RuleCardFooter>
+        <ItemIssues report={report} where="final" />
       </div>}
     </Card>
   </>;

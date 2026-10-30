@@ -1,0 +1,48 @@
+{
+  "template": {
+    "arrowX": 1118,
+    "finalArrowX": 1118,
+    "finalWidth": 112,
+    "finalX": 1026,
+    "matchX": 354,
+    "overflow": false,
+    "targetWidth": 112,
+    "targetX": 1026,
+    "titleX": 354,
+    "viewport": 1280
+  },
+  "templateMobile": {
+    "arrowX": 320,
+    "finalArrowX": 320,
+    "finalWidth": 112,
+    "finalX": 228,
+    "matchX": 114,
+    "overflow": false,
+    "targetWidth": 112,
+    "targetX": 228,
+    "titleX": 114,
+    "viewport": 390
+  },
+  "profile": {
+    "arrowX": 1118,
+    "finalArrowX": 1118,
+    "finalWidth": 112,
+    "finalX": 1026,
+    "matchX": 354,
+    "overflow": false,
+    "targetWidth": 112,
+    "targetX": 1026,
+    "titleX": 354,
+    "viewport": 1280
+  },
+  "bound": {
+    "finalWidth": 112,
+    "finalX": 1026,
+    "matchX": 354,
+    "overflow": false,
+    "targetWidth": 112,
+    "targetX": 1026,
+    "titleX": 354,
+    "viewport": 1280
+  }
+}
