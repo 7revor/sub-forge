@@ -15,7 +15,7 @@ import { RuleEditDialog } from './RuleEditDialog.tsx';
 import { applyRuleDraft } from './ruleDraft.ts';
 
 export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
-  if (matcher.kind === 'local') return localRuleLines(matcher.content)[0]?.text ?? '尚未填写';
+  if (matcher.kind === 'local') return localRuleLines(matcher.content).map(line => line.text).join(' · ') || '尚未填写';
   if (matcher.kind === 'rule') return ruleToLine(matcher.rule);
   if (matcher.repository) return matcher.repository.sources.map(source => source.name ?? `${matcher.repository!.name} · ${source.repository?.path}`).join('、');
   if (matcher.remote) return matcher.remote.url || '远程规则';
