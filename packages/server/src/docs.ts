@@ -22,14 +22,14 @@ export type LocalDoc = LocalProxyGroup;
 /** 当前模板；旧 version 字段仅供导入历史数据，不参与保存和渲染。 */
 export type TemplateVersionDoc = Template & { name?: string };
 
-/** 基础设置预设（BS-03），Surge 段仅存储，暂不参与渲染 */
+/** 基础设置预设（BS-03），各客户端基础设置独立保存与合并 */
 export type PresetDoc = { id: string; name: string; version: number; mihomo: Record<string, unknown>; stash?: Record<string, unknown>; surge?: { general?: Record<string, unknown>; host?: Record<string, string> } };
 
 export type ProfileDoc = Profile & {
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
   template?: { id: string; follow: 'latest' | { pinned: number } };
   /** 不设置表示不输出基础设置（使用客户端默认） */
-  base?: { presetId?: string; patch?: Record<string, unknown>; stashPatch?: Record<string, unknown> };
+  base?: { presetId?: string; patch?: Record<string, unknown>; stashPatch?: Record<string, unknown>; surgePatch?: Record<string, unknown> };
   /** 仅兼容旧导入；保存时移除，下发间隔取系统资源缓存时间。 */
   updateIntervalSec?: number;
   /** subscription-userinfo 的来源（SRC-05） */

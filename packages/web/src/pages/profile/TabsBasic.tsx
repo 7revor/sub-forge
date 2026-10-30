@@ -22,9 +22,8 @@ import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
 import { SchemaForm } from '../../components/SchemaForm.tsx';
-import { baseFormFromYaml, baseFromYaml, baseToYaml } from '../../convert/baseYaml.ts';
-import { baseFromForm, baseToForm, mihomoBaseGroups } from '../../schemas/mihomoBase.ts';
-import { stashBaseGroups } from '../../schemas/stashBase.ts';
+import { baseEditorFor, basePatchKey } from '../../convert/baseClient.ts';
+import { baseFromForm, baseToForm } from '../../schemas/mihomoBase.ts';
 import { useProfile } from './context.ts';
 
 const SOURCE_TEXT: Record<string, string> = { fresh: '未命中', cache: '命中', 'last-good': '上次成功结果', failed: '失败', unsupported: '不支持' };
@@ -68,6 +67,7 @@ export function TabOverview() {
                     <div className="flex gap-1.5">
                       <CopyButton className="h-9" text={t.url}><Copy size={13} />复制</CopyButton>
                       <CopyButton className="h-9" text={`${t.url}?target=stash&platform=ios`}>复制 Stash 链接</CopyButton>
+                      <CopyButton className="h-9" text={`${t.url}?target=surge&platform=ios`}>复制 Surge 链接</CopyButton>
                       <Button className="h-9 text-err" onClick={() => void manage(t, true)}><RotateCcw size={13} />重置 token</Button>
                       <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => void manage(t, false)}><Trash2 size={14} /></Button>
                     </div>
@@ -127,10 +127,11 @@ export function TabBase() {
   const [client, setClient] = useState<'mihomo' | 'surge' | 'stash'>('mihomo');
   const preset = presets.find((p) => p.id === draft.base?.presetId);
   const mode = draft.base === undefined ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
-  const patch = (client === 'stash' ? draft.base?.stashPatch : draft.base?.patch) ?? {};
-  const inherited = (client === 'stash' ? preset?.stash : preset?.mihomo) ?? {};
-  const groups = client === 'stash' ? stashBaseGroups : mihomoBaseGroups;
-  const changePatch = (patch: Record<string, unknown>) => setDraft({ ...draft, base: { ...draft.base, [client === 'stash' ? 'stashPatch' : 'patch']: patch } });
+  const patch = draft.base?.[basePatchKey(client)] ?? {};
+  const inherited = preset?.[client] ?? {};
+  const editor = baseEditorFor(client);
+  const groups = editor.groups;
+  const changePatch = (patch: Record<string, unknown>) => setDraft({ ...draft, base: { ...draft.base, [basePatchKey(client)]: patch } });
   // 规则里有进程规则，但 find-process-mode 为 off 时进程规则不会生效
   const processMode = (patch['find-process-mode'] ?? preset?.mihomo['find-process-mode']) as string | undefined;
   const hasProcess = JSON.stringify([template?.rules ?? [], draft.overlay.extraRules ?? []]).includes('"PROCESS"');
@@ -143,7 +144,7 @@ export function TabBase() {
           <Segmented label="基础设置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '完全自定义' }, { value: 'none', label: '不输出' }]}
             onChange={(m) => {
               if (m === 'none') { const { base: _b, ...rest } = draft; setDraft(rest); }
-              else if (m === 'custom') setDraft({ ...draft, base: { patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
+              else if (m === 'custom') setDraft({ ...draft, base: { patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
               else setDraft({ ...draft, base: { ...(draft.base ?? {}), presetId: presets[0]?.id ?? '' } });
             }} />
         </fieldset>
@@ -162,11 +163,9 @@ export function TabBase() {
         <div className="flex flex-wrap items-start gap-5">
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
             <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
-            {client === 'surge' ? (
-              <Empty title="Surge 基础设置暂未开放" />
-            ) : (
+            {(
               <DualEditor key={`${draft.id}:${client}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
-                toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={(text) => baseFormFromYaml(text, groups)} rawLabel={mode === 'preset' ? '覆盖项 YAML' : `${client === 'stash' ? 'Stash' : 'mihomo'} YAML`}
+                toRaw={editor.toRaw} fromRaw={editor.fromRaw} recoverForm={(text) => editor.recoverForm(text, patch)} rawLabel={`${mode === 'preset' ? '覆盖项' : client} ${editor.format}`}
                 renderForm={() => mode === 'preset'
                   ? <OverrideForm groups={groups} base={baseToForm(inherited)} patch={baseToForm(patch)}
                       onChange={(value) => changePatch(baseFromForm(value, patch, inherited))} />
@@ -174,11 +173,11 @@ export function TabBase() {
                       onChange={(value) => changePatch(baseFromForm(value, patch))} /></div>} />
             )}
           </div>
-          {client !== 'stash' && <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-2.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
+          {client === 'mihomo' && <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-2.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
             <div className="flex items-center justify-between"><h2 className="m-0 text-[14px] font-semibold">原样片段</h2></div>
             <label htmlFor="raw-snippet" className="text-[12.5px] text-ink-muted">{client === 'mihomo' ? 'YAML' : 'INI'}</label>
             <YamlTextarea id="raw-snippet" rows={10} className="bg-[#fafbfc] font-mono text-[12.5px] leading-relaxed" spellCheck={false}
-              disabled={client === 'surge'} placeholder={client === 'mihomo' ? '填写要合并到基础配置的 YAML 字段，如 hosts 域名映射' : '暂未开放'}
+              placeholder={client === 'mihomo' ? '填写要合并到基础配置的 YAML 字段，如 hosts 域名映射' : '暂未开放'}
               value={client === 'mihomo' ? draft.base?.raw ?? '' : ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, raw: e.target.value || undefined } })} />
             <span className="text-[12px] leading-normal text-ink-muted">原样片段暂不输出。</span>
           </section>}

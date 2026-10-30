@@ -12,9 +12,8 @@ import { Button, Card, Empty, ErrorAlert, PageHeader, PageScroll, Segmented, cx 
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { DualEditor, type EditorMode } from '../components/DualEditor.tsx';
 import { SchemaForm } from '../components/SchemaForm.tsx';
-import { baseFormFromYaml, baseFromYaml, baseToYaml } from '../convert/baseYaml.ts';
-import { baseFromForm, baseToForm, mihomoBaseGroups } from '../schemas/mihomoBase.ts';
-import { stashBaseGroups } from '../schemas/stashBase.ts';
+import { baseEditorFor } from '../convert/baseClient.ts';
+import { baseFromForm, baseToForm } from '../schemas/mihomoBase.ts';
 import { useList, useSaveDoc, type PresetDoc } from '../hooks.ts';
 
 const INTRO = '保存后同步更新引用此预设的配置订阅。';
@@ -57,6 +56,7 @@ export function PresetEdit() {
   if (e.isNew) return <Navigate to="/presets" replace />;
   if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const d = e.draft;
+  const editor = baseEditorFor(client);
   const refs = (profiles.data ?? []).filter((p) => p.base?.presetId === d.id);
   const publish = () => { if (rawValid) e.submit((x) => ({ ...x, version: x.version + 1 })); };
   const discard = () => {
@@ -88,11 +88,10 @@ export function PresetEdit() {
                 <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
               </div>
             </div>
-            {client === 'surge' && <Empty title="Surge 预设暂未开放" />}
-            {client !== 'surge' && <DualEditor key={`${d.id}-${client}-${editorRevision}`} value={client === 'stash' ? d.stash ?? {} : d.mihomo} onChange={(value) => e.setDraft({ ...d, [client]: value })} mode={mode} onModeChange={setMode}
-              toRaw={baseToYaml} fromRaw={baseFromYaml} recoverForm={(text) => baseFormFromYaml(text, client === 'stash' ? stashBaseGroups : mihomoBaseGroups)} onValidityChange={setRawValid} rawLabel={`${client === 'stash' ? 'Stash' : 'mihomo'} · YAML`}
-              renderForm={() => <SchemaForm groups={client === 'stash' ? stashBaseGroups : mihomoBaseGroups} value={baseToForm(client === 'stash' ? d.stash ?? {} : d.mihomo)} extra collapsible
-                onChange={(value) => e.setDraft({ ...d, [client]: baseFromForm(value, client === 'stash' ? d.stash ?? {} : d.mihomo) })} />} />}
+            {<DualEditor key={`${d.id}-${client}-${editorRevision}`} value={d[client] ?? {}} onChange={(value) => e.setDraft({ ...d, [client]: value })} mode={mode} onModeChange={setMode}
+              toRaw={editor.toRaw} fromRaw={editor.fromRaw} recoverForm={(text) => editor.recoverForm(text, d[client] ?? {})} onValidityChange={setRawValid} rawLabel={`${client} · ${editor.format}`}
+              renderForm={() => <SchemaForm groups={editor.groups} value={baseToForm(d[client] ?? {})} extra collapsible
+                onChange={(value) => e.setDraft({ ...d, [client]: baseFromForm(value, d[client] ?? {}) })} />} />}
           </section>
 
           <Card title={`引用方${profiles.data ? ` · ${refs.length}` : ''}`} className="min-w-0 flex-[1_1_260px]" bodyClass="px-4 pb-3">

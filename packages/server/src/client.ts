@@ -19,6 +19,8 @@ function platformFromUa(ua: string): Platform | undefined {
   return undefined;
 }
 
+export class InvalidClientTarget extends Error {}
+
 export function detectClient(ua: string, query: { target?: string | undefined; platform?: string | undefined }): DetectedClient {
   const qp = query.platform?.toLowerCase();
   const paramPlatform = PLATFORMS.find((p) => p === qp);
@@ -28,6 +30,7 @@ export function detectClient(ua: string, query: { target?: string | undefined; p
     const platform = paramPlatform ?? platformFromUa(ua);
     return platform ? { client, platform, by: 'param' } : { client, by: 'param' };
   }
+  if (t !== undefined) throw new InvalidClientTarget('不支持的目标客户端：' + t);
   if (/stash/i.test(ua)) return { client: 'stash', platform: paramPlatform ?? platformFromUa(ua) ?? 'ios', by: 'ua' };
   if (/surge/i.test(ua)) {
     const platform = paramPlatform ?? (/iOS|iPhone|iPad/i.test(ua) ? 'ios' : 'macos');

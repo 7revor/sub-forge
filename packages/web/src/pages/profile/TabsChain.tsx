@@ -9,7 +9,7 @@ import { CodePreview } from '../../components/CodePreview.tsx';
 // 代理链直接展示业务检查结果，引用生成细节仅在配置预览中按需展开。
 
 import { useMutation } from '@tanstack/react-query';
-import type { ChainRule, Platform, YamlClient } from '@sub-forge/core';
+import type { ChainRule, Platform, Client } from '@sub-forge/core';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
@@ -20,7 +20,7 @@ import { useProfile } from './context.ts';
 
 function usePreview() {
   const { draft } = useProfile();
-  return useMutation({ mutationFn: ({ platform, client = 'mihomo', profile = draft }: { platform?: Platform; client?: YamlClient; profile?: ProfileDoc } = {}) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: persistedProfile(profile), client, ...(platform ? { platform } : {}) }) });
+  return useMutation({ mutationFn: ({ platform, client = 'mihomo', profile = draft }: { platform?: Platform; client?: Client; profile?: ProfileDoc } = {}) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: persistedProfile(profile), client, ...(platform ? { platform } : {}) }) });
 }
 
 export function TabChains() {
@@ -70,8 +70,8 @@ export function TabPreview() {
   const { draft } = useProfile();
   const preview = usePreview();
   const [platform, setPlatform] = useState<Platform | 'any'>('any');
-  const [client, setClient] = useState<YamlClient>('mihomo');
-  const platforms = client === 'stash' ? [{ value: 'ios', label: 'iOS' }, { value: 'macos', label: 'macOS' }] : PLATFORMS;
+  const [client, setClient] = useState<Client>('mihomo');
+  const platforms = client !== 'mihomo' ? [{ value: 'ios', label: 'iOS' }, { value: 'macos', label: 'macOS' }] : PLATFORMS;
   const target = { client, profile: persistedProfile(draft), ...(platform === 'any' ? {} : { platform }) };
   const current = preview.data && !preview.isPending && !preview.error && JSON.stringify(preview.variables) === JSON.stringify(target);
   const report = preview.data?.report ?? [];
@@ -79,11 +79,11 @@ export function TabPreview() {
   // 打开标签或切换平台时自动渲染当前草稿
   useEffect(() => { preview.mutate(target); }, [client, platform]); // eslint-disable-line react-hooks/exhaustive-deps
   const exportFile = () => {
-    const yaml = client === 'stash' ? preview.data?.exportYaml : preview.data?.yaml;
+    const yaml = preview.data?.exportYaml ?? preview.data?.yaml;
     if (!yaml || !current) return;
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([yaml], { type: 'text/yaml' }));
-    a.download = `${draft.name || 'config'}.yaml`;
+    a.href = URL.createObjectURL(new Blob([yaml], { type: preview.data?.format === 'ini' ? 'text/plain' : 'text/yaml' }));
+    a.download = `${draft.name || 'config'}.${preview.data?.format === 'ini' ? 'conf' : 'yaml'}`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -91,7 +91,7 @@ export function TabPreview() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge', disabled: true, title: 'Surge 暂未开放' }]} onChange={(value) => { if (value === 'surge') return; preview.reset(); setClient(value); setPlatform(value === 'stash' ? 'ios' : 'any'); }} />
+        <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }]} onChange={(value) => { preview.reset(); setClient(value); setPlatform(value !== 'mihomo' ? 'ios' : 'any'); }} />
         <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">平台
           <Select placeholder="选择客户端运行的系统平台" className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{platforms.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
         <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
@@ -103,7 +103,7 @@ export function TabPreview() {
       {client === 'stash' && <p className="text-[12.5px] text-ink-muted">Stash 节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
       {current && (
         <div className="flex flex-wrap items-start gap-5">
-          <CodePreview label="最终配置" className="flex-[999_1_560px] rounded-[10px]" title={`config.yaml · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="max-h-[720px] p-4 text-[12.5px] leading-[1.75]" />
+          <CodePreview label="最终配置" className="flex-[999_1_560px] rounded-[10px]" title={`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="max-h-[720px] p-4 text-[12.5px] leading-[1.75]" />
           <section aria-label="渲染报告" className="flex min-w-0 flex-[1_1_340px] flex-col gap-3">
             <div className="grid grid-cols-3 gap-2">
               {[['错误', count('error'), 'text-err'], ['告警', count('warn'), 'text-warn'], ['提示', count('info'), 'text-accent-ink']].map(([t, n, c]) => (

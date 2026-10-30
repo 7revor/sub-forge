@@ -1,4 +1,4 @@
-import { localRulesError } from '@sub-forge/core';
+import { stringifyIniBase, localRulesError } from '@sub-forge/core';
 import { normalizeRulePresence } from '../rule-presence.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
@@ -276,6 +276,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (!isObj(doc.mihomo)) throw bad('mihomo 段必须是对象');
       if (doc.stash !== undefined && !isObj(doc.stash)) throw bad('stash 段必须是对象');
       if (doc.surge !== undefined) {
+        try { stringifyIniBase(doc.surge as Record<string, unknown>); } catch (error) { throw bad(error instanceof Error ? error.message : 'Surge 基础设置不合法'); }
         if (!isObj(doc.surge)) throw bad('surge 段必须是对象');
         if (doc.surge.general !== undefined && !isObj(doc.surge.general)) throw bad('surge.general 必须是对象');
         if (doc.surge.host !== undefined && (!isObj(doc.surge.host) || !Object.values(doc.surge.host).every((v) => typeof v === 'string'))) throw bad('surge.host 必须是值为字符串的对象');
@@ -297,6 +298,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (f !== 'latest' && !(isObj(f) && typeof f.pinned === 'number' && store.getTemplate(doc.template.id, f.pinned))) throw bad('模板版本不存在');
       }
       if (doc.base !== undefined && (!isObj(doc.base) || doc.base.stashPatch !== undefined && !isObj(doc.base.stashPatch))) throw bad('基础设置及 stashPatch 必须是对象');
+      if (isObj(doc.base) && doc.base.surgePatch !== undefined) {
+        if (!isObj(doc.base.surgePatch)) throw bad('surgePatch 必须是对象');
+        try { stringifyIniBase(doc.base.surgePatch); } catch (error) { throw bad(error instanceof Error ? error.message : 'Surge 基础设置不合法'); }
+      }
       if (doc.base !== undefined && isObj(doc.base) && doc.base.presetId !== undefined && !store.get('preset', String(doc.base.presetId))) throw bad('基础设置预设不存在');
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];

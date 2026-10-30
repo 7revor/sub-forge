@@ -36,3 +36,6 @@ export * from './rules/diagnostics.ts';
 export { exportStashConfig } from './render/stash-config.ts';
 
 export * from './rules/local.ts';
+
+export * from './render/ini-format.ts';
+export * from './render/surge-config.ts';

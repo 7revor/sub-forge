@@ -130,11 +130,11 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService, r
     const token = c.req.query('token');
     if (token) {
       const active = store.getActiveToken(token);
-      if (!active || (client !== 'mihomo' && client !== 'stash')) throw notFound();
+      if (!active || (client !== 'mihomo' && client !== 'stash' && client !== 'surge')) throw notFound();
       const key = c.req.query('key');
       const version = c.req.query('v');
       if (!key || !version) throw bad('订阅转换链接缺少资源键或版本');
-      const target = { client: client as 'mihomo' | 'stash', ...(platform ? { platform: platform as Platform } : {}) };
+      const target = { client: client as 'mihomo' | 'stash' | 'surge', ...(platform ? { platform: platform as Platform } : {}) };
       const retained = renderer.getVersion(active.profileId, target, version);
       // 在发起任何刷新之前检查 URL 与版本归属，防止把订阅链接用成任意地址代理。
       if (!retained || retained.remoteRuleUrls?.[key] !== url) throw notFound();
