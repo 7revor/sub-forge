@@ -58,3 +58,11 @@
 ## 清理
 
 验收结束关闭本轮两个浏览器标签，停止 API 与 Vite 临时服务，确认18951/18952无监听。工作树与提交保留，等待用户决定合并。
+
+## 合并前复验（2026-10-30）
+
+用户明确授权合并到主分支并清理本次 worktree。主分支已前进至 e973ce2，功能提交90fe80f重放为9de21af；唯一冲突是TabsChain导入声明，保留主分支Client类型与功能分支ChainResolution、Link2。range-diff确认业务改动完整保留。
+
+在整合后的提交上重新执行：core 673 passed/40 skipped，server 479 passed/5 skipped，web 360 passed/2 skipped，共1512 passed/47 skipped；全仓类型检查、web构建、diff-check通过。记录见merge-tests.log、merge-types.log、merge-build.log。构建仍有既有包体积提示。浏览器记录为功能提交90fe80f的验收结果，本次仅导入声明整合，未重复浏览器场景。
+
+按快进方式合入本地主分支后，仅清理profile-source-cards工作树及对应分支；验证材料随提交保留于主分支。不推送远端。
