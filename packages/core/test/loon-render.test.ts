@@ -64,7 +64,8 @@ describe('Loon 完整订阅', () => {
       urls[1] + ',policy=代理,tag=__loon_local_1,enabled=true',
     ]);
     expect(out.yaml).not.toMatch(/RULE-SET|DOMAIN,|IP-CIDR,|USER-AGENT,|extended-matching/);
-    expect(out.report.items).toContainEqual(expect.objectContaining({ code: 'rule.client', message: expect.stringContaining('extended-matching') }));
+    expect(files[0]!.text).toContain('# [loon 不支持 extended-matching，不能改变匹配语义]');
+    expect(out.report.byCode('rule.client')).toEqual([]);
   });
   it('交错本地块、规则集和重复引用保留顺序与出口，停用和不适配规则不生成资源', () => {
     const f = fixture();

@@ -486,14 +486,14 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       if (src.kind === 'remote' && !document.binary && !document.parsed) {
         report.error('ruleset.invalid-content', `${label}的远程快照没有可用规则，请重新拉取`, where);
       }
-      if (document.diagnostics.length) report.info('ruleset.rejected-lines', `${label}有 ${document.diagnostics.length} 行无法解析`, where);
     }
     // 所有需要处理的来源统一为一个 classical LIST，IP 选项保留在对应行内。
     const key = `${base}_classical`;
     const file = `${key}.list`;
     if (!rulesets[file]) {
       const converted = convertRuleDocuments(rs, documents, ctx, { ipOptions: r.options });
-      for (const diagnostic of converted.diagnostics) report.info(`rule.${diagnostic.kind}`, diagnostic.reason, where);
+      // 逐行解析、去重、客户端适配与改写详情由规则集预览和托管正文承载。
+      // 主配置报告只保留资源不可用等发布问题，避免正常处理淹没真正的错误。
       if (m.remote && !converted.stats.output) {
         report.error('ruleset.empty-conversion', '远程规则没有可供目标客户端使用的输出', where);
         continue;

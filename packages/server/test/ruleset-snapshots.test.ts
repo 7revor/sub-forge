@@ -65,7 +65,7 @@ describe('远程规则快照有效性', () => {
     const h = setup('classical', 'DOMAIN,valid.example.test\nUNKNOWN,value');
     const before = await h.renderer.render('p', { client: 'mihomo' });
     expect(before.ok && ruleBodies(h.store, before.render)['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n# [本系统暂未支持解析：不支持的规则类型 UNKNOWN] UNKNOWN,value\n');
-    expect(before.report).toContainEqual(expect.objectContaining({ code: 'ruleset.rejected-lines' }));
+    expect(before.report.some(item => ['ruleset.rejected-lines', 'rule.unimplemented'].includes(item.code))).toBe(false);
     expect((await h.refresh('<html>error</html>')).ok).toBe(false);
     expect((await h.refresh('DOMAIN,recovered.example.test')).ok).toBe(true);
     const after = await h.renderer.render('p', { client: 'mihomo' });
