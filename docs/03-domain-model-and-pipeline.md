@@ -507,3 +507,13 @@ SQLite 文件索引、本地授权候选在同一查询中筛选、排序和 LIM
 ### 2026-10-30：规则卡片与操作间距
 
 来源选择仍仅为前端临时状态，新增外部点击取消；仓库来源的地址、关联信息和格式仍保留在数据中，仅隐藏卡片第二行。服务端、领域模型、渲染与示例种子不变。
+
+## 2026-10-30：本地多条规则卡片
+
+`Matcher` 新增 `{ kind: 'local', content: string, client?: Client, overrides?: ClientOverride[] }`；`content` 保留原文、空行和注释。旧 `{ kind: 'rule', rule: RuleIR }` 仍可读取及原样保存，编辑内容后转换为 local；旧 RAW 的客户端限制保留。旧 RAW 仍严格限定单行，不将多行塞进 RAW.text。
+
+`localRuleLines` 提取非空、非整行 # 注释的规则，保留原始行号；保存及渲染校验每行 RAW 边界，至少含一条规则。`expandLocalRules` 按原顺序展开，继承卡片 client，同一条 RuleEntry 的 target/options 应用于全部行。第一条匹配的客户端覆盖对整组替换、丢弃或末尾追加一次；不重复应用到每行。Mihomo/Stash 及绑定订阅前置规则复用这一管线。数据库存储沿用文档 JSON，无 schema 迁移。
+
+模板 YAML 转换把 local 展开为标准 rules 行；编辑器元数据 `x-sub-forge-local-rules` 保存分组、原文、ID 与覆盖。导入仅在元数据与实际连续正文、出口完全一致时重组；正文被编辑或元数据失配时以实际 YAML 为准，降为独立规则并提示。该元数据不进入客户端下发配置，外部普通 YAML 继续按行导入。
+
+URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应用 YAML 导入及列表手动检测显式调用；去重后每批最多 1000 个 URL。检测标记属于页面临时状态，与规则内容读取缓存分离。关联时复核单文件索引；增强来源换仓库文件生成新来源 ID，避免绕过已保存来源的身份约束，数组位置保持。来源预览与固定合并结果是两个独立状态。

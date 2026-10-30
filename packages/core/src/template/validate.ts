@@ -1,3 +1,4 @@
+import { localRulesError } from '../rules/local.ts';
 // 模板自身校验（TPL-07 ① / TPL-11）。不通过则禁止发布；编辑器保存草稿时即时运行。
 
 import { Report } from '../report.ts';
@@ -66,8 +67,9 @@ export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rules
     if (ruleIds.has(r.id)) report.error('template.duplicate-id', `规则 ID ${r.id} 重复`, where);
     ruleIds.add(r.id);
     checkTarget(r.target, where);
-    if (r.matcher.kind === 'rule') {
-      checkRule(r.matcher.rule, where);
+    if (r.matcher.kind === 'rule' || r.matcher.kind === 'local') {
+      if (r.matcher.kind === 'rule') checkRule(r.matcher.rule, where);
+      else { const error = localRulesError(r.matcher); if (error) report.error('template.invalid-local-rule', error, where); }
       r.matcher.overrides?.forEach(({ action }) => {
         if ('replace' in action) action.replace.forEach(rule => checkRule(rule, where));
         else if ('append' in action) action.append.forEach(rule => checkRule(rule, where));

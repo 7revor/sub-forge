@@ -160,6 +160,7 @@ export type RuleSet = {
 
 export type Matcher =
   | { kind: 'rule'; rule: RuleIR; overrides?: ClientOverride[] }
+  | { kind: 'local'; content: string; client?: Client; overrides?: ClientOverride[] }
   | { kind: 'ruleset'; id: ID; repository?: RepositoryRuleSetReference; remote?: { url: string } };
 
 /** 仓库规则直接引用：保存所选文件映射，内容仍按快照策略刷新，不创建本地规则集。 */

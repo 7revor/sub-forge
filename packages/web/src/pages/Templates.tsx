@@ -47,7 +47,7 @@ export function TemplateList() {
               return <DocTableRow key={t.id} to={path}>
                 <td className={td}><Link to={path} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
                 <td className={td}>{t.groups.length} 个</td>
-                <td className={td}>{t.rules.length} 条</td>
+                <td className={td}>{t.rules.length} 项</td>
                 <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{n ? `${n} 个配置订阅在用` : '未使用'}</td>
                 <td className={cx(td, 'whitespace-nowrap text-right')}><div className="flex justify-end gap-2">
                   <DocActionLink to={path} name={t.name ?? t.id} viewOnly />
@@ -169,6 +169,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   useEffect(() => { save.reset(); if (dirty) setSavedWarnings([]); }, [draft]); // 草稿变化后清除上一次保存结果。
   const failure = save.error instanceof ApiError && save.error.details && typeof save.error.details === 'object' ? save.error.details as { report?: ReportItem[]; impact?: ImpactEntry[] } : undefined;
   const canSave = !!draft.name.trim() && !errors.length && !currentValidation?.error && yaml === undefined && !save.isPending;
+  const [importedUrls, setImportedUrls] = useState<string[]>();
   const yamlResult = useMemo(() => yaml !== undefined ? templateFromYaml(yaml, body, ctx) : undefined, [yaml, body, rulesets.data]);
   const openYaml = () => { setYaml(''); setDiscardYaml(false); };
   const closeYaml = () => { if (yamlDirty) setDiscardYaml(true); else setYaml(undefined); };
@@ -196,7 +197,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-panel px-4.5 py-4">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-center gap-2"><Pencil size={14} className="shrink-0 text-ink-muted" aria-hidden /><input aria-label="模板名称" placeholder="填写模板名称" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} className="h-9 w-full max-w-[400px] rounded border border-transparent bg-panel px-1 text-[17px] font-semibold hover:border-line focus:border-brand" /></div>
-            <span className="text-[12.5px] text-ink-muted">{body.groups.length} 个策略组 · {body.rules.length} 条规则{!isNew && ` · ${inUse} 个绑定订阅`}</span>
+            <span className="text-[12.5px] text-ink-muted">{body.groups.length} 个策略组 · {body.rules.length} 项规则{!isNew && ` · ${inUse} 个绑定订阅`}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={openYaml}>从 YAML 导入</Button>
@@ -204,7 +205,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
           </div>
         </section>
         <TemplateGroupsEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : group} onSelect={setGroup} report={report} />
-        <TemplateRulesEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : rule} onSelect={setRule} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
+        <TemplateRulesEditor importedUrls={importedUrls} value={body} onChange={updateBody} selected={showingLeave ? undefined : rule} onSelect={setRule} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
     </PageScroll>
     <Dialog open={yaml !== undefined && !showingLeave} onOpenChange={next => { if (!next) (closeYaml)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"从 YAML 导入"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
@@ -213,7 +214,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       {yamlResult?.ok && yamlResult.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-ink-muted">{yamlResult.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
     </div><DialogFooter>{discardYaml ? <>
       <span className="mr-auto self-center text-[12px] text-ink-muted">放弃这次 YAML 导入？</span><Button onClick={() => setDiscardYaml(false)}>继续导入</Button><Button variant="danger" onClick={() => { setYaml(undefined); setDiscardYaml(false); }}>放弃导入</Button>
-    </> : <><Button onClick={closeYaml}>取消</Button><Button variant="primary" disabled={!yamlResult?.ok} onClick={() => { if (yamlResult?.ok) { updateBody(yamlResult.value); setYaml(undefined); } }}>应用到模板</Button></>}</DialogFooter></DialogContent></Dialog>
+    </> : <><Button onClick={closeYaml}>取消</Button><Button variant="primary" disabled={!yamlResult?.ok} onClick={() => { if (yamlResult?.ok) { updateBody(yamlResult.value); setImportedUrls([...yamlResult.value.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []), ...(yamlResult.value.ruleProviders ?? []).map(p => p.url)]); setYaml(undefined); } }}>应用到模板</Button></>}</DialogFooter></DialogContent></Dialog>
     <LeaveDialog blocker={blocker} what="模板" canSave={canSave} pending={save.isPending} error={save.error}
       onSave={done => save.mutate(draft, { onSuccess: done })} onDiscard={() => { setDraft(base); setYaml(undefined); setGroup(undefined); setRule(undefined); setPendingRules(new Set()); }} />
   </>;

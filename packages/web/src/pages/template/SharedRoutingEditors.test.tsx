@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -12,7 +13,7 @@ const value: TemplateBody = {
 };
 const common = { value, onChange: () => {}, selected: undefined, onSelect: () => {}, report: [] };
 function rules(props: Partial<Parameters<typeof TemplateRulesEditor>[0]> = {}) {
-  return renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><TemplateRulesEditor {...common} ctx={{ rulesets: [] }} onRuleValidationReady={() => {}} {...props} /></QueryClientProvider>);
+  return renderToStaticMarkup(<MemoryRouter><QueryClientProvider client={new QueryClient()}><TemplateRulesEditor {...common} ctx={{ rulesets: [] }} onRuleValidationReady={() => {}} {...props} /></QueryClientProvider></MemoryRouter>);
 }
 
 describe('模板与订阅共享编辑器的权限边界', () => {
@@ -34,22 +35,22 @@ describe('模板与订阅共享编辑器的权限边界', () => {
   });
   it('绑定规则仍可查看内容，但不能编辑、删除、排序或修改 MATCH', () => {
     const html = rules({ readOnly: true });
-    expect(html).toContain('预览第 1 条规则');
+    expect(html).toContain('预览第 1 项规则');
     expect(html).toContain('DOMAIN,example.test');
     expect(html).toContain('MATCH');
-    for (const label of ['添加静态规则', '设置第 1 条规则', '删除第 1 条规则', '编辑 MATCH', 'aria-label="拖动']) expect(html).not.toContain(label);
+    for (const label of ['添加本地规则', '编辑第 1 项规则', '删除第 1 项规则', '编辑 MATCH', 'aria-label="拖动']) expect(html).not.toContain(label);
   });
-  it('前置规则只开放静态规则，不能改变模板 MATCH', () => {
+  it('前置规则只开放本地规则，不能改变模板 MATCH', () => {
     const html = rules({ hideFinal: true, staticOnly: true });
-    expect(html).toContain('添加静态规则');
-    expect(html).toContain('设置第 1 条规则');
+    expect(html).toContain('添加本地规则');
+    expect(html).toContain('编辑第 1 项规则');
     expect(html).not.toContain('引用规则');
     expect(html).not.toContain('引用远程链接');
     expect(html).not.toContain('MATCH');
   });
   it('规则出口与 MATCH 直接提供下拉选择，编辑弹窗不承担出口设置', () => {
     const html = rules();
-    expect(html).toContain('aria-label="第 1 条规则出口"');
+    expect(html).toContain('aria-label="第 1 项规则出口"');
     expect(html).toContain('aria-label="MATCH 出口"');
     expect(html).not.toContain('编辑 MATCH');
     const locked = rules({ readOnly: true });

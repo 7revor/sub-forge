@@ -100,3 +100,7 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 ## 服务端统一资源缓存接入（2026-10-30）
 
 `RenderInput.managedResources` 启用统一托管；`resourceIntervalSec` 指定 provider 间隔，服务端总是传入系统值。文本统一 classical LIST，符合限制的 MRS 原字节托管，SRS 报错。内核独立调用保留旧默认参数兼容性；生产策略由服务端确定。
+
+### 2026-10-30：本地规则分组
+
+Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整行注释后依序展开 RAW，所有行共用 RuleEntry 出口。客户端覆盖对整组执行一次；旧 rule 与单行 RAW 保持兼容。绑定前置规则支持 local；Mihomo/Stash 共用实现。见 `src/rules/local.ts` 与 `test/local-rules.test.ts`。

@@ -242,3 +242,9 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
 
 2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。
+
+### 2026-10-30：三处共用规则编辑
+
+RuleCard、RuleEditShell、LocalRulesInput 统一规则增强、模板和订阅；点击正文预览、铅笔弹窗编辑，移除复制地址。增强下方始终显示合并结果。本地多条共用出口，弹窗取消不改草稿，空内容不能应用；绑定继承规则只读。
+
+useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；只响应新增远程项、应用 YAML 导入和列表手动检测。标记离开页面清空，旧请求不能恢复；关联仍由用户明确点击，并重新校验当前索引。保存状态比较使用稳定键顺序，避免接口回写字段顺序变化导致虚假未保存提示。截图和全部验证见 `research/verification/unified-rule-cards-20261030/README.md`。
