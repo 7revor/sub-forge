@@ -1,3 +1,4 @@
+import { AccessLogCard } from '../components/AccessLogCard.tsx';
 import { boundTemplateId, modeLabel } from './profile/routing.ts';
 import { formatRelativeTime } from '../utils/format.ts';
 import { accessLogOptions, snapshotOptions } from '../hooks/documentQueries.ts';
@@ -149,6 +150,7 @@ export function Overview() {
             )}
           </div>
         </Card>
+        <AccessLogCard />
       </PageScroll>
     </>
   );
