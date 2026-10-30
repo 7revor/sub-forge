@@ -88,7 +88,9 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
   app.post('/rulesets/preview', async c => {
     const body = await jsonBody<{ id?: unknown; ruleset?: RuleSetDoc; source?: string; client?: string; platform?: string }>(c);
     const saved = own(body.id, c.get('user').id);
-    if (body.client === 'stash' && body.platform && body.platform !== 'ios' && body.platform !== 'macos') throw bad('Stash 平台仅支持 ios 或 macos');
+    if (body.client !== undefined && body.client !== 'mihomo' && body.platform && body.platform !== 'ios' && body.platform !== 'macos') throw bad('该客户端平台仅支持 ios 或 macos');
+    if (body.client !== undefined && !['mihomo', 'surge', 'stash', 'loon'].includes(body.client)) throw bad('客户端不合法');
+    if (body.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(body.platform)) throw bad('平台不合法');
     if (!body.ruleset || !Array.isArray(body.ruleset.sources)) throw bad('ruleset.sources 必须是数组');
     checkRuleSetOverrides(body.ruleset.overrides);
     const sources = body.ruleset.sources.map(source);
@@ -100,7 +102,7 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
     if (body.source !== undefined && !sources.some(s => s.id === body.source)) throw bad('来源不存在');
     const result = converter.convert(sources.map((src, i) => ({ source: src, content: loaded[i]!.content })),
       { overrides: body.ruleset.overrides },
-      { client: body.client === 'surge' || body.client === 'stash' ? body.client : 'mihomo', platform: body.platform } as ClientCtx, body.source);
+      { client: body.client === 'surge' || body.client === 'stash' || body.client === 'loon' ? body.client : 'mihomo', platform: body.platform } as ClientCtx, body.source);
     const stats = result.stats;
     return c.json({ ...result, sources: loaded.map(x => x.status), total: result.lines.length,
       stats: body.source ? undefined : { domain: stats.domain, classical: stats.classical, ipcidr: stats.ipcidr, total: stats.output + stats.duplicates + stats.unsupported, duplicates: stats.duplicates },
@@ -117,9 +119,9 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
     const url = matcher.remote!.url;
     const client = c.req.query('target') ?? 'mihomo';
     const platform = c.req.query('platform');
-    if (!['mihomo', 'surge', 'stash'].includes(client) || (platform && !['android', 'macos', 'windows', 'ios', 'linux'].includes(platform))) throw bad('客户端或平台不合法');
+    if (!['mihomo', 'surge', 'stash', 'loon'].includes(client) || (platform && !['android', 'macos', 'windows', 'ios', 'linux'].includes(platform))) throw bad('客户端或平台不合法');
     if (c.req.query('format') && c.req.query('format') !== 'list') throw bad('URL 转换仅输出 list');
-    if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') throw bad('Stash 平台仅支持 ios 或 macos');
+    if (client !== 'mihomo' && platform && platform !== 'ios' && platform !== 'macos') throw bad('该客户端平台仅支持 ios 或 macos');
     c.header('cache-control', 'no-store');
     c.header('x-content-type-options', 'nosniff');
     const send = (body: string) => {
@@ -138,8 +140,8 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
   app.post('/rules/convert', async c => {
     const body = await jsonBody<{ inputs?: unknown; overrides?: RuleSetDoc['overrides']; noResolve?: boolean; client?: string; platform?: string; sourceId?: string }>(c);
     if (!Array.isArray(body.inputs) || body.inputs.length > 256) throw bad('inputs 必须是数组且不超过 256 个来源');
-    if (!['mihomo', 'surge', 'stash'].includes(body.client ?? '') || (body.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(body.platform))) throw bad('客户端或平台不合法');
-    if (body.client === 'stash' && body.platform && body.platform !== 'ios' && body.platform !== 'macos') throw bad('Stash 平台仅支持 ios 或 macos');
+    if (!['mihomo', 'surge', 'stash', 'loon'].includes(body.client ?? '') || (body.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(body.platform))) throw bad('客户端或平台不合法');
+    if (body.client !== undefined && body.client !== 'mihomo' && body.platform && body.platform !== 'ios' && body.platform !== 'macos') throw bad('该客户端平台仅支持 ios 或 macos');
     if (body.noResolve !== undefined && typeof body.noResolve !== 'boolean') throw bad('noResolve 必须是布尔值');
     checkRuleSetOverrides(body.overrides);
     const ids = new Set<string>();

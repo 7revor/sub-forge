@@ -14,7 +14,7 @@ export function localRuleLines(content: string): { line: number; text: string }[
 
 export function localRulesError(value: { content?: unknown; client?: unknown }): string | undefined {
   if (typeof value.content !== 'string') return '本地规则内容必须是文本';
-  if (value.client !== undefined && !['mihomo', 'surge', 'stash'].includes(String(value.client))) return '本地规则客户端不合法';
+  if (value.client !== undefined && !['mihomo', 'surge', 'stash', 'loon'].includes(String(value.client))) return '本地规则客户端不合法';
   const lines = localRuleLines(value.content);
   if (!lines.length) return '请填写至少一条本地规则';
   for (const { line, text } of lines) {

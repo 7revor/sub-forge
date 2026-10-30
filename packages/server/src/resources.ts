@@ -129,7 +129,7 @@ export class ResourceService {
         const failures:string[]=[];
         for (const target of new Set(['mihomo:any',...targets.map(t=>t.target)])) {
           const [client,platform] = target.split(':');
-          if(client !== 'mihomo' && client !== 'stash') continue;
+          if(client !== 'mihomo' && client !== 'stash' && client !== 'surge' && client !== 'loon') continue;
           const result = await this.renderer.render(id,{client,...(platform !== 'any' ? {platform:platform as 'ios'} : {})});
           if(!result.ok || result.source==='last-good') failures.push(!result.ok ? result.message : result.report.filter(r=>r.level==='error').map(r=>r.message).join('；') || '生成失败，使用上次成功配置');
         }

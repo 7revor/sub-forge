@@ -131,3 +131,20 @@ it('旧组合的处理链预览和复制链接不能读取外用户成员', asyn
   expect(preview.status).toBe(404); expect((await h.api('/resource-links/collections/c')).status).toBe(404);
   expect(h.fetcher).not.toHaveBeenCalled();
 });
+
+
+it.each(['Surge iOS/3412', 'Loon/3.5.3'])('%s 独立节点与公共规则延续客户端输出并保留流量', async ua => {
+  const h = setup(), headers = { 'user-agent': ua };
+  const node = await h.app.request(`/nodes/${h.token}/source/a`, { headers });
+  expect(node.status, await node.clone().text()).toBe(200);
+  expect(await node.text()).toContain('a = socks5');
+  expect(node.headers.get('subscription-userinfo')).toContain('download=10');
+  const head = await h.app.request(`/nodes/${h.token}/source/a`, { headers, method: 'HEAD' });
+  expect(head.headers.get('subscription-userinfo')).toBe(node.headers.get('subscription-userinfo'));
+  expect(await head.text()).toBe('');
+  expect(await (await h.app.request(`/rules/${h.token}/r`, { headers })).text()).toContain('DOMAIN,example.test');
+  for (const path of [`/nodes/${h.token}/source/a`, `/rules/${h.token}/r`]) {
+    expect((await h.app.request(path + '?target=unknown')).status).toBe(400);
+    expect((await h.app.request(path + '?target=loon&platform=linux')).status).toBe(400);
+  }
+});

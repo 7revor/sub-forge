@@ -30,11 +30,14 @@ export function profileConversionRoutes(store: Store) {
     const mapping = body.mapping;
     if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) throw bad('请指定策略组成员映射');
     const map = mapping as Record<string, unknown>;
+    const extraGroups = profile.routing?.mode === 'bound' ? profile.routing.extraGroups ?? [] : [];
+    const privateIds = new Set(extraGroups.map(group => group.id));
     const ids = new Set(template.groups.map(g => g.id));
     const effective = resolveProfileRouting(profile, currentTemplate, new Report());
     const additions: Record<string, GroupMember[]> = Object.create(null);
     const changes: string[] = [];
     const destination = (old: string): string | null => {
+      if (privateIds.has(old)) return old;
       const mapped = map[old];
       if (mapped === null) return null;
       if (!isStr(mapped) || !ids.has(mapped)) throw bad(`请为策略组 ${old} 选择目标或明确选择不迁移`);
@@ -59,7 +62,7 @@ export function profileConversionRoutes(store: Store) {
       changes.push(`「${group.name}」的 ${members.length} 个成员迁移到「${template.groups.find(g => g.id === target)!.name}」`);
     }
     const { template: _old, ...rest } = profile;
-    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
+    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, extraGroups: extraGroups.map(group => ({ ...group, members: group.members.map(member => member.kind === 'group' || member.kind === 'node' ? remapTarget(member) : member) })), ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
       chains: profile.chains.map(chain => ({ ...chain, via: chain.via.kind === 'node' ? { ...chain.via, ref: { ...chain.via.ref, ...(chain.via.ref.fallback && chain.via.ref.fallback !== 'error' ? { fallback: remapTarget(chain.via.ref.fallback) } : {}) } } : remapTarget(chain.via) })),
     };
     if (profile.routing?.mode === 'bound' && profile.routing.prependRules?.length) changes.push(`保留 ${profile.routing.prependRules.length} 条前置规则，并按策略组映射更新出口`);

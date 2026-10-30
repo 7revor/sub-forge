@@ -15,9 +15,13 @@ import { Report, type ReportItem } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
 import { isYamlRuleUrl, type Behavior } from '../rules/parse.ts';
 import { type EffectiveGroup } from '../template/merge.ts';
-import type { GroupMember, Matcher, RuleEntry, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template, YamlClient } from '../types.ts';
+import type { GroupMember, Matcher, RuleEntry, NodeRef, NodeSetID, Platform, Profile, ProxyIR, RefStrategy, RuleIR, Target, Template, Client } from '../types.ts';
 import { shortHash } from '../util/hash.ts';
 import { compileUserRegex, exactNameRegex } from '../util/regex.ts';
+import { stringifySurge, surgeBenchmarks } from './surge-config.ts';
+import { isIniClient } from '../types.ts';
+import { stringifyLoon, loonBenchmarks } from './loon-config.ts';
+import { stringifyIniBase, iniName } from './ini-format.ts';
 import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
@@ -86,8 +90,8 @@ const FETCH_VIA = 'DIRECT';
 
 const safeId = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, '_');
 
-const stashOriginalName = Symbol('stashOriginalName');
-type RenderNode = ProxyIR & { [stashOriginalName]?: string };
+const inlineOriginalName = Symbol('inlineOriginalName');
+type RenderNode = ProxyIR & { [inlineOriginalName]?: string };
 
 type NS = {
   key: string;
@@ -102,11 +106,19 @@ type NS = {
 type MihomoGroup = Record<string, unknown> & { name: string; proxies?: string[]; use?: string[] };
 
 export function renderMihomo(input: RenderInput): MihomoRenderResult {
-  return renderYaml(input, 'mihomo');
+  return renderClient(input, 'mihomo');
 }
 
 export function renderStash(input: RenderInput): MihomoRenderResult {
-  return renderYaml(input, 'stash');
+  return renderClient(input, 'stash');
+}
+
+export function renderSurge(input: RenderInput): MihomoRenderResult {
+  return renderClient(input, 'surge');
+}
+
+export function renderLoon(input: RenderInput): MihomoRenderResult {
+  return renderClient(input, 'loon');
 }
 
 function displayName(ref: NodeSetID, inputs: NodeSetInputs): string {
@@ -119,7 +131,7 @@ function filterNodes(nodes: RenderNode[], f: { filter?: string; excludeFilter?: 
   const exc = f.excludeFilter ? compileUserRegex(f.excludeFilter) : undefined;
   const types = excludedAdapterTypes(f.excludeType);
   return nodes.filter((n) => {
-    const name = n[stashOriginalName] ?? n.name;
+    const name = n[inlineOriginalName] ?? n.name;
     return (!inc || inc.test(name)) && (!exc || !exc.test(name)) && !isExcludedAdapter(n.type, types);
   });
 }
@@ -133,14 +145,21 @@ function stripNode(n: ProxyIR): Record<string, unknown> {
   return out;
 }
 
-function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult {
+function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const { profile } = input;
+  const inlineNodes = client !== 'mihomo';
   const report = new Report();
   const ctx: ClientCtx = { client, ...(input.platform ? { platform: input.platform } : {}) };
   if (client === 'stash' && input.platform && input.platform !== 'ios' && input.platform !== 'macos') report.error('stash.platform', 'Stash 输出仅支持 iOS 或 macOS 平台');
   if (client === 'stash' && profile.nodeSets.some(s => s.output === 'provider')) {
     report.info('stash.nodes-inline', 'Stash 节点集按快照内联输出，随主订阅刷新更新，以保留筛选、代理链及空组拒绝语义');
   }
+  if (isIniClient(client)) {
+    if (input.platform && !['ios', 'macos'].includes(input.platform)) report.error(client + '.platform', client + ' 仅支持 iOS 或 macOS');
+    if (profile.nodeSets.some(s => s.output === 'provider')) report.info(client + '.nodes-inline', client + ' 节点按快照内联，随主订阅刷新，以保留筛选和空组拒绝语义');
+    try { stringifyIniBase(input.base ?? {}); } catch (error) { report.error(client + '.base', error instanceof Error ? error.message : '基础配置不合法'); }
+  }
+  if (client === 'loon') report.info('loon.rule-priority', 'Loon 规则集按原位置内嵌；客户端仍按域名、IP 等阶段匹配，请在 Loon 中核对跨类型规则优先级');
   const eff = resolveProfileRouting(profile, input.template, report);
   const resolver = new NodeSetResolver(input.nodeSets, report);
 
@@ -155,7 +174,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     providerNames.add(providerName);
     sets.set(key, {
       key, ref: ps.ref, providerName,
-      output: client === 'stash' ? 'inline' : ps.output,
+      output: inlineNodes ? 'inline' : ps.output,
       requestedOutput: ps.output,
       nodes: resolver.resolve(ps.ref).map((n) => client === 'stash' ? stashProxy(n, report) : ({ ...n })),
     });
@@ -170,7 +189,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
         const orig = n.name;
         let i = 2;
         while (topNames.has(`${orig} ${i}`)) i++;
-        if (client === 'stash') n[stashOriginalName] = orig;
+        if (inlineNodes) n[inlineOriginalName] = orig;
         n.name = `${orig} ${i}`;
         report.warn('inline.name-conflict', `内联节点「${orig}」与其他节点集重名，已改为「${n.name}」`, s.key);
       }
@@ -196,7 +215,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     const regex = 'regex' in match ? compileUserRegex(match.regex) : undefined;
     for (const set of candidates) {
       const node = set.nodes.find(n => {
-        const name = client === 'stash' ? n[stashOriginalName] ?? n.name : n.name;
+        const name = inlineNodes ? n[inlineOriginalName] ?? n.name : n.name;
         return 'exact' in match ? name === match.exact : regex!.test(name);
       });
       if (node) return { set, node };
@@ -218,6 +237,8 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
   };
 
   const resolveTarget = (t: ChainTarget, where: string): string | undefined => {
+    if (client === 'loon' && t.kind === 'builtin' && t.name === 'PASS') report.error('loon.policy', 'Loon 不支持 PASS 策略', where);
+    if (isIniClient(client) && t.kind === 'builtin') { try { iniName(t.name); } catch (error) { report.error('surge.target', String(error), where); } }
     if (t.kind === 'builtin') { resolvedTargetNames.set(where, t.name); return t.name; }
     if (t.kind === 'group') {
       const n = groupName.get(t.groupId);
@@ -246,7 +267,10 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     const use: string[] = [];
     const filterSpec = { filter: g.filter, excludeFilter: g.excludeFilter, excludeType: g.excludeType };
     for (const m of g.members as GroupMember[]) {
-      if (m.kind === 'builtin') proxies.push(m.name);
+      if (m.kind === 'builtin') {
+        if (client === 'loon' && m.name === 'PASS') report.error('loon.policy', 'Loon 不支持 PASS 策略', where);
+        proxies.push(m.name);
+      }
       else if (m.kind === 'group') { const n = resolveTarget({ kind: 'group', groupId: m.groupId }, where); if (n) proxies.push(n); }
       else if (m.kind === 'node') { const n = resolveTarget({ kind: 'node', ref: m.ref }, where); if (n) proxies.push(n); }
       else if (m.kind === 'nodeset') {
@@ -255,7 +279,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
         if (s.output === 'provider') use.push(s.providerName);
         else proxies.push(...filterNodes(s.nodes, filterSpec).map((n) => n.name)); // 内联节点不受 filter 约束，服务端预过滤
       } else {
-        if (client === 'stash') {
+        if (inlineNodes) {
           for (const s of sets.values()) if (m.scope === 'all' || (m.scope === 'providers' ? s.requestedOutput === 'provider' : s.requestedOutput === 'inline')) {
             proxies.push(...filterNodes(s.nodes, filterSpec).map(n => n.name));
           }
@@ -291,6 +315,15 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     if (g.type === 'load-balance' && g.strategy) out.strategy = g.strategy;
     if (g.display?.hidden) out.hidden = true;
     if (g.display?.icon) out.icon = g.display.icon;
+    if (client === 'loon') {
+      for (const key of Object.keys(g.extra ?? {})) report.error('loon.group-option', 'Loon 尚未适配策略组扩展参数 ' + key + '，请使用结构化字段', where);
+      return out;
+    }
+    if (client === 'surge') {
+      const allowed = new Set(['no-alert', 'evaluate-before-use', 'category', 'persistent']);
+      for (const key of Object.keys(g.extra ?? {})) if (!allowed.has(key)) report.error('surge.group-option', 'Surge 尚未适配策略组扩展参数 ' + key, where);
+      return { ...out, ...Object.fromEntries(Object.entries(g.extra ?? {}).filter(([key]) => allowed.has(key))) };
+    }
     // 运行时筛空同样拒绝；放在扩展字段之后，防止历史配置覆盖固定策略。
     return client === 'stash' ? stashGroup(out, g, report) as MihomoGroup : { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
   };
@@ -336,6 +369,10 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
       }
     }
     if (rules.length && set.output === 'provider') report.info('chain.provider-materialized', `「${set.providerName}」的前置已写入本订阅专属 Provider 内容，节点更新后自动重新应用`, set.key);
+  }
+  if (client === 'loon') for (const chain of profile.chains) {
+    report.error('chain.unsupported', 'Loon 尚未适配代理链，请为 Loon 使用不带前置的配置订阅', 'chain:' + chain.id, [chain.id]);
+    const count = chainCounts.get(chain.id); if (count) count.appliedCount = 0;
   }
   for (const chain of profile.chains) if (!chainSources(chain.landing.nodeSet, profile.nodeSets).length) {
     report.error('ref.nodeset-not-in-profile', `链规则的落地节点集 ${nodeSetKey(chain.landing.nodeSet)} 未加入本订阅`, `chain:${chain.id}`);
@@ -463,6 +500,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     stashBenchmarks(allGroups, inlineProxies, eff.groups, report);
     for (const node of inlineProxies) if (node['dialer-proxy'] && node['interface-name']) report.error('stash.dialer-interface', 'Stash 的 dialer-proxy 与 interface-name 不能同时配置', `proxy:${String(node.name)}`);
   }
+  if (client === 'surge') surgeBenchmarks(allGroups, inlineProxies, eff.groups, report);
   validateReferences(allGroups, inlineProxies, providers, proxyProviders, report);
 
   const config: Record<string, unknown> = { ...(input.base ?? {}), proxies: inlineProxies };
@@ -470,6 +508,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
   config['proxy-groups'] = allGroups;
   if (Object.keys(ruleProviders).length) config['rule-providers'] = ruleProviders;
   config.rules = ruleLines;
+  if (client === 'loon') loonBenchmarks(config, eff.groups, report);
   if (client === 'stash') for (const provider of Object.values(ruleProviders)) delete provider.type;
 
   const relatedGroups = (target: ChainTarget, seen = new Set<string>()): Set<string> => {
@@ -485,7 +524,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
 
   return {
     config,
-    yaml: stringify(config, { lineWidth: 0 }),
+    yaml: client === 'loon' ? stringifyLoon({ config, rulesets, report }) : client === 'surge' ? stringifySurge({ config, rulesets, report }) : stringify(config, { lineWidth: 0 }),
     providers,
     rulesets,
     dependencies: [...deps.values()],

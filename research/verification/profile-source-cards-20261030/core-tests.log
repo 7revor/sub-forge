@@ -1,0 +1,13 @@
+
+> @sub-forge/core@0.0.0 test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/profile-source-cards/packages/core
+> vitest run
+
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/profile-source-cards/packages/core
+
+
+ Test Files  23 passed | 4 skipped (27)
+      Tests  284 passed | 39 skipped (323)
+   Start at  13:29:19
+   Duration  2.26s (transform 3.35s, setup 0ms, import 8.77s, tests 1.39s, environment 2ms)
+

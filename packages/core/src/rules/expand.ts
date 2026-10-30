@@ -3,7 +3,7 @@
 import { rejectedRuleReport } from './diagnostics.ts';
 import type { Report } from '../report.ts';
 import type { ID, RuleIR, RuleSet, RuleSetSource } from '../types.ts';
-import { applyOverrides, lowerRule, type ClientCtx } from './client.ts';
+import { applyOverrides, lowerRule, composeRule, type ClientCtx } from './client.ts';
 import { behaviorOf, isYamlRuleUrl, parseRuleSourceContent, ruleKey, type Behavior } from './parse.ts';
 
 export type RuleSetInputs = {
@@ -105,9 +105,9 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
  * 用于把旧规则包里的单条规则迁移成本地来源。
  */
 export function formatRuleLine(rule: RuleIR): string {
-  if (rule.type === 'RAW') return rule.text;
-  if (rule.type === 'USER-AGENT') return `${rule.type},${rule.value}`;
-  const l = lowerRule(rule, { client: 'mihomo' });
-  if (l.kind === 'drop') return `# ${l.reason}`;
-  return [l.text, ...(l.noResolve ? ['no-resolve'] : []), ...(l.src ? ['src'] : [])].join(',');
+  for (const client of ['mihomo', 'surge', 'loon', 'stash'] as const) {
+    const lowered = lowerRule(rule, { client, platform: 'macos' });
+    if (lowered.kind === 'ok') return composeRule(lowered);
+  }
+  return '# 无法表示的规则：' + JSON.stringify(rule);
 }

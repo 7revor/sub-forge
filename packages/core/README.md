@@ -4,12 +4,12 @@
 
 | 目录 | 内容 | 对应文档 |
 | --- | --- | --- |
-| `src/proxy` | 订阅内容解析：URI / Base64 / Clash YAML / Surge `[Proxy]` → `ProxyIR` | PRD SRC-01、SRC-04、SRC-10 |
+| `src/proxy` | 订阅内容解析：URI / Base64 / Clash YAML / Surge、Loon `[Proxy]` → `ProxyIR` | PRD SRC-01、SRC-04、SRC-10 |
 | `src/pipeline` | 处理链与 P0 处理器，逐步 trace，末尾去重兜底 | SRC-06、SRC-07、SRC-11 |
 | `src/nodeset` | 订阅源 / 组合 / 本地节点组解析，组合环检测 | COL-01–04、LOC-01 |
 | `src/rules` | 规则 IR、规则集解析、按客户端降级与覆盖、多来源规则集合并与自动输出格式（原规则包并入规则集） | RS-01–03、RS-08、原 RB-01–05、CR-01–02 |
 | `src/template` | 绑定/独立分流解析、旧覆盖层迁移支持、模板保存前自检 | 03 §5、TPL-07 ①、PRF-04、PRF-09 |
-| `src/render` | mihomo 渲染：依赖解析、代理链、引用校验、环检测 | 03 §4、REF-01–12 |
+| `src/render` | 四客户端渲染（Mihomo / Surge / Loon / Stash）：依赖解析、代理链、引用校验、环检测 | 03 §4、REF-01–12 |
 
 节点 YAML 支持单节点映射、裸节点列表及带 `proxies` 的完整配置，也支持相应行内写法。整体缩进的复制片段可直接解析，嵌套与未知字段保持原样；单个节点缺少必填字段记入 `failures`，语法损坏仍抛出错误，由调用方决定如何展示。
 
@@ -42,8 +42,6 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 ## 尚未实现
 
 - 脚本处理器与规则改写脚本（SRC-08、CR-03，需要沙箱，P1）
-- 逻辑规则 AND / OR / NOT（RS-04，P1）
-- Surge 输出（M2）
 - ssr、hysteria v1、wireguard、snell 的 URI 解析（这些协议目前只能通过 Clash YAML 导入）
 
 规则集客户端改写存放在 `RuleSet.overrides`：仅按规则内容精确匹配所有启用来源，不依赖来源选择或行号。先应用第一条客户端/平台匹配的改写，再合并去重并输出一个 classical LIST；二进制来源需要改写时明确报错。来源级 `overrides` 只用于未能转换的历史数据兼容。
@@ -156,3 +154,5 @@ Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整�
 2026-10-30 拖动阴影修正为纯前端样式变动，不影响排序数据或领域行为。
 
 2026-10-30 处理器参数区仅重设计前端布局：12 种 OperatorStep 的字段、执行顺序、默认行为、origins 和独立输入输出预览契约不变；布尔 false、数值 0 与清空值保持原语义。API、数据库、核心渲染和生产示例种子无需修改。manual-resource-refresh-server.ts 增加 all-operators 虚构内存样本供全类型表单验收，并在停止时关闭测试连接；不会写入 examples/seed.example.json。
+
+2026-10-30：新增 `renderSurge` / `renderLoon`、节点输入解析、INI 基础编解码与独立导出，规则补齐逻辑表达式、URL-REGEX、extended-matching 和语义去重。架构、能力矩阵、版本要求及测试边界见 [四客户端转换](../../docs/19-client-conversion.md)。可设置 `SURGE_BIN=/path/to/surge-cli` 运行官方离线配置检查；不能用 Mihomo 校验器代替其他客户端。

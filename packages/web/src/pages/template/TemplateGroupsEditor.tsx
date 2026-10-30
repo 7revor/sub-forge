@@ -17,8 +17,9 @@ import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts
 
 const columns = 'grid grid-cols-[24px_32px_minmax(0,1fr)_60px] md:grid-cols-[24px_32px_minmax(0,1fr)_88px_minmax(0,1.4fr)_44px_60px]';
 
-export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, onEditGroup, memberSummary, nodeSetName = ref => ref.id }: {
+export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, isGroupReadOnly = () => readOnly, onRemoveGroup, onEditGroup, memberSummary, nodeSetName = ref => ref.id }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; report: ReportItem[];
+  isGroupReadOnly?: (group: GroupSpec) => boolean; onRemoveGroup?: (group: GroupSpec) => void;
   readOnly?: boolean; onEditGroup?: (group: GroupSpec, adding: boolean) => void; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
 }) {
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
@@ -28,6 +29,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
     if (result.status === 'confirmed') onChange({ ...value, groups: adding ? [...value.groups, result.data] : value.groups.map(g => g.id === group.id ? result.data : g) });
   };
   const remove = async (group: GroupSpec) => {
+    if (onRemoveGroup) { onRemoveGroup(group); return; }
     const references = value.groups.filter(g => g.id !== group.id && g.members.some(m => m.kind === 'group' && m.groupId === group.id)).length;
     const rules = value.rules.filter(r => r.target.kind === 'group' && r.target.groupId === group.id).length;
     const final = value.final.kind === 'group' && value.final.groupId === group.id;
@@ -46,7 +48,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
       }}><Plus size={14} />新增组</Button>
     </>}>
       {!value.groups.length ? <Empty title="还没有策略组" /> : <>
-        <SortableList items={value.groups} getKey={g => g.id} isLocked={() => readOnly} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
+        <SortableList items={value.groups} getKey={g => g.id} isLocked={isGroupReadOnly} canDrop={(_from, to) => !isGroupReadOnly(value.groups[to]!)} onReorder={groups => onChange({ ...value, groups })} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '—');
           return <RoutingCard id={`template-group-${g.id}`} className={columns} invalid={error}>
@@ -57,11 +59,11 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
               <span className="shrink-0 text-ink-2" title="策略组类型">{g.type.toUpperCase()}</span>
               <span className="min-w-0 flex-1 truncate text-ink-2" title={members}>{members}</span>
               <div className="flex shrink-0 items-center" title="隐藏策略组">
-                <Switch disabled={readOnly} label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
+                <Switch disabled={isGroupReadOnly(g)} label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
               </div>
             </div>
             <div className="col-start-4 row-start-1 md:col-start-7">
-              <RoutingCardActions label={`策略组「${g.name}」`} onEdit={() => void edit(g)} onDelete={readOnly ? undefined : () => void remove(g)} />
+              <RoutingCardActions label={`策略组「${g.name}」`} onEdit={() => void edit(g)} onDelete={isGroupReadOnly(g) ? undefined : () => void remove(g)} />
             </div>
           </RoutingCard>;
         }} />

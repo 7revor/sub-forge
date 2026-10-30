@@ -94,25 +94,29 @@ export type Target =
 
 // ---------- 规则侧 ----------
 
-export const CLIENTS = ['mihomo', 'surge', 'stash'] as const;
+export const CLIENTS = ['mihomo', 'surge', 'stash', 'loon'] as const;
 export type Client = typeof CLIENTS[number];
+export type IniClient = Extract<Client, 'surge' | 'loon'>;
+export const isIniClient = (client: Client): client is IniClient => client === 'surge' || client === 'loon';
 export type YamlClient = Extract<Client, 'mihomo' | 'stash'>;
 export type Platform = 'android' | 'macos' | 'windows' | 'ios' | 'linux';
 
 export type DomainRuleType = 'DOMAIN' | 'DOMAIN-SUFFIX' | 'DOMAIN-KEYWORD' | 'DOMAIN-WILDCARD' | 'DOMAIN-REGEX';
 export type IpRuleType = 'IP-CIDR' | 'IP-CIDR6' | 'IP-ASN' | 'SRC-IP-CIDR';
 
-export type RuleIR =
+export type RuleIR = (
   | { type: DomainRuleType; value: string }
   | { type: IpRuleType; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'GEOSITE'; value: string }
   | { type: 'USER-AGENT'; value: string }
+  | { type: 'URL-REGEX'; value: string }
   | { type: 'GEOIP'; value: string; noResolve?: boolean; src?: boolean }
   | { type: 'DST-PORT' | 'SRC-PORT'; value: string }
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string }
   | { type: 'AND' | 'OR' | 'NOT'; children: RuleIR[] }
-  | { type: 'RAW'; client?: Client; text: string }; // 不指定 client 时按目标客户端原样输出，兼容旧的客户端专用 RAW
+  | { type: 'RAW'; client?: Client; text: string }
+) & { extendedMatching?: boolean }; // Surge 扩展匹配必须保留；其他客户端不能静默移除
 
 export type ClientOverride = {
   when: { client: Client; platform?: Platform };
@@ -270,6 +274,8 @@ export type ProfileRouting =
     mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]>;
     /** 按显示顺序优先于全部模板规则，仅允许本地单条或多条规则。 */
     prependRules?: RuleEntry[];
+    /** 本订阅独立维护的策略组，追加于模板组末尾。 */
+    extraGroups?: GroupSpec[];
   }
   | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version?: number; name?: string } };
 
@@ -278,6 +284,8 @@ export type Profile = {
   routing?: ProfileRouting;
   id: ID;
   name: string;
+  /** 管理备注，不输出到客户端配置。 */
+  note?: string;
   nodeSets: ProfileNodeSet[];
   overlay: Overlay;
   chains: ChainRule[];

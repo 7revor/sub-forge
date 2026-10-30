@@ -1,3 +1,5 @@
+import { surgeBaseGroups } from '../schemas/surgeBase.ts';
+import { loonBaseGroups } from '../schemas/loonBase.ts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { mihomoBaseGroups } from '../schemas/mihomoBase.ts';
@@ -20,7 +22,7 @@ describe('表单占位与空值契约', () => {
   });
 
   it('所有基础设置和节点协议字段都提供中文解释', () => {
-    const groups = [...mihomoBaseGroups, ...stashBaseGroups, ...PROXY_TYPES.flatMap(({ value }) => schemaFor(value))];
+    const groups = [...mihomoBaseGroups, ...stashBaseGroups, ...surgeBaseGroups, ...loonBaseGroups, ...PROXY_TYPES.flatMap(({ value }) => schemaFor(value))];
     for (const field of groups.flatMap(group => group.fields)) {
       expect(field.placeholder, field.key).toMatch(/[\u4e00-\u9fff]/);
       expect(field.placeholder, field.key).not.toMatch(/^(未设置|不设置|请选择)$/);

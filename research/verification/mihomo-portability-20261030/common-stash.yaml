@@ -1,0 +1,43 @@
+# 虚构节点，仅用于验证格式；各客户端基础设置需另外配置。
+proxies:
+  - name: SS 示例
+    server: node.example.test
+    port: 443
+    type: ss
+    cipher: aes-128-gcm
+    password: example
+  - name: VMess 示例
+    server: node.example.test
+    port: 443
+    type: vmess
+    uuid: 0233d11c-15a4-47d3-ade3-48ffca0ce119
+    alterId: 0
+    cipher: auto
+    tls: true
+    network: ws
+    ws-opts:
+      path: /ws
+      headers:
+        Host: cdn.example.test
+  - name: Trojan 示例
+    server: node.example.test
+    port: 443
+    type: trojan
+    password: example
+    sni: tls.example.test
+    skip-cert-verify: false
+    alpn:
+      - h2
+      - http/1.1
+proxy-groups:
+  - name: 代理
+    type: select
+    proxies:
+      - SS 示例
+      - VMess 示例
+      - Trojan 示例
+rules:
+  - DOMAIN,ads.example.test,REJECT
+  - DOMAIN-SUFFIX,example.test,代理
+  - IP-CIDR,192.0.2.0/24,DIRECT,no-resolve
+  - MATCH,代理

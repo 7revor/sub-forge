@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { renderMihomo, renderStash, type RenderInput } from '../src/render/mihomo.ts';
+import { renderMihomo, renderStash, renderSurge, renderLoon, type RenderInput } from '../src/render/mihomo.ts';
 import type { ChainNodeSet } from '../src/types.ts';
 const ref = (id: string) => ({ type: 'local' as const, id });
 const all = (id: 'provider' | 'inline'): ChainNodeSet => ({ type: 'all', id });
@@ -13,7 +13,7 @@ function fixture(output: 'provider' | 'inline'): RenderInput {
 }
 
 describe('代理链全部来源', () => {
-  for (const output of ['provider', 'inline'] as const) for (const [client, render] of [['Mihomo', renderMihomo], ['Stash', renderStash]] as const) {
+  for (const output of ['provider', 'inline'] as const) for (const [client, render] of [['Mihomo', renderMihomo], ['Stash', renderStash], ['Surge', renderSurge]] as const) {
     it(`${client} ${output}：汇总多个来源、采用首个匹配、自动包含后续来源`, () => {
       const f = fixture(output), before = JSON.stringify(f);
       const initial = render(f);
@@ -33,7 +33,7 @@ describe('代理链全部来源', () => {
       expect(render(f).chainResolutions[0]).toMatchObject({ viaName: '前置-b', landingCount: 2, appliedCount: 2 });
     });
   }
-  it.each([renderMihomo, renderStash])('只包含用户指定的输出类型，空匹配来源不产生误报', render => {
+  it.each([renderMihomo, renderStash, renderSurge])('只包含用户指定的输出类型，空匹配来源不产生误报', render => {
     const f = fixture('provider');
     f.profile.nodeSets[1]!.output = 'inline';
     f.profile.chains[0]!.landing.nodeSet = all('inline');
@@ -43,6 +43,11 @@ describe('代理链全部来源', () => {
     f.profile.chains[0]!.landing.nodeSet = all('provider');
     f.profile.chains[0]!.landing.filter = '^落地-b$';
     expect(render(f).chainResolutions[0]).toMatchObject({ landingCount: 0, appliedCount: 0, issues: [expect.objectContaining({ code: 'chain.no-landing' })] });
+  });
+  it('Loon 的全部来源仍明确拒绝代理链，不能在合并后静默改成直连', () => {
+    const out = renderLoon(fixture('provider'));
+    expect(out.report.hasErrors).toBe(true);
+    expect(out.chainResolutions[0]).toMatchObject({ landingCount: 2, appliedCount: 0, issues: [expect.objectContaining({ code: 'chain.unsupported' })] });
   });
   it('默认全范围不能绕过循环检查', () => {
     const f = fixture('provider');

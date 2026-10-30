@@ -8,7 +8,7 @@
 - **多来源规则集**：一个规则集可引用多个远程 URL 与本地规则，合并去重后只配一个出口，以及**整个规则集按规则内容匹配的客户端改写**（如 mihomo 与 Surge 的进程规则差异）；
 - **模板驱动**：模板只定义"分流"（proxy-group 骨架 + rule + 二者的关联），订阅基于模板填充节点，模板更新后订阅自动同步。
 
-首期仅支持 **mihomo** 与 **Surge** 两个输出目标。
+当前支持 **Mihomo、Surge、Loon、Stash** 四个完整订阅输出目标，客户端差异与限制见 [转换说明](docs/19-client-conversion.md)。
 
 ## 文档
 
@@ -30,7 +30,7 @@
 
 ## 状态
 
-**M0 内核基本完成**（[packages/core](packages/core/README.md)）；**M1 基本完成**：服务端（[packages/server](packages/server/README.md)：多用户与登录、管理接口、上游拉取、订阅接口）与前端（[packages/web](packages/web/README.md)）都已可用，生产 Docker 镜像包含两者；支持 Mihomo 与 Stash 输出（Stash 节点按快照内联），Surge 仍待 M2。各里程碑进度见 [05 §1.1](docs/05-roadmap-and-open-questions.md#11-进度)。
+**M0 内核基本完成**（[packages/core](packages/core/README.md)）；**M1 基本完成**：服务端（[packages/server](packages/server/README.md)：多用户与登录、管理接口、上游拉取、订阅接口）与前端（[packages/web](packages/web/README.md)）都已可用，生产 Docker 镜像包含两者；支持 Mihomo、Stash、Surge 与 Loon 完整输出；后三者的节点按快照内联。各里程碑进度见 [05 §1.1](docs/05-roadmap-and-open-questions.md#11-进度)。
 
 已完成 [M1 稳定化验收](docs/10-m1-stabilization.md)：Docker 内 377 项通过、2 项原有用例跳过，并完成内置浏览器验收。跟随最新模板的订阅会在客户端下次刷新主订阅时采用新模板；主配置与节点 / 规则资源按结构版本配套，兼容的远程内容仍可独立刷新。修复已合入 main，本地服务使用主分支；尚未部署到生产环境。
 

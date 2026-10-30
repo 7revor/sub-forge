@@ -1,6 +1,6 @@
 // 公共规则产物按规则身份、处理参数和客户端共享；与用户 token、配置订阅无关。
 import { createHash } from 'node:crypto';
-import { managedRuleDelivery, renderMihomo, renderStash, ruleProviderName, sourceKey, stableStringify, type RuleSetDelivery, type RuleResourceReference, type RuleSetInputs } from '@sub-forge/core';
+import { managedRuleDelivery, renderMihomo, renderStash, renderSurge, renderLoon, ruleProviderName, sourceKey, stableStringify, type RuleSetDelivery, type RuleResourceReference, type RuleSetInputs } from '@sub-forge/core';
 import type { RuleSetDoc } from './docs.ts';
 import type { Target } from './render.ts';
 import { resolveRuleSetReference } from './ruleset-reference.ts';
@@ -113,7 +113,7 @@ export class SharedRuleService {
       if (record.error) this.store.putSharedRule(key, rs.id, { ...record, error: undefined });
       return record.body;
     }
-    const result = (record.target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = (record.target.client === 'loon' ? renderLoon : record.target.client === 'surge' ? renderSurge : record.target.client === 'stash' ? renderStash : renderMihomo)({
       profile: { id: '$shared-rule', name: rs.name, nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: {
         groups: [], rules: [{ id: 'rule', matcher: record.reference.matcher, options: record.reference.options, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' },
       } } },

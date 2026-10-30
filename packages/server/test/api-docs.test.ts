@@ -22,6 +22,7 @@ describe('文档增删改查', () => {
     ['sources', remoteSource()],
     ['locals', { name: '本地分组', proxies: [] }],
     ['collections', { name: '组合', members: [], pipeline: [] }],
+    ['profiles', { name: '订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }],
     ['rulesets', { name: '规则集', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,example.test' }] }],
   ])('%s 的备注支持旧数据、新建、更新、清空与列表读取，并拒绝非法类型', async (segment, body) => {
     const { alice, store } = await twoUsers();
@@ -192,10 +193,10 @@ describe('文档增删改查', () => {
   });
 });
 
-describe('预设 Surge 预留字段', () => {
-  it('保存和更新后可完整读回，允许 general 中的任意值及空段', async () => {
+describe('预设 Surge 基础配置', () => {
+  it('保存和更新后可完整读回，保留 general 标量、列表及空段', async () => {
     const { admin, alice } = await twoUsers();
-    const surge = { general: { ipv6: true, 'dns-server': ['1.1.1.1'], extra: { nested: null } }, host: { 'example.com': '1.2.3.4' } };
+    const surge = { general: { ipv6: true, 'dns-server': ['1.1.1.1'], extra: false }, host: { 'example.com': '1.2.3.4' } };
     const created = await admin.post('/api/presets', { name: '双客户端', mihomo: {}, surge });
     expect(created.status).toBe(201);
     const path = `/api/presets/${created.json.item.id}`;

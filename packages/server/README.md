@@ -49,7 +49,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 | 地址 | 内容 |
 | --- | --- |
-| `GET /sub/:token/:profile` | 主配置。`?target=mihomo\|surge\|stash&platform=...` 优先于 UA；Surge 暂返回 501 |
+| `GET /sub/:token/:profile` | 主配置。`?target=mihomo\|surge\|stash\|loon&platform=...` 优先于 UA；Surge/Loon 输出完整 INI |
 | `GET /p/:token/:profile/:key` | Profile 专属 provider 内容 |
 | `GET /r/:token/:key` | 全站公共规则产物，任意有效用户 token 可读 |
 | `GET /nodes/:token/:kind/:id` | 自己的节点源/组合/本地节点经处理链后的 Mihomo / Stash 节点内容；支持 HEAD 和流量信息 |
@@ -217,7 +217,7 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 ### 自动识别规则格式与全局托管（2026-10-30）
 
-规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/r/:token/:key` 按规则身份、有效处理参数与客户端/平台共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo 和 Stash；Surge 仅支持规则转换预览。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
+规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/r/:token/:key` 按规则身份、有效处理参数与客户端/平台共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo、Stash、Surge、Loon。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
 
 ### 管理列表分页
 

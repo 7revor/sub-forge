@@ -15,7 +15,7 @@ import { api, type RuleRepo, type RepoFilePreview } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
 import { Badge, Button, ErrorAlert, Input, PageHeader, formatTime, td, th } from '../components/ui.tsx';
 
-const loadFiles = ruleOptionsLoader('repository');
+const loadFiles = ruleOptionsLoader('repository', 30);
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
 
 function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos: RuleRepo[]; onSelect: (value: string) => void }) {

@@ -5,6 +5,7 @@ import { usesClashDomains } from './remote.ts';
 import { parse as parseYaml } from 'yaml';
 import type { Client, RuleIR, RuleSetFormat, RuleSetSource } from '../types.ts';
 import { rawRuleParts } from './raw.ts';
+import { splitRuleFields } from './syntax.ts';
 
 // 二进制读取层在解码文本前写入此标记，防止把转换后正文误判为可直接输出的二进制原文。
 export const DECODED_MRS_HEADER = '# sub-forge: decoded-mrs-v1';
@@ -33,11 +34,18 @@ const isCidr6 = (v: string) => v.includes(':');
  * 解析单条 classical 规则（不含出口）：`TYPE,value[,options]`。
  * 兼容 mihomo 与 Surge 的写法差异，统一到 IR。
  */
-export function parseRuleLine(text: string): RuleIR {
-  const parts = text.split(',').map((s) => s.trim());
+export function parseRuleLine(text: string, depth = 0): RuleIR {
+  if (depth > 10) throw new Error('逻辑规则嵌套不能超过 10 层');
+  const logical = /^(AND|OR|NOT)\s*,/i.test(text.trim());
+  const parts = splitRuleFields(text, logical);
   const type = (parts[0] ?? '').toUpperCase();
   const value = parts[1] ?? '';
   const opts = new Set(parts.slice(2).map((s) => s.toLowerCase()));
+  const allowed = ['IP-CIDR', 'IP-CIDR6', 'IP-ASN', 'GEOIP'].includes(type) ? ['no-resolve', 'src']
+    : ['SRC-IP-CIDR', 'SRC-IP'].includes(type) ? ['no-resolve']
+    : ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'URL-REGEX'].includes(type) ? ['extended-matching'] : [];
+  for (const option of opts) if (!allowed.includes(option)) throw new Error(`规则 ${type} 暂不支持选项 ${option}，不能丢弃后转换`);
+  const extended = opts.has('extended-matching') ? { extendedMatching: true } : {};
   const ipOptions = { ...(opts.has('no-resolve') ? { noResolve: true } : {}), ...(opts.has('src') ? { src: true } : {}) };
   if (!value && !['AND', 'OR', 'NOT'].includes(type)) throw new Error('缺少规则值');
 
@@ -47,7 +55,8 @@ export function parseRuleLine(text: string): RuleIR {
     case 'DOMAIN-KEYWORD':
     case 'DOMAIN-WILDCARD':
     case 'DOMAIN-REGEX':
-      return { type, value };
+    case 'URL-REGEX':
+      return { type, value, ...extended };
     case 'IP-CIDR':
     case 'IP-CIDR6':
       return { type: isCidr6(value) ? 'IP-CIDR6' : 'IP-CIDR', value, ...ipOptions };
@@ -55,7 +64,7 @@ export function parseRuleLine(text: string): RuleIR {
       return { type, value: value.replace(/^AS/i, ''), ...ipOptions };
     case 'SRC-IP-CIDR':
     case 'SRC-IP':
-      return { type: 'SRC-IP-CIDR', value };
+      return { type: 'SRC-IP-CIDR', value, ...ipOptions };
     case 'GEOIP':
       return { type, value, ...ipOptions };
     case 'GEOSITE':
@@ -81,7 +90,13 @@ export function parseRuleLine(text: string): RuleIR {
     case 'AND':
     case 'OR':
     case 'NOT':
-      throw new UnsupportedRuleError('暂不支持逻辑规则');
+      if (!value.startsWith('(') || !value.endsWith(')')) throw new Error('逻辑规则需要括号包裹子规则');
+      const children = splitRuleFields(value.slice(1, -1)).map(child => {
+        if (!child.startsWith('(') || !child.endsWith(')')) throw new Error('每条逻辑子规则需要单独的括号');
+        return parseRuleLine(child.slice(1, -1), depth + 1);
+      });
+      if (!children.length || (type === 'NOT' && children.length !== 1)) throw new Error('NOT 必须且只能包含一条子规则');
+      return { type, children };
     default: {
       const proc = PROCESS_TYPES[type];
       if (proc) return { type: 'PROCESS', ...proc, value };
@@ -171,6 +186,7 @@ export function parseRuleSetContent(text: string, format: RuleSetFormat = 'auto'
 
 /** 规则在规则包拆分时归入的 behavior（docs/03 §6） */
 export function behaviorOf(rule: RuleIR): Behavior {
+  if (rule.extendedMatching) return 'classical';
   if (rule.type === 'DOMAIN' || rule.type === 'DOMAIN-SUFFIX') return 'domain';
   if (rule.type === 'IP-CIDR' || rule.type === 'IP-CIDR6') return 'ipcidr';
   return 'classical';
@@ -178,7 +194,10 @@ export function behaviorOf(rule: RuleIR): Behavior {
 
 /** 去重键：type + value（+ 进程规则的 kind/mode） */
 export function ruleKey(rule: RuleIR, client?: Client): string {
+  if (rule.extendedMatching) return `${ruleKey({ ...rule, extendedMatching: false }, client)}|extended-matching`;
   switch (rule.type) {
+    case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP': case 'SRC-IP-CIDR':
+      return `${rule.type}|${rule.value}${rule.noResolve ? '|no-resolve' : ''}${rule.src ? '|src' : ''}`;
     case 'PROCESS': return `PROCESS|${rule.kind}|${rule.mode}|${client === 'mihomo' && rule.mode === 'wildcard' ? rule.value.toLowerCase() : rule.value}`;
     case 'DOMAIN-WILDCARD': return `${rule.type}|${client === 'mihomo' ? rule.value.toLowerCase() : rule.value}`;
     case 'AND': case 'OR': case 'NOT': return `${rule.type}|${rule.children.map(child => ruleKey(child, client)).join(';')}`;

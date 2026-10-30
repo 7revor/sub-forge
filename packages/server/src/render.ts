@@ -8,8 +8,8 @@ import { profileTemplate } from './profile-routing.ts';
 import { createHash } from 'node:crypto';
 import { stringify } from 'yaml';
 import {
-  resolveProfileRouting, Report, renderMihomo, renderStash, exportStashConfig, sourceKey, sourceLabel, stableStringify,
-  type RuleResourceReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
+  resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, renderLoon, isIniClient, stringifySurge, surgeProxyLine, loonProxyLine, exportStashConfig, sourceKey, sourceLabel, stableStringify,
+  type Client, type RuleResourceReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
 import type { SnapshotService } from './snapshots.ts';
@@ -19,7 +19,7 @@ import { resolveRuleSetReference } from './ruleset-reference.ts';
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
 const GENERATION_PLACEHOLDER = '__SF_GENERATION__';
 
-export type Target = { client: 'mihomo' | 'stash'; platform?: Platform };
+export type Target = { client: Client; platform?: Platform };
 
 /** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
 export type StoredRender = {
@@ -89,7 +89,7 @@ class ConcurrentRenderChange extends Error {}
 
 type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
 
-export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
+export type PreviewOutcome = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
@@ -144,7 +144,7 @@ export class RenderService {
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
       return a.result
-        ? { ok: !a.failure, yaml: a.result.yaml, ...(target.client === 'stash' && !a.failure && !Object.values(a.result.rulesets).some(r => r.text.startsWith('#subforge-binary-mrs\n')) ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
+        ? { ok: !a.failure, yaml: a.result.yaml, format: isIniClient(target.client) ? 'ini' : 'yaml', ...(target.client === 'surge' && !a.failure ? { exportYaml: stringifySurge(a.result, true) } : {}), ...(target.client === 'stash' && !a.failure && !Object.values(a.result.rulesets).some(r => r.text.startsWith('#subforge-binary-mrs\n')) ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
         : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
@@ -205,15 +205,19 @@ export class RenderService {
     checkCurrent();
     const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
     if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    const base = profile.base ? target.client === 'stash'
+    const base = profile.base ? target.client === 'loon'
+      ? deepMerge(preset?.loon ?? {}, profile.base.loonPatch ?? {})
+      : target.client === 'surge'
+      ? deepMerge(preset?.surge ?? {}, profile.base.surgePatch ?? {})
+      : target.client === 'stash'
       ? deepMerge(preset?.stash ?? {}, profile.base.stashPatch ?? {})
       : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
-    const qs = `${target.client === 'stash' ? '&target=stash' : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
+    const qs = `${target.client !== 'mihomo' ? '&target=' + target.client : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
     const sharedReferences = new Map<string, RuleResourceReference>();
-    const result = (target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
       profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
@@ -256,7 +260,9 @@ export class RenderService {
     checkCurrent();
     const render: StoredRender = {
       generation,
-      yaml: result.yaml,
+      yaml: target.client === 'surge'
+        ? '#!MANAGED-CONFIG ' + publicUrl + '/sub/' + TOKEN_PLACEHOLDER + '/' + encodeURIComponent(profile.id) + '?target=surge' + (target.platform ? '&platform=' + target.platform : '') + ' interval=' + this.store.resourceCacheTtlSec + ' strict=false\n' + result.yaml
+        : result.yaml,
       nodeDependencies: [
         ...Object.keys(nodeSets.sources).map(id => ({ type: 'source' as const, id })),
         ...Object.keys(nodeSets.collections).map(id => ({ type: 'collection' as const, id })),
@@ -314,14 +320,18 @@ export class RenderService {
     const loaded = await this.loadNodeSets([ref], owner);
     if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
     if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
-    const result = (target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
       profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
       platform: target.platform,
       nodeSets: loaded.inputs, rules: { rulesets: {}, snapshots: {} }, urls: { provider: key => key, ruleset: key => key },
     });
+    const yaml = isIniClient(target.client) ? (result.config.proxies as Record<string, unknown>[]).flatMap(node => {
+      const line = (target.client === 'loon' ? loonProxyLine : surgeProxyLine)(node, result.report);
+      return line ? [line] : [];
+    }).join('\n') + '\n' : stringify({ proxies: result.config.proxies ?? [] }, { lineWidth: 0 });
     const errors = [...loaded.report, ...result.report.items].filter(i => i.level === 'error');
     if (errors.length) throw new Error(errors.map(i => i.message).join('；'));
-    return { yaml: stringify({ proxies: result.config.proxies ?? [] }, { lineWidth: 0 }), userinfo: nodeTraffic(ref, loaded.inputs, loaded.userinfo) };
+    return { yaml, userinfo: nodeTraffic(ref, loaded.inputs, loaded.userinfo) };
   }
 
   collectNodeSets(refs: NodeSetID[], owner?: string | null): { inputs: NodeSetInputs; sources: SourceDoc[] } {

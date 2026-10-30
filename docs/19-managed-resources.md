@@ -29,7 +29,7 @@
 
 ## 节点流量信息
 
-独立节点链接按 UA 或显式 target/platform 适配 Mihomo、Stash，并在 `Subscription-Userinfo` 响应头提供上游返回的 upload、download、total、expire。GET 和 HEAD 的响应头相同，HEAD 没有正文；主配置内的 `/p` 也带对应节点集的流量，不误用整个配置的汇总。未知 UA 默认 Mihomo，Surge 节点输出暂返回 501。
+独立节点链接按 UA 或显式 target/platform 适配 Mihomo、Stash、Surge、Loon，并在 `Subscription-Userinfo` 响应头提供上游返回的 upload、download、total、expire。GET 和 HEAD 的响应头相同，HEAD 没有正文；主配置内的 `/p` 也带对应节点集的流量，不误用整个配置的汇总。未知 UA 默认 Mihomo；Surge / Loon 节点输出使用各自的原生文本格式。
 
 单源保留上游已知字段和零值；组合递归收集成员，按同一个上游 URL 去重后累加 upload/download/total，到期取已知最早值。纯本地节点和没有流量信息的来源不生成虚假数值。成功刷新但未返回流量头时清除旧流量；拉取失败则随最后成功快照保留流量。节点筛选不改变上游账户的真实套餐额度。不同 URL 即使属于同一套餐也无法可靠自动识别，仍按不同来源计算。
 
@@ -58,11 +58,11 @@ Stash 的请求约定见官方[机场订阅文档](https://stash.wiki/features/s
 
 ## 接口与升级
 
-- `GET /sub/:token/:profile`：主订阅，UA 自动选择 Mihomo / Stash。
+- `GET /sub/:token/:profile`：主订阅，UA 自动选择 Mihomo / Stash / Surge / Loon。
 - `GET /p/:token/:profile/:key?v=...`：配置节点产物；按目标保留结构版本。
-- `GET /nodes/:token/:kind/:id`：所属用户的 source / collection / local 经处理链后的 Mihomo / Stash 节点，支持 HEAD 与流量头。
+- `GET /nodes/:token/:kind/:id`：所属用户的 source / collection / local 经处理链后的 Mihomo / Stash / Surge / Loon 节点，支持 HEAD 与流量头。
 - `GET /r/:token/:key`：公共规则；目标由资源键确定，query 不能切换产物。
-- `GET /rules/:token/:id`：公共规则增强的独立链接；按 UA 或 target/platform 选择 Mihomo / Stash 变体，与主订阅的规则引用共用公共产物。
+- `GET /rules/:token/:id`：公共规则增强的独立链接；按 UA 或 target/platform 选择 Mihomo / Stash / Surge / Loon 变体，与主订阅的规则引用共用公共产物。
 - `GET /api/resource-links/:kind/:id`：登录后复制 sources / collections / locals / profiles / rulesets 链接，私有对象及节点依赖检查归属，公共规则使用当前用户 token；不拉取上游。
 - `GET /api/profiles/:id/link`：登录后读取本人的配置链接。
 - `GET /api/me/token`、`POST /api/me/token/reset`：读取、重置用户 token；重置 body 为当前 `{ token }`，过期值返回 409。
@@ -70,7 +70,7 @@ Stash 的请求约定见官方[机场订阅文档](https://stash.wiki/features/s
 
 升级事务为已有用户生成新凭证，撤销旧 `sub_tokens`，清理旧 last-good 与结构版本，保留配置、规则、节点、归属和有效原文。旧单订阅凭证不会升级为访问用户全部节点的凭证。所有客户端需重新复制订阅链接。旧 `/sub/:token`、无配置 ID 的 `/p`、按订阅管理 token 的 API 和带 token 的 `/api/rules/convert` 不再可用；登录态转换预览保留。
 
-示例种子不含固定下载 token，导入时应指定已存在的用户名。旧种子里的 profileId token 被忽略，不扩大权限；无归属私有文档不能下载。完整主订阅仍未提供 Surge 输出。
+示例种子不含固定下载 token，导入时应指定已存在的用户名。旧种子里的 profileId token 被忽略，不扩大权限；无归属私有文档不能下载。完整主订阅支持 Mihomo、Stash、Surge、Loon。
 
 ## 验证
 

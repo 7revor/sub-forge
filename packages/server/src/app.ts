@@ -10,7 +10,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { Hono, type Context } from 'hono';
 import type { Platform } from '@sub-forge/core';
 import { createApi, type ApiDeps } from './api/index.ts';
-import { detectClient } from './client.ts';
+import { InvalidClientTarget, detectClient } from './client.ts';
 import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService, type Target } from './render.ts';
 import type { Store, TrafficInfo } from './store.ts';
 
@@ -79,7 +79,9 @@ export function createApp(deps: AppDeps) {
     if (!owned || owned.owner !== t.userId) return notFound(c);
     const profile = owned.doc;
     const ua = c.req.header('user-agent') ?? '';
-    const detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform') });
+    let detected;
+    try { detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform') }); }
+    catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
 
     const log = (status: number, outcome?: RenderOutcome) => store.logAccess({
       token, profileId: profileId, at: started, ua, client: `${detected.client}${detected.by === 'default' ? '?' : ''}`,
@@ -89,12 +91,8 @@ export function createApp(deps: AppDeps) {
       source: outcome ? (outcome.ok ? outcome.source : 'failed') : 'unsupported',
     });
 
-    if (detected.client === 'stash' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
-      log(400); return c.text('Stash 平台仅支持 ios 或 macos', 400);
-    }
-    if (detected.client === 'surge') {
-      log(501);
-      return c.text('Surge 输出尚未实现（M2）。如需 mihomo 配置，请在链接后加 ?target=mihomo', 501);
+    if (detected.client !== 'mihomo' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
+      log(400); return c.text('该客户端平台仅支持 ios 或 macos', 400);
     }
 
     const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
@@ -124,10 +122,11 @@ export function createApp(deps: AppDeps) {
     const profileId = c.req.param('profile');
     if (!t || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     const qp = c.req.query('platform');
-    const platform = PLATFORMS.find(p => p === qp);
+    const platform = PLATFORMS.find((p) => p === qp);
+    if (qp !== undefined && !platform) return notFound(c);
     const client = c.req.query('target') ?? 'mihomo';
-    if ((qp && !platform) || (client !== 'mihomo' && client !== 'stash')) return notFound(c);
-    if (client === 'stash' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
+    if (client !== 'mihomo' && client !== 'stash' && client !== 'surge' && client !== 'loon') return notFound(c);
+    if (client !== 'mihomo' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
     const target: Target = { client, ...(platform ? { platform } : {}) };
     const version = c.req.query('v');
     const key = c.req.param('key');
@@ -174,9 +173,10 @@ export function createApp(deps: AppDeps) {
     const token = c.req.param('token'), id = c.req.param('id');
     const user = store.getActiveToken(token);
     if (!user || !store.get('ruleset', id)) return notFound(c);
-    const target = detectClient(c.req.header('user-agent') ?? '', c.req.query());
-    if (target.client === 'surge') return c.text('Surge 规则订阅输出尚未开放，请使用规则转换预览', 501);
-    if (target.client === 'stash' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('Stash 平台仅支持 ios 或 macos', 400);
+    let target;
+    try { target = detectClient(c.req.header('user-agent') ?? '', c.req.query()); }
+    catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
+    if (target.client !== 'mihomo' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('该客户端平台仅支持 ios 或 macos', 400);
     const reference = { matcher: { kind: 'ruleset' as const, id } };
     const output = { client: target.client, ...(target.platform ? { platform: target.platform } : {}) };
     try {
@@ -207,9 +207,10 @@ export function createApp(deps: AppDeps) {
     if (!user || !['source', 'collection', 'local'].includes(kind)) return notFound(c);
     const type = kind as 'source' | 'collection' | 'local';
     if (store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
-    const target = detectClient(c.req.header('user-agent') ?? '', c.req.query());
-    if (target.client === 'surge') return c.text('Surge 节点订阅输出尚未实现', 501);
-    if (target.client === 'stash' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('Stash 平台仅支持 ios 或 macos', 400);
+    let target;
+    try { target = detectClient(c.req.header('user-agent') ?? '', c.req.query()); }
+    catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
+    if (target.client !== 'mihomo' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('该客户端平台仅支持 ios 或 macos', 400);
     try {
       const result = await renderer.nodeSet({ type, id }, user.userId, { client: target.client, ...(target.platform ? { platform: target.platform } : {}) });
       if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);

@@ -121,10 +121,12 @@ describe('订阅接口', () => {
     }
   });
 
-  it('Surge 暂未支持，返回 501 并记入访问日志', async () => {
+  it('Surge 输出完整 INI 并记入访问日志', async () => {
     const { app, store } = setup();
-    expect((await get(app, '/sub/tk-mac/p1', 'Surge Mac/2894')).status).toBe(501);
-    expect(store.recentAccess('p1')[0]).toMatchObject({ client: 'surge', status: 501 });
+    const res = await get(app, '/sub/tk-mac/p1', 'Surge Mac/2894');
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('[Proxy Group]');
+    expect(store.recentAccess('p1')[0]).toMatchObject({ client: 'surge', status: 200 });
   });
 
   it('第二次请求重新生成；访问日志记录来源', async () => {

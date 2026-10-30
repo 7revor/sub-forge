@@ -28,7 +28,7 @@ import { newId } from '../convert/templateYaml.ts';
 import { localRuleLines } from '@sub-forge/core';
 
 const isBinary = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
-const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '')[0]?.text ?? '尚未填写');
+const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '').map(line => line.text).join(',') || '尚未填写');
 
 function sourceSummary(rs: RuleSetDoc): string {
   const remote = rs.sources.filter((s) => s.kind === 'remote').length;

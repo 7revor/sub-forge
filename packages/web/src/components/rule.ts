@@ -6,6 +6,7 @@ export function rawRuleFromText(text: string, previous?: RuleIR): RuleIR {
 }
 
 export function ruleToLine(rule: RuleIR): string {
+  if (rule.extendedMatching) return `${ruleToLine({ ...rule, extendedMatching: false })},extended-matching`;
   switch (rule.type) {
     case 'PROCESS': return `PROCESS-${rule.kind === 'name' ? 'NAME' : 'PATH'}${rule.mode === 'exact' ? '' : `-${rule.mode.toUpperCase()}`},${rule.value}`;
     case 'RAW': return rule.text;
