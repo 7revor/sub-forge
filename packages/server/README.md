@@ -346,3 +346,6 @@ SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，�
 仓库 list/txt 正文通过统一快照按需读取 raw URL，与已引用公开资源共享缓存；目录仍用 Git 索引，README 仍按索引提交读取。未被引用的文件不整库预抓取。正文预览失败且存在旧内容时继续使用旧内容。此前章节中的历史 TTL/透传设计以本节及领域模型第 7 节为准。
 
 隔离验收：构建 web 后运行 `CACHE_TEST_CONTROL=/tmp/subforge-cache-control.json pnpm --filter @sub-forge/server exec tsx test/manual-resource-cache-server.ts`，控制文件为 `{"fail":false,"version":1}`。仅内存数据与虚构上游，结束须终止进程。验收记录在 `research/verification/unified-resource-cache-20261030/`。
+
+
+2026-10-30 审查修复：草稿远程资源按用户隔离，递归引用及异步下发复核权限，授权失效不允许旧版本回退；渲染检查配置和成功/尝试快照修订，避免旧任务回写。MRS 必须实际拉取并校验二进制类型。已浏览的未引用仓库正文参与调度/异常汇总；换地址或删除后回收无其他引用的原文。新增 `test/cache-review.test.ts` 19 项，完整记录见 `research/verification/unified-resource-cache-review-20261030/`。

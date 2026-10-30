@@ -219,3 +219,8 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 系统页改为统一资源缓存时间和资源异常列表；节点、组合、增强规则列表显示缓存状态与刷新操作，订阅显示“刷新全部资源”，仓库文件可独立刷新。移除节点、规则来源、订阅中的独立时间输入；刷新任务弹窗展示进度、失败回退及生成结果。实时连接断开显示重连提示，后台重读保留未保存草稿。
 
 外部设计画布 `https://claude.ai/artifact/XceERK5VmwqhEPai8xevKd` 已在内置浏览器检查，显示 “Sign in to view this page”；因此无法修改画布，**设计稿同步未完成**。实际页面与截图记录见 [验收记录](../research/verification/unified-resource-cache-20261030/README.md)，不得将该阻塞记为设计同步通过。
+
+
+### 2026-10-30：缓存补充审查界面
+
+规则集合文件预览回退时显示琥珀色状态文字“拉取失败：…；正在显示上次成功内容（时间）”；系统异常包含已浏览但未引用的文件。刷新任务完成立即重读查询。前后端和内置浏览器验收已完成，截图见 [补充记录](../research/verification/unified-resource-cache-review-20261030/README.md)。外部画布仍因登录限制未同步，本项不能标记为设计稿同步完成。
