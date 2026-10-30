@@ -55,8 +55,8 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `GET /subs/profile?id=P&token=T` | 本人完整配置，支持 target/platform 与 UA 选择 |
 | `GET /subs/nodes?kind=source&id=N&token=T` | 本人 source / collection / local；支持 HEAD 与流量头 |
-| `GET /subs/nodes?kind=provider&profile=P&id=K&version=V&token=T` | 本配置的节点 provider，按目标保留最多 32 个结构版本 |
-| `GET /subs/ruleset?profile=P&key=K&version=V&token=T` | 本配置的专属规则产物 |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&token=T` | 本配置的节点 provider，按当前配置生成 |
+| `GET /subs/ruleset?profile=P&key=K&token=T` | 本配置的专属规则产物 |
 | `GET /resources/ruleset?id=R&token=T` | 公共增强，view=source 为来源原文；key 参数读取固定公共变体 |
 | `GET /resources/repo?id=REPO&ref=分支&path=文件&token=T` | 公共仓库文件原文；key 参数读取固定公共变体 |
 | `GET /healthz` | 健康检查 |
@@ -124,7 +124,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 
 ## 敏感数据
 
-文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、最近一次成功的渲染结果与保留的结构版本、订阅 token 均以 AES-256-GCM 加密落盘；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
+文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、最近一次成功的渲染结果、订阅 token 均以 AES-256-GCM 加密落盘；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
 
 ## 测试
 
@@ -352,7 +352,7 @@ v20 清理旧记录中的并发字段，保留配置内容、绑定关系、归�
 - `GET /api/system/resources`：管理员汇总资源及仓库索引状态。
 - `GET /api/events`：登录用户 SSE 通知，不携带文档数据；具体读取仍校验权限。服务退出主动关闭流。
 
-SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，增加系统设置和共享资源绑定；刷新任务保存 7 天，启动将未完成任务标为中断。最终渲染取消结果内存缓存；保留解析缓存、在途合并、last_good 与最多 32 个结构版本。旧版本资源用于客户端一致性，不属于上游原文历史。生产启动会运行资源和仓库调度器。
+SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，增加系统设置和共享资源绑定；刷新任务保存 7 天，启动将未完成任务标为中断。最终渲染取消结果内存缓存；保留解析缓存、在途合并与 last_good；节点和专属规则按当前配置生成。生产启动会运行资源和仓库调度器。
 
 2026-10-30 刷新任务响应：`results` 自创建起包含全部去重资源，顺序固定；`state` 标记 `pending / running / done / interrupted`，`ok` 仅在拉取完成后出现。并发完成只更新对应索引，关闭或重启将未完成项标为中断。兼容旧任务缺少逐项 `state` 的已完成结果，无数据库迁移及示例种子变更。内置浏览器可通过 `pnpm --filter @sub-forge/server exec tsx test/manual-resource-refresh-server.ts` 启动独立内存验收服务，完成后必须停止。
 
@@ -443,3 +443,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 ### 2026-10-30：查询参数入口与凭证分离（v25）
 
 现行契约见 [资源入口、鉴权与生命周期](../../docs/19-managed-resources.md)。所有 GET 动态值使用 query，旧资源入口和旧管理 GET 路径全部关闭。`/api` 仅登录态，`/subs` 按当前用户 token 校验私有归属，`/resources` 允许任意有效用户 token 访问公共规则。模板专属原文只有登录态 `/api/templates/rule-file`，不发行 token 地址；订阅使用模板后，其直接远程规则由该订阅鉴权。v25 保留用户 token，清除含旧地址的配置缓存与旧公共远程产物，客户端须重新复制链接。仓库停用、删除、索引移除及在途撤销同时清除无引用正文，不能在重新启用后恢复旧请求的缓存绑定。
+
+2026-10-30：SQLite v27 删除 `render_generations`，清空带旧参数的渲染缓存。节点 provider 和订阅专属规则 URL 移除 `version`、`hash`，读取时按当前配置生成；保留 last_good 失败兜底。升级后刷新完整主订阅，节点内容通过客户端定时或手动更新。

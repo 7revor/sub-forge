@@ -26,7 +26,7 @@ const UNREACHABLE = 'http://127.0.0.1:9';
 const isolated: Partial<RenderInput> = {
   template: MMDB ? TEMPLATE : { ...TEMPLATE, rules: TEMPLATE.rules.filter((r) => r.id !== 'r-cn') },
   urls: {
-    provider: (key, v) => `${UNREACHABLE}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
+    provider: key => `${UNREACHABLE}/p/TOKEN/${encodeURIComponent(key)}`,
     ruleset: (key) => `${UNREACHABLE}/r/TOKEN/${key}`,
   },
   rules: { ...RULES, rulesets: { ...RULES.rulesets, fin: { ...RULES.rulesets.fin!, sources: RULES.rulesets.fin!.sources.map((s) => (s.id === 'broker' ? { ...s, url: `${UNREACHABLE}/broker.mrs` } : s)) } } },

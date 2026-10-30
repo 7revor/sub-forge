@@ -27,8 +27,8 @@ import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
-  /** Profile 专属 provider 地址（/subs/nodes?kind=provider&profile=…&version=…） */
-  provider(nodeSetKey: string, version: string): string;
+  /** Profile 专属 provider 地址（/subs/nodes?kind=provider&profile=…） */
+  provider(nodeSetKey: string): string;
   /** 转换后的公共或订阅专属规则集地址 */
   ruleset(key: string, reference?: RuleResourceReference): string;
 };
@@ -67,7 +67,7 @@ export type ChainResolution = {
   issues: ReportItem[];
 };
 
-export type ProviderOutput = { name: string; version: string; yaml: string };
+export type ProviderOutput = { name: string; yaml: string };
 export type RulesetOutput = { behavior: Behavior; text: string; providerName?: string };
 
 export type MihomoRenderResult = {
@@ -495,10 +495,8 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   for (const s of sets.values()) {
     if (s.output !== 'provider') continue;
     const yaml = stringify({ proxies: s.nodes.map(stripNode) }, { lineWidth: 0 });
-    // 版本号随内容（含注入的前置）变化，客户端重载主配置即重新下载；不输出 path（REF-11）
-    const version = shortHash(yaml, 8);
-    providers[s.key] = { name: s.providerName, version, yaml };
-    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
+    providers[s.key] = { name: s.providerName, yaml };
+    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
     proxyProviders[s.providerName] = entry;
   }
 

@@ -205,9 +205,9 @@ Inline 点选前置保存具体来源与 `match.exact`；点选落地保存具�
 | 地址 | 用途 |
 | --- | --- |
 | `GET /subs/profile?id=P&token=T` | Profile 主配置（UA 识别客户端） |
-| `GET /subs/nodes?kind=provider&profile=P&id=K&version=V&token=T` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&token=T` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
 | `GET /resources/ruleset?key=K&token=T`、`GET /resources/repo?key=K&token=T` | 公共规则产物，与订阅无关 |
-| `GET /subs/ruleset?profile=P&key=K&version=V&token=T` | 订阅专属远程规则；模板不提供 token 入口 |
+| `GET /subs/ruleset?profile=P&key=K&token=T` | 订阅专属远程规则；模板不提供 token 入口 |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
 
@@ -323,7 +323,7 @@ expand(ruleset):
 | 仓库目录索引 | 最近成功的完整索引 | 同系统周期；失败保留旧索引；手动更新绕过周期 |
 | 仓库文本正文 | 与公开仓库规则引用共享成功快照，按需首次读取 | 同系统周期；手动刷新所选文件 |
 | 解析结果 | 按正文哈希与解析参数复用 | 输入变化立即失效；不另设时间 |
-| 最终配置 | 每次重新生成，不保留结果内存缓存 | 保留 last_good 和最多 32 个结构版本，用于失败兜底及旧客户端配套资源 |
+| 最终配置 | 每次重新生成，不保留结果内存缓存 | 只保留 last_good 用于失败兜底，节点和专属规则按当前配置生成 |
 | 管理端查询 | staleTime=0、gcTime=0、HTTP no-store | 挂载、聚焦、恢复网络、SSE 变更通知重读；断连显示提示，重连全量重读 |
 | 草稿预览 | 不保留已完成请求的时间缓存 | 保留在途合并；实时更新不得覆盖未保存草稿 |
 
@@ -387,7 +387,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 `Matcher` 仍分 `rule` / `ruleset`。旧 `{ kind: 'ruleset', id }` 表示本地规则集，不迁移已有数据。仓库引用为 `{ kind: 'ruleset', id, repository: { repo, entry, name, sources } }`，其中 sources 固定本次选定的分支、路径、URL 与文本格式；id 为 `repo:` 加映射的 SHA-256 摘要前 32 位，不依赖显示名称。
 
-`/rule-options/resolve` 根据仓库索引生成引用，不落本地文档；新引用经索引与 URL 校验，已发布引用仅在映射完全一致时按原映射使用。仓库引用内容不接受客户端改写和自定义拉取参数；需要定制时建立本地规则集。解析层将两类引用统一为 `RuleSetInputs`，之后快照、启用依赖收集、格式处理、托管输出校验、缓存与旧版本资源保持原链路。
+`/rule-options/resolve` 根据仓库索引生成引用，不落本地文档；新引用经索引与 URL 校验，已发布引用仅在映射完全一致时按原映射使用。仓库引用内容不接受客户端改写和自定义拉取参数；需要定制时建立本地规则集。解析层将两类引用统一为 `RuleSetInputs`，之后快照、启用依赖收集、格式处理、托管输出校验、缓存与当前资源输出保持原链路。
 
 模板编辑 YAML 的 `x-sub-forge-rulesets` 保存别名到完整 Matcher 的映射，避免名称重用与跨来源重名改变引用。该元数据仅用于模板编辑器，不进入最终订阅配置。旧的无映射 YAML 按唯一名称导入；同名本地引用导出为 `local:<id>` 别名。
 
@@ -456,7 +456,7 @@ SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`�
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
 
-2026-10-29：Client 新增 stash；服务端 Target 支持 mihomo/stash，并用客户端和平台隔离缓存、last-good、结构版本与资源地址。Preset.stash 和 Profile.base.stashPatch 保存 Stash 原生基础设置。renderStash 共用依赖/环路/规则流水线，独立转换节点和组；节点按快照内联。Stash 预览另返回 exportYaml，将已转换的托管规则内嵌，支持草稿独立文件导出。详见 [17](17-official-client-configuration-guides.md)。
+2026-10-29：Client 新增 stash；服务端 Target 支持 mihomo/stash，并用客户端和平台隔离缓存、last-good 与资源地址。Preset.stash 和 Profile.base.stashPatch 保存 Stash 原生基础设置。renderStash 共用依赖/环路/规则流水线，独立转换节点和组；节点按快照内联。Stash 预览另返回 exportYaml，将已转换的托管规则内嵌，支持草稿独立文件导出。详见 [17](17-official-client-configuration-guides.md)。
 
 ## 2026-10-29：名称搜索谓词
 
