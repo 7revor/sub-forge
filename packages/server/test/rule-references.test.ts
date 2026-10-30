@@ -4,6 +4,7 @@ import type { Matcher } from '@sub-forge/core';
 import { setupRuleReferences } from './rule-reference-fixture.ts';
 import { client } from './helpers.ts';
 import { repositoryMatcher } from '../src/ruleset-reference.ts';
+import { parse } from 'yaml';
 
 const envs: Awaited<ReturnType<typeof setupRuleReferences>>[] = [];
 afterEach(async () => { for (const env of envs.splice(0)) await env.stop(); });
@@ -48,7 +49,9 @@ describe('模板统一规则引用', () => {
     const rendered = await h.renderer.render('p', { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
     if (!rendered.ok) return;
-    expect(rendered.render.yaml).toContain('RULE-SET');
+    const config = parse(rendered.render.yaml);
+    expect(Object.keys(config['rule-providers'])).toEqual(['Google']);
+    expect(config.rules).toContain('RULE-SET,Google,REJECT');
     expect(Object.values(ruleBodies(h.store, rendered.render)).join('\n')).toContain('google.example.test');
     expect(h.store.list('ruleset')).toHaveLength(2);
     expect((await h.admin.del('/api/rule-repos/blackmatrix7')).status).toBe(409);
