@@ -140,7 +140,9 @@ export function createApp(deps: AppDeps) {
     if (!renderer.canReadNodes(selected, t.userId) || typeof selected.providers[key] !== 'string') return notFound(c);
     const traffic = userinfoHeader(selected.providerUserinfo?.[key]);
     if (traffic) c.header('subscription-userinfo', traffic);
-    c.header('content-type', 'text/yaml; charset=utf-8');
+    c.header('content-type', 'text/plain; charset=utf-8');
+    c.header('content-disposition', 'inline');
+    c.header('x-content-type-options', 'nosniff');
     return c.body(selected.providers[key]!.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
@@ -218,7 +220,7 @@ export function createApp(deps: AppDeps) {
       if (traffic) c.header('subscription-userinfo', traffic);
       c.header('profile-update-interval', String(Math.max(1, Math.round(store.resourceCacheTtlSec / 3600))));
       c.header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(store.get(type, id)!.name)}`);
-      c.header('content-type', 'text/yaml; charset=utf-8');
+      c.header('content-type', 'text/plain; charset=utf-8');
       c.header('x-content-type-options', 'nosniff');
       return c.body(result.yaml);
     } catch (error) {

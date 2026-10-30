@@ -27,6 +27,16 @@
 
 原文缓存按地址、有效拉取参数共享；公共规则跨用户共用，私有节点按用户隔离。系统统一 TTL，默认 24 小时；后台最多 4 个并发拉取，未浏览或引用的仓库文件不预抓取。过期请求等待合并的在途拉取，失败保留最后成功原文并延后一个周期。公共规则下载单独刷新其来源，不重新生成整个订阅；输入摘要未变时复用已转换产物，同一资源并发下载合并。转换失败保留成功产物，系统页显示错误，响应头 `X-Sub-Forge-Warning: last-good-rule` 标识回退。
 
+## 复制与文件预览
+
+配置订阅、节点订阅（远程源、组合、本地节点）、规则增强的列表和详情均可复制当前用户 token 的托管链接；首页的配置订阅、节点订阅表也提供复制按钮。未保存的详情修改不能复制，避免把旧内容误当作已保存结果。
+
+规则仓库文件、模板及订阅中的非静态规则、订阅中的节点来源点击后在新标签页直接显示文件。响应使用 `text/plain`、`Content-Disposition: inline`、`nosniff` 与 `no-store`，不触发附件下载；规则原文保留注释和空行。静态规则继续在弹窗内预览。二进制 MRS/SRS 不支持文本展示，返回明确说明，客户端托管下载不受影响。
+
+文件链接直接引用已保存的仓库文件或文档规则，不接受任意上游 URL，也不创建私有订阅或预览产物。公共模板、仓库文件持有效用户 token 即可读取；配置内的规则文件和节点仍校验用户归属。增强引用展示启用来源的原文，增强后的客户端结果通过其复制链接获取。
+
+规则链接附带 matcher 摘要，仅用于检查草稿是否已保存，不作为授权凭据。未保存修改或读取中配置变化返回 409，要求保存后重新打开；token 撤销、用户停用或对应引用删除返回 404。在途读取结束再次检查权限和引用，删除后不会返回旧正文。来源缓存继续使用公共原文缓存及原有清理机制。
+
 ## 节点流量信息
 
 独立节点链接按 UA 或显式 target/platform 适配 Mihomo、Stash、Surge、Loon，并在 `Subscription-Userinfo` 响应头提供上游返回的 upload、download、total、expire。GET 和 HEAD 的响应头相同，HEAD 没有正文；主配置内的 `/p` 也带对应节点集的流量，不误用整个配置的汇总。未知 UA 默认 Mihomo；Surge / Loon 节点输出使用各自的原生文本格式。
@@ -64,6 +74,8 @@ Stash 的请求约定见官方[机场订阅文档](https://stash.wiki/features/s
 - `GET /r/:token/:key`：公共规则；目标由资源键确定，query 不能切换产物。
 - `GET /rules/:token/:id`：公共规则增强的独立链接；按 UA 或 target/platform 选择 Mihomo / Stash / Surge / Loon 变体，与主订阅的规则引用共用公共产物。
 - `GET /api/resource-links/:kind/:id`：登录后复制 sources / collections / locals / profiles / rulesets 链接，私有对象及节点依赖检查归属，公共规则使用当前用户 token；不拉取上游。
+- `GET /api/files/:token/repository?repo&ref&path`：直接展示当前索引内的公共仓库文件。
+- `GET /api/files/:token/{templates|profiles}/:id/rules/:ruleId?revision=...`：直接展示已保存非静态规则的来源原文；模板公共、配置私有，摘要须匹配当前 matcher。
 - `GET /api/profiles/:id/link`：登录后读取本人的配置链接。
 - `GET /api/me/token`、`POST /api/me/token/reset`：读取、重置用户 token；重置 body 为当前 `{ token }`，过期值返回 409。
 - `GET /api/system/rule-resources`、`DELETE /api/system/rule-resources/:key`：管理员管理公共产物。

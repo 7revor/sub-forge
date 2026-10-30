@@ -73,6 +73,9 @@ it.each(['clash.meta', 'Stash/3.6.0'])('节点链接向 %s 的 GET 和 HEAD 返�
   const h = setup(), url = `/nodes/${h.token}/source/a`, headers = { 'user-agent': ua };
   const first = await h.app.request(url, { headers });
   expect(first.status).toBe(200); expect(first.headers.get('subscription-userinfo')).toBe('upload=0; download=10; total=1000; expire=2000000000');
+  expect(first.headers.get('content-type')).toContain('text/plain');
+  expect(first.headers.get('content-disposition')).toMatch(/^inline;/);
+  expect(first.headers.get('x-content-type-options')).toBe('nosniff');
   expect(parse(await first.text()).proxies).toHaveLength(1);
   const head = await h.app.request(url, { method: 'HEAD', headers }); expect(head.status).toBe(200); expect(await head.text()).toBe(''); expect(head.headers.get('subscription-userinfo')).toBe(first.headers.get('subscription-userinfo'));
   expect(h.fetcher).toHaveBeenCalledTimes(1);
@@ -90,6 +93,8 @@ it('组合按唯一上游累计已知字段和最早到期，内部 provider 带
   expect((await h.app.request(`/nodes/${h.token}/local/l`)).headers.get('subscription-userinfo')).toBeNull();
   const main = parse(await (await h.app.request(`/sub/${h.token}/p`)).text());
   const provider = await h.app.request(main['proxy-providers']['组合'].url, { method: 'HEAD' });
+  expect(provider.headers.get('content-type')).toContain('text/plain');
+  expect(provider.headers.get('content-disposition')).toBe('inline');
   expect(provider.status).toBe(200); expect(provider.headers.get('subscription-userinfo')).toBe(expected); expect(await provider.text()).toBe('');
 });
 

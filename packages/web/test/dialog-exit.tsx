@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider, Link } from 'react-router';
 import { Frame as FrameApi } from '../src/modals/Frame.tsx';
 import { createModal, ModalRoot, ModalContent, ModalHeader, ModalTitle, useModalDraft, useModalPresentation } from '../src/modals/index.tsx';
-import { NodeSetPreviewModal } from '../src/components/NodeSetPreviewModal.tsx';
 import { ProfileGroupDialog } from '../src/pages/profile/ProfileGroupDialog.tsx';
 import { ChainRuleModal } from '../src/pages/profile/ChainRuleModal.tsx';
 import { exactNodeFilter } from '../src/pages/profile/memberModel.ts';
@@ -32,7 +31,7 @@ const NestedModal = createModal<{ name: string }, string>(function NestedBody({ 
   const [name, setName] = useModalDraft(data.name);
   return <ModalContent><ModalHeader><ModalTitle>嵌套草稿与路由验收</ModalTitle></ModalHeader><Input placeholder="输入独立草稿名称" value={name} onChange={e => setName(e.target.value)} />
     <Button onClick={async () => { const result = await FrameApi.modal.prompt({ title: '子弹窗', initialValue: name, placeholder: '输入子弹窗草稿' }); if (result.status === 'confirmed') setName(result.data); }}>打开子弹窗</Button>
-    <Button onClick={() => void NodeSetPreviewModal.show(nodeFixture)}>打开嵌套节点预览</Button>
+    <Button onClick={() => void QueryModal.show({})}>打开嵌套查询预览</Button>
     <Link to="/test/dialog-exit.html?route=next">切换路由</Link><Button onClick={modal.cancel}>取消</Button><Button onClick={() => modal.confirm(name)}>保存</Button></ModalContent>;
 });
 
@@ -103,7 +102,6 @@ function App() {
       <Button onClick={() => void record(FrameApi.modal.confirm({ title: '删除第一份文档？', description: '被 3 个策略组引用，删除后引用将失效。', confirmLabel: '删除', danger: true }))}>删除确认一</Button>
       <Button onClick={() => void record(FrameApi.modal.confirm({ title: '删除第二份文档，名称较长以验证重开更新？', description: '第二份文档的独立说明。', danger: true }))}>删除确认二</Button>
       <Button onClick={() => void record(RuleSourcePreview.show({ matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'exit.example.test' } } }))}>静态规则预览</Button>
-      <Button onClick={() => void record(NodeSetPreviewModal.show(nodeFixture))}>节点列表退场</Button>
       <Button onClick={() => void record(ChainRuleModal.show({ ...profileFixture, title: '代理链退场验收', chain: { id: 'exit-chain', landing: { nodeSet: nodeFixture.nodeSet, filter: 'GCP', excludeFilter: '过期' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'relay' }, match: { regex: '日本' } } } } }))}>代理链列表退场</Button>
       <Button onClick={() => void record(ChainRuleModal.show({ ...profileFixture, title: '全部来源代理链退场', chain: { id: 'all-chain', landing: { nodeSet: { type: 'all', id: 'inline' } }, via: { kind: 'node', ref: { nodeSet: { type: 'all', id: 'provider' }, match: { regex: '' } } } } }))}>全部来源代理链退场</Button>
       <Button onClick={() => void record(ChainRuleModal.show({

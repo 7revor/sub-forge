@@ -9,7 +9,7 @@ import { formatRelativeTime } from '../../utils/format.ts';
 import { accessLogOptions } from '../../hooks/documentQueries.ts';
 import { Notice } from '../../components/Notice.tsx';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
-import { NodeSetPreviewModal } from '../../components/NodeSetPreviewModal.tsx';
+import { ResourceFileLink } from '../../components/ResourceLinkButton.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 // Profile 标签：概览（输出设置、访问日志）、基础设置、节点集。
 
@@ -169,7 +169,7 @@ export function TabNodeSets() {
         actions={<Button size="sm" onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={14} />添加节点集</Button>}>
         {!draft.nodeSets.length ? <Empty title="还没有节点集" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[24px_32px_minmax(0,1fr)_68px] md:grid-cols-[24px_32px_minmax(0,1fr)_minmax(0,1fr)_140px_68px]">
           {handle}<RoutingCardIcon><Boxes size={16} /></RoutingCardIcon>
-          <button type="button" aria-label={`预览 ${nodeSetName(n.ref)} 的节点`} onClick={() => void NodeSetPreviewModal.show({ nodeSet: n.ref, name: nodeSetName(n.ref) })} className="min-w-0 cursor-pointer truncate rounded text-left font-medium hover:text-brand hover:underline focus-visible:outline-brand">{nodeSetName(n.ref)}</button>
+          <ResourceFileLink kind={n.ref.type === 'source' ? 'sources' : n.ref.type === 'collection' ? 'collections' : 'locals'} id={n.ref.id} name={nodeSetName(n.ref)} className="min-w-0 cursor-pointer truncate rounded text-left font-medium no-underline hover:text-brand hover:underline focus-visible:outline-brand" />
           <span className="col-start-3 row-start-2 min-w-0 truncate text-ink-2 md:col-auto md:row-auto">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span>
           <div className="col-span-2 col-start-3 row-start-3 w-[140px] md:col-auto md:row-auto [&>div]:w-full [&_button]:flex-1 [&_button]:px-0"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>
           <div className="col-start-4 row-start-1 grid w-[68px] grid-cols-2 gap-1 md:col-auto md:row-auto">

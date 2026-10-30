@@ -29,6 +29,7 @@ for (const bound of [false, true]) env.store.put('profile', {
 if (process.argv.includes('--icons')) {
   const nodeSet = { type: 'local' as const, id: 'icon-nodes' };
   env.store.importSeed({
+    sources: [{ id: 'copy-source', name: '首页复制链接验收', url: 'https://nodes.example.test/sub', pipeline: [] }],
     locals: [{ id: nodeSet.id, name: '图标验收节点', proxies: [{ name: '演示节点', type: 'socks5', server: 'node.example.test', port: 1080 }] }],
     collections: [{ id: 'icon-collection', name: '图标验收组合', members: [{ ref: nodeSet }], pipeline: [{ op: 'rename.regex', rules: [{ pattern: '演示', replace: '测试' }] }] }],
     tokens: [{ token: 'icon-audit-demo-token', userId: env.user.id }],
@@ -50,7 +51,8 @@ let stopping = false;
 async function stop() {
   if (stopping) return;
   stopping = true;
-  if ('closeIdleConnections' in server) server.closeIdleConnections();
+  env.store.closeEvents();
+  if ('closeAllConnections' in server) server.closeAllConnections();
   await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done()));
   await env.stop();
 }

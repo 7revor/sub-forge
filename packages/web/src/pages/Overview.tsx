@@ -1,3 +1,4 @@
+import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 import { boundTemplateId, modeLabel } from './profile/routing.ts';
 import { formatRelativeTime } from '../utils/format.ts';
 import { accessLogOptions, snapshotOptions } from '../hooks/documentQueries.ts';
@@ -107,7 +108,7 @@ export function Overview() {
                       <td className={cx(td, 'font-mono')}>{p.nodeSets.length}</td>
                       <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-[12px] text-ink-muted">{last.client}</span></div> : <span className="text-ink-muted">从未访问</span>}</td>
                       <td className={td}>{!last ? <Badge>未访问</Badge> : last.status !== 200 ? <Badge tone="err">渲染失败</Badge> : last.warnings ? <Badge tone="warn">{last.warnings} 条告警</Badge> : <Badge tone="ok">正常</Badge>}</td>
-                      <td className={cx(td, 'text-right')}><DocActionLink to={`/profiles/${p.id}`} name={p.name} /></td>
+                      <td className={cx(td, 'text-right')}><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="profiles" id={p.id} name={p.name} size="sm" /><DocActionLink to={`/profiles/${p.id}`} name={p.name} /></div></td>
                     </DocTableRow>
                   ))}
                 </tbody>
@@ -140,7 +141,7 @@ export function Overview() {
                         ) : <span className="text-[12.5px] text-ink-muted">—</span>}</td>
                         <td className={cx(td, 'whitespace-nowrap text-ink-muted')}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
                         <td className={td}><SourceFetchStatus state={st ?? { failing: false, lastOk: undefined }} /></td>
-                        <td className={cx(td, 'text-right')}><DocActionLink to={`/sources/${source.id}`} name={source.name} /></td>
+                        <td className={cx(td, 'text-right')}><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="sources" id={source.id} name={source.name} size="sm" /><DocActionLink to={`/sources/${source.id}`} name={source.name} /></div></td>
                       </DocTableRow>
                     );
                   })}

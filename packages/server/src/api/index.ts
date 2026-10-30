@@ -1,10 +1,11 @@
 import { ResourceAccessError } from '../resource-access.ts';
 import { resourceLinkRoutes } from './resource-links.ts';
+import { fileRoutes } from './files.ts';
 import { ResourceService } from '../resources.ts';
 import { resourceRoutes } from './resources.ts';
 import { systemRoutes } from './system.ts';
 import { ruleConversionRoutes } from './rule-conversion.ts';
-// 管理接口入口：/api/*。所有接口都返回 JSON；错误格式为 { error, details? }。
+// 管理接口入口：/api/*。管理接口返回 JSON；/files 为带用户 token 的文本文件入口。
 
 import { nodeProbeRoutes } from './node-probe.ts';
 import type { NodeProbe } from '../node-probe.ts';
@@ -56,6 +57,7 @@ export function createApi(deps: ApiDeps) {
   const repos = deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now,undefined,deps.snapshots);
   const resources=deps.resources ?? new ResourceService(deps.store,deps.snapshots,deps.renderer,deps.now);
   resources.setAdditionalResources(() => repos.cachedResources());
+  api.route('/files', fileRoutes(deps.store, deps.snapshots, repos));
   api.route('/', ruleRepoRoutes(deps.store, repos, resources));
   api.route('/', ruleOptionRoutes(deps.store, repos));
 

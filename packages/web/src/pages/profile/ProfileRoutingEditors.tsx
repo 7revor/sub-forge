@@ -54,7 +54,7 @@ export function ProfileRulesEditor() {
   const { draft, setDraft, groupOptions, profileNodeSets } = useProfile();
   const { body, update, bound } = useRoutingBody();
   const rulesets = useRuleSetRefs();
-  const props = { ctx: { rulesets: rulesets.data ?? [] }, onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, extendedOptions: true };
+  const props = { previewContext: { kind: 'profiles' as const, id: draft.id }, ctx: { rulesets: rulesets.data ?? [] }, onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, extendedOptions: true };
   const prepend = { ...body, rules: draft.routing?.mode === 'bound' ? draft.routing.prependRules ?? [] : [] };
   return <>
     <ErrorAlert error={rulesets.error} />
