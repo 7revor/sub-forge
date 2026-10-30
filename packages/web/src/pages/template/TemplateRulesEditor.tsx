@@ -1,4 +1,4 @@
-import { remoteRuleMatcher, withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
+import { withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -7,7 +7,7 @@ import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { targetLabel } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
-import { Button, Card, Empty, ErrorAlert, Field, FieldError, Input, Modal, buttonClass, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, ErrorAlert, Field, Modal, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { Presence } from '../../components/Presence.tsx';
@@ -51,7 +51,6 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
 }) {
-  const [urlError, setUrlError] = useState<string>();
   const [adding, setAdding] = useState(false);
   const repositories = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: value.rules.some(r => r.matcher.kind === 'ruleset' && !!r.matcher.repository) });
   const repos = repositories.data?.repos ?? [];
@@ -108,20 +107,11 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={close}>完成</Button></>}>
       {rule ? <>
         <ItemIssues report={report} where={`rule:${rule.id}`} />
-        {rule.matcher.kind === 'ruleset' && rule.matcher.remote ? <Field label="远程链接">{id => <Input id={id} type="url" value={rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : ''} onChange={e => {
-          const url = e.target.value;
-          let matcher: Matcher;
-          try { matcher = remoteRuleMatcher(url); setUrlError(undefined); }
-          catch (error) {
-            matcher = { kind: 'ruleset', id: '', remote: { url } };
-            setUrlError(error instanceof Error ? error.message : String(error));
-          }
-          update({ ...rule, matcher });
-        }} />}</Field> : rule.matcher.kind === 'ruleset' ? <Field label="规则来源">{id => <>
-          <RuleMatcher matcher={rule.matcher} ctx={ctx} repos={repos} />
-          <RuleSetPicker id={id} label="更换规则来源" onSelect={matcher => update({ ...rule, matcher })} />
-        </>}</Field> : <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}><MatcherEditor fixedKind value={rule.matcher} rulesets={ctx.rulesets} ruleValue={withIpOptions(rule.matcher.rule, rule.options ?? {})} onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} /></div>}
-        {rule.matcher.kind === 'ruleset' && rule.matcher.remote && !rule.matcher.id && urlError && <FieldError error={urlError} />}
+        <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}>
+          <MatcherEditor value={rule.matcher} rulesets={ctx.rulesets}
+            ruleValue={rule.matcher.kind === 'rule' ? withIpOptions(rule.matcher.rule, rule.options ?? {}) : undefined}
+            onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} />
+        </div>
         <Field label="出口">{() => <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={target => update({ ...rule, target })} />}</Field>
       </> : <>
         <span className="text-[13px] text-muted">以上规则均未匹配时使用。</span>
