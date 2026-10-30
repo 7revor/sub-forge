@@ -287,3 +287,15 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 2026-10-30 合并待同步补充：新版订阅单页的成员填充与组设置弹窗、前置编辑器、系统资源缓存字段采用相同中文提示和空值交互。组设置空 lazy 显示用途说明，下拉只含开/关，清空后恢复说明；前置策略组空值显示连接用途，不绘制空选项。参考 [合并验收](../research/verification/form-placeholders-merge-20261030/README.md)，本轮未编辑外部画布。
 
 2026-10-30 待同步：订阅组弹窗高 800px 上限，模板/前置弹窗高 680px 上限，均预留视口边距并固定底栏。全 Provider 时引用区排在固定成员前；循环组显示禁用原因；隐藏用禁用开关、类型及清空按钮明确禁用。模板关联使用单选方式与底部一次确认，保留中文 placeholder、清空与真实空值规则。此次合并未重试或编辑外部画布，沿用现有待同步状态；当前截图见 research/verification/subscription-dialog-merge-20261030/。
+
+### 2026-10-30：代理链流量顺序（待同步）
+
+本轮实际访问画布要求登录，未修改远程画布；证据 `research/verification/chain-flow-editor-20261030/design-canvas-login.png`。
+
+- 连续页面将代理链紧跟节点来源；节点集行移除整集前置按钮。
+- 「添加 / 编辑代理链」定高 680px（不超过视口减 32px）、桌面宽度上限 896px，底部固定取消与应用。
+- 顶部路径「本机 → 前置 → 落地 → 目标」。桌面左块「1. 前置节点」、右块「2. 落地节点」，窄屏上下排列，中间细分隔线，无嵌套虚线。
+- 前置 Provider：来源下拉 + 正则筛选 + 命中数/首个实际采用节点；Inline：来源下拉 + 搜索 + 点选；策略组：下拉。落地 Inline 指定单节点、Provider 指定整个节点集。未选来源显示中文占位，不能预填来源或示例正则。
+- 历史落地正则显示原范围与「重新选择落地」；确认移出来源列出前置和落地受影响链，取消不变。
+
+参考本轮 `provider-to-inline.png`、`inline-to-provider.png`、`mobile-chain.png`、`remove-confirmation.png`。Mihomo 依据：[dialer-proxy](https://wiki.metacubex.one/config/proxies/dialer-proxy/)、[Provider 覆写](https://wiki.metacubex.one/config/proxy-providers/#override)、[组筛选](https://wiki.metacubex.one/config/proxy-groups/#filter)。

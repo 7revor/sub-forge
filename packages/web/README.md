@@ -244,3 +244,5 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。
 
 2026-10-30 订阅弹窗整合：固定正文滚动与底部操作，单节点前置复用组弹窗底栏；全 Provider 优先引用，循环候选说明原因。显式传递 disabled，并保留公共 Select 必填中文 placeholder、clearable 和 false/0 语义。验收见 research/verification/subscription-dialog-merge-20261030/README.md。
+
+2026-10-30 代理链编辑：节点来源后展示代理链，按前置 → 落地分块；Provider 前置输入正则并显示实际首个命中，Inline 点选、组选择，Provider 落地为整集。移出节点集先确认受影响链；清理直接落地、前置及嵌套回退引用，保留其他链。旧范围显式保留，原子取消不写入订阅。浏览器验收见 research/verification/chain-flow-editor-20261030/。

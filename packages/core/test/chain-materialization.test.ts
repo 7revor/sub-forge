@@ -57,4 +57,24 @@ describe('订阅专属 Provider 服务端覆写', () => {
     f.profile.routing.config.groups[0]!.members.push({ kind: 'node', ref: { nodeSet: ref, match: { exact: '落地' } } });
     expect(renderMihomo(f).config.proxies).toEqual([expect.objectContaining({ name: '落地', 'dialer-proxy': 'DIRECT' })]);
   });
+  it.each(['provider', 'inline'] as const)('Provider 正则前置连接 %s 落地，Mihomo 与 Stash 使用相同首个命中', output => {
+    const f = fixture(); f.profile.nodeSets[0]!.output = output;
+    const via = { type: 'local' as const, id: 'relay' };
+    f.profile.nodeSets.push({ ref: via, output: 'provider' });
+    f.nodeSets.locals.relay = { id: 'relay', name: '中转', proxies: [
+      { name: '香港 [01]', type: 'socks5', server: 'hk.test', port: 1080 },
+      { name: '香港 [02]', type: 'socks5', server: 'hk2.test', port: 1080 },
+    ] };
+    f.profile.chains = [{ id: 'regex', landing: { nodeSet: ref, ...(output === 'inline' ? { filter: '^落地$' } : {}) }, via: { kind: 'node', ref: { nodeSet: via, match: { regex: '香港' }, fallback: 'error' } } }];
+    const m = renderMihomo(f), stash = renderStash(f);
+    expect(m.report.hasErrors).toBe(false); expect(stash.report.hasErrors).toBe(false);
+    const wrapper = (m.config['proxy-groups'] as { name: string; hidden?: boolean }[]).find(g => g.hidden);
+    expect(wrapper).toMatchObject({ type: 'select', use: ['中转'], filter: '^香港 \\[01\\]$', 'empty-fallback': 'REJECT' });
+    const landings = output === 'provider' ? parse(m.providers['source:s']!.yaml).proxies : m.config.proxies;
+    expect(landings.find((p: any) => p.name === '落地')['dialer-proxy']).toBe(wrapper!.name);
+    expect((stash.config.proxies as any[]).find(p => p.name === '落地')['dialer-proxy']).toBe('香港 [01]');
+    if (output === 'inline') expect(landings.find((p: any) => p.name === '前置')['dialer-proxy']).toBeUndefined();
+    else expect(landings.every((p: any) => p['dialer-proxy'] === wrapper!.name)).toBe(true);
+  });
+
 });

@@ -28,6 +28,8 @@ store.importSeed({
   } } }, { id: 'bound', name: '模板绑定验收', overlay: {}, nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'bound', templateId: 'tpl', groupAdditions: {} } }],
   tokens: [{ token: 'member-test-token', profileId: 'independent', label: '验收设备' }],
 }, user.id);
+// 旧落地正则需保留原范围，不能因新编辑器只提供整集 / 单节点而静默扩大。
+store.put('profile', { id: 'legacy-chain', name: '历史代理链兼容', overlay: {}, nodeSets: allProviders, refPolicy: { default: 'wrap' }, chains: [{ id: 'legacy', landing: { nodeSet: { type: 'local', id: 'self' }, filter: 'GCP', excludeFilter: '过期' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'relay' }, match: { exact: '🇭🇰 香港 IPLC' }, fallback: 'error' } } }], routing: { mode: 'independent', config: { groups: [], rules: [], final: direct } } }, user.id);
 const snapshots = new SnapshotService(store, async url => { throw new Error(`验收禁止访问上游：${url}`); });
 const publicUrl = 'http://member-chain.localhost:18952';
 const renderer = new RenderService(store, snapshots, { publicUrl });

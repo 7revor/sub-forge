@@ -1,4 +1,5 @@
 import { ChainRuleEditor, chainForLanding } from './ChainRuleEditor.tsx';
+import { landingNodeName } from './chainModel.ts';
 import { putChain } from './memberModel.ts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog.tsx';
 import { persistedProfile } from './routing.ts';
@@ -36,8 +37,7 @@ export function TabChains() {
   // 编辑在对话框里进行：index 为 -1 表示新增
   const [editing, setEditing] = useState<{ index: number; chain: ChainRule }>();
   const add = () => {
-    const ns = profileNodeSets[0]?.ref;
-    if (ns) setEditing({ index: -1, chain: { ...chainForLanding([], { nodeSet: ns }), landing: { nodeSet: ns, filter: '.*' } } });
+    setEditing({ index: -1, chain: chainForLanding([], { nodeSet: { type: 'source', id: '' } }) });
   };
   const perRef = draft.refPolicy.perRef ?? {};
   const chainReport = (preview.data?.report ?? []).filter((r) =>
@@ -45,14 +45,14 @@ export function TabChains() {
 
   return (
     <>
-      <Card title={`链规则`}
-        actions={<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加链规则</Button>}>
-        {!draft.chains.length ? <Empty title={profileNodeSets.length ? '还没有链规则' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
+      <Card title="代理链" subtitle="流量依次经过前置节点、落地节点，再访问目标。"
+        actions={<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加代理链</Button>}>
+        {!draft.chains.length ? <Empty title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
           <div className="flex flex-col gap-3">
             {draft.chains.map((c, i) => (
               <div key={c.id} className="flex flex-col gap-3 rounded-[10px] border border-line bg-[#fafbfc] p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[13.5px] font-semibold">#{i + 1} · {nodeSetName(c.landing.nodeSet)}{c.landing.filter ? ` 中命中 ${c.landing.filter} 的节点` : ' 全部节点'}经由「{targetLabel(c.via, groupName, nodeSetName)}」</span>
+                  <span className="text-[13.5px] font-semibold">代理链 {i + 1}</span>
                   <div className="flex gap-1.5">
                     <Button size="sm" onClick={() => setEditing({ index: i, chain: c })}>编辑</Button>
                     <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除链规则 ${i + 1}`} onClick={() => setDraft({ ...draft, chains: draft.chains.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
@@ -61,9 +61,9 @@ export function TabChains() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Hop k="客户端" v="本机" />
                   <ArrowRight size={18} className="text-faint" aria-hidden="true" />
-                  <Hop k={c.via.kind === 'group' ? '策略组' : c.via.kind === 'node' ? `${nodeSetName(c.via.ref.nodeSet)} 节点` : '内置'} v={targetLabel(c.via, groupName, nodeSetName)} accent />
+                  <Hop k="前置节点" v={targetLabel(c.via, groupName, nodeSetName)} accent />
                   <ArrowRight size={18} className="text-faint" aria-hidden="true" />
-                  <Hop k={nodeSetName(c.landing.nodeSet)} v={c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点'} />
+                  <Hop k={`落地 · ${nodeSetName(c.landing.nodeSet)}`} v={landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')} />
                   <ArrowRight size={18} className="text-faint" aria-hidden="true" />
                   <Hop k="目标" v="互联网" />
                 </div>
@@ -101,7 +101,7 @@ export function TabChains() {
         )}
         {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-ink-muted">依赖节点不可用时拒绝连接。</p>}
       </Card>
-      <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(undefined); }}><DialogContent className="flex h-[min(680px,calc(100dvh-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl" aria-describedby={undefined}><DialogHeader className="shrink-0 border-b border-line px-5 py-4"><DialogTitle>{editing?.index === -1 ? '添加前置规则' : '编辑前置规则'}</DialogTitle></DialogHeader>{editing && <ChainRuleEditor key={editing.chain.id} initial={editing.chain} onCancel={() => setEditing(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); preview.reset(); setEditing(undefined); }} />}</DialogContent></Dialog>
+      <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(undefined); }}><DialogContent className="flex h-[min(680px,calc(100dvh-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl" aria-describedby={undefined}><DialogHeader className="shrink-0 border-b border-line px-5 py-4"><DialogTitle>{editing?.index === -1 ? '添加代理链' : '编辑代理链'}</DialogTitle></DialogHeader>{editing && <ChainRuleEditor key={editing.chain.id} initial={editing.chain} onCancel={() => setEditing(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); preview.reset(); setEditing(undefined); }} />}</DialogContent></Dialog>
     </>
   );
 }

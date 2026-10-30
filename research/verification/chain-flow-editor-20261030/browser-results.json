@@ -1,0 +1,117 @@
+[
+  {
+    "scenario": "Provider 正则筛选到 Inline 单节点，多个命中展示实际采用首项",
+    "status": "passed",
+    "evidence": "provider-to-inline.png",
+    "geometry": {
+      "dialog": {
+        "bottom": 700,
+        "height": 680,
+        "left": 192,
+        "right": 1088,
+        "top": 20,
+        "width": 896,
+        "x": 192,
+        "y": 20
+      },
+      "footer": {
+        "bottom": 699,
+        "height": 65,
+        "left": 193,
+        "right": 1087,
+        "top": 634,
+        "width": 894,
+        "x": 193,
+        "y": 634
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "保存刷新后 Provider 筛选与特殊字符 Inline 落地回显",
+    "status": "passed"
+  },
+  {
+    "scenario": "Inline 点选前置到 Provider 整集落地，确认位置固定",
+    "status": "passed",
+    "evidence": "inline-to-provider.png",
+    "geometry": {
+      "dialog": {
+        "bottom": 700,
+        "height": 680,
+        "left": 192,
+        "right": 1088,
+        "top": 20,
+        "width": 896,
+        "x": 192,
+        "y": 20
+      },
+      "footer": {
+        "bottom": 699,
+        "height": 65,
+        "left": 193,
+        "right": 1087,
+        "top": 634,
+        "width": 894,
+        "x": 193,
+        "y": 634
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "策略组选择作为前置，Provider 作为整集落地",
+    "status": "passed"
+  },
+  {
+    "scenario": "移出来源提示同时覆盖前置和落地引用；取消保留3条，确认移除2条，刷新保留无关1条",
+    "status": "passed",
+    "evidence": "remove-confirmation.png"
+  },
+  {
+    "scenario": "390px 窄屏分块可滚动，底部确认位置不变、无横向溢出",
+    "status": "passed",
+    "evidence": "mobile-chain.png",
+    "geometry": {
+      "dialog": {
+        "bottom": 762,
+        "height": 680,
+        "left": 16,
+        "right": 374,
+        "top": 82,
+        "width": 358,
+        "x": 16,
+        "y": 82
+      },
+      "footer": {
+        "bottom": 761,
+        "height": 105,
+        "left": 17,
+        "right": 373,
+        "top": 656,
+        "width": 356,
+        "x": 17,
+        "y": 656
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "非法正则、前置与整集落地同源均阻止应用",
+    "status": "passed"
+  },
+  {
+    "scenario": "旧 Provider 落地筛选和排除条件在修改前置并保存刷新后保持不变",
+    "status": "passed",
+    "evidence": "legacy-range.png"
+  },
+  {
+    "scenario": "组内单节点前置使用同一顺序、固定落地与底栏；取消组编辑撤销链草稿",
+    "status": "passed"
+  },
+  {
+    "scenario": "最终版本新增保持空来源、Provider 前置到整集落地可应用，移出提示显示完整落地范围",
+    "status": "passed",
+    "evidence": "remove-confirmation-final.png"
+  }
+]

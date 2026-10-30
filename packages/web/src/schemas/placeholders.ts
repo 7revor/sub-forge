@@ -113,3 +113,11 @@ export const groupPlaceholders = {
   hidden: '是否在控制面板中隐藏此策略组',
   icon: '控制面板显示的策略组图标地址',
 } as const;
+
+/** 代理链使用 Provider 筛选定位前置，再按 dialer-proxy 连接落地。
+ * https://wiki.metacubex.one/config/proxy-groups/#filter
+ * https://wiki.metacubex.one/config/proxies/dialer-proxy/
+ */
+export const chainPlaceholders = {
+  viaFilter: '输入前置节点关键词或正则，例如 (?i)香港|HK',
+} as const;

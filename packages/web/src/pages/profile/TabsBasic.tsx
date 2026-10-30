@@ -1,6 +1,5 @@
-import type { ChainRule } from '@sub-forge/core';
-import { ChainRuleEditor, chainForLanding } from './ChainRuleEditor.tsx';
-import { nodeSetKey, putChain } from './memberModel.ts';
+import type { NodeSetID } from '@sub-forge/core';
+import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
 import { targetLabel } from '../../components/pickers.tsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from '../../components/ui/alert-dialog.tsx';
@@ -209,12 +208,13 @@ export function TabBase() {
 export function TabNodeSets() {
   const { draft, setDraft, allNodeSets, nodeSetName, groupName } = useProfile();
   const [adding, setAdding] = useState(false);
-  const [editingChain, setEditingChain] = useState<ChainRule>();
+  const [removing, setRemoving] = useState<NodeSetID>();
+  const affected = removing ? draft.chains.filter(c => chainUsesNodeSet(c, removing)) : [];
   const chained = new Set(draft.chains.map((c) => `${c.landing.nodeSet.type}:${c.landing.nodeSet.id}`));
 
   return (
     <>
-      <Card title="节点来源" subtitle="加入节点集后，在下方策略组中填充。"
+      <Card title="节点来源" subtitle="选择输出方式后，可在下方设置代理链与策略组。"
         actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="pb-1">
         {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : <ul className="m-0 list-none p-0">
           {draft.nodeSets.map((n, i) => <li key={`${n.ref.type}:${n.ref.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line-2 px-4 py-3">
@@ -222,12 +222,17 @@ export function TabNodeSets() {
               <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
             </div>
             <Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} />
-            <Button size="sm" onClick={() => setEditingChain(chainForLanding(draft.chains, { nodeSet: n.ref }))}>{(() => { const c = draft.chains.find(c => nodeSetKey(c.landing.nodeSet) === nodeSetKey(n.ref) && !c.landing.filter && !c.landing.excludeFilter); return c ? `整集前置：${targetLabel(c.via, groupName, nodeSetName)}` : '设置整集前置'; })()}</Button>
-            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
+            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => { if (draft.chains.some(c => chainUsesNodeSet(c, n.ref))) setRemoving(n.ref); else setDraft(removeProfileNodeSet(draft, n.ref)); }}><Trash2 size={14} /></Button>
           </li>)}
         </ul>}
       </Card>
-      <Dialog open={!!editingChain} onOpenChange={open => { if (!open) setEditingChain(undefined); }}><DialogContent className="flex h-[min(680px,calc(100dvh-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl" aria-describedby={undefined}><DialogHeader className="shrink-0 border-b border-line px-5 py-4"><DialogTitle>节点集前置</DialogTitle></DialogHeader>{editingChain && <ChainRuleEditor key={editingChain.id} initial={editingChain} fixedLanding onCancel={() => setEditingChain(undefined)} onApply={chain => { setDraft({ ...draft, chains: putChain(draft.chains, chain) }); setEditingChain(undefined); }} onRemove={draft.chains.some(c => c.id === editingChain.id) ? () => { setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== editingChain.id) }); setEditingChain(undefined); } : undefined} />}</DialogContent></Dialog>
+      <AlertDialog open={!!removing} onOpenChange={open => { if (!open) setRemoving(undefined); }}><AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>移出节点集「{removing && nodeSetName(removing)}」？</AlertDialogTitle>
+          <AlertDialogDescription>以下 {affected.length} 条代理链引用了此节点集，将一起移除。保存订阅后生效。</AlertDialogDescription>
+        </AlertDialogHeader>
+        <ul className="m-0 max-h-60 list-none space-y-2 overflow-y-auto p-0 text-[13px]">{affected.map(c => <li key={c.id} className="rounded-md bg-ground px-3 py-2">{targetLabel(c.via, groupName, nodeSetName)} → {nodeSetName(c.landing.nodeSet)} · {landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}</li>)}</ul>
+        <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><Button variant="danger-solid" onClick={() => { if (removing) setDraft(removeProfileNodeSet(draft, removing)); setRemoving(undefined); }}>移出并移除代理链</Button></AlertDialogFooter>
+      </AlertDialogContent></AlertDialog>
       <NodeSetPickerDialog open={adding} options={allNodeSets} added={draft.nodeSets.map((n) => n.ref)} onClose={() => setAdding(false)}
         onAdd={(refs) => setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...refs.map((ref) => ({ ref, output: 'provider' as const }))] })} />
     </>

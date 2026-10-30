@@ -102,3 +102,5 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 `RenderInput.managedResources` 启用统一托管；`resourceIntervalSec` 指定 provider 间隔，服务端总是传入系统值。文本统一 classical LIST，符合限制的 MRS 原字节托管，SRS 报错。内核独立调用保留旧默认参数兼容性；生产策略由服务端确定。
 
 2026-10-30 订阅弹窗整合不改变渲染、Provider 前置、循环保护或客户端转换语义；空值提示仅存在于前端，false 与 0 保持真实值。领域模型与示例种子无需迁移。
+
+2026-10-30 代理链流量交互沿用现有模型：Provider 正则前置取节点顺序中的首个命中，默认隐藏组精确引用此节点；整集落地服务端覆写、Stash 内联翻译保持一致。`chain-materialization.test.ts` 新增 Provider 正则连接 Inline / Provider 两种落地的跨客户端断言。模型和示例种子无需迁移。
