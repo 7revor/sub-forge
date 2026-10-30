@@ -32,7 +32,7 @@ export function Users() {
         actions={<Button variant="primary" onClick={async () => { const result = await CreateUserModal.show({}); if (result.status === 'confirmed') { notifySuccess('用户已创建'); void refresh(); } }}><Plus size={16} />创建用户</Button>} />
       <ErrorAlert error={users.error ?? patch.error} />
       <PageScroll>
-        <section aria-label="用户列表" className="list-panel"><div className="overflow-x-auto">
+        <Card bodyClass="overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse">
             <thead><tr><th className={listTh}>用户</th><th className={listTh}>角色</th><th className={listTh}>配置订阅</th><th className={listTh}>订阅源</th><th className={listTh}>最近订阅请求</th><th className={listTh}>脚本编写权限</th><th className={listTh}>状态</th><th className={cx(listTh, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
             <tbody>
@@ -63,9 +63,8 @@ export function Users() {
               })}
             </tbody>
           </table>
-          </div>
-          {stats.data?.pending && <p className="table-panel-divider mx-0 my-0 px-6 py-3 text-[12px] text-ink-muted">统计暂不可用。</p>}
-        </section>
+          {stats.data?.pending && <p className="mx-4 my-3 text-[12px] text-ink-muted">统计暂不可用。</p>}
+        </Card>
 
         <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}
           actions={<Button onClick={async () => { const result = await ShareModal.show({ sources: sources.data ?? [], collections: collections.data ?? [], users: list.filter(u => u.id !== me?.id) }); if (result.status === 'confirmed') { notifySuccess('共享已添加'); void qc.invalidateQueries({ queryKey: ['shares'] }); } }}>共享…</Button>}>
