@@ -1,0 +1,108 @@
+[
+  {
+    "items": [
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      }
+    ],
+    "page": "模板策略组"
+  },
+  {
+    "page": "订阅源",
+    "searchBackground": "rgba(0, 0, 0, 0)",
+    "tables": [
+      {
+        "firstCell": "24px",
+        "firstHeader": "24px",
+        "lastCell": "24px",
+        "lastHeader": "24px"
+      }
+    ]
+  },
+  {
+    "page": "仓库管理",
+    "tables": [
+      {
+        "firstCell": "24px",
+        "firstHeader": "24px",
+        "label": "仓库管理",
+        "lastCell": "24px",
+        "lastHeader": "24px"
+      },
+      {
+        "firstCell": "24px",
+        "firstHeader": "24px",
+        "label": "规则文件",
+        "lastCell": "24px",
+        "lastHeader": "24px"
+      }
+    ]
+  },
+  {
+    "page": "窄屏仓库管理",
+    "pageWidth": 547,
+    "scrollers": [
+      {
+        "overflowX": "auto",
+        "scrollWidth": 908,
+        "width": 337
+      },
+      {
+        "overflowX": "auto",
+        "scrollWidth": 1040,
+        "width": 337
+      }
+    ],
+    "viewport": 375
+  },
+  {
+    "cards": [
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "scrollWidth": 303,
+        "width": 305
+      },
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "scrollWidth": 303,
+        "width": 305
+      },
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "scrollWidth": 303,
+        "width": 305
+      },
+      {
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "scrollWidth": 303,
+        "width": 305
+      }
+    ],
+    "page": "窄屏模板策略组",
+    "pageWidth": 375,
+    "viewport": 375
+  },
+  {
+    "page": "修改前的窄屏仓库管理",
+    "pageWidth": 547,
+    "tablePadding": "16px",
+    "viewport": 375
+  }
+]
