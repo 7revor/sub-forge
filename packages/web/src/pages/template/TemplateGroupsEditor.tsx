@@ -58,7 +58,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             <span className="col-span-2 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-4 sm:row-start-1" title={members}>{members}</span>
             <div className="col-start-4 row-start-2 flex flex-col items-center justify-center gap-0.5 sm:col-start-5 sm:row-start-1 sm:flex-row">
               <span className="text-[12px] text-ink-muted sm:hidden">隐藏</span>
-              {readOnly ? <span className="text-[12px] text-ink-muted">{g.display?.hidden ? '是' : '否'}</span> : <Switch label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />}
+              <Switch disabled={readOnly} label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
             </div>
             <div className="col-start-4 row-start-1 flex gap-1 sm:col-start-6">
               <Button size="sm" variant="ghost" className="px-1.5" aria-label={`编辑策略组「${g.name}」`} onClick={() => onSelect(g.id)}><Pencil size={14} /></Button>
@@ -75,12 +75,12 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <fieldset disabled={readOnly} className="m-0 contents border-0 p-0">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="组名称">{id => <Input placeholder="填写策略组在配置中的名称" id={id} value={group.name} onChange={e => update({ name: e.target.value })} />}</Field>
-          <GroupSettingsFields value={group} onChange={(key, next) => update({ [key]: next })} />
+          <GroupSettingsFields disabled={readOnly} value={group} onChange={(key, next) => update({ [key]: next })} />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
           <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
-          <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
+          <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect disabled={readOnly} id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
         </div>
         </fieldset>
         </SettingsSection>

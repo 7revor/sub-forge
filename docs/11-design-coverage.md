@@ -247,3 +247,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
 
 2026-10-30 合并补充：新版订阅成员填充、组设置、前置编辑及系统缓存表单已接入中文 placeholder；false/0 保存回显和清空恢复提示已在内置浏览器验证。外部画布待同步范围扩展至上述新表单，见 docs/13。
+
+2026-10-30 订阅弹窗复查合并：成员填充、组设置、模板关联及前置弹窗已实现固定容器、固定操作和正确禁用状态；清空、false/0、保存回显在内置浏览器复核。后端复用现有转换/保存接口，无新增待实现接口。外部画布本轮未编辑，保留待同步状态；证据见 research/verification/subscription-dialog-merge-20261030/README.md。

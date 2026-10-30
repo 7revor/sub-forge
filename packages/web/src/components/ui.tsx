@@ -131,10 +131,10 @@ export function Segmented<T extends string>({ value, options, onChange, label, s
   );
 }
 
-export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Switch({ checked, onChange, label, disabled = false }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
-      className={cx('relative h-[26px] w-11 shrink-0 rounded-full transition-colors cursor-pointer', checked ? 'bg-brand' : 'bg-[#c5cad3]')}>
+    <button type="button" role="switch" disabled={disabled} aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
+      className={cx('relative h-[26px] w-11 shrink-0 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', checked ? 'bg-brand' : 'bg-[#c5cad3]')}>
       <span className={cx('absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-[left]', checked ? 'left-[21px]' : 'left-[3px]')} />
     </button>
   );

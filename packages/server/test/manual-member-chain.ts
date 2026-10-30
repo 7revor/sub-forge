@@ -9,14 +9,21 @@ import { RenderService } from '../src/render.ts';
 const store = new Store(':memory:');
 const user = store.createUser({ username: 'member-admin', passwordHash: await hashPassword('member-demo-2026'), role: 'admin' });
 const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
+const compact = { id: 'compact', name: '精简', version: 1, groups: [
+  { id: 'science', name: '🚀 科学上网', type: 'fallback' as const, members: [] },
+  { id: 'domestic', name: '🎯 国内网络', type: 'select' as const, members: [direct, { kind: 'group' as const, groupId: 'science' }] },
+  { id: 'others', name: '🐟 其他网站', type: 'select' as const, display: { hidden: true }, members: [{ kind: 'group' as const, groupId: 'science' }, direct] },
+], rules: [], final: { kind: 'group' as const, groupId: 'others' } };
+const full = { ...compact, id: 'configured', name: '带完整参数', groups: compact.groups.map(g => g.id === 'science' ? { ...g, test: { url: 'https://example.test/ping', interval: 300, timeout: 5000, maxFailedTimes: 5, expectedStatus: '204', lazy: false } } : g) };
+const allProviders = ['self', 'relay', 'other'].map(id => ({ ref: { type: 'local' as const, id }, output: 'provider' as const }));
 store.importSeed({
   locals: [
     { id: 'self', name: '自建落地', proxies: [{ name: '🇺🇸 GCP [01]', type: 'socks5', server: 'gcp.example.test', port: 1080 }, { name: '🇸🇬 新加坡', type: 'socks5', server: 'sg.example.test', port: 1080 }] },
     { id: 'relay', name: '中转机场', proxies: [{ name: '🇭🇰 香港 IPLC', type: 'socks5', server: 'hk.example.test', port: 1080 }, { name: '🇯🇵 日本 IEPL', type: 'socks5', server: 'jp.example.test', port: 1080 }] },
     { id: 'other', name: '备用机场', proxies: [{ name: '🇭🇰 香港备用', type: 'socks5', server: 'hk2.example.test', port: 1080 }, { name: '🇯🇵 日本备用', type: 'socks5', server: 'jp2.example.test', port: 1080 }] },
   ],
-  templates: [{ id: 'tpl', name: '日常分流模板', version: 1, groups: [{ id: 'select', name: '🚀 科学上网', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }, { id: 'hk', name: '🇭🇰 香港', type: 'url-test', filter: '香港', members: [] }], rules: [], final: { kind: 'group', groupId: 'select' } }],
-  profiles: [{ id: 'independent', name: '成员与代理链验收', overlay: {}, nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }, { ref: { type: 'local', id: 'other' }, output: 'provider' }], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'independent', config: {
+  templates: [compact, full, { id: 'tpl', name: '日常分流模板', version: 1, groups: [{ id: 'select', name: '🚀 科学上网', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }, { id: 'hk', name: '🇭🇰 香港', type: 'url-test', filter: '香港', members: [] }], rules: [], final: { kind: 'group', groupId: 'select' } }],
+  profiles: [{ id: 'all-providers', name: '全部 Provider 场景', overlay: {}, nodeSets: allProviders, refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'bound', templateId: 'compact', groupAdditions: {} } }, { id: 'configured', name: '完整参数回显', overlay: {}, nodeSets: allProviders, refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'bound', templateId: 'configured', groupAdditions: {} } }, { id: 'empty', name: '空来源场景', overlay: {}, nodeSets: [], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: direct } } }, { id: 'independent', name: '成员与代理链验收', overlay: {}, nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }, { ref: { type: 'local', id: 'other' }, output: 'provider' }], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'independent', config: {
     groups: [{ id: 'select', name: '🚀 科学上网', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }, { id: 'hk', name: '🇭🇰 香港', type: 'url-test', filter: '香港', members: [] }], rules: [], final: { kind: 'group', groupId: 'select' },
   } } }, { id: 'bound', name: '模板绑定验收', overlay: {}, nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'bound', templateId: 'tpl', groupAdditions: {} } }],
   tokens: [{ token: 'member-test-token', profileId: 'independent', label: '验收设备' }],
