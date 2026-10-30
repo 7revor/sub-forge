@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { groupPlaceholders } from '../../schemas/placeholders.ts';
 import { compileUserRegex, type GroupSpec } from '@sub-forge/core';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
@@ -35,7 +36,7 @@ export function ProfileGroupDialog({ groupId, onClose }: { groupId: string; onCl
     <div className="min-h-0 overflow-y-auto px-5 py-4">
       {tab === 'members' ? <GroupMemberPicker group={group} members={members} inherited={inherited} onChange={setMembers} onGroupChange={patch} readOnlySettings={bound} onChainEditingChange={setChainEditing} /> : <fieldset disabled={bound} className="m-0 flex flex-col gap-4 border-0 p-0">
         {bound && <p className="m-0 text-[13px] text-ink-muted">以下设置跟随模板，在模板中修改。</p>}
-        <div className="grid gap-4 sm:grid-cols-2"><Field label="组名称">{id => <Input id={id} value={group.name} onChange={e => patch({ name: e.target.value })} />}</Field><GroupSettingsFields value={group} onChange={(key, value) => patch({ [key]: value })} /><Field label="图标地址">{id => <Input id={id} value={group.display?.icon ?? ''} onChange={e => patch({ display: { ...group.display, icon: e.target.value || undefined } })} />}</Field></div>
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="组名称">{id => <Input placeholder="在配置中标识此策略组的名称" id={id} value={group.name} onChange={e => patch({ name: e.target.value })} />}</Field><GroupSettingsFields value={group} onChange={(key, value) => patch({ [key]: value })} /><Field label="图标地址">{id => <Input placeholder={groupPlaceholders.icon} id={id} value={group.display?.icon ?? ''} onChange={e => patch({ display: { ...group.display, icon: e.target.value || undefined } })} />}</Field></div>
         <ExtraFields value={group.extra ?? {}} validateName={name => ['proxies', 'use', 'filter', 'exclude-filter', 'exclude-type', 'include-all', 'include-all-proxies', 'include-all-providers', 'dialer-proxy', 'empty-fallback'].includes(name) ? '请通过成员和前置设置编辑此字段；空组固定拒绝连接' : undefined} onChange={extra => patch({ extra })} />
       </fieldset>}
       {errors.map((e, i) => <p role="alert" key={i} className="text-[12px] text-err">{e.message}</p>)}

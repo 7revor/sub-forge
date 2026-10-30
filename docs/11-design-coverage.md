@@ -230,6 +230,10 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 此项替代此前基于 Radix 手动适配的弹层。官方 Dialog、AlertDialog、Select、DropdownMenu、Popover、Command、Sonner 与 Button 源码落在 `packages/web/src/components/ui/`，只更改导入路径。编辑、预览、确认、错误、规则诊断与搜索等所有弹层入口均直接调用官方组件；不覆盖默认动画参数、默认定位或默认通知外观。旧 Modal / overlays 及自定义焦点恢复删除。页面仅保留业务状态、内容、数据映射和必要的容器宽高约束。后端接口、领域模型、输出与示例种子不变；外部画布本轮未编辑，待同步见 docs/13。验收见 `research/verification/shadcn-official-20261030/`。
 
 
+## 2026-10-30：中文 placeholder 与真正空值
+
+预设、订阅基础覆盖、策略组、处理链及所有文字/选择表单统一中文占位提示。空值不绘制「未设置 / 不设置 / 不限」选项，选值后可清空，关闭状态仍为明确 false。保留 shadcn 官方 Select 的弹层、定位和动画；清空按钮在业务组件中组合。后端接口、领域模型和种子不变，已核对清空后的配置省略字段。外部画布本轮未编辑，待同步事项见 docs/13；验收记录见 research/verification/form-placeholders-20261030/README.md。
+
 2026-10-30 合并适配：缓存刷新任务弹窗直接使用主分支官方 Dialog，保留默认动画和主题命名，并隔离弹窗与列表行点击事件。内置浏览器已验证刷新、内容点击与关闭；外部画布同步状态不变。
 
 
@@ -238,4 +242,6 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 关联来源卡片只显示名称并垂直居中，选中没有空展开区域；当前卡片外点击取消选择。列表操作按钮间距为 8px。页面与交互已在内置浏览器验收；外部画布仍受此前已确认的登录限制，未完成同步。后端无待实现项。
 
 
-2026-10-30：规则格式标签统一显示 Classical、Domain-set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
+2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
+
+2026-10-30 合并补充：新版订阅成员填充、组设置、前置编辑及系统缓存表单已接入中文 placeholder；false/0 保存回显和清空恢复提示已在内置浏览器验证。外部画布待同步范围扩展至上述新表单，见 docs/13。

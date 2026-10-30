@@ -58,7 +58,7 @@ export function Users() {
                   <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
                     <td className={cx(td, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-[12px] font-normal text-ink-muted">（我）</span>}</td>
                     <td className={td}>
-                      <Select aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
+                      <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} className="h-9 w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
                         <option value="user">用户</option><option value="admin">管理员</option>
                       </Select>
                     </td>
@@ -98,21 +98,20 @@ export function Users() {
       </PageScroll>
       <Dialog open={creating} onOpenChange={next => { if (!next) (() => setCreating(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"创建用户"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="用户名" hint="2–32 位字母、数字或 _ . -">{(id) => <Input id={id} autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}</Field>
-          <Field label="角色">{(id) => <Select id={id} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as User['role'] })}><option value="user">普通用户</option><option value="admin">管理员</option></Select>}</Field>
-          <Field label="初始密码（至少 8 位）" className="col-span-2">{(id) => <Input id={id} type="password" autoComplete="new-password" className="font-mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />}</Field>
+          <Field label="用户名" hint="2–32 位字母、数字或 _ . -">{(id) => <Input placeholder="填写 2–32 位字母、数字或 _ . -" id={id} autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}</Field>
+          <Field label="角色">{(id) => <Select placeholder="选择普通用户或管理员权限" id={id} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as User['role'] })}><option value="user">普通用户</option><option value="admin">管理员</option></Select>}</Field>
+          <Field label="初始密码（至少 8 位）" className="col-span-2">{(id) => <Input placeholder="设置至少 8 位的初始密码" id={id} type="password" autoComplete="new-password" className="font-mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />}</Field>
         </div>
         {form.role !== 'admin' && <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={form.scriptAllowed} onChange={(e) => setForm({ ...form, scriptAllowed: e.target.checked })} />允许编写脚本处理器</label>}
         <ErrorAlert error={create.error} />
       </div><DialogFooter>{<><Button onClick={() => setCreating(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建'}</Button></>}</DialogFooter></DialogContent></Dialog>
 
       <Dialog open={!!resetting} onOpenChange={next => { if (!next) (() => setResetting(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{`重置 ${resetting?.username ?? ''} 的密码`}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <Field label="新密码" hint="至少 8 位；该用户的所有登录会失效">{(id) => <Input id={id} type="password" autoComplete="new-password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />}</Field>
+        <Field label="新密码" hint="至少 8 位；该用户的所有登录会失效">{(id) => <Input placeholder="设置至少 8 位的新密码" id={id} type="password" autoComplete="new-password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />}</Field>
       </div><DialogFooter>{<><Button onClick={() => setResetting(undefined)}>取消</Button><Button variant="primary" disabled={newPass.length < 8 || patch.isPending} onClick={() => resetting && patch.mutate({ id: resetting.id, body: { password: newPass } }, { onSuccess: () => setResetting(undefined) })}>重置</Button></>}</DialogFooter></DialogContent></Dialog>
 
       <Dialog open={sharing} onOpenChange={next => { if (!next) (() => setSharing(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"共享订阅源或组合"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <Field label="要共享的订阅源或组合">{(id) => <Select id={id} value={share.doc} onChange={(e) => setShare({ ...share, doc: e.target.value })}>
-          <option value="">选择</option>
+        <Field label="要共享的订阅源或组合">{(id) => <Select clearable placeholder="选择要共享的订阅源或组合" id={id} value={share.doc} onChange={(e) => setShare({ ...share, doc: e.target.value })}>
           {(sources.data ?? []).map((x) => <option key={x.id} value={`source:${x.id}`}>订阅源 · {x.name}</option>)}
           {(collections.data ?? []).map((x) => <option key={x.id} value={`collection:${x.id}`}>组合 · {x.name}</option>)}
         </Select>}</Field>

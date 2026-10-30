@@ -1,5 +1,6 @@
 import type { LocalProxy } from '@sub-forge/core';
 import type { FieldGroup, FieldSpec } from '../components/schema.ts';
+import { proxyPlaceholders } from './placeholders.ts';
 
 export const PROXY_TYPES = [
   { value: 'ss', label: 'Shadowsocks（影梭）' },
@@ -9,7 +10,7 @@ export const PROXY_TYPES = [
   { value: 'socks5', label: 'SOCKS5 代理' }, { value: 'http', label: 'HTTP 代理' },
 ];
 
-const field = (key: string, label: string, type: FieldSpec['type'] = 'string', options?: string[]): FieldSpec => ({ key, label, type, options });
+const field = (key: keyof typeof proxyPlaceholders, label: string, type: FieldSpec['type'] = 'string', options?: string[]): FieldSpec => ({ key, label, type, options, placeholder: proxyPlaceholders[key] });
 const password = field('password', '密码');
 const uuid = field('uuid', 'UUID');
 // 常用值来源：https://wiki.metacubex.one/config/proxies/ss/ 和 /tls/。

@@ -225,6 +225,12 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 本次不改变后端接口、领域模型和示例种子；视觉验收见 [官方组件迁移记录](../../research/verification/shadcn-official-20261030/README.md)。
 
 
+### 表单中文 placeholder（2026-10-30，硬性规则）
+
+Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSelect、Combobox 和 FieldSpec 必须提供 placeholder；已知 Mihomo 字段解释集中在 src/schemas/placeholders.ts。表单空值保持为空，不添加空 option，不把中文提示写入 value。可选单选使用 clearable，多选取消全部勾选；false 和 0 仍是有效值。业务字段使用对应的中文说明；不支持 placeholder 的开关等控件保留中文标签。完整要求见根目录 CLAUDE.md / AGENTS.md。
+
+验证包含 schema 中文提示覆盖、空 Select、零值、false 与清空删除的回归测试，以及 Codex 内置浏览器的发布、回显和 YAML 检查。后端和核心模型无需迁移。
+
 2026-10-30 合并适配：缓存刷新任务使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。
 
 
@@ -233,4 +239,6 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 仓库关联来源隐藏地址/格式的第二行，名称垂直居中，选中不改变高度；来源卡片外 pointerdown 取消选择。文档列表操作使用 flex gap-2 统一按钮间距。验收见 `research/verification/rule-card-interactions-20261030/`。
 
 
-2026-10-30：规则格式标签统一显示 Classical、Domain-set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
+2026-10-30：规则格式标签统一显示 Classical、Domain-Set、Domain、CIDR、YAML、MRS、SRS，移除中文“文本”描述；格式值及解析行为不变。
+
+2026-10-30 表单占位合并适配：新版成员与前置编辑、系统缓存和规则出口均遵循必填中文 placeholder；不恢复局部缓存间隔。完整验收见 `research/verification/form-placeholders-merge-20261030/`。

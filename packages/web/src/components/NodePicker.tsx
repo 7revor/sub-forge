@@ -28,7 +28,7 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
               onChange={(e) => onChange({ ...value, match: { regex: e.target.value } })} />}
         <div className="flex shrink-0 items-center gap-2">
           <span className="whitespace-nowrap text-[12px] text-ink-muted">找不到时</span>
-          <Select aria-label={`${label}兜底`} className="w-auto" value={value.fallback === 'error' || !value.fallback ? 'error' : value.fallback.kind === 'builtin' ? value.fallback.name : 'error'}
+          <Select placeholder="选择节点未匹配时采用的处理方式" aria-label={`${label}兜底`} className="w-auto" value={value.fallback === 'error' || !value.fallback ? 'error' : value.fallback.kind === 'builtin' ? value.fallback.name : 'error'}
             onChange={(e) => onChange({ ...value, fallback: e.target.value === 'error' ? 'error' : { kind: 'builtin', name: e.target.value as Builtin } })}>
             <option value="REJECT">REJECT</option><option value="DIRECT">DIRECT</option><option value="error">报错</option>
           </Select>

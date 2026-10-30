@@ -63,10 +63,10 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
     <form id="repository-form" className="flex flex-col gap-5" onSubmit={e => { e.preventDefault(); submit(); }}>
     <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
     <Card title="基本信息" bodyClass="grid gap-4 px-4 pb-4 md:grid-cols-2">
-      <Field label="GitHub 仓库地址" hint="公开仓库，如 https://github.com/owner/repo；通过 Git 校验仓库和分支">{id => <Input id={id} autoFocus value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} />}</Field>
-      <Field label="显示名称" hint="留空使用 owner/repo">{id => <Input id={id} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />}</Field>
+      <Field label="GitHub 仓库地址" hint="公开仓库，如 https://github.com/owner/repo；通过 Git 校验仓库和分支">{id => <Input placeholder="输入公开 GitHub 仓库地址，如 https://github.com/owner/repo" id={id} autoFocus value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} />}</Field>
+      <Field label="显示名称" hint="留空使用 owner/repo">{id => <Input placeholder="仓库的显示名称，留空使用 owner/repo" id={id} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />}</Field>
       <details className="md:col-span-2"><summary className="cursor-pointer text-[13px] text-ink-muted">许可证说明</summary><div className="mt-3">
-        <Field label="许可证" hint="可填写许可证名称或说明；留空请参阅上游仓库许可证">{id => <Input id={id} value={form.license} onChange={e => setForm({ ...form, license: e.target.value })} />}</Field>
+        <Field label="许可证" hint="可填写许可证名称或说明；留空请参阅上游仓库许可证">{id => <Input placeholder="填写许可证名称或说明" id={id} value={form.license} onChange={e => setForm({ ...form, license: e.target.value })} />}</Field>
       </div></details>
     </Card>
     <Card title="规则位置" subtitle="仅接受 .list 和 .txt 文本规则，支持 Clash classical、域名和 IP 列表，内容自动识别。"
@@ -77,8 +77,8 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
             {locations.length > 1 && <Button size="sm" variant="ghost" onClick={() => setLocations(locations.filter(l => l.id !== location.id))}>移除位置</Button>}
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label="分支" hint="留空通过 Git 识别默认分支">{id => <Input id={id} value={location.ref} onChange={e => updateLocation(location.id, { ref: e.target.value })} />}</Field>
-            <Field label="目录" hint="留空扫描整个仓库">{id => <Input id={id} value={location.directory} onChange={e => updateLocation(location.id, { directory: e.target.value })} />}</Field>
+            <Field label="分支" hint="留空通过 Git 识别默认分支">{id => <Input placeholder="需要扫描的分支，留空自动识别默认分支" id={id} value={location.ref} onChange={e => updateLocation(location.id, { ref: e.target.value })} />}</Field>
+            <Field label="目录" hint="留空扫描整个仓库">{id => <Input placeholder="需要扫描的目录，留空扫描整个仓库" id={id} value={location.directory} onChange={e => updateLocation(location.id, { directory: e.target.value })} />}</Field>
           </div>
         </section>)}
       </div>

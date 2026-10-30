@@ -86,7 +86,7 @@ export function TabOverview() {
           <div className="flex flex-col gap-3.5">
             <p className="text-[13px] text-muted">更新间隔由管理员在系统中统一设置。</p>
             <Field label="流量 / 到期信息">{(id) => (
-              <Select id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={(e) => {
+              <Select placeholder="选择订阅流量与到期信息的来源" id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={(e) => {
                 const v = e.target.value;
                 setDraft({ ...draft, userinfo: v.startsWith('source:') ? { mode: 'source', sourceId: v.slice(7) } : { mode: v as 'sum' | 'none' } });
               }}>
@@ -95,7 +95,7 @@ export function TabOverview() {
                 <option value="none">不输出</option>
               </Select>
             )}</Field>
-            <Field label="客户端中的显示名">{(id) => <Input id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
+            <Field label="客户端中的显示名">{(id) => <Input placeholder="填写配置订阅的名称" id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
             {lastGood
               ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）</div>
               : <Empty title="还没有成功渲染过" />}
@@ -126,7 +126,7 @@ export function TabOverview() {
         使用它的设备将无法更新。
       </DeleteDialog>
       <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"新增订阅链接"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <Field label="设备备注">{(id) => <Input id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>
+        <Field label="设备备注">{(id) => <Input placeholder="填写订阅链接的标识名称" id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>
         <ErrorAlert error={create.error} />
       </div><DialogFooter>{<><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建链接'}</Button></>}</DialogFooter></DialogContent></Dialog>
       <AlertDialog open={!!resetting} onOpenChange={next => { if (!next) (() => setResetting(undefined))(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{`重置「${resetting?.label || '未命名设备'}」的 token？`}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
@@ -164,8 +164,7 @@ export function TabBase() {
             }} />
         </fieldset>
         {mode === 'preset' && <Field label="预设" className="flex-[1_1_260px]">{(id) => (
-          <Select id={id} className="h-10" disabled={!baseValid} value={draft.base?.presetId ?? ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, presetId: e.target.value } })}>
-            <option value="" disabled>选择预设</option>
+          <Select placeholder="选择要继承的基础设置预设" id={id} className="h-10" disabled={!baseValid} value={draft.base?.presetId ?? ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, presetId: e.target.value } })}>
             {presets.map((p) => <option key={p.id} value={p.id}>{p.name}（v{p.version}）</option>)}
           </Select>
         )}</Field>}
@@ -195,7 +194,7 @@ export function TabBase() {
             <div className="flex items-center justify-between"><h2 className="m-0 text-[14px] font-semibold">原样片段</h2></div>
             <label htmlFor="raw-snippet" className="text-[12.5px] text-ink-muted">{client === 'mihomo' ? 'YAML' : 'INI'}</label>
             <YamlTextarea id="raw-snippet" rows={10} className="bg-[#fafbfc] font-mono text-[12.5px] leading-relaxed" spellCheck={false}
-              disabled={client === 'surge'} placeholder={client === 'mihomo' ? 'hosts:\n  router.home: 192.168.1.1' : '暂未开放'}
+              disabled={client === 'surge'} placeholder={client === 'mihomo' ? '填写要合并到基础配置的 YAML 字段，如 hosts 域名映射' : '暂未开放'}
               value={client === 'mihomo' ? draft.base?.raw ?? '' : ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, raw: e.target.value || undefined } })} />
             <span className="text-[12px] leading-normal text-ink-muted">原样片段暂不输出。</span>
           </section>}

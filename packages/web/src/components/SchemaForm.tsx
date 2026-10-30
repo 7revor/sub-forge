@@ -8,8 +8,7 @@ export function FieldInput({ field, value, id, onChange }: {
   field: FieldSpec; value: unknown; id: string; onChange: (value: unknown) => void;
 }) {
   if (field.type === 'bool' || field.type === 'enum') {
-    return <Select id={id} value={value == null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : field.type === 'bool' ? e.target.value === 'true' : e.target.value)}>
-      <option value="">未设置</option>
+    return <Select id={id} aria-label={field.label} placeholder={field.placeholder} clearable value={value == null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : field.type === 'bool' ? e.target.value === 'true' : e.target.value)}>
       {field.type === 'bool' ? <><option value="true">开启</option><option value="false">关闭</option></> : <>
         {value != null && !(field.options ?? []).includes(String(value)) && <option value={String(value)}>{String(value)}</option>}
         {(field.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
@@ -24,11 +23,11 @@ export function FieldInput({ field, value, id, onChange }: {
     const pairs = isRecord(value) ? value : {};
     return <div id={id} className="flex flex-col gap-2">
       {Object.entries(pairs).map(([key, item], index) => <div key={index} className="flex gap-2">
-        <Input aria-label={`${field.label} 第 ${index + 1} 项键`} value={key} onChange={(e) => {
+        <Input aria-label={`${field.label} 第 ${index + 1} 项键`} placeholder={field.keyPlaceholder ?? `${field.placeholder}：参数名称`} value={key} onChange={(e) => {
           if (e.target.value !== key && Object.hasOwn(pairs, e.target.value)) return;
           onChange(Object.fromEntries(Object.entries(pairs).map(([k, v]) => [k === key ? e.target.value : k, v])));
         }} />
-        <Input aria-label={`${field.label} 第 ${index + 1} 项值`} value={String(item ?? '')} onChange={(e) => onChange({ ...pairs, [key]: e.target.value })} />
+        <Input aria-label={`${field.label} 第 ${index + 1} 项值`} placeholder={field.valuePlaceholder ?? `${field.placeholder}：参数值`} value={String(item ?? '')} onChange={(e) => onChange({ ...pairs, [key]: e.target.value })} />
         <Button size="sm" onClick={() => {
           const next = Object.fromEntries(Object.entries(pairs).filter(([k]) => k !== key));
           onChange(Object.keys(next).length ? next : undefined);

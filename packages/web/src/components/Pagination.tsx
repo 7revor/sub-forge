@@ -9,7 +9,7 @@ export function Pagination({ page, pageSize, total, totalPages, busy, compact = 
   return <nav aria-label="列表分页" className={`shrink-0 items-center gap-3 border-t border-line px-4 py-3 ${compact ? 'grid grid-cols-[1fr_auto]' : 'flex flex-wrap justify-between'}`}>
     <span aria-live="polite" className="text-[12.5px] text-ink-muted">共 {total} 条{total > 0 && ` · 第 ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} 条`}</span>
     <div className={compact ? 'contents' : 'flex flex-wrap items-center gap-2'}>
-      <Select aria-label="每页条数" className="w-[112px]" value={pageSize} disabled={busy} onChange={e => onPageSize(Number(e.target.value))}>
+      <Select placeholder="选择每页显示的记录数量" aria-label="每页条数" className="w-[112px]" value={pageSize} disabled={busy} onChange={e => onPageSize(Number(e.target.value))}>
         {PAGE_SIZES.map(size => <option key={size} value={size}>{size} 条 / 页</option>)}
       </Select>
       <div className={`flex items-center gap-2 ${compact ? 'col-span-2 justify-between' : ''}`}>

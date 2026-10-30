@@ -1,7 +1,8 @@
-import { Segmented } from './ui.tsx';
+import { Select } from './ui.tsx';
 
-export function OptionalBoolean({ label, value, onChange, size }: { label: string; value: boolean | undefined; onChange: (value: boolean | undefined) => void; size?: 'sm' | 'md' }) {
-  return <Segmented label={label} size={size} value={value === undefined ? 'unset' : value ? 'on' : 'off'}
-    options={[{ value: 'unset', label: '不设置' }, { value: 'on', label: '开' }, { value: 'off', label: '关' }]}
-    onChange={(next) => onChange(next === 'unset' ? undefined : next === 'on')} />;
+export function OptionalBoolean({ label, placeholder, value, onChange, size }: { label: string; placeholder: string; value: boolean | undefined; onChange: (value: boolean | undefined) => void; size?: 'sm' | 'md' }) {
+  return <Select aria-label={label} placeholder={placeholder} clearable className={size === 'sm' ? 'h-9' : undefined}
+    value={value === undefined ? '' : String(value)} onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value === 'true')}>
+    <option value="true">开启</option><option value="false">关闭</option>
+  </Select>;
 }

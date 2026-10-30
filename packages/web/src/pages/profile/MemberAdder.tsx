@@ -28,7 +28,7 @@ export function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember)
 
   return (
     <div className="flex flex-wrap items-start gap-2 rounded-lg bg-ground p-2.5">
-      <Select aria-label="成员类型" className="w-auto" value={kind} onChange={(e) => setKind(e.target.value as GroupMember['kind'])}>
+      <Select placeholder="选择要添加到策略组的成员类型" aria-label="成员类型" className="w-auto" value={kind} onChange={(e) => setKind(e.target.value as GroupMember['kind'])}>
         <option value="nodeset">节点集</option>
         <option value="group">其他组</option>
         <option value="builtin">内置策略</option>
@@ -36,10 +36,10 @@ export function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember)
         <option value="all">全部节点</option>
       </Select>
       {kind === 'nodeset' && <div className="min-w-48"><NodeSetSelect label="节点集" value={ns} options={profileNodeSets} onChange={setNs} placeholder={profileNodeSets.length ? '选择节点集' : '先添加节点来源'} /></div>}
-      {kind === 'group' && <Select aria-label="组" className="w-auto min-w-40" value={groupId || groups[0]?.id || ''} onChange={(e) => setGroupId(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>}
-      {kind === 'builtin' && <Select aria-label="内置策略" className="w-auto" value={builtin} onChange={(e) => setBuiltin(e.target.value as Builtin)}>{BUILTINS.map((b) => <option key={b}>{b}</option>)}</Select>}
+      {kind === 'group' && <Select placeholder="选择要加入的其他策略组" aria-label="组" className="w-auto min-w-40" value={groupId || groups[0]?.id || ''} onChange={(e) => setGroupId(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>}
+      {kind === 'builtin' && <Select placeholder="选择直连或拒绝等内置策略" aria-label="内置策略" className="w-auto" value={builtin} onChange={(e) => setBuiltin(e.target.value as Builtin)}>{BUILTINS.map((b) => <option key={b}>{b}</option>)}</Select>}
       {kind === 'node' && <NodePicker label="节点" value={node.ref} nodeSets={profileNodeSets} onChange={(ref) => setNode({ kind: 'node', ref })} />}
-      {kind === 'all' && <Select aria-label="全部节点范围" className="w-auto" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}><option value="all">全部</option><option value="proxies">本地节点</option><option value="providers">Provider</option></Select>}
+      {kind === 'all' && <Select placeholder="选择批量引入节点的范围" aria-label="全部节点范围" className="w-auto" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}><option value="all">全部</option><option value="proxies">本地节点</option><option value="providers">Provider</option></Select>}
       <Button size="sm" disabled={!canAdd} onClick={add}><Plus size={14} />添加成员</Button>
     </div>
   );

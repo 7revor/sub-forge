@@ -73,7 +73,7 @@ function ExtraRuleModal({ open, onClose, onAdd, prepend = false }: { open: boole
   useEffect(() => { if (open) { setAnchor('top'); setRule({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }); } }, [open]);
   const error = privateRuleError(rule);
   return <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{prepend ? "添加前置规则" : "插入规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-    {!prepend && <Field label="位置">{(id) => <Select id={id} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
+    {!prepend && <Field label="位置">{(id) => <Select placeholder="选择新规则插入的位置" id={id} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
       <option value="top">最前面</option><option value="bottom">最后面（MATCH 之前）</option>
       {(template?.rules ?? []).map((r, i) => <option key={`b${r.id}`} value={`before:${r.id}`}>模板规则 #{i + 1} 之前</option>)}
       {(template?.rules ?? []).map((r, i) => <option key={`a${r.id}`} value={`after:${r.id}`}>模板规则 #{i + 1} 之后</option>)}

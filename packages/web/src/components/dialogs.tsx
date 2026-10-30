@@ -14,7 +14,7 @@ export function RenameDialog({ open, title, name, onClose, onRename }: { open: b
   return (
     <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-ink-muted">名称</span>
-        <Input autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && ok) { onRename(value.trim()); onClose(); } }} /></label>
+        <Input placeholder="填写新的名称，便于区分和查找" autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && ok) { onRename(value.trim()); onClose(); } }} /></label>
     </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ok} onClick={() => { onRename(value.trim()); onClose(); }}>确定</Button></>}</DialogFooter></DialogContent></Dialog>
   );
 }

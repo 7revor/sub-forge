@@ -45,8 +45,7 @@ function AssociationEditor({ onDone }: { onDone?: () => void }) {
   const reset = () => { setStaged(undefined); change.reset(); };
   return <div className="flex flex-col gap-4">
     <ErrorAlert error={templates.error ?? change.error} />
-    <Field label="模板">{id => <Select id={id} value={selected} disabled={change.isPending} onChange={e => { setSelected(e.target.value); setMapping({}); reset(); }}>
-      <option value="">{templates.isLoading ? '正在加载模板…' : '选择模板'}</option>
+    <Field label="模板">{id => <Select clearable placeholder={templates.isLoading ? '正在加载模板…' : '选择要绑定的规则模板'} id={id} value={selected} disabled={change.isPending} onChange={e => { setSelected(e.target.value); setMapping({}); reset(); }}>
       {(templates.data ?? []).map(t => <option key={t.id} value={t.id}>{t.name ?? t.id}</option>)}
     </Select>}</Field>
     {templates.data?.length === 0 && <p className="m-0 text-[13px] text-ink-muted">还没有模板。可以关闭此窗口，在订阅中直接创建策略组与规则。</p>}
@@ -59,8 +58,8 @@ function AssociationEditor({ onDone }: { onDone?: () => void }) {
     {target && groups.length > 0 && selected !== currentId && <details className="rounded-lg border border-line p-3" open>
       <summary className="cursor-pointer text-[13px] font-medium">迁移现有节点填充与代理链引用</summary>
       <p className="text-[12px] text-ink-muted">现有策略组和规则将被替换。有节点或代理链引用的组需要选择目标组。</p>
-      <div className="flex flex-col gap-3">{groups.map(g => <Field key={g.id} label={g.name}>{id => <Select id={id} value={mapping[g.id] ?? ''} disabled={change.isPending} onChange={e => { setMapping({ ...mapping, [g.id]: e.target.value }); reset(); }}>
-        <option value="">选择目标组</option><option value="__drop">不迁移，移除节点填充</option>
+      <div className="flex flex-col gap-3">{groups.map(g => <Field key={g.id} label={g.name}>{id => <Select clearable aria-label={`${g.name}的迁移目标`} placeholder="选择迁移节点填充的目标策略组" id={id} value={mapping[g.id] ?? ''} disabled={change.isPending} onChange={e => { setMapping({ ...mapping, [g.id]: e.target.value }); reset(); }}>
+        <option value="__drop">不迁移，移除节点填充</option>
         {target.groups.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
       </Select>}</Field>)}</div>
     </details>}

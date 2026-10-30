@@ -21,7 +21,7 @@ import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
 
-const FORMAT_TEXT: Record<string, string> = { auto: '待识别', classical: 'Classical', 'domain-set': 'Domain-set', domain: 'Domain', ipcidr: 'CIDR', yaml: 'YAML', mrs: 'MRS', srs: 'SRS' };
+const FORMAT_TEXT: Record<string, string> = { auto: '待识别', classical: 'Classical', 'domain-set': 'Domain-Set', domain: 'Domain', ipcidr: 'CIDR', yaml: 'YAML', mrs: 'MRS', srs: 'SRS' };
 const isPassthrough = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
 const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : '本地规则');
 
@@ -96,7 +96,7 @@ export function RulesetEdit() {
         {failing === 0 && d.sources.some((s) => s.kind === 'remote' && status.get(s.id)?.ok) && <Badge tone="ok">拉取成功</Badge>}
       </>}>
       <Card title="基本信息" bodyClass="flex flex-col gap-4 px-4 pb-4">
-        <Field label="名称">{(id) => <Input id={id} autoFocus={e.isNew} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
+        <Field label="名称">{(id) => <Input placeholder="填写用于区分规则集的名称" id={id} autoFocus={e.isNew} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>
         <NoteField value={d.note} onChange={(note) => set({ note })} />
       </Card>
       <Card title="来源">
@@ -177,9 +177,9 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
       </div>
       {active && (editingUrl || (src.kind === 'local' && !isPassthrough(src))) && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
-          {src.kind === 'remote' && !src.repository && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
+          {src.kind === 'remote' && !src.repository && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="远程规则文件的 HTTP 或 HTTPS 地址" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
           {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="自动识别 classical 规则、域名、CIDR 或 YAML payload。">{(id) => (
-            <LocalContentInput format={status?.format} id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
+            <LocalContentInput placeholder="填写规则原文，每行一条；支持文本或 YAML 规则集" format={status?.format} id={id} rows={10} spellCheck={false} className="min-h-[220px] font-mono text-[12.5px]" value={src.content ?? ''} onChange={(x) => onChange({ content: x.target.value })} />
           )}</Field>}
         </div>
       )}

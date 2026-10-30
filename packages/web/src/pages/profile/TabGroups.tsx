@@ -140,7 +140,7 @@ function LegacyGroups() {
         {g && eff && (
           <Card className="min-w-0 flex-[999_1_560px]"
             title={<div className="flex flex-col gap-1">
-              <h2 className="m-0 text-lg font-semibold">{g.origin === 'template' ? g.name : <Input aria-label="组名" value={g.name} onChange={(e) => patchOverlay((o) => ({ ...o, extraGroups: (o.extraGroups ?? []).map((x) => (x.group.id === g.id ? { ...x, group: { ...x.group, name: e.target.value } } : x)) }))} />}</h2>
+              <h2 className="m-0 text-lg font-semibold">{g.origin === 'template' ? g.name : <Input placeholder="填写策略组在配置中的名称" aria-label="组名" value={g.name} onChange={(e) => patchOverlay((o) => ({ ...o, extraGroups: (o.extraGroups ?? []).map((x) => (x.group.id === g.id ? { ...x, group: { ...x.group, name: e.target.value } } : x)) }))} />}</h2>
               <span className="text-[12.5px] text-ink-muted">{g.origin === 'template' ? '模板组' : '私有组'}</span>
             </div>}
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
@@ -175,7 +175,7 @@ function LegacyGroups() {
                 <Field label="exclude-type（排除协议）">{(id) => <ExcludeTypeSelect id={id} value={eff.excludeType} onChange={(value) => setField('excludeType', value)} />}</Field>
               </fieldset>
               <div className="flex flex-col gap-2">
-                {previewNodeSets.length > 1 && <Select aria-label="预览节点集" value={previewNodeSet?.[0] ?? ''} onChange={(e) => setPreviewSelection({ groupId: g.id, key: e.target.value })}>
+                {previewNodeSets.length > 1 && <Select placeholder="选择用于预览筛选结果的节点集" aria-label="预览节点集" value={previewNodeSet?.[0] ?? ''} onChange={(e) => setPreviewSelection({ groupId: g.id, key: e.target.value })}>
                   {previewNodeSets.map(([key, ref]) => <option key={key} value={key}>{nodeSetName(ref)}</option>)}
                 </Select>}
                 {previewNodeSet ? <><span className="text-[12px] text-ink-muted">节点集：{nodeSetName(previewNodeSet[1])}</span><MatchPreview nodeSet={previewNodeSet[1]} filter={eff.filter} excludeFilter={eff.excludeFilter} excludeType={eff.excludeType} /></> : <span className="text-[12px] text-ink-muted">组里没有节点集成员，filter 不生效</span>}

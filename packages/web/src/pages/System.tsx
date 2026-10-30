@@ -14,7 +14,7 @@ export function System(){
     <ErrorAlert error={info.error??save.error??resources.error}/><PageScroll>
       <Card title="资源缓存" subtitle="节点、规则、仓库索引及客户端更新间隔统一使用此设置。">
         <div className="flex max-w-[620px] flex-col gap-4">
-          <Field label="资源缓存时间（小时）">{id=><Input id={id} type="number" min={1} max={8760} step={1} value={value} onChange={e=>setHours(e.target.value)} />}</Field>
+          <Field label="资源缓存时间（小时）">{id=><Input placeholder="资源自动更新间隔，单位为小时，范围 1 至 8760" id={id} type="number" min={1} max={8760} step={1} value={value} onChange={e=>setHours(e.target.value)} />}</Field>
           {!valid&&<p className="text-[13px] text-red-600">请输入 1 至 8760 的整数小时。</p>}
           <p className="text-[13px] leading-relaxed text-ink-muted">每个资源只保留最后一次成功内容。到期自动拉取，失败时保留旧内容并延后一个周期再次尝试；列表中的“刷新缓存”可立即重新拉取。</p>
           <p className="text-[13px] text-ink-muted">设置保存后立即应用于服务端。客户端更新间隔在其下次下载配置后生效。</p>

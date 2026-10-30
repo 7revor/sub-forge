@@ -208,7 +208,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       </fieldset>
     </PageScroll>
     <Dialog open={yaml !== undefined && !showingLeave} onOpenChange={next => { if (!next) (closeYaml)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"从 YAML 导入"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，应用后仍需保存模板。">{fid => <YamlTextarea id={fid} rows={18} spellCheck={false} value={yaml ?? ''} onChange={e => { setYaml(e.target.value); setDiscardYaml(false); }} />}</Field>
+      <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，应用后仍需保存模板。">{fid => <YamlTextarea placeholder="粘贴包含策略组和规则的 Mihomo YAML 配置" id={fid} rows={18} spellCheck={false} value={yaml ?? ''} onChange={e => { setYaml(e.target.value); setDiscardYaml(false); }} />}</Field>
       {!!yaml?.trim() && yamlResult && !yamlResult.ok && <FieldError error={`第 ${yamlResult.line ?? 1} 行：${yamlResult.error}`} />}
       {yamlResult?.ok && yamlResult.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-ink-muted">{yamlResult.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
     </div><DialogFooter>{discardYaml ? <>

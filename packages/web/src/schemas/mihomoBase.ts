@@ -1,7 +1,8 @@
 import { getPath, isRecord, setPath, type FieldGroup, type FieldSpec } from '../components/schema.ts';
+import { mihomoBasePlaceholders } from './placeholders.ts';
 
-const field = (key: string, type: FieldSpec['type'], options?: string[]): FieldSpec => ({
-  key, label: key, type, ...(options ? { options } : {}),
+const field = (key: keyof typeof mihomoBasePlaceholders, type: FieldSpec['type'], options?: string[]): FieldSpec => ({
+  key, label: key, type, placeholder: mihomoBasePlaceholders[key], ...(options ? { options } : {}),
   ...(type === 'lines' ? { hint: '每行一项' } : {}),
 });
 
@@ -22,7 +23,7 @@ export const mihomoBaseGroups: FieldGroup[] = [
     field('dns.enhanced-mode', 'enum', ['fake-ip', 'redir-host']), field('dns.fake-ip-range', 'string'),
     field('dns.fake-ip-filter', 'lines'), field('dns.default-nameserver', 'lines'), field('dns.nameserver', 'lines'),
     field('dns.fallback', 'lines'), field('dns.fallback-filter.geoip', 'bool'), field('dns.fallback-filter.geoip-code', 'string'),
-    { ...field('dns.nameserver-policy', 'kv'), hint: '多个服务器用逗号分隔，保存为列表；单个服务器保存为字符串' },
+    { ...field('dns.nameserver-policy', 'kv'), keyPlaceholder: '匹配的域名、通配符或 geosite 条件', valuePlaceholder: '指定的 DNS 地址，多个用逗号分隔', hint: '多个服务器用逗号分隔，保存为列表；单个服务器保存为字符串' },
     field('dns.proxy-server-nameserver', 'lines'), field('dns.direct-nameserver', 'lines'), field('dns.respect-rules', 'bool'),
   ] },
   { title: '嗅探', fields: [

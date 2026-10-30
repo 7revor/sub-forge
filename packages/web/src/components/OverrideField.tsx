@@ -3,7 +3,7 @@ import { stringify } from 'yaml';
 import { ExtraFields } from './ExtraFields.tsx';
 import { FieldInput } from './SchemaForm.tsx';
 import { isOverridden, overrideValue } from './override.ts';
-import { getPath, otherFields, replaceOtherFields, setPath, type FieldGroup } from './schema.ts';
+import { getPath, isRecord, otherFields, replaceOtherFields, setPath, type FieldGroup } from './schema.ts';
 
 /** 设计稿「Profile · 基础设置」：每个分区一张卡片，每行「键 | 值 | 覆盖 · 还原 / 来自预设」 */
 export function OverrideForm({ groups, base, patch, onChange }: {
@@ -19,6 +19,7 @@ export function OverrideForm({ groups, base, patch, onChange }: {
         {group.fields.map((field) => {
           const active = isOverridden(patch, field.key) || editing.has(field.key);
           const value = overrideValue(base, patch, field.key);
+          const empty = value == null || value === '' || (Array.isArray(value) && !value.length) || (isRecord(value) && !Object.keys(value).length);
           return <div key={field.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#f0f2f5] px-4.5 py-2.5 last:border-b-0">
             <label htmlFor={`ov-${field.key}`} className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
               <span className="font-mono text-[12.5px]">{field.label}</span>
@@ -26,7 +27,7 @@ export function OverrideForm({ groups, base, patch, onChange }: {
             </label>
             <div className="min-w-0 flex-[2_1_260px]">
               {active ? <FieldInput id={`ov-${field.key}`} field={field} value={getPath(patch, field.key)} onChange={(next) => onChange(setPath(patch, field.key, next))} />
-                : <div id={`ov-${field.key}`} className="truncate rounded-lg border border-[#d5d9e0] bg-[#fafbfc] px-2.5 py-[7px] font-mono text-[12.5px] text-ink-2">{value === undefined ? '未设置' : stringify(value, { lineWidth: 0 }).trimEnd().replace(/\n/g, ' · ')}</div>}
+                : <div id={`ov-${field.key}`} title={empty ? field.placeholder : undefined} className="truncate rounded-lg border border-[#d5d9e0] bg-[#fafbfc] px-2.5 py-[7px] text-[12.5px] text-ink-2">{empty ? <span className="text-faint">{field.placeholder}</span> : stringify(value, { lineWidth: 0 }).trimEnd().replace(/\n/g, ' · ')}</div>}
             </div>
             <div className="flex flex-[0_0_96px] justify-end">
               <button type="button" title={active ? '还原为预设值' : '点击覆盖这一项'} aria-label={`${active ? '还原' : '覆盖'} ${field.label}`}

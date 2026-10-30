@@ -24,11 +24,11 @@ export function MatcherEditor({ value, onChange, rulesets, ruleValue, onRuleChan
     else onChange(changeMatcherKind(value, kind as Matcher['kind']));
   };
   return <div className="flex min-w-0 flex-col gap-4 [&>*]:min-w-0">
-    {!fixedKind && <Field label="匹配类型">{(id) => <Select id={id} value={selectedKind} className="text-[13px]" onChange={(event) => changeKind(event.target.value)}>
+    {!fixedKind && <Field label="匹配类型">{(id) => <Select placeholder="选择单条规则、规则集或远程规则来源" id={id} value={selectedKind} className="text-[13px]" onChange={(event) => changeKind(event.target.value)}>
       <option value="rule">静态规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
     </Select>}</Field>}
     {value.kind === 'rule' ? <Field label="规则内容">{id => <RuleEditor id={id} value={ruleValue ?? value.rule} onChange={changeRule} />}</Field>
-      : value.remote ? <Field label="规则地址">{id => directRemote ? <Input id={id} type="url" className="min-w-0 font-mono" spellCheck={false} value={value.remote!.url} placeholder="https://example.com/rules.list" onChange={event => {
+      : value.remote ? <Field label="规则地址">{id => directRemote ? <Input id={id} type="url" className="min-w-0 font-mono" spellCheck={false} value={value.remote!.url} placeholder="远程规则文件的 HTTP 或 HTTPS 地址" onChange={event => {
         const url = event.target.value;
         let matcher: Matcher;
         try { matcher = { ...value, ...remoteRuleMatcher(url), remote: { url } }; }

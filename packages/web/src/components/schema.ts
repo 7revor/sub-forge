@@ -4,7 +4,9 @@ export type FieldSpec = {
   type: 'bool' | 'number' | 'string' | 'enum' | 'lines' | 'kv';
   options?: string[];
   hint?: string;
-  placeholder?: string;
+  placeholder: string;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
   clients?: ('mihomo' | 'surge')[];
   showIf?: (obj: Record<string, unknown>) => boolean;
 };
