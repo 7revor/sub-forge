@@ -7,7 +7,7 @@ import { ruleToLine } from '../../components/rule.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, FieldError } from '../../components/ui.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
-import { RuleCard } from '../../components/RuleCard.tsx';
+import { RuleCard, RuleFinalCard } from '../../components/RuleCard.tsx';
 import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
@@ -66,8 +66,8 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   return <>
     <Card title={title} subtitle={`${value.rules.length} 项 · 自上而下匹配`} actions={!readOnly && <>
       {!staticOnly && <Button size="sm" disabled={!remoteUrls.length || repositoryMatches.isPending} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
-      <Button size="sm" aria-label="添加本地规则" onClick={() => add({ kind: 'local', content: '' })}><Plus size={15} />本地规则</Button>
-      {!staticOnly && <><Button size="sm" onClick={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}>远程链接</Button><Button size="sm" onClick={() => add({ kind: 'ruleset', id: '' })}>引用规则</Button></>}
+      <Button size="sm" className="gap-1" aria-label="添加本地规则" onClick={() => add({ kind: 'local', content: '' })}><Plus size={15} />本地规则</Button>
+      {!staticOnly && <><Button size="sm" className="gap-1" onClick={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><Plus size={15} />远程链接</Button><Button size="sm" className="gap-1" onClick={() => add({ kind: 'ruleset', id: '' })}><Plus size={15} />引用规则</Button></>}
     </>}>
       <ErrorAlert error={repositoryMatches.error} />{linkError && <FieldError error={linkError} />}
       {!value.rules.length && <Empty title="没有规则" description={hideFinal ? '先于模板规则匹配，仅影响本订阅。' : '未匹配的流量走 MATCH。'} />}
@@ -80,18 +80,16 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           icon={local ? <FileText size={16} /> : matcher.remote ? <Globe size={16} /> : <Link2 size={16} />}
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
           hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
-          target={readOnly ? <span className="block truncate text-center text-[13px]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
+          target={readOnly ? <span className="block truncate px-1.5 text-[13px]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
           onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);
           }}><span title={label}>{label}</span></RuleCard>;
       }} />
-      {!hideFinal && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line-2 pt-3 text-[13px]">
-        <span className="font-mono">MATCH</span>
-        <div id="template-rule-final" className="w-[136px] min-w-0">
-          {readOnly ? <span>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}
-        </div><ItemIssues report={report} where="final" />
-      </div>}
+      {!hideFinal && <>
+        <RuleFinalCard readOnly={readOnly} targetId="template-rule-final" target={readOnly ? <span className="block truncate px-1.5" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />} />
+        <ItemIssues report={report} where="final" />
+      </>}
     </Card>
   </>;
 }

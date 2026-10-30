@@ -18,7 +18,7 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
   }, []);
   return <DropdownMenu>
     <DropdownMenuTrigger asChild><button type="button" aria-label={label} title={selected?.label ?? placeholder}
-      className="flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 border-0 bg-transparent px-1.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+      className="flex h-8 w-full min-w-0 cursor-pointer items-center gap-1.5 border-0 bg-transparent px-1.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
       <span className={cx('min-w-0 flex-1 truncate', !selected && 'text-ink-muted')}>{selected?.label ?? placeholder}</span>
       <ChevronDown size={14} className="shrink-0 text-faint" aria-hidden />
     </button></DropdownMenuTrigger>
