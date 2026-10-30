@@ -1,4 +1,4 @@
-import { expandLocalRules, localRulesError, splitRuleFields, composeRule, lowerRule, parseRuleLine, remoteRuleMatcher, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
+import { expandLocalRules, withIpOptions, localRulesError, splitRuleFields, composeRule, lowerRule, parseRuleLine, remoteRuleMatcher, rawRuleParts, UnsupportedRuleError, stableStringify, type Builtin, type GroupSpec, type Matcher, type RuleEntry, type Target, type Template } from '@sub-forge/core';
 import { Document, isAlias, isMap, isNode, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
 import { recoverYaml } from './recoverYaml.ts';
 import { parseYamlDocument } from './yamlDocument.ts';
@@ -79,8 +79,8 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     const entries: RuleEntry[] = m.kind === 'local' ? expandLocalRules(m).map((rule, i) => ({ ...r, id: i ? `${r.id}:line:${i}` : r.id, matcher: { kind: 'rule', rule: rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule } })) : [r];
     const offset = exported.length;
     const lines = entries.map(entry => {
-      const lowered = entry.matcher.kind === 'rule' ? lowerMatcher(entry.matcher) : { text: `RULE-SET,${providerAlias(entry)}` };
-      const line = composeRule({ ...lowered, src: ('src' in lowered && lowered.src) || entry.options?.src }, targetName(entry.target, t.groups));
+      const lowered = entry.matcher.kind === 'rule' ? lowerMatcher({ ...entry.matcher, rule: withIpOptions(entry.matcher.rule, entry.options ?? {}) }) : { text: `RULE-SET,${providerAlias(entry)}`, src: entry.options?.src };
+      const line = composeRule(lowered, targetName(entry.target, t.groups));
       exported.push({ rule: entry, line });
       return line;
     });
@@ -474,7 +474,7 @@ function readTemplate(text: string, current: TemplateBody, ctx: ConvertCtx, reco
       const first = entries[0];
       const index = first ? rules.indexOf(first) : -1;
       const originalLines = isSeq(ruleNodes) ? ruleNodes.items.slice(saved.offset, saved.offset + saved.lines.length).map(node => isScalar(node) ? node.value : undefined) : [];
-      const expected = expandLocalRules(saved.entry.matcher).map(rule => composeRule({ ...lowerMatcher({ kind: 'rule', rule: rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule }), src: saved.entry.options?.src || rawRuleParts(rule.type === 'RAW' ? rule.text : '').src }, first ? targetName(first.target, groups) : ''));
+      const expected = expandLocalRules(saved.entry.matcher).map(rule => composeRule(lowerMatcher({ kind: 'rule', rule: withIpOptions(rule.type === 'RAW' ? { type: 'RAW', text: rule.text } : rule, saved.entry.options ?? {}) }), first ? targetName(first.target, groups) : ''));
       if (index < 0 || entries.some((entry, i) => !entry || rules[index + i] !== entry) || stableStringify(expected) !== stableStringify(saved.lines) || stableStringify(originalLines) !== stableStringify(saved.lines)) {
         notes.push('本地规则分组正文已修改，按当前 YAML 中的独立规则导入'); return;
       }

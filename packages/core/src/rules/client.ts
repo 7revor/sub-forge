@@ -22,6 +22,7 @@ export function withIpOptions(rule: RuleIR, options: { noResolve?: boolean; src?
   if (rule.type === 'RAW' && options.src) {
     if (rawRuleError(rule.text)) return rule;
     const parts = rawRuleParts(rule.text);
+    if (!/^(IP-CIDR6?|IP-ASN|IP-SUFFIX|GEOIP)\s*,/i.test(parts.text)) return rule;
     return { ...rule, text: composeRule({ ...parts, src: true }) };
   }
   if (rule.type !== 'IP-CIDR' && rule.type !== 'IP-CIDR6' && rule.type !== 'IP-ASN' && rule.type !== 'GEOIP') return rule;
@@ -51,7 +52,7 @@ export function regexToWildcard(re: string): string | undefined {
     const ch = src[i]!;
     if (ch === '\\') {
       const next = src[i + 1];
-      if (next === undefined || /[A-Za-z0-9]/.test(next)) return undefined; // \d \w 等字符类
+      if (next === undefined || /[A-Za-z0-9*?\[\]]/.test(next)) return undefined; // \d \w 等字符类
       out += next;
       i++;
     } else if (ch === '.') {
@@ -196,6 +197,7 @@ function lowerRaw(rule: Extract<RuleIR, { type: 'RAW' }>, ctx: ClientCtx): Lower
 
 /** 规则匹配部分（不含出口）的客户端写法 */
 export function lowerRule(rule: RuleIR, ctx: ClientCtx): LoweredRule {
+  if ('value' in rule && /[\r\n\u2028\u2029\0]/.test(rule.value)) return { kind: 'drop', reason: '规则匹配值不能包含换行或空字符' };
   if (rule.extendedMatching) {
     if (ctx.client !== 'surge') return { kind: 'drop', reason: `${ctx.client} 不支持 extended-matching，不能改变匹配语义` };
     if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'URL-REGEX', 'RAW'].includes(rule.type)) return { kind: 'drop', reason: `${rule.type} 不支持 extended-matching` };

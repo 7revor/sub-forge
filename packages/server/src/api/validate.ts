@@ -277,7 +277,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (doc.stash !== undefined && !isObj(doc.stash)) throw bad('stash 段必须是对象');
       for (const client of ['surge', 'loon']) if (doc[client] !== undefined) {
         if (!isObj(doc[client])) throw bad(client + ' 段必须是对象');
-        try { stringifyIniBase(doc[client]); } catch (error) { throw bad(error instanceof Error ? error.message : '基础设置不合法'); }
+        try { stringifyIniBase(doc[client]); } catch (error) { throw bad(client + '：' + (error instanceof Error ? error.message : '基础设置不合法')); }
       }
       if (typeof doc.version !== 'number') doc.version = 1;
       break;
@@ -298,7 +298,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (doc.base !== undefined && (!isObj(doc.base) || doc.base.stashPatch !== undefined && !isObj(doc.base.stashPatch))) throw bad('基础设置及 stashPatch 必须是对象');
       for (const key of ['surgePatch', 'loonPatch']) if (isObj(doc.base) && doc.base[key] !== undefined) {
         if (!isObj(doc.base[key])) throw bad(key + ' 必须是对象');
-        try { stringifyIniBase(doc.base[key]); } catch (error) { throw bad(error instanceof Error ? error.message : '基础设置不合法'); }
+        try { stringifyIniBase(doc.base[key]); } catch (error) { throw bad(key + '：' + (error instanceof Error ? error.message : '基础设置不合法')); }
       }
       if (doc.base !== undefined && isObj(doc.base) && doc.base.presetId !== undefined && !store.get('preset', String(doc.base.presetId))) throw bad('基础设置预设不存在');
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};

@@ -178,7 +178,7 @@ function LegacyRules() {
                 {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-[12px] font-normal text-brand">已改出口</span>}
               </button>
               <Badge tone={r.origin === 'profile' ? 'ok' : 'neutral'}>{r.origin === 'profile' ? '私有' : '模板'}</Badge>
-              <span className="flex gap-1" aria-label="客户端输出"><span className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2">mihomo</span><span className="rounded border border-dashed border-line px-1.5 py-0.5 font-mono text-[11.5px] text-faint" title="Surge 暂未开放">Surge</span></span>
+              <span className="flex gap-1" aria-label="客户端输出">{['Mihomo', 'Surge', 'Stash', 'Loon'].map(name => <span key={name} className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2">{name}</span>)}</span>
               <span onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
                 {r.origin === 'profile' && <Button size="sm" variant="ghost" aria-label={`删除规则 ${i + 1}`} onClick={() => { setExtra(r.id, () => undefined); if (editing === r.id) setEditing(undefined); }}><Trash2 size={14} /></Button>}
               </span>

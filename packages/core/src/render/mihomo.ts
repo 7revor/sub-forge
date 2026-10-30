@@ -152,7 +152,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   }
   if (isIniClient(client)) {
     if (input.platform && !['ios', 'macos'].includes(input.platform)) report.error(client + '.platform', client + ' 仅支持 iOS 或 macOS');
-    if (profile.nodeSets.some(s => s.output === 'provider')) report.info(client + '.nodes-inline', client + ' 节点按快照内联，随主订阅刷新，以保留筛选、代理链和空组拒绝语义');
+    if (profile.nodeSets.some(s => s.output === 'provider')) report.info(client + '.nodes-inline', client + ' 节点按快照内联，随主订阅刷新，以保留筛选和空组拒绝语义');
     try { stringifyIniBase(input.base ?? {}); } catch (error) { report.error(client + '.base', error instanceof Error ? error.message : '基础配置不合法'); }
   }
   if (client === 'loon') report.info('loon.rule-priority', 'Loon 规则集按原位置内嵌；客户端仍按域名、IP 等阶段匹配，请在 Loon 中核对跨类型规则优先级');

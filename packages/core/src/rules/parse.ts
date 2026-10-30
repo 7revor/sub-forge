@@ -196,6 +196,8 @@ export function behaviorOf(rule: RuleIR): Behavior {
 export function ruleKey(rule: RuleIR, client?: Client): string {
   if (rule.extendedMatching) return `${ruleKey({ ...rule, extendedMatching: false }, client)}|extended-matching`;
   switch (rule.type) {
+    case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP': case 'SRC-IP-CIDR':
+      return `${rule.type}|${rule.value}${rule.noResolve ? '|no-resolve' : ''}${rule.src ? '|src' : ''}`;
     case 'PROCESS': return `PROCESS|${rule.kind}|${rule.mode}|${client === 'mihomo' && rule.mode === 'wildcard' ? rule.value.toLowerCase() : rule.value}`;
     case 'DOMAIN-WILDCARD': return `${rule.type}|${client === 'mihomo' ? rule.value.toLowerCase() : rule.value}`;
     case 'AND': case 'OR': case 'NOT': return `${rule.type}|${rule.children.map(child => ruleKey(child, client)).join(';')}`;

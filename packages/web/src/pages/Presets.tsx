@@ -76,7 +76,7 @@ export function PresetEdit() {
           <DeleteAction what="预设" name={d.name} body={DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
             onDelete={() => e.del.mutateAsync(d.id)} onDeleted={() => leave('/presets')} />
         </>}>
-        <span className={cx('text-[12.5px]', rawValid ? 'text-ok' : 'text-err')}>{rawValid ? (dirty ? `有未发布的修改 · 当前 v${d.version}` : `已发布 v${d.version}`) : '请先修复 YAML 中的错误'}</span>
+        <span className={cx('text-[12.5px]', rawValid ? 'text-ok' : 'text-err')}>{rawValid ? (dirty ? `有未发布的修改 · 当前 v${d.version}` : `已发布 v${d.version}`) : '请先修复原始配置中的错误'}</span>
       </PageHeader>
       <ErrorAlert error={e.save.error} />
       <PageScroll>

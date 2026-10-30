@@ -37,7 +37,7 @@ export function parseLoonLine(line: string): RawProxy {
   switch (type) {
     case 'ss': case 'shadowsocks': case 'shadowsocksr':
       p.type = type === 'shadowsocksr' ? 'ssr' : 'ss'; position('cipher'); position('password'); break;
-    case 'vmess': position('cipher'); position('uuid'); break;
+    case 'vmess': position('cipher'); position('uuid'); if (p.cipher === 'chacha20-ietf-poly1305') p.cipher = 'chacha20-poly1305'; break;
     case 'vless': position('uuid'); break;
     case 'trojan': case 'hysteria2': case 'anytls': position('password'); break;
     case 'http': case 'https': case 'socks5':

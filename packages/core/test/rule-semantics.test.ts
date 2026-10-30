@@ -2,8 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { parseRuleLine, ruleKey } from '../src/rules/parse.ts';
 import { composeRule, lowerRule } from '../src/rules/client.ts';
 import { rawRuleParts } from '../src/rules/raw.ts';
+import { formatRuleLine } from '../src/rules/expand.ts';
+import { regexToWildcard } from '../src/rules/client.ts';
 
 describe('规则跨客户端转换保留语义', () => {
+  it('相同网段的解析选项和源地址选项不能被去重合并', () => {
+    const lines = ['IP-CIDR,192.0.2.0/24', 'IP-CIDR,192.0.2.0/24,no-resolve', 'IP-CIDR,192.0.2.0/24,src', 'IP-CIDR,192.0.2.0/24,no-resolve,src'];
+    expect(new Set(lines.map(line => ruleKey(parseRuleLine(line)))).size).toBe(4);
+  });
+  it.each(['URL-REGEX,^https://example[.]test', 'DOMAIN,example.test,extended-matching', 'AND,((DOMAIN,example.test),(USER-AGENT,Example*))'])('编辑格式化不会把已支持规则变成注释：%s', line => {
+    expect(formatRuleLine(parseRuleLine(line))).toBe(line);
+  });
+  it('转义后的字面量不能扩大成通配符，结构化规则不能注入换行', () => {
+    expect(regexToWildcard('^Example\\*.*$')).toBeUndefined();
+    expect(lowerRule({ type: 'DOMAIN', value: 'example.test\nFINAL,DIRECT' }, { client: 'surge' }).kind).toBe('drop');
+  });
   it('保留 Surge 扩展匹配，出口在选项之前，且去重不混淆普通规则', () => {
     const rule = parseRuleLine('DOMAIN,example.com,extended-matching');
     const output = lowerRule(rule, { client: 'surge' });

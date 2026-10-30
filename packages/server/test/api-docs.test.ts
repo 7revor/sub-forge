@@ -192,10 +192,10 @@ describe('文档增删改查', () => {
   });
 });
 
-describe('预设 Surge 预留字段', () => {
-  it('保存和更新后可完整读回，允许 general 中的任意值及空段', async () => {
+describe('预设 Surge 基础配置', () => {
+  it('保存和更新后可完整读回，保留 general 标量、列表及空段', async () => {
     const { admin, alice } = await twoUsers();
-    const surge = { general: { ipv6: true, 'dns-server': ['1.1.1.1'], extra: { nested: null } }, host: { 'example.com': '1.2.3.4' } };
+    const surge = { general: { ipv6: true, 'dns-server': ['1.1.1.1'], extra: false }, host: { 'example.com': '1.2.3.4' } };
     const created = await admin.post('/api/presets', { name: '双客户端', mihomo: {}, surge });
     expect(created.status).toBe(201);
     const path = `/api/presets/${created.json.item.id}`;
