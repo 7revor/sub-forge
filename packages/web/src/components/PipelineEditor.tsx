@@ -286,7 +286,7 @@ function AddMenu({ onAdd }: { onAdd: (op: OperatorStep['op']) => void }) {
     <div ref={ref} className="flex flex-col gap-2 border-t border-line-2 px-4 pt-3 pb-2">
       <Button className="w-full border-dashed" aria-expanded={open} onClick={() => setOpen(!open)}><Plus size={16} />添加处理器</Button>
       {open && (
-        <div role="menu" aria-label="选择处理器" className="flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.10)]">
+        <div role="menu" aria-label="选择处理器" className="popover-panel flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.10)]">
           {OP_GROUPS.map((g) => <div key={g.title} className="flex flex-col gap-0.5">
             <div className="px-2.5 pt-2 pb-1 text-[11px] tracking-[.08em] text-faint">{g.title}</div>
             {g.ops.map((op) => <button key={op} type="button" role="menuitem" onClick={() => { onAdd(op); setOpen(false); }}

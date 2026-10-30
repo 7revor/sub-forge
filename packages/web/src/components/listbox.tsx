@@ -81,7 +81,7 @@ function OptionList({ id, opts, active, selected, pos, listRef, label, onPick, o
   return createPortal(
     <div ref={listRef} id={id} role="listbox" aria-label={label} aria-multiselectable={Array.isArray(selected) || undefined}
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: pos.width, maxHeight: pos.maxHeight }}
-      className="fixed z-[60] max-w-[min(480px,calc(100vw-16px))] overflow-y-auto rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.12)]"
+      className="popover-panel fixed z-[60] max-w-[min(480px,calc(100vw-16px))] overflow-y-auto rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onMouseDown={(e) => e.preventDefault()}>
       {!opts.length && <Empty size="compact" title={empty ?? '没有选项'} />}
       {opts.map((o, i) => <Fragment key={`${o.group ?? ''}\u0000${o.value}\u0000${i}`}>
@@ -166,7 +166,7 @@ export function MultiSelect({ value, onChange, children, placeholder = '请选�
 }) {
   const opts = collect(children);
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(-1);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -180,13 +180,14 @@ export function MultiSelect({ value, onChange, children, placeholder = '请选�
   const step = (direction: 1 | -1) => {
     for (let i = active + direction; i >= 0 && i < opts.length; i += direction) if (!opts[i]?.disabled) { setActive(i); return; }
   };
+  const show = () => { setActive(value.length ? opts.findIndex(option => value.includes(option.value)) : -1); setOpen(true); };
   return <>
     <button {...rest} id={id} ref={btn} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open}
-      aria-controls={open ? listId : undefined} aria-activedescendant={open ? `${listId}-${active}` : undefined} disabled={disabled}
-      onClick={() => setOpen(!open)} onKeyDown={event => {
+      aria-controls={open ? listId : undefined} aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined} disabled={disabled}
+      onClick={() => open ? setOpen(false) : show()} onKeyDown={event => {
         rest.onKeyDown?.(event);
         if (disabled) return;
-        if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); setOpen(true); return; }
+        if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); show(); return; }
         if (!open) return;
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); }
         else if (event.key === 'Tab') setOpen(false);
@@ -196,10 +197,10 @@ export function MultiSelect({ value, onChange, children, placeholder = '请选�
         else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (opts[active]) pick(opts[active]); }
       }}
       className={cx(fieldCls, 'inline-flex min-w-0 cursor-pointer items-center gap-2 text-left disabled:opacity-50', open && 'border-accent', className)}>
-      <span className="min-w-0 flex-1 truncate">{value.length ? opts.filter(option => value.includes(option.value)).map(option => option.text).join('、') : placeholder}</span>
+      <span className={cx('min-w-0 flex-1 truncate', !value.length && 'text-faint')}>{value.length ? opts.filter(option => value.includes(option.value)).map(option => option.text).join('、') : placeholder}</span>
       <ChevronDown size={15} aria-hidden className={cx('shrink-0 text-muted', open && 'rotate-180')} />
     </button>
-    {open && pos && <OptionList id={listId} opts={opts} active={active} selected={value.length ? value : ['']} pos={pos} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} />}
+    {open && pos && <OptionList id={listId} opts={opts} active={active} selected={value} pos={pos} listRef={list} label={rest['aria-label']} onPick={pick} onHover={setActive} />}
   </>;
 }
 
@@ -267,7 +268,7 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
     </button>
     {open && pos && createPortal(<div ref={popup} id={popupId} role="dialog" aria-label={ariaLabel}
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
-      className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
+      className="popover-panel fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
       <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query}
         className={fieldCls} onChange={event => setQuery(event.target.value)}

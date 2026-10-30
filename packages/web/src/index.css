@@ -207,3 +207,61 @@ body {
   z-index: 1;
   background: var(--color-panel);
 }
+
+/* 弹窗统一使用短促的淡入与轻微位移；退场时保留遮罩和面板 160ms。 */
+@keyframes overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlay-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes panel-exit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(4px) scale(.99); }
+}
+
+.modal-overlay,
+.feedback-dialog::backdrop {
+  animation: overlay-enter 180ms ease-out both;
+}
+
+.modal-panel,
+.feedback-dialog[open] {
+  animation: panel-enter 180ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.modal-overlay[data-state='closed'],
+.feedback-dialog[data-state='closed']::backdrop {
+  pointer-events: none;
+  animation: overlay-exit 160ms ease-in both;
+}
+
+.modal-overlay[data-state='closed'] .modal-panel,
+.feedback-dialog[open][data-state='closed'] {
+  animation: panel-exit 160ms ease-in both;
+}
+
+.popover-panel,
+.notification {
+  animation: panel-enter 140ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  .modal-panel,
+  .feedback-dialog[open],
+  .feedback-dialog::backdrop,
+  .popover-panel,
+  .notification {
+    animation: none !important;
+  }
+}

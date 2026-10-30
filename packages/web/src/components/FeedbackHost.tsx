@@ -11,7 +11,7 @@ function Notification({ item }: { item: Feedback }) {
     const timer = setTimeout(() => feedbackStore.dismiss(item.id), 4500);
     return () => clearTimeout(timer);
   }, [item.id, item.action, paused]);
-  return <div role="status" className="pointer-events-auto flex items-start gap-3 rounded-xl border border-line bg-panel p-4 text-[13px] shadow-lg"
+  return <div role="status" className="notification pointer-events-auto flex items-start gap-3 rounded-xl border border-line bg-panel p-4 text-[13px] shadow-lg"
     onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPaused(false); }}>
     <CircleCheck size={20} className="shrink-0 text-ok" aria-hidden="true" />
     <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">{item.message}
@@ -25,6 +25,12 @@ function Notification({ item }: { item: Feedback }) {
 }
 
 function ErrorDialog({ item }: { item: Feedback }) {
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (open) return;
+    const timer = setTimeout(() => feedbackStore.dismiss(item.id), window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 160);
+    return () => clearTimeout(timer);
+  }, [open, item.id]);
   const dialog = useRef<HTMLDialogElement>(null);
   const confirm = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -38,12 +44,12 @@ function ErrorDialog({ item }: { item: Feedback }) {
       else document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"] input:not(:disabled), [role="dialog"][aria-modal="true"] button:not(:disabled)')?.focus();
     };
   }, []);
-  return <dialog ref={dialog} role="alertdialog" aria-modal="true" aria-labelledby={`feedback-title-${item.id}`} aria-describedby={`feedback-message-${item.id}`}
-    className="m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-[480px] overflow-auto rounded-xl border border-line bg-panel p-0 text-ink shadow-2xl backdrop:bg-[rgba(20,23,28,.42)]"
-    onCancel={event => { event.preventDefault(); feedbackStore.dismiss(item.id); }}>
+  return <dialog data-state={open ? 'open' : 'closed'} ref={dialog} role="alertdialog" aria-modal="true" aria-labelledby={`feedback-title-${item.id}`} aria-describedby={`feedback-message-${item.id}`}
+    className="feedback-dialog m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-[480px] overflow-auto rounded-xl border border-line bg-panel p-0 text-ink shadow-2xl backdrop:bg-[rgba(20,23,28,.42)]"
+    onCancel={event => { event.preventDefault(); setOpen(false); }}>
     <div className="flex items-center gap-2 px-5 pt-5"><CircleAlert size={22} className="text-err" aria-hidden="true" /><h2 id={`feedback-title-${item.id}`} className="m-0 text-base font-semibold">操作失败</h2></div>
     <p id={`feedback-message-${item.id}`} className="m-0 whitespace-pre-wrap break-words px-5 py-4 text-[13.5px] leading-relaxed">{item.message}</p>
-    <div className="flex justify-end border-t border-line bg-ground px-5 py-3"><button ref={confirm} type="button" className="h-10 cursor-pointer rounded-lg bg-accent px-5 text-[13.5px] font-medium text-white hover:bg-accent-strong" onClick={() => feedbackStore.dismiss(item.id)}>知道了</button></div>
+    <div className="flex justify-end border-t border-line bg-ground px-5 py-3"><button ref={confirm} type="button" className="h-10 cursor-pointer rounded-lg bg-accent px-5 text-[13.5px] font-medium text-white hover:bg-accent-strong" onClick={() => setOpen(false)}>知道了</button></div>
   </dialog>;
 }
 

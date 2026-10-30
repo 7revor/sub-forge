@@ -8,6 +8,7 @@ import { Notice } from '../../components/Notice.tsx';
 import { withIpOptions, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { Presence } from '../../components/Presence.tsx';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
@@ -65,12 +66,12 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
   </div>;
 }
 
-function ExtraRuleModal({ onClose, onAdd, prepend = false }: { onClose: () => void; onAdd: (anchor: ExtraRule['anchor'], rule: RuleEntry) => void; prepend?: boolean }) {
+function ExtraRuleModal({ open, onClose, onAdd, prepend = false }: { open: boolean; onClose: () => void; onAdd: (anchor: ExtraRule['anchor'], rule: RuleEntry) => void; prepend?: boolean }) {
   const { template } = useProfile();
   const [anchor, setAnchor] = useState('top');
   const [rule, setRule] = useState<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }));
   const error = privateRuleError(rule);
-  return <Modal title={prepend ? "添加前置规则" : "插入规则"} open onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
+  return <Modal title={prepend ? "添加前置规则" : "插入规则"} open={open} onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
     const position: ExtraRule['anchor'] = prepend ? 'top' : anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
     onAdd(position, rule); onClose();
   }}>插入</Button></>}>
@@ -145,7 +146,7 @@ function LegacyRules() {
         <span className="font-mono">MATCH</span><span className="min-w-0 break-words text-right text-ink-2">{targetLabel(final, groupName, nodeSetName)}</span>
       </div>
     </Card>
-    {adding && <ExtraRuleModal prepend onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay(o => ({ ...o, extraRules: [{ anchor, rule }, ...(o.extraRules ?? [])] }))} />}
+    <Presence open={adding}>{open => <ExtraRuleModal open={open} prepend onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay(o => ({ ...o, extraRules: [{ anchor, rule }, ...(o.extraRules ?? [])] }))} />}</Presence>
   </>;
 
   return <>
@@ -191,6 +192,6 @@ function LegacyRules() {
         {template && draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _, ...rest } = o; return rest; })}>还原为模板</Button>}
       </div>
     </Card>
-    {adding && <ExtraRuleModal onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />}
+    <Presence open={adding}>{open => <ExtraRuleModal open={open} onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />}</Presence>
   </>;
 }

@@ -3,7 +3,6 @@ import { ProfileGroupsEditor } from './ProfileRoutingEditors.tsx';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { Notice } from '../../components/Notice.tsx';
-import { OptionalBoolean } from '../../components/OptionalBoolean.tsx';
 // 策略组：绑定模式只补充成员；独立模式维护完整组配置。
 
 import type { GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
@@ -13,7 +12,7 @@ import { NodeSetSelect, memberLabel } from '../../components/pickers.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
@@ -122,6 +121,11 @@ function LegacyGroups() {
                     </span>
                     {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
                   </button>
+                  <div className="flex shrink-0 flex-col items-center gap-1 px-2 py-2">
+                    <span className="text-[12px] text-muted">隐藏</span>
+                    {x.origin === 'template' || bound ? <span className="text-[12px] text-muted" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
+                      onChange={hidden => patchOverlay(o => ({ ...o, extraGroups: (o.extraGroups ?? []).map(item => item.group.id === x.id ? { ...item, group: { ...item.group, display: { ...item.group.display, hidden } } } : item) }))} />}
+                  </div>
                 </div>
               );
             }} /></div>
@@ -142,7 +146,7 @@ function LegacyGroups() {
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
               <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                <fieldset disabled={bound} className="contents"><GroupSettingsFields value={eff} onChange={setField} defaultStrategy="consistent-hashing" /></fieldset>
+                <fieldset disabled={bound} className="contents"><GroupSettingsFields value={eff} onChange={setField} /></fieldset>
               </div>
 
               <div className="flex flex-col gap-2.5">
@@ -166,8 +170,8 @@ function LegacyGroups() {
               </div>
 
               <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">
-                <Field label="filter（保留）" hint="仅筛选节点集成员">{(id) => <Input id={id} className="font-mono" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
-                <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={eff.excludeFilter ?? ''} onChange={(e) => setField('excludeFilter', e.target.value)} />}</Field>
+                <Field label="filter（保留）" hint="仅筛选节点集成员">{(id) => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
+                <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={eff.excludeFilter ?? ''} onChange={(e) => setField('excludeFilter', e.target.value)} />}</Field>
                 <Field label="exclude-type（排除协议）">{(id) => <ExcludeTypeSelect id={id} value={eff.excludeType} onChange={(value) => setField('excludeType', value)} />}</Field>
               </fieldset>
               <div className="flex flex-col gap-2">
@@ -178,9 +182,6 @@ function LegacyGroups() {
               </div>
 
               <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">
-                <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">hidden（mihomo）{g.origin === 'template' ? ' · 模板设定，只读' : ''}</span>
-                  {g.origin === 'template' ? <span className="text-[13px]">{eff.display?.hidden === undefined ? '不设置' : eff.display.hidden ? '开' : '关'}</span> : <OptionalBoolean label="hidden" value={eff.display?.hidden} onChange={(hidden) => setField('display', { ...eff.display, hidden })} />}
-                </div>
                 <Field label="icon" hint="mihomo icon / Surge icon-url">{(id) => <Input id={id} placeholder="图标地址" value={eff.display?.icon ?? ''} onChange={(e) => setField('display', { ...eff.display, icon: e.target.value || undefined })} />}</Field>
               </fieldset>
               <div className="flex flex-col gap-2">
