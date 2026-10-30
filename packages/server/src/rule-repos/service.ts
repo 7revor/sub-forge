@@ -1,3 +1,4 @@
+import type { SnapshotService } from '../snapshots.ts';
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
 import { matchesNameSearch, nameLikePattern, normalizeNameSearch, parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { createHash } from 'node:crypto';
@@ -23,7 +24,7 @@ export class RuleRepoService {
   private stopped = false;
   private editing = new Set<string>();
   private cache: RepoCache;
-  constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now, cache?: RepoCache) {
+  constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now, cache?: RepoCache, private snapshots?: SnapshotService) {
     this.cache = cache ?? new GitRepoCache(join(dirname(store.db.name === ':memory:' ? './data/sub-forge.db' : store.db.name), 'rule-repo-cache'));
     this.initializeDefinitions();
     this.upgradeTextIndex();
@@ -119,6 +120,11 @@ export class RuleRepoService {
     return { repo, path, name: entry.name, license: definition.license, url: `https://github.com/${definition.owner}/${definition.repo}`,
       files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path) || a.ref.localeCompare(b.ref))
         .map(file => ({ ...file, url: rawUrl(definition, file), upstream: upstreamUrl(definition, file) })) };
+  }
+  fileResource(id:string,ref:string,path:string) {
+    this.assertEnabled(id);
+    if (!findRuleFile(this.store.db,id,ref,path) || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中');
+    return {kind:'ruleset' as const,id:`repository-file:${id}:${ref}:${path}`,name:path,url:rawUrl(this.definition(id,true),{ref,path,format:'auto'}),options:{format:'auto' as const,scope:'public-repository'}};
   }
   /** 只预览选中的目录文件，保留注释和空行，不解析 README 或聚合其他来源。 */
   async filePreview(id: string, ref: string, path: string) {
@@ -299,6 +305,12 @@ export class RuleRepoService {
   }
   private async readFile(repo: RepoDefinition, file: RepoFile): Promise<string> {
     this.assertEnabled(repo.id);
+    if (this.snapshots && isIndexedRuleFile(file.path)) {
+      const url=rawUrl(repo,file);
+      const result=await this.snapshots.get('ruleset',`repository-file:${repo.id}:${file.ref}:${file.path}`,url,{format:'auto',scope:'public-repository'});
+      if (!result.snapshot?.body) throw new Error(result.error ?? '没有可用规则缓存');
+      return result.snapshot.body;
+    }
     if (file.commit) return this.cache.read(repo, file.commit, file.path);
     // 迁移前的旧索引仍可使用；首次 Git 同步后每个文件均携带固定提交。
     const response = await this.fetcher(rawUrl(repo, file), { timeoutMs: 20_000 });
@@ -339,9 +351,11 @@ export class RuleRepoService {
         this.upgradeLegacySources();
       }
       this.store.db.prepare('UPDATE rule_repos SET checked_at = ?, error = NULL WHERE id = ?').run(this.now(), id);
+      this.store.changed();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.store.db.prepare('UPDATE rule_repos SET checked_at = ?, error = ? WHERE id = ?').run(this.now(), `索引更新失败：${message}`, id);
+      this.store.changed();
       console.warn(`规则仓库 ${id} 索引更新失败：${message}`);
     }
   }
@@ -349,7 +363,7 @@ export class RuleRepoService {
     if (this.timer || this.stopped) return;
     const tick = () => {
       for (const row of this.rows()) {
-        if (!this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (row.error ? 15 * 60_000 : DAY))) void this.refresh(row.id);
+        if (!this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (this.store.resourceCacheTtlSec * 1000))) void this.refresh(row.id);
       }
     };
     tick();
@@ -391,8 +405,7 @@ export class RuleRepoService {
     this.entry(id, path);
     const version = this.snapshotVersion(id);
     const key = `${id}:${path}:${version}`;
-    const cached = this.details.get(key);
-    if (cached) return cached;
+
     const job = (async () => {
       const entry = await this.resolvedEntry(id, path);
       const variant = this.importVariant(entry);
@@ -420,7 +433,7 @@ export class RuleRepoService {
     if (this.details.size >= 50) this.details.delete(this.details.keys().next().value!);
     this.details.set(key, job);
     // 失败后可重新尝试；成功结果只在当前索引版本内缓存。
-    void job.then(result => { if (result.previewError) this.details.delete(key); }, () => this.details.delete(key));
+    void job.then(() => this.details.delete(key), () => this.details.delete(key));
     return job;
   }
   importVariant(entry: IndexedEntry, variantId?: string) {

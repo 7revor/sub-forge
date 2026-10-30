@@ -21,9 +21,9 @@ export class RuleSourceService {
     let stale = false;
     const passthrough = ['mrs', 'srs'].includes(source.format);
     if (source.kind === 'remote') {
-      const prior = saved?.sources.find(s => s.kind === 'remote' && s.url === source.url && JSON.stringify(s.fetch ?? {}) === JSON.stringify(source.fetch ?? {}));
+      const prior = saved?.sources.find(s => s.kind === 'remote' && s.url === source.url && JSON.stringify({ua:s.fetch?.ua,timeoutMs:s.fetch?.timeoutMs}) === JSON.stringify({ua:source.fetch?.ua,timeoutMs:source.fetch?.timeoutMs}));
       if (saved && prior) {
-        const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ttlSec: 86400, ...source.fetch, format: source.format }, { waitForFresh: true, refresh }));
+        const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ttlSec: 86400, ...source.fetch, format: source.format, scope: source.repository && !source.fetch?.ua ? 'public-repository' : userId }, { waitForFresh: true, refresh }));
         content = result.snapshot?.body; fetchedAt = result.snapshot?.fetchedAt; error = result.error; stale = result.stale;
       } else {
         const key = JSON.stringify([userId, source.url, source.format, source.fetch ?? {}]);

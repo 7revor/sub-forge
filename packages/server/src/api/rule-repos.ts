@@ -1,3 +1,4 @@
+import type { ResourceService } from '../resources.ts';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
 import type { Store } from '../store.ts';
@@ -5,7 +6,7 @@ import type { RuleRepoService } from '../rule-repos/service.ts';
 import { bad, HttpError, isStr, jsonBody, notFound, requireAdmin, requireUser, type ApiEnv } from './common.ts';
 import { validateDoc } from './validate.ts';
 
-export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
+export function ruleRepoRoutes(store: Store, repos: RuleRepoService, resources?:ResourceService) {
   const app = new Hono<ApiEnv>();
   app.use('/rule-repos/*', requireUser);
   app.get('/rule-repos', requireUser, c => c.json({ repos: repos.list() }));
@@ -34,6 +35,12 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(502, `文件内容读取失败：${error instanceof Error ? error.message : String(error)}`);
     }
+  });
+  app.post('/rule-repos/file-refresh', async c=>{
+    const body=await jsonBody(c);
+    if(!resources || !isStr(body.repo) || !isStr(body.ref) || !isStr(body.path))throw bad('缺少仓库文件标识');
+    const resource=repos.fileResource(body.repo,body.ref,body.path);
+    return c.json({job:resources.startJob(c.get('user').id,'repository-file',resource.id,[resource])},202);
   });
   app.get('/rule-repos/files', c => {
     const { repo, path } = c.req.query();

@@ -35,7 +35,7 @@ export class SnapshotService {
   private readonly previews = new Map<string, Promise<{ body?: string; error?: string }>>();
   constructor(private readonly store: Store, private readonly fetcher: UpstreamFetcher, private readonly now: () => number = Date.now) {}
   identity(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): string {
-    const options = kind === 'source' ? SOURCE_REQUEST_OPTIONS : { ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format: opts.format ?? 'auto' };
+    const options = kind === 'source' ? SOURCE_REQUEST_OPTIONS : { ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format: opts.format ?? (kind === 'ruleset' ? this.store.get('ruleset',id)?.sources.find(s=>s.url===url)?.format : undefined) ?? 'auto' };
     return this.store.bindResource(kind,id,url,options,opts.scope);
   }
   status(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}) {
@@ -96,7 +96,7 @@ export class SnapshotService {
     if (policy.refresh || status.nextFetchAt === undefined || this.now() >= status.nextFetchAt || status.refreshing) {
       const row = await this.refresh(kind,id,url,opts);
       latest = this.store.latestSnapshot(kind,status.resource,url);
-      return { snapshot:latest,stale:!row.ok,error:row.ok ? undefined : row.error };
+      return { snapshot:latest,stale:!row.ok && !!latest,error:row.ok ? undefined : row.error };
     }
     return { snapshot:latest,stale:!!status.error,error:status.error };
   }

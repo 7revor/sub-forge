@@ -25,6 +25,8 @@ export type UrlBuilder = {
 };
 
 export type RenderInput = {
+  resourceIntervalSec?: number;
+  managedResources?: boolean;
   profile: Profile;
   template?: Template;
   nodeSets: NodeSetInputs;
@@ -355,6 +357,20 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
     const base = `rs_${safeId(m.id)}${r.options?.src ? '_src' : ''}`;
     const rs = input.rules.rulesets[m.id];
     if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${m.id}`); continue; }
+    const enabled = rs.sources.filter(s => s.enabled !== false);
+    if (input.managedResources && enabled.some(s => s.format === 'mrs' || s.format === 'srs')) {
+      const src = enabled[0]!;
+      const body = input.rules.snapshots[sourceKey(rs.id,src.id)];
+      if (enabled.length !== 1 || src.format !== 'mrs' || !['domain','ipcidr'].includes(src.behavior ?? '') || rs.overrides?.length || src.overrides?.length || r.options?.src || !body?.startsWith('#subforge-binary-mrs\n')) {
+        report.error('ruleset.binary-unavailable','MRS 需要单一有效来源且不能合并或改写；SRS 暂不支持托管',where);
+        continue;
+      }
+      const key = `${base}_binary`, file = `${key}.mrs`;
+      rulesets[file] = { behavior: src.behavior as Behavior, text: body };
+      ruleProviders[key] = { type:'http',behavior:src.behavior,format:'mrs',url:input.urls.ruleset(file),interval:input.resourceIntervalSec ?? RULESET_INTERVAL,...(client === 'mihomo' ? {proxy:FETCH_VIA} : {}) };
+      ruleLines.push(`RULE-SET,${key},${target}`);
+      continue;
+    }
     // 只解析一次：校验、输出方式判断和正文转换共用容错文档。
     const documents = new Map<string, RuleDocument>();
     for (const src of rs.sources.filter(s => s.enabled !== false)) {
@@ -377,14 +393,14 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
       }
       if (document.diagnostics.length) report.info('ruleset.rejected-lines', `${label}有 ${document.diagnostics.length} 行无法解析`, where);
     }
-    const delivery = m.remote ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
+    const delivery = m.remote || input.managedResources ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(rs, input.rules, ctx, r.options, documents);
     if (delivery.mode === 'unsupported') {
       report.error('ruleset.conversion-unavailable', delivery.reason, where);
       continue;
     }
     if (delivery.mode === 'original') {
       const key = `${base}_original`;
-      ruleProviders[key] ??= { type: 'http', behavior: delivery.behavior, format: delivery.format, url: delivery.url, interval: RULESET_INTERVAL };
+      ruleProviders[key] ??= { type: 'http', behavior: delivery.behavior, format: delivery.format, url: delivery.url, interval: input.resourceIntervalSec ?? RULESET_INTERVAL };
       ruleLines.push(`RULE-SET,${key},${target}`);
       continue;
     }
@@ -400,7 +416,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
       }
       if (!converted.lines.length) continue;
       rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', ...(m.remote ? { remoteUrl: m.remote.url } : {}) };
-      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
+      ruleProviders[key] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, m.remote?.url), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
     }
     ruleLines.push(`RULE-SET,${key},${target}`);
   }
@@ -420,7 +436,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
     // 版本号随内容（含注入的前置）变化，客户端重载主配置即重新下载；不输出 path（REF-11）
     const version = shortHash(`${yaml}|${providerOverride.get(s.key) ?? ''}`, 8);
     providers[s.key] = { name: s.providerName, version, yaml };
-    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: PROVIDER_INTERVAL, proxy: FETCH_VIA };
+    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
     const ov = providerOverride.get(s.key);
     if (ov) entry.override = { 'dialer-proxy': ov };
     proxyProviders[s.providerName] = entry;

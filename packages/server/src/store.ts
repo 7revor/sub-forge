@@ -625,6 +625,7 @@ export class Store {
   // ---------- 快照 ----------
 
   addSnapshot(s: Omit<SnapshotRow, 'id'>): SnapshotRow {
+    s = { ...s, ownerId:this.snapshotOwner(s.ownerKind,s.ownerId,s.url) };
     const urlHash = this.cipher.hmac(s.url);
     const tx = this.db.transaction(() => {
       const inserted = this.db.prepare('INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -676,7 +677,11 @@ export class Store {
   snapshotHistory(ownerKind: SnapshotOwner, ownerId: string): Omit<SnapshotRow, 'body'>[] {
     const rows = this.db.prepare('SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND (owner_id = ? OR owner_id IN (SELECT resource FROM resource_bindings WHERE kind = ? AND id = ?)) ORDER BY fetched_at DESC, id DESC')
       .all(ownerKind, ownerId, ownerKind, ownerId) as RawSnapshot[];
-    return rows.map((r) => this.toSnapshot(r));
+    const result=rows.map((r) => this.toSnapshot(r));
+    if(ownerKind !== 'source')return result;
+    const source=this.get('source',ownerId);
+    const current=source ? result.filter(row=>row.url===source.url) : result;
+    return current.filter((row,index)=>current.findIndex(r=>r.ok===row.ok)===index);
   }
 
   countSnapshots(ownerKind: SnapshotOwner, ownerId: string, url: string): { ok: number; failed: number } {

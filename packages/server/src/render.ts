@@ -75,7 +75,7 @@ export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; 
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
 export class RenderService {
-  private readonly cache = new Map<string, { render: StoredRender; report: ReportItem[] }>();
+
 
   constructor(
     private readonly store: Store,
@@ -166,8 +166,8 @@ export class RenderService {
     const rules = this.collectRules(profile, template);
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
       for (const src of rs.sources) {
-        if (src.enabled === false || src.kind !== 'remote' || !src.url || src.format === 'mrs' || src.format === 'srs') continue;
-        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ttlSec: src.fetch?.ttlSec ?? RULESET_TTL_SEC, ...src.fetch, format: src.format });
+        if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
+        const r = await this.snapshots.get('ruleset', rs.id, src.url, { ttlSec: src.fetch?.ttlSec ?? RULESET_TTL_SEC, ...src.fetch, format: src.format, scope: (src.repository && !src.fetch?.ua) || rs.id.startsWith('repo:') ? 'public-repository' : this.store.getWithOwner('ruleset',rs.id)?.owner ?? this.store.getWithOwner('profile',profileId)?.owner ?? undefined });
         if (r.snapshot?.body !== undefined) {
           rules.snapshots[sourceKey(rs.id, src.id)] = r.snapshot.body;
           snapshotHashes.push(`${rs.id}|${src.url}|${r.snapshot.hash}`);
@@ -183,26 +183,10 @@ export class RenderService {
       : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource);
 
-    const key = stableHash(stableStringify({
-      profile, template, base, target, snapshotHashes,
-      sources: nodeSets.sources, collections: nodeSets.collections, locals: nodeSets.locals,
-      rulesets: rules.rulesets,
-    }));
-    const hit = opts.dry ? undefined : this.cache.get(key);
-    if (hit && !pre.some(i => i.level === 'error')) {
-      // 配置内容未变时仍使用最新快照的流量和本次拉取告警，不把元信息固化在 YAML 缓存中。
-      const report = [...pre, ...hit.report];
-      const { userinfo: _oldUserinfo, ...content } = hit.render;
-      const render: StoredRender = { ...content, warnings: report.filter(i => i.level === 'warn').length, ...(userinfo ? { userinfo } : {}) };
-      this.cache.delete(key); this.cache.set(key, { render, report: hit.report });
-      this.remember(profileId, target, render);
-      return { from: 'cache', render, report };
-    }
-
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const qs = `${target.client === 'stash' ? '&target=stash' : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
     const result = (target.client === 'stash' ? renderStash : renderMihomo)({
-      profile, nodeSets, rules,
+      profile, nodeSets, rules, managedResources:true, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
@@ -246,8 +230,7 @@ export class RenderService {
       ...(userinfo ? { userinfo } : {}),
     };
     if (opts.dry) return { from: 'fresh', render, report, result };
-    this.cache.set(key, { render, report: result.report.items });
-    while (this.cache.size > (this.opts.cacheSize ?? 256)) this.cache.delete(this.cache.keys().next().value!);
+
     this.remember(profileId, target, render);
     return { from: 'fresh', render, report };
   }
@@ -273,7 +256,7 @@ export class RenderService {
     return { inputs, userinfo, hashes, report };
   }
 
-  private collectNodeSets(refs: NodeSetID[]): { inputs: NodeSetInputs; sources: SourceDoc[] } {
+  collectNodeSets(refs: NodeSetID[]): { inputs: NodeSetInputs; sources: SourceDoc[] } {
     const inputs: NodeSetInputs = { sources: {}, collections: {}, locals: {}, snapshots: {} };
     const seen = new Set<string>();
     const walk = (ref: NodeSetID) => {
@@ -289,7 +272,7 @@ export class RenderService {
   }
 
   /** 模板规则与 Profile 私有规则引用到的规则集 */
-  private collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RuleSetInputs {
+  collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RuleSetInputs {
     const out: RuleSetInputs = { rulesets: {}, snapshots: {} };
     const visit = (m: Matcher) => {
       if (m.kind !== 'ruleset') return;
