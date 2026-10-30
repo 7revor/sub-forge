@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Button, ErrorAlert, Field, Input, } from './ui.tsx';
 
 /** 创建请求和跳转由调用方负责；按钮和回车共用一次提交入口。 */
-export function NamedCreateDialog({ open, onClose, title, label = '名称', placeholder, hint, pending, error, onCreate, onReset, children }: {
+export function NamedCreateDialog({ open, onClose, title, label = '名称', placeholder = `填写${label}，用于区分和查找`, hint, pending, error, onCreate, onReset, children }: {
   open: boolean; onClose: () => void; title: string; label?: string; placeholder?: string; hint?: ReactNode;
   children?: ReactNode;
   pending: boolean; error: unknown; onCreate: (name: string) => Promise<unknown>; onReset: () => void;

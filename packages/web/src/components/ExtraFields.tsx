@@ -15,14 +15,14 @@ function ValueRow({ name, value, onChange, onRename, onRemove }: {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <Input aria-label={`${name} 的字段名称`} className="w-1/3 font-mono" value={keyText} aria-invalid={!!keyError}
+        <Input placeholder="原生配置中的字段名称" aria-label={`${name} 的字段名称`} className="w-1/3 font-mono" value={keyText} aria-invalid={!!keyError}
           onChange={(e) => { setKeyText(e.target.value); setKeyError(undefined); }}
           onBlur={() => {
             if (keyText === name) return;
             if (error) { setKeyError('请先修复字段值的解析错误'); return; }
             setKeyError(onRename(keyText.trim()));
           }} />
-        <YamlTextarea rows={1} aria-label={`${name} 的值`} className="font-mono" value={text} aria-invalid={!!error} onChange={(event) => {
+        <YamlTextarea placeholder="填写字段值，支持 YAML 字符串、列表或对象" rows={1} aria-label={`${name} 的值`} className="font-mono" value={text} aria-invalid={!!error} onChange={(event) => {
           const text = event.target.value;
           const parsed = parseExtraValue(text);
           setDraft({ source: value, text, error: parsed.ok ? undefined : parsed.error });

@@ -214,3 +214,10 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 合并包含依赖变化的分支后，先在主工作区执行 `pnpm install --frozen-lockfile`，再启动 `pnpm --filter @sub-forge/web dev`。依赖目录应属于当前工作区，不能复用其他 worktree 的 node_modules；若安装期间 Vite 正在运行，应重启开发服务以清除旧依赖解析缓存。
 
 本次不改变后端接口、领域模型和示例种子；视觉验收见 [官方组件迁移记录](../../research/verification/shadcn-official-20261030/README.md)。
+
+
+### 表单中文 placeholder（2026-10-30，硬性规则）
+
+Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSelect、Combobox 和 FieldSpec 必须提供 placeholder；已知 Mihomo 字段解释集中在 src/schemas/placeholders.ts。表单空值保持为空，不添加空 option，不把中文提示写入 value。可选单选使用 clearable，多选取消全部勾选；false 和 0 仍是有效值。业务字段使用对应的中文说明；不支持 placeholder 的开关等控件保留中文标签。完整要求见根目录 CLAUDE.md / AGENTS.md。
+
+验证包含 schema 中文提示覆盖、空 Select、零值、false 与清空删除的回归测试，以及 Codex 内置浏览器的发布、回显和 YAML 检查。后端和核心模型无需迁移。

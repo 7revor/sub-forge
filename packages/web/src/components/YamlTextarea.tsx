@@ -3,7 +3,7 @@ import { cx } from './cx.ts';
 import { highlightYaml } from './yamlHighlight.ts';
 import './yamlTextarea.css';
 
-type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'wrap'> & { value: string };
+type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'wrap'> & { value: string; placeholder: string };
 
 /** 保留原生输入、选择、撤销和粘贴事件，高亮层仅负责展示。 */
 export function YamlTextarea({ value, className, onScroll, rows = 8, ...props }: Props) {

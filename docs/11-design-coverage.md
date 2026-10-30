@@ -217,3 +217,8 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 ## 2026-10-30：全局直接使用 shadcn 官方组件
 
 此项替代此前基于 Radix 手动适配的弹层。官方 Dialog、AlertDialog、Select、DropdownMenu、Popover、Command、Sonner 与 Button 源码落在 `packages/web/src/components/ui/`，只更改导入路径。编辑、预览、确认、错误、规则诊断与搜索等所有弹层入口均直接调用官方组件；不覆盖默认动画参数、默认定位或默认通知外观。旧 Modal / overlays 及自定义焦点恢复删除。页面仅保留业务状态、内容、数据映射和必要的容器宽高约束。后端接口、领域模型、输出与示例种子不变；外部画布本轮未编辑，待同步见 docs/13。验收见 `research/verification/shadcn-official-20261030/`。
+
+
+## 2026-10-30：中文 placeholder 与真正空值
+
+预设、订阅基础覆盖、策略组、处理链及所有文字/选择表单统一中文占位提示。空值不绘制「未设置 / 不设置 / 不限」选项，选值后可清空，关闭状态仍为明确 false。保留 shadcn 官方 Select 的弹层、定位和动画；清空按钮在业务组件中组合。后端接口、领域模型和种子不变，已核对清空后的配置省略字段。外部画布本轮未编辑，待同步事项见 docs/13；验收记录见 research/verification/form-placeholders-20261030/README.md。

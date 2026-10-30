@@ -27,8 +27,7 @@ export function NodeSetSelect({ value, onChange, options, label, placeholder = '
   value: NodeSetID | undefined; onChange: (r: NodeSetID) => void; options: { ref: NodeSetID; name: string }[]; label: string; placeholder?: string;
 }) {
   return (
-    <Select aria-label={label} value={value ? key(value) : ''} onChange={(e) => e.target.value && onChange(parseKey(e.target.value))}>
-      <option value="" disabled>{placeholder}</option>
+    <Select placeholder={placeholder} aria-label={label} value={value ? key(value) : ''} onChange={(e) => e.target.value && onChange(parseKey(e.target.value))}>
       {options.map((o) => <option key={key(o.ref)} value={key(o.ref)}>{NODE_SET_LABEL[o.ref.type]} · {o.name}</option>)}
     </Select>
   );
@@ -43,7 +42,7 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
   const kind = value.kind;
   return (
     <div className="flex flex-wrap items-start gap-2">
-      <Select aria-label={`${label}类型`} className="w-auto" value={kind} onChange={(e) => {
+      <Select placeholder="选择流量目标的类型" aria-label={`${label}类型`} className="w-auto" value={kind} onChange={(e) => {
         const k = e.target.value as Target['kind'];
         if (k === 'builtin') onChange({ kind: 'builtin', name: 'DIRECT' });
         else if (k === 'group') onChange({ kind: 'group', groupId: groups[0]?.id ?? '' });
@@ -54,12 +53,12 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
         {allowNode && <option value="node">单个节点</option>}
       </Select>
       {value.kind === 'builtin' && (
-        <Select aria-label={label} className="w-auto" value={value.name} onChange={(e) => onChange({ kind: 'builtin', name: e.target.value as Builtin })}>
+        <Select placeholder="选择直连或拒绝等内置策略" aria-label={label} className="w-auto" value={value.name} onChange={(e) => onChange({ kind: 'builtin', name: e.target.value as Builtin })}>
           {BUILTINS.map((b) => <option key={b}>{b}</option>)}
         </Select>
       )}
       {value.kind === 'group' && (
-        <Select aria-label={label} className="w-auto min-w-40" value={value.groupId} onChange={(e) => onChange({ kind: 'group', groupId: e.target.value })}>
+        <Select placeholder="选择接收流量的策略组" aria-label={label} className="w-auto min-w-40" value={value.groupId} onChange={(e) => onChange({ kind: 'group', groupId: e.target.value })}>
           {!groups.some((g) => g.id === value.groupId) && <option value={value.groupId}>（已不存在：{value.groupId}）</option>}
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </Select>

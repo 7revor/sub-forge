@@ -48,7 +48,7 @@ function GroupMembers({ group }: { group: GroupSpec }) {
     <MemberAdder key={group.id} excludeGroupId={group.id} onAdd={m => setMembers([...members, m])} />
     {refs.map(ref => <div key={`${ref.type}:${ref.id}`} className="flex flex-col gap-2"><span className="text-[12px] text-ink-muted">{nodeSetName(ref)}</span><MatchPreview nodeSet={ref} filter={group.filter} excludeFilter={group.excludeFilter} excludeType={group.excludeType} /></div>)}
     {!bound && <details className="text-[13px]"><summary className="cursor-pointer text-ink-muted">更多组设置</summary><div className="mt-3 flex flex-col gap-3">
-      <Field label="图标地址">{id => <Input id={id} value={group.display?.icon ?? ''} onChange={e => { if (routing.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, display: { ...g.display, icon: e.target.value || undefined } } : g) } } }); }} />}</Field>
+      <Field label="图标地址">{id => <Input placeholder="控制面板显示的策略组图标地址" id={id} value={group.display?.icon ?? ''} onChange={e => { if (routing.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, display: { ...g.display, icon: e.target.value || undefined } } : g) } } }); }} />}</Field>
       <ExtraFields value={group.extra ?? {}} validateName={name => name === 'empty-fallback' ? '空组固定使用 REJECT' : undefined} onChange={extra => { if (routing.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, extra } : g) } } }); }} />
     </div></details>}
   </section>;

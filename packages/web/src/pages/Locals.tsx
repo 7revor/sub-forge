@@ -119,7 +119,7 @@ export function LocalEdit() {
 
       <Dialog open={groupText !== undefined} onOpenChange={next => { if (!next) (() => setGroupText(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"分组 YAML"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         <Field label="整个分组的 proxies 列表">
-          {(id) => <YamlTextarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
+          {(id) => <YamlTextarea placeholder="粘贴本地节点组的 YAML 配置" id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
         </Field>
         <FieldError error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
       </div><DialogFooter>{<><Button onClick={() => setGroupText(undefined)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {

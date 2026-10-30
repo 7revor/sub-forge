@@ -38,8 +38,8 @@ export function Login() {
         </div>
         <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-panel p-6 shadow-2xl shadow-black/40">
           <h1 className="m-0 text-lg font-semibold">登录</h1>
-          <Field label="用户名">{(id) => <Input id={id} className="h-[42px] text-[14px]" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />}</Field>
-          <Field label="密码">{(id) => <Input id={id} className="h-[42px] text-[14px]" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}</Field>
+          <Field label="用户名">{(id) => <Input placeholder="输入登录用户名" id={id} className="h-[42px] text-[14px]" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />}</Field>
+          <Field label="密码">{(id) => <Input placeholder="输入登录密码" id={id} className="h-[42px] text-[14px]" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}</Field>
           <Button type="submit" variant="primary" className="h-11 text-[14px] font-semibold" disabled={busy}>{busy ? '登录中…' : '登录'}</Button>
           <span className="text-[12px] leading-relaxed text-ink-muted">账户由管理员创建。忘记密码请联系管理员重置。</span>
         </form>

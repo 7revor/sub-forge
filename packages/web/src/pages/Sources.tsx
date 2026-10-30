@@ -62,7 +62,7 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
   return (
     <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"新建订阅源"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
-      <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
+      <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
       <NoteField value={note} onChange={setNote} />
       <ErrorAlert error={save.error} />
     </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</DialogFooter></DialogContent></Dialog>
@@ -77,12 +77,12 @@ function BasicSettings({ draft, set }: {
     <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
       <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
         <Field label="名称" className="min-w-0 sm:col-span-2">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
-        <Field label="自动更新时间（小时）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min={5 / 60} step="any" className="font-mono" inputMode="decimal" placeholder="24" value={draft.fetch?.ttlSec === undefined ? '' : String(draft.fetch.ttlSec / 3600)} onCommit={(value) => {
+        <Field label="自动更新时间（小时）" className="min-w-0">{(id) => <DraftInput id={id} type="number" min={5 / 60} step="any" className="font-mono" inputMode="decimal" placeholder="上游订阅的更新间隔，留空为 24 小时" value={draft.fetch?.ttlSec === undefined ? '' : String(draft.fetch.ttlSec / 3600)} onCommit={(value) => {
           const ttlSec = value.trim() && Number.isFinite(Number(value)) ? Math.round(Number(value) * 3600) : undefined;
           set({ fetch: ttlSec === undefined ? undefined : { ttlSec } });
         }} />}</Field>
         <Field label="订阅地址" className="col-span-full min-w-0">{(id) =>
-          <Input id={id} type="url" className="font-mono" placeholder="https://" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
+          <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
       </div>
       <NoteField value={draft.note} onChange={(note) => set({ note })} />

@@ -32,15 +32,15 @@ export function Button({ variant = 'default', size = 'md', className, ...p }: Bu
 
 export const inputCls = 'h-[38px] w-full rounded-lg border border-[#d5d9e0] bg-panel px-3 text-[13px] text-ink placeholder:text-faint';
 
-export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement> & { placeholder: string }) {
   return <input {...p} className={cx(inputCls, className)} />;
 }
 
-export function Textarea({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { placeholder: string }) {
   return <textarea {...p} className={cx('w-full rounded-lg border border-[#d5d9e0] bg-panel px-3 py-2 text-[13px] text-ink', className)} />;
 }
 
-type DraftProps<E> = { value: string; onCommit: (value: string) => void } & Omit<E, 'value' | 'onChange'>;
+type DraftProps<E> = { value: string; onCommit: (value: string) => void; placeholder: string } & Omit<E, 'value' | 'onChange'>;
 
 /** 只在失焦（或回车）时提交的输入框：输入过程只改本地草稿，避免每次按键都触发预览、命中数等反馈 */
 export function DraftInput({ value, onCommit, onBlur, onKeyDown, ...p }: DraftProps<InputHTMLAttributes<HTMLInputElement>>) {

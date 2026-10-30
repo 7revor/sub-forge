@@ -83,7 +83,7 @@ export function TabChains() {
       <Card title={`依赖节点`}
         actions={<>
           <label className="flex items-center gap-2 text-[12.5px] text-ink-2">Profile 默认
-            <Select className="h-9 w-auto" value={draft.refPolicy.default} onChange={(e) => setDraft({ ...draft, refPolicy: { ...draft.refPolicy, default: e.target.value as RefStrategy } })}>
+            <Select placeholder="选择引用外部节点时的处理方式" className="h-9 w-auto" value={draft.refPolicy.default} onChange={(e) => setDraft({ ...draft, refPolicy: { ...draft.refPolicy, default: e.target.value as RefStrategy } })}>
               {STRATEGIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </Select></label>
           <Button onClick={() => preview.mutate({})} disabled={preview.isPending}>{preview.isPending ? '解析中…' : '解析依赖'}</Button>
@@ -115,8 +115,8 @@ export function TabChains() {
             <span className="text-[12.5px] font-medium text-ink-muted">落地（哪些节点经由前置出去）</span>
             <div className="grid grid-cols-2 gap-3">
               <Field label="节点集">{() => <NodeSetSelect label="落地节点集" value={c.landing.nodeSet} options={profileNodeSets} onChange={(nodeSet) => put({ ...c, landing: { ...c.landing, nodeSet } })} />}</Field>
-              <Field label="筛选（正则，留空为全部）">{(id) => <Input id={id} className="font-mono" value={c.landing.filter ?? ''} onChange={(e) => put({ ...c, landing: { ...c.landing, filter: e.target.value || undefined } })} />}</Field>
-              <Field label="排除（正则）" className="col-span-2">{(id) => <Input id={id} className="font-mono" value={c.landing.excludeFilter ?? ''} onChange={(e) => put({ ...c, landing: { ...c.landing, excludeFilter: e.target.value || undefined } })} />}</Field>
+              <Field label="筛选（正则，留空为全部）">{(id) => <Input placeholder="保留名称匹配此正则的落地节点" id={id} className="font-mono" value={c.landing.filter ?? ''} onChange={(e) => put({ ...c, landing: { ...c.landing, filter: e.target.value || undefined } })} />}</Field>
+              <Field label="排除（正则）" className="col-span-2">{(id) => <Input placeholder="排除名称匹配此正则的落地节点" id={id} className="font-mono" value={c.landing.excludeFilter ?? ''} onChange={(e) => put({ ...c, landing: { ...c.landing, excludeFilter: e.target.value || undefined } })} />}</Field>
             </div>
             <MatchPreview nodeSet={c.landing.nodeSet} filter={c.landing.filter} excludeFilter={c.landing.excludeFilter} />
             <div className="flex flex-col gap-1.5 border-t border-line-2 pt-3"><span className="text-[12.5px] font-medium text-ink-muted">前置</span>
@@ -157,7 +157,7 @@ export function TabPreview() {
       <div className="flex flex-wrap items-center gap-3">
         <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge', disabled: true, title: 'Surge 暂未开放' }]} onChange={(value) => { if (value === 'surge') return; preview.reset(); setClient(value); setPlatform(value === 'stash' ? 'ios' : 'any'); }} />
         <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">平台
-          <Select className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{platforms.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
+          <Select placeholder="选择客户端运行的系统平台" className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{platforms.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
         <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
         <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml}>导出文件</Button>
         <span className="text-[12.5px] text-ink-muted">当前草稿预览</span>

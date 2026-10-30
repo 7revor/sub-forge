@@ -13,8 +13,7 @@ const TYPES = [
 export function ExcludeTypeSelect({ id, value, onChange }: { id?: string; value?: string; onChange: (value: string | undefined) => void }) {
   const selected = excludedAdapterTypes(value);
   const known = new Set<string>(TYPES.map(([type]) => type));
-  return <MultiSelect id={id} aria-label="exclude-type（排除协议）" value={selected} onChange={next => onChange(next.join('|') || undefined)} placeholder="不排除">
-    <option value="">不排除</option>
+  return <MultiSelect id={id} aria-label="exclude-type（排除协议）" value={selected} onChange={next => onChange(next.join('|') || undefined)} placeholder="选择需要排除的节点协议类型">
     {TYPES.map(([type, label]) => <option key={type} value={type}>{label}</option>)}
     {selected.filter(type => !known.has(type)).map(type => <option key={type} value={type}>{type}</option>)}
   </MultiSelect>;

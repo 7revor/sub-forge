@@ -62,7 +62,7 @@ export function CollectionEdit() {
         {!e.isNew && <Badge>被配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-brand">{p.name}</Link></span>) : '还没有'}</Badge>}
       </>}>
       <Card title="基本信息">
-        {e.isNew && <Field label="名称">{(id) => <Input id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
+        {e.isNew && <Field label="名称">{(id) => <Input placeholder="填写节点组合的名称" id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
         <NoteField value={d.note} onChange={(note) => set({ note })} />
       </Card>
 
@@ -78,9 +78,9 @@ export function CollectionEdit() {
                 <Link to={nodeSetPath(m.ref)} className="truncate text-[13.5px] font-medium text-ink no-underline hover:text-brand">{nameOf(m.ref)}</Link>
                 <span className="text-[12.5px] text-ink-2">{NODE_SET_LABEL[m.ref.type]}</span>
                 <NodeSetCount nodeSet={m.ref} />
-                <Input aria-label={`${nameOf(m.ref)} 前缀`} className="h-[34px] font-mono text-[12.5px]" value={m.prefix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, prefix: x.target.value || undefined } : y)) })} />
-                <Input aria-label={`${nameOf(m.ref)} 后缀`} className="h-[34px] font-mono text-[12.5px]" value={m.suffix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, suffix: x.target.value || undefined } : y)) })} />
-                <Select aria-label={`${nameOf(m.ref)} 拉取失败时`} className="h-[34px] text-[12.5px]" value={m.onFail ?? 'snapshot'}
+                <Input placeholder="添加到节点名称开头的文字" aria-label={`${nameOf(m.ref)} 前缀`} className="h-[34px] font-mono text-[12.5px]" value={m.prefix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, prefix: x.target.value || undefined } : y)) })} />
+                <Input placeholder="添加到节点名称末尾的文字" aria-label={`${nameOf(m.ref)} 后缀`} className="h-[34px] font-mono text-[12.5px]" value={m.suffix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, suffix: x.target.value || undefined } : y)) })} />
+                <Select placeholder="选择拉取失败时使用快照或中断" aria-label={`${nameOf(m.ref)} 拉取失败时`} className="h-[34px] text-[12.5px]" value={m.onFail ?? 'snapshot'}
                   onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, onFail: x.target.value as 'snapshot' | 'skip' | 'fail' } : y)) })}>
                   <option value="snapshot">使用快照</option><option value="skip">跳过该成员</option><option value="fail">整体失败</option>
                 </Select>

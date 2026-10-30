@@ -74,7 +74,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         <SettingsSection readOnly={readOnly}>
         <fieldset disabled={readOnly} className="m-0 contents border-0 p-0">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="组名称">{id => <Input id={id} value={group.name} onChange={e => update({ name: e.target.value })} />}</Field>
+          <Field label="组名称">{id => <Input placeholder="填写策略组在配置中的名称" id={id} value={group.name} onChange={e => update({ name: e.target.value })} />}</Field>
           <GroupSettingsFields value={group} onChange={(key, next) => update({ [key]: next })} />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

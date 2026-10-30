@@ -276,3 +276,10 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 此次替代之前手动适配的弹层方案。所有编辑和预览弹窗居中显示，使用官方 Dialog 默认淡入/缩放动画；确认和错误使用官方 AlertDialog，取消入口使用 AlertDialogCancel。单选采用官方 Select 默认定位，多选采用 DropdownMenuCheckboxItem，候选输入和异步搜索采用 Command + Popover，处理器菜单使用 DropdownMenu，通知直接使用官方 Sonner 默认样式与位置。禁止复制一组动画类再自行实现弹层；官方组件源码仅调整导入路径。页面可声明业务内容与必要的最大宽高，不改变动画时长、曲线、缩放或退场逻辑。
 
 官方 neutral 配色变量与页面品牌色分离。原有“已返回表单”等冗余通知不恢复。本轮未编辑外部设计画布，此处记录待同步内容；后端、领域模型和示例种子不变。截图与验收见 `research/verification/shadcn-official-20261030/`。
+
+
+## 2026-10-30：全站表单中文 placeholder 待同步
+
+实际访问外部设计画布仍显示「Sign in to view this page」，本轮未编辑。待同步预设与订阅基础设置的全部字段、策略组、处理链、规则来源、原始配置编辑器及业务表单：空值显示对应中文字段解释，选项菜单只绘制实际值；可选单选有值时在触发框旁显示独立清空按钮，清空后恢复 placeholder；多选取消全部勾选后显示 placeholder。保持独立标签和官方组件动画。Mihomo 文案以 packages/web/src/schemas/placeholders.ts 为准；DNS 策略键和值分别说明匹配条件和 DNS 地址，不显示「未设置」。
+
+此项替代本文此前自动更新时间 placeholder 仅为 `24`、可选字段以「不设置」占位的画法。原有默认数据不变，placeholder 不写入配置。截图与验收见 research/verification/form-placeholders-20261030/README.md。

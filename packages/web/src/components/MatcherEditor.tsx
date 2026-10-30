@@ -23,7 +23,7 @@ export function MatcherEditor({ value, onChange, rulesets, ruleValue, onRuleChan
     else onChange(changeMatcherKind(value, kind as Matcher['kind']));
   };
   return <>
-    {!fixedKind && <Field label="匹配项类型">{(id) => <Select id={id} value={selectedKind} onChange={(event) => changeKind(event.target.value)}>
+    {!fixedKind && <Field label="匹配项类型">{(id) => <Select placeholder="选择单条规则、规则集或远程规则来源" id={id} value={selectedKind} onChange={(event) => changeKind(event.target.value)}>
       <option value="rule">静态规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
     </Select>}</Field>}
     {value.kind === 'rule' ? <RuleEditor value={ruleValue ?? value.rule} onChange={changeRule} />

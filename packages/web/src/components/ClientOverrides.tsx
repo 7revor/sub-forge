@@ -39,18 +39,18 @@ export function ClientOverrides({ value, onChange, single = false, allowAppend =
       <div className="flex items-start gap-2">
         {leading && <div className="flex h-[62px] shrink-0 items-end pb-[3px]">{leading}</div>}
         <div className={cx('grid min-w-0 flex-1 grid-cols-2 items-start gap-3 sm:grid-cols-3', matchInput ? 'lg:grid-cols-[100px_112px_112px_minmax(0,1fr)]' : 'sm:max-w-[348px]')}>
-          <Field label="改写类型" className="col-span-full sm:col-span-1">{(id) => <Select id={id} value={action} onChange={(event) => {
+          <Field label="改写类型" className="col-span-full sm:col-span-1">{(id) => <Select placeholder="选择替换、丢弃或追加规则" id={id} value={action} onChange={(event) => {
               const next = event.target.value;
               if (next === action) return;
               update(index, { ...override, action: next === 'drop' ? { drop: true } : next === 'append' ? { append: replacements ?? [rawRuleFromText('')] } : { replace: replacements ?? [rawRuleFromText('')] } });
             }}><option value="replace">替换</option><option value="drop">丢弃</option>{allowAppend && <option value="append">追加</option>}</Select>}</Field>
-          <Field label="客户端">{(id) => <Select id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
+          <Field label="客户端">{(id) => <Select placeholder="选择这条改写适用的客户端" id={id} value={override.when.client} onChange={(e) => update(index, { ...override, when: { ...override.when, client: e.target.value as ClientOverride['when']['client'] } })}>
             <option value="mihomo">mihomo</option><option value="surge">Surge</option><option value="stash">Stash</option>
           </Select>}</Field>
-          <Field label="平台">{(id) => <Select id={id} value={override.when.platform ?? ''} onChange={(e) => {
+          <Field label="平台">{(id) => <Select clearable aria-label="适用平台" placeholder="限定适用的系统平台，留空适用于所有平台" id={id} value={override.when.platform ?? ''} onChange={(e) => {
             const { platform: _, ...when } = override.when;
             update(index, { ...override, when: e.target.value ? { ...when, platform: e.target.value as Platform } : when });
-          }}><option value="">不限</option>{(['android', 'macos', 'windows', 'ios', 'linux'] as const).map((platform) => <option key={platform} value={platform}>{platform}</option>)}</Select>}</Field>
+          }}>{(['android', 'macos', 'windows', 'ios', 'linux'] as const).map((platform) => <option key={platform} value={platform}>{platform}</option>)}</Select>}</Field>
           {matchInput && <div className="col-span-full min-w-0 lg:col-span-1">{matchInput}</div>}
         </div>
         {!single && <Button size="sm" variant="ghost" className="mt-6" aria-label={`删除客户端覆盖 ${index + 1}`} onClick={() => onChange(value.filter((_, i) => i !== index))}><Trash2 size={14} /></Button>}
