@@ -1,7 +1,7 @@
 import { remoteRuleMatcher, withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, type RuleRepo } from '../../api.ts';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
@@ -9,6 +9,7 @@ import { targetLabel } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
 import { Button, Card, Empty, ErrorAlert, Field, FieldError, Input, Modal, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
+import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
@@ -51,7 +52,13 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   onRuleValidationReady: (id: string, ready: boolean) => void;
 }) {
   const [urlError, setUrlError] = useState<string>();
+  const [linkError, setLinkError] = useState<string>();
+  const [linkingRule, setLinkingRule] = useState<string>();
   const [adding, setAdding] = useState(false);
+  const currentValue = useRef(value);
+  currentValue.current = value;
+  const remoteUrls = value.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
+  const repositoryMatches = useRepositoryUrlMatches(remoteUrls);
   const repositories = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: value.rules.some(r => r.matcher.kind === 'ruleset' && !!r.matcher.repository) });
   const repos = repositories.data?.repos ?? [];
   const [preview, setPreview] = useState<Matcher>();
@@ -73,6 +80,22 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     const { noResolve: _noResolve, src: _src, ...options } = rule.options ?? {};
     update({ ...rule, matcher: { ...rule.matcher, rule: next }, ...(rule.options ? { options } : {}) });
   };
+  const linkRepository = async (ruleId: string, url: string, match: RepositoryUrlMatch) => {
+    setLinkingRule(ruleId); setLinkError(undefined);
+    try {
+      const matcher = await resolveRepositoryUrlMatch(url, match);
+      const latest = currentValue.current;
+      const selected = latest.rules.find(r => r.id === ruleId);
+      if (selected?.matcher.kind !== 'ruleset' || selected.matcher.remote?.url !== url) return;
+      onChange({ ...latest, rules: latest.rules.map(r => {
+        if (r.id !== ruleId) return r;
+        const { providerName: _providerName, ...rest } = r;
+        return { ...rest, matcher };
+      }),
+        ...(latest.ruleProviders ? { ruleProviders: latest.ruleProviders.filter(p => p.url !== url || latest.rules.some(r => r.id !== ruleId && r.matcher.kind === 'ruleset' && r.matcher.remote?.url === url)) } : {}) });
+    } catch (error) { setLinkError(error instanceof Error ? error.message : String(error)); }
+    finally { setLinkingRule(undefined); }
+  };
   return <>
     <Card title="规则" subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={<>
       <Button size="sm" aria-label="添加静态规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />静态规则</Button>
@@ -80,6 +103,8 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       <Button size="sm" onClick={() => setAdding(true)}>引用规则</Button>
     </>}>
       <ErrorAlert error={repositories.error} />
+      <ErrorAlert error={repositoryMatches.error} />
+      {linkError && <FieldError error={linkError} />}
       {!value.rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
       <SortableList items={value.rules} getKey={r => r.id} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
         const error = report.some(item => item.level === 'error' && item.where === `rule:${r.id}`);
@@ -92,6 +117,10 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
             <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
             <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
           </div>
+          {r.matcher.kind === 'ruleset' && r.matcher.remote && repositoryMatches.matches[r.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="col-span-full flex flex-wrap items-center gap-2 pl-6 text-[12px] text-muted">
+            <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
+            <Button size="sm" disabled={!!linkingRule} onClick={() => void linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)}>关联仓库文件</Button>
+          </div>)}
         </div>;
       }} />
       <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
@@ -107,7 +136,7 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={close}>完成</Button></>}>
       {rule ? <>
         <ItemIssues report={report} where={`rule:${rule.id}`} />
-        {rule.matcher.kind === 'ruleset' && rule.matcher.remote ? <Field label="远程链接">{id => <Input id={id} type="url" value={rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : ''} onChange={e => {
+        {rule.matcher.kind === 'ruleset' && rule.matcher.remote ? <><Field label="远程链接">{id => <Input id={id} type="url" value={rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : ''} onChange={e => {
           const url = e.target.value;
           let matcher: Matcher;
           try { matcher = remoteRuleMatcher(url); setUrlError(undefined); }
@@ -116,7 +145,12 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
             setUrlError(error instanceof Error ? error.message : String(error));
           }
           update({ ...rule, matcher });
-        }} />}</Field> : rule.matcher.kind === 'ruleset' ? <Field label="规则来源">{id => <>
+        }} />}</Field>
+          {repositoryMatches.matches[rule.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="flex flex-wrap items-center gap-2 rounded border border-line bg-ground px-3 py-2 text-[12.5px]">
+            <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
+            <Button size="sm" disabled={!!linkingRule} onClick={() => void linkRepository(rule.id, rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : '', match)}>关联仓库文件</Button>
+          </div>)}
+        </> : rule.matcher.kind === 'ruleset' ? <Field label="规则来源">{id => <>
           <RuleMatcher matcher={rule.matcher} ctx={ctx} repos={repos} />
           <RuleSetPicker id={id} label="更换规则来源" onSelect={matcher => update({ ...rule, matcher })} />
         </>}</Field> : <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}><MatcherEditor fixedKind value={rule.matcher} rulesets={ctx.rulesets} ruleValue={withIpOptions(rule.matcher.rule, rule.options ?? {})} onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} /></div>}
