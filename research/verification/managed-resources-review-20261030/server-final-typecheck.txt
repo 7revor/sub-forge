@@ -1,0 +1,3 @@
+
+> @sub-forge/server@0.0.0 typecheck /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources/packages/server
+> tsc --noEmit

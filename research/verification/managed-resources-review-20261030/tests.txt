@@ -1,0 +1,41 @@
+
+> sub-forge@ test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources
+> pnpm -r test
+
+Scope: 3 of 4 workspace projects
+packages/core test$ vitest run
+packages/core test:  RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources/packages/core
+packages/core test:  Test Files  24 passed | 4 skipped (28)
+packages/core test:       Tests  289 passed | 39 skipped (328)
+packages/core test:    Start at  14:08:49
+packages/core test:    Duration  973ms (transform 1.35s, setup 0ms, import 3.50s, tests 537ms, environment 2ms)
+packages/core test: Done
+packages/server test$ vitest run
+packages/web test$ vitest run --passWithNoTests
+packages/server test:  RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources/packages/server
+packages/web test:  RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources/packages/web
+packages/server test: Switched to a new branch 'other'
+packages/server test: Switched to branch 'main'
+packages/server test: Switched to a new branch 'other'
+packages/server test: Switched to branch 'main'
+packages/server test: Switched to a new branch 'other'
+packages/server test: Switched to branch 'main'
+packages/server test: Switched to a new branch 'replacement'
+packages/server test: Switched to a new branch 'other'
+packages/server test: Switched to branch 'main'
+packages/web test:  Test Files  44 passed (44)
+packages/web test:       Tests  354 passed | 2 skipped (356)
+packages/web test:    Start at  14:08:51
+packages/web test:    Duration  4.75s (transform 6.74s, setup 0ms, import 24.08s, tests 2.65s, environment 3ms)
+packages/web test: Done
+packages/server test: Switched to a new branch 'other'
+packages/server test: Switched to branch 'main'
+packages/server test: Switched to a new branch 'other'
+packages/server test: Switched to branch 'main'
+packages/server test: Switched to a new branch 'other'
+packages/server test: Switched to branch 'main'
+packages/server test:  Test Files  56 passed | 2 skipped (58)
+packages/server test:       Tests  500 passed | 5 skipped (505)
+packages/server test:    Start at  14:08:50
+packages/server test:    Duration  15.14s (transform 8.31s, setup 0ms, import 41.53s, tests 82.04s, environment 4ms)
+packages/server test: Done

@@ -52,7 +52,8 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `GET /sub/:token/:profile` | 主配置。`?target=mihomo\|surge\|stash&platform=...` 优先于 UA；Surge 暂返回 501 |
 | `GET /p/:token/:profile/:key` | Profile 专属 provider 内容 |
 | `GET /r/:token/:key` | 全站公共规则产物，任意有效用户 token 可读 |
-| `GET /nodes/:token/:kind/:id` | 自己的节点源/组合/本地节点经处理链后的 Mihomo 节点内容 |
+| `GET /nodes/:token/:kind/:id` | 自己的节点源/组合/本地节点经处理链后的 Mihomo / Stash 节点内容；支持 HEAD 和流量信息 |
+| `GET /rules/:token/:id` | 独立公共规则增强，按 UA 选择公共变体，无需先建立配置订阅 |
 | `GET /healthz` | 健康检查 |
 
 - token 无效或所属用户被禁用：主订阅、节点与规则资源统一返回 404，空响应体。
@@ -76,6 +77,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
 | `POST /api/templates`、`PUT /api/templates/:id` | 管理员新建或直接保存；不需要版本号，后保存的内容覆盖当前内容。自身校验不通过 400；绑定冲突返回 409，不允许 `force` 跳过。旧 `POST /api/templates/:id/publish` 兼容同一保存逻辑，不再创建历史 |
 | `GET /api/profiles/:id/link` | 校验归属，返回该用户 token 与此配置订阅地址 |
+| `GET /api/resource-links/:kind/:id` | 复制当前用户令牌的节点源、组合、本地组、配置或公共规则增强链接；只生成地址，不拉取上游 |
 | `GET /api/me/token`、`POST /api/me/token/reset` | 读取或原子重置自己的唯一令牌；重置请求携带当前 `{ token }`，过期值返回 409 |
 | `GET /api/system/rule-resources`、`DELETE /api/system/rule-resources/:key` | 管理员查看公共产物与转换错误；删除仍被配置或模板引用的资源返回 409 |
 | `POST /api/profiles/:id/preview` | 预览配置、代理链检查结果、只读引用详情与渲染报告；请求体可带未保存的 `profile` 草稿 |

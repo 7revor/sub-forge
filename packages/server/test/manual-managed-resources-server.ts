@@ -13,11 +13,16 @@ const admin = store.createUser({ username: 'managed-admin', passwordHash, role: 
 const reader = store.createUser({ username: 'managed-reader', passwordHash, role: 'user' });
 store.db.prepare('UPDATE rule_repos SET enabled=0').run();
 store.put('local', { id: 'nodes', name: '验收节点', proxies: [{ name: '落地节点', type: 'socks5', server: 'example.test', port: 1080 }] }, admin.id);
+store.put('source', { id: 'source', name: '流量验收节点源', url: 'https://nodes.example.test/sub', pipeline: [] }, admin.id);
+store.put('collection', { id: 'collection', name: '验收节点组合', members: [{ ref: { type: 'source', id: 'source' } }, { ref: { type: 'local', id: 'nodes' } }], pipeline: [] }, admin.id);
+store.put('local', { id: 'reader-nodes', name: '读者私有节点', proxies: [{ name: '读者节点', type: 'socks5', server: 'reader.example.test', port: 1080 }] }, reader.id);
 store.put('ruleset', { id: 'shared', name: '公共规则增强', sources: [{ id: 'local', kind: 'local', format: 'auto', content: 'DOMAIN,example.test' }] }, admin.id);
 for (const id of ['first', 'second', 'unused']) store.put('profile', { id, name: id === 'unused' ? '临时配置' : `托管验收·${id}`, nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [{ id: 'chain', landing: { nodeSet: { type: 'local', id: 'nodes' } }, via: { kind: 'builtin', name: 'DIRECT' } }], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: {
   groups: [], rules: [{ id: 'rule', matcher: id === 'unused' ? remoteRuleMatcher('https://rules.example.test/Apple.list') : { kind: 'ruleset', id: 'shared' }, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' },
 } } }, admin.id);
-const snapshots = new SnapshotService(store, async () => ({ status: 200, body: 'DOMAIN,apple.example.test' }));
+const snapshots = new SnapshotService(store, async url => url.includes('nodes.example.test')
+  ? { status: 200, body: 'proxies: [{ name: 流量测试节点, type: socks5, server: fixture.example.test, port: 1080 }]', userinfo: { upload: 0, download: 1073741824, total: 10737418240, expire: 2000000000 } }
+  : { status: 200, body: 'DOMAIN,apple.example.test' });
 const renderer = new RenderService(store, snapshots, { publicUrl: 'http://127.0.0.1:5196' });
 for (const id of ['first', 'second', 'unused']) await renderer.render(id, { client: 'mihomo' });
 store.delete('profile', 'unused');
