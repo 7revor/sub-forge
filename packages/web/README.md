@@ -222,7 +222,7 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 
 ## 公共弹层与动效
 
-历史入口已被统一静态调用取代，底层仍使用 shadcn 官方 Dialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。不再保留自定义 Modal、动画常量、焦点恢复函数或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
+历史入口已被统一静态调用取代，底层仍使用 shadcn 官方 Dialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。业务弹窗仅使用 `src/modals` 统一运行时管理会话与焦点；不再保留平行 Modal、动画常量或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
 
 `listbox.tsx` 仅保留业务选项映射、空值编码、异步搜索与分页；单选采用官方 Select 默认定位，多选采用官方 DropdownMenuCheckboxItem，自由输入候选与异步查询由官方 Command + Popover 组合。页面通过组件属性传入业务状态、内容和必要的宽高约束。官方 neutral 主题与既有页面品牌色分开命名，避免同名 accent / muted 变量覆盖官方组件。`components.json`、TypeScript 和 Vite 路径别名已配置。
 
@@ -237,7 +237,7 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 
 验证包含 schema 中文提示覆盖、空 Select、零值、false 与清空删除的回归测试，以及 Codex 内置浏览器的发布、回显和 YAML 检查。后端和核心模型无需迁移。
 
-2026-10-30 合并适配：缓存刷新任务使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。
+2026-10-30 合并适配：缓存刷新任务现通过统一静态入口使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。
 
 
 ### 2026-10-30：规则卡片与操作间距
