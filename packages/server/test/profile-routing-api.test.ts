@@ -18,6 +18,27 @@ async function scenario() {
   return { ...env, admin, alice, bob, t, member, profile: result.json.item, user };
 }
 describe('模板绑定与独立模式', () => {
+  it('绑定、复制和解除关联保留备注，备注不会进入客户端输出', async () => {
+    const { alice, profile, app, store } = await scenario();
+    try {
+      const note = '内部管理备注：日常设备 🌏\n第二行';
+      const saved = (await alice.put(`/api/profiles/${profile.id}`, { ...profile, note })).json.item;
+      const detached = await alice.post('/api/profiles/routing/convert', { profile: saved, mode: 'independent' });
+      expect(detached.status).toBe(200);
+      expect(detached.json.item.note).toBe(note);
+      const rebound = await alice.post('/api/profiles/routing/convert', { profile: detached.json.item, mode: 'bound', templateId: profile.routing.templateId, mapping: { g: 'g' } });
+      expect(rebound.status).toBe(200);
+      expect(rebound.json.item.note).toBe(note);
+      const copy = await alice.post('/api/profiles/routing/convert', { profile: rebound.json.item, mode: 'independent' });
+      expect(copy.status).toBe(200);
+      expect(copy.json.item.note).toBe(note);
+      expect((await alice.put(`/api/profiles/${profile.id}`, copy.json.item)).status).toBe(200);
+      const token = (await alice.get(`/api/profiles/${profile.id}/tokens`)).json.items[0].token;
+      const rendered = await app.request(`/sub/${token}`);
+      expect(rendered.status).toBe(200);
+      expect(await rendered.text()).not.toContain('内部管理备注');
+    } finally { store.close(); }
+  });
   it('模板更新自动生效且保留补充、链接和历史资源；转换后的配置不随模板变更', async () => {
     const { admin, alice, t, profile, app } = await scenario();
     const token = (await alice.post(`/api/profiles/${profile.id}/tokens`)).json.item.token;
