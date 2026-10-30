@@ -29,18 +29,19 @@ export function AccessLogCard() {
     <p className="mt-0 mb-3 px-4 text-[12.5px] text-ink-muted">仅记录本人令牌的访问 · 保留 30 天</p>
     {query.error && <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 px-4 text-[13px] text-err">访问日志加载失败：{query.error.message}<Button size="sm" onClick={() => void query.refetch()}>重试</Button></div>}
     <div className="overflow-x-auto" aria-busy={query.isFetching}>
-      <table className="w-full min-w-[760px] border-collapse">
-        <thead><tr><th className={th}>时间</th><th className={th}>类型</th><th className={th}>资源</th><th className={th}>客户端</th><th className={th}>结果</th><th className={th}>耗时</th></tr></thead>
+      <table className="w-full min-w-[920px] border-collapse">
+        <thead><tr><th className={th}>时间</th><th className={th}>类型</th><th className={th}>资源</th><th className={th}>客户端 IP</th><th className={th}>客户端</th><th className={th}>结果</th><th className={th}>耗时</th></tr></thead>
         <tbody>
           {data?.items.map(row => <tr key={row.id}>
             <td className={cx(td, 'whitespace-nowrap font-mono text-[12px]')}>{formatTime(row.at).slice(5)}</td>
             <td className={cx(td, 'whitespace-nowrap')}><Badge>{TYPES[row.kind]}</Badge></td>
             <td className={cx(td, 'max-w-[240px] break-words')}><span className="font-medium">{row.resourceName}</span><div className="mt-1 text-[12px] text-ink-muted">{row.method} · {SOURCES[row.source] ?? row.source}</div></td>
+            <td className={cx(td, 'max-w-[220px]')} title={row.peerIp ? `连接来源：${row.peerIp}` : undefined}><span className="break-all font-mono text-[12px]">{row.clientIp ?? '未记录'}</span>{row.clientIp && <div className="mt-1 text-[12px] text-ink-muted">{row.ipSource === 'x-forwarded-for' ? '可信代理透传' : '连接来源'}</div>}</td>
             <td className={cx(td, 'max-w-[240px]')}><span>{row.client}{row.platform ? ` · ${row.platform}` : ''}</span><div title={row.ua} className="mt-1 max-w-[240px] truncate font-mono text-[11px] text-ink-muted">{row.ua || '未提供 User-Agent'}</div></td>
             <td className={cx(td, 'whitespace-nowrap')}><Badge tone={row.status >= 400 ? 'err' : row.warnings ? 'warn' : 'ok'}>{row.status}</Badge>{row.warnings > 0 && <span className="ml-2 text-[12px] text-ink-muted">{row.warnings} 条告警</span>}</td>
             <td className={cx(td, 'whitespace-nowrap font-mono text-[12px]')}>{row.ms >= 1000 ? `${(row.ms / 1000).toFixed(2)} s` : `${row.ms} ms`}</td>
           </tr>)}
-          {!data?.items.length && <tr><td colSpan={6} className={td}>{query.isPending ? <div role="status" className="py-5 text-center text-ink-muted">正在加载访问日志…</div> : !query.error && <Empty title={kind === 'all' ? '还没有访问记录' : '该类型暂无访问记录'} />}</td></tr>}
+          {!data?.items.length && <tr><td colSpan={7} className={td}>{query.isPending ? <div role="status" className="py-5 text-center text-ink-muted">正在加载访问日志…</div> : !query.error && <Empty title={kind === 'all' ? '还没有访问记录' : '该类型暂无访问记录'} />}</td></tr>}
         </tbody>
       </table>
     </div>

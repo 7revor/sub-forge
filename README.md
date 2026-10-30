@@ -26,6 +26,7 @@
 | [docs/09-frontend-forms-plan.md](docs/09-frontend-forms-plan.md) | 前端表单化改造方案：可视化表单 + 原始配置双模式、分期 |
 | [docs/10-m1-stabilization.md](docs/10-m1-stabilization.md) | M1 稳定化修复、订阅资源版本与模板更新策略、验收记录 |
 | [docs/11-design-coverage.md](docs/11-design-coverage.md) | 前端页面与设计稿的逐页对照，服务端待实现的功能 |
+| [docs/20-deployment-client-ip.md](docs/20-deployment-client-ip.md) | 访问日志 IP 来源、Docker / Nginx / CDN 部署与可信代理透传 |
 | [docs/12-backend-regression-fixes.md](docs/12-backend-regression-fixes.md) | 后端六项问题修复、边界约定与回归验证 |
 
 ## 状态

@@ -1,4 +1,5 @@
 import { accessLogger, type DownloadEnv } from './access-log.ts';
+import type { BlockList } from 'node:net';
 // /subs 为用户私有订阅，/resources 为公共规则；动态值只使用查询参数。
 // 资源凭证与登录会话互不替代，失效或越权不暴露资源存在性。
 
@@ -33,6 +34,7 @@ const notFound = (c: Context) => c.body(null, 404);
 export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'>> & {
   /** 前端构建产物目录（packages/web/dist）；设置后托管静态文件，其余路径回落到 index.html */
   webDir?: string;
+  trustedProxies?: BlockList;
 };
 
 const MIME: Record<string, string> = {
@@ -69,7 +71,7 @@ export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
   const now = deps.now ?? Date.now;
   const app = new Hono<DownloadEnv>();
-  app.use('*', accessLogger(store, now));
+  app.use('*', accessLogger(store, now, deps.trustedProxies));
 
   app.get('/healthz', (c) => c.text('ok'));
   const ruleRepos = deps.ruleRepos ?? new RuleRepoService(store, createUpstreamFetcher({ allow: parseAllowList([]) }), now, undefined, deps.snapshots);

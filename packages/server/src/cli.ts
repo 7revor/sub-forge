@@ -13,6 +13,7 @@ import { createApp } from './app.ts';
 import { Cipher, hashPassword, loadMasterKey } from './crypto.ts';
 import type { Seed } from './docs.ts';
 import { parseAllowList } from './net/ssrf.ts';
+import { parseTrustedProxies } from './net/client-ip.ts';
 import { createUpstreamFetcher } from './net/upstream.ts';
 import { RenderService } from './render.ts';
 import { SnapshotService } from './snapshots.ts';
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
 }
 
 async function start(): Promise<void> {
+  const trustedProxies = parseTrustedProxies(env.SUBFORGE_TRUSTED_PROXIES);
   const host = env.HOST ?? '127.0.0.1';
   const port = Number(env.PORT ?? 8080);
   const publicUrl = env.PUBLIC_URL ?? `http://${host}:${port}`;
@@ -94,7 +96,7 @@ async function start(): Promise<void> {
   const nodeProbe = env.MIHOMO_BIN ? createNodeProbe(env.MIHOMO_BIN, { allow: parseAllowList((env.SSRF_ALLOW ?? '').split(',')) }) : undefined;
   const resources = new ResourceService(store,snapshots,renderer);
   const app = createApp({
-    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe, resources,
+    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe, resources, trustedProxies,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),

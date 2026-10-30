@@ -1,12 +1,15 @@
 import type { MiddlewareHandler } from 'hono';
+import type { HttpBindings } from '@hono/node-server';
+import { getConnInfo } from '@hono/node-server/conninfo';
+import { parseTrustedProxies, resolveClientAddress } from './net/client-ip.ts';
 import { detectClient, InvalidClientTarget } from './client.ts';
 import type { SharedRuleRecord } from './shared-rules.ts';
 import type { AccessKind, Store } from './store.ts';
 
-export type DownloadEnv = { Variables: { accessResult: { source: string; warnings: number }; accessResource: { kind: AccessKind; resourceId: string; resourceName: string } } };
+export type DownloadEnv = { Bindings: Partial<HttpBindings>; Variables: { accessResult: { source: string; warnings: number }; accessResource: { kind: AccessKind; resourceId: string; resourceName: string } } };
 
 /** 日志仅保存资源身份和凭证摘要，不保存带 token 的 URL。 */
-export function accessLogger(store: Store, now: () => number): MiddlewareHandler<DownloadEnv> {
+export function accessLogger(store: Store, now: () => number, trustedProxies = parseTrustedProxies()): MiddlewareHandler<DownloadEnv> {
   const paths = new Set(['/subs/profile', '/subs/nodes', '/subs/ruleset', '/resources/ruleset', '/resources/repo']);
   return async (c, next) => {
     if (!paths.has(c.req.path) || !['GET', 'HEAD'].includes(c.req.method)) return next();
@@ -15,6 +18,7 @@ export function accessLogger(store: Store, now: () => number): MiddlewareHandler
     const user = token ? store.getActiveToken(token) : undefined;
     if (!user) return next();
     const started = now(), ua = c.req.header('user-agent') ?? '';
+    const address = resolveClientAddress(c.env?.incoming ? getConnInfo(c).remote.address : undefined, c.req.header('x-forwarded-for'), trustedProxies);
     let client = '未知', platform: string | undefined;
     try {
       const detected = detectClient(ua, c.req.query());
@@ -47,7 +51,7 @@ export function accessLogger(store: Store, now: () => number): MiddlewareHandler
     const file = c.req.query('view') === 'source' || path === '/resources/repo' && !key;
     if (file) client = '原文';
     const result = c.get('accessResult'), fallback = !!c.res.headers.get('x-sub-forge-warning');
-    store.logAccess({ token: token!, profileId, kind, resourceId, resourceName, method: c.req.method, at: started, ua, client, ...(platform ? { platform } : {}),
+    store.logAccess({ ...address, token: token!, profileId, kind, resourceId, resourceName, method: c.req.method, at: started, ua, client, ...(platform ? { platform } : {}),
       status: c.res.status, ms: Math.max(0, now() - started), warnings: result?.warnings ?? (fallback ? 1 : 0), source: result?.source ?? (c.res.status >= 400 ? 'failed' : fallback ? 'last-good' : file ? 'file' : 'managed') });
   };
 }

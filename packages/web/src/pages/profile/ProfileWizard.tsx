@@ -1,7 +1,7 @@
 // 新建与编辑共用基础设置、核心设置两个标签页。
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Button, ErrorAlert, PageHeader, PageScroll } from '../../components/ui.tsx';
+import { Button, ErrorAlert, PageHeader } from '../../components/ui.tsx';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard.ts';
 import { useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { draftIssues } from '../template/model.ts';
@@ -31,14 +31,11 @@ export function ProfileWizard() {
     </PageHeader>
     <ErrorAlert error={save.error} />
     {!ctx!.baseValid && <div className="flex items-center justify-between gap-2 text-[13px] text-err">请修复基础设置中的 YAML，或放弃该次编辑。<Button onClick={ctx!.resetBaseEditor}>放弃无效 YAML</Button></div>}
-    <PageScroll>
-      <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
-        <ProfileSections routingReady={templateReady} templateNotice={<>
-          <ErrorAlert error={template.error} />
-          {!templateReady && <div className="flex items-center gap-3 text-[13px] text-ink-muted">{template.isError ? '模板加载失败，请重试或更换模板。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
-        </>} />
-        {!!issues.length && <p role="status" className="m-0 text-[13px] text-err">{issues[0]!.message}（{issues.length} 项待补全）</p>}
-      </fieldset>
-    </PageScroll>
+    <ProfileSections disabled={save.isPending} routingReady={templateReady} templateNotice={<>
+      <ErrorAlert error={template.error} />
+      {!templateReady && <div className="flex items-center gap-3 text-[13px] text-ink-muted">{template.isError ? '模板加载失败，请重试或更换模板。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
+    </>}>
+      {!!issues.length && <p role="status" className="m-0 text-[13px] text-err">{issues[0]!.message}（{issues.length} 项待补全）</p>}
+    </ProfileSections>
   </ProfileContext.Provider>;
 }
