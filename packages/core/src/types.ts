@@ -262,7 +262,7 @@ export type RoutingConfig = Pick<Template, 'groups' | 'rules' | 'final'>;
 export type ProfileRouting =
   | {
     mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]>;
-    /** 按显示顺序优先于全部模板规则，仅允许单条匹配。 */
+    /** 按显示顺序优先于全部模板规则，仅允许本地单条或多条规则。 */
     prependRules?: RuleEntry[];
   }
   | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version?: number; name?: string } };

@@ -261,3 +261,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 本任务在内置浏览器访问外部 Claude Design 画布，仍显示 “Sign in to view this page”，**外部设计稿同步未完成**。待同步画法与文案见 [docs/13](13-design-canvas-sync.md)，实际实现截图与验证见 [验收记录](../research/verification/unified-rule-cards-20261030/README.md)。
 
 2026-10-30 订阅弹窗复查合并：成员填充、组设置、模板关联及前置弹窗已实现固定容器、固定操作和正确禁用状态；清空、false/0、保存回显在内置浏览器复核。后端复用现有转换/保存接口，无新增待实现接口。外部画布本轮未编辑，保留待同步状态；证据见 research/verification/subscription-dialog-merge-20261030/README.md。
+
+2026-10-30 全局图标补充：公共按钮使用现有 cn 合并冲突类，px-0 正确覆盖默认内边距，Lucide 图标禁止 flex 收缩。已核验订阅、模板、增强集合、组合、处理链及弹窗，前后端无新增接口待办，外部画布登录阻塞仍未解除。详见 [实测记录](../research/verification/global-icons-merge-20261030/README.md)。

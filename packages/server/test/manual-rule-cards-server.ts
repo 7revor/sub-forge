@@ -21,6 +21,17 @@ for (const bound of [false, true]) env.store.put('profile', {
   id: bound ? 'cards-bound' : 'cards-profile', name: bound ? '绑定规则验收' : '独立规则验收', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' },
   routing: bound ? { mode: 'bound', templateId: template.id, groupAdditions: {}, prependRules: [{ ...template.rules[1]!, id: 'prepend' }] } : { mode: 'independent', config: { groups: template.groups, rules: template.rules, final: template.final } },
 }, env.user.id);
+// 可选图标验收数据：覆盖组合成员、处理链、订阅来源/链/链接等固定宽度按钮。
+if (process.argv.includes('--icons')) {
+  const nodeSet = { type: 'local' as const, id: 'icon-nodes' };
+  env.store.importSeed({
+    locals: [{ id: nodeSet.id, name: '图标验收节点', proxies: [{ name: '演示节点', type: 'socks5', server: 'node.example.test', port: 1080 }] }],
+    collections: [{ id: 'icon-collection', name: '图标验收组合', members: [{ ref: nodeSet }], pipeline: [{ op: 'rename.regex', rules: [{ pattern: '演示', replace: '测试' }] }] }],
+    tokens: [{ token: 'icon-audit-demo-token', profileId: 'cards-profile', label: '图标验收链接' }],
+  }, env.user.id);
+  const profile = env.store.get('profile', 'cards-profile')!;
+  env.store.put('profile', { ...profile, nodeSets: [{ ref: nodeSet, output: 'inline' }], chains: [{ id: 'icon-chain', landing: { nodeSet }, via: direct }] }, env.user.id);
+}
 const publicUrl = 'http://127.0.0.1:5237';
 const app = createApp({ ...env, ruleRepos: env.repos, publicUrl, webDir: resolve('../web/dist') });
 let checks = 0;

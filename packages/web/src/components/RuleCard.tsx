@@ -16,8 +16,8 @@ export function RuleCard({ handle, icon, children, count, hint, target, readOnly
     {hint}{count}
     {target && <div className="order-last ml-9 w-full min-w-0 sm:order-none sm:ml-0 sm:w-[136px]">{target}</div>}
     {!readOnly && <div className="ml-auto flex shrink-0 gap-1">
-      <Button variant="ghost" className="w-10 px-0!" title={`编辑${label}`} aria-label={`编辑${label}`} onClick={onEdit}><Pencil size={18} className="shrink-0" /></Button>
-      <Button variant="ghost" className="w-10 px-0! hover:text-err" title={`删除${label}`} aria-label={`删除${label}`} onClick={onDelete}><Trash2 size={18} className="shrink-0" /></Button>
+      <Button variant="ghost" className="w-10 px-0" title={`编辑${label}`} aria-label={`编辑${label}`} onClick={onEdit}><Pencil size={18} /></Button>
+      <Button variant="ghost" className="w-10 px-0 hover:text-err" title={`删除${label}`} aria-label={`删除${label}`} onClick={onDelete}><Trash2 size={18} /></Button>
     </div>}
     {readOnly && <span className="text-[12px] text-ink-muted">跟随模板</span>}
   </div>;
