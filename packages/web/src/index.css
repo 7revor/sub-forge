@@ -140,10 +140,7 @@ body {
   margin-inline: auto;
 }
 
-/* 订阅源使用导航右侧的完整宽度；基础设置之下的处理链与预览共享剩余高度。 */
-.page-layout:has(.source-detail-content) {
-  --page-content-width: 100%;
-}
+/* 沿用公共页面限宽；基础设置之下的处理链与预览只在纵向共享剩余高度。 */
 
 .pipeline-workspace {
   display: grid;
