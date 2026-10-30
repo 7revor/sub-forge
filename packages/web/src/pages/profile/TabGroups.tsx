@@ -196,8 +196,8 @@ export function TabGroups() {
               </div>
 
               <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">
-                <Field label="filter（保留）" hint="仅筛选节点集成员">{(id) => <Input id={id} className="font-mono" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
-                <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" value={eff.excludeFilter ?? ''} onChange={(e) => setField('excludeFilter', e.target.value)} />}</Field>
+                <Field label="filter（保留）" hint="仅筛选节点集成员">{(id) => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={eff.filter ?? ''} onChange={(e) => setField('filter', e.target.value)} />}</Field>
+                <Field label="exclude-filter（剔除）">{(id) => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={eff.excludeFilter ?? ''} onChange={(e) => setField('excludeFilter', e.target.value)} />}</Field>
                 <Field label="exclude-type（排除协议）">{(id) => <ExcludeTypeSelect id={id} value={eff.excludeType} onChange={(value) => setField('excludeType', value)} />}</Field>
               </fieldset>
               <div className="flex flex-col gap-2">

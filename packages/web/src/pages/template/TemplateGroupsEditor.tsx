@@ -71,8 +71,8 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           <GroupSettingsFields value={group} onChange={(key, next) => update({ [key]: next })} />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
-          <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
+          <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
+          <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
           <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
         </div>
         <label className="flex items-center gap-3 text-[13px]"><Switch label="隐藏策略组" checked={group.display?.hidden ?? false} onChange={hidden => update({ display: { ...group.display, hidden } })} />隐藏策略组</label>
@@ -87,7 +87,6 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             </div>} />
           </div>}
         </section>
-        <div className="pt-2"><Button variant="danger" size="sm" onClick={() => setDeleting(group.id)}>删除组</Button></div>
       </>}
     </Modal>
     <DeleteDialog open={!!deletingGroup} title={`删除策略组「${deletingGroup?.name || '未命名组'}」？`} onClose={() => setDeleting(undefined)} onConfirm={() => {
