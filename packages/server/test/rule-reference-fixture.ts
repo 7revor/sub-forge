@@ -4,7 +4,7 @@ import { RuleRepoService } from '../src/rule-repos/service.ts';
 import type { RepoCache } from '../src/rule-repos/git-cache.ts';
 import { addUser, client, setupApp } from './helpers.ts';
 
-export async function setupRuleReferences() {
+export async function setupRuleReferences(options: { cacheSnapshots?: boolean } = {}) {
   let paths = ['rule/Surge/Google/Google.list', 'rule/Surge/OpenAI/OpenAI.list'];
   let commit = 'a'.repeat(40);
   let body = 'DOMAIN,google.example.test\nIP-CIDR,198.51.100.0/24';
@@ -13,14 +13,15 @@ export async function setupRuleReferences() {
   const reads: { repo: string; commit: string; path: string }[] = [];
   let readError: string | undefined;
   let beforeRead: (() => Promise<void>) | undefined;
-  const env = setupApp({ fetcher: async url => { calls.push(url); return { status: 200, body }; } });
+  let beforeFetch: (() => Promise<void>) | undefined;
+  const env = setupApp({ fetcher: async url => { calls.push(url); await beforeFetch?.(); return { status: 200, body }; } });
   const cache: RepoCache = {
     inspect: async () => ({ defaultBranch: 'master', branches: ['master', 'surge-rule-set', 'surge-domain-set'] }),
     sync: async repo => Object.fromEntries(repo.refs.map(ref => [ref, commit])),
     files: async () => paths,
     read: async (repo, commit, path) => { reads.push({ repo: repo.id, commit, path }); await beforeRead?.(); if (readError) throw new Error(readError); return fileBodies.get(path) ?? body; }, remove: async () => {}, stop: async () => {},
   };
-  const repos = new RuleRepoService(env.store, async () => ({ status: 200, body }), Date.now, cache);
+  const repos = new RuleRepoService(env.store, async () => ({ status: 200, body }), Date.now, cache, options.cacheSnapshots ? env.snapshots : undefined);
   await repos.refresh('blackmatrix7');
   repos.setEnabled('zydou', false);
   const app = createApp({ ...env, ruleRepos: repos, publicUrl: 'http://127.0.0.1:5186', allowedOrigins: ['http://127.0.0.1:5186'] });
@@ -33,5 +34,5 @@ export async function setupRuleReferences() {
   await admin.login('reference-admin');
   const resolve = async () => (await admin.post('/api/rule-options/resolve', { source: 'repository', repo: 'blackmatrix7', entry: 'Google' })).json.matcher;
   const stop = async () => { await repos.stop(); await env.snapshots.settled(); env.store.close(); };
-  return { ...env, app, repos, user, privateUser, admin, resolve, calls, reads, stop, setFileBody: (path: string, content: string) => { fileBodies.set(path, content); }, setReadError: (error?: string) => { readError = error; }, setBeforeRead: (callback?: () => Promise<void>) => { beforeRead = callback; }, setBody: (next: string) => { body = next; }, setPaths: (next: string[]) => { paths = next; commit = 'b'.repeat(40); } };
+  return { ...env, app, repos, user, privateUser, admin, resolve, calls, reads, stop, setFileBody: (path: string, content: string) => { fileBodies.set(path, content); }, setReadError: (error?: string) => { readError = error; }, setBeforeRead: (callback?: () => Promise<void>) => { beforeRead = callback; }, setBeforeFetch: (callback?: () => Promise<void>) => { beforeFetch = callback; }, setBody: (next: string) => { body = next; }, setPaths: (next: string[]) => { paths = next; commit = 'b'.repeat(40); } };
 }

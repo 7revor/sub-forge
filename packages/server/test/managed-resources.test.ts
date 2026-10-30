@@ -21,7 +21,7 @@ function setup() {
     } },
   }, owner);
   h.store.put('ruleset', { id: 'r', name: '规则增强', sources: [{ id: 's', kind: 'remote', url: 'https://rules.test/common.list', format: 'auto' }] }, a.id);
-  const main = async (token: string, id: string, query = '') => { const res = await h.app.request(`/sub/${token}/${id}${query}`); expect(res.status, await res.clone().text()).toBe(200); return parse(await res.text()); };
+  const main = async (token: string, id: string, query = '') => { const res = await h.app.request(`/subs/profile?token=${token}&id=${id}${query.replace('?', '&')}`); expect(res.status, await res.clone().text()).toBe(200); return parse(await res.text()); };
   return { ...h, a, b, tokenA, tokenB, profile, main, api, fetcher, update: (next: string) => { body = next; h.advance(86400001); }, fail: () => { fail = true; h.advance(86400001); } };
 }
 const ruleUrl = (config: any): string => Object.values<{ url: string }>(config['rule-providers'])[0]!.url;
@@ -36,7 +36,7 @@ it('不同用户同规则同处理共用产物和原文，平台变体独立，�
   const stash = await h.main(h.tokenB, 'b', '?target=stash&platform=ios');
   expect(ruleUrl(stash)).not.toBe(ruleUrl(b)); expect(h.store.listSharedRules()).toHaveLength(2);
   expect(h.fetcher).toHaveBeenCalledTimes(1);
-  expect((await h.app.request(`/sub/${h.tokenB}/a`)).status).toBe(404);
+  expect((await h.app.request(`/subs/profile?token=${h.tokenB}&id=a`)).status).toBe(404);
   expect((await h.app.request(ruleUrl(a).replace(h.tokenA, h.tokenB))).status).toBe(200);
   expect((await h.app.request(ruleUrl(a).replace(h.tokenA, 'invalid'))).status).toBe(404);
 });
@@ -57,31 +57,32 @@ it('删除订阅只清理私有产物；公共规则继续更新，删除规则�
   expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });
 
-it('直接 URL 公共资源在订阅删除后保留，可由管理员清理，引用中的资源禁止删除', async () => {
+it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理正文、历史产物和原文绑定', async () => {
   const h = setup(); h.profile('a', h.a.id, remoteRuleMatcher('https://rules.test/Apple.list?download=1'));
-  const cfg = await h.main(h.tokenA, 'a'), url = ruleUrl(cfg), key = new URL(url).pathname.split('/').at(-1)!;
+  const cfg = await h.main(h.tokenA, 'a'), url = ruleUrl(cfg), key = new URL(url).searchParams.get('key')!;
   expect(Object.keys(cfg['rule-providers'])).toEqual(['Apple']);
-  expect((await h.api(`/system/rule-resources/${key}`, 'DELETE')).status).toBe(409);
-  h.store.delete('profile', 'a'); expect((await h.app.request(url.replace(h.tokenA, h.tokenB))).status).toBe(200);
-  expect((await h.api('/system/rule-resources')).status).toBe(200);
-  expect((await h.api(`/system/rule-resources/${key}`, 'DELETE')).status).toBe(200);
+  expect(new URL(url).pathname).toBe('/subs/ruleset');
+  expect(h.store.listSharedRules()).toEqual([]);
+  expect((await h.app.request(url)).status).toBe(200);
+  expect((await h.app.request(url.replace(h.tokenA, h.tokenB))).status).toBe(404);
+  expect((await h.app.request(`/resources/ruleset?key=${key}&token=${h.tokenB}`)).status).toBe(404);
+  h.store.delete('profile', 'a');
   expect((await h.app.request(url)).status).toBe(404);
-  expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
-  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
+  for (const table of ['last_good', 'render_generations', 'resource_bindings', 'snapshots']) expect(h.store.db.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
 });
 
 it('旧转换 token 入口不可用，修改下载参数不能把规则资源变为任意 URL 代理', async () => {
   const h = setup(); h.profile('a', h.a.id);
   const url = ruleUrl(await h.main(h.tokenA, 'a'));
-  expect((await h.app.request(`/api/rules/convert?token=${h.tokenA}&url=https://foreign.test/x`)).status).toBe(404);
-  expect(await (await h.app.request(`${url}?url=https://foreign.test/x&target=stash`)).text()).toBe('DOMAIN,one.test\n');
+  expect((await h.app.request(`/api/rules/convert?token=${h.tokenA}&url=https://foreign.test/x`)).status).toBe(401);
+  expect((await h.app.request(`${url}&url=https://foreign.test/x&target=stash`)).status).toBe(400);
   expect(h.fetcher).toHaveBeenCalledTimes(1);
 });
 
 it('规则增强公共读取，普通用户不能修改他人定义；引用关系跨用户阻止删除', async () => {
   const h = setup(); h.profile('b', h.b.id);
   const session = h.store.createSession(h.b.id, 3600000), headers = { cookie: `sf_session=${session}`, 'content-type': 'application/json' };
-  const detail = await h.app.request('/api/rulesets/r', { headers });
+  const detail = await h.app.request('/api/rulesets?id=r', { headers });
   expect(detail.status).toBe(200); expect(await detail.json()).toMatchObject({ writable: false });
   expect(await (await h.app.request('/api/rulesets', { headers })).json()).toMatchObject({ writableIds: [] });
   expect(await (await h.api('/rulesets')).json()).toMatchObject({ writableIds: ['r'] });
@@ -106,12 +107,12 @@ it('原始节点下载按用户隔离，历史配置也不能绕过节点归属�
   h.profile('a', h.a.id);
   h.store.put('profile', { ...h.store.get('profile', 'a')!, nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }] }, h.a.id);
   const config = await h.main(h.tokenA, 'a'), provider = config['proxy-providers']['节点'].url;
-  expect((await h.app.request(`/nodes/${h.tokenA}/local/nodes`)).status).toBe(200);
-  expect((await h.app.request(`/nodes/${h.tokenB}/local/nodes`)).status).toBe(404);
+  expect((await h.app.request(`/subs/nodes?token=${h.tokenA}&kind=local&id=nodes`)).status).toBe(200);
+  expect((await h.app.request(`/subs/nodes?token=${h.tokenB}&kind=local&id=nodes`)).status).toBe(404);
   h.store.put('profile', { ...h.store.get('profile', 'a')!, nodeSets: [] }, h.a.id);
   h.store.db.prepare("UPDATE docs SET owner=? WHERE kind='local' AND id='nodes'").run(h.b.id);
   expect((await h.app.request(provider)).status).toBe(404);
-  expect((await h.app.request(`/nodes/${h.tokenA}/local/nodes`)).status).toBe(404);
+  expect((await h.app.request(`/subs/nodes?token=${h.tokenA}&kind=local&id=nodes`)).status).toBe(404);
 });
 
 it('规则和订阅刷新在途删除不会恢复缓存、产物或刷新任务', async () => {

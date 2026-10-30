@@ -1,5 +1,7 @@
 # 06 · 代理链专项调研：前置/落地在本地或 provider 中的通解
 
+> 本文保留历史设计与验收记录；现行资源路径、鉴权和代理链交付方式以 [统一托管资源](19-managed-resources.md) 为准。
+
 > 依据：mihomo 源码（MetaCubeX/mihomo `Alpha` 分支，2026-10-26）与官方文档（MetaCubeX/Meta-Docs）。
 > 本篇结论均来自**阅读源码**；因环境限制尚未用 mihomo 二进制实际跑过，M0 阶段需补一组集成测试（见 §6）。
 

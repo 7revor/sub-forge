@@ -17,18 +17,18 @@ function checkPassword(p: unknown): string {
   return p;
 }
 
-export function authRoutes(store: Store, opts: { secureCookies: boolean; now: () => number }) {
+const startSession = (c: Context<ApiEnv>, user: User, store: Store, secureCookies: boolean) => {
+    const sid = store.createSession(user.id, SESSION_TTL_MS);
+    setCookie(c, SESSION_COOKIE, sid, { httpOnly: true, sameSite: 'Lax', secure: secureCookies, path: '/', maxAge: SESSION_TTL_MS / 1000 });
+  };
+
+export function sessionRoutes(store: Store, opts: { secureCookies: boolean; now: () => number }) {
   const app = new Hono<ApiEnv>();
   /** 按用户名计数的登录失败次数，超过上限锁定一段时间（内存中，重启清零） */
   const failures = new Map<string, { count: number; until: number }>();
   const dummyHash = hashPassword('sub-forge-dummy-password');
 
-  const startSession = (c: Context<ApiEnv>, user: User) => {
-    const sid = store.createSession(user.id, SESSION_TTL_MS);
-    setCookie(c, SESSION_COOKIE, sid, { httpOnly: true, sameSite: 'Lax', secure: opts.secureCookies, path: '/', maxAge: SESSION_TTL_MS / 1000 });
-  };
-
-  app.post('/auth/login', async (c) => {
+  app.post('/login', async (c) => {
     const { username, password } = await jsonBody<{ username?: unknown; password?: unknown }>(c);
     if (!isStr(username) || typeof password !== 'string') throw bad('需要用户名和密码');
     const f = failures.get(username);
@@ -43,17 +43,22 @@ export function authRoutes(store: Store, opts: { secureCookies: boolean; now: ()
     }
     failures.delete(username);
     const { passwordHash: _ph, ...user } = u;
-    startSession(c, user);
+    startSession(c, user, store, opts.secureCookies);
     return c.json({ user });
   });
 
-  app.post('/auth/logout', (c) => {
+  app.post('/logout', (c) => {
     const sid = getCookie(c, SESSION_COOKIE);
     if (sid) store.deleteSession(sid);
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ ok: true });
   });
 
+  return app;
+}
+
+export function authRoutes(store: Store, opts: { secureCookies: boolean; now: () => number }) {
+  const app = new Hono<ApiEnv>();
   app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }));
 
   app.get('/me/token', requireUser, c => c.json({ item: store.createToken(c.get('user').id) }));
@@ -74,7 +79,7 @@ export function authRoutes(store: Store, opts: { secureCookies: boolean; now: ()
     store.updateUser(me.id, { passwordHash: await hashPassword(checkPassword(next)) });
     // 修改密码后其他设备的会话全部失效
     store.deleteUserSessions(me.id);
-    startSession(c, me);
+    startSession(c, me, store, opts.secureCookies);
     return c.json({ ok: true });
   });
 

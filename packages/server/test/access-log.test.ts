@@ -37,13 +37,13 @@ async function rows(h: ReturnType<typeof setup>, other = false): Promise<UserAcc
 
 it('默认包含四类访问，所有节点入口与 HEAD 只记录一次，参数错误也保留状态', async () => {
   const h = setup();
-  const main = await h.app.request(`/sub/${h.token}/p`, { headers: { 'user-agent': 'ClashMetaForAndroid' } });
+  const main = await h.app.request(`/subs/profile?token=${h.token}&id=p`, { headers: { 'user-agent': 'ClashMetaForAndroid' } });
   const config = parse(await main.text());
   const urls = [Object.values<{ url: string }>(config['proxy-providers'])[0]!.url, ...Object.values<{ url: string }>(config['rule-providers']).map(r => r.url),
-    `/rules/${h.token}/r`, `/nodes/${h.token}/source/s`, `/nodes/${h.token}/collection/c`, `/nodes/${h.token}/local/l`];
+    `/resources/ruleset?token=${h.token}&id=r`, `/subs/nodes?token=${h.token}&kind=source&id=s`, `/subs/nodes?token=${h.token}&kind=collection&id=c`, `/subs/nodes?token=${h.token}&kind=local&id=l`];
   for (const url of urls) expect((await h.app.request(url)).status).toBe(200);
-  expect((await h.app.request(`/nodes/${h.token}/local/l`, { method: 'HEAD' })).status).toBe(200);
-  for (const url of [`/sub/${h.token}/p`, `/nodes/${h.token}/local/l`, `/rules/${h.token}/r`]) expect((await h.app.request(url + '?target=bad')).status).toBe(400);
+  expect((await h.app.request(`/subs/nodes?token=${h.token}&kind=local&id=l`, { method: 'HEAD' })).status).toBe(200);
+  for (const url of [`/subs/profile?token=${h.token}&id=p`, `/subs/nodes?token=${h.token}&kind=local&id=l`, `/resources/ruleset?token=${h.token}&id=r`]) expect((await h.app.request(url + '&target=bad')).status).toBe(400);
   const all = await rows(h);
   expect(all).toHaveLength(12);
   expect(new Set(all.map(r => r.kind))).toEqual(new Set(['subscription', 'nodes', 'rule-collection', 'enhancement']));
@@ -57,9 +57,9 @@ it('默认包含四类访问，所有节点入口与 HEAD 只记录一次，参�
 
 it('公共资源按访问者 token 归属，管理员也只能查询自己；越权日志不暴露资源名', async () => {
   const h = setup();
-  await h.app.request(`/rules/${h.otherToken}/r`);
-  await h.app.request(`/nodes/${h.otherToken}/local/l`);
-  await h.app.request(`/sub/${h.otherToken}/p`);
+  await h.app.request(`/resources/ruleset?token=${h.otherToken}&id=r`);
+  await h.app.request(`/subs/nodes?token=${h.otherToken}&kind=local&id=l`);
+  await h.app.request(`/subs/profile?token=${h.otherToken}&id=p`);
   expect(await rows(h)).toEqual([]);
   expect(await rows(h, true)).toMatchObject([
     { kind: 'subscription', status: 404, resourceName: '不可用资源', profileId: '' },
@@ -72,13 +72,13 @@ it('公共资源按访问者 token 归属，管理员也只能查询自己；越
 
 it('无效、禁用、重置前的 token 不记录；重置、删除资源后历史仍归原用户', async () => {
   const h = setup();
-  await h.app.request(`/sub/${h.token}/p`);
+  await h.app.request(`/subs/profile?token=${h.token}&id=p`);
   const next = h.store.resetToken(h.token)!.token;
-  expect((await h.app.request(`/sub/${h.token}/p`)).status).toBe(404);
-  await h.app.request('/sub/invalid/p');
-  await h.app.request(`/sub/${next}/p`);
+  expect((await h.app.request(`/subs/profile?token=${h.token}&id=p`)).status).toBe(404);
+  await h.app.request('/subs/profile?token=invalid&id=p');
+  await h.app.request(`/subs/profile?token=${next}&id=p`);
   h.store.updateUser(h.b.id, { disabled: true });
-  await h.app.request(`/rules/${h.otherToken}/r`);
+  await h.app.request(`/resources/ruleset?token=${h.otherToken}&id=r`);
   h.store.delete('profile', 'p');
   expect(await rows(h)).toHaveLength(2);
   expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM access_log').get()).toEqual({ n: 2 });
@@ -86,8 +86,8 @@ it('无效、禁用、重置前的 token 不记录；重置、删除资源后历
 
 it('服务端按类型分页且同时间排序稳定，拒绝非法筛选，日志保留期限生效', async () => {
   const h = setup();
-  for (let i = 0; i < 24; i++) await h.app.request(`/nodes/${h.token}/local/l`);
-  await h.app.request(`/rules/${h.token}/r`);
+  for (let i = 0; i < 24; i++) await h.app.request(`/subs/nodes?token=${h.token}&kind=local&id=l`);
+  await h.app.request(`/resources/ruleset?token=${h.token}&id=r`);
   const first = await pageJson(await h.api('?kind=nodes&page=1&pageSize=10'));
   const second = await pageJson(await h.api('?kind=nodes&page=2&pageSize=10'));
   expect(first).toMatchObject({ total: 24, page: 1, totalPages: 3 });
@@ -103,9 +103,9 @@ it('服务端按类型分页且同时间排序稳定，拒绝非法筛选，日�
 it('记录失败状态、处理耗时，并清理 UA 中的当前 token', async () => {
   const h = setup();
   h.store.put('source', { id: 'broken', name: '无效节点源', url: 'https://rules.test/fail.list', pipeline: [] }, h.a.id);
-  expect((await h.app.request(`/nodes/${h.token}/source/broken`, { headers: { 'user-agent': 'Fixture ' + h.token } })).status).toBe(503);
+  expect((await h.app.request(`/subs/nodes?token=${h.token}&kind=source&id=broken`, { headers: { 'user-agent': 'Fixture ' + h.token } })).status).toBe(503);
   expect((await rows(h))[0]).toMatchObject({ kind: 'nodes', status: 503, source: 'failed', ua: 'Fixture [令牌]' });
-  await h.app.request(`/sub/${h.token}/${h.token}`);
+  await h.app.request(`/subs/profile?token=${h.token}&id=${h.token}`);
   expect(JSON.stringify(h.store.db.prepare('SELECT * FROM access_log').all())).not.toContain(h.token);
 });
 
@@ -135,7 +135,7 @@ it('请求等待期间重置令牌，不把旧请求归入新令牌的访问记�
   const user = h.store.createUser({ username: '并发用户', passwordHash: 'fixture', role: 'user' });
   const token = h.store.userToken(user.id)!.token;
   h.store.put('source', { id: 's', name: '等待的节点', url: 'https://example.test/nodes', pipeline: [] }, user.id);
-  const response = h.app.request(`/nodes/${token}/source/s`);
+  const response = h.app.request(`/subs/nodes?token=${token}&kind=source&id=s`);
   await ready; h.store.resetToken(token); release();
   expect((await response).status).toBe(404);
   expect(h.store.userAccessPage(user.id, { page: 1, pageSize: 20, q: '' }).total).toBe(0);
@@ -151,14 +151,14 @@ it.each([undefined, '127.0.0.1'])('真实 HTTP 连接记录 IP，透传信任配
     if (!address || typeof address === 'string') throw new Error('测试服务没有 TCP 地址');
     const base = `http://127.0.0.1:${address.port}`;
     const headers = { 'x-forwarded-for': '192.0.2.99, 2001:db8::7', 'x-real-ip': '192.0.2.88', 'cf-connecting-ip': '192.0.2.77', forwarded: 'for=192.0.2.66' };
-    for (const path of [`/sub/${h.token}/p`, `/nodes/${h.token}/local/l`, `/rules/${h.token}/r`, `/sub/${h.token}/p?target=bad`]) {
+    for (const path of [`/subs/profile?token=${h.token}&id=p`, `/subs/nodes?token=${h.token}&kind=local&id=l`, `/resources/ruleset?token=${h.token}&id=r`, `/subs/profile?token=${h.token}&id=p&target=bad`]) {
       const response = await fetch(base + path, { headers }); await response.text();
     }
     const result = await rows(h);
     expect(result).toHaveLength(4);
     for (const row of result) expect(row).toMatchObject({ clientIp: trustedProxies ? '2001:db8::7' : '127.0.0.1', peerIp: '127.0.0.1', ipSource: trustedProxies ? 'x-forwarded-for' : 'socket' });
     expect(h.store.recentAccess('p')[0]).toMatchObject({ clientIp: trustedProxies ? '2001:db8::7' : '127.0.0.1' });
-    const response = await fetch(base + `/sub/${h.token}/p`, { method: 'HEAD', headers: { 'x-real-ip': '192.0.2.88', 'cf-connecting-ip': '192.0.2.77', forwarded: 'for=192.0.2.66' } });
+    const response = await fetch(base + `/subs/profile?token=${h.token}&id=p`, { method: 'HEAD', headers: { 'x-real-ip': '192.0.2.88', 'cf-connecting-ip': '192.0.2.77', forwarded: 'for=192.0.2.66' } });
     await response.text();
     expect((await rows(h))[0]).toMatchObject({ clientIp: '127.0.0.1', peerIp: '127.0.0.1', ipSource: 'socket', method: 'HEAD' });
   } finally {
@@ -167,7 +167,7 @@ it.each([undefined, '127.0.0.1'])('真实 HTTP 连接记录 IP，透传信任配
   }
 });
 
-it('v24 升级保留原日志，旧记录 IP 为空，新记录重启后仍保留', () => {
+it.each([24, 25])('v%s 升级保留原日志，旧记录 IP 为空，新记录重启后仍保留', version => {
   const dir = mkdtempSync(join(tmpdir(), 'sf-access-ip-')), path = join(dir, 'test.db');
   const cipher = new Cipher(randomBytes(32));
   let store = new Store(path, { cipher });
@@ -176,12 +176,15 @@ it('v24 升级保留原日志，旧记录 IP 为空，新记录重启后仍保�
     const token = store.userToken(user.id)!.token;
     const record = { token, profileId: 'p', at: Date.now(), ua: '', client: 'mihomo', status: 200, ms: 0, source: 'fresh', warnings: 0 };
     store.logAccess(record);
+    const cached = { yaml: '已迁移到查询参数入口的配置' };
+    if (version === 25) store.putLastGood('p', 'mihomo', cached);
     store.db.exec('ALTER TABLE access_log DROP COLUMN client_ip; ALTER TABLE access_log DROP COLUMN peer_ip; ALTER TABLE access_log DROP COLUMN ip_source');
-    store.db.pragma('user_version = 24'); store.close(); store = new Store(path, { cipher });
+    store.db.pragma(`user_version = ${version}`); store.close(); store = new Store(path, { cipher });
     expect(store.recentAccess('p')[0]).toMatchObject({ clientIp: null, peerIp: null, ipSource: 'unknown' });
+    if (version === 25) expect(store.getLastGood('p', 'mihomo')?.data).toEqual(cached);
     store.logAccess({ ...record, clientIp: '2001:db8::9', peerIp: '10.2.0.2', ipSource: 'x-forwarded-for' });
     store.close(); store = new Store(path, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(25);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(26);
     const result = store.userAccessPage(user.id, { page: 1, pageSize: 20, q: '' });
     expect(result.total).toBe(2);
     expect(result.items[0]).toMatchObject({ clientIp: '2001:db8::9', peerIp: '10.2.0.2', ipSource: 'x-forwarded-for' });

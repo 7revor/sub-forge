@@ -22,7 +22,7 @@ async function fixture(rs: RuleSet, options: Parameters<typeof setupApp>[0] = {}
   const read = (refresh = false) => api.post('/api/rulesets/source', { id: rs.id, source: rs.sources[0], refresh });
   const preview = (content: string) => api.post('/api/rules/convert', { inputs: [{ source: rs.sources[0], content }], overrides: rs.overrides, client: 'mihomo' });
   const download = async (platform?: string) => {
-    const sub = await env.app.request(`/sub/preview-test/p${platform ? `?platform=${platform}` : ''}`);
+    const sub = await env.app.request(`/subs/profile?token=preview-test&id=p${platform ? `&platform=${platform}` : ''}`);
     expect(sub.status).toBe(200);
     const config = parse(await sub.text());
     const provider = Object.values(config['rule-providers'])[0] as { url: string };
@@ -58,7 +58,7 @@ describe('规则预览、实际下发与来源异常恢复', () => {
     expect(failed.json.status).toMatchObject({ ok: false, error: '瞬时上游错误' });
     expect(failed.json.content).toBeUndefined();
     expect(calls).toBe(1);
-    expect((await h.app.request('/sub/preview-test/p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=preview-test&id=p')).status).toBe(503);
     expect((await h.read()).json.status.ok).toBe(false);
     expect(calls).toBe(1);
     const recovered = await h.read(true);

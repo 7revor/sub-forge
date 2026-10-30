@@ -11,8 +11,8 @@ it('移出落地节点集时拒绝残留代理链，来源与对应链同时移�
   const invalid = await user.put(`/api/profiles/${profile.id}`, { ...profile, nodeSets: [] });
   expect(invalid.status).toBe(400);
   expect(JSON.stringify(invalid.json)).toContain('落地');
-  expect((await user.get(`/api/profiles/${profile.id}`)).json.item.chains).toHaveLength(1);
+  expect((await user.get(`/api/profiles?id=${profile.id}`)).json.item.chains).toHaveLength(1);
   const valid = await user.put(`/api/profiles/${profile.id}`, { ...profile, nodeSets: [], chains: [] });
   expect(valid.status).toBe(200); expect(valid.json.item.chains).toEqual([]);
-  expect((await user.get(`/api/locals/${local.id}`)).status).toBe(200);
+  expect((await user.get(`/api/locals?id=${local.id}`)).status).toBe(200);
 });

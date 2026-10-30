@@ -16,7 +16,7 @@ const template = (version = 1, name = '旧前置'): TemplateVersionDoc => ({ id:
 const profile: ProfileDoc = { id: 'p', name: 'P', template: { id: 't', follow: 'latest' }, nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'provider' }], overlay: { groupPatches: { g: { addMembers: [{ kind: 'builtin', name: 'REJECT' }] } } }, chains: [{ id: 'c', landing: { nodeSet: { type: 'source', id: 's' }, filter: '^落地' }, via: { kind: 'group', groupId: 'g' } }], refPolicy: { default: 'wrap' } };
 const path = (url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; };
 const urls = (cfg: any) => ({ provider: cfg['proxy-providers'].S.url as string, ruleset: cfg['rule-providers'].R.url as string });
-const version = (url: string) => new URL(url).searchParams.get('v');
+const version = (url: string) => new URL(url).searchParams.get('version');
 function harness(store = new Store(':memory:')) {
   let now = 1000;
   const bodies = { source: 'proxies:\n  - { name: 落地 A, type: socks5, server: node.test, port: 1080 }\n', rules: 'DOMAIN,old.example.test' };
@@ -24,7 +24,7 @@ function harness(store = new Store(':memory:')) {
   const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test' });
   const app = createApp({ store, renderer, snapshots });
   const get = (url: string) => app.request(path(url));
-  const main = async (suffix = '') => parse(await (await get(`/sub/token/p${suffix}`)).text());
+  const main = async (suffix = '') => parse(await (await get(`/subs/profile?token=token&id=p${suffix.replace('?', '&')}`)).text());
   return { store, renderer, snapshots, app, bodies, get, main, advance: () => { now += 100_000_000; } };
 }
 function seed(store: Store) {
@@ -74,7 +74,7 @@ describe('订阅结构版本与独立刷新', () => {
     expect(await (await h.get(old.ruleset)).text()).toBe('DOMAIN,new.example.test\n');
     const next = urls(await h.main());
     expect(version(next.provider)).toBe(version(old.provider));
-    expect(new URL(next.provider).searchParams.get('h')).not.toBe(new URL(old.provider).searchParams.get('h'));
+    expect(new URL(next.provider).searchParams.get('hash')).not.toBe(new URL(old.provider).searchParams.get('hash'));
   });
 
   it('同源不同订阅的整集覆写隔离，新增节点沿用前置，旧版本保留旧链', async () => {
@@ -85,7 +85,7 @@ describe('订阅结构版本与独立刷新', () => {
     h.store.db.prepare("UPDATE docs SET owner = ? WHERE kind='profile' AND id='p2'").run(h.store.getToken('token')!.userId);
     const first = await h.main(); const old = urls(first);
     expect(first['proxy-providers'].S.override).toBeUndefined();
-    const second = parse(await (await h.get('/sub/token/p2')).text());
+    const second = parse(await (await h.get('/subs/profile?token=token&id=p2')).text());
     expect(parse(await (await h.get(urls(second).provider)).text()).proxies[0]['dialer-proxy']).toBe('DIRECT');
     expect(parse(await (await h.get(old.provider)).text()).proxies[0]['dialer-proxy']).toBe('旧前置');
     h.bodies.source += '  - { name: 新落地, type: socks5, server: new.test, port: 1080 }\n'; h.advance();
@@ -102,10 +102,10 @@ describe('订阅结构版本与独立刷新', () => {
   it('版本不存在不冒充最新内容，撤销 token 后历史版本也不可访问', async () => {
     const h = harness(); seed(h.store);
     const old = urls(await h.main());
-    const missing = new URL(old.provider); missing.searchParams.set('v', '0'.repeat(32));
+    const missing = new URL(old.provider); missing.searchParams.set('version', '0'.repeat(32));
     expect((await h.get(missing.toString())).status).toBe(404);
     h.store.deleteToken('token');
-    for (const url of [old.provider, old.ruleset, '/sub/token/p']) expect((await h.get(url)).status).toBe(404);
+    for (const url of [old.provider, old.ruleset, '/subs/profile?token=token&id=p']) expect((await h.get(url)).status).toBe(404);
   });
 
   it('保留最近 32 个结构版本，过期地址明确失效而不返回新结构', async () => {

@@ -21,7 +21,7 @@ store.logAccess({ token, profileId: '', at: Date.now(), ua: '历史记录', clie
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18743 });
 if (!server.listening) await once(server, 'listening');
 for (const xff of [undefined, '198.51.100.7', '2001:db8:1234:5678:90ab:cdef:1234:5678', '192.0.2.66, 198.51.100.8, 10.2.0.2', 'invalid']) {
-  const response = await fetch(`${publicUrl}/nodes/${token}/local/fixture`, { headers: { 'user-agent': 'Mihomo/1.0', ...(xff ? { 'x-forwarded-for': xff } : {}) } });
+  const response = await fetch(`${publicUrl}/subs/nodes?token=${token}&kind=local&id=fixture`, { headers: { 'user-agent': 'Mihomo/1.0', ...(xff ? { 'x-forwarded-for': xff } : {}) } });
   await response.text();
 }
 console.log(`隔离验收：${publicUrl}；账号 ip-admin，密码 ip-test-2026`);

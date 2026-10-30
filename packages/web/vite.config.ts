@@ -11,8 +11,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: '127.0.0.1',
-    // 按完整路径段匹配：/p 与 /r 不能吞掉前端路由 /profiles、/rulesets
-    proxy: { '^/(api|sub|p|r)/.*': { target, changeOrigin: false }, '/healthz': { target, changeOrigin: false } },
+    // 只代理固定接口命名空间，旧资源路径不再提供服务。
+    proxy: { '^/(api|auth|subs|resources)(/|$)': { target, changeOrigin: false }, '/healthz': { target, changeOrigin: false } },
   },
   build: { outDir: 'dist', sourcemap: true },
 });

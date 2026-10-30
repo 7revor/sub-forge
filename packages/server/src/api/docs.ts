@@ -1,3 +1,4 @@
+import { requiredQuery } from '../query.ts';
 import { normalizeRulePresence } from '../rule-presence.ts';
 import { migrateProfile, profileTemplate } from '../profile-routing.ts';
 import type { ProfileDoc } from '../docs.ts';
@@ -41,15 +42,14 @@ export function docRoutes(store: Store) {
     };
 
     app.get(`/${seg}`, (c) => {
+      if (c.req.query('id') !== undefined) {
+        const row = load(requiredQuery(c, 'id'), c.get('user').id);
+        return c.json({ item: row.doc, updatedAt: row.updatedAt, writable: kind !== 'ruleset' || row.owner === c.get('user').id || c.get('user').role === 'admin' });
+      }
       const options = readPagination(c.req.query());
       const owner = publicRead ? undefined : c.get('user').id;
       const result = options ? store.listPage(kind, options, owner) : { items: store.list(kind, owner) };
       return c.json(kind === 'ruleset' ? { ...result, writableIds: result.items.filter(doc => c.get('user').role === 'admin' || store.getWithOwner(kind, doc.id)?.owner === c.get('user').id).map(doc => doc.id) } : result);
-    });
-
-    app.get(`/${seg}/:id`, (c) => {
-      const row = load(c.req.param('id'), c.get('user').id);
-      return c.json({ item: row.doc, updatedAt: row.updatedAt, writable: kind !== 'ruleset' || row.owner === c.get('user').id || c.get('user').role === 'admin' });
     });
 
     app.post(`/${seg}`, async (c) => {

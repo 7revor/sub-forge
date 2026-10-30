@@ -16,7 +16,7 @@ function setup() {
   h.store.put('profile', { id: 'p', name: '订阅', nodeSets: [], overlay: {}, refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'independent', config: {
     groups: [], rules: [{ id: 'rule', matcher: { kind: 'ruleset', id: 'r' }, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' },
   } } }, user.id);
-  const main = async () => { const res = await h.app.request(`/sub/${token}/p`); expect(res.status, await res.clone().text()).toBe(200); return parse(await res.text()); };
+  const main = async () => { const res = await h.app.request(`/subs/profile?token=${token}&id=p`); expect(res.status, await res.clone().text()).toBe(200); return parse(await res.text()); };
   return { ...h, fetcher, user, token, main };
 }
 const ruleUrl = (config: any): string => Object.values<{ url: string }>(config['rule-providers'])[0]!.url;
@@ -37,7 +37,7 @@ it('节点依赖串行拉取期间删除订阅及来源，不拉取已删除的�
   for (const id of ['a', 'b']) h.store.put('source', { id, name: id, url: `https://nodes.test/${id}`, pipeline: [] }, h.user.id);
   h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: ['a', 'b'].map(id => ({ ref: { type: 'source', id }, output: 'provider' })) }, h.user.id);
   h.fetcher.mockImplementation(async () => { entered.release(); await held.promise; return { status: 200, body: 'trojan://fixture@node.test:443#节点' }; });
-  const pending = h.app.request(`/sub/${h.token}/p`); await entered.promise;
+  const pending = h.app.request(`/subs/profile?token=${h.token}&id=p`); await entered.promise;
   h.store.delete('profile', 'p'); for (const id of ['a', 'b']) h.store.delete('source', id); held.release();
   expect((await pending).status).toBe(404); expect(h.fetcher).toHaveBeenCalledTimes(1);
   expect(h.store.db.prepare("SELECT * FROM resource_bindings WHERE kind='source'").all()).toEqual([]);
@@ -82,7 +82,7 @@ it('私有 provider 的原型属性路径视为不存在', async () => {
   h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'socks5', server: 'node.test', port: 1080 }] }, h.user.id);
   h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }] }, h.user.id);
   const config = await h.main(), url = new URL(config['proxy-providers']['节点'].url);
-  url.pathname = url.pathname.slice(0, url.pathname.lastIndexOf('/') + 1) + '__proto__';
+  url.searchParams.set('id', '__proto__');
   expect((await h.app.request(url.href)).status).toBe(404);
 });
 
@@ -90,7 +90,7 @@ it('未记录输出契约的旧 MRS 资源不能被当前文本配置覆盖', as
   const h = setup();
   h.store.put('ruleset', { id: 'r', name: '公共规则', sources: [{ id: 'binary', kind: 'remote', format: 'mrs', behavior: 'domain', url: 'https://rules.test/a.mrs' }] }, h.user.id);
   h.fetcher.mockResolvedValue({ status: 200, body: '#subforge-binary-mrs\n' + Buffer.from('模拟已校验的二进制').toString('base64') });
-  const oldUrl = ruleUrl(await h.main()), key = new URL(oldUrl).pathname.split('/').at(-1)!;
+  const oldUrl = ruleUrl(await h.main()), key = new URL(oldUrl).searchParams.get('key')!;
   const { delivery: _legacyMissing, ...legacy } = h.store.getSharedRule<SharedRuleRecord>(key)!;
   h.store.putSharedRule(key, 'r', legacy);
   h.store.put('ruleset', { id: 'r', name: '公共规则', sources: [{ id: 'text', kind: 'local', format: 'auto', content: 'DOMAIN,new.test' }] }, h.user.id);

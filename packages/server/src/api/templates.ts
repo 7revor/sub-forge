@@ -1,3 +1,5 @@
+import { ruleBinding } from '../rule-binding.ts';
+import { requiredQuery } from '../query.ts';
 import { normalizeRulePresence } from '../rule-presence.ts';
 // 模板：所有人可读，管理员直接保存。保存时检查模板与绑定订阅：
 //   ① 模板自身：不通过不能保存；
@@ -65,7 +67,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
       }
       let content = src.content ?? '';
       if (src.kind === 'remote') {
-        const result = await snapshots.get('ruleset', id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
+        const result = await snapshots.get('ruleset', ruleBinding(id, `template:${t.id}`).id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: ruleBinding(id, `template:${t.id}`).scope });
         if (!result.snapshot) {
           report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `${label}没有可用快照：${result.error ?? '无法拉取'}`, where });
           continue;
@@ -102,14 +104,13 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
   const app = new Hono<ApiEnv>();
 
   app.get('/templates', requireUser, (c) => {
+    if (c.req.query('id') !== undefined) {
+      const t = store.getTemplate(requiredQuery(c, 'id'));
+      if (!t) throw notFound('模板');
+      return c.json({ item: t });
+    }
     const options = readPagination(c.req.query());
     return c.json(options ? store.listLatestTemplatesPage(options) : { items: store.listLatestTemplates() });
-  });
-
-  app.get('/templates/:id', requireUser, (c) => {
-    const t = store.getTemplate(c.req.param('id'));
-    if (!t) throw notFound('模板');
-    return c.json({ item: t });
   });
 
   /** 编辑器即时校验（TPL-11）：只做模板自身检查 */

@@ -1,3 +1,4 @@
+import { queryUrl } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 import { api } from '../api.ts';
@@ -66,7 +67,7 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 /** 规则集（设计稿「规则集」）：来源 → 客户端改写（整个规则集）→ 输出预览，每块独占一行 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
-  const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', `/rulesets/${e.id}`).then(r => r.writable) });
+  const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', queryUrl('/rulesets', { id: e.id })).then(r => r.writable) });
   const canEdit = e.isNew || permission.data === true;
   const [linking, setLinking] = useState<string>();
   const [linkError, setLinkError] = useState<string>();

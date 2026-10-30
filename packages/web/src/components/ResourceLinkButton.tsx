@@ -1,3 +1,4 @@
+import { queryUrl } from '@sub-forge/core';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link2 } from 'lucide-react';
@@ -18,7 +19,7 @@ export function ResourceLinkButton({ kind, id, name, disabled = false, size = 'm
 function useResourceLink(kind: LinkKind, id: string) {
   return useQuery({
     queryKey: ['resource-link', kind, id], enabled: !!id,
-    queryFn: () => api<{ item: { url: string } }>('GET', `/resource-links/${kind}/${encodeURIComponent(id)}`).then(r => new URL(r.item.url, window.location.origin).href),
+    queryFn: () => api<{ item: { url: string } }>('GET', queryUrl('/resource-links', { kind, id })).then(r => new URL(r.item.url, window.location.origin).href),
   });
 }
 

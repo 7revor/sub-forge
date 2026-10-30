@@ -204,9 +204,10 @@ Inline 点选前置保存具体来源与 `match.exact`；点选落地保存具�
 
 | 地址 | 用途 |
 | --- | --- |
-| `GET /sub/:token/:profile` | Profile 主配置（UA 识别客户端） |
-| `GET /p/:token/:profile/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
-| `GET /r/:token/:resourceKey` | 公共规则产物，资源键确定规则身份、处理参数与客户端/平台；不依赖订阅 |
+| `GET /subs/profile?id=P&token=T` | Profile 主配置（UA 识别客户端） |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&version=V&token=T` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
+| `GET /resources/ruleset?key=K&token=T`、`GET /resources/repo?key=K&token=T` | 公共规则产物，与订阅无关 |
+| `GET /subs/ruleset?profile=P&key=K&version=V&token=T` | 订阅专属远程规则；模板不提供 token 入口 |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
 
@@ -241,7 +242,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 5. ChainRule 的落地侧：
    - 落地 NodeSet 为 inline → 直接给匹配节点写 dialer-proxy
    - 落地 NodeSet 为 provider →
-       在 /p/:token/P 的订阅专属内容中给匹配节点注入 dialer-proxy；整集规则覆盖局部规则。
+       在 /subs/nodes?kind=provider&profile=P 的订阅专属内容中给匹配节点注入 dialer-proxy；整集规则覆盖局部规则。
 6. 上游自带 dialer-proxy 的节点（REF-04）：
    - 其前置名在同一 NodeSet 中 → 视为 NodeRef(同 NodeSet, exact) 走步骤 3–4
    - 在其他地方找不到 → report.warn，并按 fallback 处理（默认移除该字段）
@@ -581,4 +582,4 @@ URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应�
 
 绑定间切换模板保留独立组及其 ID，只对其中引用的模板组按映射更新；解除绑定将全部有效组复制到独立配置。节点来源与代理链列表复用策略组、规则的 `RoutingCard`。代理链路径与前置摘要只显示节点名或组名；全部/正则范围查询匹配节点名称，查询失败明确展示失败，关闭弹窗时保留最后展示。
 
-2026-10-30 访问日志增加 `clientIp`、`peerIp`、`ipSource`，分别表示解析后的客户端地址、TCP 连接对端及来源（socket / x-forwarded-for / unknown）。SQLite v25 保留旧记录并将未知 IP 留空；访问日志仍按令牌所属用户隔离并保留 30 天。IP 解析属于服务端部署适配，核心订阅领域、渲染及种子无需改变。可信代理配置与传递链路见 [部署说明](20-deployment-client-ip.md)。
+2026-10-30 访问日志增加 `clientIp`、`peerIp`、`ipSource`，分别表示解析后的客户端地址、TCP 连接对端及来源（socket / x-forwarded-for / unknown）。SQLite v26 保留旧记录并将未知 IP 留空；访问日志仍按令牌所属用户隔离并保留 30 天。IP 解析属于服务端部署适配，核心订阅领域、渲染及种子无需改变。可信代理配置与传递链路见 [部署说明](20-deployment-client-ip.md)。

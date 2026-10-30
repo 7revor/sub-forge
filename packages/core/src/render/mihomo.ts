@@ -27,9 +27,9 @@ import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
-  /** Profile 专属 provider 地址（/p/:token/:key?v=） */
+  /** Profile 专属 provider 地址（/subs/nodes?kind=provider&profile=…&version=…） */
   provider(nodeSetKey: string, version: string): string;
-  /** 转换后的规则集地址（/r/:token/:key） */
+  /** 转换后的公共或订阅专属规则集地址 */
   ruleset(key: string, reference?: RuleResourceReference): string;
 };
 
