@@ -6,7 +6,8 @@ import { ClientOverrides } from '../../components/ClientOverrides.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { TargetPicker, memberLabel } from '../../components/pickers.tsx';
+import { memberLabel } from '../../components/pickers.tsx';
+import { RuleTargetSelect } from '../../components/RuleTargetSelect.tsx';
 import { Badge, Button, Empty, ErrorAlert, Field, Input, Switch } from '../../components/ui.tsx';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
 import { useRuleSetRefs } from '../../hooks.ts';
@@ -80,7 +81,7 @@ export function ProfileRulesEditor() {
   const [selected, setSelected] = useState<string>();
   const [extra, setExtra] = useState<string>();
   const rulesets = useRuleSetRefs();
-  const props = { ctx: { rulesets: rulesets.data ?? [] }, saveHint: '保存订阅后生效', onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void) => <TargetPicker label="规则出口" value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, renderOptions: (rule: RuleEntry, onChange: (rule: RuleEntry) => void) => <RuleOptions rule={rule} onChange={onChange} /> };
+  const props = { ctx: { rulesets: rulesets.data ?? [] }, saveHint: '保存订阅后生效', onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, renderOptions: (rule: RuleEntry, onChange: (rule: RuleEntry) => void) => <RuleOptions rule={rule} onChange={onChange} /> };
   const prepend = { ...body, rules: draft.routing?.mode === 'bound' ? draft.routing.prependRules ?? [] : [] };
   return <>
     <ErrorAlert error={rulesets.error} />

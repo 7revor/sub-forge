@@ -125,7 +125,10 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const locate = (where: string) => {
     if (where.startsWith('group:')) { setGroup(where.slice(6)); setRule(undefined); }
     if (where.startsWith('rule:')) { setRule(where.slice(5)); setGroup(undefined); }
-    if (where === 'final') setRule('final');
+    if (where === 'final') {
+      setRule(undefined);
+      document.getElementById('template-rule-final')?.querySelector('button')?.focus();
+    }
   };
 
   // 只同步最初读取及保存结果；后台重新获取数据不会覆盖尚未保存的页面草稿。
