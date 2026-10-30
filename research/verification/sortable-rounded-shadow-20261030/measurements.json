@@ -1,0 +1,61 @@
+{
+  "rule": [
+    {
+      "cardRadius": "10px",
+      "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px",
+      "height": 50,
+      "label": "拖动第 1 项",
+      "width": 946,
+      "wrapperRadius": "0px",
+      "wrapperShadow": "none"
+    }
+  ],
+  "group": [
+    {
+      "cardRadius": "10px",
+      "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px",
+      "height": 50,
+      "label": "拖动第 1 项",
+      "width": 946,
+      "wrapperRadius": "0px",
+      "wrapperShadow": "none"
+    }
+  ],
+  "afterCancel": {
+    "cardShadow": "none",
+    "wrapperShadow": "none"
+  },
+  "enhance": [
+    {
+      "cardRadius": "10px",
+      "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px",
+      "height": 50,
+      "label": "拖动第 1 项",
+      "width": 946,
+      "wrapperRadius": "0px",
+      "wrapperShadow": "none"
+    }
+  ],
+  "flatRow": [
+    {
+      "cardRadius": "0px",
+      "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px",
+      "height": 57,
+      "label": "拖动第 1 项",
+      "width": 978,
+      "wrapperRadius": "0px",
+      "wrapperShadow": "none"
+    }
+  ],
+  "pipeline": [
+    {
+      "cardRadius": "0px",
+      "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px",
+      "height": 66,
+      "label": "拖动第 1 项",
+      "width": 272.3984375,
+      "wrapperRadius": "0px",
+      "wrapperShadow": "none"
+    }
+  ]
+}

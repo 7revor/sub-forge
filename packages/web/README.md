@@ -303,3 +303,6 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-10-30 RuleFinalCard 替代 RuleCardFooter，与规则行共用 RoutingCard、内容布局和出口宽度；MATCH 固定在 SortableList 外，不参与排序。桌面/窄屏同尺寸，继承模式出口仍只读。
 
 2026-10-30 订阅编辑合并复验：保留前置→落地配置、紧凑代理链文本、自动依赖检查、来源移除联动与订阅名称/模板合并卡片；与主分支静态弹窗及固定 MATCH 卡片整合。代理链与模板关联统一走静态弹窗独立草稿，取消不提交；主分支其他规则样式改动保留。类型检查、构建和 1078 项测试通过（46 项条件测试跳过），最终前端 351 项测试再次通过。内置浏览器关键场景及未重跑边界见 `research/verification/member-chain-main-merge-20261030/README.md`。本次整合不新增接口、核心数据字段或示例种子要求。
+
+
+2026-10-30 SortableList 拖动时通过直接子元素选择器给实际内容绘制 shadow-md，外层 li 只处理位移/层级；卡片自然沿用自己的 border-radius，避免圆角边框与矩形阴影错位。不影响嵌套控件和非拖动行。
