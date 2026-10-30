@@ -27,13 +27,10 @@ export function ChainCheckResult({ chain, result, checking }: { chain: ChainRule
   const cycles = result?.issues.filter(i => i.code === 'chain.cycle') ?? [];
   const issues = result?.issues.filter(i => i.code !== 'chain.cycle' || i === cycles[0]) ?? [];
   const label = (message: string) => profileNodeSets.reduce((text, s) => text.replaceAll(`${s.ref.type}:${s.ref.id}`, `「${s.name}」`), message);
-  return <div aria-label="代理链检查结果" aria-live="polite" className="border-t border-line-2 pt-2 text-[12.5px] leading-relaxed [overflow-wrap:anywhere]">
-    {checking ? <span className="text-ink-muted">正在检查当前代理链…</span> : result ? <>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-ink-2">
-        {result.viaName && <span>{chain.via.kind === 'group' ? '前置策略组' : '实际前置'}：<strong>{result.viaName}</strong></span>}
-        <span>命中 {result.landingCount} 个落地节点{result.appliedCount !== result.landingCount && (result.appliedCount ? `，此规则应用于 ${result.appliedCount} 个` : '，前置未应用')}</span>
-      </div>
-      {issues.map((issue, i) => <p key={i} className={`mt-1 mb-0 ${issue.level === 'error' ? 'text-err' : 'text-warn'}`}>{label(issue.message)}{issue.code === 'chain.cycle' && cycles.length > 1 && `（另有 ${cycles.length - 1} 处循环，详见配置预览）`}</p>)}
-    </> : <span className="text-ink-muted">暂未取得检查结果，请重新检查。</span>}
-  </div>;
+  const actual = result?.viaName && chain.via.kind === 'node' && (!('exact' in chain.via.ref.match) || result.viaName !== chain.via.ref.match.exact) ? `命中 ${result.viaName} · ` : '';
+  const summary = checking ? '检查中…' : result ? `${actual}落地 ${result.landingCount} 个${result.appliedCount !== result.landingCount ? result.appliedCount ? `，应用 ${result.appliedCount} 个` : '，前置未应用' : ''}` : '暂无检查结果，请重新检查';
+  const messages = issues.map(issue => `${label(issue.message)}${issue.code === 'chain.cycle' && cycles.length > 1 ? `（另有 ${cycles.length - 1} 处循环，详见配置预览）` : ''}`);
+  return <span aria-label="代理链检查结果" aria-live="polite" title={[summary, ...messages].join('；')} className="min-w-0 max-w-full truncate text-[12px] leading-6 text-ink-muted">
+    {summary}{issues.map((issue, i) => <span key={i} className={issue.level === 'error' ? 'text-err' : 'text-warn'}> · {messages[i]}</span>)}
+  </span>;
 }
