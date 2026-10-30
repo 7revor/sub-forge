@@ -61,9 +61,11 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                     ))}
                     {refreshable && <td className={td}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
                     <td className={cx(td, 'text-right whitespace-nowrap')}>
-                      {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
-                      <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} className="mr-2" onClick={() => { del.reset(); setDeleting(d); }}>删除</Button>
-                      <DocActionLink to={`/${kind}/${d.id}`} name={d.name} />
+                      <div className="flex items-center justify-end gap-2">
+                        {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
+                        <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); setDeleting(d); }}>删除</Button>
+                        <DocActionLink to={`/${kind}/${d.id}`} name={d.name} />
+                      </div>
                     </td>
                   </DocTableRow>
                 ))}

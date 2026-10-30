@@ -9,7 +9,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 选中来源时预览该来源，取消选中时预览合并结果；本地内容仍在来源配置中编辑。
 
 import { FileText, Globe, Link2, Trash2 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
@@ -62,6 +62,15 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [selected, setSelected] = useState<string | undefined>();
+  useEffect(() => {
+    if (!selected) return;
+    const dismiss = (event: PointerEvent) => {
+      const card = event.target instanceof Element ? event.target.closest('[data-ruleset-source]') : null;
+      if (card?.getAttribute('data-ruleset-source') !== selected) setSelected(undefined);
+    };
+    document.addEventListener('pointerdown', dismiss, true);
+    return () => document.removeEventListener('pointerdown', dismiss, true);
+  }, [selected]);
   const sources = useRulesetSources(e.isNew ? undefined : e.id, e.draft, selected);
   if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const d = e.draft;
@@ -150,7 +159,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
     ? [!editingUrl && src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${detected}`].filter(Boolean).join(' · ')
     : `本地 · ${detected} · ${lines} 行`;
   return (
-    <div className={cx('my-2 rounded-lg border', active ? 'border-brand bg-[#f8faff]' : 'border-line')}>
+    <div data-ruleset-source={src.id} className={cx('my-2 rounded-lg border', active ? 'border-brand bg-[#f8faff]' : 'border-line')}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 pr-3 pl-2">
         {handle}
         <button type="button" aria-pressed={active} onClick={onSelect} className="flex min-w-0 flex-[1_1_260px] cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left">
@@ -159,14 +168,14 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
             <span title={title} className={cx('truncate text-[13.5px] font-medium', src.kind === 'remote' && !src.name?.trim() && !editingUrl && 'font-mono text-[12.5px]')}>{title}</span>
-            <span title={sub} className="truncate text-[12px] text-ink-muted">{sub}</span>
+            {!src.repository && <span title={sub} className="truncate text-[12px] text-ink-muted">{sub}</span>}
           </span>
         </button>
         {src.kind === 'remote' && src.repository && src.url && <CopyButton text={src.url} size="sm" variant="ghost" aria-label={`复制关联地址 ${label}`}>复制地址</CopyButton>}
         <SourceStatus src={src} status={status} loading={loading} />
         <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除 ${label}`} onClick={onDelete}><Trash2 size={14} /></Button>
       </div>
-      {active && (
+      {active && (editingUrl || (src.kind === 'local' && !isPassthrough(src))) && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 border-t border-line-2 px-4 pt-3 pb-3.5">
           {src.kind === 'remote' && !src.repository && <Field label="地址" className="col-span-full">{(id) => <Input id={id} autoFocus={!src.url} className="font-mono" placeholder="https://" value={src.url ?? ''} onChange={(x) => onChange({ url: x.target.value })} />}</Field>}
           {src.kind === 'local' && !isPassthrough(src) && <Field className="col-span-full" label="本地规则内容" hint="自动识别 classical 规则、域名、CIDR 或 YAML payload。">{(id) => (
