@@ -1,89 +1,64 @@
-import { TemplateCard } from './TemplateCard.tsx';
-// 七步新建向导：所有步骤共用前端草稿，仅在完成时创建文档。
-
-import { Check } from 'lucide-react';
+// 单页草稿编辑：默认展示节点与分流内容，可选设置按需打开。
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Button, Card, ErrorAlert, Field, Input, PageHeader, cx } from '../../components/ui.tsx';
-import { useSaveDoc, useTemplates, type ProfileDoc } from '../../hooks.ts';
+import { Link, useSearchParams } from 'react-router';
+import { Button, ErrorAlert, Field, Input, PageHeader, PageScroll, cx } from '../../components/ui.tsx';
+import { LeaveDialog } from '../../components/LeaveDialog.tsx';
+import { useLeaveGuard } from '../../hooks/useLeaveGuard.ts';
+import { useSaveDoc, type ProfileDoc } from '../../hooks.ts';
+import { draftIssues } from '../template/model.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
 import { TabBase, TabNodeSets } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
 import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
-import { ProfileEditGuard } from './ProfileEditGuard.tsx';
+import { TemplateCard } from './TemplateCard.tsx';
 
-const STEPS = ['名称与基础设置', '节点集', '模板', '填充策略组', '规则', '代理链', '预览'] as const;
+const TABS = [['content', '配置内容'], ['advanced', '高级设置'], ['preview', '预览配置']] as const;
 
 export function ProfileWizard() {
-  const navigate = useNavigate();
-  const templates = useTemplates();
   const save = useSaveDoc('profiles');
-  // 从模板页「用这个模板新建配置订阅」进入时预选模板
   const preset = useSearchParams()[0].get('template');
-  const [draft, setDraft] = useState<ProfileDoc>({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: preset ? { mode: 'bound', templateId: preset, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
-  const [step, setStep] = useState(0);
-  const [reached, setReached] = useState(0);
+  const [initial] = useState<ProfileDoc>(() => ({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: preset ? { mode: 'bound', templateId: preset, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }));
+  const [draft, setDraft] = useState(initial);
+  const [tab, setTab] = useState<typeof TABS[number][0]>('content');
   const { ctx, template } = useProfileCtx(draft, setDraft);
-  const nameValid = !!draft.name.trim();
+  const { blocker, leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial) || !ctx!.baseValid);
   const templateReady = draft.routing?.mode !== 'bound' || (!!template.data && !template.isError);
-  const next = () => {
-    if (!nameValid || !ctx?.baseValid || save.isPending) return;
-    const nextStep = Math.min(step + 1, STEPS.length - 1);
-    setStep(nextStep);
-    setReached(Math.max(reached, nextStep));
-  };
-  const finish = () => {
-    if (!nameValid || !ctx?.baseValid || !templateReady || save.isPending) return;
+  const body = draft.routing?.mode === 'independent' ? draft.routing.config : { groups: template.data?.groups ?? [], rules: draft.routing?.prependRules ?? [], final: template.data?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const } };
+  const issues = draftIssues(body);
+  const canSave = !!draft.name.trim() && ctx!.baseValid && templateReady && !issues.length && !save.isPending;
+  const finish = (done?: () => void) => {
+    if (!canSave) return;
     const { id: _id, ...profile } = draft;
-    save.mutate(profile, { onSuccess: (p) => navigate(`/profiles/${p.id}/overview`) });
+    save.mutate({ ...profile, name: profile.name.trim() }, { onSuccess: p => done ? done() : leave(`/profiles/${p.id}/overview`) });
   };
-
-  return (
-    <ProfileContext.Provider value={ctx!}>
-      <PageHeader crumbs={<><Link to="/profiles" className="text-muted no-underline">配置订阅</Link> / 新建</>} title="新建配置订阅">
-        <span className="text-[13px] text-muted">完成后才会保存；离开页面会丢失当前草稿。</span>
-      </PageHeader>
-      <ProfileEditGuard valid={ctx!.baseValid} onDiscard={ctx!.resetBaseEditor} />
-      <ol aria-label="新建 Profile 步骤" className="m-0 flex shrink-0 list-none gap-2 overflow-x-auto p-0">
-        {STEPS.map((label, index) => {
-          const now = step === index, done = index < reached && !now;
-          return (
-            <li key={label} className="min-w-[140px] flex-1">
-              <button type="button" aria-current={now ? 'step' : undefined} disabled={index > reached || !ctx!.baseValid || save.isPending || (index > 0 && !nameValid)} onClick={() => setStep(index)}
-                className={cx('flex min-h-14 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60', now ? 'border-accent bg-[#f5f8ff]' : 'border-line bg-panel hover:bg-ground')}>
-                <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[12px]', now || done ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}>{done ? <Check size={13} /> : index + 1}</span>
-                <span className="text-[13.5px] font-semibold">{label}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      <fieldset disabled={save.isPending} className="page-scroll -m-1 gap-5 border-0 p-1">
-        {step === 0 && <>
-          <Card title="名称与基础设置">
-            <Field label="名称">{(id) => <Input id={id} required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
-          </Card>
-          <TabBase />
+  return <ProfileContext.Provider value={ctx!}>
+    <PageHeader crumbs={<><Link to="/profiles" className="text-muted no-underline">配置订阅</Link> / 新建</>} title="新建配置订阅" actions={<Button variant="primary" disabled={!canSave} onClick={() => finish()}>{save.isPending ? '正在创建…' : '创建订阅'}</Button>}>
+      <span className="text-[13px] text-muted">选择节点并配置分流，保存后可创建订阅链接。</span>
+    </PageHeader>
+    <nav aria-label="新建订阅分区" className="flex shrink-0 gap-6 border-b border-line">
+      {TABS.map(([key, label]) => <button key={key} type="button" aria-current={tab === key ? 'page' : undefined} disabled={!ctx!.baseValid || save.isPending} onClick={() => setTab(key)} className={cx('min-h-11 cursor-pointer border-b-2 px-1 text-[14px] disabled:cursor-not-allowed', tab === key ? 'border-accent font-semibold text-ink' : 'border-transparent text-muted hover:text-ink')}>{label}</button>)}
+    </nav>
+    <ErrorAlert error={save.error} />
+    {!ctx!.baseValid && <div className="flex items-center justify-between gap-2 text-[13px] text-err">请修复基础设置中的 YAML，或放弃该次编辑。<Button onClick={ctx!.resetBaseEditor}>放弃无效 YAML</Button></div>}
+    <PageScroll>
+      <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+        {tab === 'content' && <>
+          <section className="rounded-[10px] border border-line bg-panel px-4.5 py-4"><Field label="订阅名称">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} className="max-w-[480px]" />}</Field></section>
+          <TemplateCard />
+          <TabNodeSets />
+          <ErrorAlert error={template.error} />
+          {!templateReady ? <div className="flex items-center gap-3 text-[13px] text-muted">{template.isError ? '模板加载失败，请重试或更换模板。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div> : <><TabGroups /><TabRules /></>}
+          {!!issues.length && <p role="status" className="m-0 text-[13px] text-err">{issues[0]!.message}（{issues.length} 项待补全）</p>}
         </>}
-        {step === 1 && <TabNodeSets />}
-        {step === 2 && <TemplateCard />}
-        <ErrorAlert error={template.error} />
-        {step >= 3 && !templateReady && <div className="text-muted">{template.isError ? '模板加载失败，请返回模板步骤重新选择，或重试。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
-        {templateReady && step === 3 && <TabGroups />}
-        {templateReady && step === 4 && <TabRules />}
-        {templateReady && step === 5 && <TabChains />}
-        {templateReady && step === 6 && <TabPreview />}
+        {tab === 'advanced' && <>
+          <div className="flex flex-col gap-2"><h2 className="m-0 text-[15px] font-semibold">基础设置</h2><p className="m-0 text-[13px] text-muted">按需引用预设或填写客户端设置。</p></div>
+          <TabBase />
+          <details className="rounded-[10px] border border-line bg-panel p-4"><summary className="cursor-pointer text-[14px] font-semibold">代理链（{draft.chains.length} 条）</summary><div className="mt-4 flex flex-col gap-5"><TabChains /></div></details>
+        </>}
+        {tab === 'preview' && <TabPreview />}
       </fieldset>
-      <ErrorAlert error={save.error} />
-      <div className="flex flex-wrap justify-end gap-2">
-        {!ctx!.baseValid && <Button onClick={ctx!.resetBaseEditor}>放弃无效的 YAML</Button>}
-        <Button disabled={step === 0 || !ctx!.baseValid || save.isPending} onClick={() => setStep(step - 1)}>上一步</Button>
-        {step < STEPS.length - 1 ? <>
-          <Button disabled={!nameValid || !ctx!.baseValid || save.isPending} onClick={next}>跳过</Button>
-          <Button variant="primary" disabled={!nameValid || !ctx!.baseValid || save.isPending || (step >= 2 && !templateReady)} onClick={next}>下一步</Button>
-        </> : <Button variant="primary" disabled={!nameValid || !ctx!.baseValid || !templateReady || save.isPending} onClick={finish}>{save.isPending ? '创建中…' : '完成'}</Button>}
-      </div>
-    </ProfileContext.Provider>
-  );
+    </PageScroll>
+    <LeaveDialog blocker={blocker} what="新建订阅" canSave={canSave} pending={save.isPending} error={save.error} saveLabel="创建并离开" onSave={finish} />
+  </ProfileContext.Provider>;
 }

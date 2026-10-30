@@ -1,62 +1,31 @@
+import { MemberAdder } from './MemberAdder.tsx';
+import { ProfileGroupsEditor } from './ProfileRoutingEditors.tsx';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { Notice } from '../../components/Notice.tsx';
-import { OptionalBoolean } from '../../components/OptionalBoolean.tsx';
 // 策略组：绑定模式只补充成员；独立模式维护完整组配置。
 
-import type { Builtin, GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
+import type { GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
 import { Lock, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { BUILTINS, NodeSetSelect, memberLabel } from '../../components/pickers.tsx';
+import { NodeSetSelect, memberLabel } from '../../components/pickers.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
-import { NodePicker } from '../../components/NodePicker.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
 type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'display' | 'extra'>;
 
-function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => void; excludeGroupId: string }) {
-  const { profileNodeSets, groupOptions } = useProfile();
-  const [kind, setKind] = useState<GroupMember['kind']>('nodeset');
-  const [ns, setNs] = useState<NodeSetID | undefined>(profileNodeSets[0]?.ref);
-  const [groupId, setGroupId] = useState('');
-  const [scope, setScope] = useState<Extract<GroupMember, { kind: 'all' }>['scope']>('all');
-  const [builtin, setBuiltin] = useState<Builtin>('DIRECT');
-  const [node, setNode] = useState<{ kind: 'node'; ref: import('@sub-forge/core').NodeRef }>({ kind: 'node', ref: { nodeSet: profileNodeSets[0]?.ref ?? { type: 'source', id: '' }, match: { exact: '' }, fallback: { kind: 'builtin', name: 'REJECT' } } });
-  const groups = groupOptions.filter((g) => g.id !== excludeGroupId);
-
-  const add = () => {
-    if (kind === 'nodeset' && ns) onAdd({ kind: 'nodeset', ref: ns });
-    else if (kind === 'group' && (groupId || groups[0])) onAdd({ kind: 'group', groupId: groupId || groups[0]!.id });
-    else if (kind === 'builtin') onAdd({ kind: 'builtin', name: builtin });
-    else if (kind === 'node' && ('exact' in node.ref.match ? node.ref.match.exact : node.ref.match.regex)) onAdd({ kind: 'node', ref: node.ref });
-    else if (kind === 'all') onAdd({ kind: 'all', scope });
-  };
-
-  return (
-    <div className="flex flex-wrap items-start gap-2 rounded-lg bg-ground p-2.5">
-      <Select aria-label="成员类型" className="w-auto" value={kind} onChange={(e) => setKind(e.target.value as GroupMember['kind'])}>
-        <option value="nodeset">节点集</option>
-        <option value="group">其他组</option>
-        <option value="builtin">内置策略</option>
-        <option value="node">单个节点</option>
-        <option value="all">全部节点</option>
-      </Select>
-      {kind === 'nodeset' && <div className="min-w-48"><NodeSetSelect label="节点集" value={ns} options={profileNodeSets} onChange={setNs} placeholder={profileNodeSets.length ? '选择节点集' : '先在「节点集」中加入'} /></div>}
-      {kind === 'group' && <Select aria-label="组" className="w-auto min-w-40" value={groupId || groups[0]?.id || ''} onChange={(e) => setGroupId(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>}
-      {kind === 'builtin' && <Select aria-label="内置策略" className="w-auto" value={builtin} onChange={(e) => setBuiltin(e.target.value as Builtin)}>{BUILTINS.map((b) => <option key={b}>{b}</option>)}</Select>}
-      {kind === 'node' && <NodePicker label="节点" value={node.ref} nodeSets={profileNodeSets} onChange={(ref) => setNode({ kind: 'node', ref })} />}
-      {kind === 'all' && <Select aria-label="全部节点范围" className="w-auto" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}><option value="all">全部</option><option value="proxies">本地节点</option><option value="providers">provider</option></Select>}
-      <Button size="sm" onClick={add}><Plus size={14} />添加成员</Button>
-    </div>
-  );
-}
 
 export function TabGroups() {
+  const { draft } = useProfile();
+  return draft.routing ? <ProfileGroupsEditor /> : <LegacyGroups />;
+}
+
+function LegacyGroups() {
   const { draft, groups, template, patchOverlay, groupName, nodeSetName, profileNodeSets } = useProfile();
   const bound = draft.routing?.mode === 'bound';
   const [regionSource, setRegionSource] = useState<NodeSetID>();
@@ -152,6 +121,11 @@ export function TabGroups() {
                     </span>
                     {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
                   </button>
+                  <div className="flex shrink-0 flex-col items-center gap-1 px-2 py-2">
+                    <span className="text-[12px] text-muted">隐藏</span>
+                    {x.origin === 'template' || bound ? <span className="text-[12px] text-muted" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
+                      onChange={hidden => patchOverlay(o => ({ ...o, extraGroups: (o.extraGroups ?? []).map(item => item.group.id === x.id ? { ...item, group: { ...item.group, display: { ...item.group.display, hidden } } } : item) }))} />}
+                  </div>
                 </div>
               );
             }} /></div>
@@ -172,7 +146,7 @@ export function TabGroups() {
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
               <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                <fieldset disabled={bound} className="contents"><GroupSettingsFields value={eff} onChange={setField} defaultStrategy="consistent-hashing" /></fieldset>
+                <fieldset disabled={bound} className="contents"><GroupSettingsFields value={eff} onChange={setField} /></fieldset>
               </div>
 
               <div className="flex flex-col gap-2.5">
@@ -208,9 +182,6 @@ export function TabGroups() {
               </div>
 
               <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">
-                <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">hidden（mihomo）{g.origin === 'template' ? ' · 模板设定，只读' : ''}</span>
-                  {g.origin === 'template' ? <span className="text-[13px]">{eff.display?.hidden === undefined ? '不设置' : eff.display.hidden ? '开' : '关'}</span> : <OptionalBoolean label="hidden" value={eff.display?.hidden} onChange={(hidden) => setField('display', { ...eff.display, hidden })} />}
-                </div>
                 <Field label="icon" hint="mihomo icon / Surge icon-url">{(id) => <Input id={id} placeholder="图标地址" value={eff.display?.icon ?? ''} onChange={(e) => setField('display', { ...eff.display, icon: e.target.value || undefined })} />}</Field>
               </fieldset>
               <div className="flex flex-col gap-2">
