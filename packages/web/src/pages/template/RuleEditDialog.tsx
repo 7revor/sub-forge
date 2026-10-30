@@ -2,12 +2,11 @@ import { remoteRuleMatcher, withIpOptions, type Matcher, type RuleEntry } from '
 import { useRef, useState, type ReactNode } from 'react';
 import { clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
+import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { Button, ErrorAlert, FieldError } from '../../components/ui.tsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import type { ConvertCtx } from '../../convert/templateYaml.ts';
-
-export const repositoryHintClass = 'shrink-0 cursor-pointer rounded text-[12px] text-ink-muted underline-offset-4 hover:text-brand hover:underline disabled:cursor-wait disabled:opacity-50';
 
 /** 每次打开复制一次；输入、关联仓库和扩展选项都只修改弹窗草稿。 */
 export function RuleEditDialog({ rule, index, ctx, staticOnly, adding, saveHint, renderOptions, onSave, onClose }: {
@@ -44,13 +43,13 @@ export function RuleEditDialog({ rule, index, ctx, staticOnly, adding, saveHint,
     finally { setLinking(false); }
   };
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
-    <DialogContent className="flex max-h-[85dvh] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+    <DialogContent className="flex h-[min(460px,85dvh)] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
       <DialogHeader className="shrink-0 border-b border-line-2 px-5 py-4 text-left sm:px-6">
         <DialogTitle className="pr-6 text-[16px] leading-6">{adding ? '添加静态规则' : `编辑第 ${index + 1} 条规则`}</DialogTitle>
         <DialogDescription className="text-[12.5px]">编辑匹配内容，出口在规则列表中选择。</DialogDescription>
       </DialogHeader>
-      <form noValidate className="flex min-h-0 min-w-0 flex-col" onSubmit={event => { event.preventDefault(); setAttempted(true); if (!error && !linking) onSave({ ...draft, matcher: normalized }); }}>
-        <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 [&>*]:min-w-0">
+      <form noValidate className="flex min-h-0 min-w-0 flex-1 flex-col" onSubmit={event => { event.preventDefault(); setAttempted(true); if (!error && !linking) onSave({ ...draft, matcher: normalized }); }}>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 [&>*]:min-w-0">
           <fieldset disabled={linking} className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
             <MatcherEditor directRemote fixedKind={staticOnly} value={matcher} rulesets={ctx.rulesets}
               ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}
@@ -59,7 +58,7 @@ export function RuleEditDialog({ rule, index, ctx, staticOnly, adding, saveHint,
                 const { noResolve: _noResolve, src: _src, ...options } = draft.options ?? {};
                 update({ ...draft, matcher: { ...matcher, rule }, ...(draft.options ? { options } : {}) });
               }} onChange={matcher => update({ ...draft, matcher })} />
-            {lookupUrl && matches.matches[lookupUrl]?.map(match => <button key={`${match.repo}:${match.ref}:${match.path}`} type="button" className={`${repositoryHintClass} self-start text-left`} title={match.hint} onClick={() => void link(match)}>关联仓库文件</button>)}
+            {lookupUrl && !!matches.matches[lookupUrl]?.length && <div className="flex items-center gap-1.5 text-[12px] text-ink-muted"><RepositoryMatchHint matches={matches.matches[lookupUrl] ?? []} busy={linking} onLink={link} />此地址可关联仓库文件</div>}
             {renderOptions && <div className="min-w-0 border-t border-line-2 pt-4">{renderOptions(draft, update)}</div>}
           </fieldset>
           <ErrorAlert error={matches.error} />
