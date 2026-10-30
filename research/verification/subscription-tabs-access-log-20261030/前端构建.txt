@@ -1,0 +1,18 @@
+
+> @sub-forge/web@0.0.0 build /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/subscription-tabs-access-log/packages/web
+> tsc --noEmit && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 2397 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.58 kB │ gzip:   0.34 kB
+dist/assets/index-GLvcnvKB.css     62.44 kB │ gzip:  12.64 kB
+dist/assets/index-Bt1KQY0i.js   1,163.13 kB │ gzip: 373.62 kB │ map: 4,789.47 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.75s
