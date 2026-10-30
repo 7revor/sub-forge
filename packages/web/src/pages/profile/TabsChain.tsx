@@ -8,16 +8,18 @@ import { SortableList } from '../../components/SortableList.tsx';
 import type { ReactNode } from 'react';
 import { putChain } from './memberModel.ts';
 import { persistedProfile } from './routing.ts';
-import { CodePreview } from '../../components/CodePreview.tsx';
+import { CodePreview, type CodeRange } from '../../components/CodePreview.tsx';
+import { PreviewReport } from './PreviewReport.tsx';
+import { indexPreview, locatePreviewIssue } from './previewReport.ts';
 // 代理链直接展示业务检查结果，引用生成细节仅在配置预览中按需展开。
 
 import { useMutation } from '@tanstack/react-query';
 import { CLIENT_APPS, type ClientApp, type ChainResolution, type ChainRule, type Client } from '@sub-forge/core';
 import { Link2, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import type { ProfileDoc } from '../../hooks.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, ReportList, Segmented, Select } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Segmented, Select } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 function usePreview() {
@@ -62,14 +64,18 @@ function ChainCard({ chain, index, handle, checking, result, onEdit, onDelete }:
 }
 
 export function TabPreview() {
-  const { draft } = useProfile();
+  const { draft, groups } = useProfile();
   const preview = usePreview();
+  const [located, setLocated] = useState<{ result: ProfilePreview; index: number; range: CodeRange }>();
   const [app, setApp] = useState<ClientApp>();
   const [client, setClient] = useState<Client>('mihomo');
   const apps = CLIENT_APPS.filter(a => a.kernel === client);
   const target = { client, profile: persistedProfile(draft), ...(app ? { app } : {}) };
   const current = preview.data && !preview.isPending && !preview.error && JSON.stringify(preview.variables) === JSON.stringify(target);
   const report = preview.data?.report ?? [];
+  const outputIndex = useMemo(() => indexPreview(preview.data?.yaml ?? '', preview.data?.format), [preview.data]);
+  const locations = report.map(item => locatePreviewIssue(item, outputIndex, groups));
+  const selection = located?.result === preview.data ? located : undefined;
   const count = (l: string) => report.filter((r) => r.level === l).length;
   // 打开标签或切换内核、客户端时自动渲染当前草稿
   useEffect(() => { preview.mutate(target); }, [client, app]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -100,16 +106,16 @@ export function TabPreview() {
       {current && preview.data.exportUnavailableReason && <p role="status" className="text-[13px] text-ink-muted">{preview.data.exportUnavailableReason}</p>}
       {current && (
         <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
-          <CodePreview fill label="最终配置" className="rounded-[10px]" title={`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="overscroll-contain p-4 text-[12.5px] leading-[1.75]" />
+          <CodePreview fill label="最终配置" className="rounded-[10px]" title={<>{`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`}{selection && <span role="status" className="ml-3 text-[#b8ccff]">已定位第 {selection.range.startLine} 行</span>}</>} text={preview.data.yaml ?? preview.data.failure ?? ''} highlight={selection?.range} bodyClassName="overscroll-contain p-4 text-[12.5px] leading-[1.75]" />
           <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-auto overscroll-contain [overflow-wrap:anywhere] [&>*]:shrink-0">
             <div className="grid grid-cols-3 gap-2">
               {[['错误', count('error'), 'text-err'], ['告警', count('warn'), 'text-warn'], ['提示', count('info'), 'text-accent-ink']].map(([t, n, c]) => (
                 <div key={t as string} className="flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel px-3 py-2.5"><span className="text-[12px] text-ink-muted">{t}</span><span className={`text-[22px] font-semibold ${c}`}>{n}</span></div>
               ))}
             </div>
-            <Card title="渲染报告" bodyClass="px-4 pb-2">
-              {!preview.data.ok && <div className="mb-2"><Badge tone="err">渲染失败，订阅接口会返回上一份成功结果</Badge></div>}
-              <ReportList items={report} />
+            <Card title="渲染报告" bodyClass="px-2 pb-2">
+              {!preview.data.ok && <div className="mb-2 px-2"><Badge tone="err">渲染失败，请修正错误</Badge></div>}
+              <PreviewReport items={report} locations={locations} selected={selection?.index} onLocate={index => { const range = locations[index]; if (range) setLocated({ result: preview.data, index, range: { ...range } }); }} />
             </Card>
             <details className="rounded-lg border border-line bg-panel px-4 py-3">
               <summary className="cursor-pointer text-[13px] font-medium">自动生成的引用详情（{preview.data.dependencies?.length ?? 0}）</summary>

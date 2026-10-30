@@ -17,7 +17,6 @@ export function ProfileDetail() {
   const navigate = useNavigate();
   const doc = useDoc('profiles', id);
   const save = useSaveDoc('profiles');
-  const dup = useSaveDoc('profiles');
   const del = useDeleteDoc('profiles');
   const tokens = useQuery(tokenOptions(id));
   const [draft, setDraft] = useState<ProfileDoc>();
@@ -37,10 +36,6 @@ export function ProfileDetail() {
   const validName = !!draft.name.trim();
   const discard = () => { setDraft(doc.data);  };
   const subscriptionUrl = tokens.data?.[0]?.url;
-  const duplicate = () => {
-    const { id: _id, ...rest } = doc.data ?? draft;
-    dup.mutate({ ...rest, name: `${rest.name} 副本` }, { onSuccess: (p) => navigate(`/profiles/${p.id}/overview`) });
-  };
 
   return (
     <ProfileContext.Provider value={ctx}>
@@ -48,7 +43,6 @@ export function ProfileDetail() {
         <PageHeader crumbs={<><Link to="/profiles" className="text-ink-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
           actions={<>
             {dirty && <Button onClick={discard}>放弃修改</Button>}
-            <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
             <Button variant="primary" disabled={!validName || !dirty || save.isPending} onClick={() => { if (validName) save.mutate({ ...draft, name: draft.name.trim() }, { onSuccess: saved => setDraft(current => acceptProfileSave(current, draft, saved)) }); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
             <DeleteAction what="配置订阅" name={draft.name} body="它的订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
               onReset={del.reset} onDelete={() => del.mutateAsync(draft.id)} onDeleted={() => navigate('/profiles')} />
@@ -69,7 +63,7 @@ export function ProfileDetail() {
           </>}
         </div>
       </div>
-      <ErrorAlert error={save.error ?? dup.error} />
+      <ErrorAlert error={save.error} />
       {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={queryUrl('/api/profiles/migration-backup', { id: draft.id })} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
       {template.error && <ErrorAlert error={template.error} />}
 

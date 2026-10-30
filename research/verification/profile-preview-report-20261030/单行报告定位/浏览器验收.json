@@ -1,0 +1,196 @@
+[
+  {
+    "name": "点击第一条告警",
+    "documentHeight": 720,
+    "leftBounds": [
+      313.25,
+      692
+    ],
+    "leftTop": 13063.5,
+    "mark": "  - name: 空策略组 1\n    type: select\n    proxies:\n      - REJECT\n    empty-fallback: REJECT",
+    "markCount": 1,
+    "markTop": 438,
+    "outerHeight": 511,
+    "outerScrollHeight": 511,
+    "outerTop": 0,
+    "rightTop": 0,
+    "selected": "「空策略组 1」为空，将拒绝连接",
+    "viewport": [
+      1280,
+      720
+    ],
+    "rowHeightRange": [
+      36,
+      37
+    ]
+  },
+  {
+    "name": "键盘再次定位同一条",
+    "documentHeight": 720,
+    "leftBounds": [
+      313.25,
+      692
+    ],
+    "leftTop": 13063.5,
+    "mark": "  - name: 空策略组 1\n    type: select\n    proxies:\n      - REJECT\n    empty-fallback: REJECT",
+    "markCount": 1,
+    "markTop": 438,
+    "outerHeight": 511,
+    "outerScrollHeight": 511,
+    "outerTop": 0,
+    "rightTop": 0,
+    "selected": "「空策略组 1」为空，将拒绝连接",
+    "viewport": [
+      1280,
+      720
+    ],
+    "rowHeightRange": [
+      36,
+      37
+    ]
+  },
+  {
+    "name": "定位最后一条",
+    "documentHeight": 720,
+    "leftBounds": [
+      313.25,
+      692
+    ],
+    "leftTop": 16782,
+    "mark": "  - name: 空策略组 35\n    type: select\n    proxies:\n      - REJECT\n    empty-fallback: REJECT",
+    "markCount": 1,
+    "markTop": 438.25,
+    "outerHeight": 511,
+    "outerScrollHeight": 511,
+    "outerTop": 0,
+    "rightTop": 1082.5,
+    "selected": "「空策略组 35」为空，将拒绝连接",
+    "viewport": [
+      1280,
+      720
+    ],
+    "rowHeightRange": [
+      36,
+      37
+    ]
+  },
+  {
+    "name": "重新渲染清除旧高亮",
+    "documentHeight": 720,
+    "leftBounds": [
+      313.25,
+      692
+    ],
+    "leftTop": 0,
+    "markCount": 0,
+    "outerHeight": 511,
+    "outerScrollHeight": 511,
+    "outerTop": 0,
+    "rightTop": 0,
+    "viewport": [
+      1280,
+      720
+    ],
+    "rowHeightRange": [
+      36,
+      37
+    ]
+  },
+  {
+    "name": "Loon INI 定位",
+    "documentHeight": 720,
+    "leftBounds": [
+      391.5,
+      692
+    ],
+    "leftTop": 3267.5,
+    "mark": "空策略组 1 = select, REJECT",
+    "markCount": 1,
+    "markTop": 490.375,
+    "outerHeight": 511,
+    "outerScrollHeight": 511,
+    "outerTop": 0,
+    "rightTop": 25.5,
+    "selected": "「空策略组 1」为空，将拒绝连接",
+    "viewport": [
+      1280,
+      720
+    ],
+    "rowHeightRange": [
+      36,
+      37
+    ]
+  },
+  {
+    "name": "切换内核清除旧高亮",
+    "documentHeight": 720,
+    "leftBounds": [
+      313.25,
+      692
+    ],
+    "leftTop": 0,
+    "markCount": 0,
+    "outerHeight": 511,
+    "outerScrollHeight": 511,
+    "outerTop": 0,
+    "rightTop": 0,
+    "viewport": [
+      1280,
+      720
+    ],
+    "rowHeightRange": [
+      36,
+      37
+    ]
+  },
+  {
+    "name": "手机定位",
+    "documentHeight": 844,
+    "leftBounds": [
+      594.25,
+      681.25
+    ],
+    "leftTop": 16879.5,
+    "mark": "  - name: 空策略组 35\n    type: select\n    proxies:\n      - REJECT\n    empty-fallback: REJECT",
+    "markCount": 1,
+    "markTop": 621.75,
+    "outerHeight": 452,
+    "outerScrollHeight": 452,
+    "outerTop": 0,
+    "rightTop": 1353,
+    "selected": "「空策略组 35」为空，将拒绝连接",
+    "viewport": [
+      390,
+      844
+    ],
+    "rowHeightRange": [
+      36,
+      37
+    ]
+  },
+  {
+    "name": "名称冲突定位策略组",
+    "documentHeight": 720,
+    "leftBounds": [
+      338,
+      692
+    ],
+    "leftTop": 13000,
+    "mark": "  - name: 验收节点 1\n    type: select\n    proxies:\n      - DIRECT\n    empty-fallback: REJECT",
+    "markCount": 1,
+    "markTop": 526.25,
+    "outerHeight": 486,
+    "outerScrollHeight": 486,
+    "outerTop": 0,
+    "rightTop": 0,
+    "selected": "「验收节点 1」与节点或内置策略重名",
+    "viewport": [
+      1280,
+      720
+    ],
+    "rowHeightRange": [
+      36,
+      36
+    ]
+  }
+]
