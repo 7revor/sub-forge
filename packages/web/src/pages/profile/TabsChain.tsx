@@ -14,7 +14,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import type { ProfileDoc } from '../../hooks.ts';
-import { targetLabel } from '../../components/pickers.tsx';
+import { chainNodeSetName, targetLabel } from '../../components/pickers.tsx';
 import { Badge, Button, Card, Empty, ErrorAlert, ReportList, Segmented, Select } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
@@ -42,7 +42,7 @@ export function TabChains() {
         {!draft.chains.length ? <div className="px-4 pb-4"><Empty title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /></div> : (
           <ol aria-label="代理链列表" className="m-0 list-none p-0">
             {draft.chains.map((c, i) => {
-              const landing = landingNodeName(c.landing) ?? `${nodeSetName(c.landing.nodeSet)} · ${c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点'}`;
+              const landing = landingNodeName(c.landing) ?? `${chainNodeSetName(c.landing.nodeSet, nodeSetName)} · ${c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点'}`;
               const path = `${targetLabel(c.via, groupName, nodeSetName)} → ${landing}`;
               return <li key={c.id} aria-label={`代理链 ${i + 1}`} className="flex min-h-14 items-center gap-3 border-t border-line-2 px-4 py-2 hover:bg-ground">
                 <span className="w-4 shrink-0 text-[12px] tabular-nums text-ink-muted">{i + 1}</span>

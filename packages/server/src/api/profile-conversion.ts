@@ -60,7 +60,7 @@ export function profileConversionRoutes(store: Store) {
     }
     const { template: _old, ...rest } = profile;
     const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
-      chains: profile.chains.map(chain => ({ ...chain, via: remapTarget(chain.via) })),
+      chains: profile.chains.map(chain => ({ ...chain, via: chain.via.kind === 'node' ? { ...chain.via, ref: { ...chain.via.ref, ...(chain.via.ref.fallback && chain.via.ref.fallback !== 'error' ? { fallback: remapTarget(chain.via.ref.fallback) } : {}) } } : remapTarget(chain.via) })),
     };
     if (profile.routing?.mode === 'bound' && profile.routing.prependRules?.length) changes.push(`保留 ${profile.routing.prependRules.length} 条前置规则，并按策略组映射更新出口`);
     if (profile.routing?.mode === 'independent' && effective.groups.length) changes.push(`替换原策略组：${effective.groups.map(g => g.name).join('、')}；原有 ${effective.rules.length} 条规则改为模板的 ${template.rules.length} 条规则`);

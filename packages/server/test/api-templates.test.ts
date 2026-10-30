@@ -90,22 +90,25 @@ describe('模板', () => {
 });
 
 describe('订阅链接与预览', () => {
-  it('创建、重置、删除订阅链接；旧链接立即失效', async () => {
+  it('保存自动生成唯一链接，重复创建返回原链接，重置使旧链接失效', async () => {
     const { alice, app, profile } = await scenario();
+    const initial = (await alice.get(`/api/profiles/${profile}/tokens`)).json.items;
+    expect(initial).toHaveLength(1);
     const created = await alice.post(`/api/profiles/${profile}/tokens`, { label: 'Mac' });
-    expect(created.status).toBe(201);
+    expect(created.status).toBe(200);
+    expect(created.json.item).toEqual(initial[0]);
     expect(created.json.item.url).toMatch(/^https:\/\/sub\.test\/sub\/[\w-]+$/);
     const token = created.json.item.token as string;
     expect((await app.request(`/sub/${token}`, { headers: { 'user-agent': 'clash.meta' } })).status).toBe(200);
 
     const reset = await alice.post(`/api/profiles/${profile}/tokens/${token}/reset`);
-    expect(reset.json.item.label).toBe('Mac');
+    expect(reset.json.item.token).not.toBe(token);
     expect((await app.request(`/sub/${token}`)).status).toBe(404);
     expect((await app.request(`/sub/${reset.json.item.token}`, { headers: { 'user-agent': 'clash.meta' } })).status).toBe(200);
 
     expect((await alice.get(`/api/profiles/${profile}/tokens`)).json.items).toHaveLength(1);
-    expect((await alice.del(`/api/profiles/${profile}/tokens/${reset.json.item.token}`)).status).toBe(200);
-    expect((await alice.get(`/api/profiles/${profile}/tokens`)).json.items).toEqual([]);
+    expect((await alice.del(`/api/profiles/${profile}/tokens/${reset.json.item.token}`)).status).toBe(409);
+    expect((await alice.get(`/api/profiles/${profile}/tokens`)).json.items).toHaveLength(1);
   });
 
   it('预览返回配置、依赖节点与报告；可预览未保存的草稿', async () => {

@@ -48,7 +48,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 21;
+const SCHEMA_VERSION = 22;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -290,6 +290,14 @@ export class Store {
           this.db.prepare('UPDATE docs SET data = ? WHERE kind = ? AND id = ?').run(this.cipher.encrypt(JSON.stringify(doc)),row.kind,row.id);
         }
       }
+      if (version < 22) {
+        // 每个订阅保留最早的链接；同一时间按原列表顺序决定，重复迁移不换链接。
+        this.db.exec(`DELETE FROM sub_tokens WHERE token_hash NOT IN (SELECT token_hash FROM (
+          SELECT token_hash, ROW_NUMBER() OVER (PARTITION BY profile_id ORDER BY created_at, token_hash) AS position FROM sub_tokens
+        ) WHERE position = 1)`);
+        this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS sub_tokens_one_per_profile ON sub_tokens (profile_id)');
+        for (const row of this.db.prepare("SELECT id FROM docs WHERE kind = 'profile'").all() as { id: string }[]) this.createToken(row.id);
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -510,8 +518,11 @@ export class Store {
     this.stripResourceTiming(doc as unknown as Record<string, any>);
     if (kind === 'profile') doc = stripProfileRevisions(doc as ProfileDoc) as DocTypes[K];
     if (kind === 'source') doc = normalizeSourceFetch(doc as SourceDoc) as DocTypes[K];
-    this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
-      .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
+    this.db.transaction(() => {
+      this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
+        .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
+      if (kind === 'profile') this.createToken(doc.id);
+    })();
     if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
     if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
     this.changed();
@@ -598,15 +609,34 @@ export class Store {
 
   // ---------- 订阅 token ----------
 
-  createToken(profileId: string, label?: string): TokenDoc {
-    const token = randomId();
-    this.putToken(label === undefined ? { token, profileId } : { token, profileId, label });
-    return label === undefined ? { token, profileId } : { token, profileId, label };
+  /** 幂等获取订阅的唯一链接；普通保存和重复调用均不会换链接。 */
+  createToken(profileId: string, label?: string): TokenDoc & { createdAt: number } {
+    return this.db.transaction(() => {
+      const existing = this.listTokens(profileId)[0];
+      if (existing) return existing;
+      this.putToken({ token: randomId(), profileId, ...(label === undefined ? {} : { label }) });
+      return this.listTokens(profileId)[0]!;
+    })();
   }
 
+  /** 显式导入或轮换令牌；不得把其他订阅的令牌转移过来。 */
   putToken(t: TokenDoc): void {
-    this.db.prepare('INSERT INTO sub_tokens (token_hash, token_enc, profile_id, label, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (token_hash) DO UPDATE SET profile_id = excluded.profile_id, label = excluded.label')
-      .run(this.cipher.hmac(t.token), this.cipher.encrypt(t.token), t.profileId, t.label ?? null, this.now());
+    this.db.transaction(() => {
+      const existing = this.getToken(t.token);
+      if (existing && existing.profileId !== t.profileId) throw new Error('订阅令牌已被其他订阅使用');
+      this.db.prepare('DELETE FROM sub_tokens WHERE profile_id = ? AND token_hash <> ?').run(t.profileId, this.cipher.hmac(t.token));
+      this.db.prepare('INSERT INTO sub_tokens (token_hash, token_enc, profile_id, label, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (token_hash) DO UPDATE SET label = excluded.label')
+        .run(this.cipher.hmac(t.token), this.cipher.encrypt(t.token), t.profileId, t.label ?? null, this.now());
+    })();
+  }
+
+  resetToken(token: string): (TokenDoc & { createdAt: number }) | undefined {
+    return this.db.transaction(() => {
+      const old = this.getToken(token);
+      if (!old) return undefined;
+      this.putToken({ ...old, token: randomId() });
+      return this.listTokens(old.profileId)[0]!;
+    })();
   }
 
   getToken(token: string): TokenDoc | undefined {
@@ -854,7 +884,12 @@ export class Store {
         if (!d.routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)').run(d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
         this.put('profile', next, owner);
       }
-      for (const t of seed.tokens ?? []) this.putToken(t);
+      const importedProfiles = new Set<string>();
+      for (const t of seed.tokens ?? []) {
+        if (importedProfiles.has(t.profileId)) continue;
+        this.putToken(t);
+        importedProfiles.add(t.profileId);
+      }
       // 旧种子里的本地内容订阅源同样转成本地节点组，本地节点上的前置同样转成链规则；旧格式规则集与规则包转成多来源规则集
       this.convertLocalSources();
       this.moveLocalDialers();

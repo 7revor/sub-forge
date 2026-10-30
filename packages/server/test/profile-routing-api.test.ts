@@ -123,11 +123,11 @@ it('模板影响检查期间有订阅保存时，模板仍可正常保存', asyn
   expect((await admin.get(`/api/templates/${t.id}`)).json.item.groups).toEqual(template.groups);
 });
 
-it('代理链前置节点在保存、解除绑定与重新绑定时保留', async () => {
+it.each([false, true])('代理链前置节点在保存、解除绑定与重新绑定时保留（全部来源：%s）', async all => {
   const { alice, profile, member, renderer } = await scenario();
   const via = (await alice.post('/api/locals', { name: '代理链前置节点', proxies: [{ name: '前置', type: 'socks5', server: 'via.test', port: 1080 }] })).json.item;
   profile.nodeSets.push({ ref: { type: 'local', id: via.id }, output: 'provider' });
-  profile.chains = [{ id: 'chain', landing: { nodeSet: member.ref }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: via.id }, match: { exact: '前置' }, fallback: 'error' } } }];
+  profile.chains = [{ id: 'chain', landing: { nodeSet: member.ref }, via: { kind: 'node', ref: { nodeSet: all ? { type: 'all', id: 'provider' } : { type: 'local', id: via.id }, match: { exact: '前置' }, fallback: 'error' } } }];
   const saved = await alice.put(`/api/profiles/${profile.id}`, profile);
   expect(saved.status).toBe(200);
   const detached = await alice.post('/api/profiles/routing/convert', { profile: saved.json.item, mode: 'independent' });

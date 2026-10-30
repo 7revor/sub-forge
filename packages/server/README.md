@@ -54,7 +54,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 - token 无效或所属用户被禁用：主订阅、节点与规则资源统一返回 404，空响应体。
 - 渲染失败（报告中有错误、`mihomo -t` 失败或内核异常）：返回上一份成功结果；从未成功过：503 与纯文本原因。
-- 渲染结果与 token 无关，同一 Profile 的多个订阅链接共用 last_good 和结构版本资源，下发时把地址里的占位符换成请求所用的 token。
+- 渲染结果与 token 无关，同一 Profile 重置链接后仍复用 last_good 和结构版本资源，下发时把地址里的占位符换成请求所用的 token。
 - 每次渲染读取当前流量信息与拉取告警，并同步到最近成功结果。流量先按同源不同 URL 累加，再按 Profile 选择汇总、指定源或关闭；缺失字段不补零，到期时间取最早值，重复引用同一源不重复累加。仅流量变化不产生新的结构版本。
 - 生成的 `/p` 与 `/r` 地址携带相同的结构版本 `v` 和输出平台；旧主配置读取旧版本资源。兼容的远程内容仍在原结构版本内刷新；结构变化等待下次主订阅刷新。每个 Profile / 输出目标保留最近 32 个结构版本，过期资源返回 404 并提示刷新主订阅。
 - 升级前无版本规则链接无法恢复历史关联，已有客户端应刷新一次主订阅。完整更新和迁移说明见 [稳定化记录](../../docs/10-m1-stabilization.md)。
@@ -72,7 +72,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
 | `POST /api/templates`、`PUT /api/templates/:id` | 管理员新建或直接保存；不需要版本号，后保存的内容覆盖当前内容。自身校验不通过 400；绑定冲突返回 409，不允许 `force` 跳过。旧 `POST /api/templates/:id/publish` 兼容同一保存逻辑，不再创建历史 |
-| `GET/POST /api/profiles/:id/tokens`、`POST .../tokens/:token/reset`、`DELETE .../tokens/:token` | 订阅链接；重置后旧链接立即失效 |
+| `GET/POST /api/profiles/:id/tokens`、`POST .../tokens/:token/reset` | 保存订阅时自动生成唯一链接；GET 返回单项列表，POST 幂等返回现有链接（200）；重置原子替换，旧链接立即失效；单独 DELETE 返回 409 |
 | `POST /api/profiles/:id/preview` | 预览配置、代理链检查结果、只读引用详情与渲染报告；请求体可带未保存的 `profile` 草稿 |
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
 | `GET /api/profiles/:id/access-log` | 访问日志（保留 30 天） |
@@ -409,3 +409,14 @@ SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，�
 2026-10-30 拖动阴影验收复用隔离卡片/组合/处理链样本，API、数据库和生产示例种子不变。
 
 2026-10-30 处理器参数区仅重设计前端布局：12 种 OperatorStep 的字段、执行顺序、默认行为、origins 和独立输入输出预览契约不变；布尔 false、数值 0 与清空值保持原语义。API、数据库、核心渲染和生产示例种子无需修改。manual-resource-refresh-server.ts 增加 all-operators 虚构内存样本供全类型表单验收，并在停止时关闭测试连接；不会写入 examples/seed.example.json。
+
+
+## 唯一订阅链接（2026-10-30）
+
+每个 Profile 在保存事务内生成一个随机令牌，数据库同时约束令牌全局唯一及每个 Profile 只有一个令牌。重复保存保持链接；复制配置生成另一个链接。订阅和令牌在同一事务中保存，令牌写入失败会回滚文档。旧种子每个 Profile 采用第一条令牌；跨 Profile 复用令牌会报错并回滚导入。
+
+SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列表 token_hash 排序），移除其余链接，并为没有链接的 Profile 补生成。其他旧链接及其资源地址在升级后返回 404；保留下来的链接、归属和文档更新时间不变。这里描述的是升级规则，本次开发验收仅使用隔离测试数据库。
+
+`GET /sub/:token` 通过 User-Agent 选择 Mihomo / Stash，并按可识别的平台选择配置。`target` / `platform` 参数保留为旧接口兼容和手工覆盖，页面只显示无参数的唯一链接。浏览器及未知 UA 默认 Mihomo，响应为 `text/plain; charset=utf-8`、`Content-Disposition: inline`、`X-Content-Type-Options: nosniff`，直接显示 YAML；保留文件名、流量信息和更新间隔。`Vary: User-Agent` 与 `Cache-Control: no-store` 防止缓存混用客户端输出。Surge 仍返回 501，尚未新增其他输出格式。
+
+请求头依据与验收范围见 [唯一链接验收](../../research/verification/single-subscription-20261030/README.md)。

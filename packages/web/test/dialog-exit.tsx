@@ -1,15 +1,25 @@
-// 仅供 Codex 内置浏览器验收，不进入生产构建，不访问业务服务。
+// 仅供 Codex 内置浏览器验收，不进入生产构建；节点按钮需配合 manual-member-chain 内存服务。
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider, Link } from 'react-router';
 import { Frame as FrameApi } from '../src/modals/Frame.tsx';
 import { createModal, ModalRoot, ModalContent, ModalHeader, ModalTitle, useModalDraft, useModalPresentation } from '../src/modals/index.tsx';
+import { NodeSetPreviewModal } from '../src/components/NodeSetPreviewModal.tsx';
+import { ChainRuleModal } from '../src/pages/profile/ChainRuleModal.tsx';
+import { exactNodeFilter } from '../src/pages/profile/memberModel.ts';
+import type { ProfileModalData } from '../src/pages/profile/modalProfile.ts';
 import { RuleSourcePreview } from '../src/components/RuleSourcePreview.tsx';
 import { Button, Input } from '../src/components/ui.tsx';
 import { TemplateGroupsEditor } from '../src/pages/template/TemplateGroupsEditor.tsx';
 import type { TemplateBody } from '../src/convert/templateYaml.ts';
 import '../src/index.css';
+
+const nodeFixture = { nodeSet: { type: 'local' as const, id: 'self' }, name: '自建落地' };
+const profileFixture: ProfileModalData = {
+  profile: { id: 'exit-check', name: '代理链退场验收', nodeSets: [{ ref: nodeFixture.nodeSet, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
+  nodeSets: [{ ref: nodeFixture.nodeSet, name: nodeFixture.name }, { ref: { type: 'local', id: 'relay' }, name: '中转机场' }],
+};
 
 const QueryModal = createModal<Record<string, never>>(function QueryBody({ modal }) {
   const [text, setText] = useState('初次读取的文件正文\n规则一\n规则二');
@@ -21,6 +31,7 @@ const NestedModal = createModal<{ name: string }, string>(function NestedBody({ 
   const [name, setName] = useModalDraft(data.name);
   return <ModalContent><ModalHeader><ModalTitle>嵌套草稿与路由验收</ModalTitle></ModalHeader><Input placeholder="输入独立草稿名称" value={name} onChange={e => setName(e.target.value)} />
     <Button onClick={async () => { const result = await FrameApi.modal.prompt({ title: '子弹窗', initialValue: name, placeholder: '输入子弹窗草稿' }); if (result.status === 'confirmed') setName(result.data); }}>打开子弹窗</Button>
+    <Button onClick={() => void NodeSetPreviewModal.show(nodeFixture)}>打开嵌套节点预览</Button>
     <Link to="/test/dialog-exit.html?route=next">切换路由</Link><Button onClick={modal.cancel}>取消</Button><Button onClick={() => modal.confirm(name)}>保存</Button></ModalContent>;
 });
 
@@ -91,6 +102,18 @@ function App() {
       <Button onClick={() => void record(FrameApi.modal.confirm({ title: '删除第一份文档？', description: '被 3 个策略组引用，删除后引用将失效。', confirmLabel: '删除', danger: true }))}>删除确认一</Button>
       <Button onClick={() => void record(FrameApi.modal.confirm({ title: '删除第二份文档，名称较长以验证重开更新？', description: '第二份文档的独立说明。', danger: true }))}>删除确认二</Button>
       <Button onClick={() => void record(RuleSourcePreview.show({ matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'exit.example.test' } } }))}>静态规则预览</Button>
+      <Button onClick={() => void record(NodeSetPreviewModal.show(nodeFixture))}>节点列表退场</Button>
+      <Button onClick={() => void record(ChainRuleModal.show({ ...profileFixture, title: '代理链退场验收', chain: { id: 'exit-chain', landing: { nodeSet: nodeFixture.nodeSet, filter: 'GCP', excludeFilter: '过期' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'relay' }, match: { regex: '日本' } } } } }))}>代理链列表退场</Button>
+      <Button onClick={() => void record(ChainRuleModal.show({ ...profileFixture, title: '全部来源代理链退场', chain: { id: 'all-chain', landing: { nodeSet: { type: 'all', id: 'inline' } }, via: { kind: 'node', ref: { nodeSet: { type: 'all', id: 'provider' }, match: { regex: '' } } } } }))}>全部来源代理链退场</Button>
+      <Button onClick={() => void record(ChainRuleModal.show({
+        ...profileFixture,
+        profile: { ...profileFixture.profile, routing: { mode: 'independent', config: {
+          groups: [{ id: 'direct', name: '直连前置组', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }, { id: 'backup', name: '备用前置组', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }],
+          rules: [], final: { kind: 'builtin', name: 'DIRECT' },
+        } } },
+        title: '直接点选代理链退场',
+        chain: { id: 'click-chain', landing: { nodeSet: nodeFixture.nodeSet, filter: exactNodeFilter('🇺🇸 GCP [01]') }, via: { kind: 'node', ref: { nodeSet: nodeFixture.nodeSet, match: { exact: '🇸🇬 新加坡' } } } },
+      }))}>直接点选代理链退场</Button>
       <Button onClick={() => void record(QueryModal.show({}))}>查询结果弹窗</Button>
       <Button onClick={() => { attempt.current = 0; void record(FrameApi.modal.prompt({ title: '保存失败后重试', initialValue: '保留我的草稿', placeholder: '输入要保存的名称' }, { submit: async () => { if (++attempt.current === 1) throw new Error('模拟保存失败，请重试'); } })); }}>异步失败与重试</Button>
       <Button onClick={() => void record(NestedModal.show({ name: '外部原值' }))}>嵌套与路由</Button>

@@ -9,7 +9,7 @@ import { ProfileWizard } from './ProfileWizard.tsx';
 export function ProfileList() {
   const templates = useTemplates().data ?? [];
   return (
-    <DocList kind="profiles" title="配置订阅" deleteBody="它的所有订阅链接会立即失效，客户端将无法更新。"
+    <DocList kind="profiles" title="配置订阅" deleteBody="它的订阅链接会立即失效，客户端将无法更新。"
       columns={[
         { header: '名称', cell: (p) => p.name },
         { header: '模式', cell: (p) => <Badge>{modeLabel(p, templates.find(t => t.id === boundTemplateId(p))?.name)}</Badge> },

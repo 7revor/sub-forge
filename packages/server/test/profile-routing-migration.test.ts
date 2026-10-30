@@ -48,7 +48,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(21);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(22);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();
@@ -94,7 +94,7 @@ it('模板版本缺失时整批回滚，数据库版本、原配置及链接保�
       expect(raw.pragma('user_version', { simple: true })).toBe(15);
       expect(JSON.parse(cipher.decrypt((raw.prepare("SELECT data FROM docs WHERE id = 'a-valid'").get() as any).data))).toEqual(JSON.parse(JSON.stringify(valid)));
       expect(raw.prepare('SELECT COUNT(*) n FROM profile_migration_backups').get()).toEqual({ n: 0 });
-      expect(raw.prepare('SELECT COUNT(*) n FROM sub_tokens').get()).toEqual({ n: 1 });
+      expect(raw.prepare('SELECT COUNT(*) n FROM sub_tokens').get()).toEqual({ n: 2 });
     } finally { raw.close(); }
   } finally { rmSync(dir, { recursive: true }); }
 });

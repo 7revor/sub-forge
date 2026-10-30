@@ -255,10 +255,15 @@ export type Overlay = {
   final?: Target;
 };
 
+/** 代理链的全部来源按订阅当前输出类型动态展开，不保存某次预览的节点快照。 */
+export type ChainNodeSet = NodeSetID | { type: 'all'; id: 'provider' | 'inline' };
+export type ChainNodeRef = Omit<NodeRef, 'nodeSet'> & { nodeSet: ChainNodeSet };
+export type ChainTarget = Exclude<Target, { kind: 'node' }> | { kind: 'node'; ref: ChainNodeRef };
+
 export type ChainRule = {
   id: ID;
-  landing: { nodeSet: NodeSetID; filter?: string; excludeFilter?: string };
-  via: Target;
+  landing: { nodeSet: ChainNodeSet; filter?: string; excludeFilter?: string };
+  via: ChainTarget;
 };
 
 export type ProfileNodeSet = { ref: NodeSetID; output: 'provider' | 'inline'; providerName?: string };

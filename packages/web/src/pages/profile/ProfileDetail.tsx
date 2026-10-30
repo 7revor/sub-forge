@@ -43,7 +43,7 @@ export function ProfileDetail() {
   const discard = () => { setDraft(doc.data); ctx.resetBaseEditor(); };
   const preset = presets.data?.find((p) => p.id === draft.base?.presetId);
   const warnings = log.data?.[0]?.warnings ?? 0;
-  const firstUrl = tokens.data?.[0]?.url;
+  const subscriptionUrl = tokens.data?.[0]?.url;
   const duplicate = () => {
     const { id: _id, ...rest } = doc.data ?? draft;
     dup.mutate({ ...rest, name: `${rest.name} 副本` }, { onSuccess: (p) => navigate(`/profiles/${p.id}/overview`) });
@@ -56,9 +56,9 @@ export function ProfileDetail() {
           actions={<>
             {dirty && <Button onClick={discard}>放弃修改</Button>}
             <Button onClick={duplicate} disabled={dup.isPending}>{dup.isPending ? '复制中…' : '复制配置订阅'}</Button>
-            {!dirty && <CopyButton text={firstUrl ?? ''} disabled={!firstUrl} title={firstUrl ? undefined : '先在页面下方新增订阅链接'}>复制订阅链接</CopyButton>}
+            {!dirty && <CopyButton text={subscriptionUrl ?? ''} disabled={!subscriptionUrl} title={subscriptionUrl ? undefined : '正在加载订阅链接'}>复制订阅链接</CopyButton>}
             <Button variant="primary" disabled={!validName || !ctx.baseValid || !dirty || save.isPending} onClick={() => { if (validName && ctx.baseValid) save.mutate({ ...draft, name: draft.name.trim() }, { onSuccess: saved => setDraft(current => acceptProfileSave(current, draft, saved)) }); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
-            <DeleteAction what="配置订阅" name={draft.name} body="它的所有订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
+            <DeleteAction what="配置订阅" name={draft.name} body="它的订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
               onReset={del.reset} onDelete={() => del.mutateAsync(draft.id)} onDeleted={() => navigate('/profiles')} />
           </>}>
           <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[12.5px] text-accent-ink">

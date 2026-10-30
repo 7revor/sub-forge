@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import type { Platform } from '@sub-forge/core';
 import { TOKEN_PLACEHOLDER, type RenderService } from '../render.ts';
 import type { Store } from '../store.ts';
-import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
+import { bad, HttpError, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
 import { validateDoc } from './validate.ts';
 
 const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
@@ -47,7 +47,7 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
     const { label } = await jsonBody<{ label?: unknown }>(c);
     if (label !== undefined && typeof label !== 'string') throw bad('label 必须是字符串');
     const t = store.createToken(p.id, label);
-    return c.json({ item: withUrl({ ...t, createdAt: Date.now() }) }, 201);
+    return c.json({ item: withUrl(t) });
   });
 
   /** 重置：旧链接立即失效，换一个新 token，保留备注 */
@@ -55,17 +55,14 @@ export function profileRoutes(store: Store, renderer: RenderService, publicUrl: 
     const p = own(c.req.param('id'), c.get('user').id);
     const old = store.getToken(c.req.param('token'));
     if (!old || old.profileId !== p.id) throw notFound('订阅链接');
-    store.deleteToken(old.token);
-    const t = store.createToken(p.id, old.label);
-    return c.json({ item: withUrl({ ...t, createdAt: Date.now() }) });
+    return c.json({ item: withUrl(store.resetToken(old.token)!) });
   });
 
   app.delete('/profiles/:id/tokens/:token', (c) => {
     const p = own(c.req.param('id'), c.get('user').id);
     const old = store.getToken(c.req.param('token'));
     if (!old || old.profileId !== p.id) throw notFound('订阅链接');
-    store.deleteToken(old.token);
-    return c.json({ ok: true });
+    throw new HttpError(409, '每个订阅必须保留一个链接；如需使旧链接失效，请重置链接或删除订阅');
   });
 
   // ---------- 预览（CR-05 / 4.9 第 7 步）----------

@@ -1,4 +1,4 @@
-import type { ChainRule, NodeSetID, Profile, Target } from '@sub-forge/core';
+import type { ChainRule, NodeSetID, Profile, ChainTarget } from '@sub-forge/core';
 import { exactNodeFilter, nodeSetKey } from './memberModel.ts';
 
 /** 只还原本编辑器生成的精确筛选；历史正则不能被误当成单个节点。 */
@@ -11,7 +11,7 @@ export function landingNodeName(landing: ChainRule['landing']): string | undefin
 /** 同时检查落地、前置与嵌套回退，移出来源后不能留下悬空链引用。 */
 export function chainUsesNodeSet(chain: ChainRule, ref: NodeSetID): boolean {
   const key = nodeSetKey(ref);
-  const targetUses = (target: Target): boolean => target.kind === 'node' && (
+  const targetUses = (target: ChainTarget): boolean => target.kind === 'node' && (
     nodeSetKey(target.ref.nodeSet) === key || !!(target.ref.fallback && target.ref.fallback !== 'error' && targetUses(target.ref.fallback))
   );
   return nodeSetKey(chain.landing.nodeSet) === key || targetUses(chain.via);

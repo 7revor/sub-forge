@@ -102,7 +102,7 @@ Stash 使用 YAML；配置、节点集和规则集的形状与 Clash 家族相�
 /sub/<token>?target=stash&platform=macos
 ```
 
-Stash User-Agent 可以自动识别；显式参数优先。前端「订阅 → 概览」可复制 Stash iOS 链接；「预览」选择 Stash 和平台，可查看草稿及导出独立 YAML 文件。导出文件把本次已转换的托管规则内嵌到 `rules` 中，避免依赖预览占位 token；原始远程规则集合继续使用其真实 URL。
+Stash User-Agent 可以自动识别；显式参数优先。前端「订阅 → 概览」只提供一个无参数链接，Stash 与 Mihomo 客户端共用该链接，浏览器直接显示 Mihomo YAML；「预览」选择 Stash 和平台，可查看草稿及导出独立 YAML 文件。导出文件把本次已转换的托管规则内嵌到 `rules` 中，避免依赖预览占位 token；原始远程规则集合继续使用其真实 URL。
 
 Stash 专属基础设置保存在预设的 `stash` 和订阅的 `base.stashPatch`，按预设加覆盖合并。既有 `mihomo` / `base.patch` 继续只用于 Mihomo，避免误带其 DNS / TUN 开关。`base` 省略时使用客户端默认设置。
 

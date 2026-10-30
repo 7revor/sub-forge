@@ -1,3 +1,4 @@
+import type { ChainNodeSet, ChainTarget } from '@sub-forge/core';
 import { NODE_SET_LABEL, nodeSetKey as key, parseNodeSetKey as parseKey } from '../domain/nodeSet.ts';
 // 选择器：节点集、出口（内置策略 / 组 / 单个节点）、组成员。供 Profile、本地节点、组合等页面共用。
 
@@ -70,10 +71,10 @@ export function TargetPicker({ value, onChange, groups, nodeSets, allowNode = tr
   );
 }
 
-export function targetLabel(t: Target, groupName: (id: string) => string, nodeSetName: (r: NodeSetID) => string): string {
+export function targetLabel(t: ChainTarget, groupName: (id: string) => string, nodeSetName: (r: NodeSetID) => string): string {
   if (t.kind === 'builtin') return t.name;
   if (t.kind === 'group') return groupName(t.groupId);
-  return `${nodeSetName(t.ref.nodeSet)} · ${'exact' in t.ref.match ? t.ref.match.exact : `/${t.ref.match.regex}/`}`;
+  return `${chainNodeSetName(t.ref.nodeSet, nodeSetName)} · ${'exact' in t.ref.match ? t.ref.match.exact : t.ref.match.regex ? `/${t.ref.match.regex}/` : '全部节点'}`;
 }
 
 export function memberLabel(m: GroupMember, groupName: (id: string) => string, nodeSetName: (r: NodeSetID) => string): { kind: string; text: string } {
@@ -84,4 +85,8 @@ export function memberLabel(m: GroupMember, groupName: (id: string) => string, n
     case 'node': return { kind: '节点', text: targetLabel({ kind: 'node', ref: m.ref }, groupName, nodeSetName) };
     case 'all': return { kind: '全部', text: m.scope === 'all' ? '全部节点' : m.scope === 'proxies' ? '全部 Inline 节点' : '全部 Provider' };
   }
+}
+
+export function chainNodeSetName(ref: ChainNodeSet, nodeSetName: (ref: NodeSetID) => string): string {
+  return ref.type === 'all' ? `全部 ${ref.id === 'provider' ? 'Provider' : 'Inline'} 来源` : nodeSetName(ref);
 }

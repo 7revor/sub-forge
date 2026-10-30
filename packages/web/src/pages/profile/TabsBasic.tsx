@@ -1,21 +1,21 @@
-import type { NodeSetID } from '@sub-forge/core';
+import { chainSources, type NodeSetID } from '@sub-forge/core';
 import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
-import { targetLabel } from '../../components/pickers.tsx';
+import { chainNodeSetName, targetLabel } from '../../components/pickers.tsx';
 import { Frame } from '../../modals/Frame.tsx';
-import { notifySuccess } from '../../feedback.ts';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
 import { Notice } from '../../components/Notice.tsx';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
+import { NodeSetPreviewModal } from '../../components/NodeSetPreviewModal.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 import { CopyButton } from '../../components/CopyButton.tsx';
 // Profile 标签：概览（订阅链接、输出设置、访问日志）、基础设置、节点集。
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Copy, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { api, type TokenItem } from '../../api.ts';
+import { api } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
@@ -31,52 +31,30 @@ const SOURCE_TEXT: Record<string, string> = { fresh: '未命中', cache: '命中
 /** 概览（设计稿「Profile · 概览」）：订阅链接、输出设置、访问日志 */
 export function TabOverview() {
   const { draft, setDraft, allNodeSets } = useProfile();
-  const qc = useQueryClient();
   const tokens = useQuery(tokenOptions(draft.id));
   const log = useQuery(accessLogOptions(draft.id));
-  const refreshTokens = () => qc.invalidateQueries({ queryKey: ['tokens', draft.id] });
-  const create = async () => { const result = await Frame.modal.prompt({ title: '新增订阅链接', label: '设备备注', placeholder: '填写订阅链接的标识名称', minLength: 0, confirmLabel: '创建链接' }, { submit: async label => { await api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}); } }); if (result.status === 'confirmed') { notifySuccess('订阅链接已创建'); void refreshTokens(); } };
-  const manage = async (token: TokenItem, reset: boolean) => {
-    const result = await Frame.modal.confirm({ title: reset ? `重置「${token.label || '未命名设备'}」的 token？` : `删除订阅链接「${token.label || '未命名设备'}」？`, description: reset ? '旧链接立即失效，这台设备需要导入新链接才能继续更新。' : '使用它的设备将无法更新。', confirmLabel: reset ? '重置' : '删除', danger: true }, { submit: async () => { await api(reset ? 'POST' : 'DELETE', `/profiles/${draft.id}/tokens/${token.token}${reset ? '/reset' : ''}`); } });
-    if (result.status === 'confirmed') { notifySuccess(reset ? '订阅链接已重置' : '订阅链接已删除'); void refreshTokens(); }
-  };
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
   const sources = allNodeSets.filter((n) => n.ref.type === 'source' && draft.nodeSets.some((p) => p.ref.type === 'source' && p.ref.id === n.ref.id));
   const rows = log.data ?? [];
-  const lastSeen = (token: string) => rows.find((r) => r.token === token)?.at;
-  const linkName = (token: string) => tokens.data?.find((t) => t.token === token)?.label ?? '已删除的链接';
+  const subscription = tokens.data?.[0];
+  const lastSeen = rows[0]?.at;
   const lastGood = rows.find((r) => r.status === 200 && (r.source === 'fresh' || r.source === 'cache'));
 
   return (
     <>
       <div className="grid grid-cols-1 gap-5">
-        <Card className="min-w-0"
-          title={`订阅链接`}
-          actions={<Button onClick={create}><Plus size={15} />新增链接</Button>}>
-          {!tokens.data?.length ? <Empty title="还没有订阅链接" /> : (
-            <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-              {tokens.data.map((t) => {
-                const seen = lastSeen(t.token);
-                return (
-                  <li key={t.token} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg border border-line px-3.5 py-3">
-                    <div className="flex flex-[1_1_160px] flex-col gap-0.5">
-                      <span className="text-[13.5px] font-semibold">{t.label || '未命名设备'}</span>
-                      <span className="text-[12px] text-ink-muted">{seen ? `最近访问 ${formatRelativeTime(seen)}` : '从未访问'}</span>
-                    </div>
-                    <code className="min-w-0 flex-[999_1_280px] truncate rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px]">{t.url}</code>
-                    <div className="flex gap-1.5">
-                      <CopyButton className="h-9" text={t.url}><Copy size={13} />复制</CopyButton>
-                      <CopyButton className="h-9" text={`${t.url}?target=stash&platform=ios`}>复制 Stash 链接</CopyButton>
-                      <CopyButton className="h-9" text={`${t.url}?target=surge&platform=ios`}>复制 Surge 链接</CopyButton>
-                      <CopyButton className="h-9" text={`${t.url}?target=loon&platform=ios`}>复制 Loon 链接</CopyButton>
-                      <Button className="h-9 text-err" onClick={() => void manage(t, true)}><RotateCcw size={13} />重置 token</Button>
-                      <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => void manage(t, false)}><Trash2 size={14} /></Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+        <Card className="min-w-0" title="订阅链接">
+          <ErrorAlert error={tokens.error} />
+          {subscription ? (
+            <div className="flex flex-col gap-3">
+              <p className="m-0 text-[13px] text-ink-muted">所有设备使用同一链接，自动适配 Mihomo、Surge、Loon 或 Stash；浏览器打开显示 Mihomo 配置。</p>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <a className="min-w-0 flex-[1_1_280px] break-all rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px] text-accent-ink hover:underline" href={subscription.url} target="_blank" rel="noreferrer">{subscription.url}</a>
+                <CopyButton className="h-9" text={subscription.url}><Copy size={13} />复制链接</CopyButton>
+              </div>
+              <span className="text-[12px] text-ink-muted">{lastSeen ? `最近访问 ${formatRelativeTime(lastSeen)}` : '从未访问'}</span>
+            </div>
+          ) : tokens.isPending ? <p className="m-0 text-[13px] text-ink-muted">正在加载订阅链接…</p> : <Button onClick={() => void tokens.refetch()}>重新加载链接</Button>}
         </Card>
         <Card title="输出设置" className="min-w-0">
           <div className="flex flex-col gap-3.5">
@@ -99,12 +77,11 @@ export function TabOverview() {
       </div>
       <Card title="访问日志" actions={<span className="text-[12.5px] text-ink-muted">保留 30 天</span>} bodyClass="overflow-x-auto">
         <table className="w-full min-w-[860px] border-collapse">
-          <thead><tr><th className={th}>时间</th><th className={th}>链接</th><th className={th}>识别结果</th><th className={th}>User-Agent</th><th className={th}>耗时</th><th className={th}>缓存</th><th className={th}>告警</th></tr></thead>
+          <thead><tr><th className={th}>时间</th><th className={th}>识别结果</th><th className={th}>User-Agent</th><th className={th}>耗时</th><th className={th}>缓存</th><th className={th}>告警</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{formatTime(r.at).slice(5)}</td>
-                <td className={td}>{linkName(r.token)}</td>
                 <td className={cx(td, 'font-medium')}>{r.client}{r.platform ? ` · ${r.platform}` : ''}{r.status !== 200 && <Badge tone="err" className="ml-2">{r.status}</Badge>}</td>
                 <td className={cx(td, 'max-w-[280px] truncate font-mono text-[12px] text-ink-muted')}>{r.ua}</td>
                 <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{r.ms >= 1000 ? `${(r.ms / 1000).toFixed(2)} s` : `${r.ms} ms`}</td>
@@ -112,7 +89,7 @@ export function TabOverview() {
                 <td className={td}><Badge tone={r.warnings ? 'warn' : 'neutral'}>{r.warnings}</Badge></td>
               </tr>
             ))}
-            {!rows.length && <tr><td className={td} colSpan={7}><Empty title="还没有访问记录" /></td></tr>}
+            {!rows.length && <tr><td className={td} colSpan={6}><Empty title="还没有访问记录" /></td></tr>}
           </tbody>
         </table>
       </Card>
@@ -195,13 +172,13 @@ export function TabNodeSets() {
   const remove = async (ref: NodeSetID) => {
     const affected = draft.chains.filter(c => chainUsesNodeSet(c, ref));
     if (affected.length) {
-      const chains = affected.map(c => `${targetLabel(c.via, groupName, nodeSetName)} → ${nodeSetName(c.landing.nodeSet)} · ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}`).join('\n');
+      const chains = affected.map(c => `${targetLabel(c.via, groupName, nodeSetName)} → ${chainNodeSetName(c.landing.nodeSet, nodeSetName)} · ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}`).join('\n');
       const result = await Frame.modal.confirm({ title: `移出节点集「${nodeSetName(ref)}」？`, description: `以下 ${affected.length} 条代理链引用了此节点集，将一起移除。保存订阅后生效。\n\n${chains}`, confirmLabel: '移出并移除代理链', danger: true });
       if (result.status !== 'confirmed') return;
     }
     setDraft(removeProfileNodeSet(draft, ref));
   };
-  const chained = new Set(draft.chains.map((c) => `${c.landing.nodeSet.type}:${c.landing.nodeSet.id}`));
+  const chained = new Set(draft.chains.flatMap(c => chainSources(c.landing.nodeSet, draft.nodeSets).map(source => `${source.ref.type}:${source.ref.id}`)));
 
   return (
     <>
@@ -209,9 +186,9 @@ export function TabNodeSets() {
         actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={15} />添加节点集</Button>} bodyClass="pb-1">
         {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : <ul className="m-0 list-none p-0">
           {draft.nodeSets.map((n, i) => <li key={`${n.ref.type}:${n.ref.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line-2 px-4 py-3">
-            <div className="flex min-w-0 flex-[1_1_180px] flex-col gap-1"><span className="truncate text-[13.5px] font-medium">{nodeSetName(n.ref)}</span>
-              <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
-            </div>
+            <button type="button" aria-label={`预览 ${nodeSetName(n.ref)} 的节点`} onClick={() => void NodeSetPreviewModal.show({ nodeSet: n.ref, name: nodeSetName(n.ref) })} className="group flex min-w-0 flex-[1_1_180px] cursor-pointer flex-col gap-1 rounded text-left focus-visible:outline-brand"><span className="truncate text-[13.5px] font-medium group-hover:text-brand group-hover:underline">{nodeSetName(n.ref)}</span>
+              <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'} · 点击预览</span>
+            </button>
             <Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} />
             <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => void remove(n.ref)}><Trash2 size={14} /></Button>
           </li>)}

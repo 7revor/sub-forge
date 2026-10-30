@@ -114,10 +114,10 @@ export const groupPlaceholders = {
   icon: '控制面板显示的策略组图标地址',
 } as const;
 
-/** 代理链使用 Provider 筛选定位前置，再按 dialer-proxy 连接落地。
+/** 代理链的 Provider 与 Inline 默认全部节点，使用筛选定位前置，再按 dialer-proxy 连接落地。
  * https://wiki.metacubex.one/config/proxy-groups/#filter
  * https://wiki.metacubex.one/config/proxies/dialer-proxy/
  */
 export const chainPlaceholders = {
-  viaFilter: '输入前置节点关键词或正则，例如 (?i)香港|HK',
+  viaFilter: '全部',
 } as const;

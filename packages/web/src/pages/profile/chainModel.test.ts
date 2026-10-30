@@ -4,7 +4,7 @@ import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chain
 import { chainInputError, exactNodeFilter } from './memberModel.ts';
 const landing = { type: 'local' as const, id: 'landing' };
 const relay = { type: 'local' as const, id: 'relay' };
-const chain: ChainRule = { id: 'c', landing: { nodeSet: landing }, via: { kind: 'node', ref: { nodeSet: relay, match: { regex: '香港|HK' }, fallback: 'error' } } };
+const chain = { id: 'c', landing: { nodeSet: landing }, via: { kind: 'node', ref: { nodeSet: relay, match: { regex: '香港|HK' }, fallback: 'error' } } } satisfies ChainRule;
 describe('流量顺序代理链', () => {
   it.each(['🇺🇸 GCP [01]', '节点.*+?^${}()|[]\\尾', '香港'])('精确落地名称可无损回显：%s', name => {
     expect(landingNodeName({ nodeSet: landing, filter: exactNodeFilter(name) })).toBe(name);
@@ -21,12 +21,23 @@ describe('流量顺序代理链', () => {
     expect(chainInputError({ ...chain, landing: { nodeSet: relay } })).toContain('循环');
     expect(chainInputError({ ...chain, via: { kind: 'node', ref: { nodeSet: relay, match: { regex: '[' } } } })).toContain('正则');
   });
+  it('空正则默认全部，空精确名称仍须选择节点', () => {
+    expect(chainInputError({ ...chain, via: { kind: 'node', ref: { nodeSet: relay, match: { regex: '' } } } })).toBeUndefined();
+    expect(chainInputError({ ...chain, via: { kind: 'node', ref: { nodeSet: relay, match: { exact: '' } } } })).toContain('请选择');
+  });
   it('前置、落地、回退引用都算受影响，相同 ID 不同来源不混淆', () => {
     expect(chainUsesNodeSet(chain, landing)).toBe(true);
     expect(chainUsesNodeSet(chain, relay)).toBe(true);
     expect(chainUsesNodeSet(chain, { ...relay, type: 'source' })).toBe(false);
     const via: Target = { kind: 'node', ref: { nodeSet: landing, match: { exact: '旧节点' }, fallback: chain.via } };
     expect(chainUsesNodeSet({ ...chain, via }, relay)).toBe(true);
+  });
+  it('全部来源的链在移出单个节点集后保留，继续动态选择剩余来源', () => {
+    const all: ChainRule = { id: 'all', landing: { nodeSet: { type: 'all', id: 'inline' } }, via: { kind: 'node', ref: { nodeSet: { type: 'all', id: 'provider' }, match: { regex: '' } } } };
+    expect(chainInputError(all)).toBeUndefined();
+    expect(chainInputError({ ...all, landing: { nodeSet: { type: 'all', id: 'provider' } } })).toContain('循环');
+    const profile: Profile = { id: 'p', name: '全部', nodeSets: [{ ref: landing, output: 'inline' }, { ref: relay, output: 'provider' }], chains: [all], overlay: {}, refPolicy: { default: 'wrap' } };
+    expect(removeProfileNodeSet(profile, relay).chains).toEqual([all]);
   });
   it('确认移出时原子删除对应链，保留其他链及节点源文档', () => {
     const unaffected = { ...chain, id: 'keep', via: { kind: 'group' as const, groupId: 'g' } };

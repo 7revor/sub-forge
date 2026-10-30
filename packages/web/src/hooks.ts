@@ -69,14 +69,24 @@ export function useDeleteDoc(kind: Kind) {
 
 export const useTemplates = () => useQuery({ queryKey: ['templates'], queryFn: () => api<{ items: TemplateDoc[] }>('GET', '/templates').then((r) => r.items) });
 
-export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined, query = '') {
+export function nodeListOptions(ref: import('@sub-forge/core').NodeSetID | undefined, query = '', filters?: { filter?: string; excludeFilter?: string }) {
   const q = normalizeNameSearch(query);
-  return useQuery({
-    queryKey: ['nodes', ref?.type, ref?.id, q],
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (filters?.filter) params.set('filter', filters.filter);
+  if (filters?.excludeFilter) params.set('excludeFilter', filters.excludeFilter);
+  const queryKey = ['nodes', ref?.type, ref?.id, q];
+  if (filters?.filter || filters?.excludeFilter) queryKey.push(filters.filter ?? '', filters.excludeFilter ?? '');
+  return {
+    queryKey,
     enabled: !!ref?.id,
     staleTime: 0,
-    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes${q ? `?q=${encodeURIComponent(q)}` : ''}`),
-  });
+    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes${params.size ? `?${params}` : ''}`),
+  };
+}
+
+export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined, query = '', filters?: { filter?: string; excludeFilter?: string }) {
+  return useQuery(nodeListOptions(ref, query, filters));
 }
 
 /** 订阅源的拉取状态：最近一次成功的快照、最近一次是否失败（与总览共用缓存） */
