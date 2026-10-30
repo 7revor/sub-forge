@@ -86,9 +86,10 @@ export function RuleRepoPage() {
     {ruleset && <div className="text-[13px] text-ink-muted">点击文件查看源文件；添加来源请返回增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-brand">返回增强集合</Link></div>}
     <ErrorAlert error={repos.error} />
     <section aria-label="规则文件列表" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 table-panel-divider-bottom px-4 py-3">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 table-panel-divider-bottom px-6 py-4">
+        <h2 className="m-0 text-base font-semibold">规则文件</h2>
         <span role="status" className="text-[12px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
-        <SearchInput aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="max-w-80" />
+        <SearchInput size="md" aria-label="搜索规则名称或路径" placeholder="按文件名或路径搜索，例如 115.list" value={q} onChange={event => setQ(event.target.value)} className="w-80" />
       </div>
       {!pending && repos.data ? <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} /> : <RepositoryFileLoading failed={!!repos.error && !repos.data} />}
     </section>

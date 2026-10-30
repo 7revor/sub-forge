@@ -35,10 +35,12 @@ export function TemplateList() {
   return (
     <>
       <PageHeader title="模板"
-        actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
+        actions={<>
+          <SearchInput size="md" aria-label="搜索模板" placeholder="搜索名称" value={list.q} onChange={e => list.setQ(e.target.value)} />
+          <Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>
+        </>} />
       <ErrorAlert error={list.error} />
       <section className="list-panel" aria-label="模板列表" aria-busy={list.isFetching}>
-        <div className="shrink-0 px-4 py-3"><SearchInput aria-label="搜索模板" placeholder="搜索名称" className="max-w-80" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
         <div key={`${list.page}-${list.pageSize}-${list.q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
           <ListTable label="模板列表" columns={[
             { header: '名称', width: 240 }, { header: '策略组', width: 100 }, { header: '规则', width: 100 },

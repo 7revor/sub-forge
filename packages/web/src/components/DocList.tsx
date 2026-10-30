@@ -1,5 +1,5 @@
 import { RefreshCacheButton, ResourceCacheStatus, ResourceLastRefreshTime } from './ResourceCache.tsx';
-// 文档列表：服务端搜索与分页，搜索栏和分页器固定，表格占满剩余高度并独立滚动。
+// 文档列表：服务端搜索与分页；搜索与新建放在页头，表格卡片只含表格和分页器，表格占满剩余高度并独立滚动。
 // 空列表保留分页和搜索；删除统一放在操作区最右侧，先弹确认。
 
 import { usePagedList } from '../hooks/usePagedList.ts';
@@ -47,13 +47,13 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
   ];
   return (
     <>
-      <PageHeader title={title} subtitle={intro} actions={canCreate && createButton('md', 'primary')} />
+      <PageHeader title={title} subtitle={intro} actions={<>
+        <span role="status" className={cx('self-center text-[12.5px] text-ink-muted', !list.isFetching && 'sr-only')}>{list.isFetching ? '加载中…' : ''}</span>
+        <SearchInput size="md" aria-label={`搜索${name}`} placeholder="搜索名称" value={q} onChange={(e) => setQ(e.target.value)} />
+        {canCreate && createButton('md', 'primary')}
+      </>} />
       <ErrorAlert error={list.error} />
-      <section className="list-panel" aria-busy={list.isFetching}>
-        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
-          <span className={cx('shrink-0 text-[12.5px] text-ink-muted', !list.isFetching && 'invisible')}>加载中…</span>
-          <SearchInput aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-80" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
+      <section className="list-panel" aria-label={`${title}列表`} aria-busy={list.isFetching}>
         <div key={`${list.page}-${list.pageSize}-${q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
           <ListTable label={`${title}列表`} columns={tableColumns}>
             {!list.data && !list.error ? <ListTableLoading columns={tableColumns.length} /> : rows.map((d) => (
