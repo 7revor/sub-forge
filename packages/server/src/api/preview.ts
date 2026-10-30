@@ -5,7 +5,7 @@
 //   GET  /api/nodesets/:type/:id/nodes      已保存处理链之后的节点列表
 
 import {
-  matchesNameSearch, NodeSetResolver, parseContent, Report, runPipeline,
+  compileUserRegex, matchesNameSearch, NodeSetResolver, parseContent, Report, runPipeline,
   type Collection, type NodeSetID, type OperatorStep, type ProxyIR,
 } from '@sub-forge/core';
 import { Hono, type Context } from 'hono';
@@ -42,13 +42,24 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     if (type !== 'source' && type !== 'collection' && type !== 'local') throw bad('type 只能是 source、collection 或 local');
     const doc = own(type, c.req.param('id'), c.get('user').id);
     const ref: NodeSetID = { type, id: doc.id };
+    const filter = c.req.query('filter') ?? '';
+    const excludeFilter = c.req.query('excludeFilter') ?? '';
+    let include: RegExp | undefined;
+    let exclude: RegExp | undefined;
+    try {
+      if (filter) include = compileUserRegex(filter);
+      if (excludeFilter) exclude = compileUserRegex(excludeFilter);
+    } catch (error) { throw bad(error instanceof Error ? error.message : String(error)); }
     const loaded = await renderer.loadNodeSets([ref]);
     const report = new Report();
     const nodes = new NodeSetResolver(loaded.inputs, report).resolve(ref).filter(node => matchesNameSearch(node.name, query));
+    // 先在完整列表筛选，再截断展示，避免第 5000 个以后的节点无法被找到。
+    const matched = nodes.filter(node => (!include || include.test(node.name)) && (!exclude || !exclude.test(node.name)));
     return c.json({
-      nodes: nodes.slice(0, MAX_NODE_LIST_SIZE).map(brief),
-      total: nodes.length,
-      truncated: nodes.length > MAX_NODE_LIST_SIZE,
+      nodes: matched.slice(0, MAX_NODE_LIST_SIZE).map(brief),
+      total: matched.length,
+      ...(filter || excludeFilter ? { unfilteredTotal: nodes.length } : {}),
+      truncated: matched.length > MAX_NODE_LIST_SIZE,
       report: [...loaded.report, ...report.items],
     });
   });
