@@ -28,13 +28,13 @@ function CommandInput({
   return (
     <div
       data-slot="command-input-wrapper"
-      className="flex h-9 items-center gap-2 border-b border-line-2 bg-ground px-3 transition-colors focus-within:bg-panel focus-within:shadow-[inset_0_-2px_0_0_var(--color-brand)]"
+      className="flex h-9 items-center gap-2 border-b px-3 focus-within:shadow-[inset_0_-2px_0_0_var(--color-brand)]"
     >
-      <SearchIcon aria-hidden="true" className="size-4 shrink-0 text-ink-muted" />
+      <SearchIcon aria-hidden="true" className="size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "flex h-full w-full min-w-0 bg-transparent py-0 text-[13px] text-ink outline-none placeholder:text-ink-muted disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-full w-full min-w-0 bg-transparent py-0 text-[13px] outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         {...props}

@@ -87,7 +87,7 @@ export function RuleRepoPage() {
     <ErrorAlert error={repos.error} />
     <section aria-label="规则文件列表" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line-2 px-4 py-3">
-        <div className="flex items-center gap-3"><h2 className="m-0 text-[13px] font-medium text-ink-2">规则文件</h2><span role="status" className="text-[12px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span></div>
+        <span role="status" className="text-[12px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
         <SearchInput aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="max-w-80" />
       </div>
       {!pending && repos.data ? <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} /> : <RepositoryFileLoading failed={!!repos.error && !repos.data} />}
