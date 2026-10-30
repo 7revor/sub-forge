@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../../api.ts';
-import { Badge, Button, Field, Select } from '../../components/ui.tsx';
+import { Badge, Button, Field, Input, Select } from '../../components/ui.tsx';
 import { useTemplates, type ProfileDoc } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { boundTemplateId, persistedProfile } from './routing.ts';
@@ -71,19 +71,26 @@ function AssociationEditor({ onDone, onPending }: { onDone?: () => void; onPendi
 }
 
 export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
-  const { draft, template } = useProfile();
+  const { draft, setDraft, template } = useProfile();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const currentId = boundTemplateId(draft);
   const initialized = draft.routing?.mode === 'independent' ? draft.routing.initializedFrom : undefined;
   if (bare) return <AssociationEditor />;
   return <>
-    <section aria-label="模板关联" className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-2"><h2 className="m-0 text-[14px] font-semibold">{currentId ? <Link className="text-ink no-underline hover:text-brand" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link> : '独立配置'}</h2><Badge tone={currentId ? 'accent' : 'neutral'}>{currentId ? '跟随模板更新' : '由本订阅维护'}</Badge></div>
+    <section aria-label="订阅名称与模板设置" className="grid min-w-0 gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.2fr)]">
+      <div className="min-w-0">
+        <Field label="订阅名称" hint="同时用作客户端中的显示名。">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} aria-invalid={!!draft.id && !draft.name.trim()} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
+        {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-[12px] text-err">请填写订阅名称</p>}
+      </div>
+      <div className="flex min-w-0 flex-col gap-1.5 border-t border-line-2 pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5">
+        <h2 className="m-0 text-[12.5px] font-medium text-ink-muted">模板设置</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2"><span className="text-[14px] font-semibold [overflow-wrap:anywhere]">{currentId ? <Link className="text-ink no-underline hover:text-brand" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link> : '独立配置'}</span><Badge tone={currentId ? 'accent' : 'neutral'}>{currentId ? '跟随模板更新' : '由本订阅维护'}</Badge></div>
+          <Button size="sm" onClick={() => setOpen(true)}>{currentId ? '管理模板关联' : '使用模板'}</Button>
+        </div>
         <p className="m-0 text-[12.5px] leading-relaxed text-ink-muted">{currentId ? '策略组和规则由模板维护；节点填充仅用于本订阅。模板保存后，下次刷新订阅时更新。' : initialized ? `复制自「${initialized.name ?? initialized.templateId}」，后续修改互不影响。` : '直接编辑策略组和规则，也可以选择模板作为起点。'}</p>
       </div>
-      <Button onClick={() => setOpen(true)}>{currentId ? '管理模板关联' : '使用模板'}</Button>
     </section>
     <Dialog open={open} onOpenChange={next => { if (!pending) setOpen(next); }}><DialogContent className="flex h-[min(680px,calc(100dvh-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl" aria-describedby={undefined}><DialogHeader className="shrink-0 border-b border-line px-5 py-4"><DialogTitle>{currentId ? '管理模板关联' : '使用模板'}</DialogTitle></DialogHeader>
       {open && <AssociationEditor onPending={setPending} onDone={() => setOpen(false)} />}

@@ -94,7 +94,6 @@ export function TabOverview() {
                 <option value="none">不输出</option>
               </Select>
             )}</Field>
-            <Field label="客户端中的显示名">{(id) => <Input placeholder="填写配置订阅的名称" id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
             {lastGood
               ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）</div>
               : <Empty title="还没有成功渲染过" />}
