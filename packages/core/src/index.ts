@@ -44,7 +44,7 @@ export * from './render/loon-config.ts';
 export * from './proxy/loon.ts';
 export * from './nodeset/chain.ts';
 
-export * from './base/common.ts';
+export * from './base/native.ts';
 
 export * from './import/loon.ts';
 export * from './rules/provider-name.ts';

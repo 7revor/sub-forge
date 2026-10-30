@@ -1,4 +1,4 @@
-import { lowerCommonBase, mergeBase, type CommonBase } from '@sub-forge/core';
+import { CLIENT_APPS, resolveNativeBase, validateNativeText, type ClientApp } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
@@ -20,7 +20,14 @@ import { resolveRuleSetReference } from './ruleset-reference.ts';
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
 const GENERATION_PLACEHOLDER = '__SF_GENERATION__';
 
-export type Target = { client: Client; platform?: Platform };
+export type Target = { client: Client; platform?: Platform; app?: ClientApp };
+
+function normalizeTarget(target: Target): Target {
+  const app = target.app ? CLIENT_APPS.find(a => a.id === target.app) : CLIENT_APPS.find(a => a.kernel === target.client && 'platform' in a && a.platform === target.platform);
+  if (target.app && (!app || app.kernel !== target.client)) throw new Error('客户端与内核不匹配');
+  if (app && 'platform' in app && target.platform && app.platform !== target.platform) throw new Error('客户端与平台不匹配');
+  return { client: target.client, ...(target.platform ? { platform: target.platform } : {}), ...(app ? { app: app.id, ...('platform' in app ? { platform: app.platform } : {}) } : {}) };
+}
 
 /** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
 export type StoredRender = {
@@ -75,24 +82,13 @@ function nodeTraffic(ref: NodeSetID, inputs: NodeSetInputs, infos: Map<string, T
   visit(ref); return sumTraffic(byUrl.values());
 }
 
-function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...base };
-  for (const [k, v] of Object.entries(patch)) {
-    const b = out[k];
-    out[k] = v && typeof v === 'object' && !Array.isArray(v) && b && typeof b === 'object' && !Array.isArray(b)
-      ? deepMerge(b as Record<string, unknown>, v as Record<string, unknown>)
-      : v;
-  }
-  return out;
-}
-
 class ConcurrentRenderChange extends Error {}
 
 type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
 
 export type PreviewOutcome = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 
-const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
+const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}${t.app ? ':' + t.app : ''}`;
 
 export class RenderService {
   readonly sharedRules: SharedRuleService;
@@ -104,6 +100,7 @@ export class RenderService {
   ) { this.sharedRules = new SharedRuleService(store, snapshots); }
 
   async render(profileId: string, target: Target): Promise<RenderOutcome> {
+    target = normalizeTarget(target);
     const pre: ReportItem[] = [];
     let attempt: Attempt;
     try {
@@ -133,6 +130,7 @@ export class RenderService {
 
   /** 只返回指定结构版本，未知版本不能回退到最新内容。 */
   getVersion(profileId: string, target: Target, version: string): StoredRender | undefined {
+    target = normalizeTarget(target);
     return /^[0-9a-f]{32}$/.test(version) ? this.store.getRenderGeneration(profileId, targetKey(target), version) : undefined;
   }
 
@@ -141,6 +139,7 @@ export class RenderService {
    * template 传入时代替 Profile 当前引用的模板版本。
    */
   async preview(profileId: string, target: Target, overrides: { profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<PreviewOutcome> {
+    target = normalizeTarget(target);
     const pre: ReportItem[] = [];
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
@@ -190,7 +189,9 @@ export class RenderService {
     pre.push(...loaded.report);
 
     const rules = this.collectRules(profile, template);
+    for (const note of template?.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
+      for (const note of rs.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
       for (const src of rs.sources) {
         if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
         const r = await this.snapshots.get('ruleset', rs.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
@@ -204,31 +205,18 @@ export class RenderService {
     }
 
     checkCurrent();
-    const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
-    if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    const common = mergeBase(preset?.common ?? {}, profile.base?.common ?? {}) as CommonBase;
-    const nativeBase = profile.base ? target.client === 'loon'
-      ? deepMerge(preset?.loon ?? {}, profile.base.loonPatch ?? {})
-      : target.client === 'surge'
-      ? deepMerge(preset?.surge ?? {}, profile.base.surgePatch ?? {})
-      : target.client === 'stash'
-      ? deepMerge(preset?.stash ?? {}, profile.base.stashPatch ?? {})
-      : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
-    const mapped = lowerCommonBase(common, target.client, target.platform, nativeBase);
-    pre.push(...mapped.report);
-    const base = profile.base ? mergeBase(mapped.base, nativeBase ?? {}) : undefined;
-    const general = base?.general as Record<string, unknown> | undefined;
-    const defaults = { ...common,
-      ...(typeof general?.['proxy-test-url'] === 'string' ? { testUrl: general['proxy-test-url'] } : {}),
-      ...(typeof general?.['test-timeout'] === 'number' ? { testTimeoutMs: general['test-timeout'] * 1000 } : {}),
-    };
+    const preset = profile.base?.enabled !== false && profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
+    if (profile.base?.enabled !== false && profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
+    for (const text of [preset?.config.kernels?.[target.client], target.app ? preset?.config.clients?.[target.app] : undefined]) if (text !== undefined) validateNativeText(text, target.client, 'preset');
+    for (const note of [...(preset?.migrationNotes ?? []), ...(profile.migrationNotes ?? [])]) pre.push({ level: 'warn', code: 'base.migrated', message: note });
+    const base = profile.base && profile.base.enabled !== false ? resolveNativeBase(target.client, target.app, preset?.config, profile.base) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
-    const qs = `${target.client !== 'mihomo' ? '&target=' + target.client : ''}${target.platform ? `&platform=${target.platform}` : ''}`;
+    const qs = `${target.client !== 'mihomo' ? '&target=' + target.client : ''}${target.platform ? `&platform=${target.platform}` : ''}${target.app ? `&app=${target.app}` : ''}`;
     const sharedReferences = new Map<string, RuleResourceReference>();
     const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
-      profile, nodeSets, rules, common: defaults, resourceIntervalSec:this.store.resourceCacheTtlSec,
+      profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
@@ -271,7 +259,7 @@ export class RenderService {
     const render: StoredRender = {
       generation,
       yaml: target.client === 'surge'
-        ? '#!MANAGED-CONFIG ' + publicUrl + '/sub/' + TOKEN_PLACEHOLDER + '/' + encodeURIComponent(profile.id) + '?target=surge' + (target.platform ? '&platform=' + target.platform : '') + ' interval=' + this.store.resourceCacheTtlSec + ' strict=false\n' + result.yaml
+        ? '#!MANAGED-CONFIG ' + publicUrl + '/sub/' + TOKEN_PLACEHOLDER + '/' + encodeURIComponent(profile.id) + '?target=surge' + (target.platform ? '&platform=' + target.platform : '') + (target.app ? '&app=' + target.app : '') + ' interval=' + this.store.resourceCacheTtlSec + ' strict=false\n' + result.yaml
         : result.yaml,
       nodeDependencies: [
         ...Object.keys(nodeSets.sources).map(id => ({ type: 'source' as const, id })),

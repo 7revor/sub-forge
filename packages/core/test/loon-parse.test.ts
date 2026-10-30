@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { parseContent, parseLoonLine, renderLoon } from '../src/index.ts';
 import { iniFixture } from './fixtures/ini-client.ts';
@@ -11,7 +12,7 @@ describe('Loon 节点输入', () => {
   it('Hysteria2 跳跃端口、带宽、混淆可重新导出，不能丢失凭据', () => {
     const node = parseLoonLine('HY2 = Hysteria2,hy.example.test,443,"a,b=c",server-ports="20000:20100,30000",hop-interval=30,download-bandwidth=100,salamander-password=example,sni=cdn.example.test');
     expect(node).toMatchObject({ password: 'a,b=c', ports: '20000-20100,30000', down: '100 Mbps', obfs: 'salamander', 'obfs-password': 'example' });
-    const f = iniFixture(); f.base = {};
+    const f = iniFixture(); f.base = '';
     f.nodeSets.locals.nodes!.proxies = [node];
     const out = renderLoon(f);
     expect(out.report.hasErrors, JSON.stringify(out.report.items)).toBe(false);

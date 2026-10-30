@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api } from '../api.ts';
 import type { ResourceState } from '../components/ResourceCache.tsx';
 import { Button,Card,ErrorAlert,Field,Input,PageHeader,PageScroll,formatTime } from '../components/ui.tsx';
-type RuleResource = { key: string; name: string; target: { client: string; platform?: string }; referenced: boolean; error?: string };
+type RuleResource = { key: string; name: string; target: { client: string }; referenced: boolean; error?: string };
 export function System(){
   const qc=useQueryClient();const [hours,setHours]=useState<string>();
   const info=useQuery({queryKey:['system'],queryFn:()=>api<{resourceCacheTtlSec:number}>('GET','/system')});
@@ -34,7 +34,7 @@ export function System(){
       <Card title="公共规则资源" subtitle="由所有有效用户令牌共享。删除订阅不删除这里的资源；可清理已无配置或模板引用的产物。">
         <ErrorAlert error={rules.error} />
         {!rules.data ? <p className="text-ink-muted">正在读取公共资源…</p> : !rules.data.items.length ? <p className="text-ink-muted">尚未生成公共规则资源。</p> : <ul className="flex list-none flex-col gap-3 p-0">{rules.data.items.map(resource => <li key={resource.key} className="flex items-center justify-between gap-4 rounded border border-line p-3 text-[13px]">
-          <div className="min-w-0"><div className="break-all font-medium">{resource.name}</div><div className="text-ink-muted">{resource.target.client} · {resource.target.platform ?? '通用平台'} · {resource.referenced ? '仍被引用' : '无配置引用'}</div>{resource.error && <p className="text-red-600">{resource.error} · 正在使用上次成功产物</p>}</div>
+          <div className="min-w-0"><div className="break-all font-medium">{resource.name}</div><div className="text-ink-muted">{resource.target.client} · {resource.referenced ? '仍被引用' : '无配置引用'}</div>{resource.error && <p className="text-red-600">{resource.error} · 正在使用上次成功产物</p>}</div>
           <Button size="sm" disabled={resource.referenced} onClick={() => void remove(resource)}>删除资源</Button>
         </li>)}</ul>}
       </Card>

@@ -1,3 +1,4 @@
+import { mergeNativeIni } from '../base/native.ts';
 import type { GroupSpec } from '../types.ts';
 import type { Report } from '../report.ts';
 import type { MihomoRenderResult } from './mihomo.ts';
@@ -40,10 +41,10 @@ function loonGroup(group: Fields, report: Report): string {
 }
 
 /** 所有规则集原位置展开，避免 [Remote Rule] 与本地规则具有不同优先级。 */
-export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rulesets' | 'report'>): string {
+export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rulesets' | 'report' | 'baseText'>): string {
   const { config, report } = result;
   try {
-    const base = stringifyIniBase({ ...(config.general ? { general: config.general } : {}), ...(config.host ? { host: config.host } : {}) });
+    const base = mergeNativeIni([result.baseText ?? '', stringifyIniBase({ ...(config.general ? { general: config.general } : {}) })]);
     const names = new Set([...(config.proxies as Fields[]).map(n => String(n.name)), ...(config['proxy-groups'] as Fields[]).map(g => String(g.name))]);
     const chains: string[] = [];
     const proxies = (config.proxies as Fields[]).flatMap(node => {

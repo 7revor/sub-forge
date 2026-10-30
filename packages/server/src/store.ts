@@ -1,3 +1,4 @@
+import { migrateNativeDocument } from './native-migration.ts';
 import { normalizeRulePresence } from './rule-presence.ts';
 import { migrateProfile, profileTemplate, stripProfileRevisions } from './profile-routing.ts';
 // SQLite 存储。保存文档、快照与最近成功的配置版本；旧客户端按版本取兼容资源。
@@ -52,11 +53,12 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 24;
+const SCHEMA_VERSION = 25;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS native_migration_backups (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
 CREATE TABLE IF NOT EXISTS system_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS resource_bindings (kind TEXT NOT NULL, id TEXT NOT NULL, url_hash TEXT NOT NULL, resource TEXT NOT NULL, PRIMARY KEY(kind,id,url_hash));
 CREATE INDEX IF NOT EXISTS resource_bindings_resource ON resource_bindings (resource);
@@ -370,6 +372,7 @@ export class Store {
         // 旧日志只有截断的 token 摘要，不能可靠确定访问者；保留原记录，不猜测用户归属。
         this.db.exec('CREATE INDEX IF NOT EXISTS access_log_user_time ON access_log (user_id, at DESC, id DESC); CREATE INDEX IF NOT EXISTS access_log_user_kind ON access_log (user_id, kind, at DESC, id DESC)');
       }
+      if (version < 25) this.migrateNativeConfigs();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -574,6 +577,27 @@ export class Store {
       this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
         .run(this.cipher.encrypt(JSON.stringify(stripProfileRevisions(profile))), row.id);
     }
+  }
+
+  /** 整体备份后升级；失败由外层事务回滚，原配置和归属不变。 */
+  private migrateNativeConfigs(): void {
+    const rows = this.db.prepare('SELECT kind,id,data FROM docs').all() as { kind: string; id: string; data: string }[];
+    const presets = new Map(rows.filter(r => r.kind === 'preset').map(r => [r.id, JSON.parse(this.cipher.decrypt(r.data))]));
+    for (const row of rows) {
+      const previous = JSON.parse(this.cipher.decrypt(row.data));
+      const next = migrateNativeDocument(row.kind, previous, presets.get(previous.base?.presetId));
+      if (JSON.stringify(next) === JSON.stringify(previous)) continue;
+      this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run(row.kind, row.id, row.data, this.now());
+      this.db.prepare('UPDATE docs SET data = ? WHERE kind = ? AND id = ?').run(this.cipher.encrypt(JSON.stringify(next)), row.kind, row.id);
+    }
+    for (const row of this.db.prepare('SELECT template_id,version,data FROM template_versions').all() as {template_id:string;version:number;data:string}[]) {
+      const previous = JSON.parse(row.data), next = migrateNativeDocument('template', previous);
+      if (JSON.stringify(next) === JSON.stringify(previous)) continue;
+      this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('template', row.template_id + ':' + row.version, this.cipher.encrypt(row.data), this.now());
+      this.db.prepare('UPDATE template_versions SET data = ? WHERE template_id = ? AND version = ?').run(JSON.stringify(next), row.template_id, row.version);
+    }
+    // 清理可回退主配置，历史节点/规则资源继续服务已经下发的订阅地址。
+    this.db.exec('DELETE FROM last_good');
   }
 
   private stripResourceTiming(doc: Record<string, any>): void {
@@ -1012,6 +1036,7 @@ export class Store {
       this.removeRuleSwitches();
       this.collapseTemplateHistory();
       this.removeConcurrencyMarkers();
+      this.migrateNativeConfigs();
     });
     tx();
   }

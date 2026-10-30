@@ -48,7 +48,7 @@ export function accessLogger(store: Store, now: () => number): MiddlewareHandler
       const resource = store.getSharedRule<SharedRuleRecord>(id!);
       const matcher = resource?.reference.matcher;
       kind = matcher && !matcher.remote && !matcher.repository ? 'enhancement' : 'rule-collection';
-      if (resource) { resourceName = resource.name; client = resource.target.client; platform = resource.target.platform; }
+      if (resource) { resourceName = resource.name; client = resource.target.client; platform = undefined; }
     }
     const result = c.get('accessResult');
     const fallback = !!c.res.headers.get('x-sub-forge-warning');

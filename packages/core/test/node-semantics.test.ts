@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 import { expect, it } from 'vitest';
 import { parseContent, renderMihomo, renderSurge, renderLoon, renderStash } from '../src/index.ts';
 import { iniFixture, routing } from './fixtures/ini-client.ts';
@@ -10,7 +11,7 @@ it.each(['vless', 'vmess'])('Loon %s 的 SNI 变成 Mihomo 的 servername', type
   expect(parsed.proxies[0]).not.toHaveProperty('sni');
 });
 it('节点 QUIC 控制按客户端语义处理，不把被忽略字段当作成功', () => {
-  const f = iniFixture(); f.base = {}; routing(f).rules = [];
+  const f = iniFixture(); f.base = ''; routing(f).rules = [];
   f.nodeSets.locals.nodes!.proxies = [{ name: '节点', type: 'ss', server: 'example.test', port: 443, cipher: 'aes-128-gcm', password: 'example', 'block-quic': true }];
   expect(renderSurge(f).yaml).toContain('block-quic=on');
   expect(renderLoon(f).yaml).toContain('block-quic=true');
@@ -24,7 +25,7 @@ it('节点 QUIC 控制按客户端语义处理，不把被忽略字段当作成�
   }
 });
 it('手工 VLESS SNI 别名也会规范化，冲突阻止输出', () => {
-  const f = iniFixture(); f.base = {}; routing(f).rules = []; f.profile.nodeSets[0]!.output = 'inline';
+  const f = iniFixture(); f.base = ''; routing(f).rules = []; f.profile.nodeSets[0]!.output = 'inline';
   f.nodeSets.locals.nodes!.proxies = [{ name: '节点', type: 'vless', server: 'example.test', port: 443, uuid: '00000000-0000-4000-8000-000000000001', sni: 'tls.example.test' }];
   expect(renderMihomo(f).config.proxies).toEqual([expect.objectContaining({ servername: 'tls.example.test' })]);
   f.nodeSets.locals.nodes!.proxies[0]!.servername = 'different.example.test';

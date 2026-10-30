@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 // 代理链集成测试（docs/06 §6）：用真实 mihomo 内核验证渲染结果。
 // 需要环境变量 MIHOMO 指向 mihomo 二进制（v1.19.27+），否则整组跳过：
 //   MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
@@ -151,7 +152,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
         provider: (key, v) => `http://127.0.0.1:${ports.files}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
         ruleset: (key) => `http://127.0.0.1:${ports.files}/r/TOKEN/${key}`,
       },
-      base: { 'log-level': 'debug', ipv6: false, 'geodata-mode': false, 'geo-auto-update': false },
+      base: testYaml({ 'log-level': 'debug', ipv6: false, 'geodata-mode': false, 'geo-auto-update': false }),
     };
     if (opts.viaGroup) {
       profile.overlay.extraGroups = [{ group: { id: 'pre', name: '普通前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'source', id: 'T' } }], filter: '^前置$', whenEmpty: 'reject' } }];

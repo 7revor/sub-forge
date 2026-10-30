@@ -60,7 +60,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
           if (!Array.isArray(rule.matcher.overrides)) throw bad('客户端覆盖必须是数组');
           for (const override of rule.matcher.overrides) {
             if (!obj(override) || !obj(override.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
-            if (override.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(String(override.when.platform))) throw bad('客户端覆盖平台不合法');
+            if ('platform' in override.when) throw bad('规则改写只区分内核，不再支持平台条件');
             const action = override.action;
             if (Object.keys(action).length !== 1) throw bad('客户端覆盖只能指定一个动作');
             if ('drop' in action) { if (action.drop !== true) throw bad('客户端覆盖丢弃动作不合法'); }

@@ -1,3 +1,5 @@
+import { stringify as testYaml } from 'yaml';
+import { stringifyIniBase as testIni } from '@sub-forge/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { remoteRuleMatcher } from '@sub-forge/core';
 import { RenderService } from '../src/render.ts';
@@ -14,10 +16,10 @@ async function scenario() {
   envs.push(env);
   const user = await addUser(env.store, 'alice', 'admin'); await addUser(env.store, 'bob');
   const alice = client(env.app), bob = client(env.app); await alice.login('alice'); await bob.login('bob');
-  env.store.put('preset', { id: 'base', name: '独立基础配置', version: 1, mihomo: { 'mixed-port': 7890 }, surge: { general: { ipv6: false, loglevel: 'notify' } } }, user.id);
+  env.store.put('preset', { id: 'base', name: '独立基础配置', version: 1, config: { kernels: {mihomo: testYaml({ 'mixed-port': 7890 }), surge: testIni({ general: { ipv6: false, loglevel: 'notify' } }) } } }, user.id);
   env.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'trojan', server: 'example.test', port: 443, password: 'example' }] }, user.id);
   const draft = { name: 'Surge', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' },
-    base: { presetId: 'base', patch: { 'allow-lan': true }, surgePatch: { general: { 'test-timeout': 5 } } },
+    base: { presetId: 'base', kernels: {mihomo: testYaml({ 'allow-lan': true }), surge: testIni({ general: { 'test-timeout': 5 } }) } },
     routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }],
       rules: [{ id: 'rs', matcher: remoteRuleMatcher(url), target: { kind: 'group', groupId: 'g' } }, { id: 'proc', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Example' } }, target: { kind: 'group', groupId: 'g' } }], final: { kind: 'builtin', name: 'DIRECT' } } } };
   const saved = await alice.post('/api/profiles', draft); expect(saved.status, saved.text).toBe(201);
@@ -30,14 +32,14 @@ const resourceUrl = (text: string) => {
   return match[1]!;
 };
 describe('Surge 主订阅和 API', () => {
-  it('完整 INI 使用独立基础配置、正确 MIME、客户端与平台规则资源', async () => {
+  it('完整 INI 使用独立基础配置、正确 MIME、按内核生成规则资源', async () => {
     const h = await scenario();
     const res = await h.app.request('/sub/' + h.token + '/' + h.profile.id, { headers: { 'user-agent': 'Surge iOS/3412' } });
     expect(res.status).toBe(200); expect(res.headers.get('content-type')).toContain('text/plain');
     const text = await res.text();
-    expect(text).toContain('#!MANAGED-CONFIG https://sub.test/sub/' + h.token + '/' + h.profile.id + '?target=surge&platform=ios interval=86400 strict=false');
+    expect(text).toContain('#!MANAGED-CONFIG https://sub.test/sub/' + h.token + '/' + h.profile.id + '?target=surge&platform=ios&app=surge-ios interval=86400 strict=false');
     expect(text).toContain('[General]\nipv6 = false\nloglevel = notify\ntest-timeout = 5');
-    expect(text).not.toMatch(/mixed-port|allow-lan|PROCESS-NAME/);
+    expect(text).not.toMatch(/mixed-port|allow-lan/);
     expect(text).toContain('节点 = trojan, example.test, 443, password="example"');
     expect(text).toContain('FINAL,DIRECT');
     const url = resourceUrl(text), file = await h.app.request(url);
@@ -58,7 +60,7 @@ describe('Surge 主订阅和 API', () => {
       expect(res.json.exportYaml).not.toMatch(/__SF_|RULE-SET/);
       expect(res.json.exportYaml).toContain('DOMAIN,example.test,代理,extended-matching\nIP-CIDR,192.0.2.0/24,代理,no-resolve\nUSER-AGENT,Example*,代理');
     }
-    expect(h.store.getLastGood(h.profile.id, 'surge:ios')).toBeUndefined();
+    expect(h.store.getLastGood(h.profile.id, 'surge:ios:surge-ios')).toBeUndefined();
     expect((await h.bob.post('/api/profiles/' + h.profile.id + '/preview', { client: 'surge' })).status).toBe(404);
     expect((await h.bob.post('/api/profiles/preview', { profile: h.profile, client: 'surge' })).status).toBe(400);
   });
@@ -67,8 +69,8 @@ describe('Surge 主订阅和 API', () => {
     expect((await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=unknown')).status).toBe(400);
     expect((await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=surge&platform=linux')).status).toBe(400);
     expect((await h.alice.post('/api/profiles/preview', { profile: h.profile, client: 'surge', platform: 'android' })).status).toBe(400);
-    expect((await h.alice.post('/api/presets', { name: '非法', mihomo: {}, surge: { proxies: [] } })).status).toBe(400);
-    expect((await h.alice.post('/api/profiles', { ...h.draft, base: { surgePatch: { general: { loglevel: 'notify\n[Rule]' } } } })).status).toBe(400);
+    expect((await h.alice.post('/api/presets', { name: '非法', config: { kernels: {mihomo: testYaml({}), surge: {} } } })).status).toBe(400);
+    expect((await h.alice.post('/api/profiles', { ...h.draft, base: { kernels: {surge: {} } } })).status).toBe(400);
     const mihomo = await h.app.request('/sub/' + h.token + '/' + h.profile.id + '?target=mihomo');
     expect(mihomo.status).toBe(200); expect(await mihomo.text()).toContain('mixed-port: 7890');
   });

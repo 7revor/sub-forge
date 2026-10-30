@@ -7,18 +7,18 @@
 | 项目 | Mihomo | Surge | Loon | Stash |
 | --- | --- | --- | --- | --- |
 | 完整主订阅 | YAML | INI | INI | YAML |
-| 基础预设 | `preset.mihomo` | `preset.surge` | `preset.loon` | `preset.stash` |
-| 订阅覆盖 | `base.patch` | `base.surgePatch` | `base.loonPatch` | `base.stashPatch` |
+| 基础预设原文 | `config.kernels.mihomo` | `config.kernels.surge` | `config.kernels.loon` | `config.kernels.stash` |
+| 订阅追加原文 | `base.kernels.mihomo` | `base.kernels.surge` | `base.kernels.loon` | `base.kernels.stash` |
 | 节点集 | provider / inline | 快照内联 | 快照内联 | 快照内联 |
 | 规则集 | 全局托管 provider | 全局托管 LIST | 原位置展开到 `[Rule]` | 全局托管 provider |
 | 独立文件 | 现有 YAML 导出 | 规则内嵌 `.conf` | 完整 `.conf` | 规则内嵌 YAML |
 | 平台 | 现有平台 | iOS / macOS | iOS / macOS | iOS / macOS |
 
-INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Host]`；节点、组、规则由对应领域对象生成。原生项仍按客户端独立合并；新增公共项只映射已适配语义，不把任意 Mihomo DNS/TUN 配置自动套到其他客户端。表单和 INI 双向转换保留 `false`、`0`、列表、引号和转义；清空字段恢复未配置状态。INI 大小写和行内注释按解析规则处理，非法段、重复键、换行注入和不支持的嵌套值报错。
+基础配置使用「内核公共追加＋可选客户端追加」，只保存原生文本，取消表单解析、公共字段提取及跨内核转换。Mihomo/Stash 填写 YAML；Surge/Loon 填写 INI。DNS 分流、加密 DNS、Hosts、IPv6、GeoData、skip-proxy、TUN 排除及 fake-ip-range 全部由用户在对应内核原文中维护，不猜测等价关系。详见[原文追加约定](20-native-client-append.md)。
 
 `GET /sub/:token/:profileId?target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。token 为当前用户的统一资源令牌，配置必须属于该用户；导入沿用现有令牌。Surge 主订阅含带当前 token 和配置 ID 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
 
-预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同客户端、同平台的上一份成功产物；没有可回退产物时返回 503，不发布半成品。规则产物按公共资源身份、处理参数、客户端和平台共享，下载使用有效用户 token 鉴权；节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
+预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同客户端、同平台的上一份成功产物；没有可回退产物时返回 503，不发布半成品。规则产物按公共资源身份、处理参数和内核共享，下载使用有效用户 token 鉴权；节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
 
 ## 节点和策略组
 
@@ -38,23 +38,11 @@ INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Ho
 
 节点输入支持完整 INI 的 `[Proxy]` 段及裸节点行，通过位置凭据和专有参数区分 Surge/Loon。凭据中的逗号、等号、引号、反斜杠以及显式 false 可往返。Surge VMess 输入要求显式 `vmess-aead=true`；旧的非 AEAD 配置无法忠实映射时拒绝导入。节点粘贴入口仍只导入节点；整份 Loon 配置使用配置订阅列表中的「导入 Loon 完整配置」入口。
 
-## 公共基础配置与专用覆盖
+## 内核与客户端原文追加
 
-预设新增 `common`，订阅新增 `base.common`。合并顺序为：**预设公共项 → 本订阅公共项 → 预设客户端原生项 → 本订阅客户端原生覆盖**。数组替换，对象递归合并，`false`、`0` 不当作空值。公共测速默认值进入节点/组适配流程，组显式参数优先；INI 端明确设置的全局测速覆盖优先于公共默认值。
+合并顺序为：**预设内核原文 → 订阅内核原文 → 预设客户端原文 → 订阅客户端原文**。内核为 Mihomo、Surge、Stash、Loon；FlClash、Clash Verge Rev 属于 Mihomo，Apple 两端按应用选择。保存只检查目标及字符串类型，未写完的原文也能保存。生成时解析必要的结构：YAML 映射递归合并、数组/标量/null 后层替换；INI General/Host/MITM 同名键后层替换，其余段落按顺序追加。原文不回写，错误会在预览报告，不会静默丢字段。
 
-| 公共项 | 映射与边界 |
-| --- | --- |
-| `dnsServers` | 普通 DNS IP / system → Mihomo、Stash nameserver，Surge、Loon dns-server；加密 DNS 和复杂上游参数保留原生配置 |
-| `hosts` / `dnsPolicy` | 精确域名 → 单个固定 IP / DNS；INI 使用 Host。通配符、别名、SSID、域名集合与特殊 DNS 规则暂不提取 |
-| `realIpDomains` | 精确域名 → fake-ip-filter / always-real-ip / real-ip；不同通配语法不互换，也不当作 DIRECT 分流规则 |
-| `dnsIpv6` | Mihomo/Stash dns.ipv6，Surge ipv6；Loon ip-mode 还控制连接，不能等价替换。若明确配置 Loon ip-mode 则采用原生覆盖并警告，否则阻止该目标生成。Stash true 仍依赖网络状态并提示 |
-| `geoipUrl` | Mihomo MMDB、Surge geoip-maxmind-url、Loon geoip-url；Stash 暂未适配 |
-| `httpPort` / `socksPort` / `allowLan` | Mihomo 原生端口；Surge 需明确 macOS/iOS，macOS 使用监听地址，iOS/Loon 使用 Wi-Fi 代理共享并提示范围差异；Stash 暂未适配。Wi-Fi 端口不以 0 表示停用 |
-| `testUrl` / `testTimeoutMs` | 默认代理测速 URL / 毫秒超时；各端按节点、组或全局作用域输出，不同组要求冲突时明确报错 |
-
-预设和订阅基础编辑器提供「公共项」表单/YAML；原生标签提供「提取公共基础项」预览，只在「应用到草稿」后改变草稿，仍需保存。已有公共值优先于提取值，未映射字段保持原样并逐项报告。Mihomo `tun.stack=mips` 保留且表单可选。
-
-`mode`、日志等级、TUN 栈/路由/DNS 劫持、FakeIP 模式与地址段、API/dashboard、HTTP 引擎、skip-proxy、STUN、网络接口选择等仍在专用覆盖维护。特别是 `skip-proxy` 不能自动改成 DIRECT，`*.example.com` 和 `*example.com` 不能盲目换成 Mihomo 后缀语法。原文中有 Host 通配/特殊条目时整个 Host 段保留，避免破坏匹配顺序。
+节点、策略组、规则仍由原有模块管理；原文包含这些受管理的段时生成报错。listeners 仅允许放在订阅追加。预设不再提供表单、原文切换或公共项提取入口。升级前的对象及公共映射只在 v25 一次迁移中使用，保留加密备份与迁移提示。
 
 ## Loon 完整配置导入
 
@@ -77,7 +65,7 @@ INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Ho
 - Surge `extended-matching` 保留在出口之后；其他客户端不能等价表示时诊断并跳过。未知尾参数拒绝解析，不静默丢弃。
 - IP 去重键包含 `no-resolve` 和 `src`；整组 src 只加到 IP 规则，模板编辑往返不再生成 `DOMAIN,...,src`。
 - 正则转通配符拒绝把转义的字面星号、问号或方括号扩大成通配语义。
-- Loon 使用 DEST-PORT、PROTOCOL；进程规则只输出到 macOS，并提示名称匹配大小写差异。复杂进程正则、GEOSITE、DOMAIN-REGEX、SRC-IP-CIDR 等不强行转换。Mihomo 斜杠端口集合现会转为等价 OR，源端口与逻辑嵌套一并保留。
+- Loon 使用 DEST-PORT、PROTOCOL；进程规则按内核输出，并提示名称匹配大小写差异；平台差异由目标客户端处理。复杂进程正则、GEOSITE、DOMAIN-REGEX、SRC-IP-CIDR 等不强行转换。Mihomo 斜杠端口集合现会转为等价 OR，源端口与逻辑嵌套一并保留。
 - RAW/本地原文仍为既有的显式透传入口；未指定客户端时不会自动解释未知语法，需由使用者确认目标支持。结构化规则和规则集转换提供语义诊断。
 - Loon 将规则集原位置展开以避免本地与远程规则的优先级重排，但客户端自身仍有域名/IP 等匹配阶段，不能保证跨客户端完全相同的规则优先级。
 - 旧二进制规则不能解码或转换时明确报错；本轮不新增通用 MRS/SRS 解码器。
@@ -100,3 +88,6 @@ Loon 没有在本机执行官方配置校验器；Surge/Loon 的真实客户端�
 ## Mihomo 公共子集测试
 
 后续逐项测试覆盖 77 个场景、四端 308 个生成组合，补充准确字段、单位、成员、规则出口、节点导入与基础配置隔离断言，并修复端口集合在 Surge 无法加载的问题。公共范围、条件、官方校验结果及四端示例见[多端可移植性验收](../research/verification/mihomo-portability-20261030/验收记录.md)。上方验证数字是首轮实现验收，本轮结果以新记录为准。
+
+
+2026-10-30 后续重构：当前基础配置与规则维度以 [20](20-native-client-append.md) 为准。早期公共映射验收仅描述历史实现。

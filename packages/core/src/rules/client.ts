@@ -1,9 +1,9 @@
 // 按客户端的规则改写与降级（CR-01 / CR-02，docs/04 §3）。
 
-import type { Client, ClientOverride, Platform, RuleIR } from '../types.ts';
+import type { Client, ClientOverride, RuleIR } from '../types.ts';
 import { rawRuleError, rawRuleParts } from './raw.ts';
 
-export type ClientCtx = { client: Client; platform?: Platform };
+export type ClientCtx = { client: Client };
 
 export type LoweredRule =
   | { kind: 'ok'; text: string; noResolve?: boolean; src?: boolean; extendedMatching?: boolean; note?: string }
@@ -31,7 +31,7 @@ export function withIpOptions(rule: RuleIR, options: { noResolve?: boolean; src?
 
 /** 声明式客户端覆盖：命中第一条匹配的覆盖，返回替换结果、保留原规则并追加，或丢弃（空数组） */
 export function applyOverrides(rule: RuleIR, overrides: ClientOverride[] | undefined, ctx: ClientCtx): RuleIR[] {
-  const hit = overrides?.find((o) => o.when.client === ctx.client && (o.when.platform === undefined || o.when.platform === ctx.platform));
+  const hit = overrides?.find((o) => o.when.client === ctx.client);
   if (!hit) return [rule];
   return 'drop' in hit.action ? [] : 'append' in hit.action ? [rule, ...hit.action.append] : hit.action.replace;
 }
@@ -127,7 +127,6 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
     case 'NETWORK':
       return { kind: 'ok', text: `PROTOCOL,${rule.value.toUpperCase()}` };
     case 'PROCESS': {
-      if (ctx.platform === 'ios') return { kind: 'drop', reason: 'Surge iOS 不支持进程规则' };
       if (rule.mode !== 'regex') return { kind: 'ok', text: `PROCESS-NAME,${rule.value}` };
       const wc = regexToWildcard(rule.value);
       return wc === undefined
@@ -161,7 +160,6 @@ function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
       return lowered.kind === 'ok' ? { ...lowered, note: 'Stash SRC-PORT 需要 iOS 3.7 / macOS 4.4 或更新版本' } : lowered;
     }
     case 'PROCESS': {
-      if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Stash 进程规则仅支持 macOS' };
       if (rule.kind === 'path') return rule.mode === 'exact'
         ? { kind: 'ok', text: `PROCESS-PATH,${rule.value}` }
         : { kind: 'drop', reason: 'Stash 不支持进程路径通配或正则' };
@@ -191,7 +189,6 @@ function lowerLoon(rule: RuleIR, ctx: ClientCtx): LoweredRule {
       return lowerPort(rule.type === 'DST-PORT' ? 'DEST-PORT' : 'SRC-PORT', rule.value);
     case 'NETWORK': return { kind: 'ok', text: `PROTOCOL,${rule.value.toUpperCase()}` };
     case 'PROCESS': {
-      if (ctx.platform !== 'macos') return { kind: 'drop', reason: 'Loon 进程规则仅支持 macOS' };
       const value = rule.mode === 'regex' ? regexToWildcard(rule.value) : rule.value;
       if (value === undefined || (rule.kind === 'path' && value.endsWith('/'))) return { kind: 'drop', reason: '该进程表达式无法等价转换为 Loon 名称或完整路径匹配' };
       const notes = [rule.kind === 'name' ? 'Loon 进程名称匹配不区分大小写' : '', rule.mode === 'regex' ? '进程正则转换为 Loon 通配符' : ''].filter(Boolean);

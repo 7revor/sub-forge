@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { importLoonConfig, renderLoon, renderMihomo, renderSurge, renderStash, lowerCommonBase, mergeBase, type LoonImport, type ReportItem, type Client } from '@sub-forge/core';
+import { importLoonConfig, renderLoon, renderMihomo, renderSurge, renderStash, resolveNativeBase, type LoonImport, type ReportItem, type Client } from '@sub-forge/core';
 import type { Store } from '../store.ts';
 import { randomId } from '../crypto.ts';
 import { bad, jsonBody, requireUser, type ApiEnv } from './common.ts';
@@ -8,14 +8,13 @@ import { validateDoc } from './validate.ts';
 /** 仅用本地节点校验，远程来源等待正常快照流程；导入预览不会请求用户订阅。 */
 function compatibility(plan: LoonImport) {
   return Object.fromEntries((['mihomo', 'surge', 'loon', 'stash'] as Client[]).map(client => {
-    const mapped = lowerCommonBase(plan.profile.base.common, client);
     const result = ({ mihomo: renderMihomo, surge: renderSurge, loon: renderLoon, stash: renderStash }[client])({
-      profile: plan.profile, common: plan.profile.base.common,
-      base: client === 'loon' ? mergeBase(mapped.base, plan.profile.base.loonPatch) : mapped.base,
+      profile: plan.profile,
+      base: resolveNativeBase(client, undefined, undefined, plan.profile.base),
       nodeSets: { locals: Object.fromEntries(plan.locals.map(x => [x.id,x])), sources: Object.fromEntries(plan.sources.map(x => [x.id,x])), collections: Object.fromEntries(plan.collections.map(x => [x.id,x])), snapshots: Object.fromEntries(plan.sources.map(x => [x.id, ['']])) },
       rules: { rulesets: {}, snapshots: {} }, urls: { provider: () => 'https://example.invalid/provider', ruleset: () => 'https://example.invalid/rules' },
     });
-    return [client, [...mapped.report, ...result.report.items.map(item => item.code === 'ruleset.missing' ? { ...item, level: 'info' as const, code: 'loon.import-remote-unchecked', message: '远程规则内容尚未拉取，暂未校验内容兼容性' } : item)]];
+    return [client, [...result.report.items.map(item => item.code === 'ruleset.missing' ? { ...item, level: 'info' as const, code: 'loon.import-remote-unchecked', message: '远程规则内容尚未拉取，暂未校验内容兼容性' } : item)]];
   })) as Record<Client, ReportItem[]>;
 }
 export function loonImportRoutes(store: Store) {

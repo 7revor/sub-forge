@@ -81,7 +81,7 @@ export function createApp(deps: AppDeps) {
     const profile = owned.doc;
     const ua = c.req.header('user-agent') ?? '';
     let detected;
-    try { detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform') }); }
+    try { detected = detectClient(ua, { target: c.req.query('target'), platform: c.req.query('platform'), app: c.req.query('app') }); }
     catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
 
     const setAccessResult = (outcome?: RenderOutcome) => c.set('accessResult', {
@@ -93,7 +93,7 @@ export function createApp(deps: AppDeps) {
       setAccessResult(); return c.text('该客户端平台仅支持 ios 或 macos', 400);
     }
 
-    const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}) });
+    const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}), ...(detected.app ? { app: detected.app } : {}) });
     if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     if (outcome.ok && !renderer.canReadNodes(outcome.render, t.userId)) return notFound(c);
     if (!outcome.ok) {
@@ -125,7 +125,8 @@ export function createApp(deps: AppDeps) {
     const client = c.req.query('target') ?? 'mihomo';
     if (client !== 'mihomo' && client !== 'stash' && client !== 'surge' && client !== 'loon') return notFound(c);
     if (client !== 'mihomo' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
-    const target: Target = { client, ...(platform ? { platform } : {}) };
+    let target: Target;
+    try { target = detectClient('', { target: client, platform, app: c.req.query('app') }); } catch (error) { if (error instanceof InvalidClientTarget) return notFound(c); throw error; }
     const version = c.req.query('v');
     const key = c.req.param('key');
     if (!version) return notFound(c);
@@ -176,9 +177,8 @@ export function createApp(deps: AppDeps) {
     let target;
     try { target = detectClient(c.req.header('user-agent') ?? '', c.req.query()); }
     catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
-    if (target.client !== 'mihomo' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('该客户端平台仅支持 ios 或 macos', 400);
     const reference = { matcher: { kind: 'ruleset' as const, id } };
-    const output = { client: target.client, ...(target.platform ? { platform: target.platform } : {}) };
+    const output = { client: target.client };
     try {
       const body = await renderer.sharedRules.readReference(reference, output);
       if (store.getActiveToken(token)?.userId !== user.userId || !store.get('ruleset', id) || body === undefined) return notFound(c);

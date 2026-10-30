@@ -107,6 +107,7 @@ export function RulesetEdit() {
       e.submit(x => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' }) }));
     }} saveError={e.save.error} onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
     badges={!e.isNew && <Badge>{sourceSummary(d)}</Badge>}>
+    {(d.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[13px] text-warn">{note}</p>)}
     {!canEdit && <p className="text-[13px] text-ink-muted">公共规则增强 · 仅创建者或管理员可以修改</p>}
     <fieldset disabled={!canEdit} className="contents">
     <Card title="基本信息" bodyClass="flex flex-col gap-4 px-4 pb-4">

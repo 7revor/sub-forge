@@ -84,7 +84,7 @@ export function convertRuleDocuments(
 ): RuleConversion {
   const out: RuleConversion = { lines: [], origins: [], diagnostics: [], stats: { parsed: 0, rejected: 0, output: 0, duplicates: 0, removed: 0, replaced: 0, appended: 0, unsupported: 0, degraded: 0, domain: 0, classical: 0, ipcidr: 0 } };
   const seen = new Set<string>();
-  const matches = (o: ClientOverride) => o.when.client === ctx.client && (o.when.platform === undefined || o.when.platform === ctx.platform);
+  const matches = (o: ClientOverride) => o.when.client === ctx.client;
   const push = (text: string, sourceId: string, line: number) => { out.lines.push(text); out.origins.push({ sourceId, line }); };
   const emit = (rule: RuleIR, sourceId: string, line: number, text: string) => {
     const r = withIpOptions(rule, options.ipOptions ?? {});

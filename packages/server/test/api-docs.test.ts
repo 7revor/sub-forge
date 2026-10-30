@@ -184,8 +184,8 @@ describe('文档增删改查', () => {
 
   it('基础设置预设：管理员维护，所有人可读', async () => {
     const { admin, alice } = await twoUsers();
-    expect((await alice.post('/api/presets', { name: 'X', mihomo: {} })).status).toBe(403);
-    const id = (await admin.post('/api/presets', { name: 'fake-ip', mihomo: { 'mixed-port': 7890 } })).json.item.id;
+    expect((await alice.post('/api/presets', { name: 'X', config: {} })).status).toBe(403);
+    const id = (await admin.post('/api/presets', { name: 'fake-ip', config: { kernels: { mihomo: 'mixed-port: 7890' } } })).json.item.id;
     expect((await alice.get('/api/presets')).json.items.map((p: { name: string }) => p.name)).toEqual(['fake-ip']);
     expect((await alice.get(`/api/presets/${id}`)).status).toBe(200);
     await alice.post('/api/profiles', { name: 'P', nodeSets: [], base: { presetId: id } });
@@ -193,24 +193,21 @@ describe('文档增删改查', () => {
   });
 });
 
-describe('预设 Surge 基础配置', () => {
-  it('保存和更新后可完整读回，保留 general 标量、列表及空段', async () => {
+describe('预设原文配置', () => {
+  it('保存和更新后逐字读回，空文本不自动补默认值', async () => {
     const { admin, alice } = await twoUsers();
-    const surge = { general: { ipv6: true, 'dns-server': ['1.1.1.1'], extra: false }, host: { 'example.com': '1.2.3.4' } };
-    const created = await admin.post('/api/presets', { name: '双客户端', mihomo: {}, surge });
+    const surge = '# 保留注释\n[General]\nipv6 = false\n[Host]\n*.example.test = server:1.1.1.1\n';
+    const created = await admin.post('/api/presets', { name: '原文', config: { kernels: { surge } } });
     expect(created.status).toBe(201);
     const path = `/api/presets/${created.json.item.id}`;
-    expect((await alice.get(path)).json.item.surge).toEqual(surge);
-    const updated = await admin.put(path, { name: '空段', mihomo: {}, surge: {} });
-    expect(updated.status).toBe(200);
-    expect((await alice.get(path)).json.item.surge).toEqual({});
+    expect((await alice.get(path)).json.item.config.kernels.surge).toBe(surge);
+    expect((await admin.put(path, { name: '空段', config: { kernels: { surge: '' } } })).status).toBe(200);
+    expect((await alice.get(path)).json.item.config.kernels.surge).toBe('');
   });
-
-  it.each([1, null, [], { general: 1 }, { general: null }, { general: [] }, { host: 1 }, { host: null }, { host: [] }, { host: { a: 1 } }])('非法 Surge 类型 %j 返回 400', async (surge) => {
+  it.each([1, null, [], {}, { general: {} }])('只接受原文，拒绝结构对象 %j', async surge => {
     const { admin } = await twoUsers();
-    const res = await admin.post('/api/presets', { name: '非法预设', mihomo: {}, surge });
-    expect(res.status).toBe(400);
-    expect(res.json.error).toMatch(/surge.*必须是/);
+    const res = await admin.post('/api/presets', { name: '错误类型', config: { kernels: { surge } } });
+    expect(res.status).toBe(400); expect(res.json.error).toContain('原始文本');
   });
 });
 

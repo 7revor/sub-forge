@@ -1,8 +1,8 @@
 import { remoteRuleMatcher } from '../rules/remote.ts';
 import type { Collection, GroupMember, GroupSpec, LocalProxyGroup, Profile, Source, Target } from '../types.ts';
 import { Report, type ReportItem } from '../report.ts';
-import { parseIniBase, stripIniComment, iniName } from '../render/ini-format.ts';
-import { extractCommonBase, type CommonBase } from '../base/common.ts';
+import { stripIniComment, iniName } from '../render/ini-format.ts';
+import { validateNativeText, type ProfileBase } from '../base/native.ts';
 import { parseLoonLine } from '../proxy/loon.ts';
 import { splitRuleFields } from '../rules/syntax.ts';
 import { parseRuleLine } from '../rules/parse.ts';
@@ -11,7 +11,7 @@ import { findGroupCycles } from '../template/merge.ts';
 
 type Row = { text: string; line: number };
 export type LoonImport = {
-  profile: Profile & { base: { common: CommonBase; loonPatch: Record<string, unknown> } };
+  profile: Profile & { base: ProfileBase };
   sources: Source[]; collections: Collection[]; locals: LocalProxyGroup[];
   report: ReportItem[];
 };
@@ -44,7 +44,7 @@ export function importLoonConfig(text: string, opts: { id: string; name: string;
   let serial = 0; const id = () => opts.id + '-' + ++serial;
   const locals: LocalProxyGroup[] = [{ id: id(), name: opts.name + ' · 本地节点', proxies: [] }], local = locals[0]!;
   const sources: Source[] = [], collections: Collection[] = [], groups: GroupSpec[] = [];
-  const profile: LoonImport['profile'] = { id: opts.id, name: opts.name, nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups, rules: [], final: { kind: 'builtin', name: 'REJECT' } } }, base: { common: {}, loonPatch: {} } };
+  const profile: LoonImport['profile'] = { id: opts.id, name: opts.name, nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups, rules: [], final: { kind: 'builtin', name: 'REJECT' } } }, base: {} };
   const config = profile.routing!.mode === 'independent' ? profile.routing!.config : null!;
   const run = (name: string, fn: (row: Row) => void) => {
     for (const row of sections.get(name) ?? []) try { fn(row); } catch (error) { report.error('loon.import-invalid', '[' + name + '] ' + (error instanceof Error ? error.message : '内容不合法'), 'line:' + row.line); }
@@ -57,9 +57,14 @@ export function importLoonConfig(text: string, opts: { id: string; name: string;
     declared.add(name); return { name, fields: splitRuleFields(row.text.slice(at + 1), false) };
   };
   try {
-    const base = ['general', 'host'].filter(k => sections.has(k)).map(k => '[' + k + ']\n' + sections.get(k)!.map(r => r.text).join('\n')).join('\n');
-    const extracted = extractCommonBase(parseIniBase(base), 'loon');
-    profile.base = { common: extracted.common, loonPatch: extracted.native }; report.items.push(...extracted.report);
+    let inBase = false;
+    const base = text.split(/\r?\n/).filter(line => {
+      const heading = /^\[([^\]]+)\]$/.exec(stripIniComment(line).trim());
+      if (heading) inBase = ['general', 'host'].includes(heading[1]!.toLowerCase());
+      return inBase;
+    }).join('\n');
+    validateNativeText(base, 'loon');
+    profile.base = { kernels: { loon: base } };
   } catch (error) { report.error('loon.import-base', (error as Error).message); }
   run('proxy', row => { const { name } = named(row); const proxy = parseLoonLine(row.text); local.proxies.push({ ...proxy, name }); });
   const remote = new Map<string, Source>(), active = new Set<string>();

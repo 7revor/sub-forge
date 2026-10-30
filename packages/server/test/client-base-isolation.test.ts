@@ -1,72 +1,139 @@
 import { expect, it } from 'vitest';
-import { parse as parseYaml } from 'yaml';
-import { parseIniBase } from '@sub-forge/core';
-const readConfig = (target: string, text: string): Record<string, unknown> => target === 'surge' || target === 'loon' ? parseIniBase(text.split('[Proxy]')[0]!) : parseYaml(text);
+import { parse } from 'yaml';
 import { addUser, client, setupApp } from './helpers.ts';
 
-it('Mihomo 的 DNS/TUN/端口不会自动转换；各端只合并自己的预设和覆盖', async () => {
+const mihomo = `# 用户原始配置：注释、空值和布尔值均保留
+port: 7890
+socks-port: 7891
+allow-lan: true
+mode: rule
+log-level: info
+external-controller: 0.0.0.0:9090
+hosts:
+tun:
+  enable: true
+  stack: mips
+  auto-route: true
+  strict-route: false
+  auto-detect-interface: true
+  dns-hijack:
+    - any:53
+dns:
+  enable: true
+  use-hosts: true
+  ipv6: false
+  respect-rules: true
+  proxy-server-nameserver: [223.5.5.5]
+  direct-nameserver: [223.5.5.5]
+  direct-nameserver-follow-policy: true
+  nameserver-policy:
+    "geosite:cn,private": 223.5.5.5
+    "+.example.test": ["https://dns.example.test/dns-query#DIRECT"]
+  nameserver: [223.5.5.5]
+  fake-ip-filter: ["*.orb.local"]
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+`;
+const surge = `[General]
+ipv6 = false
+dns-server = 223.5.5.5
+encrypted-dns-server = h3://dns.example.test/dns-query
+skip-proxy = *.orb.local
+tun-excluded-routes = 192.168.0.0/16
+[Host]
+*.example.test = server:1.1.1.1
+[URL Rewrite]
+^https://example.test/foo https://example.test/bar 302
+`;
+const routing = { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } };
+const draft = { name: '原文追加', nodeSets: [], chains: [], overlay: {}, routing };
+
+it('原文逐字保存，四内核隔离；仅生成时合并，不把切换目标的结果回写源文档', async () => {
   const h = setupApp();
   try {
-    const user = await addUser(h.store, 'compatibility'), api = client(h.app); await api.login('compatibility');
-    const preset = { id: 'base', name: '隔离基础设置', version: 1, mihomo: {
-      'mixed-port': 7890, 'allow-lan': true, dns: { enable: true, 'enhanced-mode': 'fake-ip', 'fake-ip-range': '198.18.0.1/16', nameserver: ['1.1.1.1'] },
-      tun: { enable: true, stack: 'mixed', 'auto-route': true }, sniffer: { enable: true },
-    } };
-    h.store.put('preset', preset, user.id);
-    h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '示例', type: 'trojan', server: 'node.example.test', port: 443, password: 'example' }] }, user.id);
-    const saved = await api.post('/api/profiles', {
-      name: '兼容性', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'inline' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' },
-      base: { presetId: 'base', patch: { 'mixed-port': 0, 'allow-lan': false } },
-      routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }], rules: [], final: { kind: 'group', groupId: 'g' } } },
-    });
-    expect(saved.status, saved.text).toBe(201);
-    const profile = saved.json.item;
-    for (const target of ['mihomo', 'surge', 'loon', 'stash'] as const) {
-      const out = await h.renderer.render(profile.id, { client: target, platform: 'ios' });
-      expect(out.ok, JSON.stringify(out.report)).toBe(true);
-      if (!out.ok) throw new Error('基础配置测试渲染失败');
-      if (target === 'mihomo') expect(readConfig(target, out.render.yaml)).toMatchObject({ ...preset.mihomo, 'mixed-port': 0, 'allow-lan': false });
-      else for (const key of ['mixed-port', 'allow-lan', 'dns', 'tun', 'sniffer']) expect(readConfig(target, out.render.yaml)).not.toHaveProperty(key);
+    await addUser(h.store, 'native', 'admin'); const api = client(h.app); await api.login('native');
+    const config = { kernels: { mihomo, surge, stash: 'dns:\n  nameserver: [https://doh.pub/dns-query]\n', loon: '[General]\nip-mode = v4-only\n[Host]\n*.example.test = server:1.1.1.1\n' }, clients: { 'surge-ios': '[General]\nallow-wifi-access = false\n', 'surge-macos': '[General]\nsocks5-listen = 0.0.0.0:10001, 0.0.0.0:10002\n' } };
+    const preset = await api.post('/api/presets', { name: '原文', config }); expect(preset.status, preset.text).toBe(201);
+    expect(preset.json.item.config).toEqual(config);
+    const base = { presetId: preset.json.item.id, kernels: { mihomo: 'allow-lan: false\nport: 0\ndns:\n  nameserver-policy:\n    "rule-set:custom": ["tls://1.1.1.1"]\n' }, clients: { flclash: 'dns:\n  nameserver: [9.9.9.9]\n' } };
+    const saved = await api.post('/api/profiles', { ...draft, base }); expect(saved.status, saved.text).toBe(201);
+    const id = saved.json.item.id;
+    for (const kernel of ['mihomo', 'stash', 'surge', 'loon'] as const) {
+      const output = await h.renderer.render(id, { client: kernel }); expect(output.ok, JSON.stringify(output.report)).toBe(true);
+      if (!output.ok) throw new Error(output.message);
+      if (kernel === 'mihomo') {
+        const actual = parse(output.render.yaml);
+        expect(actual).toMatchObject({ ...parse(mihomo), port: 0, 'allow-lan': false });
+        expect(actual.dns['nameserver-policy']['rule-set:custom']).toEqual(['tls://1.1.1.1']);
+      } else { expect(output.render.yaml).not.toContain('fake-ip-range'); expect(output.render.yaml).not.toContain('mips'); }
     }
-    h.store.put('preset', { ...preset, surge: { general: { ipv6: false, 'dns-server': ['1.1.1.1'] } }, loon: { general: { 'ip-mode': 'v4-only', 'dns-server': ['1.0.0.1'] } }, stash: { dns: { nameserver: ['9.9.9.9'] } } }, user.id);
-    h.store.put('profile', { ...profile, base: { ...profile.base, surgePatch: { general: { 'test-timeout': 5 } }, loonPatch: { general: { 'allow-wifi-access': false } }, stashPatch: { dns: { 'follow-rule': false } } } }, user.id);
-    for (const target of ['surge', 'loon', 'stash'] as const) {
-      const out = await h.renderer.render(profile.id, { client: target, platform: 'ios' });
-      expect(out.ok, JSON.stringify(out.report)).toBe(true);
-      if (!out.ok) throw new Error('客户端独立基础配置渲染失败');
-      const expected = target === 'surge' ? { general: { ipv6: false, 'dns-server': ['1.1.1.1'], 'test-timeout': 5 } }
-        : target === 'loon' ? { general: { 'ip-mode': 'v4-only', 'dns-server': ['1.0.0.1'], 'allow-wifi-access': false } }
-        : { dns: { nameserver: ['9.9.9.9'], 'follow-rule': false } };
-      expect(readConfig(target, out.render.yaml)).toMatchObject(expected);
-      expect(readConfig(target, out.render.yaml)).not.toHaveProperty('tun');
-      expect(readConfig(target, out.render.yaml)).not.toHaveProperty('dns.enhanced-mode');
-    }
+    const ios = await h.renderer.preview(id, { client: 'surge', app: 'surge-ios' });
+    const mac = await h.renderer.preview(id, { client: 'surge', app: 'surge-macos' });
+    expect(ios.yaml).toContain('allow-wifi-access = false'); expect(ios.yaml).not.toContain('socks5-listen');
+    expect(mac.yaml).toContain('socks5-listen = 0.0.0.0:10001, 0.0.0.0:10002'); expect(mac.exportYaml).toContain('[URL Rewrite]');
+    expect(h.store.get('profile', id)?.base).toEqual(base);
+    expect(h.store.get('preset', preset.json.item.id)?.config).toEqual(config);
   } finally { await h.snapshots.settled(); h.store.close(); }
 });
 
-it('公共配置四层合并，原生覆盖最后生效，预览与订阅一致', async () => {
+it('UA 和显式 app 匹配客户端追加；缓存、节点链接与预览使用同一个目标', async () => {
   const h = setupApp();
   try {
-    const user = await addUser(h.store, 'common'), api = client(h.app); await api.login('common');
-    h.store.put('preset', { id: 'common', name: '公共预设', version: 1, common: { dnsServers: ['223.5.5.5'], hosts: { 'a.test': '192.0.2.1' } }, mihomo: { dns: { nameserver: ['1.1.1.1'] } } });
-    const saved = await api.post('/api/profiles', { name: '公共订阅', nodeSets: [], chains: [], overlay: {}, base: { presetId: 'common', common: { dnsServers: ['9.9.9.9'] }, loonPatch: { general: { 'dns-server': ['1.0.0.1'], 'allow-wifi-access': false } } }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
-    expect(saved.status, saved.text).toBe(201);
-    for (const target of ['mihomo', 'surge', 'loon', 'stash'] as const) {
-      const out = await h.renderer.render(saved.json.item.id, { client: target });
-      expect(out.ok, JSON.stringify(out.report)).toBe(true); if (!out.ok) throw new Error('渲染失败');
-      const parsed = readConfig(target, out.render.yaml);
-      expect(target === 'mihomo' || target === 'stash' ? (parsed.dns as any).nameserver : (parsed.general as any)['dns-server']).toEqual([target === 'mihomo' ? '1.1.1.1' : target === 'loon' ? '1.0.0.1' : '9.9.9.9']);
+    const user = await addUser(h.store, 'app'); const api = client(h.app); await api.login('app');
+    const saved = await api.post('/api/profiles', { ...draft, base: { kernels: { mihomo: 'port: 7890\n' }, clients: { flclash: 'port: 7892\n', 'clash-verge': 'port: 7893\n' } } });
+    expect(saved.status).toBe(201); const id = saved.json.item.id, token = h.store.createToken(user.id).token;
+    for (const [ua, app, port] of [['FlClash/1.0 Platform/macos', 'flclash', 7892], ['clash-verge/v2.4 Platform/windows', 'clash-verge', 7893], ['mihomo/1.19', undefined, 7890]] as const) {
+      const response = await h.app.request(`/sub/${token}/${id}`, { headers: { 'user-agent': ua } }); expect(response.status).toBe(200);
+      expect(parse(await response.text()).port).toBe(port);
+      const preview = await api.post(`/api/profiles/${id}/preview`, { client: 'mihomo', ...(app ? { app } : {}) });
+      expect(parse(preview.json.yaml).port).toBe(port);
     }
-    expect((await api.put('/api/profiles/' + saved.json.item.id, { ...saved.json.item, base: { common: { unknown: true } } })).status).toBe(400);
+    expect((await h.app.request(`/sub/${token}/${id}?target=surge&app=flclash`)).status).toBe(400);
+    const disabled = { ...saved.json.item, base: { ...saved.json.item.base, enabled: false } };
+    expect((await api.put('/api/profiles/' + id, disabled)).status).toBe(200);
+    const preview = await api.post(`/api/profiles/${id}/preview`, { client: 'mihomo', app: 'flclash' });
+    expect(parse(preview.json.yaml)).not.toHaveProperty('port');
+    expect(h.store.get('profile', id)?.base?.kernels?.mihomo).toBe('port: 7890\n');
   } finally { await h.snapshots.settled(); h.store.close(); }
 });
-it('客户端专用测速覆盖优先于公共默认值，不制造 Loon 超时冲突', async () => {
+
+it('格式错误仍原样保存，生成时明确失败；非当前内核的错误不影响输出', async () => {
   const h = setupApp();
   try {
-    const user = await addUser(h.store, 'timeout'), api = client(h.app); await api.login('timeout');
-    const saved = await api.post('/api/profiles', { name:'超时',nodeSets:[],chains:[],overlay:{},base:{common:{testTimeoutMs:3000,dnsIpv6:false},loonPatch:{general:{'test-timeout':5,'ip-mode':'v4-only'}}},routing:{mode:'independent',config:{groups:[{id:'g',name:'测速',type:'url-test',members:[{kind:'builtin',name:'DIRECT'}]}],rules:[],final:{kind:'group',groupId:'g'}}} });
-    expect(saved.status).toBe(201); const out=await h.renderer.render(saved.json.item.id,{client:'loon'});
-    expect(out.ok,JSON.stringify(out.report)).toBe(true);if(out.ok)expect(out.render.yaml).toContain('test-timeout = 5');
-    expect(out.report.some(r=>r.code==='base.native-override')).toBe(true);
-  } finally {await h.snapshots.settled();h.store.close();}
+    await addUser(h.store, 'invalid'); const api = client(h.app); await api.login('invalid');
+    const base = { kernels: { mihomo: 'dns: [尚未写完', surge } };
+    const saved = await api.post('/api/profiles', { ...draft, base }); expect(saved.status).toBe(201);
+    const id = saved.json.item.id;
+    expect(h.store.get('profile', id)?.base).toEqual(base);
+    expect((await h.renderer.preview(id, { client: 'mihomo' })).ok).toBe(false);
+    expect((await h.renderer.preview(id, { client: 'surge' })).ok).toBe(true);
+    expect((await api.put('/api/profiles/' + id, { ...saved.json.item, base: { common: { dnsIpv6: false } } })).status).toBe(400);
+  } finally { await h.snapshots.settled(); h.store.close(); }
+});
+
+it('同内核规则产物在所有客户端间共享，进程与逻辑规则保持完整', async () => {
+  const h = setupApp();
+  try {
+    h.store.put('ruleset', { id: 'r', name: '进程', sources: [{ id: 's', kind: 'local', format: 'auto', content: 'PROCESS-NAME,Example\nNOT,((PROCESS-NAME,Example))' }] });
+    const reference = { matcher: { kind: 'ruleset' as const, id: 'r' } };
+    for (const kernel of ['surge', 'stash', 'loon'] as const) {
+      const ios = { client: kernel, platform: 'ios', app: kernel + '-ios' }, mac = { client: kernel, platform: 'macos', app: kernel + '-macos' };
+      expect(h.renderer.sharedRules.key(reference, ios)).toBe(h.renderer.sharedRules.key(reference, mac));
+      const text = await h.renderer.sharedRules.readReference(reference, ios);
+      expect(text).toContain('PROCESS-NAME,Example'); expect(text).toContain('NOT,((PROCESS-NAME,Example))');
+      expect(text).not.toContain('不支持进程');
+    }
+    expect(h.store.listSharedRules()).toHaveLength(3);
+  } finally { await h.snapshots.settled(); h.store.close(); }
+});
+
+
+it('旧平台规则条件及互相矛盾的客户端参数明确拒绝', async () => {
+  const h = setupApp();
+  try {
+    await addUser(h.store, 'validation'); const api = client(h.app); await api.login('validation');
+    const withRule = { ...draft, routing: { mode: 'independent', config: { ...routing.config, rules: [{ id: 'r', matcher: { kind: 'local', content: 'PROCESS-NAME,Example', overrides: [{ when: { client: 'surge', platform: 'ios' }, action: { drop: true } }] }, target: { kind: 'builtin', name: 'DIRECT' } }] } } };
+    expect((await api.post('/api/profiles', withRule)).status).toBe(400);
+    expect((await api.post('/api/profiles/preview', { profile: draft, client: 'surge', app: 'surge-ios', platform: 'macos' })).status).toBe(400);
+  } finally { await h.snapshots.settled(); h.store.close(); }
 });

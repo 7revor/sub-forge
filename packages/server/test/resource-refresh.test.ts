@@ -1,3 +1,4 @@
+import { stringifyIniBase as testIni } from '@sub-forge/core';
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
@@ -24,11 +25,11 @@ describe('资源刷新任务',()=>{
     const h = await setup();
     for (const client of ['surge', 'loon'] as const) expect((await h.renderer.render('p', { client, platform: 'ios' })).ok).toBe(true);
     const profile = h.store.get('profile', 'p')!;
-    h.store.put('profile', { ...profile, base: { surgePatch: { general: { 'test-timeout': 3 } }, loonPatch: { general: { 'test-timeout': 7 } } } }, h.user.id);
+    h.store.put('profile', { ...profile, base: { kernels: {surge: testIni({ general: { 'test-timeout': 3 } }), loon: testIni({ general: { 'test-timeout': 7 } }) } } }, h.user.id);
     const started = await h.api.post('/api/profiles/p/refresh-cache');
     expect((await done(h.api, started.json.job.id)).render.ok).toBe(true);
-    expect((h.store.getLastGood('p', 'surge:ios')?.data as { yaml: string }).yaml).toContain('test-timeout = 3');
-    expect((h.store.getLastGood('p', 'loon:ios')?.data as { yaml: string }).yaml).toContain('test-timeout = 7');
+    expect((h.store.getLastGood('p', 'surge:ios:surge-ios')?.data as { yaml: string }).yaml).toContain('test-timeout = 3');
+    expect((h.store.getLastGood('p', 'loon:ios:loon-ios')?.data as { yaml: string }).yaml).toContain('test-timeout = 7');
   });
   it('创建时列出全部资源，并发乱序完成时只更新原位置的状态',async()=>{
     const releases = new Map<string,()=>void>();

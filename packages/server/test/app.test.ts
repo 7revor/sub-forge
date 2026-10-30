@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 import { issueProfileToken } from './helpers.ts';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +19,7 @@ const AIRPORT = `proxies:
 const PROFILE: ProfileDoc = {
   id: 'p1', name: '落地链路',
   template: { id: 'std', follow: 'latest' },
-  base: { presetId: 'fakeip', patch: { 'allow-lan': true } },
+  base: { presetId: 'fakeip', kernels: {mihomo: testYaml({ 'allow-lan': true }) } },
   nodeSets: [{ ref: { type: 'source', id: 'air' }, output: 'provider' }, { ref: { type: 'local', id: 'self' }, output: 'inline' }],
   overlay: { groupPatches: { hk: { addMembers: [{ kind: 'nodeset', ref: { type: 'source', id: 'air' } }], set: { filter: 'HK' } } } },
   chains: [{ id: 'c1', landing: { nodeSet: { type: 'local', id: 'self' } }, via: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'air' }, match: { exact: '🇭🇰 HK-01' } } } }],
@@ -29,7 +30,7 @@ const SEED: Seed = {
   sources: [{ id: 'air', name: '机场 A', url: 'https://air.example.com/sub', pipeline: [{ op: 'filter.useless' }, { op: 'rename.regex', rules: [{ pattern: '^香港\\s*(\\d+)', replace: 'HK-$1' }] }, { op: 'flag', mode: 'add' }] }],
   locals: [{ id: 'self', name: '自建', proxies: [{ name: '自建 SG', type: 'trojan', server: 'sg.example.com', port: 443, password: 's' }] }],
   rulesets: [{ id: 'tg', name: 'Telegram', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's1', kind: 'remote', format: 'auto', url: 'https://rules.example.com/telegram.list' }] }],
-  presets: [{ id: 'fakeip', name: 'fake-ip 推荐', version: 1, mihomo: { 'mixed-port': 7890, dns: { enable: true, 'enhanced-mode': 'fake-ip' } } }],
+  presets: [{ id: 'fakeip', name: 'fake-ip 推荐', version: 1, config: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, dns: { enable: true, 'enhanced-mode': 'fake-ip' } }) } } }],
   templates: [{
     id: 'std', version: 1,
     groups: [
@@ -81,7 +82,7 @@ describe('订阅接口', () => {
     const cfg = parse(await res.text()) as Record<string, any>;
     expect(cfg['mixed-port']).toBe(7890);
     expect(cfg['allow-lan']).toBe(true);
-    expect(cfg['proxy-providers']['机场 A'].url).toMatch(/^https:\/\/sub\.test\/p\/tk-mac\/p1\/source%3Aair\?v=[0-9a-f]{32}&h=[0-9a-f]{8}&platform=macos$/);
+    expect(cfg['proxy-providers']['机场 A'].url).toMatch(/^https:\/\/sub\.test\/p\/tk-mac\/p1\/source%3Aair\?v=[0-9a-f]{32}&h=[0-9a-f]{8}&platform=macos&app=clash-verge$/);
     expect(cfg['rule-providers'].Telegram.url).toMatch(/^https:\/\/sub\.test\/r\/tk-mac\/[0-9a-f]{64}$/);
     expect(cfg.proxies[0]['dialer-proxy']).toMatch(/^__ref_air_/);
     expect(cfg.rules.at(-1)).toBe('MATCH,🚀 节点选择');
@@ -171,11 +172,11 @@ describe('失败兜底', () => {
 
 describe('客户端识别', () => {
   it('参数优先，其次 UA，识别不了按 mihomo', () => {
-    expect(detectClient('Surge Mac/2894', { target: 'mihomo' })).toEqual({ client: 'mihomo', platform: 'macos', by: 'param' });
-    expect(detectClient('Surge iOS/3412', {})).toEqual({ client: 'surge', platform: 'ios', by: 'ua' });
-    expect(detectClient('ClashMetaForAndroid/2.11.5.Meta', {})).toEqual({ client: 'mihomo', platform: 'android', by: 'ua' });
+    expect(detectClient('Surge Mac/2894', { target: 'mihomo' })).toMatchObject({ client: 'mihomo', platform: 'macos', by: 'param' });
+    expect(detectClient('Surge iOS/3412', {})).toMatchObject({ client: 'surge', platform: 'ios', by: 'ua' });
+    expect(detectClient('ClashMetaForAndroid/2.11.5.Meta', {})).toMatchObject({ client: 'mihomo', platform: 'android', by: 'ua' });
     expect(detectClient('FlClash/v0.8.80 clash-verge Platform/android', {})).toMatchObject({ client: 'mihomo', platform: 'android' });
-    expect(detectClient('curl/8.0', {})).toEqual({ client: 'mihomo', by: 'default' });
-    expect(detectClient('clash.meta', { platform: 'windows' })).toEqual({ client: 'mihomo', platform: 'windows', by: 'ua' });
+    expect(detectClient('curl/8.0', {})).toMatchObject({ client: 'mihomo', by: 'default' });
+    expect(detectClient('clash.meta', { platform: 'windows' })).toMatchObject({ client: 'mihomo', platform: 'windows', by: 'ua' });
   });
 });

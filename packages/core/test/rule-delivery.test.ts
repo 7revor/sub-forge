@@ -19,16 +19,16 @@ describe('按内容识别与自动输出格式', () => {
     const text = Object.values(rendered(f.inputs).rulesets)[0]!.text;
     expect(text.split('\n').filter(line => line && !line.startsWith('#'))).toEqual(['DOMAIN,paypal.com']);
     expect(text).toContain('# [mihomo 不支持 USER-AGENT] USER-AGENT,PayPal*');
-    expect(managedRuleDelivery(f.rs, { client: 'surge', platform: 'ios' }).mode).toBe('managed');
+    expect(managedRuleDelivery(f.rs, { client: 'surge' }).mode).toBe('managed');
   });
 
   it('Stash 文本转换托管，MRS 使用二进制托管', () => {
     for (const body of ['payload: ["DOMAIN,paypal.test", "USER-AGENT,PayPal*"]', '192.0.2.0/24']) {
       const f = fixture(body);
-      expect(managedRuleDelivery(f.rs, { client: 'stash', platform: 'ios' }).mode).toBe('managed');
+      expect(managedRuleDelivery(f.rs, { client: 'stash' }).mode).toBe('managed');
     }
     const process = fixture('USER-AGENT,PayPal*\nPROCESS-NAME,Example');
-    expect(managedRuleDelivery(process.rs, { client: 'stash', platform: 'ios' }).mode).toBe('managed');
+    expect(managedRuleDelivery(process.rs, { client: 'stash' }).mode).toBe('managed');
     const binary = fixture('');
     binary.rs.sources[0]!.format = 'mrs'; binary.rs.sources[0]!.behavior = 'domain';
     expect(managedRuleDelivery(binary.rs, { client: 'stash' })).toMatchObject({ mode: 'managed', format: 'mrs', behavior: 'domain' });
@@ -41,7 +41,7 @@ describe('按内容识别与自动输出格式', () => {
     const text = Object.values(rendered(f.inputs).rulesets)[0]!.text;
     expect(text.split('\n').filter(line => line && !line.startsWith('#'))).toEqual([lines[0]]);
     expect(text).toContain(`# [重复规则] ${lines[1]}`);
-    expect(managedRuleDelivery(f.rs, { client: 'surge', platform: 'macos' }).mode).toBe('managed'); // Surge 需要翻译进程类型
+    expect(managedRuleDelivery(f.rs, { client: 'surge' }).mode).toBe('managed'); // Surge 需要翻译进程类型
     expect(fixture(lines[0]!).decide().mode).toBe('managed');
   });
 

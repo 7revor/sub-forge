@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { addUser, client, setupApp } from './helpers.ts';
 
@@ -7,7 +8,7 @@ const docs = [
   ['locals', { proxies: [] }],
   ['rulesets', { sources: [] }],
   ['profiles', { nodeSets: [] }],
-  ['presets', { mihomo: {} }],
+  ['presets', { config: { kernels: {mihomo: testYaml({}) } } }],
 ] as const;
 
 async function setup() {

@@ -1,3 +1,4 @@
+import { stringifyIniBase as testIni } from '@sub-forge/core';
 import type { RenderInput, RoutingConfig } from '../../src/index.ts';
 export const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
 export function iniFixture(): RenderInput {
@@ -11,7 +12,7 @@ export function iniFixture(): RenderInput {
       { name: '日本', type: 'hysteria2', server: 'jp.example.test', port: 443, password: 'hy2-example', down: '1 Gbps' },
     ] } }, snapshots: {} },
     rules: { rulesets: {}, snapshots: {} },
-    base: { general: { loglevel: 'notify', ipv6: false, 'test-timeout': 5, 'dns-server': ['system', '1.1.1.1'] }, host: { 'local.example.test': '192.0.2.1' } },
+    base: testIni({ general: { loglevel: 'notify', ipv6: false, 'test-timeout': 5, 'dns-server': ['system', '1.1.1.1'] }, host: { 'local.example.test': '192.0.2.1' } }),
     urls: { provider: key => 'https://sub.test/p/' + key, ruleset: key => 'https://sub.test/r/' + key + '?v=test&target=surge' },
   };
 }

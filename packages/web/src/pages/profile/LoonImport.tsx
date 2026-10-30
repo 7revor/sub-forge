@@ -22,7 +22,7 @@ export function LoonImportPage() {
   return <>
     <PageHeader title="导入 Loon 完整配置" crumbs={<Link to="/profiles">配置订阅</Link>} actions={<Button variant="primary" disabled={busy || !current || current.plan.report.some(r => r.level === 'error')} onClick={() => save.mutate(body)}>创建配置订阅</Button>} />
     <PageScroll><div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-      <p className="text-[13px] text-ink-muted">解析基础设置、节点、远程订阅、筛选器、策略组、代理链与规则。预览不拉取远程订阅；创建后由现有资源流程更新。各端兼容报告仅覆盖已提供的本地内容。</p>
+      <p className="text-[13px] text-ink-muted">基础设置保存为 Loon 原文；解析节点、远程订阅、筛选器、策略组、代理链与规则。预览不拉取远程订阅；创建后由现有资源流程更新。各端兼容报告仅覆盖已提供的本地内容。</p>
       <fieldset disabled={busy} className="m-0 flex flex-col gap-4 border-0 p-0">
         <Field label="订阅名称">{id => <Input id={id} placeholder="填写导入后的配置订阅名称" value={name} onChange={e => setName(e.target.value)} />}</Field>
         <Field label="Loon 配置原文">{id => <YamlTextarea id={id} rows={18} spellCheck={false} placeholder="粘贴包含 [General]、[Proxy]、[Proxy Group] 等段落的 Loon 配置" value={text} onChange={e => setText(e.target.value)} />}</Field>

@@ -3,7 +3,7 @@ import { persistedProfile, updateEditorOverlay } from './routing.ts';
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
 
 import type { GroupSpec, NodeSetID, Overlay } from '@sub-forge/core';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api.ts';
 import { useNodeSetNames, type GroupOption } from '../../components/pickers.tsx';
@@ -12,10 +12,6 @@ import type { ProfileDoc, TemplateDoc } from '../../hooks.ts';
 export type ProfileCtx = {
   draft: ProfileDoc;
   setDraft: (p: ProfileDoc) => void;
-  baseValid: boolean;
-  setBaseValid: (valid: boolean) => void;
-  baseEditorKey: number;
-  resetBaseEditor: () => void;
   patchOverlay: (fn: (o: Overlay) => Overlay) => void;
   template: TemplateDoc | undefined;
   /** 模板组 + 私有组（按输出顺序），用于各种选择器 */
@@ -49,9 +45,6 @@ export function effectiveGroups(template: TemplateDoc | undefined, overlay: Over
 
 /** 详情页和新建向导共用模板查询与草稿派生状态。 */
 export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: ProfileDoc) => void) {
-  const [baseValid, setBaseValid] = useState(true);
-  const [baseEditorKey, setBaseEditorKey] = useState(0);
-  const resetBaseEditor = useCallback(() => { setBaseValid(true); setBaseEditorKey(key => key + 1); }, []);
   const templateId = draft?.routing?.mode === 'bound' ? draft.routing.templateId : draft?.routing ? undefined : draft?.template?.id;
   const template = useQuery({
     queryKey: ['template', templateId],
@@ -66,7 +59,7 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
     const overlay = profileEditorOverlay(draft);
     const groups = effectiveGroups(template.data, overlay);
     return {
-      draft: { ...draft, overlay }, setDraft: (next) => setDraft(persistedProfile(next)), baseValid, setBaseValid, baseEditorKey, resetBaseEditor,
+      draft: { ...draft, overlay }, setDraft: (next) => setDraft(persistedProfile(next)),
       patchOverlay: (fn: (o: Overlay) => Overlay) => setDraft(updateEditorOverlay(draft, fn)),
       template: template.data,
       groups,
@@ -76,7 +69,7 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
       allNodeSets: all,
       nodeSetName: nameOf,
     };
-  }, [draft, setDraft, template.data, all, nameOf, baseValid, baseEditorKey, resetBaseEditor]);
+  }, [draft, setDraft, template.data, all, nameOf]);
 
   return { ctx, template };
 }

@@ -1,9 +1,10 @@
+import { stringify as testYaml } from 'yaml';
 import { expect, it } from 'vitest';
-import { importLoonConfig, renderLoon, renderMihomo, mergeBase, lowerCommonBase, NodeSetResolver, Report } from '../src/index.ts';
+import { importLoonConfig, renderLoon, renderMihomo, resolveNativeBase, NodeSetResolver, Report } from '../src/index.ts';
 import { loonFull } from './fixtures/loon-full.ts';
 const plan = (text = loonFull) => importLoonConfig(text, { id: 'import', name: '导入样例' });
 function fixture(result = plan()) {
-  return { profile: result.profile, common: result.profile.base.common, base: mergeBase(lowerCommonBase(result.profile.base.common, 'loon').base, result.profile.base.loonPatch),
+  return { profile: result.profile, base: resolveNativeBase('loon', undefined, undefined, result.profile.base),
     nodeSets: { sources: Object.fromEntries(result.sources.map(s => [s.id,s])), collections: Object.fromEntries(result.collections.map(c => [c.id,c])), locals: Object.fromEntries(result.locals.map(l => [l.id,l])), snapshots: Object.fromEntries(result.sources.map(s => [s.id, ['香港远程 = Shadowsocks,hk.example.test,443,aes-128-gcm,"example"\n日本远程 = Shadowsocks,jp.example.test,443,aes-128-gcm,"example"']])) },
     rules: { rulesets: {}, snapshots: {} }, urls: { provider: () => 'https://example.test/p', ruleset: () => 'https://example.test/r' } };
 }
@@ -11,7 +12,8 @@ it('导入全部配置段，保留原落地、两个独立命名链与 VLESS SNI
   const p = plan(); expect(p.report.filter(r => r.level === 'error')).toEqual([]);
   expect(p.profile.chains).toHaveLength(2); expect(p.locals[0]!.proxies.map(n => n.name)).toEqual(['入口', '落地', '命名链', '地区链']);
   expect(p.locals[0]!.proxies[0]).toHaveProperty('servername', 'tls.example.test');
-  expect(p.profile.base.common).toEqual({ dnsServers: ['223.5.5.5'], testUrl: 'https://example.test/204', testTimeoutMs: 3000 });
+  expect(p.profile.base.kernels?.loon).toContain('dns-server = 223.5.5.5');
+  expect(p.profile.base.kernels?.loon).toContain('proxy-test-url = https://example.test/204');
   const f = fixture(p), before = JSON.stringify(f), out = renderLoon(f);
   expect(out.report.items.filter(r => r.level === 'error')).toEqual([]);
   expect(out.yaml).toContain('[Proxy Chain]\n命名链 = 入口, 命名链 · 链落地, udp=true');
@@ -21,7 +23,7 @@ it('导入全部配置段，保留原落地、两个独立命名链与 VLESS SNI
   expect(out.yaml).toContain('url=https://example.test/204');
   expect(out.yaml).toContain('IP-CIDR,192.0.2.0/24,DIRECT,no-resolve');
   expect(JSON.stringify(f)).toBe(before);
-  const mihomo = renderMihomo({ ...f, base: {} });
+  const mihomo = renderMihomo({ ...f, base: '' });
   expect(mihomo.report.byCode('proxy.block-quic-unsupported').length).toBeGreaterThan(0);
   const nodes = mihomo.config.proxies as Record<string,unknown>[];
   expect(nodes.find(n => n.name === '落地')).not.toHaveProperty('dialer-proxy');
@@ -57,5 +59,5 @@ it('Loon max-timeout 与全局 test-timeout 分开保留，其他端明确报告
   expect(p.report.filter(r => r.level === 'error')).toEqual([]);
   const f = fixture(p), out = renderLoon(f);
   expect(out.report.hasErrors).toBe(false); expect(out.yaml).toContain('test-timeout = 3'); expect(out.yaml).toContain('max-timeout=1500');
-  expect(renderMihomo({ ...f, base: {} }).report.byCode('group.max-timeout-unsupported')).toHaveLength(1);
+  expect(renderMihomo({ ...f, base: '' }).report.byCode('group.max-timeout-unsupported')).toHaveLength(1);
 });

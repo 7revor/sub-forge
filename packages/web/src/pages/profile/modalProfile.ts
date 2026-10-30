@@ -12,14 +12,11 @@ export function profileModalData(ctx: ProfileCtx): ProfileModalData {
 }
 export function useModalProfile(data: ProfileModalData) {
   const [working, setWorking] = useModalDraft(data.profile);
-  const [baseValid, setBaseValid] = useModalDraft(true);
-  const [baseEditorKey, setBaseEditorKey] = useModalDraft(0);
   const overlay = profileEditorOverlay(working);
   const groups = effectiveGroups(data.template, overlay);
   const nodeSetName = (ref: ProfileCtx['allNodeSets'][number]['ref']) => data.nodeSets.find(n => nodeSetKey(n.ref) === nodeSetKey(ref))?.name ?? ref.id;
   const ctx: ProfileCtx = {
     draft: { ...working, overlay }, setDraft: next => setWorking(persistedProfile(next)),
-    baseValid, setBaseValid, baseEditorKey, resetBaseEditor: () => { setBaseValid(true); setBaseEditorKey(key => key + 1); },
     patchOverlay: fn => setWorking(updateEditorOverlay(working, fn)), template: data.template, groups,
     groupOptions: groups.map(g => ({ id: g.id, name: g.name })), groupName: id => groups.find(g => g.id === id)?.name ?? id,
     profileNodeSets: working.nodeSets.map(n => ({ ref: n.ref, name: nodeSetName(n.ref) })), allNodeSets: data.nodeSets, nodeSetName,

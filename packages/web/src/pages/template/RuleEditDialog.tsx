@@ -27,6 +27,6 @@ export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx:
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}
       onRuleChange={rule => { if (matcher.kind === 'rule') setDraft({ ...draft, matcher: { ...matcher, rule } }); }}
       onChange={matcher => setDraft({ ...draft, matcher })} />
-    {extendedOptions && <div className="min-w-0 border-t border-line-2 pt-4">{matcher.kind !== 'ruleset' ? <details><summary className="cursor-pointer text-[13px]">客户端覆盖</summary><div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={overrides => setDraft({ ...draft, matcher: { ...matcher, overrides } })} /></div></details> : <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={draft.options?.src === true} onChange={src => setDraft({ ...draft, options: { ...draft.options, src } })} />src</label>}</div>}
+    {extendedOptions && <div className="min-w-0 border-t border-line-2 pt-4">{matcher.kind !== 'ruleset' ? <details><summary className="cursor-pointer text-[13px]">内核改写</summary><div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={overrides => setDraft({ ...draft, matcher: { ...matcher, overrides } })} /></div></details> : <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={draft.options?.src === true} onChange={src => setDraft({ ...draft, options: { ...draft.options, src } })} />src</label>}</div>}
   </RuleEditShell>;
 });
