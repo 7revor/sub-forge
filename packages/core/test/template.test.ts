@@ -109,3 +109,12 @@ describe('模板校验', () => {
     ]);
   });
 });
+
+
+it('模板拒绝旧平台条件，避免保存后扩大为内核范围', () => {
+  const t = structuredClone(TPL);
+  const matcher = t.rules[2]!.matcher;
+  if (matcher.kind !== 'rule') throw new Error('缺少本地测试规则');
+  matcher.overrides = [{ when: { client: 'surge', platform: 'ios' } as any, action: { drop: true } }];
+  expect(validateTemplate(t).byCode('template.invalid-override')).toHaveLength(1);
+});

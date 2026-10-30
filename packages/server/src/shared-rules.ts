@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { managedRuleDelivery, renderMihomo, renderStash, renderSurge, renderLoon, ruleProviderName, sourceKey, stableStringify, type RuleSetDelivery, type RuleResourceReference, type RuleSetInputs } from '@sub-forge/core';
 import type { RuleSetDoc } from './docs.ts';
-import type { Target } from './render.ts';
+type Target = { client: import('@sub-forge/core').Client };
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 import type { SnapshotService } from './snapshots.ts';
 import type { Store } from './store.ts';
@@ -28,17 +28,17 @@ export class SharedRuleService {
     const identity = m.remote ? { url: m.remote.url } : m.repository ? { repo: m.repository.repo, entry: m.repository.entry, sources: m.repository.sources } : { id: m.id };
     const rs = resolveRuleSetReference(m, this.store);
     const delivery = rs ? managedRuleDelivery(rs, target, reference.options) : undefined;
-    return hash({ identity, options: canonical(reference).options, target, delivery: delivery?.mode === 'managed' ? delivery : undefined });
+    return hash({ identity, options: canonical(reference).options, target: { client: target.client }, delivery: delivery?.mode === 'managed' ? delivery : undefined });
   }
   private inputHash(rs: RuleSetDoc, rules: RuleSetInputs, reference: RuleResourceReference, target: Target): string {
-    return hash({ version: 1, rs, target, options: canonical(reference).options, bodies: rs.sources.filter(s => s.enabled !== false).map(s => s.kind === 'local' ? s.content : rules.snapshots[sourceKey(rs.id, s.id)]) });
+    return hash({ version: 2, rs, target: { client: target.client }, options: canonical(reference).options, bodies: rs.sources.filter(s => s.enabled !== false).map(s => s.kind === 'local' ? s.content : rules.snapshots[sourceKey(rs.id, s.id)]) });
   }
   register(reference: RuleResourceReference, target: Target, rs: RuleSetDoc, rules: RuleSetInputs, body: string): void {
     if (reference.matcher.remote) throw new Error('订阅专属规则不能注册为公共资源');
     const delivery = managedRuleDelivery(rs, target, reference.options);
     if (delivery.mode !== 'managed') throw new Error(delivery.reason);
     this.store.putSharedRule(this.key(reference, target), rs.id, {
-      reference: canonical(reference), target, name: ruleProviderName(reference.matcher, rs), delivery,
+      reference: canonical(reference), target: { client: target.client }, name: ruleProviderName(reference.matcher, rs), delivery,
       inputHash: this.inputHash(rs, rules, reference, target), body,
     } satisfies SharedRuleRecord);
   }
@@ -52,7 +52,7 @@ export class SharedRuleService {
     if (!rs) return Promise.resolve(undefined);
     const delivery = managedRuleDelivery(rs, target, reference.options);
     if (delivery.mode !== 'managed') return Promise.reject(new Error(delivery.reason));
-    return this.resolve(this.key(reference, target), { reference: canonical(reference), target, name: ruleProviderName(reference.matcher, rs), delivery, inputHash: '', body: '' });
+    return this.resolve(this.key(reference, target), { reference: canonical(reference), target: { client: target.client }, name: ruleProviderName(reference.matcher, rs), delivery, inputHash: '', body: '' });
   }
   private resolve(key: string, initial?: SharedRuleRecord): Promise<string | undefined> {
     const pending = this.inflight.get(key);
@@ -121,7 +121,7 @@ export class SharedRuleService {
       profile: { id: '$shared-rule', name: rs.name, nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: {
         groups: [], rules: [{ id: 'rule', matcher: record.reference.matcher, options: record.reference.options, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' },
       } } },
-      nodeSets: { sources: {}, locals: {}, collections: {}, snapshots: {} }, rules, platform: record.target.platform,
+      nodeSets: { sources: {}, locals: {}, collections: {}, snapshots: {} }, rules,
       urls: { provider: key => key, ruleset: key => key },
     });
     if (result.report.hasErrors) throw new Error(result.report.items.filter(i => i.level === 'error').map(i => i.message).join('；'));

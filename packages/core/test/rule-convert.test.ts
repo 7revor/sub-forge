@@ -3,7 +3,7 @@ import { convertRuleDocuments, prepareRuleDocument, type RuleConversion } from '
 import type { ClientCtx } from '../src/rules/client.ts';
 import type { RuleSet } from '../src/types.ts';
 
-const targets: ClientCtx[] = [{ client: 'mihomo' }, { client: 'mihomo', platform: 'android' }, { client: 'surge', platform: 'macos' }, { client: 'surge', platform: 'ios' }, { client: 'stash', platform: 'macos' }, { client: 'stash', platform: 'ios' }];
+const targets: ClientCtx[] = [{ client: 'mihomo' }, { client: 'mihomo' }, { client: 'surge' }, { client: 'surge' }, { client: 'stash' }, { client: 'stash' }];
 const source = (content: string) => ({ id: 'a', kind: 'local' as const, format: 'auto' as const, content });
 function convert(rs: RuleSet, ctx: ClientCtx, sourceId?: string) {
   return convertRuleDocuments(rs, new Map(rs.sources.map(s => [s.id, prepareRuleDocument(s.content ?? '', s)])), ctx, { sourceId });
@@ -18,7 +18,7 @@ describe('保留行位的通用规则转换', () => {
     expect(result.stats).toMatchObject({ output: 2, duplicates: 1 });
     expect(result.lines[1]).toBe(`# [重复规则] ${type},/apps/example*`);
     expect(result.origins).toEqual([1, 2, 3].map(line => ({ sourceId: 'a', line })));
-    expect(convert(rs, { client: 'surge', platform: 'macos' }).stats.duplicates).toBe(0);
+    expect(convert(rs, { client: 'surge' }).stats.duplicates).toBe(0);
     expect(active(convert(rs, { client: 'mihomo' }, 'a'))).toHaveLength(3);
   });
 
@@ -59,14 +59,14 @@ describe('保留行位的通用规则转换', () => {
     }
   });
 
-  it.each([undefined, 'ios'] as const)('Stash %s 的进程诊断保留原文，原因和注释简洁且不改变行位', platform => {
+  it('Stash 进程规则保留原文和行位，由终端决定是否使用', () => {
     const text = 'PROCESS-NAME,Example';
     const rs: RuleSet = { id: 'r', name: '', sources: [source(`# 进程\n${text}\nDOMAIN,last.test`)] };
-    const result = convert(rs, { client: 'stash', platform });
-    expect(result.diagnostics).toEqual([{ sourceId: 'a', line: 2, text, kind: 'client', reason: 'Stash 进程规则仅支持 macOS' }]);
-    expect(result.lines).toEqual(['# 进程', `# [Stash 进程规则仅支持 macOS] ${text}`, 'DOMAIN,last.test']);
+    const result = convert(rs, { client: 'stash' });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.lines).toEqual(['# 进程', text, 'DOMAIN,last.test']);
     expect(result.origins).toEqual([1, 2, 3].map(line => ({ sourceId: 'a', line })));
-    expect(active(convert(rs, { client: 'stash', platform: 'macos' }))).toEqual([text, 'DOMAIN,last.test']);
+    expect(active(convert(rs, { client: 'stash' }))).toEqual([text, 'DOMAIN,last.test']);
   });
 
   it('四个客户端保留原注释、空行、未解析、重复和不兼容规则的位置', () => {
@@ -82,15 +82,15 @@ describe('保留行位的通用规则转换', () => {
       expect(r.origins[7]).toEqual({ sourceId: 'a', line: 8 });
     }
     expect(results[0]!.stats).toMatchObject({ parsed: 4, rejected: 2, output: 3, duplicates: 1, unsupported: 0 });
-    expect(results[3]!.stats).toMatchObject({ output: 2, unsupported: 1 });
-    expect(results[3]!.lines[5]).toContain('Surge iOS 不支持进程规则');
+    expect(results[3]!.stats).toMatchObject({ output: 3, unsupported: 0 });
+    expect(results[3]!.lines[5]).toBe('PROCESS-NAME,Example');
   });
 
   it('多条替换、移除和组级追加为所有客户端预留稳定行位，保持首条匹配语义', () => {
     const rs: RuleSet = { id: 'r', name: '', sources: [source('DOMAIN,a.test\nDOMAIN,b.test\nDOMAIN,last.test')], overrides: [
       { match: 'DOMAIN,a.test', override: { when: { client: 'surge' }, action: { replace: [{ type: 'DOMAIN', value: 'x.test' }, { type: 'DOMAIN', value: 'y.test' }] } } },
       { match: 'DOMAIN,a.test', override: { when: { client: 'surge' }, action: { drop: true } } },
-      { match: 'DOMAIN,b.test', override: { when: { client: 'surge', platform: 'ios' }, action: { drop: true } } },
+      { match: 'DOMAIN,b.test', override: { when: { client: 'surge' }, action: { drop: true } } },
       { override: { when: { client: 'mihomo' }, action: { append: [{ type: 'DOMAIN', value: 'extra.test' }] } } },
     ] };
     const results = targets.map(t => convert(rs, t));
@@ -115,7 +115,7 @@ describe('保留行位的通用规则转换', () => {
       const results = targets.map(t => convert(rs, t));
       expect(new Set(results.map(r => r.lines.length)).size).toBe(1);
       expect(active(results[0]!)).toEqual(['DOMAIN,a.test', 'PROCESS-NAME,App']);
-      expect(active(results[3]!)).toEqual(['DOMAIN,a.test']);
+      expect(active(results[3]!)).toEqual(['DOMAIN,a.test', 'PROCESS-NAME,App']);
       expect(results[0]!.diagnostics[0]!.line).toBe(content.includes('\n') ? 4 : 1);
     }
   });

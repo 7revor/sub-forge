@@ -1,5 +1,6 @@
-import type { Client, Platform } from '../types.ts';
-import { Report, type ReportItem } from '../report.ts';
+// 仅用于 v25 历史数据迁移，订阅运行时不进行公共字段转换。
+import type { Client, Platform } from '@sub-forge/core';
+import { Report, type ReportItem } from '@sub-forge/core';
 type Fields = Record<string, unknown>;
 /** 公共层只表达已确认的意图；其余设置保留在客户端覆盖中。 */
 export type CommonBase = {
@@ -23,7 +24,6 @@ const ip = (s: string) => {
   try { return new URL('http://[' + s + ']/').hostname.startsWith('['); } catch { return false; }
 };
 const dns = (s: string) => ip(s) || s === 'system';
-const list = (x: unknown): string[] | undefined => Array.isArray(x) && x.every(v => typeof v === 'string') ? x : typeof x === 'string' ? x.split(',').map(v => v.trim()) : undefined;
 export function mergeBase(base: Fields, patch: Fields): Fields {
   const out = structuredClone(base);
   for (const [k, v] of Object.entries(patch)) {
@@ -101,46 +101,3 @@ export function lowerCommonBase(common: CommonBase, client: Client, platform?: P
   return { base, report: report.items };
 }
 
-/** 提取可证明等价的部分；保留全部未转换原生字段，并逐项说明。 */
-export function extractCommonBase(input: Fields, client: Client): { common: CommonBase; native: Fields; report: ReportItem[] } {
-  const native = structuredClone(input), common: CommonBase = {}, report = new Report();
-  const yaml = client === 'mihomo' || client === 'stash';
-  const g = (yaml ? native : native.general) as Fields | undefined;
-  const d = (yaml && (native.dns as Fields)?.enable === false ? undefined : yaml ? native.dns : g) as Fields | undefined;
-  const take = (obj: Fields | undefined, key: string, target: keyof CommonBase, accept: (v: unknown) => boolean, convert: (v: unknown) => unknown = v => v) => {
-    if (obj?.[key] !== undefined && accept(obj[key])) { (common as Fields)[target] = convert(obj[key]); delete obj[key]; }
-  };
-  take(d, yaml ? 'nameserver' : 'dns-server', 'dnsServers', v => !!list(v)?.every(dns), v => list(v));
-  if (client !== 'loon') take(d, 'ipv6', 'dnsIpv6', v => typeof v === 'boolean');
-  take(d, yaml ? 'fake-ip-filter' : client === 'surge' ? 'always-real-ip' : 'real-ip', 'realIpDomains', v => (!yaml || !d?.['fake-ip-filter-mode'] || d['fake-ip-filter-mode'] === 'blacklist') && !!list(v)?.every(domain), v => list(v));
-  const hosts = (yaml ? native.hosts : native.host) as Fields | undefined;
-  // 有任意通配/特殊条目时整体保留，避免破坏 INI 顺序优先语义。
-  if (object(hosts) && Object.entries(hosts).every(([k, v]) => domain(k) && typeof v === 'string' && (ip(v) || !yaml && v.startsWith('server:') && dns(v.slice(7))))) {
-    for (const [k, v] of Object.entries(hosts) as [string,string][]) {
-      if (v.startsWith('server:')) (common.dnsPolicy ??= {})[k] = v.slice(7); else (common.hosts ??= {})[k] = v;
-    }
-    delete native[yaml ? 'hosts' : 'host'];
-  }
-  take(d, 'nameserver-policy', 'dnsPolicy', v => object(v) && Object.entries(v).every(([k, x]) => domain(k) && typeof x === 'string' && dns(x)));
-  if (client === 'mihomo') {
-    take(native, 'port', 'httpPort', v => Number.isInteger(v)); take(native, 'socks-port', 'socksPort', v => Number.isInteger(v)); take(native, 'allow-lan', 'allowLan', v => typeof v === 'boolean');
-    if (native['geodata-mode'] !== true) take(native['geox-url'] as Fields, 'mmdb', 'geoipUrl', v => typeof v === 'string');
-  } else if (!yaml) {
-    take(g, client === 'loon' ? 'geoip-url' : 'geoip-maxmind-url', 'geoipUrl', v => typeof v === 'string');
-    take(g, 'proxy-test-url', 'testUrl', v => typeof v === 'string');
-    take(g, 'test-timeout', 'testTimeoutMs', v => typeof v === 'number' && v > 0, v => Number(v) * 1000);
-    // Wi-Fi 与桌面 loopback 监听范围不同，导入时不擅自升级为公共意图。
-  }
-  const walk = (obj: Fields, prefix = '') => {
-    for (const [key, value] of Object.entries(obj)) {
-      const path = prefix + key;
-      if (object(value) && Object.keys(value).length === 0) { delete obj[key]; continue; }
-      report.warn('base.native-only', client + ' 的 ' + path + ' 保留在专用覆盖中，未自动转换到其他客户端（需核对匹配范围、平台或行为）', path);
-    }
-  };
-  if (object(native.general)) walk(native.general, 'general.');
-  if (object(native.dns)) walk(native.dns, 'dns.');
-  walk(Object.fromEntries(Object.entries(native).filter(([k]) => !['general', 'dns'].includes(k))));
-  validateCommonBase(common);
-  return { common, native, report: report.items };
-}

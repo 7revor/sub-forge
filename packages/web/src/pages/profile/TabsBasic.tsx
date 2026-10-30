@@ -1,29 +1,18 @@
-import { BaseExtract } from '../../components/BaseExtract.tsx';
+import { NativeBaseEditor } from '../../components/NativeBaseEditor.tsx';
 import { RoutingCard, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { appendProviderGroup } from './providerGroup.ts';
 import type { NodeSetID } from '@sub-forge/core';
 import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
 import { Frame } from '../../modals/Frame.tsx';
-import { YamlTextarea } from '../../components/YamlTextarea.tsx';
-import { Notice } from '../../components/Notice.tsx';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
 import { ResourceFileLink } from '../../components/ResourceLinkButton.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 // 订阅页共用的基本设置、输出设置和节点配置。
 
-import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
-import { useState } from 'react';
-import { api } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
-import { useList } from '../../hooks.ts';
-import { DualEditor } from '../../components/DualEditor.tsx';
-import { OverrideForm } from '../../components/OverrideField.tsx';
-import { SchemaForm } from '../../components/SchemaForm.tsx';
-import { baseEditorFor, basePatchKey } from '../../convert/baseClient.ts';
-import { baseFromForm, baseToForm } from '../../schemas/mihomoBase.ts';
+import { Button, Card, Empty, Field, Segmented, Select } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 /** 输出设置与基本信息放在同一个标签页。 */
@@ -46,78 +35,20 @@ export function TabOutput() {
   </Card>;
 }
 
-const EMPTY_BASE_PATCH: Record<string, unknown> = Object.freeze({});
-
-/** 基础设置（设计稿「Profile · 基础设置」）：来源条、进程规则提醒、按客户端分区的覆盖项、原样片段 */
+/** 按内核和可选客户端保存原文，编辑阶段不做字段解析。 */
 export function TabBase() {
-  const { draft, setDraft, baseValid, setBaseValid, baseEditorKey, template } = useProfile();
-  const presets = useList('presets').data ?? [];
-  const [client, setClient] = useState<'common' | 'mihomo' | 'surge' | 'stash' | 'loon'>('common');
-  const preset = presets.find((p) => p.id === draft.base?.presetId);
-  const mode = draft.base === undefined ? 'none' : draft.base.presetId !== undefined ? 'preset' : 'custom';
-  // 空覆盖项保持引用稳定，校验状态变化不能被编辑器误判成外部重置。
-  const patch: Record<string, unknown> = draft.base?.[basePatchKey(client)] ?? EMPTY_BASE_PATCH;
-  const inherited = preset?.[client] ?? {};
-  const editor = baseEditorFor(client);
-  const groups = editor.groups;
-  const changePatch = (patch: Record<string, unknown>) => setDraft({ ...draft, base: { ...draft.base, [basePatchKey(client)]: patch } });
-  // 规则里有进程规则，但 find-process-mode 为 off 时进程规则不会生效
-  const processMode = (patch['find-process-mode'] ?? preset?.mihomo['find-process-mode']) as string | undefined;
-  const hasProcess = JSON.stringify([template?.rules ?? [], draft.overlay.extraRules ?? []]).includes('"PROCESS"');
-
-  return (
-    <>
-      <section className="flex flex-wrap items-center gap-x-7 gap-y-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-        <fieldset disabled={!baseValid} className="m-0 flex min-w-0 flex-[1_1_260px] flex-col gap-1.5 border-0 p-0">
-          <span className="text-[12.5px] font-medium text-ink-muted">来源</span>
-          <Segmented label="基础设置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '完全自定义' }, { value: 'none', label: '不输出' }]}
-            onChange={(m) => {
-              if (m === 'none') { const { base: _b, ...rest } = draft; setDraft(rest); }
-              else if (m === 'custom') setDraft({ ...draft, base: { common: draft.base?.common, patch: draft.base?.patch ?? {}, stashPatch: draft.base?.stashPatch ?? {}, surgePatch: draft.base?.surgePatch ?? {}, loonPatch: draft.base?.loonPatch ?? {}, ...(draft.base?.raw ? { raw: draft.base.raw } : {}) } });
-              else setDraft({ ...draft, base: { ...(draft.base ?? {}), presetId: presets[0]?.id ?? '' } });
-            }} />
-        </fieldset>
-        {mode === 'preset' && <Field label="预设" className="flex-[1_1_260px]">{(id) => (
-          <Select placeholder="选择要继承的基础设置预设" id={id} className="h-10" disabled={!baseValid} value={draft.base?.presetId ?? ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, presetId: e.target.value } })}>
-            {presets.map((p) => <option key={p.id} value={p.id}>{p.name}（v{p.version}）</option>)}
-          </Select>
-        )}</Field>}
-      </section>
-
-      {client === 'mihomo' && hasProcess && processMode !== undefined && processMode !== 'strict' && processMode !== 'always' && mode !== 'none' && (
-        <Notice tone="warn" actions={<Button className="h-9 border-[#e2b88a] bg-[#fff8f0]" onClick={() => changePatch({ ...patch, 'find-process-mode': 'strict' })}>改为 strict</Button>}><span className="text-[13px] leading-normal"><b>进程规则不会生效：</b>规则里有进程规则，但 <span className="font-mono">find-process-mode</span> 当前为 <span className="font-mono">{processMode}</span>。</span></Notice>
-      )}
-
-      {mode !== 'none' && (
-        <div className="flex flex-wrap items-start gap-5">
-          <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
-            <Segmented label="客户端" value={client} options={[{ value: 'common', label: '公共项' }, { value: 'mihomo', label: 'mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }, { value: 'stash', label: 'Stash' }]} onChange={setClient} />
-            <p className="text-[13px] text-ink-muted">合并顺序：预设公共项 → 本订阅公共项 → 预设客户端覆盖 → 本订阅客户端覆盖。</p>
-            {client !== 'common' && <BaseExtract client={client} value={patch} common={draft.base?.common} disabled={!baseValid} onApply={(common, native) => setDraft({ ...draft, base: { ...draft.base, common, [basePatchKey(client)]: native } })} />}
-            {(
-              <DualEditor key={`${draft.id}:${client}:${mode}:${draft.base?.presetId ?? ''}:${baseEditorKey}`} value={patch} onChange={changePatch} onValidityChange={setBaseValid}
-                toRaw={editor.toRaw} fromRaw={editor.fromRaw} recoverForm={(text) => editor.recoverForm(text, patch)} rawLabel={`${mode === 'preset' ? '覆盖项' : client} ${editor.format}`}
-                renderForm={() => mode === 'preset'
-                  ? <OverrideForm groups={groups} base={baseToForm(inherited)} patch={baseToForm(patch)}
-                      onChange={(value) => changePatch(baseFromForm(value, patch, inherited))} />
-                  : <div className="rounded-[10px] border border-line bg-panel px-4.5 pb-4"><SchemaForm groups={groups} value={baseToForm(patch)} extra
-                      onChange={(value) => changePatch(baseFromForm(value, patch))} /></div>} />
-            )}
-          </div>
-          {client === 'mihomo' && <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-2.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-            <div className="flex items-center justify-between"><h2 className="m-0 text-[14px] font-semibold">原样片段</h2></div>
-            <label htmlFor="raw-snippet" className="text-[12.5px] text-ink-muted">{client === 'mihomo' ? 'YAML' : 'INI'}</label>
-            <YamlTextarea id="raw-snippet" rows={10} className="bg-[#fafbfc] font-mono text-[12.5px] leading-relaxed" spellCheck={false}
-              placeholder={client === 'mihomo' ? '填写要合并到基础配置的 YAML 字段，如 hosts 域名映射' : '暂未开放'}
-              value={client === 'mihomo' ? draft.base?.raw ?? '' : ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, raw: e.target.value || undefined } })} />
-            <span className="text-[12px] leading-normal text-ink-muted">原样片段暂不输出。</span>
-          </section>}
-        </div>
-      )}
-    </>
-  );
+  const { draft, setDraft } = useProfile();
+  const enabled = draft.base !== undefined && draft.base.enabled !== false;
+  return <>
+    {(draft.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[13px] text-warn">{note}</p>)}
+    <section className="flex flex-wrap items-center gap-4 rounded-[10px] border border-line bg-panel p-4">
+      <Field label="基础配置追加">{() => <Segmented label="基础配置追加" value={enabled ? 'enabled' : 'disabled'} options={[{ value: 'enabled', label: '启用' }, { value: 'disabled', label: '不输出' }]} onChange={m => {
+        setDraft({ ...draft, base: { ...draft.base, enabled: m === 'enabled' } });
+      }} />}</Field>
+    </section>
+    {enabled && <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />}
+  </>;
 }
-
 
 /** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
 export function TabNodeSets() {

@@ -10,7 +10,7 @@ function fixture(): RenderInput {
   return {
     profile: { id: 'p', name: '订阅', overlay: {}, nodeSets: [{ ref, output: 'provider' }], chains: structuredClone([whole]), refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref }] }], rules: [], final: { kind: 'group', groupId: 'g' } } } },
     nodeSets: { sources: { s: { id: 's', name: '来源', url: 'https://example.test', pipeline: [] } }, collections: {}, locals: {}, snapshots: { s: ['proxies:\n- { name: 落地, type: socks5, server: landing.test, port: 1080 }\n- { name: 前置, type: socks5, server: relay.test, port: 1080 }'] } },
-    rules: { rulesets: {}, snapshots: {} }, urls: { provider: (k, v) => `https://sub.test/${k}?v=${v}`, ruleset: k => k },
+    rules: { rulesets: {}, snapshots: {} }, urls: { provider: k => `https://sub.test/${k}`, ruleset: k => k },
   };
 }
 describe('订阅专属 Provider 服务端覆写', () => {

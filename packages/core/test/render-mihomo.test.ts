@@ -19,7 +19,7 @@ describe('PRD 场景 1：多源不打平', () => {
     expect(group(r, '🇭🇰 香港')).toMatchObject({ type: 'url-test', use: ['机场 A', '中转'], filter: '(?i)港|HK', interval: 300, tolerance: 50 });
     const pp = (r.config['proxy-providers'] as Record<string, Record<string, unknown>>)['机场 A']!;
     expect(pp).not.toHaveProperty('path');
-    expect(pp.url).toMatch(/\?v=[0-9a-f]{8}$/);
+    expect(pp.url).toBe('https://sub.example.com/p/TOKEN/source%3AA');
     expect(r.report.byCode('verify.dangling')).toEqual([]);
   });
 });
@@ -40,13 +40,14 @@ describe('PRD 场景 3：落地走中转（provider 内节点）', () => {
     expect(r.report.items.filter((i) => i.level === 'error')).toEqual([]);
   });
 
-  it('只给部分落地挂前置：注入到 Profile 专属 provider 内容中，版本号随之变化', () => {
+  it('只给部分落地挂前置：注入到 Profile 专属 provider 内容中，下载地址保持稳定', () => {
     const plain = render(base);
     const r = render({ ...base, chains: [{ id: 'c1', landing: { nodeSet: { type: 'source', id: 'L' }, filter: '^L-0' }, via }] });
     const nodes = providerProxies(r, 'source:L');
     const wrapperName = groupsOf(r).find((g) => String(g.name).startsWith('__ref_T_'))!.name;
     expect(nodes.map((n) => n['dialer-proxy'])).toEqual([wrapperName, wrapperName, undefined]);
-    expect(r.providers['source:L']!.version).not.toBe(plain.providers['source:L']!.version);
+    expect(r.providers['source:L']!.yaml).not.toBe(plain.providers['source:L']!.yaml);
+    expect(r.config['proxy-providers']).toEqual(plain.config['proxy-providers']);
   });
 
   it('包装组名只依赖节点身份：上游改显示名后名称不变', () => {

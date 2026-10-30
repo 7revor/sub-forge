@@ -39,7 +39,7 @@ describe('规则选项在解析与最终输出之间保真', () => {
     const r = render('DOMAIN,example.test\nGEOIP,CN\nIP-CIDR,192.0.2.0/24', [plain, { ...plain, id: 'src', options: { noResolve: true, src: true } }]);
     expect(r.rulesets['rs_rs_classical.list']!.text).toBe('DOMAIN,example.test\nGEOIP,CN\nIP-CIDR,192.0.2.0/24\n');
     expect(r.rulesets['rs_rs_src_classical.list']!.text).toBe('DOMAIN,example.test\nGEOIP,CN,src\nIP-CIDR,192.0.2.0/24,src\n');
-    expect(r.config.rules).toContain('RULE-SET,R (2),DIRECT');
+    expect(r.config.rules).toContain('RULE-SET,R_2,DIRECT');
     expect(r.config.rules).toContain('RULE-SET,R,DIRECT');
   });
 

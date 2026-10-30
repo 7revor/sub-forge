@@ -1,6 +1,6 @@
 import { useModalPresentation } from '../modals/index.tsx';
 import { useQuery } from '@tanstack/react-query';
-import type { Client, Platform, RuleConversion, RuleSetDelivery } from '@sub-forge/core';
+import type { Client, RuleConversion, RuleSetDelivery } from '@sub-forge/core';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.ts';
 import type { RuleSetDoc } from '../hooks.ts';
@@ -10,15 +10,11 @@ import { CodePreview } from './CodePreview.tsx';
 import { Badge, Button, FieldError, cx } from './ui.tsx';
 
 type Result = RuleConversion & { delivery: RuleSetDelivery; binary: boolean };
-const TARGETS: { key: string; client: Client; platform?: Platform; label: string }[] = [
-  { key: 'mihomo', client: 'mihomo', label: 'mihomo' },
-  { key: 'mihomo-android', client: 'mihomo', platform: 'android', label: 'mihomo Android' },
-  { key: 'surge-macos', client: 'surge', platform: 'macos', label: 'Surge macOS' },
-  { key: 'surge-ios', client: 'surge', platform: 'ios', label: 'Surge iOS' },
-  { key: 'loon-ios', client: 'loon', platform: 'ios', label: 'Loon iOS' },
-  { key: 'loon-macos', client: 'loon', platform: 'macos', label: 'Loon macOS' },
-  { key: 'stash-macos', client: 'stash', platform: 'macos', label: 'Stash macOS' },
-  { key: 'stash-ios', client: 'stash', platform: 'ios', label: 'Stash iOS' },
+const TARGETS: { key: Client; client: Client; label: string }[] = [
+  { key: 'mihomo', client: 'mihomo', label: 'Mihomo' },
+  { key: 'surge', client: 'surge', label: 'Surge' },
+  { key: 'stash', client: 'stash', label: 'Stash' },
+  { key: 'loon', client: 'loon', label: 'Loon' },
 ];
 /** 客户端选择自控；转换由服务器完成。整个更新周期保持文本区域挂载。 */
 export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError, sourceNames, sourceReading, onRefreshSources }: {
@@ -28,7 +24,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
   const [target, setTarget] = useState('mihomo');
   const t = TARGETS.find(x => x.key === target)!;
   const process = useModalPresentation(useDebouncedValue({ overrides }, 300));
-  const body = { inputs, sourceId, ...process, client: t.client, platform: t.platform };
+  const body = { inputs, sourceId, ...process, client: t.client };
   const settled = JSON.stringify(process) === JSON.stringify({ overrides });
   const query = useQuery({
     queryKey: ['rule-conversion', body], enabled: ready && settled, retry: false, staleTime: 0,
@@ -54,7 +50,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
     : result?.delivery.mode === 'unsupported' ? result.delivery.reason
     : result?.binary ? 'MRS 由服务端缓存并原样托管，无法展示文本；SRS 暂不支持。' : null;
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
-    <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
+    <div role="group" aria-label="规则内核" className="flex flex-wrap gap-1.5">
       {TARGETS.map(x => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
         className={cx('h-[34px] shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3 text-[12.5px]', x.key === target ? 'border-brand bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
     </div>
@@ -68,7 +64,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
       {sourceError ? <Button size="sm" onClick={() => void onRefreshSources()} disabled={sourceReading}>重新读取来源</Button> : null}
       {preview.error && <Button size="sm" onClick={() => void preview.refetch()} disabled={!ready || !settled || preview.isFetching}>重新转换</Button>}
     </div> : null}
-    <details className={cx("text-[12.5px]", !diagnostic.length && "invisible")}><summary className="cursor-pointer">客户端处理详情（{diagnostic.length} 条）</summary>
+    <details className={cx("text-[12.5px]", !diagnostic.length && "invisible")}><summary className="cursor-pointer">内核处理详情（{diagnostic.length} 条）</summary>
       <div className="mt-2 max-h-64 overflow-auto">{diagnostic.slice(0, 100).map((d, i) => <div key={i} className="flex gap-2 py-1">
         {d.kind !== 'client' && <Badge tone="accent">{d.kind === 'degraded' ? '降级' : '改写'}</Badge>}
         <span className="min-w-0 break-all">{d.sourceId === '$append' ? '组级追加' : sourceNames[d.sourceId] ?? d.sourceId} · <code>{d.text}</code> · {d.reason}</span>

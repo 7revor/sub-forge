@@ -1,6 +1,8 @@
 # @sub-forge/server
 
-当前资源权限、清理与 v25 迁移契约见 [全局托管与鉴权](../../docs/19-managed-resources.md)。文末按日期记录的旧接口设计以该契约为准。
+基础配置现行契约见[两层原文追加](../../docs/20-native-client-append.md)：v28 移除预设 API，历史引用备份后展开到订阅，规则只按内核区分。
+
+资源权限、清理与 v25 迁移契约见 [全局托管与鉴权](../../docs/19-managed-resources.md)。文末按日期记录的旧接口设计以该契约为准。
 
 订阅服务（M1 服务端）：SQLite 存储、多用户与登录、管理接口、上游拉取与快照、实时渲染、订阅接口。目前支持 Mihomo、Stash、Surge 与 Loon；生产镜像同源托管 `packages/web` 管理前端。
 
@@ -55,8 +57,8 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `GET /subs/profile?id=P&token=T` | 本人完整配置，支持 target/platform 与 UA 选择 |
 | `GET /subs/nodes?kind=source&id=N&token=T` | 本人 source / collection / local；支持 HEAD 与流量头 |
-| `GET /subs/nodes?kind=provider&profile=P&id=K&version=V&token=T` | 本配置的节点 provider，按目标保留最多 32 个结构版本 |
-| `GET /subs/ruleset?profile=P&key=K&version=V&token=T` | 本配置的专属规则产物 |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&token=T` | 本配置的节点 provider，按当前配置生成 |
+| `GET /subs/ruleset?profile=P&key=K&token=T` | 本配置的专属规则产物 |
 | `GET /resources/ruleset?id=R&token=T` | 公共增强，view=source 为来源原文；key 参数读取固定公共变体 |
 | `GET /resources/repo?id=REPO&ref=分支&path=文件&token=T` | 公共仓库文件原文；key 参数读取固定公共变体 |
 | `GET /healthz` | 健康检查 |
@@ -71,7 +73,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `POST /auth/login`、`POST /auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
 | `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限 |
-| `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles` `presets`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；预设由管理员维护、所有人可读；被引用的文档不能删除（409 返回引用方） |
+| `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；被引用的文档不能删除（409 返回引用方） |
 | `GET /api/templates`、`GET /api/templates?id=ID` | 所有登录用户可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
@@ -124,7 +126,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 
 ## 敏感数据
 
-文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、最近一次成功的渲染结果与保留的结构版本、订阅 token 均以 AES-256-GCM 加密落盘；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
+文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、最近一次成功的渲染结果、订阅 token 均以 AES-256-GCM 加密落盘；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
 
 ## 测试
 
@@ -218,11 +220,11 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 ### 自动识别规则格式与全局托管（2026-10-30）
 
-规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/resources/ruleset?key=KEY&token=TOKEN` 与 `/resources/repo?key=KEY&token=TOKEN` 按规则身份、有效处理参数与客户端/平台共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo、Stash、Surge、Loon。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
+规则来源 API 可省略 format，缺省 auto；旧文本 format 只保留方言兼容，解析、快照校验、仓库导入与模板自检均按实际内容识别。规则预览返回来源的 format/behavior，以及整组 delivery（managed/unsupported）。所有文本规则经服务端解析、处理后输出 classical LIST；合法单一 MRS 来源原字节托管，合并、改写、src 或不支持的客户端组合明确报错；SRS 暂不支持。公共 `/resources/ruleset?key=KEY&token=TOKEN` 与 `/resources/repo?key=KEY&token=TOKEN` 按规则身份、有效处理参数与内核共享，不绑定订阅，不下发上游地址。当前完整主订阅支持 Mihomo、Stash、Surge、Loon。权限、迁移和资源清理见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
 
 ### 管理列表分页
 
-`GET /api/{sources,profiles,collections,locals,rulesets,presets,templates}` 支持 `page`、`pageSize`、`q`。传任一参数即启用分页，默认第 1 页、每页 20 条，`pageSize` 范围 1–100；非法页码或条数返回 400。返回 `{ items, total, page, pageSize, totalPages }`，计数仅包含当前用户可见且名称匹配的结果（模板、预设沿用共享读取权限）。模板仅计最新版本；名称搜索忽略首尾空白和大小写，无名称的历史模板按 ID 搜索。顺序保持 ID 升序，越界页回退至最后一页，空结果为第 1 / 1 页。
+`GET /api/{sources,profiles,collections,locals,rulesets,templates}` 支持 `page`、`pageSize`、`q`。传任一参数即启用分页，默认第 1 页、每页 20 条，`pageSize` 范围 1–100；非法页码或条数返回 400。返回 `{ items, total, page, pageSize, totalPages }`，计数仅包含当前用户可见且名称匹配的结果（模板沿用共享读取权限）。模板仅计最新版本；名称搜索忽略首尾空白和大小写，无名称的历史模板按 ID 搜索。顺序保持 ID 升序，越界页回退至最后一页，空结果为第 1 / 1 页。
 
 不传参数仍返回全量 `{ items }`，兼容关联选择器及旧客户端。无搜索时通过 SQLite `LIMIT/OFFSET` 分页；文档正文保持加密，名称搜索在服务端解密后筛选，不新增明文名称索引。
 
@@ -352,7 +354,7 @@ v20 清理旧记录中的并发字段，保留配置内容、绑定关系、归�
 - `GET /api/system/resources`：管理员汇总资源及仓库索引状态。
 - `GET /api/events`：登录用户 SSE 通知，不携带文档数据；具体读取仍校验权限。服务退出主动关闭流。
 
-SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，增加系统设置和共享资源绑定；刷新任务保存 7 天，启动将未完成任务标为中断。最终渲染取消结果内存缓存；保留解析缓存、在途合并、last_good 与最多 32 个结构版本。旧版本资源用于客户端一致性，不属于上游原文历史。生产启动会运行资源和仓库调度器。
+SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，增加系统设置和共享资源绑定；刷新任务保存 7 天，启动将未完成任务标为中断。最终渲染取消结果内存缓存；保留解析缓存、在途合并与 last_good；节点和专属规则按当前配置生成。生产启动会运行资源和仓库调度器。
 
 2026-10-30 刷新任务响应：`results` 自创建起包含全部去重资源，顺序固定；`state` 标记 `pending / running / done / interrupted`，`ok` 仅在拉取完成后出现。并发完成只更新对应索引，关闭或重启将未完成项标为中断。兼容旧任务缺少逐项 `state` 的已完成结果，无数据库迁移及示例种子变更。内置浏览器可通过 `pnpm --filter @sub-forge/server exec tsx test/manual-resource-refresh-server.ts` 启动独立内存验收服务，完成后必须停止。
 
@@ -443,3 +445,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 ### 2026-10-30：查询参数入口与凭证分离（v25）
 
 现行契约见 [资源入口、鉴权与生命周期](../../docs/19-managed-resources.md)。所有 GET 动态值使用 query，旧资源入口和旧管理 GET 路径全部关闭。`/api` 仅登录态，`/subs` 按当前用户 token 校验私有归属，`/resources` 允许任意有效用户 token 访问公共规则。模板专属原文只有登录态 `/api/templates/rule-file`，不发行 token 地址；订阅使用模板后，其直接远程规则由该订阅鉴权。v25 保留用户 token，清除含旧地址的配置缓存与旧公共远程产物，客户端须重新复制链接。仓库停用、删除、索引移除及在途撤销同时清除无引用正文，不能在重新启用后恢复旧请求的缓存绑定。
+
+2026-10-30：SQLite v27 删除 `render_generations`，清空带旧参数的渲染缓存。节点 provider 和订阅专属规则 URL 移除 `version`、`hash`，读取时按当前配置生成；保留 last_good 失败兜底。升级后刷新完整主订阅，节点内容通过客户端定时或手动更新。

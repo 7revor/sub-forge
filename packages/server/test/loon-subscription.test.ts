@@ -1,3 +1,5 @@
+import { stringify as testYaml } from 'yaml';
+import { stringifyIniBase as testIni } from '@sub-forge/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { remoteRuleMatcher } from '@sub-forge/core';
 import { detectClient } from '../src/client.ts';
@@ -14,10 +16,9 @@ async function scenario() {
   envs.push(h);
   const user = await addUser(h.store, 'alice', 'admin'), alice = client(h.app); await alice.login('alice');
   await addUser(h.store, 'bob'); const bob = client(h.app); await bob.login('bob');
-  h.store.put('preset', { id: 'base', name: '隔离预设', version: 1, mihomo: { 'mixed-port': 7890 }, surge: { general: { loglevel: 'notify' } }, loon: { general: { 'ip-mode': 'v4-only', 'allow-wifi-access': false } } }, user.id);
   h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'trojan', server: 'example.test', port: 443, password: 'example' }] }, user.id);
   const draft = { name: 'Loon', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' },
-    base: { presetId: 'base', patch: { 'allow-lan': true }, surgePatch: { general: { ipv6: false } }, loonPatch: { general: { 'test-timeout': 5 } } },
+    base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, 'allow-lan': true }), surge: testIni({ general: { ipv6: false } }), loon: testIni({ general: { 'ip-mode': 'v4-only', 'allow-wifi-access': false, 'test-timeout': 5 } }) } },
     routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }], rules: [
       { id: 'before', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'before.test' } }, target: { kind: 'builtin', name: 'DIRECT' } },
       { id: 'remote', matcher: remoteRuleMatcher(url), target: { kind: 'group', groupId: 'g' } },
@@ -29,21 +30,22 @@ async function scenario() {
 }
 describe('Loon 订阅与管理接口', () => {
   it('参数与 UA 识别、非法平台和未知目标明确拒绝', () => {
-    expect(detectClient('Loon/3.5.3', {})).toEqual({ client: 'loon', platform: 'ios', by: 'ua' });
+    expect(detectClient('Loon/3.5.3', {})).toMatchObject({ client: 'loon', platform: 'ios', by: 'ua' });
     expect(detectClient('Loon (macOS)', {})).toMatchObject({ client: 'loon', platform: 'macos' });
     expect(detectClient('Loon/3.5.3', { target: 'mihomo' }).client).toBe('mihomo');
     expect(() => detectClient('curl', { target: 'unknown' })).toThrow();
     expect(() => detectClient('Loon', { platform: 'unknown' })).toThrow();
   });
-  it('主配置只引用托管规则，手写规则与规则集顺序、平台隔离和令牌撤销有效', async () => {
+  it('主配置只引用托管规则，手写规则与规则集顺序、客户端资源隔离和令牌撤销有效', async () => {
     const h = await scenario(), res = await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}`, { headers: { 'user-agent': 'Loon/3.5.3' } });
     expect(res.status).toBe(200); expect(res.headers.get('content-type')).toContain('text/plain');
     const text = await res.text();
     expect(text).toContain('[General]\nip-mode = v4-only\nallow-wifi-access = false\ntest-timeout = 5');
     expect(text).toContain('节点 = trojan, example.test, 443, "example", transport=tcp');
     expect(text).toContain('[Rule]\nFINAL,DIRECT\n\n[Remote Rule]');
+    expect(text).toContain(',policy=代理,tag=loon,enabled=true');
     const links = text.split('[Remote Rule]\n')[1]!.trim().split('\n').map(line => line.split(',policy=')[0]!);
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(3);
     const bodies = [];
     for (const link of links) {
       const url = new URL(link);
@@ -51,11 +53,11 @@ describe('Loon 订阅与管理接口', () => {
       expect(url.searchParams.get('target')).toBe('loon');
       const resource = await h.app.request(link); expect(resource.status).toBe(200); bodies.push(await resource.text());
       const wrongClient = new URL(link); wrongClient.searchParams.set('target', 'surge');
-      expect((await h.app.request(wrongClient.href)).status).toBe(404);
+      expect((await h.app.request(wrongClient.href)).status).toBe(400);
       const otherUser = new URL(link); otherUser.searchParams.set('token', h.store.createToken(h.store.getUserAuth('bob')!.id).token);
       expect((await h.app.request(otherUser.href)).status).toBe(404);
     }
-    expect(bodies).toEqual(['DOMAIN,before.test\n', 'DOMAIN,remote.test\nIP-CIDR,192.0.2.0/24,no-resolve\n']);
+    expect(bodies).toEqual(['DOMAIN,before.test\n', 'DOMAIN,remote.test\nIP-CIDR,192.0.2.0/24,no-resolve\n', 'PROCESS-NAME,Example\n']);
     expect(text).not.toMatch(/mixed-port|loglevel|ipv6 =|DOMAIN,|IP-CIDR,|PROCESS-NAME|RULE-SET|__SF_/);
     const mac = await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=loon&platform=macos`);
     const macText = await mac.text();
@@ -77,7 +79,7 @@ describe('Loon 订阅与管理接口', () => {
       expect(res.json.exportUnavailableReason).toContain('请保存配置后');
       expect(res.json.exportYaml).toBeUndefined();
     }
-    expect(h.store.getLastGood(h.profile.id, 'loon:ios')).toBeUndefined();
+    expect(h.store.getLastGood(h.profile.id, 'loon:ios:loon-ios')).toBeUndefined();
     expect((await h.bob.post('/api/profiles/' + h.profile.id + '/preview', { client: 'loon' })).status).toBe(404);
     expect((await h.bob.post('/api/profiles/preview', { profile: h.profile, client: 'loon' })).status).toBe(400);
     const inputs = [{ source: { id: 's', kind: 'local', format: 'auto' }, content: 'DST-PORT,443\nGEOSITE,cn' }];
@@ -87,8 +89,7 @@ describe('Loon 订阅与管理接口', () => {
     expect(rules.json.lines).toEqual(['DEST-PORT,443', 'DOMAIN-SUFFIX,cn']);
     const legacy = await h.alice.post('/api/rulesets/preview', { ruleset: { sources: inputs.map(i => ({ ...i.source, content: i.content })), overrides }, client: 'loon' });
     expect(legacy.json.lines).toEqual(rules.json.lines);
-    expect((await h.alice.post('/api/presets', { name: '非法', mihomo: {}, loon: { proxies: [] } })).status).toBe(400);
-    expect((await h.alice.post('/api/profiles', { ...h.draft, base: { loonPatch: [] } })).status).toBe(400);
+    expect((await h.alice.post('/api/profiles', { ...h.draft, base: { kernels: {loon: [] } } })).status).toBe(400);
   });
   it('手写规则只能由所属订阅读取，移除或改写后撤销历史正文', async () => {
     const h = await scenario();
@@ -128,7 +129,7 @@ describe('Loon 订阅与管理接口', () => {
     if (!original.ok) throw new Error('测试初始渲染失败');
     const legacy = { ...original.render, yaml: '[Rule]\nDOMAIN,before.test,DIRECT\nFINAL,DIRECT\n' };
     delete legacy.loonRuleDelivery;
-    h.store.putLastGood(h.profile.id, 'loon:ios', legacy);
+    h.store.putLastGood(h.profile.id, 'loon:ios:loon-ios', legacy);
     h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'tuic', server: 'example.test', port: 443 }] }, h.user.id);
     expect((await h.renderer.render(h.profile.id, { client: 'loon', platform: 'ios' })).ok).toBe(false);
     expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=loon&platform=ios`)).status).toBe(503);

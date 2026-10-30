@@ -1,5 +1,5 @@
-import { validateCommonBase } from '@sub-forge/core';
-import { stringifyIniBase, localRulesError } from '@sub-forge/core';
+import { validateNativeBase } from '@sub-forge/core';
+import { localRulesError } from '@sub-forge/core';
 import { normalizeRulePresence } from '../rule-presence.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
@@ -38,7 +38,7 @@ export function checkRuleSetOverrides(value: unknown): void {
     const at = `客户端改写第 ${i + 1} 条`;
     if (!isObj(item) || item.line !== undefined) throw bad(`${at}：只支持规则内容匹配，请填写完整规则内容`);
     const o = item.override;
-    if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(o.when.client as string) || (o.when.platform !== undefined && !['android', 'macos', 'windows', 'ios', 'linux'].includes(o.when.platform as string))) throw bad(`${at}：客户端或平台不合法`);
+    if (!isObj(o) || !isObj(o.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(o.when.client as string) || Object.keys(o.when).some(key => key !== 'client')) throw bad(`${at}：规则改写只允许指定内核，不再接受平台条件`);
     const a = o.action;
     if (!isObj(a) || !(
       a.drop === true && a.replace === undefined && a.append === undefined ||
@@ -60,6 +60,7 @@ function checkRegex(pattern: unknown, where: string, flags = ''): void {
 function checkRawRules(value: unknown, where: string): void {
   if (Array.isArray(value)) { value.forEach(item => checkRawRules(item, where)); return; }
   if (!isObj(value)) return;
+  if (value.when !== undefined && (!isObj(value.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(String(value.when.client)) || Object.keys(value.when).some(key => key !== 'client'))) throw bad(`${where}：规则改写只允许指定内核`);
   if (value.kind === 'local') {
     const error = localRulesError(value);
     if (error) throw bad(`${where}：${error}`);
@@ -277,17 +278,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       Object.assign(doc, promoteRuleSetOverrides(doc as unknown as RuleSetDoc, (src) => src.url ? store.latestSnapshot('ruleset', id, src.url)?.body : undefined));
       break;
     }
-    case 'preset': {
-      if (doc.common !== undefined) try { validateCommonBase(doc.common); } catch (error) { throw bad((error as Error).message); }
-      if (!isObj(doc.mihomo)) throw bad('mihomo 段必须是对象');
-      if (doc.stash !== undefined && !isObj(doc.stash)) throw bad('stash 段必须是对象');
-      for (const client of ['surge', 'loon']) if (doc[client] !== undefined) {
-        if (!isObj(doc[client])) throw bad(client + ' 段必须是对象');
-        try { stringifyIniBase(doc[client]); } catch (error) { throw bad(client + '：' + (error instanceof Error ? error.message : '基础设置不合法')); }
-      }
-      if (typeof doc.version !== 'number') doc.version = 1;
-      break;
-    }
+    case 'preset': throw bad('基础设置预设已移除');
     case 'profile': {
       delete doc.revision;
       delete doc.templateVersion;
@@ -301,13 +292,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         const f = doc.template.follow;
         if (f !== 'latest' && !(isObj(f) && typeof f.pinned === 'number' && store.getTemplate(doc.template.id, f.pinned))) throw bad('模板版本不存在');
       }
-      if (isObj(doc.base) && doc.base.common !== undefined) try { validateCommonBase(doc.base.common); } catch (error) { throw bad((error as Error).message); }
-      if (doc.base !== undefined && (!isObj(doc.base) || doc.base.stashPatch !== undefined && !isObj(doc.base.stashPatch))) throw bad('基础设置及 stashPatch 必须是对象');
-      for (const key of ['surgePatch', 'loonPatch']) if (isObj(doc.base) && doc.base[key] !== undefined) {
-        if (!isObj(doc.base[key])) throw bad(key + ' 必须是对象');
-        try { stringifyIniBase(doc.base[key]); } catch (error) { throw bad(key + '：' + (error instanceof Error ? error.message : '基础设置不合法')); }
-      }
-      if (doc.base !== undefined && isObj(doc.base) && doc.base.presetId !== undefined && !store.get('preset', String(doc.base.presetId))) throw bad('基础设置预设不存在');
+      if (doc.base !== undefined) try { validateNativeBase(doc.base); } catch (error) { throw bad((error as Error).message); }
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];
       doc.refPolicy = { default: 'wrap' }; // 兼容旧字段，引用方式由客户端自动决定
@@ -371,9 +356,6 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
     for (const t of store.listLatestTemplates()) {
       if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」`);
     }
-  }
-  if (kind === 'preset') {
-    for (const p of store.list('profile')) if (p.base?.presetId === id) hits.push(`配置订阅「${p.name}」`);
   }
   return [...new Set(hits)];
 }

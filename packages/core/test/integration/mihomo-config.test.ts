@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 // 配置合法性校验：渲染结果交给真实 mihomo 内核执行 `-t`（只解析配置，不启动代理、不监听端口）。
 // 需要环境变量 MIHOMO 指向 mihomo 二进制（v1.19.27+），否则整组跳过：
 //   MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
@@ -26,18 +27,18 @@ const UNREACHABLE = 'http://127.0.0.1:9';
 const isolated: Partial<RenderInput> = {
   template: MMDB ? TEMPLATE : { ...TEMPLATE, rules: TEMPLATE.rules.filter((r) => r.id !== 'r-cn') },
   urls: {
-    provider: (key, v) => `${UNREACHABLE}/p/TOKEN/${encodeURIComponent(key)}?v=${v}`,
+    provider: key => `${UNREACHABLE}/p/TOKEN/${encodeURIComponent(key)}`,
     ruleset: (key) => `${UNREACHABLE}/r/TOKEN/${key}`,
   },
   rules: { ...RULES, rulesets: { ...RULES.rulesets, fin: { ...RULES.rulesets.fin!, sources: RULES.rulesets.fin!.sources.map((s) => (s.id === 'broker' ? { ...s, url: `${UNREACHABLE}/broker.mrs` } : s)) } } },
-  base: {
+  base: testYaml({
     'mixed-port': 0,
     'log-level': 'warning',
     ipv6: false,
     'geodata-mode': false,
     'geo-auto-update': false,
     'geox-url': { geoip: `${UNREACHABLE}/geoip.dat`, geosite: `${UNREACHABLE}/geosite.dat`, mmdb: `${UNREACHABLE}/country.mmdb`, asn: `${UNREACHABLE}/asn.mmdb` },
-  },
+  }),
 };
 
 const dirs: string[] = [];

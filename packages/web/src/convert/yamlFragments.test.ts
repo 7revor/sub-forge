@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
-import { baseFormFromYaml, baseFromYaml } from './baseYaml.ts';
 import { formatLocalNodeYaml, inspectLocalNodeYaml } from './localNodeYaml.ts';
 import { groupFromYaml, proxyFromPaste, proxyFormFromYaml, proxyFromYaml } from './proxyYaml.ts';
 import { templateFormFromYaml, templateFromYaml, templateToYaml, type TemplateBody } from './templateYaml.ts';
@@ -24,14 +23,6 @@ describe('各处 YAML 编辑器接收带短横线的片段', () => {
     expect(groupFromYaml(stringify([node, { ...node, name: '日本测试' }]))).toEqual({ ok: true, value: [node, { ...node, name: '日本测试' }] });
     expect(groupFromYaml('- {name: 好, type: http, server: example.test, port: 80}\n- {name: 坏, type: http, server: example.test}')).toMatchObject({ ok: false, line: 2, error: expect.stringContaining('第 2 个节点') });
     expect(inspectLocalNodeYaml(stringify([node, node]))).toMatchObject({ ok: false });
-  });
-  it('基础设置和预设兼容单项映射列表，不改变内部列表或放过重复键', () => {
-    const value = { dns: { enable: true, nameserver: ['1.1.1.1', '8.8.8.8'] }, mode: 'rule' };
-    const text = stringify([value]);
-    expect(baseFromYaml(text)).toEqual({ ok: true, value });
-    expect(baseFormFromYaml(text).value).toEqual(value);
-    expect(baseFromYaml('- mode: rule\n  mode: global')).toMatchObject({ ok: false, line: 2 });
-    expect(baseFromYaml('- mode: rule\n- mode: global')).toMatchObject({ ok: false });
   });
   it('模板支持直接粘贴四个地区组，保留已有规则及隐藏设置，筛选字段不丢失', () => {
     const groups = createRegionGroups([]);

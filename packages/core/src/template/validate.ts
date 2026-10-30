@@ -70,7 +70,8 @@ export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rules
     if (r.matcher.kind === 'rule' || r.matcher.kind === 'local') {
       if (r.matcher.kind === 'rule') checkRule(r.matcher.rule, where);
       else { const error = localRulesError(r.matcher); if (error) report.error('template.invalid-local-rule', error, where); }
-      r.matcher.overrides?.forEach(({ action }) => {
+      r.matcher.overrides?.forEach(({ when, action }) => {
+        if (!when || !['mihomo', 'surge', 'stash', 'loon'].includes(when.client) || Object.keys(when).some(key => key !== 'client')) report.error('template.invalid-override', '规则改写只允许指定内核，不再接受平台条件', where);
         if ('replace' in action) action.replace.forEach(rule => checkRule(rule, where));
         else if ('append' in action) action.append.forEach(rule => checkRule(rule, where));
       });

@@ -107,7 +107,7 @@ describe('规则集预览（CR-05）', () => {
   const RULES = 'DOMAIN-SUFFIX,notion.so\nPROCESS-NAME-REGEX,^steam.*\nPROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*\nIP-CIDR,1.1.1.0/24,no-resolve\nUNKNOWN,x*';
   const local = (id: string, content: string) => ({ id, kind: 'local', format: 'auto', content });
 
-  it('单个来源按客户端与平台输出，列出降级、丢弃与无法解析的行；草稿不必保存', async () => {
+  it('单个来源按内核输出，同族两端一致，列出降级、丢弃与无法解析的行；草稿不必保存', async () => {
     const { alice } = await scenario();
     const ruleset = { name: '', sources: [local('a', RULES)] };
     const mihomo = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'mihomo' });
@@ -118,8 +118,8 @@ describe('规则集预览（CR-05）', () => {
     expect(mac.json.lines).toContain('PROCESS-NAME,steam*');
     expect(mac.json.notes).toHaveLength(1);
     const ios = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'ios' });
-    expect(activeLines(ios.json.lines)).toEqual(['DOMAIN-SUFFIX,notion.so', 'IP-CIDR,1.1.1.0/24,no-resolve']);
-    expect(ios.json.dropped).toHaveLength(2);
+    expect(ios.json.lines).toEqual(mac.json.lines);
+    expect(ios.json.dropped).toHaveLength(0);
   });
 
   it('切换来源只返回对应内容，合并时也提供各来源不支持行的详情', async () => {

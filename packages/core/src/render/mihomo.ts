@@ -1,3 +1,4 @@
+import { parseNativeYaml, validateNativeText, iniGeneralValue } from '../base/native.ts';
 import { nodeSemantics } from './node-semantics.ts';
 import { chainSources } from '../nodeset/chain.ts';
 import type { ChainNodeRef, ChainTarget } from '../types.ts';
@@ -22,13 +23,13 @@ import { compileUserRegex, exactNameRegex } from '../util/regex.ts';
 import { stringifySurge, surgeBenchmarks } from './surge-config.ts';
 import { isIniClient } from '../types.ts';
 import { stringifyLoon, loonBenchmarks } from './loon-config.ts';
-import { stringifyIniBase, iniName } from './ini-format.ts';
+import { iniName } from './ini-format.ts';
 import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
-  /** Profile 专属 provider 地址（/subs/nodes?kind=provider&profile=…&version=…） */
-  provider(nodeSetKey: string, version: string): string;
+  /** Profile 专属 provider 地址（/subs/nodes?kind=provider&profile=…） */
+  provider(nodeSetKey: string): string;
   /** 转换后的公共或订阅专属规则集地址 */
   ruleset(key: string, reference?: HostedRuleReference): string;
 };
@@ -37,7 +38,6 @@ export type HostedRuleReference = { matcher: Matcher; options?: RuleEntry['optio
 export type RuleResourceReference = HostedRuleReference & { matcher: Extract<Matcher, { kind: 'ruleset' }> };
 
 export type RenderInput = {
-  common?: import('../base/common.ts').CommonBase;
   resourceIntervalSec?: number;
   profile: Profile;
   template?: Template;
@@ -45,8 +45,8 @@ export type RenderInput = {
   rules: RuleSetInputs;
   platform?: Platform;
   urls: UrlBuilder;
-  /** 已合并好的 mihomo 基础设置（预设 ⊕ Profile 覆盖），原样放在配置顶部 */
-  base?: Record<string, unknown>;
+  /** 已按内核和客户端选取的原生追加文本，仅生成时合并 */
+  base?: string;
 };
 
 /** 配置预览中的只读引用生成详情。 */
@@ -68,11 +68,12 @@ export type ChainResolution = {
   issues: ReportItem[];
 };
 
-export type ProviderOutput = { name: string; version: string; yaml: string };
+export type ProviderOutput = { name: string; yaml: string };
 export type RulesetOutput = { behavior: Behavior; text: string; providerName?: string };
 
 export type MihomoRenderResult = {
   config: Record<string, unknown>;
+  baseText?: string;
   yaml: string;
   providers: Record<string, ProviderOutput>;
   rulesets: Record<string, RulesetOutput>;
@@ -152,7 +153,10 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const { profile } = input;
   const inlineNodes = client !== 'mihomo';
   const report = new Report();
-  const ctx: ClientCtx = { client, ...(input.platform ? { platform: input.platform } : {}) };
+  const ctx: ClientCtx = { client };
+  let base: Record<string, unknown> = {};
+  try { validateNativeText(input.base ?? '', client); if (!isIniClient(client)) base = parseNativeYaml(input.base ?? ''); }
+  catch (error) { report.error(client + '.base', (error as Error).message); }
   if (client === 'stash' && input.platform && input.platform !== 'ios' && input.platform !== 'macos') report.error('stash.platform', 'Stash 输出仅支持 iOS 或 macOS 平台');
   if (client === 'stash' && profile.nodeSets.some(s => s.output === 'provider')) {
     report.info('stash.nodes-inline', 'Stash 节点集按快照内联输出，随主订阅刷新更新，以保留筛选、代理链及空组拒绝语义');
@@ -160,7 +164,6 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   if (isIniClient(client)) {
     if (input.platform && !['ios', 'macos'].includes(input.platform)) report.error(client + '.platform', client + ' 仅支持 iOS 或 macOS');
     if (profile.nodeSets.some(s => s.output === 'provider')) report.info(client + '.nodes-inline', client + ' 节点按快照内联，随主订阅刷新，以保留筛选和空组拒绝语义');
-    try { stringifyIniBase(input.base ?? {}); } catch (error) { report.error(client + '.base', error instanceof Error ? error.message : '基础配置不合法'); }
   }
   if (client === 'loon') report.info('loon.rule-priority', 'Loon 全部分流规则按列表顺序托管；客户端仍按域名、IP 等阶段匹配，请在 Loon 中核对跨类型规则优先级');
   const eff = resolveProfileRouting(profile, input.template, report);
@@ -336,8 +339,12 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     // 运行时筛空同样拒绝；放在扩展字段之后，防止历史配置覆盖固定策略。
     return client === 'stash' ? stashGroup(out, g, report) as MihomoGroup : { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
   };
-  for (const group of eff.groups) if (input.common?.testUrl !== undefined || input.common?.testTimeoutMs !== undefined) {
-    group.test = { ...(input.common.testUrl !== undefined ? { url: input.common.testUrl } : {}), ...(input.common.testTimeoutMs !== undefined ? { timeout: input.common.testTimeoutMs } : {}), ...group.test };
+  if (isIniClient(client) && !report.items.some(r => r.code === client + '.base')) {
+    const url = iniGeneralValue(input.base ?? '', 'proxy-test-url');
+    const rawTimeout = iniGeneralValue(input.base ?? '', 'test-timeout');
+    const timeout = rawTimeout !== undefined ? Number(rawTimeout) * 1000 : undefined;
+    for (const group of eff.groups) group.test = { ...(url ? { url } : {}), ...(timeout !== undefined && Number.isFinite(timeout) ? { timeout } : {}), ...group.test };
+    if (client === 'loon' && timeout !== undefined && Number.isFinite(timeout)) base.general = { 'test-timeout': timeout / 1000 };
   }
   const groups = eff.groups.map(lowerGroup);
 
@@ -510,10 +517,8 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   for (const s of sets.values()) {
     if (s.output !== 'provider') continue;
     const yaml = stringify({ proxies: s.nodes.map(stripNode) }, { lineWidth: 0 });
-    // 版本号随内容（含注入的前置）变化，客户端重载主配置即重新下载；不输出 path（REF-11）
-    const version = shortHash(yaml, 8);
-    providers[s.key] = { name: s.providerName, version, yaml };
-    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key, version), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
+    providers[s.key] = { name: s.providerName, yaml };
+    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
     proxyProviders[s.providerName] = entry;
   }
 
@@ -525,7 +530,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   if (client === 'surge') surgeBenchmarks(allGroups, inlineProxies, eff.groups, report);
   validateReferences(allGroups, inlineProxies, providers, proxyProviders, report);
 
-  const config: Record<string, unknown> = { ...(input.base ?? {}), proxies: inlineProxies };
+  const config: Record<string, unknown> = { ...base, proxies: inlineProxies };
   if (Object.keys(proxyProviders).length) config['proxy-providers'] = proxyProviders;
   config['proxy-groups'] = allGroups;
   if (Object.keys(ruleProviders).length) config['rule-providers'] = ruleProviders;
@@ -545,8 +550,9 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const groupIssues = (chain: Profile['chains'][number], item: ReportItem) => item.where?.startsWith('group:') && relatedGroups(chain.via).has(item.where.slice(6));
 
   return {
+    baseText: input.base,
     config,
-    yaml: client === 'loon' ? stringifyLoon({ config, rulesets, report }) : client === 'surge' ? stringifySurge({ config, rulesets, report }) : stringify(config, { lineWidth: 0 }),
+    yaml: client === 'loon' ? stringifyLoon({ config, rulesets, report, baseText: input.base }) : client === 'surge' ? stringifySurge({ config, rulesets, report, baseText: input.base }) : stringify(config, { lineWidth: 0 }),
     providers,
     rulesets,
     dependencies: [...deps.values()],

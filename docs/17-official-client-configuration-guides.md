@@ -85,7 +85,7 @@ Stash 使用 YAML；配置、节点集和规则集的形状与 Clash 家族相�
 
 本次核对并落实的差异：
 
-- `USER-AGENT`、`DOMAIN-REGEX`、`GEOSITE`、`NETWORK` 等规则按 Stash 能力输出。进程规则仅 macOS；未指定平台时不输出进程规则。路径通配 / 路径正则未建立等价映射，保留客户端诊断。源地址 `SRC-IP`、源端口 `SRC-PORT` 页面标为 Beta iOS/tvOS 3.7+ / macOS 4.4+，转换结果带版本提示。[规则类型](https://stash.wiki/rules/rule-types)
+- `USER-AGENT`、`DOMAIN-REGEX`、`GEOSITE`、`NETWORK` 等规则按 Stash 能力输出。进程匹配能力依赖平台；本项目按内核保留进程规则，不再按平台删除。路径通配 / 路径正则未建立等价映射，保留客户端诊断。源地址 `SRC-IP`、源端口 `SRC-PORT` 页面标为 Beta iOS/tvOS 3.7+ / macOS 4.4+，转换结果带版本提示。[规则类型](https://stash.wiki/rules/rule-types)
 - Hysteria2 将 IR 中的 `password` 转成 `auth`，`up/down` 转成 Mbps 数值的 `up-speed/down-speed`。未适配的协议和传输明确阻止成功导出。[协议类型](https://stash.wiki/proxy-protocols/proxy-types)
 - Stash 空组可能直连。本项目为保持现有筛选与空组拒绝语义，将节点集在导出时按快照内联，展开动态成员；筛空补 REJECT。当前不生成 Stash 节点 provider，节点更新随主订阅刷新。[策略组](https://stash.wiki/proxy-protocols/proxy-groups)、[远程代理集](https://stash.wiki/proxy-protocols/proxy-providers)
 - 延迟测试 URL / 超时下放到节点的 `benchmark-*` 字段，并将毫秒转换为秒。共享节点要求测试设置一致，冲突时报错。[延迟测试](https://stash.wiki/proxy-protocols/proxy-benchmark)
@@ -106,7 +106,7 @@ Stash User-Agent 可以自动识别；显式参数优先。前端「订阅 → �
 
 Stash 专属基础设置保存在预设的 `stash` 和订阅的 `base.stashPatch`，按预设加覆盖合并。既有 `mihomo` / `base.patch` 继续只用于 Mihomo，避免误带其 DNS / TUN 开关。`base` 省略时使用客户端默认设置。
 
-主订阅、配套规则链接、缓存、last-good 和保留的结构版本都区分客户端与平台。修改 `target` 或 `platform` 不能借用另一套资源；撤销 token 后资源链接失效。
+主订阅、节点资源、缓存、last-good 和保留的结构版本区分内核与应用；公共规则产物仅区分内核。修改 `target` 或 `platform` 不能借用另一套资源；撤销 token 后资源链接失效。
 
 ### 单独转换规则
 

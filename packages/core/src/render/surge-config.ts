@@ -1,3 +1,4 @@
+import { mergeNativeIni } from '../base/native.ts';
 // 在公共依赖解析之后输出 Surge；基础设置不从 Mihomo DNS/TUN 字段猜测转换。
 import type { GroupSpec } from '../types.ts';
 import type { Report } from '../report.ts';
@@ -45,10 +46,10 @@ function surgeGroup(group: Fields, report: Report): string {
   return name + ' = ' + fields.join(', ');
 }
 
-export function stringifySurge(result: Pick<MihomoRenderResult, 'config' | 'rulesets' | 'report'>, standalone = false): string {
+export function stringifySurge(result: Pick<MihomoRenderResult, 'config' | 'rulesets' | 'report' | 'baseText'>, standalone = false): string {
   const { config, report } = result;
   try {
-    const base = stringifyIniBase({ ...(config.general ? { general: config.general } : {}), ...(config.host ? { host: config.host } : {}) });
+    const base = mergeNativeIni([result.baseText ?? '', stringifyIniBase({ ...(config.general ? { general: config.general } : {}) })]);
     const proxies = (config.proxies as Fields[]).flatMap(node => {
       const line = surgeProxyLine(node, report);
       return line ? [line] : [];

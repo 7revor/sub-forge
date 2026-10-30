@@ -14,11 +14,11 @@ export function ProfileWizard() {
   const [initial] = useState<ProfileDoc>(() => ({ id: '', name: '', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: preset ? { mode: 'bound', templateId: preset, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }));
   const [draft, setDraft] = useState(initial);
   const { ctx, template } = useProfileCtx(draft, setDraft);
-  const { blocker, leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial) || !ctx!.baseValid, undefined, () => ({ what: '新建订阅', canSave, saveLabel: '创建并离开', onSave: () => finish(true) }));
+  const { leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial), undefined, () => ({ what: '新建订阅', canSave, saveLabel: '创建并离开', onSave: () => finish(true) }));
   const templateReady = draft.routing?.mode !== 'bound' || (!!template.data && !template.isError);
   const body = draft.routing?.mode === 'independent' ? draft.routing.config : { groups: [...(template.data?.groups ?? []), ...(draft.routing?.extraGroups ?? [])], rules: [...(draft.routing?.prependRules ?? []), ...(draft.routing?.appendRules ?? [])], final: template.data?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const } };
   const issues = draftIssues(body);
-  const canSave = !!draft.name.trim() && ctx!.baseValid && templateReady && !issues.length && !save.isPending;
+  const canSave = !!draft.name.trim() && templateReady && !issues.length && !save.isPending;
   const finish = async (leaving = false) => {
     if (!canSave) return;
     const { id: _id, ...profile } = draft;
@@ -30,7 +30,6 @@ export function ProfileWizard() {
       <span className="text-[13px] text-ink-muted">选择节点并配置分流，保存后自动生成唯一订阅链接。</span>
     </PageHeader>
     <ErrorAlert error={save.error} />
-    {!ctx!.baseValid && <div className="flex items-center justify-between gap-2 text-[13px] text-err">请修复基础设置中的 YAML，或放弃该次编辑。<Button onClick={ctx!.resetBaseEditor}>放弃无效 YAML</Button></div>}
     <ProfileSections disabled={save.isPending} routingReady={templateReady} templateNotice={<>
       <ErrorAlert error={template.error} />
       {!templateReady && <div className="flex items-center gap-3 text-[13px] text-ink-muted">{template.isError ? '模板加载失败，请重试或更换模板。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}

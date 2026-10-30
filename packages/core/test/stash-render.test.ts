@@ -108,13 +108,13 @@ describe('Stash 完整 YAML 渲染', () => {
 
 describe('Stash 规则能力独立于 Surge / Mihomo', () => {
   it.each(['DOMAIN-REGEX,^example', 'GEOSITE,cn', 'NETWORK,tcp', 'DST-PORT,443', 'USER-AGENT,PayPal*'])('原生规则：%s', text => {
-    expect(lowerRule(parseRuleLine(text), { client: 'stash', platform: 'ios' })).toEqual({ kind: 'ok', text });
+    expect(lowerRule(parseRuleLine(text), { client: 'stash' })).toEqual({ kind: 'ok', text });
   });
   it('进程规则仅 macOS 生效，精确路径保留 PROCESS-PATH，名称正则可等价降级', () => {
-    expect(lowerRule(parseRuleLine('PROCESS-PATH,/usr/bin/ssh'), { client: 'stash', platform: 'macos' })).toMatchObject({ kind: 'ok', text: 'PROCESS-PATH,/usr/bin/ssh' });
-    expect(lowerRule(parseRuleLine('PROCESS-NAME-REGEX,^App.*'), { client: 'stash', platform: 'macos' })).toMatchObject({ kind: 'ok', text: 'PROCESS-NAME,App*' });
-    for (const platform of [undefined, 'ios'] as const) expect(lowerRule(parseRuleLine('PROCESS-NAME,App'), { client: 'stash', platform })).toMatchObject({ kind: 'drop' });
-    expect(lowerRule(parseRuleLine('PROCESS-PATH-WILDCARD,/Apps/*'), { client: 'stash', platform: 'macos' })).toMatchObject({ kind: 'drop' });
+    expect(lowerRule(parseRuleLine('PROCESS-PATH,/usr/bin/ssh'), { client: 'stash' })).toMatchObject({ kind: 'ok', text: 'PROCESS-PATH,/usr/bin/ssh' });
+    expect(lowerRule(parseRuleLine('PROCESS-NAME-REGEX,^App.*'), { client: 'stash' })).toMatchObject({ kind: 'ok', text: 'PROCESS-NAME,App*' });
+    expect(lowerRule(parseRuleLine('PROCESS-NAME,App'), { client: 'stash' })).toMatchObject({ kind: 'ok', text: 'PROCESS-NAME,App' });
+    expect(lowerRule(parseRuleLine('PROCESS-PATH-WILDCARD,/Apps/*'), { client: 'stash' })).toMatchObject({ kind: 'drop' });
     const raw: RuleIR = { type: 'RAW', client: 'stash', text: 'URL-REGEX,^https://example.test/' };
     expect(lowerRule(raw, { client: 'stash' }).kind).toBe('ok');
     expect(lowerRule(raw, { client: 'mihomo' }).kind).toBe('drop');

@@ -178,6 +178,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
     </PageHeader>
     <PageScroll>
       <ErrorAlert error={save.error ?? rulesets.error} />
+      {(initial?.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[13px] text-warn">{note}</p>)}
       {currentValidation?.error && <FieldError error={currentValidation.error} />}
       {visibleErrors.length > 0 && <Notice tone="err" actions={firstLocation && <Button size="sm" onClick={() => locate(firstLocation)}>定位</Button>}>
         <span>{visibleErrors[0]!.message}{visibleErrors.length > 1 ? `（共 ${visibleErrors.length} 项待修复）` : ''}</span>

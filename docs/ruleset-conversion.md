@@ -8,7 +8,7 @@
 - `RuleConverter` 不做网络或数据库访问。它接受原文、来源元数据、改写及客户端上下文，调用共享内核；解析结果按内容缓存，最多 64 项、约 16 MiB 序列化数据。
 - `prepareRuleDocument` 和 `convertRuleDocuments` 为共享纯函数。管理接口及实际托管 LIST 文件调用相同的转换函数。原始透传仍遵循已有的输出格式判定。
 - `useRulesetSources` 按来源缓存原文和诊断。名称、备注、客户端选择和改写不进入来源获取键。
-- `RulesetPreview` 内部保存客户端与平台，仅请求服务端转换。更新保留旧输出并明确标注；切换到其他来源不冒用旧来源结果；失败可重新转换。
+- `RulesetPreview` 内部只保存内核，仅请求服务端转换。更新保留旧输出并明确标注；切换到其他来源不冒用旧来源结果；失败可重新转换。
 
 ## 接口
 
@@ -137,4 +137,4 @@
 
 验收：核心、服务端与前端共 880 项测试通过，46 项沿用环境条件跳过；类型检查、生产构建通过。内置浏览器验证模板 YAML 导入与回显、单条原文增删标记、订阅远程引用展开、规则增强新建页，以及 390px 手机布局。规则行保留上下间距，未恢复独立开关。
 
-2026-10-29 Stash：规则转换、预览与 GET 下载接受 target/client=stash；主订阅已接入，嵌套转换链接包含 target=stash 并按平台及结构版本鉴权。USER-AGENT 可正常输出；进程规则仅 macOS，其余平台保留说明注释。官方差异与完整导出边界见 [17](17-official-client-configuration-guides.md)。
+2026-10-29 Stash：规则转换、预览与 GET 下载接受 target/client=stash；主订阅已接入，嵌套转换链接包含 target=stash 并按内核及结构版本鉴权。USER-AGENT 可正常输出；进程规则按内核保留，不再按 iOS/macOS 分别删除。官方差异与完整导出边界见 [17](17-official-client-configuration-guides.md)。

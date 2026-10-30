@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 // 仅访问本机的真实内核验收；每项等待子进程退出并清理临时目录和 HTTP 服务。
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -48,7 +49,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('真实 Mihomo �
         profile: { id: 'p', name: '测试', nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'provider' }], overlay: { extraGroups: [{ group }], final: { kind: 'group', groupId: 'g' } }, chains: [], refPolicy: { default: 'wrap' } },
         nodeSets: { sources: { s: { id: 's', name: '本机测试源', url: 'http://127.0.0.1:9/sub', pipeline: [] } }, collections: {}, locals: {}, snapshots: { s: ['proxies:\n- {name: 原有节点, type: http, server: 127.0.0.1, port: 9}'] } },
         rules: { rulesets: {}, snapshots: {} }, urls: { provider: () => 'http://127.0.0.1:9/provider', ruleset: () => 'http://127.0.0.1:9/rules' },
-        base: { 'mixed-port': mixed, 'external-controller': `127.0.0.1:${control}`, 'log-level': 'warning', 'geo-auto-update': false, 'geodata-mode': false, ipv6: false },
+        base: testYaml({ 'mixed-port': mixed, 'external-controller': `127.0.0.1:${control}`, 'log-level': 'warning', 'geo-auto-update': false, 'geodata-mode': false, ipv6: false }),
       });
       const provider = Object.values(rendered.providers)[0];
       if (provider) writeFileSync(join(dir, 'provider.yaml'), provider.yaml);

@@ -1,28 +1,13 @@
-import { surgeBaseGroups } from '../schemas/surgeBase.ts';
-import { loonBaseGroups } from '../schemas/loonBase.ts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { mihomoBaseGroups } from '../schemas/mihomoBase.ts';
-import { stashBaseGroups } from '../schemas/stashBase.ts';
 import { PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
 import { FieldInput } from './SchemaForm.tsx';
-import { OverrideForm } from './OverrideField.tsx';
 import { Select, type SelectProps } from './listbox.tsx';
 import { setPath, type FieldSpec } from './schema.ts';
 
 describe('表单占位与空值契约', () => {
-  it('继承预设的空字符串、空列表和空对象显示提示，保留 false 与零', () => {
-    const field: FieldSpec = { key: 'value', label: '测试字段', type: 'string', placeholder: '字段用途说明' };
-    const render = (value: unknown) => renderToStaticMarkup(<OverrideForm groups={[{ title: '测试', fields: [field] }]} base={{ value }} patch={{}} onChange={() => {}} />);
-    for (const value of [undefined, null, '', [], {}]) expect(render(value)).toContain('字段用途说明');
-    for (const value of [false, 0]) {
-      expect(render(value)).not.toContain('字段用途说明');
-      expect(render(value)).toContain(`>${value}<`);
-    }
-  });
-
-  it('所有基础设置和节点协议字段都提供中文解释', () => {
-    const groups = [...mihomoBaseGroups, ...stashBaseGroups, ...surgeBaseGroups, ...loonBaseGroups, ...PROXY_TYPES.flatMap(({ value }) => schemaFor(value))];
+  it('所有节点协议字段都提供中文解释', () => {
+    const groups = [...PROXY_TYPES.flatMap(({ value }) => schemaFor(value))];
     for (const field of groups.flatMap(group => group.fields)) {
       expect(field.placeholder, field.key).toMatch(/[\u4e00-\u9fff]/);
       expect(field.placeholder, field.key).not.toMatch(/^(未设置|不设置|请选择)$/);

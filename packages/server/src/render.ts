@@ -1,6 +1,6 @@
+import { CLIENT_APPS, resolveNativeBase, type ClientApp } from '@sub-forge/core';
 import { ruleBinding } from './rule-binding.ts';
 import { queryUrl } from '@sub-forge/core';
-import { lowerCommonBase, mergeBase, type CommonBase } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
@@ -20,14 +20,18 @@ import type { Store, TrafficInfo, SnapshotRow } from './store.ts';
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
-const GENERATION_PLACEHOLDER = '__SF_GENERATION__';
 
-export type Target = { client: Client; platform?: Platform };
+export type Target = { client: Client; platform?: Platform; app?: ClientApp };
+
+function normalizeTarget(target: Target): Target {
+  const app = target.app ? CLIENT_APPS.find(a => a.id === target.app) : CLIENT_APPS.find(a => a.kernel === target.client && 'platform' in a && a.platform === target.platform);
+  if (target.app && (!app || app.kernel !== target.client)) throw new Error('客户端与内核不匹配');
+  if (app && 'platform' in app && target.platform && app.platform !== target.platform) throw new Error('客户端与平台不匹配');
+  return { client: target.client, ...(target.platform ? { platform: target.platform } : {}), ...(app ? { app: app.id, ...('platform' in app ? { platform: app.platform } : {}) } : {}) };
+}
 
 /** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
 export type StoredRender = {
-  /** 配置结构版本；旧数据库中的 last-good 没有这个字段。 */
-  generation?: string;
   /** Loon 全部分流规则已托管；旧内联产物不可作为回退。 */
   loonRuleDelivery?: 'remote';
   yaml: string;
@@ -80,24 +84,13 @@ function nodeTraffic(ref: NodeSetID, inputs: NodeSetInputs, infos: Map<string, T
   visit(ref); return sumTraffic(byUrl.values());
 }
 
-function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...base };
-  for (const [k, v] of Object.entries(patch)) {
-    const b = out[k];
-    out[k] = v && typeof v === 'object' && !Array.isArray(v) && b && typeof b === 'object' && !Array.isArray(b)
-      ? deepMerge(b as Record<string, unknown>, v as Record<string, unknown>)
-      : v;
-  }
-  return out;
-}
-
 class ConcurrentRenderChange extends Error {}
 
 type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
 
 export type PreviewOutcome = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; exportUnavailableReason?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 
-const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
+const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}${t.app ? ':' + t.app : ''}`;
 
 export class RenderService {
   readonly sharedRules: SharedRuleService;
@@ -109,6 +102,7 @@ export class RenderService {
   ) { this.sharedRules = new SharedRuleService(store, snapshots); }
 
   async render(profileId: string, target: Target): Promise<RenderOutcome> {
+    target = normalizeTarget(target);
     const pre: ReportItem[] = [];
     let attempt: Attempt;
     try {
@@ -157,13 +151,7 @@ export class RenderService {
   }
 
   private remember(profileId: string, target: Target, render: StoredRender): void {
-    if (render.generation) this.store.putRenderGeneration(profileId, targetKey(target), render.generation, render);
     this.store.putLastGood(profileId, targetKey(target), render);
-  }
-
-  /** 只返回指定结构版本，未知版本不能回退到最新内容。 */
-  getVersion(profileId: string, target: Target, version: string): StoredRender | undefined {
-    return /^[0-9a-f]{32}$/.test(version) ? this.store.getRenderGeneration(profileId, targetKey(target), version) : undefined;
   }
 
   /**
@@ -171,6 +159,7 @@ export class RenderService {
    * template 传入时代替 Profile 当前引用的模板版本。
    */
   async preview(profileId: string, target: Target, overrides: { profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<PreviewOutcome> {
+    target = normalizeTarget(target);
     const pre: ReportItem[] = [];
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
@@ -220,7 +209,9 @@ export class RenderService {
     pre.push(...loaded.report);
 
     const rules = this.collectRules(profile, template);
+    for (const note of template?.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
+      for (const note of rs.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
       for (const src of rs.sources) {
         if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
         const binding = ruleBinding(rs.id, `profile:${profileId || `draft:${owner}`}`);
@@ -235,42 +226,26 @@ export class RenderService {
     }
 
     checkCurrent();
-    const preset = profile.base?.presetId ? this.store.get('preset', profile.base.presetId) : undefined;
-    if (profile.base?.presetId && !preset) pre.push({ level: 'error', code: 'preset.missing', message: `基础设置预设 ${profile.base.presetId} 不存在` });
-    const common = mergeBase(preset?.common ?? {}, profile.base?.common ?? {}) as CommonBase;
-    const nativeBase = profile.base ? target.client === 'loon'
-      ? deepMerge(preset?.loon ?? {}, profile.base.loonPatch ?? {})
-      : target.client === 'surge'
-      ? deepMerge(preset?.surge ?? {}, profile.base.surgePatch ?? {})
-      : target.client === 'stash'
-      ? deepMerge(preset?.stash ?? {}, profile.base.stashPatch ?? {})
-      : deepMerge(preset?.mihomo ?? {}, profile.base.patch ?? {}) : undefined;
-    const mapped = lowerCommonBase(common, target.client, target.platform, nativeBase);
-    pre.push(...mapped.report);
-    const base = profile.base ? mergeBase(mapped.base, nativeBase ?? {}) : undefined;
-    const general = base?.general as Record<string, unknown> | undefined;
-    const defaults = { ...common,
-      ...(typeof general?.['proxy-test-url'] === 'string' ? { testUrl: general['proxy-test-url'] } : {}),
-      ...(typeof general?.['test-timeout'] === 'number' ? { testTimeoutMs: general['test-timeout'] * 1000 } : {}),
-    };
+    for (const note of profile.migrationNotes ?? []) pre.push({ level: 'warn', code: 'base.migrated', message: note });
+    const base = profile.base && profile.base.enabled !== false ? resolveNativeBase(target.client, target.app, profile.base) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource);
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
-    const output = { target: target.client, platform: target.platform, token: TOKEN_PLACEHOLDER };
+    const output = { target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER };
     const ruleReferences = new Map<string, HostedRuleReference>();
     const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
-      profile, nodeSets, rules, common: defaults, resourceIntervalSec:this.store.resourceCacheTtlSec,
+      profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
       urls: {
-        provider: (k, v) => queryUrl('/subs/nodes', { kind: 'provider', profile: profile.id, id: k, version: GENERATION_PLACEHOLDER, hash: v, ...output }, publicUrl),
+        provider: k => queryUrl('/subs/nodes', { kind: 'provider', profile: profile.id, id: k, ...output }, publicUrl),
         ruleset: (k, reference) => {
           if (!reference) throw new Error('托管规则缺少资源定义');
           ruleReferences.set(k, reference);
           const key = this.ruleKey(reference, target);
           return reference.matcher.kind !== 'ruleset' || reference.matcher.remote
-            ? queryUrl('/subs/ruleset', { profile: profile.id, key, version: GENERATION_PLACEHOLDER, ...output }, publicUrl)
+            ? queryUrl('/subs/ruleset', { profile: profile.id, key, ...output }, publicUrl)
             : queryUrl(reference.matcher.repository ? '/resources/repo' : '/resources/ruleset', { key, token: TOKEN_PLACEHOLDER }, publicUrl);
         },
       },
@@ -278,20 +253,6 @@ export class RenderService {
     const report = [...pre, ...result.report.items];
     const errors = report.filter((i) => i.level === 'error');
     if (errors.length) return { report, result, failure: errors.map((e) => e.message).join('；') };
-
-    // 文档意图与主配置结构决定版本。远程快照不参与；兼容的节点/规则内容可在本版本独立更新。
-    // provider 的 hash 仅用于主配置刷新时破除客户端缓存，不影响结构版本。
-    const loonRuleDelivery = target.client === 'loon' ? 'remote' as const : undefined;
-    const contract = structuredClone(result.config);
-    for (const entry of Object.values((contract['proxy-providers'] ?? {}) as Record<string, { url: string }>)) {
-      entry.url = entry.url.replace(/&hash=[0-9a-f]+/, '');
-    }
-    const generation = createHash('sha256').update(stableStringify({
-      profile, template, base, target, contract, loonRuleDelivery,
-      sources: nodeSets.sources, collections: nodeSets.collections, locals: nodeSets.locals,
-      rulesets: rules.rulesets,
-    })).digest('hex').slice(0, 32);
-    result.yaml = result.yaml.replaceAll(GENERATION_PLACEHOLDER, generation);
 
     if (this.opts.verify && target.client === 'mihomo') {
       const v = await this.opts.verify(result.yaml.replaceAll(TOKEN_PLACEHOLDER, 'verify'));
@@ -304,8 +265,7 @@ export class RenderService {
 
     checkCurrent();
     const render: StoredRender = {
-      generation,
-      ...(loonRuleDelivery ? { loonRuleDelivery } : {}),
+      ...(target.client === 'loon' ? { loonRuleDelivery: 'remote' as const } : {}),
       yaml: target.client === 'surge'
         ? '#!MANAGED-CONFIG ' + queryUrl('/subs/profile', { id: profile.id, ...output }, publicUrl) + ' interval=' + this.store.resourceCacheTtlSec + ' strict=false\n' + result.yaml
         : result.yaml,

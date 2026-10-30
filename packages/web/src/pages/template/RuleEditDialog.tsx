@@ -26,6 +26,6 @@ export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx:
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}
       onRuleChange={rule => { if (matcher.kind === 'rule') setDraft({ ...draft, matcher: { ...matcher, rule } }); }}
       onChange={matcher => setDraft({ ...draft, matcher })} />
-    {extendedOptions && matcher.kind !== 'ruleset' && <div className="min-w-0 border-t border-line-2 pt-4"><details><summary className="cursor-pointer text-[13px]">客户端覆盖</summary><div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={overrides => setDraft({ ...draft, matcher: { ...matcher, overrides } })} /></div></details></div>}
+    {extendedOptions && matcher.kind !== 'ruleset' && <div className="min-w-0 border-t border-line-2 pt-4"><details><summary className="cursor-pointer text-[13px]">内核改写</summary><div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={overrides => setDraft({ ...draft, matcher: { ...matcher, overrides } })} /></div></details></div>}
   </RuleEditShell>;
 });

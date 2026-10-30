@@ -119,7 +119,7 @@ export type RuleIR = (
 ) & { extendedMatching?: boolean }; // Surge 扩展匹配必须保留；其他客户端不能静默移除
 
 export type ClientOverride = {
-  when: { client: Client; platform?: Platform };
+  when: { client: Client };
   action: { replace: RuleIR[] } | { drop: true } | { append: RuleIR[] };
 };
 
@@ -151,6 +151,8 @@ export type RuleSetSource = {
  * 文本统一解析、合并去重后托管 classical LIST；单一合法 MRS 来源原字节托管。
  */
 export type RuleSet = {
+  /** 历史条件停用等升级诊断，供管理界面确认。 */
+  migrationNotes?: string[];
   id: ID;
   name: string;
   /** 管理备注，仅用于界面展示 */
@@ -229,6 +231,7 @@ export type RuleEntry = {
 };
 
 export type Template = {
+  migrationNotes?: string[];
   id: ID;
   /** 仅兼容旧数据导入；当前模板不维护版本号。 */
   version?: number;

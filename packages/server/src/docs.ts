@@ -1,6 +1,6 @@
 // 服务层保存的文档类型：在内核领域模型上补充拉取参数、模板引用、基础设置等服务层字段。
 
-import type { IniBase, Collection, LocalProxyGroup, Profile, RuleSet, RuleSetSource, Source, Template } from '@sub-forge/core';
+import type { Collection, LocalProxyGroup, Profile, RuleSet, RuleSetSource, Source, Template } from '@sub-forge/core';
 
 export type FetchOptions = {
   /** 拉取时使用的 User-Agent */
@@ -22,14 +22,15 @@ export type LocalDoc = LocalProxyGroup;
 /** 当前模板；旧 version 字段仅供导入历史数据，不参与保存和渲染。 */
 export type TemplateVersionDoc = Template & { name?: string };
 
-/** 基础设置预设（BS-03），各客户端基础设置独立保存与合并 */
-export type PresetDoc = { id: string; name: string; version: number; common?: import('@sub-forge/core').CommonBase; mihomo: Record<string, unknown>; stash?: Record<string, unknown>; surge?: IniBase; loon?: IniBase };
+/** 仅用于迁移历史预设；正常 API 和渲染已不再使用 */
+export type PresetDoc = { id: string; name: string; version: number; config: import('@sub-forge/core').NativeBase; migrationNotes?: string[] };
 
 export type ProfileDoc = Profile & {
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
   template?: { id: string; follow: 'latest' | { pinned: number } };
   /** 不设置表示不输出基础设置（使用客户端默认） */
-  base?: { common?: import('@sub-forge/core').CommonBase; presetId?: string; patch?: Record<string, unknown>; stashPatch?: Record<string, unknown>; surgePatch?: Record<string, unknown>; loonPatch?: Record<string, unknown> };
+  base?: import('@sub-forge/core').ProfileBase;
+  migrationNotes?: string[];
   /** 仅兼容旧导入；保存时移除，下发间隔取系统资源缓存时间。 */
   updateIntervalSec?: number;
   /** subscription-userinfo 的来源（SRC-05） */
@@ -51,7 +52,7 @@ export type Seed = {
   bundles?: unknown[];
   presets?: PresetDoc[];
   templates?: TemplateVersionDoc[];
-  profiles?: ProfileDoc[];
+  profiles?: (Omit<ProfileDoc, 'base'> & { base?: import('@sub-forge/core').ProfileBase & { presetId?: string } })[];
   tokens?: (TokenDoc | LegacyTokenDoc)[];
 };
 

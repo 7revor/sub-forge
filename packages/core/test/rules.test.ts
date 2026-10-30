@@ -36,10 +36,10 @@ AND,((DOMAIN,a.com),(DST-PORT,443))`;
     expect(rule).toEqual({ type: 'USER-AGENT', value: 'PayPal?*' });
     expect(formatRuleLine(rule)).toBe(text);
     for (const platform of ['macos', 'ios'] as const) {
-      expect(lowerRule(rule, { client: 'surge', platform })).toEqual({ kind: 'ok', text });
+      expect(lowerRule(rule, { client: 'surge' })).toEqual({ kind: 'ok', text });
     }
     for (const platform of [undefined, 'android'] as const) {
-      expect(lowerRule(rule, { client: 'mihomo', platform })).toEqual({ kind: 'drop', reason: 'mihomo 不支持 USER-AGENT' });
+      expect(lowerRule(rule, { client: 'mihomo' })).toEqual({ kind: 'drop', reason: 'mihomo 不支持 USER-AGENT' });
     }
     expect(() => parseRuleLine('USER-AGENT,')).toThrow('缺少规则值');
   });
@@ -76,10 +76,10 @@ describe('PRD 场景 6：进程规则分客户端', () => {
     expect(lowerRule(rule, { client: 'mihomo' })).toEqual({ kind: 'ok', text: 'PROCESS-PATH-WILDCARD,/Applications/*/WeChat.app/*' });
   });
   it('Surge macOS 输出 PROCESS-NAME', () => {
-    expect(lowerRule(rule, { client: 'surge', platform: 'macos' })).toEqual({ kind: 'ok', text: 'PROCESS-NAME,/Applications/*/WeChat.app/*' });
+    expect(lowerRule(rule, { client: 'surge' })).toEqual({ kind: 'ok', text: 'PROCESS-NAME,/Applications/*/WeChat.app/*' });
   });
-  it('Surge iOS 丢弃并说明原因', () => {
-    expect(lowerRule(rule, { client: 'surge', platform: 'ios' })).toEqual({ kind: 'drop', reason: 'Surge iOS 不支持进程规则' });
+  it('Surge 公共输出保留进程规则，由客户端判断平台能力', () => {
+    expect(lowerRule(rule, { client: 'surge' })).toEqual({ kind: 'ok', text: 'PROCESS-NAME,/Applications/*/WeChat.app/*' });
   });
 });
 
@@ -91,23 +91,23 @@ describe('客户端降级与覆盖', () => {
     expect(regexToWildcard('^code(-insiders)?$')).toBeUndefined();
     expect(regexToWildcard('(?i)^code$')).toBeUndefined();
     const r: RuleIR = { type: 'PROCESS', kind: 'name', mode: 'regex', value: '^steam.*' };
-    expect(lowerRule(r, { client: 'surge', platform: 'macos' })).toMatchObject({ kind: 'ok', text: 'PROCESS-NAME,steam*' });
+    expect(lowerRule(r, { client: 'surge' })).toMatchObject({ kind: 'ok', text: 'PROCESS-NAME,steam*' });
   });
 
   it('Surge 写法差异', () => {
-    const s = (t: string) => lowerRule(parseRuleLine(t), { client: 'surge', platform: 'macos' });
+    const s = (t: string) => lowerRule(parseRuleLine(t), { client: 'surge' });
     expect(s('DST-PORT,22')).toEqual({ kind: 'ok', text: 'DEST-PORT,22' });
     expect(s('NETWORK,udp')).toEqual({ kind: 'ok', text: 'PROTOCOL,UDP' });
     expect(s('GEOSITE,cn').kind).toBe('drop');
     expect(s('DOMAIN-REGEX,^a\\.com$').kind).toBe('drop');
   });
 
-  it('按客户端与平台覆盖（Android 包名）', () => {
+  it('按内核改写进程名称，不影响其他内核', () => {
     const rule: RuleIR = { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Telegram' };
-    const ov = [{ when: { client: 'mihomo' as const, platform: 'android' as const }, action: { replace: [{ ...rule, value: 'org.telegram.messenger' }] } }];
-    expect(applyOverrides(rule, ov, { client: 'mihomo', platform: 'android' })).toEqual([{ ...rule, value: 'org.telegram.messenger' }]);
-    expect(applyOverrides(rule, ov, { client: 'mihomo', platform: 'windows' })).toEqual([rule]);
-    expect(applyOverrides(rule, [{ when: { client: 'surge' }, action: { drop: true } }], { client: 'surge', platform: 'ios' })).toEqual([]);
+    const ov = [{ when: { client: 'mihomo' as const }, action: { replace: [{ ...rule, value: 'org.telegram.messenger' }] } }];
+    expect(applyOverrides(rule, ov, { client: 'mihomo' })).toEqual([{ ...rule, value: 'org.telegram.messenger' }]);
+    expect(applyOverrides(rule, ov, { client: 'surge' })).toEqual([rule]);
+    expect(applyOverrides(rule, [{ when: { client: 'surge' }, action: { drop: true } }], { client: 'surge' })).toEqual([]);
     expect(applyOverrides(rule, [{ when: { client: 'surge' }, action: { append: [{ type: 'DOMAIN', value: 'added.test' }] } }], { client: 'surge' })).toEqual([rule, { type: 'DOMAIN', value: 'added.test' }]);
   });
 });
@@ -168,13 +168,13 @@ describe('规则集组级内容改写', () => {
       { id: 'binary', kind: 'remote', format: 'mrs', behavior: 'domain', url: 'https://example.test/binary' },
     ],
     overrides: [
-      { match: 'DOMAIN,same.test', override: { when: { client: 'mihomo', platform: 'android' }, action: { replace: [{ type: 'IP-CIDR', value: '192.0.2.0/24' }] } } },
+      { match: 'DOMAIN,same.test', override: { when: { client: 'mihomo' }, action: { replace: [{ type: 'IP-CIDR', value: '192.0.2.0/24' }] } } },
       { match: 'DOMAIN,same.test', override: { when: { client: 'mihomo' }, action: { drop: true } } },
     ],
   } }, snapshots: { 'r/b': 'DOMAIN,same.test\nDOMAIN,remote.test' } });
 
   it('所有来源按内容匹配，平台优先级、替换后去重、忽略独立 no-resolve 且保留二进制托管', () => {
-    const b = expandRuleSet('r', make(), { client: 'mihomo', platform: 'android' }, new Report());
+    const b = expandRuleSet('r', make(), { client: 'mihomo' }, new Report());
     expect(b.domain.map((r) => 'value' in r && r.value)).toEqual(['keep.test', 'remote.test']);
     expect(b.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24' }]);
     expect(b).toMatchObject({ total: 4, duplicates: 1, binary: [{ sourceId: 'binary' }] });
@@ -187,7 +187,7 @@ describe('规则集组级内容改写', () => {
     ]);
     expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report()).domain).toHaveLength(3);
     inputs.rulesets.r!.sources.reverse();
-    expect(expandRuleSet('r', inputs, { client: 'mihomo', platform: 'android' }, new Report()).ipcidr).toHaveLength(1);
+    expect(expandRuleSet('r', inputs, { client: 'mihomo' }, new Report()).ipcidr).toHaveLength(1);
   });
 });
 
@@ -206,12 +206,12 @@ describe('规则集条件追加', () => {
     expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report())).toMatchObject({ total: 4, duplicates: 0 });
   });
 
-  it('多来源只追加一次，遵循客户端与平台条件、去重并忽略旧 no-resolve', () => {
+  it('多来源只追加一次，遵循内核条件、去重并忽略旧 no-resolve', () => {
     const inputs: RuleSetInputs = { rulesets: { r: {
       id: 'r', name: '追加', noResolve: true,
       sources: ['a', 'b'].map((id) => ({ id, kind: 'local', format: 'auto', content: 'DOMAIN,keep.test' })),
       overrides: [
-        { override: { when: { client: 'surge', platform: 'macos' }, action: { append: [
+        { override: { when: { client: 'surge' }, action: { append: [
           { type: 'DOMAIN', value: 'added.test' }, { type: 'DOMAIN', value: 'keep.test' },
           { type: 'IP-CIDR', value: '192.0.2.0/24' },
         ] } } },
@@ -219,13 +219,13 @@ describe('规则集条件追加', () => {
         { match: 'DOMAIN,added.test', override: { when: { client: 'surge' }, action: { drop: true } } },
       ],
     } }, snapshots: {} };
-    const mac = expandRuleSet('r', inputs, { client: 'surge', platform: 'macos' }, new Report());
+    const mac = expandRuleSet('r', inputs, { client: 'surge' }, new Report());
     expect(mac.domain).toEqual(['keep.test', 'added.test', 'second.test'].map((value) => ({ type: 'DOMAIN', value })));
     expect(mac.ipcidr).toEqual([{ type: 'IP-CIDR', value: '192.0.2.0/24' }]);
     expect(mac).toMatchObject({ total: 6, duplicates: 2 });
-    expect(expandRuleSet('r', inputs, { client: 'surge', platform: 'ios' }, new Report()).domain).toHaveLength(2);
+    expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report()).domain).toHaveLength(3);
     expect(expandRuleSet('r', inputs, { client: 'mihomo' }, new Report()).domain).toHaveLength(1);
     inputs.rulesets.r!.sources.forEach((s) => { s.enabled = false; });
-    expect(expandRuleSet('r', inputs, { client: 'surge', platform: 'macos' }, new Report()).domain).toHaveLength(3);
+    expect(expandRuleSet('r', inputs, { client: 'surge' }, new Report()).domain).toHaveLength(3);
   });
 });

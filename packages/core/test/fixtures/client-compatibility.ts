@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 // 以 Mihomo 字段为输入，逐项测试目标输出；ok 仅表示生成器完整接受，不代表真机连接通过。
 import type { Client, GroupSpec, LocalProxy, RenderInput } from '../../src/index.ts';
 import { parseRuleLine, renderMihomo, renderSurge, renderLoon, renderStash, type MihomoRenderResult } from '../../src/index.ts';
@@ -12,7 +13,7 @@ export function outputStatus(result: MihomoRenderResult): Status {
 }
 export type CompatibilityCase = { id: string; category: string; label: string; apply: (f: RenderInput) => void; expected?: Partial<Record<Client, Status>>; caveat?: string };
 export function commonInput(): RenderInput {
-  const f = iniFixture(); f.base = {}; f.platform = 'ios'; f.profile.nodeSets[0]!.output = 'inline';
+  const f = iniFixture(); f.base = ''; f.platform = 'ios'; f.profile.nodeSets[0]!.output = 'inline';
   f.nodeSets.locals.nodes!.proxies = [{ name: '测试节点', type: 'trojan', server: 'node.example.test', port: 443, password: 'example' }];
   routing(f).rules = []; return f;
 }
@@ -86,7 +87,7 @@ export const compatibilityCases: CompatibilityCase[] = [
   rule('rule-regex', 'DOMAIN-REGEX', 'DOMAIN-REGEX,^example[.]test$', { surge: 'omitted', loon: 'omitted' }),
   rule('rule-srcip', 'SRC-IP-CIDR', 'SRC-IP-CIDR,192.0.2.0/24', { loon: 'omitted' }),
   rule('rule-src', 'IP-CIDR src', 'IP-CIDR,192.0.2.0/24,src', { loon: 'omitted' }),
-  rule('rule-process', 'PROCESS-NAME（iOS）', 'PROCESS-NAME,Example', { surge: 'omitted', loon: 'omitted', stash: 'omitted' }),
+  rule('rule-process', 'PROCESS-NAME（由客户端处理平台能力）', 'PROCESS-NAME,Example'),
   rule('rule-proc-regex', '复杂进程正则（macOS）', 'PROCESS-NAME-REGEX,^(Foo|Bar)[0-9]+$', { surge: 'omitted', loon: 'omitted', stash: 'omitted' }),
   rule('rule-ua', 'USER-AGENT（非 Mihomo 通用项）', 'USER-AGENT,Example*', { mihomo: 'omitted' }),
   rule('rule-urlregex', 'URL-REGEX（非 Mihomo 通用项）', 'URL-REGEX,^https://example[.]test', { mihomo: 'omitted', stash: 'omitted' }),

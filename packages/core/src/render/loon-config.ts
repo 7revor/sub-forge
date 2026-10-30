@@ -1,3 +1,4 @@
+import { mergeNativeIni } from '../base/native.ts';
 import type { GroupSpec } from '../types.ts';
 import type { Report } from '../report.ts';
 import type { MihomoRenderResult } from './mihomo.ts';
@@ -38,10 +39,10 @@ function loonGroup(group: Fields, report: Report): string {
 }
 
 /** 所有分流规则按列表顺序托管；[Rule] 仅保留最终兜底。 */
-export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rulesets' | 'report'>): string {
+export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rulesets' | 'report' | 'baseText'>): string {
   const { config, report } = result;
   try {
-    const base = stringifyIniBase({ ...(config.general ? { general: config.general } : {}), ...(config.host ? { host: config.host } : {}) });
+    const base = mergeNativeIni([result.baseText ?? '', stringifyIniBase({ ...(config.general ? { general: config.general } : {}) })]);
     const names = new Set([...(config.proxies as Fields[]).map(n => String(n.name)), ...(config['proxy-groups'] as Fields[]).map(g => String(g.name))]);
     const chains: string[] = [];
     const proxies = (config.proxies as Fields[]).flatMap(node => {
@@ -65,7 +66,7 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       if (!match) throw new Error('Loon 分流规则必须使用托管链接');
       const url = providers[match[1]!]?.url;
       if (typeof url !== 'string' || !url.trim()) throw new Error('Loon 缺少托管规则地址');
-      remoteRules.push(iniValue(url) + ',policy=' + iniName(match[2]) + ',enabled=true');
+      remoteRules.push(iniValue(url) + ',policy=' + iniName(match[2]) + ',tag=' + iniValue(match[1]) + ',enabled=true');
       return [];
     });
     return [base.trim(), '[Proxy]', ...proxies, ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ...(remoteRules.length ? ['', '[Remote Rule]', ...remoteRules] : []), ''].filter((s, i) => i !== 0 || s).join('\n');

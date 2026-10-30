@@ -150,11 +150,11 @@ it('已删除来源的在途旧响应不会重新留下孤立缓存', async () =
   const pending=h.snapshots.refresh('source','s','https://old.test');await entered.promise;h.store.delete('source','s');held.release();await pending;
   expect(h.store.latestSnapshot('source',resource,'https://old.test')).toBeUndefined();
 });
-it.each(['provider'])('等待刷新时撤销 token，%s 入口也拒绝已保留的旧版本',async route=>{
+it('等待刷新时撤销 token，专属规则入口也拒绝返回正文',async()=>{
   const entered=gate(),held=gate();let block=false;const h=setup({fetcher:async()=>{if(block){entered.release();await held.promise;}return {status:200,body:'DOMAIN,private.test'};}});
   h.store.put('profile',profile());issueProfileToken(h.store, {token:'token',profileId:'p'});const result=await h.renderer.render('p',{client:'mihomo'});if(!result.ok)throw new Error('准备失败');
-  const key=Object.keys(result.render.privateRules!)[0]!;const version=result.render.generation!;block=true;h.advance(86400001);
-  const url=route==='provider'?`/subs/ruleset?profile=p&token=token&key=${key}&version=${version}`:`/api/rules/convert?${new URLSearchParams({url:'https://rules.test/a',token:'token',key,v:version})}`;
+  const key=Object.keys(result.render.privateRules!)[0]!;block=true;h.advance(86400001);
+  const url=`/subs/ruleset?profile=p&token=token&key=${key}`;
   const pending=h.app.request(url);await entered.promise;h.store.deleteToken('token');held.release();expect((await pending).status).toBe(404);
 });
 it('校验期间新发生的拉取失败不会丢失告警，仍使用最后成功内容', async () => {

@@ -41,7 +41,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
   const tableColumns = [
     ...columns.map(column => ({ header: column.header, width: column.width ?? 180 })),
     ...(refreshable ? [{ header: '状态', width: 164 }, { header: '上次刷新时间', width: 164 }] : []),
-    { header: actionHeader, width: kind === 'presets' ? 132 : kind === 'profiles' ? 348 : refreshable ? 324 : 240 },
+    { header: actionHeader, width: kind === 'profiles' ? 348 : refreshable ? 324 : 240 },
   ];
   return (
     <>
@@ -65,7 +65,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                 {refreshable && <td className={td}><ResourceLastRefreshTime kind={kind} id={d.id}/></td>}
                 <td className={cx(td, 'text-right whitespace-nowrap')}>
                   <div className="flex items-center justify-end gap-2">
-                    {kind !== 'presets' && <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />}
+                    <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />
                     {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
                     {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
                     <DocActionLink to={`/${kind}/${d.id}`} name={d.name} viewOnly={!canWrite(d.id)} />

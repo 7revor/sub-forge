@@ -44,7 +44,7 @@ export function accessLogger(store: Store, now: () => number, trustedProxies = p
     } else if (path === '/resources/ruleset' && !key) resourceName = store.get('ruleset', id)?.name ?? resourceName;
     if (key && path.startsWith('/resources/')) {
       const record = store.getSharedRule<SharedRuleRecord>(key);
-      if (record && !record.reference.matcher.remote) { client = record.target.client; platform = record.target.platform; }
+      if (record && !record.reference.matcher.remote) { client = record.target.client; platform = undefined; }
     }
     const resource = c.get('accessResource');
     if (resource) { kind = resource.kind; resourceId = resource.resourceId; resourceName = resource.resourceName; }

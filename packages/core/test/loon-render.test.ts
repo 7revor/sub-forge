@@ -1,9 +1,10 @@
+import { stringifyIniBase as testIni } from '@sub-forge/core';
 import { describe, expect, it } from 'vitest';
 import { renderLoon, lowerRule, parseRuleLine, prepareRuleDocument, convertRuleDocuments, stringifyLoon, Report, type RuleSet } from '../src/index.ts';
 import { iniFixture, routing } from './fixtures/ini-client.ts';
 const fixture = () => {
   const f = iniFixture();
-  f.base = { general: { 'ip-mode': 'v4-only', 'allow-wifi-access': false, 'dns-server': ['system', '1.1.1.1'] }, host: { 'local.example.test': '192.0.2.1' } };
+  f.base = testIni({ general: { 'ip-mode': 'v4-only', 'allow-wifi-access': false, 'dns-server': ['system', '1.1.1.1'] }, host: { 'local.example.test': '192.0.2.1' } });
   return f;
 };
 describe('Loon 完整订阅', () => {
@@ -58,7 +59,10 @@ describe('Loon 完整订阅', () => {
     expect(files[0]!.text).toContain('DOMAIN,loon.test\nIP-CIDR,192.0.2.0/24,no-resolve');
     expect(files[1]!.text).toBe('USER-AGENT,Example*\n');
     const urls = Object.values(out.config['rule-providers'] as Record<string, { url: string }>).map(p => p.url);
-    expect(out.yaml.split('[Remote Rule]\n')[1]!.trim().split('\n')).toEqual(urls.map(url => url + ',policy=代理,enabled=true'));
+    expect(out.yaml.split('[Remote Rule]\n')[1]!.trim().split('\n')).toEqual([
+      urls[0] + ',policy=代理,tag=规则,enabled=true',
+      urls[1] + ',policy=代理,tag=__loon_local_1,enabled=true',
+    ]);
     expect(out.yaml).not.toMatch(/RULE-SET|DOMAIN,|IP-CIDR,|USER-AGENT,|extended-matching/);
     expect(out.report.items).toContainEqual(expect.objectContaining({ code: 'rule.client', message: expect.stringContaining('extended-matching') }));
   });
@@ -78,10 +82,25 @@ describe('Loon 完整订阅', () => {
     expect(out.report.hasErrors).toBe(false);
     const lines = out.yaml.split('[Remote Rule]\n')[1]!.trim().split('\n');
     expect(lines).toHaveLength(4);
-    expect(lines.map(l => l.split(',policy=')[1])).toEqual(['DIRECT,enabled=true', 'REJECT,enabled=true', 'DIRECT,enabled=true', 'DIRECT,enabled=true']);
+    expect(lines.map(l => l.split(',policy=')[1])).toEqual([
+      'DIRECT,tag=__loon_local_1,enabled=true', 'REJECT,tag=远程集,enabled=true',
+      'DIRECT,tag=__loon_local_2,enabled=true', 'DIRECT,tag=远程集,enabled=true',
+    ]);
     expect(lines[1]!.split(',policy=')[0]).toBe(lines[3]!.split(',policy=')[0]);
     expect(Object.values(out.rulesets).map(r => r.text)).toEqual(['DOMAIN,first.test\nIP-CIDR,192.0.2.0/24,no-resolve\n', 'DOMAIN,remote.test\n', 'DOMAIN,last.test\n']);
     expect(out.yaml).not.toMatch(/DOMAIN,|IP-CIDR,|GEOSITE,/);
+  });
+  it('规则名称中的引号、分号与注释符号安全输出为 tag，重名仍可区分', () => {
+    const f = fixture();
+    const name = '中文 "规则"; # 名称';
+    for (const id of ['a', 'b']) {
+      f.rules.rulesets[id] = { id, name, sources: [{ id: 's', kind: 'local', format: 'auto', content: 'DOMAIN,' + id + '.test' }] };
+      routing(f).rules.push({ id, matcher: { kind: 'ruleset', id }, target: { kind: 'builtin', name: 'DIRECT' } });
+    }
+    const out = renderLoon(f);
+    expect(out.report.hasErrors, JSON.stringify(out.report.items)).toBe(false);
+    expect(out.yaml).toContain(',policy=DIRECT,tag=' + JSON.stringify(name) + ',enabled=true');
+    expect(out.yaml).toContain(',policy=DIRECT,tag=' + JSON.stringify(name + '_2') + ',enabled=true');
   });
   it('缺少托管地址或残留内联规则时明确失败，不回退为内联正文', () => {
     for (const rules of [['RULE-SET,missing,DIRECT'], ['DOMAIN,inline.test,DIRECT']]) {
@@ -113,9 +132,10 @@ describe('Loon 规则能力', () => {
   ])('转换 %s', (input, text) => {
     expect(lowerRule(parseRuleLine(input), { client: 'loon' })).toMatchObject({ kind: 'ok', text });
   });
-  it('unsupported 保留诊断，逻辑条件不能因 iOS 不支持进程而放宽', () => {
-    for (const text of ['GEOSITE,cn', 'DOMAIN-REGEX,^example', 'IP-CIDR,192.0.2.0/24,src', 'DOMAIN,a.test,extended-matching', 'AND,((DOMAIN,a.test),(PROCESS-NAME,Example))']) expect(lowerRule(parseRuleLine(text), { client: 'loon', platform: 'ios' }).kind).toBe('drop');
-    expect(lowerRule(parseRuleLine('PROCESS-NAME,Example'), { client: 'loon', platform: 'macos' })).toMatchObject({ kind: 'ok', text: 'PROCESS-NAME,Example', note: expect.stringContaining('不区分大小写') });
+  it('不支持的规则保留诊断，含进程条件的逻辑规则完整输出', () => {
+    for (const text of ['GEOSITE,cn', 'DOMAIN-REGEX,^example', 'IP-CIDR,192.0.2.0/24,src', 'DOMAIN,a.test,extended-matching']) expect(lowerRule(parseRuleLine(text), { client: 'loon' }).kind).toBe('drop');
+    expect(lowerRule(parseRuleLine('AND,((DOMAIN,a.test),(PROCESS-NAME,Example))'), { client: 'loon' })).toMatchObject({ kind: 'ok', text: 'AND,((DOMAIN,a.test),(PROCESS-NAME,Example))' });
+    expect(lowerRule(parseRuleLine('PROCESS-NAME,Example'), { client: 'loon' })).toMatchObject({ kind: 'ok', text: 'PROCESS-NAME,Example', note: expect.stringContaining('不区分大小写') });
     expect(lowerRule(parseRuleLine('DOMAIN-WILDCARD,*.test'), { client: 'loon' })).toMatchObject({ kind: 'ok', note: expect.stringContaining('1008') });
   });
   it('规则集输出不把丢弃行当成有效规则', () => {

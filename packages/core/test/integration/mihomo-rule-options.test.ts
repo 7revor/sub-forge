@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 // 断网 Docker 中用本地 HTTP/DNS 验证规则语义：不能只检查 YAML 字符串或 mihomo -t。
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createSocket } from 'node:dgram';
@@ -67,7 +68,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 规则选
       nodeSets: { sources: {}, collections: {}, locals: {}, snapshots: {} },
       rules: { rulesets: { rs: { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content }] } }, snapshots: {} },
       urls: { provider: key => `http://127.0.0.1:${filePort}/${key}`, ruleset: key => `http://127.0.0.1:${filePort}/${key}` },
-      base: { 'mixed-port': mixed, 'external-controller': `127.0.0.1:${ctl}`, ipv6: false, 'log-level': 'warning', dns: { enable: true, ipv6: false, 'enhanced-mode': 'redir-host', nameserver: [`udp://127.0.0.1:${dnsPort}`] } },
+      base: testYaml({ 'mixed-port': mixed, 'external-controller': `127.0.0.1:${ctl}`, ipv6: false, 'log-level': 'warning', dns: { enable: true, ipv6: false, 'enhanced-mode': 'redir-host', nameserver: [`udp://127.0.0.1:${dnsPort}`] } }),
     });
     const dir = mkdtempSync(join(tmpdir(), 'sf-rule-runtime-')); dirs.push(dir);
     writeFileSync(join(dir, 'config.yaml'), served.yaml);

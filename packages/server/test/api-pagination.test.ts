@@ -7,7 +7,6 @@ const docs = [
   ['locals', { proxies: [] }],
   ['rulesets', { sources: [] }],
   ['profiles', { nodeSets: [] }],
-  ['presets', { mihomo: {} }],
 ] as const;
 
 async function setup() {
@@ -43,8 +42,8 @@ describe('列表分页', () => {
         expect(searched.items[0].name).toBe('Alpha 甲');
         expect((await admin.get(`${path}?q=%25_`)).json.items[0].name).toBe('百分号 %_');
         expect((await admin.get(`${path}?q=不存在&page=2`)).json).toMatchObject({ total: 0, page: 1, totalPages: 1, items: [] });
-        expect((await other.get(`${path}?page=1`)).json.total).toBe((segment === 'presets' || segment === 'rulesets') ? 3 : 0);
-        expect((await other.get(`${path}?q=Alpha`)).json.total).toBe((segment === 'presets' || segment === 'rulesets') ? 1 : 0);
+        expect((await other.get(`${path}?page=1`)).json.total).toBe((segment === 'rulesets') ? 3 : 0);
+        expect((await other.get(`${path}?q=Alpha`)).json.total).toBe((segment === 'rulesets') ? 1 : 0);
         expect((await admin.del(`${path}/${last.items[0].id}`)).status).toBe(200);
         expect((await admin.get(`${path}?page=2&pageSize=2`)).json).toMatchObject({ total: 2, page: 1, totalPages: 1 });
       }

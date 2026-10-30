@@ -174,43 +174,41 @@ describe('文档增删改查', () => {
     expect(res.json.details.referrers).toEqual(['组合「全部」', '配置订阅「订阅」']);
   });
 
-  it('Profile 补全默认字段，模板与预设必须存在', async () => {
+  it('Profile 补全默认字段，模板必须存在且禁止旧预设引用', async () => {
     const { alice } = await twoUsers();
     const res = await alice.post('/api/profiles', { name: 'P', nodeSets: [] });
     expect(res.json.item).toMatchObject({ overlay: {}, chains: [], refPolicy: { default: 'wrap' } });
     expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], template: { id: 'nope', follow: 'latest' } })).json.error).toMatch(/模板不存在/);
-    expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], base: { presetId: 'nope' } })).json.error).toMatch(/预设不存在/);
+    expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], base: { presetId: 'nope' } })).json.error).toMatch(/不支持的基础配置字段：presetId/);
   });
 
-  it('基础设置预设：管理员维护，所有人可读', async () => {
+  it('移除预设的列表、读取和写入接口，管理员与普通用户均不可访问', async () => {
     const { admin, alice } = await twoUsers();
-    expect((await alice.post('/api/presets', { name: 'X', mihomo: {} })).status).toBe(403);
-    const id = (await admin.post('/api/presets', { name: 'fake-ip', mihomo: { 'mixed-port': 7890 } })).json.item.id;
-    expect((await alice.get('/api/presets')).json.items.map((p: { name: string }) => p.name)).toEqual(['fake-ip']);
-    expect((await alice.get(`/api/presets?id=${id}`)).status).toBe(200);
-    await alice.post('/api/profiles', { name: 'P', nodeSets: [], base: { presetId: id } });
-    expect((await admin.del(`/api/presets/${id}`)).status).toBe(409);
+    for (const api of [admin, alice]) {
+      expect((await api.get('/api/presets')).status).toBe(404);
+      expect((await api.get('/api/presets?id=old')).status).toBe(404);
+      expect((await api.post('/api/presets', { name: '旧入口', config: {} })).status).toBe(404);
+      expect((await api.put('/api/presets/old', { name: '旧入口', config: {} })).status).toBe(404);
+      expect((await api.del('/api/presets/old')).status).toBe(404);
+    }
   });
 });
 
-describe('预设 Surge 基础配置', () => {
-  it('保存和更新后可完整读回，保留 general 标量、列表及空段', async () => {
-    const { admin, alice } = await twoUsers();
-    const surge = { general: { ipv6: true, 'dns-server': ['1.1.1.1'], extra: false }, host: { 'example.com': '1.2.3.4' } };
-    const created = await admin.post('/api/presets', { name: '双客户端', mihomo: {}, surge });
+describe('订阅原文配置', () => {
+  it('保存和更新后逐字读回，空文本不自动补默认值', async () => {
+    const { alice } = await twoUsers();
+    const surge = '# 保留注释\n[General]\nipv6 = false\n[Host]\n*.example.test = server:1.1.1.1\n';
+    const created = await alice.post('/api/profiles', { name: '原文', nodeSets: [], base: { kernels: { surge } } });
     expect(created.status).toBe(201);
-    const path = `/api/presets/${created.json.item.id}`;
-    expect((await alice.get(`/api/presets?id=${created.json.item.id}`)).json.item.surge).toEqual(surge);
-    const updated = await admin.put(path, { name: '空段', mihomo: {}, surge: {} });
-    expect(updated.status).toBe(200);
-    expect((await alice.get(`/api/presets?id=${created.json.item.id}`)).json.item.surge).toEqual({});
+    const path = `/api/profiles/${created.json.item.id}`;
+    expect((await alice.get(`/api/profiles?id=${created.json.item.id}`)).json.item.base.kernels.surge).toBe(surge);
+    expect((await alice.put(path, { ...created.json.item, name: '空段', base: { kernels: { surge: '' } } })).status).toBe(200);
+    expect((await alice.get(`/api/profiles?id=${created.json.item.id}`)).json.item.base.kernels.surge).toBe('');
   });
-
-  it.each([1, null, [], { general: 1 }, { general: null }, { general: [] }, { host: 1 }, { host: null }, { host: [] }, { host: { a: 1 } }])('非法 Surge 类型 %j 返回 400', async (surge) => {
-    const { admin } = await twoUsers();
-    const res = await admin.post('/api/presets', { name: '非法预设', mihomo: {}, surge });
-    expect(res.status).toBe(400);
-    expect(res.json.error).toMatch(/surge.*必须是/);
+  it.each([1, null, [], {}, { general: {} }])('只接受原文，拒绝结构对象 %j', async surge => {
+    const { alice } = await twoUsers();
+    const res = await alice.post('/api/profiles', { name: '错误类型', nodeSets: [], base: { kernels: { surge } } });
+    expect(res.status).toBe(400); expect(res.json.error).toContain('原始文本');
   });
 });
 

@@ -49,8 +49,8 @@ describe('来源获取与服务端转换分离', () => {
     const ios = await alice.post('/api/rules/convert', { ...body, client: 'surge', platform: 'ios' });
     expect(mihomo.status).toBe(200); expect(ios.status).toBe(200);
     expect(mihomo.json.lines).toHaveLength(ios.json.lines.length);
-    expect(ios.json.lines[3]).toContain('Surge iOS 不支持进程规则');
-    expect(ios.json.stats).toMatchObject({ rejected: 1, unsupported: 1, output: 2 });
+    expect(ios.json.lines[3]).toBe('PROCESS-NAME,Example');
+    expect(ios.json.stats).toMatchObject({ rejected: 1, unsupported: 0, output: 3 });
     expect(calls).toHaveLength(1);
     await alice.post('/api/rulesets/source', { source: { ...remote, name: '重命名' } });
     expect(calls).toHaveLength(2);

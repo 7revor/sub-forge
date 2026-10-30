@@ -29,6 +29,6 @@ export function expandLocalRules(matcher: LocalMatcher, ctx?: ClientCtx): RuleIR
   const error = localRulesError(matcher);
   if (error) throw new Error(error);
   const rules: RuleIR[] = localRuleLines(matcher.content).map(({ text }) => ({ type: 'RAW', text, ...(matcher.client ? { client: matcher.client } : {}) }));
-  const hit = ctx && matcher.overrides?.find(o => o.when.client === ctx.client && (o.when.platform === undefined || o.when.platform === ctx.platform));
+  const hit = ctx && matcher.overrides?.find(o => o.when.client === ctx.client);
   return !hit ? rules : 'drop' in hit.action ? [] : 'append' in hit.action ? [...rules, ...hit.action.append] : hit.action.replace;
 }

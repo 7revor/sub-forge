@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 // 生成可复核的矩阵及示例，只运行官方配置解析器，不启动代理。
 // 从仓库根目录运行；完整命令见 research/verification/mihomo-portability-20261030/验收记录.md。
 import { spawnSync } from 'node:child_process';
@@ -33,7 +34,7 @@ try {
   const rows = compatibilityCases.map(c => {
     const results = targets.map(target => {
       const f = commonInput(); c.apply(f);
-      if (target === 'mihomo') f.base = mihomoBase;
+      if (target === 'mihomo') f.base = testYaml(mihomoBase);
       const out = renderers[target](f), status = outputStatus(out);
       // 不用仅剩 FINAL 的文件掩盖规则丢失，也不把不可发布的半成品送去校验。
       const official = ['error', 'omitted'].includes(status)

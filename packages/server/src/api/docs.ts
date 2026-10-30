@@ -2,7 +2,7 @@ import { requiredQuery } from '../query.ts';
 import { normalizeRulePresence } from '../rule-presence.ts';
 import { migrateProfile, profileTemplate } from '../profile-routing.ts';
 import type { ProfileDoc } from '../docs.ts';
-// 文档增删改查：订阅源、组合、本地节点组、规则集、配置订阅（按用户隔离），基础设置预设（管理员维护，所有人可读）。
+// 文档增删改查：订阅源、组合、本地节点组、规则集、配置订阅（按用户隔离）。
 
 import { readPagination } from './pagination.ts';
 import { Hono } from 'hono';
@@ -18,7 +18,6 @@ const SEGMENTS: Record<string, DocKind> = {
   locals: 'local',
   rulesets: 'ruleset',
   profiles: 'profile',
-  presets: 'preset',
 };
 
 const LABEL: Record<DocKind, string> = { source: '订阅源', collection: '组合', local: '本地节点组', ruleset: '规则集', profile: '配置订阅', preset: '基础设置预设' };
@@ -28,17 +27,13 @@ export function docRoutes(store: Store) {
   app.use('*', requireUser);
 
   for (const [seg, kind] of Object.entries(SEGMENTS)) {
-    const shared = kind === 'preset';
-    const publicRead = shared || kind === 'ruleset';
+    const publicRead = kind === 'ruleset';
 
     /** 读取当前用户可见的文档；不可见与不存在一样返回 404，不暴露是否存在 */
     const load = (id: string, userId: string) => {
       const row = store.getWithOwner(kind, id);
       if (!row || (!publicRead && row.owner !== userId)) throw notFound(LABEL[kind]);
       return row;
-    };
-    const assertWritable = (role: string) => {
-      if (shared && role !== 'admin') throw new HttpError(403, '需要管理员权限');
     };
 
     app.get(`/${seg}`, (c) => {
@@ -54,19 +49,17 @@ export function docRoutes(store: Store) {
 
     app.post(`/${seg}`, async (c) => {
       const user = c.get('user');
-      assertWritable(user.role);
       const body = await jsonBody(c);
       let doc = validateDoc(kind, body, randomId(9), user, store);
       if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), migration: undefined };
       doc = normalizeRulePresence(kind, doc);
-      store.put(kind, doc, shared ? null : user.id);
+      store.put(kind, doc, user.id);
       return c.json({ item: doc }, 201);
     });
 
     app.put(`/${seg}/:id`, async (c) => {
       const user = c.get('user');
       const id = c.req.param('id');
-      assertWritable(user.role);
       const body = await jsonBody(c);
       const current = load(id, user.id);
       if (kind === 'ruleset' && current.owner !== user.id && user.role !== 'admin') throw new HttpError(403, '只有创建者或管理员可以修改公共规则增强');
@@ -75,14 +68,13 @@ export function docRoutes(store: Store) {
       let doc = validateDoc(kind, body, id, user, store);
       if (kind === 'profile') doc = { ...migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, v) => store.getTemplate(id, v))), migration: (current.doc as ProfileDoc).migration };
       doc = normalizeRulePresence(kind, doc);
-      store.put(kind, doc, shared ? null : kind === 'ruleset' ? current.owner : user.id);
+      store.put(kind, doc, kind === 'ruleset' ? current.owner : user.id);
       return c.json({ item: doc });
     });
 
     app.delete(`/${seg}/:id`, (c) => {
       const user = c.get('user');
       const id = c.req.param('id');
-      assertWritable(user.role);
       const row = load(id, user.id);
       if (kind === 'ruleset' && row.owner !== user.id && user.role !== 'admin') throw new HttpError(403, '只有创建者或管理员可以删除公共规则增强');
       const referrers = findReferrers(store, user.id, kind, id);

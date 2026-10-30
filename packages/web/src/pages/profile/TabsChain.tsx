@@ -12,7 +12,7 @@ import { CodePreview } from '../../components/CodePreview.tsx';
 // 代理链直接展示业务检查结果，引用生成细节仅在配置预览中按需展开。
 
 import { useMutation } from '@tanstack/react-query';
-import type { ChainResolution, ChainRule, Platform, Client } from '@sub-forge/core';
+import { CLIENT_APPS, type ClientApp, type ChainResolution, type ChainRule, type Client } from '@sub-forge/core';
 import { Link2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
@@ -22,7 +22,7 @@ import { useProfile } from './context.ts';
 
 function usePreview() {
   const { draft } = useProfile();
-  return useMutation({ mutationFn: ({ platform, client = 'mihomo', profile = draft }: { platform?: Platform; client?: Client; profile?: ProfileDoc } = {}) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: persistedProfile(profile), client, ...(platform ? { platform } : {}) }) });
+  return useMutation({ mutationFn: ({ app, client = 'mihomo', profile = draft }: { app?: ClientApp; client?: Client; profile?: ProfileDoc } = {}) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: persistedProfile(profile), client, ...(app ? { app } : {}) }) });
 }
 
 export function TabChains() {
@@ -61,20 +61,18 @@ function ChainCard({ chain, index, handle, checking, result, onEdit, onDelete }:
   </RoutingCard>;
 }
 
-const PLATFORMS: { value: Platform | 'any'; label: string }[] = [{ value: 'any', label: '不区分' }, { value: 'macos', label: 'macOS' }, { value: 'windows', label: 'Windows' }, { value: 'android', label: 'Android' }, { value: 'linux', label: 'Linux' }];
-
 export function TabPreview() {
   const { draft } = useProfile();
   const preview = usePreview();
-  const [platform, setPlatform] = useState<Platform | 'any'>('any');
+  const [app, setApp] = useState<ClientApp>();
   const [client, setClient] = useState<Client>('mihomo');
-  const platforms = client !== 'mihomo' ? [{ value: 'ios', label: 'iOS' }, { value: 'macos', label: 'macOS' }] : PLATFORMS;
-  const target = { client, profile: persistedProfile(draft), ...(platform === 'any' ? {} : { platform }) };
+  const apps = CLIENT_APPS.filter(a => a.kernel === client);
+  const target = { client, profile: persistedProfile(draft), ...(app ? { app } : {}) };
   const current = preview.data && !preview.isPending && !preview.error && JSON.stringify(preview.variables) === JSON.stringify(target);
   const report = preview.data?.report ?? [];
   const count = (l: string) => report.filter((r) => r.level === l).length;
-  // 打开标签或切换平台时自动渲染当前草稿
-  useEffect(() => { preview.mutate(target); }, [client, platform]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 打开标签或切换内核、客户端时自动渲染当前草稿
+  useEffect(() => { preview.mutate(target); }, [client, app]); // eslint-disable-line react-hooks/exhaustive-deps
   const exportFile = () => {
     const yaml = preview.data?.exportYaml ?? preview.data?.yaml;
     if (!yaml || !current || !preview.data?.ok || preview.data.exportUnavailableReason) return;
@@ -88,9 +86,9 @@ export function TabPreview() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented label="客户端" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setPlatform(value !== 'mihomo' ? 'ios' : 'any'); }} />
-        <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">平台
-          <Select placeholder="选择客户端运行的系统平台" className="w-auto" value={platform} onChange={(e) => setPlatform(e.target.value as Platform | 'any')}>{platforms.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>
+        <Segmented label="预览内核" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setApp(undefined); }} />
+        <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">客户端追加
+          <Select clearable placeholder="选择客户端，留空仅应用内核公共追加" className="w-auto" value={app ?? ''} onChange={e => setApp(e.target.value ? e.target.value as ClientApp : undefined)}>{apps.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</Select></label>
         <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
         <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml || !!preview.data.exportUnavailableReason}>导出文件</Button>
         <span className="text-[12.5px] text-ink-muted">当前草稿预览</span>

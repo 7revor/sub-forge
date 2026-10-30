@@ -11,7 +11,7 @@ const base = (group: GroupSpec, output: 'provider' | 'inline' = 'provider'): Ren
   },
   nodeSets: { sources: { s: { id: 's', name: '源', url: 'https://s.test/sub', pipeline: [] } }, collections: {}, locals: {}, snapshots: { s: ['proxies:\n  - { name: 落地, type: socks5, server: landing.test, port: 1080 }\n  - { name: 前置, type: http, server: relay.test, port: 8080 }\n'] } },
   rules: { rulesets: {}, snapshots: {} },
-  urls: { provider: (key, v) => `https://test/p/${key}?v=${v}`, ruleset: key => `https://test/r/${key}` },
+  urls: { provider: key => `https://test/p/${key}`, ruleset: key => `https://test/r/${key}` },
 });
 const group = (patch: Partial<GroupSpec> = {}): GroupSpec => ({ id: 'g', name: '前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'source', id: 's' } }], filter: '^前置$', ...patch });
 

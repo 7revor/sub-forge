@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
 import { remoteRuleMatcher } from '@sub-forge/core';
@@ -17,9 +18,8 @@ async function scenario() {
   envs.push(env);
   const user = await addUser(env.store, 'alice', 'admin'); await addUser(env.store, 'bob');
   const alice = client(env.app), bob = client(env.app); await alice.login('alice'); await bob.login('bob');
-  env.store.put('preset', { id: 'preset', name: '双客户端', version: 1, mihomo: { 'mixed-port': 7890, dns: { enable: true } }, stash: { mode: 'rule', dns: { nameserver: ['https://dns.example.test/dns-query'] } } }, user.id);
   env.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '测试节点', type: 'hysteria2', server: 'example.test', port: 443, password: 'example-password' }] }, user.id);
-  const draft = { name: '双客户端订阅', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, base: { presetId: 'preset', patch: { 'allow-lan': true }, stashPatch: { 'log-level': 'warning' } },
+  const draft = { name: '双客户端订阅', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, 'allow-lan': true , dns: { enable: true } }), stash: testYaml({ mode: 'rule', dns: { nameserver: ['https://dns.example.test/dns-query'] }, 'log-level': 'warning' }) } },
     routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }], rules: [
       { id: 'remote', matcher: remoteRuleMatcher(rulesUrl), target: { kind: 'group', groupId: 'g' } },
       { id: 'proc', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Example' } }, target: { kind: 'group', groupId: 'g' } },
@@ -32,10 +32,10 @@ async function scenario() {
 
 describe('Stash 主订阅与资源隔离', () => {
   it('UA 与参数正确识别，macOS 优先于 iOS 默认值', () => {
-    expect(detectClient('Stash/3.6.0', {})).toEqual({ client: 'stash', platform: 'ios', by: 'ua' });
-    expect(detectClient('Stash/4.3.0 (macOS)', {})).toEqual({ client: 'stash', platform: 'macos', by: 'ua' });
+    expect(detectClient('Stash/3.6.0', {})).toMatchObject({ client: 'stash', platform: 'ios', by: 'ua' });
+    expect(detectClient('Stash/4.3.0 (macOS)', {})).toMatchObject({ client: 'stash', platform: 'macos', by: 'ua' });
     expect(detectClient('Stash/3.6.0', { target: 'mihomo' }).client).toBe('mihomo');
-    expect(detectClient('curl', { target: 'stash', platform: 'macos' })).toEqual({ client: 'stash', platform: 'macos', by: 'param' });
+    expect(detectClient('curl', { target: 'stash', platform: 'macos' })).toMatchObject({ client: 'stash', platform: 'macos', by: 'param' });
   });
 
   it('完整订阅有独立基础设置、节点字段、平台规则及可下载的配套规则', async () => {
@@ -49,7 +49,7 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(yaml.proxies[0]).toMatchObject({ name: '测试节点', auth: 'example-password' });
     expect(yaml.proxies[0].password).toBeUndefined();
     expect(yaml['proxy-providers']).toBeUndefined();
-    expect(yaml.rules).not.toContain('PROCESS-NAME,Example,代理');
+    expect(yaml.rules).toContain('PROCESS-NAME,Example,代理');
     const provider = Object.values(yaml['rule-providers'])[0] as { url: string };
     expect(new URL(provider.url).pathname).toBe('/subs/ruleset');
     const file = await h.app.request(provider.url);
@@ -71,7 +71,7 @@ describe('Stash 主订阅与资源隔离', () => {
     const config = parse(await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=ios`)).text());
     const url = (Object.values(config['rule-providers'])[0] as { url: string }).url;
     const doc = h.store.get('profile', h.profile.id)!;
-    h.store.put('profile', { ...doc, base: { ...doc.base, stashPatch: { mode: 'direct' } } }, h.user.id);
+    h.store.put('profile', { ...doc, base: { ...doc.base, kernels: { stash: testYaml({ mode: 'direct' }) } } }, h.user.id);
     expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=ios`)).status).toBe(200);
     expect(await (await h.app.request(url)).text()).toContain('USER-AGENT,PayPal*');
     expect((await h.app.request(`${url}&platform=macos`)).status).toBe(400);
@@ -85,9 +85,9 @@ describe('Stash 主订阅与资源隔离', () => {
       expect(preview.json.exportYaml).not.toMatch(/\{token\}|__SF_TOKEN__/);
       const yaml = parse(preview.json.exportYaml);
       expect(yaml['rule-providers']).toBeUndefined();
-      expect(yaml.rules).toEqual(['DOMAIN,paypal.test,代理', 'USER-AGENT,PayPal*,代理', 'IP-CIDR,192.0.2.0/24,代理,no-resolve', 'MATCH,DIRECT']);
+      expect(yaml.rules).toEqual(['DOMAIN,paypal.test,代理', 'USER-AGENT,PayPal*,代理', 'IP-CIDR,192.0.2.0/24,代理,no-resolve', 'PROCESS-NAME,Example,代理', 'MATCH,DIRECT']);
     }
-    expect(h.store.getLastGood(h.profile.id, 'stash:ios')).toBeUndefined();
+    expect(h.store.getLastGood(h.profile.id, 'stash:ios:stash-ios')).toBeUndefined();
     expect((await h.bob.post(`/api/profiles/${h.profile.id}/preview`, { client: 'stash' })).status).toBe(404);
     expect((await h.bob.post('/api/profiles/preview', { profile: h.profile, client: 'stash' })).status).toBe(400);
   });
@@ -103,11 +103,10 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(legacy.json.lines).toEqual(['USER-AGENT,PayPal*']);
     const file = await h.alice.get(`/api/rules/convert?url=${encodeURIComponent(rulesUrl)}&target=stash&platform=ios`);
     expect(file.status).toBe(200); expect(file.text).toContain('USER-AGENT,PayPal*');
-    expect((await h.alice.post('/api/rules/convert', { inputs, client: 'stash', platform: 'linux' })).status).toBe(400);
+    expect((await h.alice.post('/api/rules/convert', { inputs, client: 'stash', platform: 'linux' })).status).toBe(200);
     expect((await h.alice.post('/api/profiles/preview', { profile: h.profile, client: 'stash', platform: 'android' })).status).toBe(400);
     expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=linux`)).status).toBe(400);
-    expect((await h.alice.post('/api/presets', { name: '非法设置', mihomo: {}, stash: [] })).status).toBe(400);
-    expect((await h.alice.post('/api/profiles', { ...h.draft, base: { stashPatch: [] } })).status).toBe(400);
+    expect((await h.alice.post('/api/profiles', { ...h.draft, base: { kernels: { stash: [] } } })).status).toBe(400);
   });
 
   it('失败只回退同客户端的成功结果，不调用 Mihomo 校验器验证 Stash', async () => {

@@ -92,8 +92,7 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
   }
   // 追加作用于整个规则集，只执行一次，并沿用分桶、去重和 IP 选项。
   for (const { override } of rs.overrides ?? []) {
-    if ('append' in override.action && override.when.client === ctx.client &&
-      (override.when.platform === undefined || override.when.platform === ctx.platform)) {
+    if ('append' in override.action && override.when.client === ctx.client) {
       override.action.append.forEach(add);
     }
   }
@@ -106,7 +105,7 @@ export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, rep
  */
 export function formatRuleLine(rule: RuleIR): string {
   for (const client of ['mihomo', 'surge', 'loon', 'stash'] as const) {
-    const lowered = lowerRule(rule, { client, platform: 'macos' });
+    const lowered = lowerRule(rule, { client });
     if (lowered.kind === 'ok') return composeRule(lowered);
   }
   return '# 无法表示的规则：' + JSON.stringify(rule);

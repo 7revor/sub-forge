@@ -1,3 +1,4 @@
+import { stringify as testYaml } from 'yaml';
 // 列表布局验收：内存库、虚构数据、可控响应顺序；只监听本机，不访问外部上游。
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
@@ -24,7 +25,7 @@ for (let i = 1; i <= 24; i++) {
 env.store.put('local', { id: 'local', name: '本地节点', note: '布局验收', proxies: [] }, user.id);
 env.store.put('collection', { id: 'collection', name: '组合验收', members: [{ ref: { type: 'source', id: 'source-1' } }], pipeline: [] }, user.id);
 env.store.put('ruleset', { id: 'ruleset', name: '增强集合验收', sources: [{ id: 'remote', kind: 'remote', url: 'https://fixture.test/rules', format: 'auto' }] }, user.id);
-env.store.put('preset', { id: 'preset', name: '基础设置验收', version: 1, mihomo: {} });
+env.store.put('preset', { id: 'preset', name: '基础设置验收', version: 1, config: { kernels: {mihomo: testYaml({}) } } });
 env.store.putTemplateVersion({ id: 'template', name: '模板验收', version: 1, groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } });
 env.store.put('profile', { id: 'profile', name: '配置订阅验收', template: { id: 'template', follow: 'latest' }, nodeSets: [{ ref: { type: 'collection', id: 'collection' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' } }, user.id);
 const cache: RepoCache = {
