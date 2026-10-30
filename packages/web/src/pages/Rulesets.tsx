@@ -1,3 +1,4 @@
+import { sourcePreviewHref } from '../domain/rulePreview.ts';
 import { queryUrl } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
@@ -15,7 +16,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 来源正文打开只读预览，编辑使用统一弹窗；下方始终显示合并结果。
 
 import { FileText, Globe, Link2, ScanSearch } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
@@ -67,6 +68,9 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 /** 规则集（设计稿「规则集」）：来源 → 客户端改写（整个规则集）→ 输出预览，每块独占一行 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
+  const previewRef = useCallback((element: HTMLDivElement | null) => {
+    if (element && window.location.hash === '#preview') element.scrollIntoView();
+  }, [e.id]);
   const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', queryUrl('/rulesets', { id: e.id })).then(r => r.writable) });
   const canEdit = e.isNew || permission.data === true;
   const [linking, setLinking] = useState<string>();
@@ -127,19 +131,20 @@ export function RulesetEdit() {
         icon={s.repository ? <Link2 size={16} /> : s.kind === 'remote' ? <Globe size={16} /> : <FileText size={16} />}
         count={<SourceStatus src={s} status={status.get(s.id)} loading={sources.loading.has(s.id)} />}
         hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking} onLink={match => link(s.id, s.url!, match)} />}
+        externalPreview={s.kind === 'remote'} previewLinks={sourcePreviewHref(s) ? [{ href: sourcePreviewHref(s)! }] : []}
         onPreview={() => void RuleSourcePreview.show({ source: { rulesetId: e.isNew ? undefined : e.id, source: s } })} onEdit={() => void edit({ source: s, adding: false })} onDelete={() => { set({ sources: d.sources.filter(x => x.id !== s.id) }); if (s.url) matches.clear([s.url]); }}>
         <span title={sourceLabel(s)}>{sourceLabel(s)}</span>
       </RuleCard>} />
     </Card>
-    </> : <Card title="来源（只读）"><div className="flex flex-col gap-2">{d.sources.map((source, i) => <Button key={source.id} onClick={() => void RuleSourcePreview.show({ source: { rulesetId: e.id, source } })}>查看来源 {i + 1} · {sourceLabel(source)}</Button>)}</div></Card>}
+    </> : <Card title="来源（只读）"><div className="flex flex-col gap-2">{d.sources.map((source, i) => source.kind === 'remote' ? <a key={source.id} href={sourcePreviewHref(source)} target="_blank" rel="noreferrer noopener" className={buttonClass('default', 'sm')}>查看来源 {i + 1} · {sourceLabel(source)}</a> : <Button key={source.id} onClick={() => void RuleSourcePreview.show({ source: { rulesetId: e.id, source } })}>查看来源 {i + 1} · {sourceLabel(source)}</Button>)}</div></Card>}
     <fieldset disabled={!canEdit} className="contents">
     <RulesetOverrides value={d.overrides ?? []} legacySources={d.sources} onChange={overrides => set({ overrides: overrides.length ? overrides : undefined })}
       onRemoveLegacy={id => set({ sources: d.sources.map(s => s.id === id ? { ...s, overrides: undefined } : s) })} />
     </fieldset>
-    <Card className="min-w-0" title="合并结果（只读）">
+    <div id="preview" className="min-w-0 scroll-mt-4" ref={previewRef}><Card className="min-w-0" title="合并结果（只读）">
       <RulesetPreview key={e.id} inputs={sources.inputs} ready={sources.ready} sourceReading={sources.reading} onRefreshSources={sources.refresh}
         overrides={d.overrides} sourceError={sources.error} sourceNames={Object.fromEntries(d.sources.map(s => [s.id, sourceLabel(s)]))} />
-    </Card>
+    </Card></div>
   </DetailShell>;
 }
 

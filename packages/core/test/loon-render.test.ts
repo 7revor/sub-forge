@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderLoon, lowerRule, parseRuleLine, prepareRuleDocument, convertRuleDocuments, type RuleSet } from '../src/index.ts';
+import { renderLoon, lowerRule, parseRuleLine, prepareRuleDocument, convertRuleDocuments, stringifyLoon, Report, type RuleSet } from '../src/index.ts';
 import { iniFixture, routing } from './fixtures/ini-client.ts';
 const fixture = () => {
   const f = iniFixture();
@@ -21,7 +21,9 @@ describe('Loon 完整订阅', () => {
     expect(out.yaml).toContain('url-test = url-test, 香港, 日本, url=http://example.test/204, interval=300, tolerance=0');
     expect(out.yaml).toContain('load-balance = load-balance, 香港, 日本, url=http://example.test/204, interval=300, max-timeout=1500, algorithm=Round-Robin');
     expect(out.yaml).toContain('筛空 = select, REJECT');
-    expect(out.yaml).toContain('USER-AGENT,Example*,代理\nFINAL,DIRECT');
+    expect(out.yaml).toContain('[Rule]\nFINAL,DIRECT\n\n[Remote Rule]');
+    expect(Object.values(out.rulesets).map(r => r.text)).toEqual(['USER-AGENT,Example*\n']);
+    expect(out.yaml).not.toContain('USER-AGENT,');
     expect(out.yaml).not.toMatch(/empty-fallback|proxy-providers|underlying-proxy/);
     expect(JSON.stringify(f)).toBe(snapshot); expect(before).not.toBe(snapshot);
   });
@@ -45,15 +47,48 @@ describe('Loon 完整订阅', () => {
     expect(out.yaml).toContain('SOCKS = socks5, example.test, 443, "example", "example", over-tls=true');
     expect(out.yaml).toContain('salamander-password="obfs", server-ports="20000:20100,30000", hop-interval=30');
   });
-  it('多个规则来源原位置内嵌，转换选项和客户端改写生效', () => {
+  it('规则集与手写规则按原列表顺序托管，转换选项和客户端改写生效', () => {
     const f = fixture();
     f.rules.rulesets.rs = { id: 'rs', name: '规则', sources: [{ id: 'local', kind: 'local', format: 'auto', content: 'DOMAIN,a.test\nIP-CIDR,192.0.2.0/24,no-resolve\nDOMAIN,b.test,extended-matching' }], overrides: [{ match: 'DOMAIN,a.test', override: { when: { client: 'loon' }, action: { replace: [{ type: 'DOMAIN', value: 'loon.test' }] } } }] };
     routing(f).rules.unshift({ id: 'rs', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'group', groupId: 'all' } });
     const out = renderLoon(f);
     expect(out.report.hasErrors).toBe(false);
-    expect(out.yaml).toContain('[Rule]\nDOMAIN,loon.test,代理\nIP-CIDR,192.0.2.0/24,代理,no-resolve\nUSER-AGENT,Example*,代理\nFINAL,DIRECT');
-    expect(out.yaml).not.toMatch(/Remote Rule|RULE-SET|https:\/\/sub.test|extended-matching/);
+    expect(out.yaml).toContain('[Rule]\nFINAL,DIRECT\n\n[Remote Rule]');
+    const files = Object.values(out.rulesets);
+    expect(files[0]!.text).toContain('DOMAIN,loon.test\nIP-CIDR,192.0.2.0/24,no-resolve');
+    expect(files[1]!.text).toBe('USER-AGENT,Example*\n');
+    const urls = Object.values(out.config['rule-providers'] as Record<string, { url: string }>).map(p => p.url);
+    expect(out.yaml.split('[Remote Rule]\n')[1]!.trim().split('\n')).toEqual(urls.map(url => url + ',policy=代理,enabled=true'));
+    expect(out.yaml).not.toMatch(/RULE-SET|DOMAIN,|IP-CIDR,|USER-AGENT,|extended-matching/);
     expect(out.report.items).toContainEqual(expect.objectContaining({ code: 'rule.client', message: expect.stringContaining('extended-matching') }));
+  });
+  it('交错本地块、规则集和重复引用保留顺序与出口，停用和不适配规则不生成资源', () => {
+    const f = fixture();
+    f.rules.rulesets.rs = { id: 'rs', name: '远程集', sources: [{ id: 's', kind: 'local', format: 'auto', content: 'DOMAIN,remote.test' }] };
+    const direct = { kind: 'builtin' as const, name: 'DIRECT' as const }, reject = { kind: 'builtin' as const, name: 'REJECT' as const };
+    routing(f).rules = [
+      { id: 'first', matcher: { kind: 'local', content: 'DOMAIN,first.test\nIP-CIDR,192.0.2.0/24,no-resolve' }, target: direct },
+      { id: 'rs', matcher: { kind: 'ruleset', id: 'rs' }, target: reject },
+      { id: 'last', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'last.test' } }, target: direct },
+      { id: 'again', matcher: { kind: 'ruleset', id: 'rs' }, target: direct },
+      { id: 'disabled', enabled: false, matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'disabled.test' } }, target: direct },
+      { id: 'drop', matcher: { kind: 'rule', rule: { type: 'GEOSITE', value: 'cn' } }, target: direct },
+    ];
+    const out = renderLoon(f);
+    expect(out.report.hasErrors).toBe(false);
+    const lines = out.yaml.split('[Remote Rule]\n')[1]!.trim().split('\n');
+    expect(lines).toHaveLength(4);
+    expect(lines.map(l => l.split(',policy=')[1])).toEqual(['DIRECT,enabled=true', 'REJECT,enabled=true', 'DIRECT,enabled=true', 'DIRECT,enabled=true']);
+    expect(lines[1]!.split(',policy=')[0]).toBe(lines[3]!.split(',policy=')[0]);
+    expect(Object.values(out.rulesets).map(r => r.text)).toEqual(['DOMAIN,first.test\nIP-CIDR,192.0.2.0/24,no-resolve\n', 'DOMAIN,remote.test\n', 'DOMAIN,last.test\n']);
+    expect(out.yaml).not.toMatch(/DOMAIN,|IP-CIDR,|GEOSITE,/);
+  });
+  it('缺少托管地址或残留内联规则时明确失败，不回退为内联正文', () => {
+    for (const rules of [['RULE-SET,missing,DIRECT'], ['DOMAIN,inline.test,DIRECT']]) {
+      const report = new Report();
+      expect(stringifyLoon({ config: { proxies: [], 'proxy-groups': [], rules }, rulesets: {}, report })).toBe('');
+      expect(report.byCode('loon.format')).toHaveLength(1);
+    }
   });
   it('支持代理链，不支持协议、PASS 和不一致测速超时阻止发布', () => {
     const f = fixture(), groups = routing(f).groups;

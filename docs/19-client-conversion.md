@@ -10,15 +10,15 @@
 | 基础预设 | `preset.mihomo` | `preset.surge` | `preset.loon` | `preset.stash` |
 | 订阅覆盖 | `base.patch` | `base.surgePatch` | `base.loonPatch` | `base.stashPatch` |
 | 节点集 | provider / inline | 快照内联 | 快照内联 | 快照内联 |
-| 规则集 | 全局托管 provider | 全局托管 LIST | 原位置展开到 `[Rule]` | 全局托管 provider |
-| 独立文件 | 现有 YAML 导出 | 规则内嵌 `.conf` | 完整 `.conf` | 规则内嵌 YAML |
+| 规则集 | 托管 provider | 托管 LIST | 托管 `[Remote Rule]` | 托管 provider |
+| 独立文件 | 现有 YAML 导出 | 规则内嵌 `.conf` | 含规则时通过正式订阅获取 `.conf` | 规则内嵌 YAML |
 | 平台 | 现有平台 | iOS / macOS | iOS / macOS | iOS / macOS |
 
 INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Host]`；节点、组、规则由对应领域对象生成。原生项仍按客户端独立合并；新增公共项只映射已适配语义，不把任意 Mihomo DNS/TUN 配置自动套到其他客户端。表单和 INI 双向转换保留 `false`、`0`、列表、引号和转义；清空字段恢复未配置状态。INI 大小写和行内注释按解析规则处理，非法段、重复键、换行注入和不支持的嵌套值报错。
 
 `GET /subs/profile?id=配置ID&token=用户token&target=surge|loon&platform=ios|macos` 返回 `text/plain`，URL 参数优先于 UA。token 为当前用户的统一资源令牌，配置必须属于该用户；导入沿用现有令牌。Surge 主订阅含带当前 token 和配置 ID 的 `#!MANAGED-CONFIG` 更新地址，并用 `#!FORBIDDEN-AUTO-UPGRADE smart-group` 避免自动改写策略组。独立导出不包含托管占位 token。未知客户端/平台返回 400。
 
-预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同客户端、同平台的上一份成功产物；没有可回退产物时返回 503，不发布半成品。规则产物按公共资源身份、处理参数、客户端和平台共享，下载使用有效用户 token 鉴权；节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
+预览返回 `format: "ini"`；历史 `yaml`、`exportYaml` 属性继续作为配置文本字段，避免破坏 API 和存储兼容。失败时仅回退到同客户端、同平台的上一份成功产物；没有可回退产物时返回 503，不发布半成品。公共仓库和增强规则产物按资源身份、处理参数、客户端和平台共享；直接远程规则及 Loon 手写规则按订阅私有，下载校验所有者、客户端和结构版本。节点资源仍按用户隔离，具体见[全局托管约定](19-managed-resources.md)。
 
 ## 节点和策略组
 
@@ -37,6 +37,8 @@ INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Ho
 协议名出现在表内不代表所有可选参数都已覆盖。未适配协议、传输或重要参数给出错误；已明确允许省略的差异（例如部分显示/测速选项和上传带宽）在报告中说明。Loon 不输出 PASS、TUIC、Snell 或 WireGuard；Surge 不输出 VLESS/Reality。引用、重名、筛选和循环检测继续使用已有实现。
 
 节点输入支持完整 INI 的 `[Proxy]` 段及裸节点行，通过位置凭据和专有参数区分 Surge/Loon。凭据中的逗号、等号、引号、反斜杠以及显式 false 可往返。Surge VMess 输入要求显式 `vmess-aead=true`；旧的非 AEAD 配置无法忠实映射时拒绝导入。节点粘贴入口仍只导入节点；整份 Loon 配置使用配置订阅列表中的「导入 Loon 完整配置」入口。
+
+自动生成的 Loon 辅助名称使用下划线分隔：链落地副本为 `原节点名_链落地`，与节点或策略组重名时依次尝试 `原节点名_链落地_2`、`原节点名_链落地_3`；代理链引用同步使用最终名称。完整配置导入创建的本地节点组为 `订阅名_本地节点`。用户已有名称按原文保留，页面说明和诊断文字中的间隔号不参与名称规范化。
 
 ## 公共基础配置与专用覆盖
 
@@ -79,7 +81,10 @@ INI 基础配置只含 `general` 和 `host`，编辑器显示 `[General]` / `[Ho
 - 正则转通配符拒绝把转义的字面星号、问号或方括号扩大成通配语义。
 - Loon 使用 DEST-PORT、PROTOCOL；进程规则只输出到 macOS，并提示名称匹配大小写差异。复杂进程正则、GEOSITE、DOMAIN-REGEX、SRC-IP-CIDR 等不强行转换。Mihomo 斜杠端口集合现会转为等价 OR，源端口与逻辑嵌套一并保留。
 - RAW/本地原文仍为既有的显式透传入口；未指定客户端时不会自动解释未知语法，需由使用者确认目标支持。结构化规则和规则集转换提供语义诊断。
-- Loon 将规则集原位置展开以避免本地与远程规则的优先级重排，但客户端自身仍有域名/IP 等匹配阶段，不能保证跨客户端完全相同的规则优先级。
+- Loon 将全部手写规则、仓库规则、直接远程规则和增强集合按原列表顺序写入 `[Remote Rule]`，每项使用 `托管URL,policy=出口,enabled=true`；`[Rule]` 仅保留 `FINAL`。同一规则的不同出口引用保留各自位置，不按 URL 去重。规则正文不携带出口，继续保留客户端改写、逻辑匹配和 `no-resolve`。
+- 手写规则按每个列表项生成订阅私有产物，使用 `/subs/ruleset`，不注册为公共资源。删除、禁用或改写匹配内容时撤销旧正文；不同用户、客户端、平台和结构版本不能混用。升级后的 Loon 不再回退到旧内联 last-good。
+- Loon 草稿预览不发布规则产物、不发行令牌。含托管规则时返回 `exportUnavailableReason` 并禁用草稿导出，需保存后使用正式订阅链接获取；不通过内联正文规避托管要求。没有分流项、仅 `FINAL` 的配置仍可直接导出。
+- 全部规则置于远程段可避免本地规则优先于远程规则造成的跨段重排，但 Loon 自身仍按域名/IP 等阶段匹配，不保证跨客户端完全相同的命中顺序。依据：[Loon 规则优先级](https://nsloon.app/docs/Rule/)、[官方配置示例](https://github.com/Loon0x00/LoonExampleConfig/blob/master/example.conf)。
 - 旧二进制规则不能解码或转换时明确报错；本轮不新增通用 MRS/SRS 解码器。
 
 ## 上游参考与版本要求

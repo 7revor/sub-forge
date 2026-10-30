@@ -42,7 +42,7 @@ export function importLoonConfig(text: string, opts: { id: string; name: string;
   const supported = ['general', 'host', 'proxy', 'remote proxy', 'proxy chain', 'proxy group', 'remote filter', 'rule', 'remote rule'];
   for (const [name, rows] of sections) if (!supported.includes(name) && rows.length) report.error('loon.import-section', '[' + name + '] 尚未适配，不能丢弃此段后导入');
   let serial = 0; const id = () => opts.id + '-' + ++serial;
-  const locals: LocalProxyGroup[] = [{ id: id(), name: opts.name + ' · 本地节点', proxies: [] }], local = locals[0]!;
+  const locals: LocalProxyGroup[] = [{ id: id(), name: opts.name + '_本地节点', proxies: [] }], local = locals[0]!;
   const sources: Source[] = [], collections: Collection[] = [], groups: GroupSpec[] = [];
   const profile: LoonImport['profile'] = { id: opts.id, name: opts.name, nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups, rules: [], final: { kind: 'builtin', name: 'REJECT' } } }, base: { common: {}, loonPatch: {} } };
   const config = profile.routing!.mode === 'independent' ? profile.routing!.config : null!;

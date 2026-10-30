@@ -42,7 +42,7 @@ export type NodeListResult = { nodes: NodeBrief[]; total: number; unfilteredTota
 export type TraceStep = { index: number; op: string; enabled: boolean; before: number; after: number; renamed: { from: string; to: string }[]; removed: string[]; error?: string; nodes: NodeBrief[]; origins: (number | null)[]; truncated: boolean };
 export type PipelinePreview = { input: number; inputNodes: NodeBrief[]; failures: { line: string; reason: string }[]; report: ReportItem[]; trace: TraceStep[]; nodes: NodeBrief[] };
 export type DependencyEntry = { refKey: string; nodeSet: string; node: string; strategy: 'wrap' | 'copy' | 'inline'; output: string; usedBy: string[] };
-export type ProfilePreview = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
+export type ProfilePreview = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; exportUnavailableReason?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; forceable?: boolean; issues: ReportItem[] };
 export type RejectedRuleDetail = { line: number; text: string; reason: string };
 /** 规则集预览中每个来源的拉取 / 解析状态；不支持的行最多返回前 100 条详情 */
@@ -66,7 +66,7 @@ export type RuleRepo = { id: string; name: string; url: string; refs: string[]; 
 export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
 export type RepoFileEntry = RepoEntry & { filePath: string; ref: string; url: string };
 export type RepoFilePreview = { cache?: { error?: string; lastSuccessAt?: number; nextFetchAt?: number }; repo: string; entry?: string; ref: string; path: string; name: string; content: string; url: string; upstream: string; license: string };
-export type RuleOption = { value: string; label: string; hint: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
+export type RuleOption = { value: string; label: string; hint: string; url?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
 export type RuleOptions = { items: RuleOption[]; total: number; offset: number; limit: number; nextOffset?: number; notices: string[] };
 export type RepoFileList = RepoEntry & { license?: string; url: string; files: { ref: string; path: string; url: string; upstream: string; format: string }[] };
 export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?: RejectedRuleDetail[]; license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };

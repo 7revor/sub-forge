@@ -9,6 +9,22 @@ afterEach(async () => { for (const env of envs.splice(0)) await env.stop(); });
 const setup = async () => { const env = await setupRuleReferences(); envs.push(env); return env; };
 
 describe('物理文件平铺搜索与分页', () => {
+  it('文件选项返回公共 raw 地址，特殊字符逐段编码且不读取正文、不创建托管资源', async () => {
+    const h = await setup();
+    h.repos.setEnabled('blackmatrix7', false);
+    const path = '路径/文件 & #名称.list';
+    h.setPaths([path]);
+    const id = await h.repos.addCustom({ url: 'https://github.com/example/raw-preview', name: '源文件预览', ref: 'surge-rule-set' });
+    await h.repos.refresh(id);
+    h.reads.length = 0;
+    const result = (await h.admin.get('/api/rule-options/search?scope=repository')).json;
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].url).toBe(`https://raw.githubusercontent.com/example/raw-preview/surge-rule-set/${path.split('/').map(encodeURIComponent).join('/')}`);
+    expect(h.reads).toEqual([]);
+    expect(h.calls).toEqual([]);
+    expect(h.store.list('ruleset')).toHaveLength(2);
+    expect((await h.admin.get('/api/rule-options/search?scope=all&q=Google')).json.items.every((item: { url?: string }) => item.url === undefined)).toBe(true);
+  });
   it('按完整 URL 提示单个仓库文件，忽略未关联文件和停用仓库', async () => {
     const h = await setup();
     const path = 'rule/Surge/Google/Google.list';

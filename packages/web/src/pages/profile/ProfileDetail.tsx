@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DeleteAction } from '../../components/DetailActions.tsx';
-import { Badge, Button, ErrorAlert, PageHeader, PageScroll } from '../../components/ui.tsx';
+import { Badge, Button, ErrorAlert, PageHeader } from '../../components/ui.tsx';
 import { useDeleteDoc, useDoc, useList, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
 import { ProfileSections } from './ProfileSections.tsx';
@@ -78,9 +78,7 @@ export function ProfileDetail() {
       <ProfileEditGuard valid={ctx.baseValid} onDiscard={discard} />
       {template.error && <ErrorAlert error={template.error} />}
 
-      <PageScroll>
-        <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} />
-      </PageScroll>
+      <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} />
     </ProfileContext.Provider>
   );
 }

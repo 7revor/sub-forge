@@ -63,7 +63,7 @@ rules:
 
 配置结构及参数应直接对照 Loon 手册；不能将 Surge 的整段配置直接标记为 Loon。官方 HTTP 规则页明确列出 `USER-AGENT` 的通配匹配；规则订阅使用 Loon 支持的逐行规则语法。依据：[HTTP 规则](https://nsloon.app/en/docs/Rule/http_rule/)、[规则订阅](https://nsloon.app/en/docs/Rule/sub_rule/)。
 
-本项目：2026-10-30 已接入 Loon IR 映射、保存校验、API、基础配置、节点、策略组、规则和完整 INI 订阅。规则集原位置内嵌；代理链与未适配协议明确报错。详见 [19](19-client-conversion.md)。
+本项目：2026-10-30 已接入 Loon IR 映射、保存校验、API、基础配置、节点、策略组、规则和完整 INI 订阅。全部分流规则按顺序写入 `[Remote Rule]` 托管，手写规则也使用订阅私有产物；主配置仅保留 `FINAL`。代理链输出专用段，未适配协议明确报错。详见 [19](19-client-conversion.md)。
 
 ### Stash
 
@@ -136,3 +136,5 @@ GET /api/rules/convert?url=<完整编码的上游URL>&target=stash&platform=ios
 | 2026-10-29 | Stash | 完整订阅、独立文件导出、规则转换及 iOS/macOS 预览接入；节点按快照内联 | 自动化及内置浏览器结果见[验收记录](../research/verification/stash-support-20261029/验收记录.md)；未进行 Stash 真机导入/转发验收 |
 | 2026-10-30 | Surge | 完整主订阅、独立导出、基础配置、节点与策略组接通 | 全量回归、内置浏览器、官方 surge-cli 离线检查；未真机转发 |
 | 2026-10-30 | Loon | 独立 INI 适配、规则集内嵌、平台规则与失败回退接通 | 全量回归和内置浏览器；未运行官方校验器或真机转发 |
+
+2026-10-30 后续修正：Loon 全部分流规则改为托管，含规则的草稿禁用独立导出，正式订阅沿用新 query API；旧内联 last-good 不再下发。见[源预览与托管验收](../research/verification/raw-source-preview-20261030/README.md)。上表内嵌记录属于初次实现基线。

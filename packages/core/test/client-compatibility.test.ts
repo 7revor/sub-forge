@@ -39,11 +39,18 @@ for (const target of targets) describe(`${target} 能力边界`, () => {
     expect(JSON.stringify(f)).toBe(before);
     if (status === 'error') return;
     const ini = target === 'surge' || target === 'loon';
-    const textRules = ini ? out.yaml.split('[Rule]\n')[1]!.trim().split('\n') : parseYaml(out.yaml).rules as string[];
-    // 被省略的规则不能计为成功转换：只剩 FINAL/MATCH；其他规则须有匹配项和出口。
-    expect(textRules).toHaveLength(c.category === '规则' && status !== 'omitted' ? 2 : 1);
-    expect(textRules.at(-1)).toBe(ini ? 'FINAL,DIRECT' : 'MATCH,DIRECT');
-    if (c.category === '规则' && status !== 'omitted') expect(textRules[0]).toMatch(/,代理(?:,no-resolve|,extended-matching|,src)*$/);
+    if (target === 'loon') {
+      expect(out.yaml.split('[Rule]\n')[1]!.split('\n\n')[0]!.trim()).toBe('FINAL,DIRECT');
+      const hosted = Object.values(out.rulesets).flatMap(r => r.text.trim().split('\n'));
+      expect(hosted).toHaveLength(c.category === '规则' && status !== 'omitted' ? 1 : 0);
+      if (hosted.length) expect(out.yaml).toMatch(/,policy=代理,enabled=true/);
+    } else {
+      const textRules = ini ? out.yaml.split('[Rule]\n')[1]!.trim().split('\n') : parseYaml(out.yaml).rules as string[];
+      // 被省略的规则不能计为成功转换：只剩 FINAL/MATCH；其他规则须有匹配项和出口。
+      expect(textRules).toHaveLength(c.category === '规则' && status !== 'omitted' ? 2 : 1);
+      expect(textRules.at(-1)).toBe(ini ? 'FINAL,DIRECT' : 'MATCH,DIRECT');
+      if (c.category === '规则' && status !== 'omitted') expect(textRules[0]).toMatch(/,代理(?:,no-resolve|,extended-matching|,src)*$/);
+    }
     if (ini) {
       const nodes = out.yaml.split('[Proxy]\n')[1]!.split('\n\n')[0]!.trim().split('\n');
       expect(nodes).toHaveLength(1);
@@ -125,6 +132,11 @@ it('常见规则准确改名，no-resolve 保留在出口后，端口集合不�
   for (const target of targets) {
     const f = commonInput(); routing(f).rules = lines.map((line, i) => ({ id: String(i), matcher: { kind: 'rule', rule: parseRuleLine(line) }, target: { kind: 'group', groupId: 'all' } }));
     const out = renderers[target](f), ini = target === 'surge' || target === 'loon';
+    if (target === 'loon') {
+      expect(Object.values(out.rulesets).map(r => r.text.trim())).toEqual(['DOMAIN,a.test', 'IP-CIDR,192.0.2.0/24,no-resolve', 'DEST-PORT,443', 'PROTOCOL,UDP', 'OR,((DEST-PORT,80),(DEST-PORT,443))']);
+      expect(out.yaml.match(/,policy=代理,enabled=true/g)).toHaveLength(5);
+      continue;
+    }
     const rules = ini ? out.yaml.split('[Rule]\n')[1]!.trim().split('\n') : parseYaml(out.yaml).rules;
     const port = ini ? 'DEST-PORT' : 'DST-PORT';
     expect(rules).toEqual(['DOMAIN,a.test,代理', 'IP-CIDR,192.0.2.0/24,代理,no-resolve', `${port},443,代理`, ini ? 'PROTOCOL,UDP,代理' : 'NETWORK,udp,代理', target === 'mihomo' ? 'DST-PORT,80/443,代理' : `OR,((${port},80),(${port},443)),代理`, ini ? 'FINAL,DIRECT' : 'MATCH,DIRECT']);
