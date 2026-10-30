@@ -65,3 +65,27 @@ it('节点预览在截断前筛选完整列表，支持空筛选、排除和非�
   expect(selected.json.nodes.map((n: { name: string }) => n.name)).toEqual(['HK-目标']);
   expect((await user.get('/api/nodesets/local/many/nodes?filter=%5B')).status).toBe(400);
 });
+
+it('保存和读回全部来源，生成跨来源代理链；非法范围不被接受', async () => {
+  const env = setupApp(); envs.push(env); await addUser(env.store, 'alice');
+  const user = client(env.app); await user.login('alice');
+  const ref = (id: string) => ({ type: 'local', id });
+  const locals = [];
+  for (const name of ['一', '二']) locals.push((await user.post('/api/locals', { name, proxies: ['前置', '落地'].map(role => ({ name: role + name, type: 'socks5', server: 'node.example.test', port: 1080 })) })).json.item);
+  const scope = { type: 'all', id: 'provider' };
+  const chains = [{ id: 'c', landing: { nodeSet: scope, filter: '落地' }, via: { kind: 'node', ref: { nodeSet: scope, match: { regex: '前置' } } } }];
+  const body = { name: '全部来源', nodeSets: locals.map(item => ({ ref: ref(item.id), output: 'provider' })), chains, overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } };
+  const saved = await user.post('/api/profiles', body);
+  expect(saved.status).toBe(201);
+  const profile = (await user.get(`/api/profiles/${saved.json.item.id}`)).json.item;
+  expect(profile.chains).toEqual(chains);
+  const preview = await user.post(`/api/profiles/${profile.id}/preview`, { profile });
+  expect(preview.json.ok).toBe(true);
+  expect(preview.json.chainResolutions[0]).toMatchObject({ viaName: '前置一', landingCount: 2, appliedCount: 2 });
+  for (const nodeSet of [{ type: 'all', id: '' }, { type: 'all', id: 'other' }]) {
+    expect((await user.post('/api/profiles', { ...body, chains: [{ ...chains[0], landing: { nodeSet } }] })).status).toBe(400);
+    expect((await user.post('/api/profiles', { ...body, chains: [{ ...chains[0], via: { kind: 'node', ref: { nodeSet, match: { regex: '' } } } }] })).status).toBe(400);
+  }
+  // 全部来源仅用于代理链，不能借此绕过普通分流目标的具体来源校验。
+  expect((await user.post('/api/profiles', { ...body, routing: { ...body.routing, config: { ...body.routing.config, final: chains[0]!.via } } })).status).toBe(400);
+});

@@ -162,12 +162,19 @@ type Overlay = {
   final?: Target;
 };
 
+type ChainNodeSet = NodeSetID | { type: 'all'; id: 'provider' | 'inline' };
+type ChainNodeRef = Omit<NodeRef, 'nodeSet'> & { nodeSet: ChainNodeSet };
+type ChainTarget = Exclude<Target, { kind: 'node' }> | { kind: 'node'; ref: ChainNodeRef };
 type ChainRule = {
   id: ID;
-  landing: { nodeSet: NodeSetID; filter?: string; excludeFilter?: string };
-  via: Target;                                               // 前置：节点引用或组
+  landing: { nodeSet: ChainNodeSet; filter?: string; excludeFilter?: string };
+  via: ChainTarget;                                          // 前置：节点引用或组
 };
 ```
+
+代理链来源选择为空时，界面显示 placeholder「全部」，保存为 `{ type: 'all', id: 'provider' | 'inline' }`。渲染时按订阅中的来源顺序展开当前对应输出类型，包含后续加入的来源与节点；移出单个来源不会删除这类动态规则。前置采用范围内首个匹配节点，落地应用到全部匹配节点，循环检查继续生效。Stash 按用户设置的输出类型确定范围，再转换为内联输出。普通策略组、分流目标和嵌套回退仍使用具体 `NodeSetID`。
+
+独立节点预览弹窗只展示节点列表；代理链编辑器保留来源选择与节点正则筛选，两者留空均代表全部，并直接展示汇总预览。
 
 `{ op: 'flag', mode: 'add' }` 根据节点名称中的地区名或代码添加旗帜；已带旗帜的名称保持不变。以 Traffic、Expire、Remaining 等或流量、到期等开头的说明节点跳过识别，避免把流量单位 GB 当作英国代码。需要移除这类伪节点时，另用 `filter.useless`。
 

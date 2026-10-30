@@ -1,3 +1,5 @@
+import { chainSources } from '../nodeset/chain.ts';
+import type { ChainNodeRef, ChainTarget } from '../types.ts';
 import { expandLocalRules, localRulesError } from '../rules/local.ts';
 import { resolveProfileRouting } from '../template/routing.ts';
 import { sourceKey, sourceLabel, type RuleSetInputs } from '../rules/expand.ts';
@@ -185,13 +187,19 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
   const deps = new Map<string, DependencyEntry>();
   const wrapperNode = new Map<string, { set: NS; node: ProxyIR }>();
 
-  const findNode = (ref: NodeRef, where: string): { set: NS; node: ProxyIR } | undefined => {
-    const set = sets.get(nodeSetKey(ref.nodeSet));
-    if (!set) { report.error('ref.nodeset-not-in-profile', `引用的节点集 ${nodeSetKey(ref.nodeSet)} 未加入本 Profile`, where); return undefined; }
-    const node = 'exact' in ref.match
-      ? set.nodes.find((n) => (client === 'stash' ? n[stashOriginalName] ?? n.name : n.name) === (ref.match as { exact: string }).exact)
-      : (() => { const re = compileUserRegex((ref.match as { regex: string }).regex); return set.nodes.find((n) => re.test((client === 'stash' ? n[stashOriginalName] : undefined) ?? n.name)); })();
-    return node ? { set, node } : undefined;
+  const findNode = (ref: ChainNodeRef, where: string): { set: NS; node: ProxyIR } | undefined => {
+    const candidates = chainSources(ref.nodeSet, profile.nodeSets).map(source => sets.get(nodeSetKey(source.ref))!).filter(Boolean);
+    if (!candidates.length) { report.error('ref.nodeset-not-in-profile', `前置范围 ${nodeSetKey(ref.nodeSet)} 中没有可用节点集`, where); return undefined; }
+    const match = ref.match;
+    const regex = 'regex' in match ? compileUserRegex(match.regex) : undefined;
+    for (const set of candidates) {
+      const node = set.nodes.find(n => {
+        const name = client === 'stash' ? n[stashOriginalName] ?? n.name : n.name;
+        return 'exact' in match ? name === match.exact : regex!.test(name);
+      });
+      if (node) return { set, node };
+    }
+    return undefined;
   };
 
   const nameForNode = (set: NS, node: ProxyIR, where: string): string => {
@@ -207,7 +215,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     return output;
   };
 
-  const resolveTarget = (t: Target, where: string): string | undefined => {
+  const resolveTarget = (t: ChainTarget, where: string): string | undefined => {
     if (t.kind === 'builtin') { resolvedTargetNames.set(where, t.name); return t.name; }
     if (t.kind === 'group') {
       const n = groupName.get(t.groupId);
@@ -293,7 +301,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
   const chainCounts = new Map<string, { landingCount: number; appliedCount: number }>();
   const resolvedChains = new Map<(typeof profile.chains)[number], string | undefined>();
   for (const set of sets.values()) {
-    const rules = profile.chains.filter(c => nodeSetKey(c.landing.nodeSet) === set.key);
+    const rules = profile.chains.filter(c => chainSources(c.landing.nodeSet, profile.nodeSets).some(source => nodeSetKey(source.ref) === set.key));
     const whole = rules.filter(c => !c.landing.filter && !c.landing.excludeFilter);
     const partial = rules.filter(c => c.landing.filter || c.landing.excludeFilter);
     if (whole.length > 1 && new Set(whole.map(c => JSON.stringify(c.via))).size > 1) {
@@ -303,8 +311,8 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     const matches = new Map(partial.map(c => [c, new Set(filterNodes(set.nodes, c.landing))]));
     for (const c of rules) {
       const landingCount = matches.get(c)?.size ?? set.nodes.length;
-      chainCounts.set(c.id, { landingCount, appliedCount: 0 });
-      if (!landingCount) report.warn('chain.no-landing', '没有命中落地节点，请检查落地来源或原筛选范围', `chain:${c.id}`);
+      const counts = chainCounts.get(c.id) ?? { landingCount: 0, appliedCount: 0 };
+      chainCounts.set(c.id, { ...counts, landingCount: counts.landingCount + landingCount });
     }
     for (const n of set.nodes) {
       const selected = whole.length ? whole : partial.filter(c => matches.get(c)!.has(n));
@@ -327,9 +335,11 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
     }
     if (rules.length && set.output === 'provider') report.info('chain.provider-materialized', `「${set.providerName}」的前置已写入本订阅专属 Provider 内容，节点更新后自动重新应用`, set.key);
   }
-  for (const chain of profile.chains) if (!sets.has(nodeSetKey(chain.landing.nodeSet))) {
+  for (const chain of profile.chains) if (!chainSources(chain.landing.nodeSet, profile.nodeSets).length) {
     report.error('ref.nodeset-not-in-profile', `链规则的落地节点集 ${nodeSetKey(chain.landing.nodeSet)} 未加入本订阅`, `chain:${chain.id}`);
   }
+
+  for (const chain of profile.chains) if (!chainCounts.get(chain.id)?.landingCount) report.warn('chain.no-landing', '没有命中落地节点，请检查落地来源或筛选范围', `chain:${chain.id}`);
 
   // ---------- 规则 ----------
   const ruleLines: string[] = [];
@@ -456,7 +466,7 @@ function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult 
   config.rules = ruleLines;
   if (client === 'stash') for (const provider of Object.values(ruleProviders)) delete provider.type;
 
-  const relatedGroups = (target: Target, seen = new Set<string>()): Set<string> => {
+  const relatedGroups = (target: ChainTarget, seen = new Set<string>()): Set<string> => {
     if (target.kind === 'group' && !seen.has(target.groupId)) {
       seen.add(target.groupId);
       for (const member of eff.groups.find(g => g.id === target.groupId)?.members ?? []) {

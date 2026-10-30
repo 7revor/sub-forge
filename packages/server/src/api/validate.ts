@@ -158,6 +158,14 @@ export class RefChecker {
     return r;
   }
 
+  chainSource(ref: unknown, where: string): void {
+    if (isObj(ref) && ref.type === 'all') {
+      if (ref.id !== 'provider' && ref.id !== 'inline') throw bad(`${where}：全部来源的输出类型不合法`);
+      return;
+    }
+    this.nodeSet(ref, where);
+  }
+
   target(t: unknown, where: string): void {
     if (!isObj(t)) throw bad(`${where}：出口格式错误`);
     if (t.kind === 'builtin' || t.kind === 'group') return;
@@ -317,9 +325,10 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       }
       (doc.chains as Record<string, unknown>[]).forEach((ch, i) => {
         if (!isObj(ch) || !isObj(ch.landing)) throw bad(`链规则 ${i + 1} 格式错误`);
-        refs.nodeSet(ch.landing.nodeSet, `链规则 ${i + 1} 的落地`);
+        refs.chainSource(ch.landing.nodeSet, `链规则 ${i + 1} 的落地`);
         if (ch.landing.filter !== undefined) checkRegex(ch.landing.filter, `链规则 ${i + 1}`);
-        refs.target(ch.via, `链规则 ${i + 1} 的前置`);
+        if (isObj(ch.via) && ch.via.kind === 'node' && isObj(ch.via.ref)) refs.chainSource(ch.via.ref.nodeSet, `链规则 ${i + 1} 的前置`);
+        else refs.target(ch.via, `链规则 ${i + 1} 的前置`);
       });
       if (doc.routing !== undefined) {
         validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);

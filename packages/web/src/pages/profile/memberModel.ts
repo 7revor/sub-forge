@@ -1,6 +1,6 @@
-import { compileUserRegex, type ChainRule, type GroupMember, type GroupSpec, type NodeSetID } from '@sub-forge/core';
+import { compileUserRegex, type ChainNodeSet, type ChainRule, type GroupMember, type GroupSpec, type NodeSetID } from '@sub-forge/core';
 
-export const nodeSetKey = (ref: NodeSetID) => `${ref.type}:${ref.id}`;
+export const nodeSetKey = (ref: ChainNodeSet) => `${ref.type}:${ref.id}`;
 export function memberKey(member: GroupMember): string {
   switch (member.kind) {
     case 'nodeset': return `set:${nodeSetKey(member.ref)}`;
@@ -40,7 +40,7 @@ export function chainInputError(chain: ChainRule): string | undefined {
       const ref = chain.via.ref;
       if (!ref.nodeSet.id || ('exact' in ref.match && !ref.match.exact.trim())) return '请选择前置节点';
       if ('regex' in ref.match) compileUserRegex(ref.match.regex);
-      if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && !chain.landing.filter && !chain.landing.excludeFilter) return '前置与整集落地不能使用同一节点集，会形成循环';
+      if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && !chain.landing.filter && !chain.landing.excludeFilter) return '前置也在全部落地范围内，会形成循环；请缩小来源或落地筛选范围';
       if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && 'exact' in ref.match) {
         const included = !chain.landing.filter || compileUserRegex(chain.landing.filter).test(ref.match.exact);
         const excluded = !!chain.landing.excludeFilter && compileUserRegex(chain.landing.excludeFilter).test(ref.match.exact);

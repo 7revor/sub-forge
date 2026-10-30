@@ -1,4 +1,4 @@
-import type { GroupSpec, Profile, Target } from '@sub-forge/core';
+import type { GroupSpec, Profile, ChainTarget } from '@sub-forge/core';
 
 /** 只要求映射仍需保留的填充及引用，避免为无关策略组制造空表单。 */
 export function associationRequirements(profile: Profile, groups: GroupSpec[], mapping: Record<string, string> = {}) {
@@ -9,7 +9,7 @@ export function associationRequirements(profile: Profile, groups: GroupSpec[], m
     if (reference) item.canDrop = false;
     required.set(id, item);
   };
-  const visit = (target: Target, reason: string) => {
+  const visit = (target: ChainTarget, reason: string) => {
     if (target.kind === 'group') add(target.groupId, reason, true);
     else if (target.kind === 'node' && target.ref.fallback && target.ref.fallback !== 'error') visit(target.ref.fallback, reason);
   };

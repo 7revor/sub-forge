@@ -1,6 +1,6 @@
-import type { NodeSetID } from '@sub-forge/core';
+import { chainSources, type NodeSetID } from '@sub-forge/core';
 import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
-import { targetLabel } from '../../components/pickers.tsx';
+import { chainNodeSetName, targetLabel } from '../../components/pickers.tsx';
 import { Frame } from '../../modals/Frame.tsx';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
@@ -174,13 +174,13 @@ export function TabNodeSets() {
   const remove = async (ref: NodeSetID) => {
     const affected = draft.chains.filter(c => chainUsesNodeSet(c, ref));
     if (affected.length) {
-      const chains = affected.map(c => `${targetLabel(c.via, groupName, nodeSetName)} → ${nodeSetName(c.landing.nodeSet)} · ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}`).join('\n');
+      const chains = affected.map(c => `${targetLabel(c.via, groupName, nodeSetName)} → ${chainNodeSetName(c.landing.nodeSet, nodeSetName)} · ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}`).join('\n');
       const result = await Frame.modal.confirm({ title: `移出节点集「${nodeSetName(ref)}」？`, description: `以下 ${affected.length} 条代理链引用了此节点集，将一起移除。保存订阅后生效。\n\n${chains}`, confirmLabel: '移出并移除代理链', danger: true });
       if (result.status !== 'confirmed') return;
     }
     setDraft(removeProfileNodeSet(draft, ref));
   };
-  const chained = new Set(draft.chains.map((c) => `${c.landing.nodeSet.type}:${c.landing.nodeSet.id}`));
+  const chained = new Set(draft.chains.flatMap(c => chainSources(c.landing.nodeSet, draft.nodeSets).map(source => `${source.ref.type}:${source.ref.id}`)));
 
   return (
     <>

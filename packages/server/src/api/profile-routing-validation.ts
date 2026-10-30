@@ -87,12 +87,13 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
     const ref = refs.nodeSet(value, where);
     if (!doc.nodeSets.some(n => n.ref.type === ref.type && n.ref.id === ref.id)) throw bad(`${where}：节点集未加入本订阅`);
   };
-  const target = (value: unknown, where: string, depth = 0): void => {
+  const target = (value: unknown, where: string, depth = 0, allowAll = false): void => {
     if (depth > 20 || !obj(value)) throw bad(`${where}：引用格式错误`);
     if (value.kind === 'builtin' && builtins.has(value.name as string)) return;
     if (value.kind === 'group' && ids.has(value.groupId as string)) return;
     if (value.kind === 'node' && obj(value.ref) && obj(value.ref.match)) {
-      nodeSet(value.ref.nodeSet, where);
+      if (allowAll && obj(value.ref.nodeSet) && value.ref.nodeSet.type === 'all') refs.chainSource(value.ref.nodeSet, where);
+      else nodeSet(value.ref.nodeSet, where);
       const match = value.ref.match;
       if (!isStr(match.exact) && !isStr(match.regex, 0)) throw bad(`${where}：节点匹配条件不能为空`);
       if (value.ref.fallback && value.ref.fallback !== 'error') target(value.ref.fallback, where, depth + 1);
@@ -128,7 +129,8 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
   }
   target(effective.final, '最终出口');
   for (const chain of doc.chains) {
-    nodeSet(chain.landing.nodeSet, `代理链 ${chain.id} 的落地`);
-    target(chain.via, `代理链 ${chain.id} 的前置`);
+    if (chain.landing.nodeSet.type === 'all') refs.chainSource(chain.landing.nodeSet, `代理链 ${chain.id} 的落地`);
+    else nodeSet(chain.landing.nodeSet, `代理链 ${chain.id} 的落地`);
+    target(chain.via, `代理链 ${chain.id} 的前置`, 0, true);
   }
 }

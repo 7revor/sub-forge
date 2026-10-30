@@ -4,7 +4,7 @@
 import { finalizeProxy, parseContent } from '../proxy/parse.ts';
 import { runPipeline } from '../pipeline/run.ts';
 import { Report } from '../report.ts';
-import type { Collection, ID, LocalProxyGroup, NodeSetID, ProxyIR, Source } from '../types.ts';
+import type { ChainNodeSet, Collection, ID, LocalProxyGroup, NodeSetID, ProxyIR, Source } from '../types.ts';
 
 export type NodeSetInputs = {
   sources: Record<ID, Source>;
@@ -14,7 +14,7 @@ export type NodeSetInputs = {
   snapshots: Record<ID, string[]>;
 };
 
-export const nodeSetKey = (ref: NodeSetID) => `${ref.type}:${ref.id}`;
+export const nodeSetKey = (ref: ChainNodeSet) => `${ref.type}:${ref.id}`;
 
 /** 组合引用图必须是 DAG（COL-04）。返回所有环（以 ID 序列表示），空数组表示无环 */
 export function findCollectionCycles(collections: Record<ID, Collection>): ID[][] {

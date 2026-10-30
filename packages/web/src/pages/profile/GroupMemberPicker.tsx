@@ -1,3 +1,4 @@
+import { chainSources } from '@sub-forge/core';
 import { useModalPresentation } from '../../modals/index.tsx';
 import type { ChainRule, GroupMember, GroupSpec } from '@sub-forge/core';
 import { Link2, X } from 'lucide-react';
@@ -82,7 +83,7 @@ export function GroupMemberPicker({ group, members, inherited, onChange, readOnl
               const label = memberLabel(m, groupName, nodeSetName);
               const legacyProvider = m.kind === 'node' && output(m.ref.nodeSet) !== 'inline';
               const landing = m.kind === 'node' ? { nodeSet: m.ref.nodeSet, filter: 'exact' in m.ref.match ? exactNodeFilter(m.ref.match.exact) : m.ref.match.regex } : undefined;
-              const relevant = landing ? draft.chains.filter(c => nodeSetKey(c.landing.nodeSet) === nodeSetKey(landing.nodeSet)) : [];
+              const relevant = landing ? draft.chains.filter(c => chainSources(c.landing.nodeSet, draft.nodeSets).some(source => nodeSetKey(source.ref) === nodeSetKey(landing.nodeSet))) : [];
               const whole = relevant.find(c => !c.landing.filter && !c.landing.excludeFilter);
               const exact = landing ? relevant.find(c => c.landing.filter === landing.filter && !c.landing.excludeFilter) : undefined;
               return <div className="border-b border-line-2 py-2 last:border-0"><div className="flex items-center gap-1">{handle}<span className="min-w-0 flex-1 break-words text-[13px] font-medium">{label.text}</span><Button size="sm" variant="ghost" aria-label={`移除 ${label.text}`} onClick={() => onChange([...fixed.filter((_, j) => i !== j), ...dynamic])}><X size={14} /></Button></div>
