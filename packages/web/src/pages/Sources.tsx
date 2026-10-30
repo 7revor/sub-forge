@@ -144,7 +144,7 @@ export function SourceEdit() {
       <ErrorAlert error={state.snaps.error} />
 
       <PageScroll className="source-detail-content">
-        {preview.data?.report.filter((r) => r.level === 'error' || r.level === 'warn').map((r, i) => (
+        {preview.data?.report.filter((r) => r.level === 'error' || (r.level === 'warn' && r.code !== 'source.fetch-failed')).map((r, i) => (
           <div key={i} role="status" className={cx('rounded-lg px-3 py-2 text-[13px]', r.level === 'error' ? 'bg-err-soft text-err' : 'bg-warn-soft text-warn')}>{r.message}</div>
         ))}
         <BasicSettings draft={draft} set={set} />
