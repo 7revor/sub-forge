@@ -9,6 +9,8 @@ import { api, ApiError, type ImpactEntry } from '../api.ts';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { Notice } from '../components/Notice.tsx';
 import { ListTable, ListTableLoading } from '../components/ListTable.tsx';
+import { ListActions } from '../components/ListActions.tsx';
+import { SearchInput } from '../components/SearchInput.tsx';
 import { Pagination } from '../components/Pagination.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll, td, cx } from '../components/ui.tsx';
@@ -36,7 +38,7 @@ export function TemplateList() {
         actions={<Link to="/templates/new" className={buttonClass('primary')}><Plus size={16} />新建模板</Link>} />
       <ErrorAlert error={list.error} />
       <section className="list-panel" aria-label="模板列表" aria-busy={list.isFetching}>
-        <div className="shrink-0 px-4 py-3.5"><Input aria-label="搜索模板" placeholder="搜索名称" className="max-w-[280px]" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
+        <div className="shrink-0 px-4 py-3"><SearchInput aria-label="搜索模板" placeholder="搜索名称" className="max-w-80" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
         <div key={`${list.page}-${list.pageSize}-${list.q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
           <ListTable label="模板列表" columns={[
             { header: '名称', width: 240 }, { header: '策略组', width: 100 }, { header: '规则', width: 100 },
@@ -50,10 +52,10 @@ export function TemplateList() {
                 <td className={td}>{t.groups.length} 个</td>
                 <td className={td}>{t.rules.length} 条</td>
                 <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</td>
-                <td className={cx(td, 'whitespace-nowrap text-right')}><div className="flex justify-end gap-2">
-                  <DocActionLink to={path} name={t.name ?? t.id} viewOnly />
+                <td className={cx(td, 'whitespace-nowrap text-right')}><ListActions>
                   <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
-                </div></td>
+                  <DocActionLink to={path} name={t.name ?? t.id} />
+                </ListActions></td>
               </DocTableRow>;
             })}
           </ListTable>

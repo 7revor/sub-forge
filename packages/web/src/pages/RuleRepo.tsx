@@ -9,11 +9,12 @@ import { ListTable, ListTableLoading } from '../components/ListTable.tsx';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
 import { OptionPageStatus, useOptionPages } from '../components/OptionPage.tsx';
 import { HighlightedText } from '../components/HighlightedText.tsx';
+import { SearchInput } from '../components/SearchInput.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleRepo } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
-import { Button, ErrorAlert, Input, PageHeader, td } from '../components/ui.tsx';
+import { Button, ErrorAlert, PageHeader, td } from '../components/ui.tsx';
 
 const loadFiles = ruleOptionsLoader('repository', 30);
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
@@ -83,10 +84,12 @@ export function RuleRepoPage() {
     <PageHeader title="规则集合" />
     <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} loading={!repos.data && !repos.error} failed={!!repos.error && !repos.data} onRetry={() => void repos.refetch()} />
     {ruleset && <div className="text-[13px] text-ink-muted">点击文件查看源文件；添加来源请返回增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-brand">返回增强集合</Link></div>}
-    <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
     <ErrorAlert error={repos.error} />
     <section aria-label="规则文件列表" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
-      <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : '规则文件'}</div>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line-2 px-4 py-3">
+        <div className="flex items-center gap-3"><h2 className="m-0 text-[13px] font-medium text-ink-2">规则文件</h2><span role="status" className="text-[12px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span></div>
+        <SearchInput aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="max-w-80" />
+      </div>
       {!pending && repos.data ? <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} /> : <RepositoryFileLoading failed={!!repos.error && !repos.data} />}
     </section>
 

@@ -1,0 +1,44 @@
+[
+  {
+    "path": "/profiles",
+    "height": 36,
+    "label": "搜索配置订阅",
+    "placeholder": "搜索名称",
+    "width": 320
+  },
+  {
+    "path": "/sources",
+    "height": 36,
+    "label": "搜索订阅源",
+    "placeholder": "搜索名称",
+    "width": 320
+  },
+  {
+    "path": "/locals",
+    "height": 36,
+    "label": "搜索分组",
+    "placeholder": "搜索名称",
+    "width": 320
+  },
+  {
+    "path": "/collections",
+    "height": 36,
+    "label": "搜索组合",
+    "placeholder": "搜索名称",
+    "width": 320
+  },
+  {
+    "path": "/rulesets",
+    "height": 36,
+    "label": "搜索增强集合",
+    "placeholder": "搜索名称",
+    "width": 320
+  },
+  {
+    "path": "/templates",
+    "height": 36,
+    "label": "搜索模板",
+    "placeholder": "搜索名称",
+    "width": 320
+  }
+]

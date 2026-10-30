@@ -1,0 +1,209 @@
+[
+  {
+    "path": "/profiles",
+    "heading": "配置订阅",
+    "tables": [
+      {
+        "actions": [
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "复制 配置订阅验收 的链接",
+            "padding": "0px 10px",
+            "text": "复制链接"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "刷新全部资源 配置订阅验收",
+            "padding": "0px 10px",
+            "text": "刷新全部资源"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "编辑 配置订阅验收",
+            "padding": "0px 10px",
+            "text": "编辑"
+          },
+          {
+            "color": "rgb(180, 35, 24)",
+            "height": 32,
+            "label": "删除 配置订阅验收",
+            "padding": "0px 10px",
+            "text": "删除"
+          }
+        ],
+        "gap": "8px",
+        "label": "配置订阅列表"
+      }
+    ],
+    "confirmation": "删除配置订阅「配置订阅验收」？\n\n它的订阅链接会立即失效，客户端将无法更新。\n\n取消\n删除\nClose"
+  },
+  {
+    "path": "/locals",
+    "heading": "本地节点",
+    "tables": [
+      {
+        "actions": [
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "复制 本地节点 的链接",
+            "padding": "0px 10px",
+            "text": "复制链接"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "编辑 本地节点",
+            "padding": "0px 10px",
+            "text": "编辑"
+          },
+          {
+            "color": "rgb(180, 35, 24)",
+            "height": 32,
+            "label": "删除 本地节点",
+            "padding": "0px 10px",
+            "text": "删除"
+          }
+        ],
+        "gap": "8px",
+        "label": "本地节点列表"
+      }
+    ],
+    "confirmation": "删除分组「本地节点」？\n\n分组里的节点会一起删除；引用它的配置订阅需要先移除。\n\n取消\n删除\nClose"
+  },
+  {
+    "path": "/collections",
+    "heading": "组合",
+    "tables": [
+      {
+        "actions": [
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "复制 组合验收 的链接",
+            "padding": "0px 10px",
+            "text": "复制链接"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "刷新缓存 组合验收",
+            "padding": "0px 10px",
+            "text": "刷新缓存"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "编辑 组合验收",
+            "padding": "0px 10px",
+            "text": "编辑"
+          },
+          {
+            "color": "rgb(180, 35, 24)",
+            "height": 32,
+            "label": "删除 组合验收",
+            "padding": "0px 10px",
+            "text": "删除"
+          }
+        ],
+        "gap": "8px",
+        "label": "组合列表"
+      }
+    ],
+    "confirmation": "删除组合「组合验收」？\n\n删除后无法恢复。\n\n取消\n删除\nClose"
+  },
+  {
+    "path": "/rulesets",
+    "heading": "增强集合",
+    "tables": [
+      {
+        "actions": [
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "复制 增强集合验收 的链接",
+            "padding": "0px 10px",
+            "text": "复制链接"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "刷新缓存 增强集合验收",
+            "padding": "0px 10px",
+            "text": "刷新缓存"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "编辑 增强集合验收",
+            "padding": "0px 10px",
+            "text": "编辑"
+          },
+          {
+            "color": "rgb(180, 35, 24)",
+            "height": 32,
+            "label": "删除 增强集合验收",
+            "padding": "0px 10px",
+            "text": "删除"
+          }
+        ],
+        "gap": "8px",
+        "label": "增强集合列表"
+      }
+    ],
+    "confirmation": "删除增强集合「增强集合验收」？\n\n删除后无法恢复。\n\n取消\n删除\nClose"
+  },
+  {
+    "path": "/templates",
+    "heading": "模板",
+    "tables": [
+      {
+        "actions": [
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": null,
+            "padding": "0px 10px",
+            "text": "新建订阅"
+          },
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": "编辑 模板验收",
+            "padding": "0px 10px",
+            "text": "编辑"
+          }
+        ],
+        "gap": "8px",
+        "label": "模板列表"
+      }
+    ]
+  },
+  {
+    "path": "/users",
+    "heading": "用户",
+    "tables": [
+      {
+        "actions": [
+          {
+            "color": "rgb(21, 24, 29)",
+            "height": 32,
+            "label": null,
+            "padding": "0px 10px",
+            "text": "重置密码"
+          }
+        ],
+        "gap": "8px",
+        "label": null
+      }
+    ]
+  },
+  {
+    "path": "/system",
+    "heading": "系统",
+    "tables": []
+  }
+]

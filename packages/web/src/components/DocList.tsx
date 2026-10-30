@@ -1,15 +1,17 @@
 import { RefreshCacheButton, ResourceCacheStatus, ResourceLastRefreshTime } from './ResourceCache.tsx';
 // 文档列表：服务端搜索与分页，搜索栏和分页器固定，表格占满剩余高度并独立滚动。
-// 空列表保留分页和搜索；每行操作为「删除」「编辑」，删除先弹确认。
+// 空列表保留分页和搜索；删除统一放在操作区最右侧，先弹确认。
 
 import { usePagedList } from '../hooks/usePagedList.ts';
 import { Pagination } from './Pagination.tsx';
 import { ListTable, ListTableLoading } from './ListTable.tsx';
+import { ListActions } from './ListActions.tsx';
+import { SearchInput } from './SearchInput.tsx';
 import { Plus } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useDeleteDoc, type DocMap, type Kind } from '../hooks.ts';
-import { Button, buttonClass, cx, Empty, ErrorAlert, Input, PageHeader, td } from './ui.tsx';
+import { Button, buttonClass, cx, Empty, ErrorAlert, PageHeader, td } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { Frame } from '../modals/Frame.tsx';
 import { ResourceLinkButton } from './ResourceLinkButton.tsx';
@@ -48,8 +50,8 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
       <PageHeader title={title} subtitle={intro} actions={canCreate && createButton('md', 'primary')} />
       <ErrorAlert error={list.error} />
       <section className="list-panel" aria-busy={list.isFetching}>
-        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3.5">
-          <Input aria-label={`搜索${name}`} placeholder="搜索名称" className="min-w-0 max-w-[280px]" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+          <SearchInput aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-80" value={q} onChange={(e) => setQ(e.target.value)} />
           <span className={cx('shrink-0 text-[12.5px] text-ink-muted', !list.isFetching && 'invisible')}>加载中…</span>
         </div>
         <div key={`${list.page}-${list.pageSize}-${q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
@@ -64,12 +66,12 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                 {refreshable && <td className={td}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
                 {refreshable && <td className={td}><ResourceLastRefreshTime kind={kind} id={d.id}/></td>}
                 <td className={cx(td, 'text-right whitespace-nowrap')}>
-                  <div className="flex items-center justify-end gap-2">
+                  <ListActions>
                     <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />
                     {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
-                    {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
                     <DocActionLink to={`/${kind}/${d.id}`} name={d.name} viewOnly={!canWrite(d.id)} />
-                  </div>
+                    {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
+                  </ListActions>
                 </td>
               </DocTableRow>
             ))}
