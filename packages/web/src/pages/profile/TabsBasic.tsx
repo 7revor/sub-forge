@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type TokenItem } from '../../api.ts';
+import { DeleteDialog } from '../../components/DetailActions.tsx';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Modal, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
@@ -34,9 +35,10 @@ export function TabOverview() {
   const [label, setLabel] = useState('');
   const [adding, setAdding] = useState(false);
   const [resetting, setResetting] = useState<TokenItem>();
+  const [deleting, setDeleting] = useState<TokenItem>();
   const create = useMutation({ meta: { successMessage: '订阅链接已创建' }, mutationFn: () => api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}), onSuccess: () => { setLabel(''); setAdding(false); void refreshTokens(); } });
   const reset = useMutation({ meta: { successMessage: '订阅链接已重置' }, mutationFn: (t: string) => api('POST', `/profiles/${draft.id}/tokens/${t}/reset`), onSuccess: () => { setResetting(undefined); void refreshTokens(); } });
-  const remove = useMutation({ meta: { successMessage: '订阅链接已删除' }, mutationFn: (t: string) => api('DELETE', `/profiles/${draft.id}/tokens/${t}`), onSuccess: refreshTokens });
+  const remove = useMutation({ meta: { successMessage: '订阅链接已删除' }, mutationFn: (t: string) => api('DELETE', `/profiles/${draft.id}/tokens/${t}`), onSuccess: () => { setDeleting(undefined); void refreshTokens(); } });
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
   const sources = allNodeSets.filter((n) => n.ref.type === 'source' && draft.nodeSets.some((p) => p.ref.type === 'source' && p.ref.id === n.ref.id));
   const rows = log.data ?? [];
@@ -66,7 +68,7 @@ export function TabOverview() {
                       <CopyButton className="h-9" text={t.url}><Copy size={13} />复制</CopyButton>
                       <CopyButton className="h-9" text={`${t.url}?target=stash&platform=ios`}>复制 Stash 链接</CopyButton>
                       <Button className="h-9 text-err" onClick={() => setResetting(t)}><RotateCcw size={13} />重置 token</Button>
-                      <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => { if (confirm('删除这个订阅链接？使用它的设备将无法更新。')) remove.mutate(t.token); }}><Trash2 size={14} /></Button>
+                      <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => { remove.reset(); setDeleting(t); }}><Trash2 size={14} /></Button>
                     </div>
                   </li>
                 );
@@ -117,6 +119,10 @@ export function TabOverview() {
           </tbody>
         </table>
       </Card>
+      <DeleteDialog title={`删除订阅链接「${deleting?.label || '未命名设备'}」？`} open={!!deleting} pending={remove.isPending} error={remove.error}
+        onClose={() => setDeleting(undefined)} onConfirm={() => { if (deleting) remove.mutate(deleting.token); }}>
+        使用它的设备将无法更新。
+      </DeleteDialog>
       <Modal title="新增订阅链接" open={adding} onClose={() => setAdding(false)}
         footer={<><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建链接'}</Button></>}>
         <Field label="设备备注">{(id) => <Input id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>

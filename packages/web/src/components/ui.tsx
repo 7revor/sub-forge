@@ -10,6 +10,7 @@ export { Empty } from './Empty.tsx';
 export { cx } from './cx.ts';
 export { Select, Combobox, type SelectProps, type ComboOption } from './listbox.tsx';
 import { cx } from './cx.ts';
+import { Presence } from './Presence.tsx';
 
 type BtnVariant = 'primary' | 'default' | 'danger' | 'danger-solid' | 'ghost';
 const BTN: Record<BtnVariant, string> = {
@@ -166,19 +167,30 @@ export function FieldError({ error }: { error: unknown }) {
   return <div role="alert" className="rounded-lg bg-err-soft px-3 py-2.5 text-[13px] text-[#8f2a1f]">{error instanceof Error ? error.message : String(error)}</div>;
 }
 
-export function Modal({ title, open, onClose, children, footer, wide }: { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+type ModalProps = { title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean };
+
+export function Modal(props: ModalProps) {
+  return <Presence open={props.open}>{open => <ModalContent {...props} open={open} />}</Presence>;
+}
+
+function ModalContent({ title, open, onClose, children, footer, wide }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // 在子元素 autoFocus 执行前记录入口，退场时才能把焦点还给触发按钮。
+  const previousFocus = useRef<Element | null>(null);
+  const wasOpen = useRef(false);
+  if (open && !wasOpen.current) previousFocus.current = document.activeElement;
+  wasOpen.current = open;
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!open || !dialog) return;
-    const previous = document.activeElement;
+    const previous = previousFocus.current;
     const focusable = () => [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')].filter(element => element.getClientRects().length > 0);
     (dialog.querySelector<HTMLElement>('input:not(:disabled), textarea:not(:disabled)') ?? focusable()[0] ?? dialog).focus();
     const onKey = (e: KeyboardEvent) => {
       // 弹层只处理自身顶层的键盘操作，保留下拉菜单和确认框的 Escape 行为。
-      if (e.defaultPrevented || [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].at(-1) !== dialog || document.querySelector('dialog[open][role="alertdialog"]')) return;
+      if (e.defaultPrevented || [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter(element => !element.closest('[inert]')).at(-1) !== dialog || document.querySelector('dialog[open][role="alertdialog"]')) return;
       if (e.key === 'Escape') { e.preventDefault(); closeRef.current(); }
       if (e.key === 'Tab') {
         const items = focusable();
@@ -193,12 +205,11 @@ export function Modal({ title, open, onClose, children, footer, wide }: { title:
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
   }, [open]);
-  if (!open) return null;
   // 挂到 body，避免页面限宽、裁切或定位祖先影响全屏遮罩。
   // 设计稿「对话框与危险操作」：标题 + 关闭、内容、灰底操作栏；宽度 560（表单）/ 720（粘贴、YAML）
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={cx('flex max-h-full min-h-0 w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
+    <div data-state={open ? 'open' : 'closed'} inert={!open} className="modal-overlay fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[rgba(20,23,28,.42)] p-4 pt-[10vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={cx('modal-panel flex max-h-full min-h-0 w-full flex-col rounded-xl bg-panel shadow-[0_24px_64px_rgba(20,23,28,.28)]', wide ? 'max-w-[720px]' : 'max-w-[560px]')}>
         <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-[18px] pb-2">
           <h2 className="m-0 text-base font-semibold">{title}</h2>
           <button type="button" aria-label="关闭" onClick={onClose} className="grid h-8 w-8 cursor-pointer place-items-center rounded-md text-muted hover:bg-ground hover:text-ink"><X size={16} /></button>

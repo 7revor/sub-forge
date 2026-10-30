@@ -81,7 +81,7 @@ function OptionList({ id, opts, active, selected, pos, listRef, label, onPick, o
   return createPortal(
     <div ref={listRef} id={id} role="listbox" aria-label={label} aria-multiselectable={Array.isArray(selected) || undefined}
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: pos.width, maxHeight: pos.maxHeight }}
-      className="fixed z-[60] max-w-[min(480px,calc(100vw-16px))] overflow-y-auto rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.12)]"
+      className="popover-panel fixed z-[60] max-w-[min(480px,calc(100vw-16px))] overflow-y-auto rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onMouseDown={(e) => e.preventDefault()}>
       {!opts.length && <Empty size="compact" title={empty ?? '没有选项'} />}
       {opts.map((o, i) => <Fragment key={`${o.group ?? ''}\u0000${o.value}\u0000${i}`}>
@@ -267,7 +267,7 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
     </button>
     {open && pos && createPortal(<div ref={popup} id={popupId} role="dialog" aria-label={ariaLabel}
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
-      className="fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
+      className="popover-panel fixed z-[60] flex flex-col overflow-hidden rounded-[10px] border border-line bg-panel shadow-[0_8px_24px_rgba(20,23,28,.12)]"
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
       <div className="shrink-0 border-b border-line-2 p-3"><input autoFocus aria-label="搜索规则文件" placeholder="搜索文件名或路径" value={query}
         className={fieldCls} onChange={event => setQuery(event.target.value)}

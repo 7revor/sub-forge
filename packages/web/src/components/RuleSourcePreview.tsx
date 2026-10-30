@@ -6,7 +6,7 @@ import { ruleToLine } from './rule.ts';
 import { Button, FieldError, Modal } from './ui.tsx';
 
 /** 只读源文件，与规则编辑及客户端输出预览分开。 */
-export function RuleSourcePreview({ matcher, onClose }: { matcher: Matcher; onClose: () => void }) {
+export function RuleSourcePreview({ open, matcher, onClose }: { open: boolean; matcher: Matcher; onClose: () => void }) {
   const preview = useQuery({
     queryKey: ['rule-matcher-source', matcher],
     enabled: matcher.kind === 'ruleset', retry: false, staleTime: 60_000,
@@ -15,7 +15,7 @@ export function RuleSourcePreview({ matcher, onClose }: { matcher: Matcher; onCl
   const single = matcher.kind === 'rule';
   const text = single ? ruleToLine(matcher.rule) : preview.data?.content ?? '';
   const loading = !single && preview.isPending;
-  return <Modal title="规则预览" open onClose={onClose} wide footer={<Button onClick={onClose}>关闭</Button>}>
+  return <Modal title="规则预览" open={open} onClose={onClose} wide footer={<Button onClick={onClose}>关闭</Button>}>
     {!single && preview.error ? <div className="flex flex-col items-start gap-3">
       <FieldError error={preview.error} /><Button size="sm" disabled={preview.isFetching} onClick={() => void preview.refetch()}>重新读取</Button>
     </div> : <>

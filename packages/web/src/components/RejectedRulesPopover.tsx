@@ -72,7 +72,7 @@ export function RejectedRulesPopover({ sourceName, status }: { sourceName: strin
     </button>
     {open && pos && createPortal(<div ref={panel} id={id} role="region" aria-label={`${sourceName} 未解析的规则`} style={pos}
       onMouseEnter={show} onMouseLeave={leave} onFocus={show}
-      className="fixed z-[80] overflow-auto overscroll-contain rounded-lg border border-line bg-panel p-3.5 text-ink shadow-xl">
+      className="popover-panel fixed z-[80] overflow-auto overscroll-contain rounded-lg border border-line bg-panel p-3.5 text-ink shadow-xl">
       <div className="mb-3 flex items-start justify-between gap-3">
         <strong className="min-w-0 break-all text-[13px]">{sourceName} · 未解析 {status.rejected} 行</strong>
         <button type="button" aria-label="关闭规则详情" className="shrink-0 cursor-pointer border-0 bg-transparent text-[12px] text-muted hover:text-ink"

@@ -10,6 +10,7 @@ import { ruleToLine } from '../../components/rule.ts';
 import { Button, Card, Empty, ErrorAlert, Field, FieldError, Input, Modal, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
+import { Presence } from '../../components/Presence.tsx';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
@@ -128,6 +129,6 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
         <ItemIssues report={report} where="final" />
       </>}
     </Modal>
-    {preview && <RuleSourcePreview matcher={preview} onClose={() => setPreview(undefined)} />}
+    <Presence open={!!preview}>{open => <RuleSourcePreview open={open} matcher={preview!} onClose={() => setPreview(undefined)} />}</Presence>
   </>;
 }

@@ -6,13 +6,14 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { api, type SystemInfo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, Input, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Input, Modal, PageHeader, PageScroll, PendingNotice, Switch, formatBytes, formatTime } from '../components/ui.tsx';
 
 export function System() {
   const qc = useQueryClient();
   const info = useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('GET', '/system') });
   const [draft, setDraft] = useState<SystemInfo>();
   const [allow, setAllow] = useState('');
+  const [restoreFile, setRestoreFile] = useState<File>();
   useEffect(() => { if (info.data) setDraft(info.data); }, [info.data]);
   const save = useMutation({ meta: { successMessage: '系统设置已保存' }, mutationFn: (body: SystemInfo) => api('PUT', '/system', body), onSuccess: () => qc.invalidateQueries({ queryKey: ['system'] }) });
   const backup = useMutation({ meta: { successMessage: '备份已导出' }, mutationFn: () => api('POST', '/system/backup') });
@@ -75,7 +76,7 @@ export function System() {
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => backup.mutate()} disabled={backup.isPending}>{backup.isPending ? '导出中…' : '导出备份'}</Button>
                   <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-[#d5d9e0] bg-panel px-3.5 text-[13.5px] font-medium hover:bg-ground">
-                    从文件恢复…<input type="file" accept="application/json" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f && confirm('恢复会覆盖当前全部配置，确定？')) restore.mutate(f); e.target.value = ''; }} />
+                    从文件恢复…<input type="file" accept="application/json" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { restore.reset(); setRestoreFile(f); } e.target.value = ''; }} />
                   </label>
                 </div>
                 <span className="text-[12.5px] text-muted">{draft.lastBackup ? `上次导出：${formatTime(draft.lastBackup.at).slice(5)} · ${formatBytes(draft.lastBackup.size)}` : '还没有导出过'}</span>
@@ -86,6 +87,13 @@ export function System() {
         </div>
 
       </PageScroll>
+      <Modal title="恢复备份？" open={!!restoreFile} onClose={() => { if (!restore.isPending) setRestoreFile(undefined); }} footer={<>
+        <Button disabled={restore.isPending} onClick={() => setRestoreFile(undefined)}>取消</Button>
+        <Button variant="danger-solid" disabled={restore.isPending} onClick={() => { if (restoreFile) restore.mutate(restoreFile, { onSuccess: () => setRestoreFile(undefined) }); }}>{restore.isPending ? '恢复中…' : '恢复'}</Button>
+      </>}>
+        <span className="text-[13.5px] leading-relaxed">恢复会覆盖当前全部配置。</span>
+        <span className="break-all text-[13px] text-muted">{restoreFile?.name}</span>
+      </Modal>
 
     </>
   );
