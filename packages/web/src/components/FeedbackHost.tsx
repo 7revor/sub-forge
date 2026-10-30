@@ -3,13 +3,15 @@ import { toast } from 'sonner';
 import { Toaster } from './ui/sonner.tsx';
 import { alertError, feedbackStore, type Feedback } from '../feedback.ts';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from './ui/alert-dialog.tsx';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 
 function ErrorDialog({ item }: { item?: Feedback }) {
+  const [message] = useDialogDraft(!!item, item?.message, item ? String(item.id) : undefined);
   return <AlertDialog open={!!item} onOpenChange={open => { if (!open && item) feedbackStore.dismiss(item.id); }}>
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>操作失败</AlertDialogTitle>
-        <AlertDialogDescription className="whitespace-pre-wrap break-words">{item?.message}</AlertDialogDescription>
+        <AlertDialogDescription className="whitespace-pre-wrap break-words">{message}</AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter><AlertDialogCancel>知道了</AlertDialogCancel></AlertDialogFooter>
     </AlertDialogContent>

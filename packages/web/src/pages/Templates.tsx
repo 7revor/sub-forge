@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stableStringify, type ReportItem } from '@sub-forge/core';
 import { Pencil, Plus } from 'lucide-react';
@@ -104,13 +105,15 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
     else next.add(id);
     return next;
   });
-  const [yaml, setYaml] = useState<string>();
+  const [yamlOpen, setYamlOpen] = useState(false);
+  const [yaml, setYaml] = useDialogDraft(yamlOpen, '');
+  const [yamlBase] = useDialogDraft(yamlOpen, draft.body);
   const [discardYaml, setDiscardYaml] = useState(false);
   const [validation, setValidation] = useState<{ draft: TemplateDraft; report: ReportItem[]; error?: string }>();
   const [savedWarnings, setSavedWarnings] = useState<ReportItem[]>([]);
   const body = draft.body;
   const dirty = stableStringify(draft) !== stableStringify(base);
-  const yamlDirty = yaml !== undefined && yaml !== '';
+  const yamlDirty = yamlOpen && yaml !== '';
   const { blocker, leave } = useLeaveGuard(dirty || yamlDirty);
   const showingLeave = blocker.state === 'blocked';
   const currentValidation = validation?.draft === draft ? validation : undefined;
@@ -156,10 +159,10 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   });
   useEffect(() => { save.reset(); if (dirty) setSavedWarnings([]); }, [draft]); // 草稿变化后清除上一次保存结果。
   const failure = save.error instanceof ApiError && save.error.details && typeof save.error.details === 'object' ? save.error.details as { report?: ReportItem[]; impact?: ImpactEntry[] } : undefined;
-  const canSave = !!draft.name.trim() && !errors.length && !currentValidation?.error && yaml === undefined && !save.isPending;
-  const yamlResult = useMemo(() => yaml !== undefined ? templateFromYaml(yaml, body, ctx) : undefined, [yaml, body, rulesets.data]);
-  const openYaml = () => { setYaml(''); setDiscardYaml(false); };
-  const closeYaml = () => { if (yamlDirty) setDiscardYaml(true); else setYaml(undefined); };
+  const canSave = !!draft.name.trim() && !errors.length && !currentValidation?.error && !yamlOpen && !save.isPending;
+  const yamlResult = useMemo(() => templateFromYaml(yaml, yamlBase, ctx), [yaml, yamlBase, rulesets.data]);
+  const openYaml = () => { setYamlOpen(true); setDiscardYaml(false); };
+  const closeYaml = () => { if (yamlDirty) setDiscardYaml(true); else setYamlOpen(false); };
 
   return <>
     <PageHeader title={isNew ? '新建模板' : '模板详情'} crumbs={<Link to="/templates" className="text-ink-muted no-underline">模板</Link>}
@@ -195,14 +198,14 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
         <TemplateRulesEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : rule} onSelect={setRule} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
     </PageScroll>
-    <Dialog open={yaml !== undefined && !showingLeave} onOpenChange={next => { if (!next) (closeYaml)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"从 YAML 导入"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <Dialog open={yamlOpen && !showingLeave} onOpenChange={next => { if (!next) (closeYaml)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"从 YAML 导入"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，应用后仍需保存模板。">{fid => <YamlTextarea id={fid} rows={18} spellCheck={false} value={yaml ?? ''} onChange={e => { setYaml(e.target.value); setDiscardYaml(false); }} />}</Field>
       {!!yaml?.trim() && yamlResult && !yamlResult.ok && <FieldError error={`第 ${yamlResult.line ?? 1} 行：${yamlResult.error}`} />}
       {yamlResult?.ok && yamlResult.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-ink-muted">{yamlResult.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
     </div><DialogFooter>{discardYaml ? <>
-      <span className="mr-auto self-center text-[12px] text-ink-muted">放弃这次 YAML 导入？</span><Button onClick={() => setDiscardYaml(false)}>继续导入</Button><Button variant="danger" onClick={() => { setYaml(undefined); setDiscardYaml(false); }}>放弃导入</Button>
-    </> : <><Button onClick={closeYaml}>取消</Button><Button variant="primary" disabled={!yamlResult?.ok} onClick={() => { if (yamlResult?.ok) { updateBody(yamlResult.value); setYaml(undefined); } }}>应用到模板</Button></>}</DialogFooter></DialogContent></Dialog>
+      <span className="mr-auto self-center text-[12px] text-ink-muted">放弃这次 YAML 导入？</span><Button onClick={() => setDiscardYaml(false)}>继续导入</Button><Button variant="danger" onClick={() => setYamlOpen(false)}>放弃导入</Button>
+    </> : <><Button onClick={closeYaml}>取消</Button><Button variant="primary" disabled={!yamlResult?.ok} onClick={() => { if (yamlResult?.ok) { updateBody(structuredClone(yamlResult.value)); setYamlOpen(false); } }}>保存</Button></>}</DialogFooter></DialogContent></Dialog>
     <LeaveDialog blocker={blocker} what="模板" canSave={canSave} pending={save.isPending} error={save.error}
-      onSave={done => save.mutate(draft, { onSuccess: done })} onDiscard={() => { setDraft(base); setYaml(undefined); setGroup(undefined); setRule(undefined); setPendingRules(new Set()); }} />
+      onSave={done => save.mutate(draft, { onSuccess: done })} onDiscard={() => { setDraft(base); setYamlOpen(false); setGroup(undefined); setRule(undefined); setPendingRules(new Set()); }} />
   </>;
 }

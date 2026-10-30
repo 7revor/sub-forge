@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
+import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from '../../components/ui/alert-dialog.tsx';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
@@ -34,11 +35,11 @@ export function TabOverview() {
   const tokens = useQuery(tokenOptions(draft.id));
   const log = useQuery(accessLogOptions(draft.id));
   const refreshTokens = () => qc.invalidateQueries({ queryKey: ['tokens', draft.id] });
-  const [label, setLabel] = useState('');
   const [adding, setAdding] = useState(false);
+  const [label, setLabel] = useDialogDraft(adding, '');
   const [resetting, setResetting] = useState<TokenItem>();
   const [deleting, setDeleting] = useState<TokenItem>();
-  const create = useMutation({ meta: { successMessage: '订阅链接已创建' }, mutationFn: () => api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}), onSuccess: () => { setLabel(''); setAdding(false); void refreshTokens(); } });
+  const create = useMutation({ meta: { successMessage: '订阅链接已创建' }, mutationFn: () => api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}), onSuccess: () => { setAdding(false); void refreshTokens(); } });
   const reset = useMutation({ meta: { successMessage: '订阅链接已重置' }, mutationFn: (t: string) => api('POST', `/profiles/${draft.id}/tokens/${t}/reset`), onSuccess: () => { setResetting(undefined); void refreshTokens(); } });
   const remove = useMutation({ meta: { successMessage: '订阅链接已删除' }, mutationFn: (t: string) => api('DELETE', `/profiles/${draft.id}/tokens/${t}`), onSuccess: () => { setDeleting(undefined); void refreshTokens(); } });
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };

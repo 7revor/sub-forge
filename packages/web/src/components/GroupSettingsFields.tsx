@@ -2,6 +2,9 @@ import type { GroupSpec } from '@sub-forge/core';
 import { Field, Input, Select } from './ui.tsx';
 
 type Settings = Pick<GroupSpec, 'type' | 'test' | 'strategy'>;
+type SettingsProps = {
+  value: Settings; onChange: <K extends keyof Settings>(key: K, value: Settings[K] | undefined) => void;
+};
 const TYPES = ['select', 'url-test', 'fallback', 'load-balance'] as const;
 const TEST_FIELDS = [
   ['url', '测速地址', false, '输入测速 URL（选填）'],
@@ -11,14 +14,15 @@ const TEST_FIELDS = [
 ] as const;
 
 /** 模板和配置订阅共用参数字段；覆盖写入及可编辑权限留给调用方。 */
-export function GroupSettingsFields({ value, onChange }: {
-  value: Settings; onChange: <K extends keyof Settings>(key: K, value: Settings[K] | undefined) => void;
-}) {
+export function GroupTypeField({ value, onChange }: SettingsProps) {
+  return <Field label="类型">{(id) => <Select id={id} value={value.type} onChange={(event) => onChange('type', event.target.value as GroupSpec['type'])}>
+      {TYPES.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}
+    </Select>}</Field>;
+}
+
+export function GroupAdvancedFields({ value, onChange }: SettingsProps) {
   const test = value.test ?? {};
   return <>
-    <Field label="类型">{(id) => <Select id={id} value={value.type} onChange={(event) => onChange('type', event.target.value as GroupSpec['type'])}>
-      {TYPES.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}
-    </Select>}</Field>
     {value.type !== 'select' && <>
       {TEST_FIELDS.filter(([key]) => key !== 'tolerance' || value.type === 'url-test').map(([key, label, numeric, placeholder]) => <Field key={key} label={label}>{(id) => <Input id={id}
         type={numeric ? 'number' : 'text'} min={numeric ? 0 : undefined} step={key === 'maxFailedTimes' ? 1 : undefined}
@@ -34,4 +38,8 @@ export function GroupSettingsFields({ value, onChange }: {
       {value.strategy && <option value="">清空</option>}{['consistent-hashing', 'round-robin', 'sticky-sessions'].map((strategy) => <option key={strategy}>{strategy}</option>)}
     </Select>}</Field>}
   </>;
+}
+
+export function GroupSettingsFields(props: SettingsProps) {
+  return <><GroupTypeField {...props} /><GroupAdvancedFields {...props} /></>;
 }

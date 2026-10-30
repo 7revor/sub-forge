@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog.tsx';
-import { useRef } from 'react';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 import type { Matcher } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api.ts';
@@ -9,9 +9,7 @@ import { Button, FieldError, } from './ui.tsx';
 
 /** 只读源文件，与规则编辑及客户端输出预览分开。 */
 export function RuleSourcePreview({ matcher: selected, onClose }: { matcher?: Matcher; onClose: () => void }) {
-  const retained = useRef<Matcher>({ kind: 'rule', rule: { type: 'RAW', text: '' } });
-  if (selected) retained.current = selected;
-  const matcher = selected ?? retained.current;
+  const [matcher] = useDialogDraft<Matcher>(!!selected, selected ?? { kind: 'rule', rule: { type: 'RAW', text: '' } }, JSON.stringify(selected));
   const preview = useQuery({
     queryKey: ['rule-matcher-source', matcher],
     enabled: !!selected && matcher.kind === 'ruleset', retry: false, staleTime: 60_000,

@@ -78,12 +78,12 @@ function ExtraRuleModal({ open, onClose, onAdd, prepend = false }: { open: boole
       {(template?.rules ?? []).map((r, i) => <option key={`b${r.id}`} value={`before:${r.id}`}>模板规则 #{i + 1} 之前</option>)}
       {(template?.rules ?? []).map((r, i) => <option key={`a${r.id}`} value={`after:${r.id}`}>模板规则 #{i + 1} 之后</option>)}
     </Select>}</Field>}
-    <PrivateRuleFields single={prepend} value={rule} onChange={setRule} />
+    <PrivateRuleFields single={prepend} value={rule} onChange={next => setRule(structuredClone(next))} />
     <FieldError error={error} />
   </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
     const position: ExtraRule['anchor'] = prepend ? 'top' : anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
-    onAdd(position, rule); onClose();
-  }}>插入</Button></>}</DialogFooter></DialogContent></Dialog>;
+    onAdd(position, structuredClone(rule)); onClose();
+  }}>保存</Button></>}</DialogFooter></DialogContent></Dialog>;
 }
 
 function PrivateRuleEdit({ rule, onApply, onClose, single = false }: { rule: RuleEntry; onApply: (rule: RuleEntry) => void; onClose: () => void; single?: boolean }) {

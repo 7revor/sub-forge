@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
@@ -51,9 +52,9 @@ export function SourceList() {
 function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const save = useSaveDoc('sources');
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [note, setNote] = useState('');
+  const [name, setName] = useDialogDraft(open, '');
+  const [url, setUrl] = useDialogDraft(open, '');
+  const [note, setNote] = useDialogDraft(open, '');
   const ready = name.trim() && url.trim();
   const create = () => save.mutate(
     { name: name.trim(), url: url.trim(), note, pipeline: [] },

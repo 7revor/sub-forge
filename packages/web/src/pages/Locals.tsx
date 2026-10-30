@@ -23,6 +23,7 @@ import { DeleteAction, DeleteDialog, ActionButtons } from '../components/DetailA
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, FieldError, Field, Input, PageHeader, cx, td, th } from '../components/ui.tsx';
 import { useDocEditor } from '../components/useDocEditor.ts';
 import { useDoc, useSaveDoc } from '../hooks.ts';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 
 const EMPTY: LocalProxyGroup = { id: '', name: '', proxies: [] };
 const crumbLink = 'text-ink-muted no-underline';
@@ -63,7 +64,8 @@ export function LocalList() {
 /** /locals/:id：分组详情，节点表的「编辑」「新增节点」进入节点子页 */
 export function LocalEdit() {
   const e = useDocEditor('locals', EMPTY);
-  const [groupText, setGroupText] = useState<string>();
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupText, setGroupText] = useDialogDraft(groupOpen, groupToYaml(e.draft?.proxies ?? []));
   const [deletingNode, setDeletingNode] = useState<number>();
   const { blocker, leave } = useLeaveGuard(e.dirty && !e.isNew);
   if (e.isNew) return <Navigate to="/locals" replace />;
@@ -71,7 +73,7 @@ export function LocalEdit() {
   const d = e.draft;
   const validName = !!d.name.trim();
   const setProxies = (proxies: LocalProxy[]) => e.setDraft({ ...d, proxies });
-  const groupResult = groupText === undefined ? undefined : groupFromYaml(groupText);
+  const groupResult = groupFromYaml(groupText);
   const nodePath = (i: number | 'new') => `/locals/${d.id}/nodes/${i}`;
 
   return (
@@ -79,7 +81,7 @@ export function LocalEdit() {
       <PageHeader crumbs={<><Link to="/locals" className={crumbLink}>本地节点</Link> / {e.doc.data?.name}</>}
         title={d.name || '未命名'}
         actions={<>
-          <ActionButtons items={[{ label: '分组 YAML', onSelect: () => setGroupText(groupToYaml(d.proxies)) }]} />
+          <ActionButtons items={[{ label: '分组 YAML', onSelect: () => setGroupOpen(true) }]} />
           <Button variant="primary" onClick={() => e.submit((draft) => ({ ...draft, name: draft.name.trim() }))} disabled={e.save.isPending || !e.dirty || !validName}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
           <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
             onDelete={() => e.del.mutate(d.id, { onSuccess: () => leave('/locals') })} />
@@ -117,14 +119,14 @@ export function LocalEdit() {
         )}
       </Card>
 
-      <Dialog open={groupText !== undefined} onOpenChange={next => { if (!next) (() => setGroupText(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"分组 YAML"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+      <Dialog open={groupOpen} onOpenChange={setGroupOpen}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"分组 YAML"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         <Field label="整个分组的 proxies 列表">
           {(id) => <YamlTextarea id={id} rows={18} className="font-mono" spellCheck={false} value={groupText ?? ''} onChange={(event) => setGroupText(event.target.value)} />}
         </Field>
         <FieldError error={groupResult && !groupResult.ok ? `第 ${groupResult.line ?? 1} 行：${groupResult.error}` : undefined} />
-      </div><DialogFooter>{<><Button onClick={() => setGroupText(undefined)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {
-          if (groupResult?.ok) { setProxies(groupResult.value); setGroupText(undefined); }
-        }}>应用到分组</Button></>}</DialogFooter></DialogContent></Dialog>
+      </div><DialogFooter>{<><Button onClick={() => setGroupOpen(false)}>取消</Button><Button variant="primary" disabled={!groupResult?.ok} onClick={() => {
+          if (groupResult?.ok) { setProxies(structuredClone(groupResult.value)); setGroupOpen(false); }
+        }}>保存</Button></>}</DialogFooter></DialogContent></Dialog>
       <DeleteDialog open={deletingNode !== undefined} title={`删除节点「${deletingNode === undefined ? '' : d.proxies[deletingNode]?.name ?? ''}」？`} error={e.save.error} pending={e.save.isPending}
         onClose={() => setDeletingNode(undefined)}
         onConfirm={() => e.save.mutate({ ...d, proxies: d.proxies.filter((_, i) => i !== deletingNode) }, { onSuccess: () => setDeletingNode(undefined) })}>

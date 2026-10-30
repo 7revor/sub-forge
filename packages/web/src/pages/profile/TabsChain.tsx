@@ -12,6 +12,7 @@ import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { NodeSetSelect, TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, ReportList, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
+import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
 
 const STRATEGIES: { value: RefStrategy; label: string }[] = [{ value: 'wrap', label: '包装组' }, { value: 'copy', label: '复制到本地' }, { value: 'inline', label: '整体内联' }];
 
@@ -33,17 +34,19 @@ export function TabChains() {
   const preview = usePreview();
   const setChain = (i: number, c: ChainRule) => setDraft({ ...draft, chains: draft.chains.map((x, j) => (j === i ? c : x)) });
   // 编辑在对话框里进行：index 为 -1 表示新增
-  const [editing, setEditing] = useState<{ index: number; chain: ChainRule }>();
+  const [selection, setSelection] = useState<{ index: number; chain: ChainRule }>();
+  const [editing, setEditing] = useDialogDraft(!!selection, selection, selection?.chain.id);
   const add = () => {
     const ns = profileNodeSets[0]?.ref;
     if (!ns) return;
-    setEditing({ index: -1, chain: { id: `c_${Date.now().toString(36)}`, landing: { nodeSet: ns }, via: { kind: 'group', groupId: groupOptions[0]?.id ?? '' } } });
+    setSelection({ index: -1, chain: { id: `c_${Date.now().toString(36)}`, landing: { nodeSet: ns }, via: { kind: 'group', groupId: groupOptions[0]?.id ?? '' } } });
   };
   const commit = () => {
     if (!editing) return;
-    if (editing.index < 0) setDraft({ ...draft, chains: [...draft.chains, editing.chain] });
-    else setChain(editing.index, editing.chain);
-    setEditing(undefined);
+    const saved = structuredClone(editing.chain);
+    if (editing.index < 0) setDraft({ ...draft, chains: [...draft.chains, saved] });
+    else setChain(editing.index, saved);
+    setSelection(undefined);
   };
   const perRef = draft.refPolicy.perRef ?? {};
   const chainReport = (preview.data?.report ?? []).filter((r) =>
@@ -60,7 +63,7 @@ export function TabChains() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[13.5px] font-semibold">#{i + 1} · {nodeSetName(c.landing.nodeSet)}{c.landing.filter ? ` 中命中 ${c.landing.filter} 的节点` : ' 全部节点'}经由「{targetLabel(c.via, groupName, nodeSetName)}」</span>
                   <div className="flex gap-1.5">
-                    <Button size="sm" onClick={() => setEditing({ index: i, chain: c })}>编辑</Button>
+                    <Button size="sm" onClick={() => setSelection({ index: i, chain: c })}>编辑</Button>
                     <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除链规则 ${i + 1}`} onClick={() => setDraft({ ...draft, chains: draft.chains.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
                   </div>
                 </div>
@@ -107,10 +110,10 @@ export function TabChains() {
         )}
         {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-ink-muted">依赖节点不可用时拒绝连接。</p>}
       </Card>
-      <Dialog open={!!editing} onOpenChange={next => { if (!next) (() => setEditing(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{editing?.index === -1 ? '添加链规则' : `编辑链规则 #${(editing?.index ?? 0) + 1}`}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+      <Dialog open={!!selection} onOpenChange={next => { if (!next) setSelection(undefined); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{editing?.index === -1 ? '添加链规则' : `编辑链规则 #${(editing?.index ?? 0) + 1}`}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         {editing && (() => {
           const c = editing.chain;
-          const put = (chain: ChainRule) => setEditing({ ...editing, chain });
+          const put = (chain: ChainRule) => setEditing({ ...editing, chain: structuredClone(chain) });
           return <>
             <span className="text-[12.5px] font-medium text-ink-muted">落地（哪些节点经由前置出去）</span>
             <div className="grid grid-cols-2 gap-3">
@@ -123,7 +126,7 @@ export function TabChains() {
               <TargetPicker label="前置" value={c.via} onChange={(via) => put({ ...c, via })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
           </>;
         })()}
-      </div><DialogFooter>{<><Button onClick={() => setEditing(undefined)}>取消</Button><Button variant="primary" onClick={commit}>{editing?.index === -1 ? '添加' : '保存链规则'}</Button></>}</DialogFooter></DialogContent></Dialog>
+      </div><DialogFooter><Button onClick={() => setSelection(undefined)}>取消</Button><Button variant="primary" onClick={commit}>保存</Button></DialogFooter></DialogContent></Dialog>
     </>
   );
 }

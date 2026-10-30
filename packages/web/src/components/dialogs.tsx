@@ -6,16 +6,16 @@ import { NODE_SET_LABEL, sameNodeSet as same, nodeSetKey } from '../domain/nodeS
 import type { NodeSetID } from '@sub-forge/core';
 import { useEffect, useState } from 'react';
 import { Button, Empty, Input, } from './ui.tsx';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 
 export function RenameDialog({ open, title, name, onClose, onRename }: { open: boolean; title: string; name: string; onClose: () => void; onRename: (name: string) => void }) {
-  const [value, setValue] = useState(name);
-  useEffect(() => { if (open) setValue(name); }, [open, name]);
+  const [value, setValue] = useDialogDraft(open, name);
   const ok = !!value.trim() && value.trim() !== name;
   return (
     <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <label className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-ink-muted">名称</span>
         <Input autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && ok) { onRename(value.trim()); onClose(); } }} /></label>
-    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ok} onClick={() => { onRename(value.trim()); onClose(); }}>确定</Button></>}</DialogFooter></DialogContent></Dialog>
+    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ok} onClick={() => { onRename(value.trim()); onClose(); }}>保存</Button></>}</DialogFooter></DialogContent></Dialog>
   );
 }
 
@@ -38,7 +38,7 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
           const on = picked.some((p) => same(p, o.ref));
           return (
             <label key={nodeSetKey(o.ref)} className={`flex items-center gap-2.5 border-b border-line-2 px-3 py-2.5 last:border-0 ${isAdded ? 'text-faint' : 'cursor-pointer hover:bg-ground'}`}>
-              <input type="checkbox" disabled={isAdded} checked={on || isAdded} onChange={(e) => setPicked(e.target.checked ? [...picked, o.ref] : picked.filter((p) => !same(p, o.ref)))} />
+              <input type="checkbox" disabled={isAdded} checked={on || isAdded} onChange={(e) => setPicked(e.target.checked ? [...picked, structuredClone(o.ref)] : picked.filter((p) => !same(p, o.ref)))} />
               <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{o.name}</span>
               <span className="text-[12px] text-ink-muted">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>
             </label>
@@ -47,6 +47,6 @@ export function NodeSetPickerDialog({ open, title = '添加节点集', options, 
         {!shown.length && <div className="p-3"><Empty title={options.length ? '没有匹配的节点集' : '还没有可加入的节点集'} /></div>}
       </div>
       {hint && <span className="text-[12px] leading-relaxed text-ink-muted">{hint}</span>}
-    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); onClose(); }}>加入 {picked.length || ''} 个</Button></>}</DialogFooter></DialogContent></Dialog>
+    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(structuredClone(picked)); onClose(); }}>保存{picked.length ? `（${picked.length} 个）` : ''}</Button></>}</DialogFooter></DialogContent></Dialog>
   );
 }

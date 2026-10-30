@@ -9,6 +9,7 @@ import { OptionPageStatus, useOptionPages } from '../components/OptionPage.tsx';
 import { CodePreview } from '../components/CodePreview.tsx';
 import { HighlightedText } from '../components/HighlightedText.tsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleRepo, type RepoFilePreview } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
@@ -52,6 +53,7 @@ export function RuleRepoPage() {
   const [q, setQ] = useState(params.get('q') ?? '');
   const query = useDebouncedValue(q.trim(), 250);
   const [selected, setSelected] = useState<RepositoryFile>();
+  const [dialogFile] = useDialogDraft(!!selected, selected, selected ? `${selected.repo}:${selected.file.ref}:${selected.file.path}` : undefined);
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), refetchInterval: 3000 });
   const revision = repos.data?.repos.map(repo => `${repo.id}:${repo.builtAt}:${repo.enabled}:${repo.configRevision}`).join('|');
   const pending = q.trim() !== query;
@@ -59,8 +61,8 @@ export function RuleRepoPage() {
   useEffect(() => {
     if (selected && repos.data && !repos.data.repos.some(repo => repo.id === selected.repo && repo.enabled)) setSelected(undefined);
   }, [repos.data, selected]);
-  const preview = useQuery({ queryKey: ['rule-repos', 'file-preview', selected?.repo, selected?.file.ref, selected?.file.path, revision], enabled: !!selected, retry: false,
-    queryFn: () => api<{ item: RepoFilePreview }>('GET', `/rule-repos/file-preview?${new URLSearchParams({ repo: selected!.repo, ref: selected!.file.ref, path: selected!.file.path })}`).then(result => result.item),
+  const preview = useQuery({ queryKey: ['rule-repos', 'file-preview', dialogFile?.repo, dialogFile?.file.ref, dialogFile?.file.path, revision], enabled: !!selected, retry: false,
+    queryFn: () => api<{ item: RepoFilePreview }>('GET', `/rule-repos/file-preview?${new URLSearchParams({ repo: dialogFile!.repo, ref: dialogFile!.file.ref, path: dialogFile!.file.path })}`).then(result => result.item),
   });
   const create = useMutation({ meta: { successMessage: ruleset ? '规则文件已加入增强集合' : '增强集合已创建' },
     mutationFn: (file: RepoFilePreview) => api<{ item: { id: string } }>('POST', '/rule-repos/import', { repo: file.repo, path: file.entry, file: { ref: file.ref, path: file.path }, ...(ruleset ? { ruleset } : {}) }),
@@ -83,13 +85,13 @@ export function RuleRepoPage() {
       {!pending && repos.data && <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} onSelect={select} />}
     </section>
     <Dialog open={!!selected} onOpenChange={next => { if (!next) (() => setSelected(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"文件内容预览"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      {selected && <>
+      {dialogFile && <>
         <div className="flex shrink-0 flex-col gap-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="m-0 break-all text-[17px] font-semibold">{selected.file.path.split('/').at(-1)}</h2>
-            <Badge>分支：{selected.file.ref}</Badge>
+            <h2 className="m-0 break-all text-[17px] font-semibold">{dialogFile.file.path.split('/').at(-1)}</h2>
+            <Badge>分支：{dialogFile.file.ref}</Badge>
           </div>
-          <span className="break-all font-mono text-[12px] text-ink-muted">{repos.data?.repos.find(repo => repo.id === selected.repo)?.name ?? selected.repo} · {selected.file.path}</span>
+          <span className="break-all font-mono text-[12px] text-ink-muted">{repos.data?.repos.find(repo => repo.id === dialogFile.repo)?.name ?? dialogFile.repo} · {dialogFile.file.path}</span>
           {file && !preview.isFetching && !preview.isError && <div className="flex flex-wrap items-center gap-3 text-[12px]">
             <Badge>许可证 {file.license}</Badge><a href={file.upstream} target="_blank" rel="noreferrer" className="text-brand">打开原文件</a>
             <Button size="sm" variant="primary" disabled={create.isPending || file.entry === undefined} onClick={() => create.mutate(file)}>{create.isPending ? '创建中…' : ruleset ? '加入增强集合' : '新建增强集合'}</Button>

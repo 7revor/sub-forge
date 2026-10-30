@@ -1,8 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
 import type { GroupSpec, ReportItem } from '@sub-forge/core';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
+import { GroupAdvancedFields, GroupTypeField } from '../../components/GroupSettingsFields.tsx';
 import { DeleteDialog } from '../../components/DetailActions.tsx';
 import { memberLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
@@ -10,27 +10,38 @@ import { Button, Card, Empty, Field, Input, Switch, cx } from '../../components/
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
-import { removeGroup } from './model.ts';
+import { draftIssues, removeGroup } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
+import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
 
 const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_56px_64px]';
 
-function SettingsSection({ readOnly, children }: { readOnly: boolean; children: ReactNode }) {
-  return readOnly ? <details className="flex flex-col gap-4"><summary className="cursor-pointer text-[13px] text-ink-muted">模板组设置 · 只读</summary>{children}</details> : <>{children}</>;
-}
-
-export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report, readOnly = false, saveHint = '保存模板后生效', renderMembers, memberSummary, nodeSetName = ref => ref.id }: {
+export function TemplateGroupsEditor({ value, onChange, selected, onSelect, report, readOnly = false, saveHint = '保存模板后生效', renderMembers, renderAdvanced, onSave, memberSummary, nodeSetName = ref => ref.id }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; report: ReportItem[];
-  readOnly?: boolean; saveHint?: string; renderMembers?: (group: GroupSpec) => ReactNode; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
+  readOnly?: boolean; saveHint?: string; renderMembers?: (group: GroupSpec, update: (patch: Partial<GroupSpec>) => void) => ReactNode; renderAdvanced?: (group: GroupSpec, update: (patch: Partial<GroupSpec>) => void) => ReactNode; onSave?: (group: GroupSpec) => void; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
 }) {
   const [deleting, setDeleting] = useState<string>();
+  const [newGroup, setNewGroup] = useState<GroupSpec>();
   const deletingGroup = value.groups.find(g => g.id === deleting);
-  const group = value.groups.find(g => g.id === selected);
+  const source = value.groups.find(g => g.id === selected) ?? (newGroup?.id === selected ? newGroup : undefined);
+  const open = !!selected && !!source && !deletingGroup;
+  const [group, setGroup] = useDialogDraft(open, source, selected);
+  const [advanced, setAdvanced] = useDialogDraft(open, false, selected);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (patch: Partial<GroupSpec>) => {
-    if (group) onChange({ ...value, groups: value.groups.map(g => g.id === group.id ? { ...g, ...patch } : g) });
+    setGroup(current => current ? { ...current, ...structuredClone(patch) } : current);
   };
   const close = () => { onSelect(undefined); setDeleting(undefined); };
+  const dialogReport = group ? draftIssues({ ...value, groups: value.groups.some(g => g.id === group.id) ? value.groups.map(g => g.id === group.id ? group : g) : [...value.groups, group] }) : [];
+  const save = () => {
+    if (!group) return;
+    if (!readOnly) {
+      const saved = structuredClone(group);
+      onChange({ ...value, groups: value.groups.some(g => g.id === saved.id) ? value.groups.map(g => g.id === saved.id ? saved : g) : [...value.groups, saved] });
+    }
+    onSave?.(structuredClone(group));
+    close();
+  };
   const references = deletingGroup ? value.groups.filter(g => g.id !== deletingGroup.id && g.members.some(m => m.kind === 'group' && m.groupId === deletingGroup.id)).length : 0;
   const rules = deletingGroup ? value.rules.filter(r => r.target.kind === 'group' && r.target.groupId === deletingGroup.id).length : 0;
   const final = deletingGroup && value.final.kind === 'group' && value.final.groupId === deletingGroup.id;
@@ -42,7 +53,7 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
       }}>添加地区节点</Button>
       <Button size="sm" onClick={() => {
         const id = newId('g');
-        onChange({ ...value, groups: [...value.groups, { id, name: '新策略组', type: 'select', members: [] }] });
+        setNewGroup({ id, name: '新策略组', type: 'select', members: [] });
         onSelect(id);
       }}><Plus size={14} />新增组</Button>
     </>}>
@@ -68,23 +79,16 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
         }} />
       </>}
     </Card>
-    <Dialog open={!!group && !deletingGroup} onOpenChange={next => { if (!next) (close)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <Dialog open={open} onOpenChange={next => { if (!next) close(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       {group && <>
-        <ItemIssues report={report} where={`group:${group.id}`} />
-        <SettingsSection readOnly={readOnly}>
+        <ItemIssues report={dialogReport} where={`group:${group.id}`} />
         <fieldset disabled={readOnly} className="m-0 contents border-0 p-0">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="组名称">{id => <Input id={id} value={group.name} onChange={e => update({ name: e.target.value })} />}</Field>
-          <GroupSettingsFields value={group} onChange={(key, next) => update({ [key]: next })} />
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
-          <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
-          <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
+          <GroupTypeField value={group} onChange={(key, next) => update({ [key]: next })} />
         </div>
         </fieldset>
-        </SettingsSection>
-        {renderMembers ? renderMembers(group) : <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
+        {renderMembers ? renderMembers(group, update) : <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-ink-muted">{group.members.length} 个</span></h3>
             <TemplateTargetSelect action label="添加成员" value={undefined} groups={value.groups.filter(g => g.id !== group.id)} onChange={member => update({ members: [...group.members, member] })} />
           </div>
@@ -95,8 +99,23 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
             </div>} />
           </div>}
         </section>}
+        <details open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)} className="group border-t border-line-2 pt-3.5">
+          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm text-[13.5px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
+            <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-ink-muted transition-transform group-open:rotate-90" />
+            高级设置{readOnly && <span className="ml-auto text-[12px] font-normal text-ink-muted">模板组设置 · 只读</span>}
+          </summary>
+          <div className="flex flex-col gap-4 pt-4">
+            <fieldset disabled={readOnly} className="m-0 grid grid-cols-1 gap-4 border-0 p-0 sm:grid-cols-2">
+              <GroupAdvancedFields value={group} onChange={(key, next) => update({ [key]: next })} />
+              <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
+              <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
+              <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
+            </fieldset>
+            {renderAdvanced?.(group, update)}
+          </div>
+        </details>
       </>}
-    </div><DialogFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button variant="primary" onClick={close}>完成</Button></>}</DialogFooter></DialogContent></Dialog>
+    </div><DialogFooter><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={close}>取消</Button><Button variant="primary" disabled={!group?.name.trim()} onClick={save}>保存</Button></DialogFooter></DialogContent></Dialog>
     <DeleteDialog open={!!deletingGroup} title={`删除策略组「${deletingGroup?.name || '未命名组'}」？`} onClose={() => setDeleting(undefined)} onConfirm={() => {
       if (!deletingGroup) return;
       onChange(removeGroup(value, deletingGroup.id));

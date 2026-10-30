@@ -5,22 +5,24 @@ import { useRulesetSources } from '../hooks/useRulesetSources.ts';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches } from '../hooks/useRepositoryUrlMatches.ts';
 import { RulesetPreview } from './RulesetPreview.tsx';
 import { Button, Field, FieldError, Input, buttonClass } from './ui.tsx';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 
 type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
 function RemoteRuleDialog({ open, value, onSelect, onClose }: { open: boolean; value?: string; onSelect: (matcher: RuleSetMatcher) => void; onClose: () => void }) {
-  const [url, setUrl] = useState(value ?? '');
+  const [url, setUrl] = useDialogDraft(open, value ?? '');
+  const [repositoryMatcher, setRepositoryMatcher] = useDialogDraft<RuleSetMatcher | undefined>(open, undefined);
   let matcher: RuleSetMatcher | undefined;
   let error: string | undefined;
   try { matcher = remoteRuleMatcher(url); } catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
   const [previewUrl, setPreviewUrl] = useState<string>();
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState<string>();
-  useEffect(() => { if (open) { setUrl(value ?? ''); setPreviewUrl(undefined); setLinkError(undefined); } }, [open, value]);
+  useEffect(() => { if (open) { setPreviewUrl(undefined); setLinkError(undefined); } }, [open]);
   const repositoryMatches = useRepositoryUrlMatches(open && matcher?.remote ? [matcher.remote.url] : []);
   const source = { id: 'remote', kind: 'remote' as const, format: 'auto' as const, url: previewUrl };
   const loaded = useRulesetSources(undefined, previewUrl ? { id: '', name: '', sources: [source] } : undefined);
-  return <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"远程链接"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-    <Field label="规则地址">{id => <Input id={id} type="url" disabled={linking} value={url} placeholder="https://example.com/rules.yaml" onChange={e => { setUrl(e.target.value); setPreviewUrl(undefined); setLinkError(undefined); }} />}</Field>
+  return <Dialog open={open} onOpenChange={next => { if (!next && !linking) onClose(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"远程链接"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <Field label="规则地址">{id => <Input id={id} type="url" disabled={linking} value={url} placeholder="https://example.com/rules.yaml" onChange={e => { setUrl(e.target.value); setRepositoryMatcher(undefined); setPreviewUrl(undefined); setLinkError(undefined); }} />}</Field>
     <p className="m-0 text-[13px] text-ink-muted">直接引用自己或第三方维护的规则，自动识别格式并输出 .list。</p>
     {url && error && <FieldError error={error} />}
     {linkError && <FieldError error={linkError} />}
@@ -29,14 +31,15 @@ function RemoteRuleDialog({ open, value, onSelect, onClose }: { open: boolean; v
       <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
       <Button size="sm" disabled={linking} onClick={async () => {
         setLinking(true); setLinkError(undefined);
-        try { onSelect(await resolveRepositoryUrlMatch(matcher.remote!.url, match)); onClose(); }
+        try { setRepositoryMatcher(structuredClone(await resolveRepositoryUrlMatch(matcher.remote!.url, match))); }
         catch (cause) { setLinkError(cause instanceof Error ? cause.message : String(cause)); }
         finally { setLinking(false); }
-      }}>引用仓库文件</Button>
+      }}>选择仓库文件</Button>
     </div>)}
+    {repositoryMatcher && <span className="text-[12.5px] text-ink-muted">已选择仓库文件，保存后加入规则。</span>}
     <div><Button disabled={!matcher || loaded.reading && !!previewUrl} onClick={() => { if (matcher) setPreviewUrl(matcher.remote!.url); }}>读取并预览</Button></div>
     {previewUrl && <RulesetPreview key={previewUrl} inputs={loaded.inputs} ready={loaded.ready} overrides={undefined} sourceError={loaded.error} sourceNames={{ remote: '远程规则' }} sourceReading={loaded.reading} onRefreshSources={loaded.refresh} />}
-  </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!matcher || linking} onClick={() => { if (matcher) { onSelect(matcher); onClose(); } }}>使用此地址</Button></>}</DialogFooter></DialogContent></Dialog>;
+  </div><DialogFooter>{<><Button disabled={linking} onClick={onClose}>取消</Button><Button variant="primary" disabled={!matcher || linking} onClick={() => { if (matcher) { onSelect(structuredClone(repositoryMatcher ?? matcher)); onClose(); } }}>保存</Button></>}</DialogFooter></DialogContent></Dialog>;
 }
 export function RemoteRulePicker({ value, label = '引用远程 URL', id, ariaLabel, triggerClassName, onSelect }: {
   value?: string; label?: string; id?: string; ariaLabel?: string; triggerClassName?: string; onSelect: (matcher: RuleSetMatcher) => void;

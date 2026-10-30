@@ -1,5 +1,5 @@
 // 订阅与模板使用同一套列表和弹窗；订阅补充节点成员与独立规则出口。
-import type { GroupSpec, RuleEntry } from '@sub-forge/core';
+import type { GroupMember, GroupSpec, RuleEntry } from '@sub-forge/core';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ClientOverrides } from '../../components/ClientOverrides.tsx';
@@ -15,6 +15,7 @@ import { TemplateRulesEditor } from '../template/TemplateRulesEditor.tsx';
 import { draftIssues } from '../template/model.ts';
 import { useProfile } from './context.ts';
 import { MemberAdder } from './MemberAdder.tsx';
+import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
 
 function useRoutingBody() {
   const { draft, setDraft, template } = useProfile();
@@ -27,15 +28,13 @@ function useRoutingBody() {
   return { body, update, bound };
 }
 
-function GroupMembers({ group }: { group: GroupSpec }) {
-  const { draft, setDraft, groupName, nodeSetName } = useProfile();
+function GroupMembers({ group, update, additions, setAdditions }: { group: GroupSpec; update: (patch: Partial<GroupSpec>) => void; additions: GroupMember[]; setAdditions: (members: GroupMember[]) => void }) {
+  const { draft, groupName, nodeSetName } = useProfile();
   const routing = draft.routing!;
   const bound = routing.mode === 'bound';
-  const members = bound ? routing.groupAdditions[group.id] ?? [] : group.members;
+  const members = bound ? additions : group.members;
   const inherited = bound ? group.members : [];
-  const setMembers = (members: GroupSpec['members']) => setDraft({ ...draft, routing: routing.mode === 'bound'
-    ? { ...routing, groupAdditions: { ...routing.groupAdditions, [group.id]: members } }
-    : { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, members } : g) } } });
+  const setMembers = (members: GroupSpec['members']) => bound ? setAdditions(structuredClone(members)) : update({ members });
   const refs = [...new Map([...inherited, ...members].flatMap(m => m.kind === 'nodeset' ? [[`${m.ref.type}:${m.ref.id}`, m.ref] as const] : [])).values()];
   return <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
     {inherited.length > 0 && <div className="flex flex-col gap-2"><span className="text-[12px] text-ink-muted">模板成员</span>{inherited.map((m, i) => <div key={i} className="flex items-center gap-2 text-[13px]"><Badge>模板</Badge>{memberLabel(m, groupName, nodeSetName).text}</div>)}</div>}
@@ -47,24 +46,32 @@ function GroupMembers({ group }: { group: GroupSpec }) {
     </div>} /></div> : <Empty title={bound ? '尚未填充节点' : '还没有成员'} />}
     <MemberAdder key={group.id} excludeGroupId={group.id} onAdd={m => setMembers([...members, m])} />
     {refs.map(ref => <div key={`${ref.type}:${ref.id}`} className="flex flex-col gap-2"><span className="text-[12px] text-ink-muted">{nodeSetName(ref)}</span><MatchPreview nodeSet={ref} filter={group.filter} excludeFilter={group.excludeFilter} excludeType={group.excludeType} /></div>)}
-    {!bound && <details className="text-[13px]"><summary className="cursor-pointer text-ink-muted">更多组设置</summary><div className="mt-3 flex flex-col gap-3">
-      <Field label="图标地址">{id => <Input id={id} value={group.display?.icon ?? ''} onChange={e => { if (routing.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, display: { ...g.display, icon: e.target.value || undefined } } : g) } } }); }} />}</Field>
-      <ExtraFields value={group.extra ?? {}} validateName={name => name === 'empty-fallback' ? '空组固定使用 REJECT' : undefined} onChange={extra => { if (routing.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config: { ...routing.config, groups: routing.config.groups.map(g => g.id === group.id ? { ...g, extra } : g) } } }); }} />
-    </div></details>}
   </section>;
 }
 
+function GroupExtraSettings({ group, update }: { group: GroupSpec; update: (patch: Partial<GroupSpec>) => void }) {
+  const { draft } = useProfile();
+  const routing = draft.routing!;
+  return routing.mode === 'independent' ? <div className="flex flex-col gap-3">
+      <Field label="图标地址">{id => <Input id={id} value={group.display?.icon ?? ''} onChange={e => update({ display: { ...group.display, icon: e.target.value || undefined } })} />}</Field>
+      <ExtraFields value={group.extra ?? {}} validateName={name => name === 'empty-fallback' ? '空组固定使用 REJECT' : undefined} onChange={extra => update({ extra })} />
+    </div> : null;
+}
+
 export function ProfileGroupsEditor() {
-  const { draft, template, groupName, nodeSetName } = useProfile();
+  const { draft, setDraft, template, groupName, nodeSetName } = useProfile();
   const { body, update, bound } = useRoutingBody();
   const [selected, setSelected] = useState<string>();
+  const [additions, setAdditions] = useDialogDraft<GroupMember[]>(!!selected, draft.routing?.mode === 'bound' && selected ? draft.routing.groupAdditions[selected] ?? [] : [], selected);
   return <>
     {bound && <p className="m-0 text-[13px] text-ink-muted">策略组结构跟随 <Link className="text-brand" to={`/templates/${template?.id}`}>{template?.name ?? '模板'}</Link>。点击编辑，为各组填充本订阅的节点。</p>}
     <TemplateGroupsEditor value={body} onChange={update} selected={selected} onSelect={setSelected} report={draftIssues(body)} readOnly={bound} saveHint="保存订阅后生效" nodeSetName={nodeSetName}
       memberSummary={group => {
         const additions = draft.routing?.mode === 'bound' ? draft.routing.groupAdditions[group.id] ?? [] : [];
         return [...group.members, ...additions].map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '尚未添加成员';
-      }} renderMembers={group => <GroupMembers group={group} />} />
+      }} renderMembers={(group, update) => <GroupMembers group={group} update={update} additions={additions} setAdditions={setAdditions} />}
+      renderAdvanced={(group, update) => <GroupExtraSettings group={group} update={update} />}
+      onSave={group => { if (draft.routing?.mode === 'bound') setDraft({ ...draft, routing: { ...draft.routing, groupAdditions: { ...draft.routing.groupAdditions, [group.id]: structuredClone(additions) } } }); }} />
   </>;
 }
 

@@ -29,10 +29,11 @@ export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则�
   return <RuleOptionPicker id={id} label={busy ? '正在读取…' : label} ariaLabel={ariaLabel} disabled={busy} scope={scope}
     triggerClassName={triggerClassName} triggerIcon={triggerIcon}
     onSelect={async selection => {
+      const select = currentSelect.current;
       setBusy(true);
       try {
         const result = await api<{ matcher: RuleSetMatcher }>('POST', '/rule-options/resolve', selection);
-        if (alive.current) currentSelect.current(result.matcher);
+        if (alive.current) select(result.matcher);
       } catch (error) { if (alive.current) alertError(error); }
       finally { if (alive.current) setBusy(false); }
     }} />;

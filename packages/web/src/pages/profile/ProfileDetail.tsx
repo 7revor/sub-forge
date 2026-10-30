@@ -102,8 +102,8 @@ export function ProfileDetail() {
 
       </PageScroll>
       <Dialog open={tplOpen} onOpenChange={next => { if (!next) (() => setTplOpen(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"模板关联"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-        <TemplateCard bare />
-      </div><DialogFooter>{<Button variant="primary" onClick={() => setTplOpen(false)}>完成</Button>}</DialogFooter></DialogContent></Dialog>
+        <TemplateCard bare open={tplOpen} onDone={() => setTplOpen(false)} />
+      </div><DialogFooter>{<Button onClick={() => setTplOpen(false)}>取消</Button>}</DialogFooter></DialogContent></Dialog>
     </ProfileContext.Provider>
   );
 }

@@ -15,6 +15,8 @@ import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
+import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
+import { draftIssues } from './model.ts';
 
 const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(100px,10vw,140px)_64px]';
 
@@ -58,6 +60,10 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   const [linkError, setLinkError] = useState<string>();
   const [linkingRule, setLinkingRule] = useState<string>();
   const [adding, setAdding] = useState(false);
+  const [reference, setReference] = useDialogDraft<Matcher | undefined>(adding, undefined);
+  const [newRule, setNewRule] = useState<RuleEntry>();
+  const [editingId, setEditingId] = useState(selected);
+  if (selected && selected !== editingId) setEditingId(selected);
   const currentValue = useRef(value);
   currentValue.current = value;
   const remoteUrls = readOnly ? [] : value.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
@@ -65,18 +71,34 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
   const repositories = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: value.rules.some(r => r.matcher.kind === 'ruleset' && !!r.matcher.repository) });
   const repos = repositories.data?.repos ?? [];
   const [preview, setPreview] = useState<Matcher>();
-  const rule = value.rules.find(r => r.id === selected);
+  const sourceRule = value.rules.find(r => r.id === selected) ?? (newRule?.id === selected ? newRule : undefined);
+  const editing = !!sourceRule || selected === 'final';
+  const [draftLinkError, setDraftLinkError] = useDialogDraft<string | undefined>(editing, undefined, selected);
+  const [draftLinking, setDraftLinking] = useDialogDraft(editing, false, selected);
+  const [dialogValue, setDialogValue] = useDialogDraft(editing, sourceRule && !value.rules.some(r => r.id === sourceRule.id) ? { ...value, rules: [...value.rules, sourceRule] } : value, selected);
+  const rule = dialogValue.rules.find(r => r.id === editingId);
+  const dialogReport = draftIssues(dialogValue);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
-  const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
+  const update = (rule: RuleEntry) => setDialogValue(current => ({ ...current, rules: current.rules.map(r => r.id === rule.id ? structuredClone(rule) : r) }));
   const close = () => {
-    if (rule) onRuleValidationReady(rule.id, true);
     onSelect(undefined);
+  };
+  const save = () => {
+    if (rule) {
+      const saved = structuredClone(rule);
+      const previous = value.rules.find(r => r.id === saved.id);
+      const previousUrl = previous?.matcher.kind === 'ruleset' ? previous.matcher.remote?.url : undefined;
+      const rules = previous ? value.rules.map(r => r.id === saved.id ? saved : r) : [...value.rules, saved];
+      onChange({ ...value, rules, ...(previousUrl && value.ruleProviders ? { ruleProviders: value.ruleProviders.filter(provider => provider.url !== previousUrl || rules.some(r => r.matcher.kind === 'ruleset' && r.matcher.remote?.url === previousUrl)) } : {}) });
+      onRuleValidationReady(rule.id, true);
+    } else onChange({ ...value, final: structuredClone(dialogValue.final) });
+    close();
   };
   const add = (matcher: Matcher) => {
     const id = newId('r');
-    if (matcher.kind === 'rule') onRuleValidationReady(id, false);
-    onChange({ ...value, rules: [...value.rules, { id, matcher, target: value.final }] });
-    if (matcher.kind === 'rule') onSelect(id);
+    const added = { id, matcher: structuredClone(matcher), target: structuredClone(value.final) };
+    if (matcher.kind === 'rule') { setNewRule(added); onSelect(id); }
+    else onChange({ ...value, rules: [...value.rules, added] });
   };
   const changeRule = (next: RuleIR) => {
     if (rule?.matcher.kind !== 'rule') return;
@@ -100,6 +122,20 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
     } catch (error) { setLinkError(error instanceof Error ? error.message : String(error)); }
     finally { setLinkingRule(undefined); }
   };
+  const linkDraftRepository = async (ruleId: string, url: string, match: RepositoryUrlMatch) => {
+    setDraftLinking(true); setDraftLinkError(undefined);
+    try {
+      const matcher = await resolveRepositoryUrlMatch(url, match);
+      setDialogValue(current => ({ ...current, rules: current.rules.map(r => {
+        if (r.id !== ruleId || r.matcher.kind !== 'ruleset' || r.matcher.remote?.url !== url) return r;
+        const { providerName: _providerName, ...rest } = r;
+        return { ...rest, matcher };
+      }), ...(current.ruleProviders ? { ruleProviders: current.ruleProviders.filter(p => p.url !== url || current.rules.some(r => r.id !== ruleId && r.matcher.kind === 'ruleset' && r.matcher.remote?.url === url)) } : {}) }));
+    } catch (error) { setDraftLinkError(error instanceof Error ? error.message : String(error)); }
+    finally { setDraftLinking(false); }
+  };
+  const draftRemoteUrls = editing && rule?.matcher.kind === 'ruleset' && rule.matcher.remote ? [rule.matcher.remote.url] : [];
+  const draftRepositoryMatches = useRepositoryUrlMatches(draftRemoteUrls);
   return <>
     <Card title={title} subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={!readOnly && <>
       <Button size="sm" aria-label="添加静态规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />静态规则</Button>
@@ -134,28 +170,31 @@ export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, 
       </div>}
     </Card>
     <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"引用规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" onSelect={matcher => { add(matcher); setAdding(false); }} />}</Field>
-    </div><DialogFooter>{<Button onClick={() => setAdding(false)}>取消</Button>}</DialogFooter></DialogContent></Dialog>
-    <Dialog open={!!rule || selected === 'final'} onOpenChange={next => { if (!next) (close)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{rule ? `编辑第 ${value.rules.indexOf(rule) + 1} 条规则` : 'MATCH 出口'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+      <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" onSelect={matcher => setReference(structuredClone(matcher))} />}</Field>
+      {reference && <RuleMatcher matcher={reference} ctx={ctx} repos={repos} />}
+    </div><DialogFooter><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={!reference} onClick={() => { if (reference) { add(reference); setAdding(false); } }}>保存</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={editing} onOpenChange={next => { if (!next) close(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{rule ? `编辑第 ${dialogValue.rules.findIndex(r => r.id === rule.id) + 1} 条规则` : 'MATCH 出口'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       {rule ? <>
-        <ItemIssues report={report} where={`rule:${rule.id}`} />
-        <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}>
+        <ItemIssues report={dialogReport} where={`rule:${rule.id}`} />
+        <div className="contents">
           <MatcherEditor fixedKind={staticOnly} value={rule.matcher} rulesets={ctx.rulesets}
             ruleValue={rule.matcher.kind === 'rule' ? withIpOptions(rule.matcher.rule, rule.options ?? {}) : undefined}
             onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} />
         </div>
-        {rule.matcher.kind === 'ruleset' && rule.matcher.remote && repositoryMatches.matches[rule.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="flex flex-wrap items-center gap-2 rounded border border-line bg-ground px-3 py-2 text-[12.5px]">
+        {draftLinkError && <FieldError error={draftLinkError} />}
+        {draftRepositoryMatches.error && <ErrorAlert error={draftRepositoryMatches.error} />}
+        {rule.matcher.kind === 'ruleset' && rule.matcher.remote && draftRepositoryMatches.matches[rule.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="flex flex-wrap items-center gap-2 rounded border border-line bg-ground px-3 py-2 text-[12.5px]">
           <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
-          <Button size="sm" disabled={!!linkingRule} onClick={() => void linkRepository(rule.id, rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : '', match)}>关联仓库文件</Button>
+          <Button size="sm" disabled={draftLinking} onClick={() => void linkDraftRepository(rule.id, rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : '', match)}>关联仓库文件</Button>
         </div>)}
         <Field label="出口">{() => renderTarget ? renderTarget(rule.target, target => update({ ...rule, target })) : <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={target => update({ ...rule, target })} />}</Field>
         {renderOptions?.(rule, update)}
       </> : <>
         <span className="text-[13px] text-ink-muted">以上规则均未匹配时使用。</span>
-        {renderTarget ? renderTarget(value.final, final => onChange({ ...value, final })) : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}
-        <ItemIssues report={report} where="final" />
+        {renderTarget ? renderTarget(dialogValue.final, final => setDialogValue(current => ({ ...current, final: structuredClone(final) }))) : <TemplateTargetSelect label="MATCH 出口" value={dialogValue.final} groups={dialogValue.groups} onChange={final => setDialogValue(current => ({ ...current, final: structuredClone(final) }))} />}
+        <ItemIssues report={dialogReport} where="final" />
       </>}
-    </div><DialogFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button variant="primary" onClick={close}>完成</Button></>}</DialogFooter></DialogContent></Dialog>
+    </div><DialogFooter><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={close}>取消</Button><Button variant="primary" disabled={draftLinking || dialogReport.some(item => item.level === 'error' && item.where === (rule ? `rule:${rule.id}` : 'final'))} onClick={save}>保存</Button></DialogFooter></DialogContent></Dialog>
     <RuleSourcePreview matcher={preview} onClose={() => setPreview(undefined)} />
   </>;
 }

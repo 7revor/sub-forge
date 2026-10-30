@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, PendingNotice, Select, Switch, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
+import { useDialogDraft } from '../hooks/useDialogDraft.ts';
 
 /** 用户（设计稿「管理员 · 用户」）：用户表与共享的订阅源 / 组合 */
 export function Users() {
@@ -21,18 +22,19 @@ export function Users() {
   const refresh = () => qc.invalidateQueries({ queryKey: ['users'] });
   const patch = useMutation({ meta: { successMessage: '用户已更新' }, mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => api('PATCH', `/users/${id}`, body), onSuccess: refresh });
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ username: '', password: '', role: 'user' as User['role'], scriptAllowed: false });
+  const [form, setForm] = useDialogDraft(creating, { username: '', password: '', role: 'user' as User['role'], scriptAllowed: false });
   const create = useMutation({ meta: { successMessage: '用户已创建' },
     mutationFn: async () => {
       const { user } = await api<{ user: User }>('POST', '/users', { username: form.username, password: form.password, role: form.role });
       if (form.scriptAllowed && form.role !== 'admin') await api('PATCH', `/users/${user.id}`, { scriptAllowed: true });
     },
-    onSuccess: () => { setCreating(false); setForm({ username: '', password: '', role: 'user', scriptAllowed: false }); void refresh(); },
+    onSuccess: () => { setCreating(false); void refresh(); },
   });
   const [resetting, setResetting] = useState<User>();
-  const [newPass, setNewPass] = useState('');
+  const [resetUser] = useDialogDraft(!!resetting, resetting, resetting?.id);
+  const [newPass, setNewPass] = useDialogDraft(!!resetting, '', resetting?.id);
   const [sharing, setSharing] = useState(false);
-  const [share, setShare] = useState<{ doc: string; to: string[] }>({ doc: '', to: [] });
+  const [share, setShare] = useDialogDraft<{ doc: string; to: string[] }>(sharing, { doc: '', to: [] });
   const addShare = useMutation({ meta: { successMessage: '共享已添加' },
     mutationFn: () => { const [kind, docId] = share.doc.split(':'); return api('POST', '/shares', { kind, id: docId, to: share.to }); },
     onSuccess: () => { setSharing(false); void qc.invalidateQueries({ queryKey: ['shares'] }); },
@@ -69,7 +71,7 @@ export function Users() {
                     <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
                     <td className={td}>
                       <div className="flex justify-end gap-1.5">
-                        <Button size="sm" onClick={() => { setResetting(u); setNewPass(''); }}>重置密码</Button>
+                        <Button size="sm" onClick={() => setResetting(u)}>重置密码</Button>
                         {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
                       </div>
                     </td>
@@ -82,7 +84,7 @@ export function Users() {
         </Card>
 
         <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}
-          actions={<Button onClick={() => { setShare({ doc: '', to: [] }); setSharing(true); }}>共享…</Button>}>
+          actions={<Button onClick={() => setSharing(true)}>共享…</Button>}>
           {shares.data?.pending && <div className="mb-3"><PendingNotice>共享暂不可用。</PendingNotice></div>}
           <div className="flex flex-col">
             {(shares.data?.items ?? []).map((x) => (
@@ -106,7 +108,7 @@ export function Users() {
         <ErrorAlert error={create.error} />
       </div><DialogFooter>{<><Button onClick={() => setCreating(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建'}</Button></>}</DialogFooter></DialogContent></Dialog>
 
-      <Dialog open={!!resetting} onOpenChange={next => { if (!next) (() => setResetting(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{`重置 ${resetting?.username ?? ''} 的密码`}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+      <Dialog open={!!resetting} onOpenChange={next => { if (!next) (() => setResetting(undefined))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{`重置 ${resetUser?.username ?? ''} 的密码`}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         <Field label="新密码" hint="至少 8 位；该用户的所有登录会失效">{(id) => <Input id={id} type="password" autoComplete="new-password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />}</Field>
       </div><DialogFooter>{<><Button onClick={() => setResetting(undefined)}>取消</Button><Button variant="primary" disabled={newPass.length < 8 || patch.isPending} onClick={() => resetting && patch.mutate({ id: resetting.id, body: { password: newPass } }, { onSuccess: () => setResetting(undefined) })}>重置</Button></>}</DialogFooter></DialogContent></Dialog>
 

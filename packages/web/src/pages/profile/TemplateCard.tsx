@@ -8,19 +8,30 @@ import { Badge, Button, ErrorAlert, Field, Select, cx } from '../../components/u
 import { useTemplates, type ProfileDoc } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { boundTemplateId, persistedProfile } from './routing.ts';
+import { useDialogDraft } from '../../hooks/useDialogDraft.ts';
 
 type Conversion = { item: ProfileDoc; changes: string[] };
 
-function AssociationEditor({ onDone }: { onDone?: () => void }) {
-  const { draft, setDraft, template, groups } = useProfile();
+function AssociationEditor({ open, onDone }: { open: boolean; onDone?: () => void }) {
+  const { draft, template } = useProfile();
+  const loaded = !boundTemplateId(draft) || !!template;
+  const [ready, setReady] = useDialogDraft(open, loaded);
+  if (open && !ready && loaded) setReady(true);
+  // 等关联模板读取完成后再创建快照；一旦开始编辑，保存及退场不再替换内容。
+  return ready ? <AssociationDraft open={open} onDone={onDone} /> : <p role="status" className="m-0 text-[13px] text-ink-muted">正在加载关联模板…</p>;
+}
+
+function AssociationDraft({ open, onDone }: { open: boolean; onDone?: () => void }) {
+  const { draft: sourceDraft, setDraft, template: sourceTemplate, groups: sourceGroups } = useProfile();
+  const [{ draft, template, groups }] = useDialogDraft(open, { draft: sourceDraft, template: sourceTemplate, groups: sourceGroups });
   const templates = useTemplates();
   const currentId = boundTemplateId(draft);
-  const [selected, setSelected] = useState(currentId ?? '');
-  const [mode, setMode] = useState<'bound' | 'copy'>('bound');
-  const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [staged, setStaged] = useState<Conversion>();
+  const [selected, setSelected] = useDialogDraft(open, boundTemplateId(sourceDraft) ?? '');
+  const [mode, setMode] = useDialogDraft<'bound' | 'copy'>(open, 'bound');
+  const [mapping, setMapping] = useDialogDraft<Record<string, string>>(open, {});
+  const [staged, setStaged] = useDialogDraft<Conversion | undefined>(open, undefined);
   const target = templates.data?.find(t => t.id === selected);
-  const apply = (item: ProfileDoc) => { setDraft(item); setStaged(undefined); onDone?.(); };
+  const apply = (item: ProfileDoc) => { setDraft(structuredClone(item)); onDone?.(); };
   const change = useMutation({
     mutationFn: async (action: 'bound' | 'copy' | 'detach') => {
       // 转换接口复用完整文档校验；临时名称仅用于检查，不写入订阅草稿。
@@ -36,11 +47,9 @@ function AssociationEditor({ onDone }: { onDone?: () => void }) {
       const independent = await api<Conversion>('POST', '/profiles/routing/convert', { profile: bound.item, mode: 'independent' });
       return { ...independent, changes: [...bound.changes, ...independent.changes] };
     },
-    onSuccess: converted => {
-      const result = { ...converted, item: { ...converted.item, name: draft.name } };
-      if (!groups.length && !draft.chains.length && draft.routing?.mode === 'independent' && !draft.routing.config.rules.length) apply(result.item);
-      else setStaged(result);
-    },
+  });
+  const check = (action: 'bound' | 'copy' | 'detach') => change.mutate(action, {
+    onSuccess: converted => setStaged({ ...converted, item: { ...converted.item, name: draft.name } }),
   });
   const reset = () => { setStaged(undefined); change.reset(); };
   return <div className="flex flex-col gap-4">
@@ -65,24 +74,25 @@ function AssociationEditor({ onDone }: { onDone?: () => void }) {
       </Select>}</Field>)}</div>
     </details>}
     {!staged && <div className="flex flex-wrap justify-end gap-2">
-      {currentId && <Button disabled={change.isPending || !template} onClick={() => change.mutate('detach')}>解除关联，保留当前配置</Button>}
-      <Button variant="primary" disabled={change.isPending || !target || (mode === 'bound' && selected === currentId)} onClick={() => change.mutate(mode)}>{change.isPending ? '正在检查…' : groups.length ? '检查变更' : '使用此模板'}</Button>
+      {currentId && <Button disabled={change.isPending || !template} onClick={() => check('detach')}>解除关联，保留当前配置</Button>}
+      <Button variant="primary" disabled={change.isPending || !target || (mode === 'bound' && selected === currentId)} onClick={() => check(mode)}>{change.isPending ? '正在检查…' : groups.length ? '检查变更' : '使用此模板'}</Button>
     </div>}
     {staged && <div className="flex flex-col gap-3 rounded-lg border border-line bg-ground p-3">
       <strong className="text-[13px]">{staged.item.routing?.mode === 'bound' ? '将跟随所选模板更新' : '将改为独立维护'}</strong>
       <ul className="m-0 pl-5 text-[13px] leading-relaxed">{staged.changes.map((s, i) => <li key={i}>{s}</li>)}</ul>
       <p className="m-0 text-[12px] text-ink-muted">应用后可继续检查和编辑，保存订阅后生效。</p>
-      <div className="flex gap-2"><Button variant="primary" onClick={() => apply(staged.item)}>应用变更</Button><Button onClick={() => setStaged(undefined)}>取消变更</Button></div>
+      <div className="flex gap-2"><Button variant="primary" onClick={() => apply(staged.item)}>保存</Button><Button onClick={() => setStaged(undefined)}>取消变更</Button></div>
     </div>}
   </div>;
 }
 
-export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
+export function TemplateCard({ bare = false, open: parentOpen = true, onDone }: { bare?: boolean; open?: boolean; onDone?: () => void } = {}) {
   const { draft, template } = useProfile();
   const [open, setOpen] = useState(false);
   const currentId = boundTemplateId(draft);
+  const [dialogHasTemplate] = useDialogDraft(open, !!currentId);
   const initialized = draft.routing?.mode === 'independent' ? draft.routing.initializedFrom : undefined;
-  if (bare) return <AssociationEditor />;
+  if (bare) return <AssociationEditor open={parentOpen} onDone={onDone} />;
   return <>
     <section aria-label="模板关联" className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -91,8 +101,8 @@ export function TemplateCard({ bare = false }: { bare?: boolean } = {}) {
       </div>
       <Button onClick={() => setOpen(true)}>{currentId ? '管理模板关联' : '使用模板'}</Button>
     </section>
-    <Dialog open={open} onOpenChange={next => { if (!next) (() => setOpen(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{currentId ? '管理模板关联' : '使用模板'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
-      {open && <AssociationEditor onDone={() => setOpen(false)} />}
-    </div><DialogFooter>{<Button onClick={() => setOpen(false)}>关闭</Button>}</DialogFooter></DialogContent></Dialog>
+    <Dialog open={open} onOpenChange={next => { if (!next) (() => setOpen(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{dialogHasTemplate ? '管理模板关联' : '使用模板'}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
+      <AssociationEditor open={open} onDone={() => setOpen(false)} />
+    </div><DialogFooter>{<Button onClick={() => setOpen(false)}>取消</Button>}</DialogFooter></DialogContent></Dialog>
   </>;
 }
