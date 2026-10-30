@@ -16,21 +16,21 @@ import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts
 
 const columns = 'grid grid-cols-[24px_minmax(0,1fr)_90px_64px] gap-x-2 sm:grid-cols-[24px_minmax(0,1fr)_110px_minmax(0,1.4fr)_56px_64px]';
 
-export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, saveHint = '保存模板后生效', onEditGroup, memberSummary, nodeSetName = ref => ref.id }: {
+export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, onEditGroup, memberSummary, nodeSetName = ref => ref.id }: {
   value: TemplateBody; onChange: (body: TemplateBody) => void; report: ReportItem[];
-  readOnly?: boolean; saveHint?: string; onEditGroup?: (group: GroupSpec, adding: boolean) => void; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
+  readOnly?: boolean; onEditGroup?: (group: GroupSpec, adding: boolean) => void; memberSummary?: (group: GroupSpec) => string; nodeSetName?: (ref: import('@sub-forge/core').NodeSetID) => string;
 }) {
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const edit = async (group: GroupSpec, adding = false) => {
     if (onEditGroup) { onEditGroup(group, adding); return; }
-    const result = await TemplateGroupModal.show({ group, groups: value.groups, report, readOnly, saveHint });
+    const result = await TemplateGroupModal.show({ group, groups: value.groups, report, readOnly });
     if (result.status === 'confirmed') onChange({ ...value, groups: adding ? [...value.groups, result.data] : value.groups.map(g => g.id === group.id ? result.data : g) });
   };
   const remove = async (group: GroupSpec) => {
     const references = value.groups.filter(g => g.id !== group.id && g.members.some(m => m.kind === 'group' && m.groupId === group.id)).length;
     const rules = value.rules.filter(r => r.target.kind === 'group' && r.target.groupId === group.id).length;
     const final = value.final.kind === 'group' && value.final.groupId === group.id;
-    const result = await Frame.modal.confirm({ title: `删除策略组「${group.name || '未命名组'}」？`, description: `删除此组会移除 ${references} 个组内的引用，将 ${rules} 条规则${final ? '和 MATCH' : ''}的出口改为 REJECT。\n${saveHint}。`, confirmLabel: '删除', danger: true });
+    const result = await Frame.modal.confirm({ title: `删除策略组「${group.name || '未命名组'}」？`, description: `删除此组会移除 ${references} 个组内的引用，将 ${rules} 条规则${final ? '和 MATCH' : ''}的出口改为 REJECT。`, confirmLabel: '删除', danger: true });
     if (result.status === 'confirmed') onChange(removeGroup(value, group.id));
   };
   return <>
@@ -69,7 +69,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
   </>;
 }
 
-export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupSpec[]; report: ReportItem[]; readOnly: boolean; saveHint: string }, GroupSpec>(function TemplateGroup({ data: { groups, report, readOnly, saveHint, group: initial }, modal }) {
+export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupSpec[]; report: ReportItem[]; readOnly: boolean }, GroupSpec>(function TemplateGroup({ data: { groups, report, readOnly, group: initial }, modal }) {
   const [group, setGroup] = useModalDraft(initial);
   const value = { groups };
   const errors: ReportItem[] = [];
@@ -110,5 +110,5 @@ export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupS
           </div>}
         </section>
       </>
-    </div><ModalFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!!errors.length} onClick={() => modal.confirm(group)}>保存</Button></>}</ModalFooter></ModalContent>;
+    </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!!errors.length} onClick={() => modal.confirm(group)}>保存</Button></>}</ModalFooter></ModalContent>;
 });

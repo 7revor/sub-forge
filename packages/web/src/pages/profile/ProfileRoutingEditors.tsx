@@ -29,7 +29,7 @@ export function ProfileGroupsEditor() {
   const { body, update, bound } = useRoutingBody();
   return <>
     {bound && <p className="m-0 text-[13px] text-ink-muted">策略组结构跟随 <Link className="text-brand" to={`/templates/${template?.id}`}>{template?.name ?? '模板'}</Link>。点击编辑，为各组填充本订阅的节点。</p>}
-    <TemplateGroupsEditor value={body} onChange={update} report={draftIssues(body)} readOnly={bound} saveHint="保存订阅后生效" nodeSetName={nodeSetName}
+    <TemplateGroupsEditor value={body} onChange={update} report={draftIssues(body)} readOnly={bound} nodeSetName={nodeSetName}
       memberSummary={group => {
         const additions = draft.routing?.mode === 'bound' ? draft.routing.groupAdditions[group.id] ?? [] : [];
         return [...group.members, ...additions].map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '尚未添加成员';
@@ -46,7 +46,7 @@ export function ProfileRulesEditor() {
   const { draft, setDraft, groupOptions, profileNodeSets } = useProfile();
   const { body, update, bound } = useRoutingBody();
   const rulesets = useRuleSetRefs();
-  const props = { ctx: { rulesets: rulesets.data ?? [] }, saveHint: '保存订阅后生效', onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, extendedOptions: true };
+  const props = { ctx: { rulesets: rulesets.data ?? [] }, onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, extendedOptions: true };
   const prepend = { ...body, rules: draft.routing?.mode === 'bound' ? draft.routing.prependRules ?? [] : [] };
   return <>
     <ErrorAlert error={rulesets.error} />

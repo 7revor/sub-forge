@@ -15,7 +15,7 @@ export const RulesetSourceDialog = createModal<{ source: RuleSetSourceDoc; repos
   if (repository && !draft.repository) error = '请选择关联的仓库文件';
   else if (draft.kind === 'remote') { try { normalizeRuleUrl(draft.url ?? ''); } catch (cause) { error = cause instanceof Error ? cause.message : String(cause); } }
   else if (!draft.content?.trim()) error = '请填写本地规则内容';
-  return <RuleEditShell tall={draft.kind === 'local'} title={adding ? '添加规则来源' : '编辑规则来源'} description="修改当前来源，合并顺序保持不变。" saveHint="保存增强集合后生效" error={attempted ? error : undefined}
+  return <RuleEditShell tall={draft.kind === 'local'} title={adding ? '添加规则来源' : '编辑规则来源'} description="修改当前来源，合并顺序保持不变。" error={attempted ? error : undefined}
     onClose={onClose} onApply={() => { setAttempted(true); if (!error) onApply(draft.kind === 'remote' ? { ...draft, url: normalizeRuleUrl(draft.url!) } : draft); }}>
     {repository ? <Field label="仓库文件">{id => <RuleSetPicker id={id} scope="repository" modal label="选择仓库文件" placeholder="搜索并选择要关联的仓库文件" valueLabel={draft.repository ? draft.name ?? draft.repository.path : undefined} onSelect={matcher => {
       const next = matcher.repository?.sources[0];
