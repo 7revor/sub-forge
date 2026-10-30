@@ -26,8 +26,8 @@ export function CollectionList() {
       columns={[
         { header: '名称', cell: (c) => c.name },
         { header: '备注', cell: (c) => <NoteCell note={c.note} /> },
-        { header: '成员', cell: (c) => <span className="font-mono">{c.members.length}</span> },
-        { header: '处理链', cell: (c) => <span className="font-mono">{c.pipeline.length} 步</span> },
+        { header: '成员', width: 80, cell: (c) => <span className="font-mono">{c.members.length}</span> },
+        { header: '处理链', width: 88, cell: (c) => <span className="font-mono">{c.pipeline.length} 步</span> },
       ]} />
   );
 }

@@ -5,6 +5,7 @@ import { nameSearchRanges } from '@sub-forge/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { ListTable, ListTableLoading } from '../components/ListTable.tsx';
 import { RepositoryManager } from '../components/RepositoryManager.tsx';
 import { OptionPageStatus, useOptionPages } from '../components/OptionPage.tsx';
 import { CodePreview } from '../components/CodePreview.tsx';
@@ -13,18 +14,31 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleRepo, type RepoFilePreview } from '../api.ts';
 import { ruleOptionsLoader, type RuleSelection } from '../domain/ruleOptions.ts';
-import { Badge, Button, ErrorAlert, Input, PageHeader, formatTime, td, th } from '../components/ui.tsx';
+import { Badge, Button, ErrorAlert, Input, PageHeader, formatTime, td } from '../components/ui.tsx';
 
 const loadFiles = ruleOptionsLoader('repository', 30);
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
 
+const FILE_COLUMNS = [
+  { header: '文件名', width: 220 }, { header: '路径', width: 320 }, { header: '仓库', width: 180 },
+  { header: '分支', width: 100 }, { header: '操作', width: 130 },
+];
+
+function RepositoryFileLoading({ failed }: { failed: boolean }) {
+  return <>
+    <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
+      <ListTable label="规则文件" columns={FILE_COLUMNS}>{!failed && <ListTableLoading columns={5} rowHeight={53} />}</ListTable>
+    </div>
+    <div role="status" className="shrink-0 border-t border-line-2 px-3 py-2 text-center text-[12px] text-ink-muted">{failed ? '仓库加载失败，无法读取文件列表。' : '正在加载…'}</div>
+  </>;
+}
+
 function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos: RuleRepo[]; onSelect: (value: string) => void }) {
   const page = useOptionPages(loadFiles, query);
   return <>
-    <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
-      <table aria-label="规则文件" aria-busy={page.isFetching} className="w-full min-w-[640px] border-collapse">
-        <thead className="sticky top-0 z-10 bg-panel"><tr>{['文件名', '路径', '仓库', '分支', '操作'].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
-        <tbody>{page.options.map(option => {
+    <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain" aria-busy={page.isFetching}>
+      <ListTable label="规则文件" columns={FILE_COLUMNS}>
+        {!page.data && !page.error ? <ListTableLoading columns={5} rowHeight={53} /> : page.options.map(option => {
           const selection = JSON.parse(option.value) as RepositoryFile;
           const repoName = repos.find(repo => repo.id === selection.repo)?.name ?? selection.repo;
           return <tr key={option.value} className="cursor-pointer hover:bg-ground focus-within:bg-ground" onClick={event => {
@@ -38,8 +52,8 @@ function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos:
             <td className={`${td} text-ink-muted`}>{selection.file.ref}</td>
             <td className={td}><RefreshCacheButton kind="repository-file" id={selection.file.path} name={option.label} endpoint="/rule-repos/file-refresh" body={{repo:selection.repo,ref:selection.file.ref,path:selection.file.path}}/></td>
           </tr>;
-        })}</tbody>
-      </table>
+        })}
+      </ListTable>
     </div>
     <OptionPageStatus page={page} />
   </>;
@@ -64,13 +78,13 @@ export function RuleRepoPage() {
   };
   return <>
     <PageHeader title="规则集合" />
-    <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} />
+    <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} loading={!repos.data && !repos.error} failed={!!repos.error && !repos.data} onRetry={() => void repos.refetch()} />
     {ruleset && <div className="text-[13px] text-ink-muted">选择文件预览后可加入增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-brand">返回增强集合</Link></div>}
     <div className="flex shrink-0"><Input aria-label="搜索规则名称或路径" placeholder="搜索文件名或路径" value={q} onChange={event => setQ(event.target.value)} className="h-10 max-w-[440px]" /></div>
     <ErrorAlert error={repos.error} />
     <section aria-label="规则文件列表" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
       <div className="shrink-0 border-b border-line-2 px-4 py-3 text-[12.5px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : '规则文件'}</div>
-      {!pending && repos.data && <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} onSelect={select} />}
+      {!pending && repos.data ? <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} onSelect={select} /> : <RepositoryFileLoading failed={!!repos.error && !repos.data} />}
     </section>
 
   </>;

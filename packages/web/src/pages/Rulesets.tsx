@@ -43,7 +43,7 @@ export function RulesetList() {
       columns={[
         { header: '名称', cell: (r) => r.name },
         { header: '备注', cell: (r) => <NoteCell note={r.note} /> },
-        { header: '来源', cell: (r) => <span className="text-ink-2">{sourceSummary(r)}</span> },
+        { header: '来源', width: 200, cell: (r) => <span className="text-ink-2">{sourceSummary(r)}</span> },
       ]} />
   );
 }

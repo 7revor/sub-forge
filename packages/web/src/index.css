@@ -295,6 +295,28 @@ body {
   background: var(--color-panel);
 }
 
+/* 表格加载、空态和数据使用同一列宽；滚动条出现时也保留内容宽度。 */
+.list-table-scroll {
+  scrollbar-gutter: stable;
+}
+
+.list-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.list-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-panel);
+}
+
+.list-table td {
+  overflow-wrap: anywhere;
+}
+
 /* shadcn 官方 neutral 主题；旧页面的品牌色单独命名。 */
 :root {
   --radius: 0.625rem;

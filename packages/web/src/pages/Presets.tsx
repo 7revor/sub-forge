@@ -37,8 +37,8 @@ export function PresetList() {
       <DocList kind="presets" title="基础设置预设" noun="预设" intro={INTRO} onCreate={create} deleteBody={DELETE_BODY}
         columns={[
           { header: '名称', cell: (p) => p.name },
-          { header: '已发布版本', cell: (p) => <span className="font-mono text-[13px]">v{p.version}</span> },
-          { header: '引用方', cell: (p) => profiles.isLoading ? '加载中…' : profiles.error ? '加载失败' : `${(profiles.data ?? []).filter((profile) => profile.base?.presetId === p.id).length} 个配置订阅` },
+          { header: '已发布版本', width: 160, cell: (p) => <span className="font-mono text-[13px]">v{p.version}</span> },
+          { header: '引用方', width: 200, cell: (p) => profiles.isLoading ? '加载中…' : profiles.error ? '加载失败' : `${(profiles.data ?? []).filter((profile) => profile.base?.presetId === p.id).length} 个配置订阅` },
         ]} />
     </>
   );

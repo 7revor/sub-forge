@@ -1,11 +1,12 @@
+import { ListTable, ListTableLoading } from './ListTable.tsx';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { api, type RuleRepo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, buttonClass, formatTime, th, td } from './ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, buttonClass, formatTime, td } from './ui.tsx';
 
-export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: boolean }) {
+export function RepositoryManager({ repos, admin, loading = false, failed = false, onRetry }: { repos: RuleRepo[]; admin: boolean; loading?: boolean; failed?: boolean; onRetry?: () => void }) {
   const qc = useQueryClient();
   const { search } = useLocation();
   const [deleting, setDeleting] = useState<RuleRepo>();
@@ -15,10 +16,12 @@ export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: 
   const remove = useMutation({ meta: { successMessage: '仓库已删除' }, mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => { setDeleting(undefined); return invalidate(); } });
   return <>
     <Card title="仓库" subtitle="仅索引目录、.list 和 .txt 文件" className="shrink-0" bodyClass="px-4 pb-4" actions={admin && <><Link to={`/rule-repo/new${search}`} className={buttonClass('default', 'sm')}><Plus size={14} />添加仓库</Link></>}>
-      <div className="max-h-[30vh] min-h-0 overflow-auto overscroll-contain rounded-lg border border-line-2">
-        <table aria-label="仓库管理" className="w-full min-w-[760px] border-collapse">
-          <thead className="sticky top-0 z-10 bg-panel"><tr>{['仓库名称', '分支', '规则数', '更新时间', '状态', ...(admin ? ['操作'] : [])].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
-          <tbody>{repos.map(r => <Fragment key={r.id}>
+      <div className="list-table-scroll h-[min(30vh,240px)] min-h-0 overflow-auto overscroll-contain rounded-lg border border-line-2" aria-busy={loading}>
+        <ListTable label="仓库管理" columns={[
+          { header: '仓库名称', width: 240 }, { header: '分支', width: 112 }, { header: '规则数', width: 80 },
+          { header: '更新时间', width: 144 }, { header: '状态', width: 112 }, ...(admin ? [{ header: '操作', width: 328 }] : []),
+        ]}>
+          {loading ? <ListTableLoading columns={admin ? 6 : 5} rows={3} rowHeight={53} /> : repos.map(r => <Fragment key={r.id}>
             <tr>
               <td className={td}><a href={r.url} target="_blank" rel="noreferrer" className="break-all font-medium text-ink hover:text-brand">{r.name}</a>
                 {r.pending && r.builtAt && <div className="mt-1 text-[12px] text-ink-muted">新配置待同步，搜索仍使用上次成功索引。</div>}
@@ -36,9 +39,9 @@ export function RepositoryManager({ repos, admin }: { repos: RuleRepo[]; admin: 
             <ErrorAlert error={remove.error} />
           </div></td></tr>}
           </Fragment>)}
-          {!repos.length && <tr><td colSpan={admin ? 6 : 5} className={td}><Empty title="还没有仓库" /></td></tr>}
-          </tbody>
-        </table>
+        </ListTable>
+        {failed && <div className="p-4 text-ink-muted">仓库加载失败。<Button size="sm" onClick={onRetry}>重试</Button></div>}
+        {!loading && !failed && !repos.length && <div className="p-4"><Empty title="还没有仓库" /></div>}
       </div>
       <ErrorAlert error={refresh.error ?? toggle.error} />
     </Card>

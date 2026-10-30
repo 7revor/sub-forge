@@ -12,9 +12,12 @@ export function ProfileList() {
     <DocList kind="profiles" title="配置订阅" deleteBody="它的订阅链接会立即失效，客户端将无法更新。"
       columns={[
         { header: '名称', cell: (p) => p.name },
-        { header: '模式', cell: (p) => <Badge>{modeLabel(p, templates.find(t => t.id === boundTemplateId(p))?.name)}</Badge> },
-        { header: '节点集', cell: (p) => <span className="font-mono">{p.nodeSets.length}</span> },
-        { header: '代理链', cell: (p) => <span className="font-mono">{p.chains.length}</span> },
+        { header: '模式', width: 200, cell: (p) => {
+          const label = modeLabel(p, templates.find(t => t.id === boundTemplateId(p))?.name);
+          return <span title={label}><Badge className="max-w-full"><span className="truncate">{label}</span></Badge></span>;
+        } },
+        { header: '节点集', width: 80, cell: (p) => <span className="font-mono">{p.nodeSets.length}</span> },
+        { header: '代理链', width: 80, cell: (p) => <span className="font-mono">{p.chains.length}</span> },
       ]} />
   );
 }

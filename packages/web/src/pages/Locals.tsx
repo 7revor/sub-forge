@@ -46,8 +46,8 @@ export function LocalList() {
         columns={[
           { header: '名称', cell: (g) => g.name },
           { header: '备注', cell: (g) => <NoteCell note={g.note} /> },
-          { header: '节点', cell: (g) => <span className="font-mono text-[13px]">{g.proxies.length}</span> },
-          { header: '协议', cell: (g) => <span className="font-mono text-[12.5px] text-ink-2">{typesText(g)}</span> },
+          { header: '节点', width: 80, cell: (g) => <span className="font-mono text-[13px]">{g.proxies.length}</span> },
+          { header: '协议', width: 200, cell: (g) => <span className="font-mono text-[12.5px] text-ink-2">{typesText(g)}</span> },
         ]} />
     </>
   );

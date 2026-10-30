@@ -7,9 +7,10 @@ import { Link, Navigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { Notice } from '../components/Notice.tsx';
+import { ListTable, ListTableLoading } from '../components/ListTable.tsx';
 import { Pagination } from '../components/Pagination.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll, td, cx } from '../components/ui.tsx';
 import { useList, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { usePagedList } from '../hooks/usePagedList.ts';
@@ -35,29 +36,31 @@ export function TemplateList() {
       <ErrorAlert error={list.error} />
       <section className="list-panel" aria-label="模板列表" aria-busy={list.isFetching}>
         <div className="shrink-0 px-4 py-3.5"><Input aria-label="搜索模板" placeholder="搜索名称" className="max-w-[280px]" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
-        <div key={`${list.data?.page}-${list.pageSize}-${list.q}`} className="min-h-0 flex-1 overflow-auto overscroll-contain">
-          {!list.data ? <div className="p-4 text-ink-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !list.data.items.length ? (
-            <div className="p-4"><Empty title={list.q.trim() ? `没有名称包含「${list.q.trim()}」的模板` : '还没有模板'} action={!list.q.trim() && <Link to="/templates/new" className={buttonClass('default', 'sm')}>新建模板</Link>} /></div>
-          ) : <table className="w-full border-collapse">
-            <thead><tr>{['名称', '策略组', '规则', '使用情况'].map(label => <th key={label} className={th}>{label}</th>)}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
-            <tbody>{list.data.items.map(t => {
+        <div key={`${list.page}-${list.pageSize}-${list.q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
+          <ListTable label="模板列表" columns={[
+            { header: '名称', width: 240 }, { header: '策略组', width: 100 }, { header: '规则', width: 100 },
+            { header: '使用情况', width: 180 }, { header: actionHeader, width: 216 },
+          ]}>
+            {!list.data && !list.error ? <ListTableLoading columns={5} rowHeight={53} /> : list.data?.items.map(t => {
               const n = inUse(t.id);
               const path = `/templates/${encodeURIComponent(t.id)}`;
               return <DocTableRow key={t.id} to={path}>
                 <td className={td}><Link to={path} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
                 <td className={td}>{t.groups.length} 个</td>
                 <td className={td}>{t.rules.length} 条</td>
-                <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{n ? `${n} 个配置订阅在用` : '未使用'}</td>
+                <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</td>
                 <td className={cx(td, 'whitespace-nowrap text-right')}><div className="flex justify-end gap-2">
                   <DocActionLink to={path} name={t.name ?? t.id} viewOnly />
                   <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
                 </div></td>
               </DocTableRow>;
-            })}</tbody>
-          </table>}
+            })}
+          </ListTable>
+          {!list.data && list.error && <div className="p-4 text-ink-muted">列表加载失败，请重试。<Button size="sm" onClick={() => void list.refetch()}>重试</Button></div>}
+          {list.data && !list.data.items.length && <div className="p-4"><Empty title={list.q.trim() ? `没有名称包含「${list.q.trim()}」的模板` : '还没有模板'} action={!list.q.trim() && <Link to="/templates/new" className={buttonClass('default', 'sm')}>新建模板</Link>} /></div>}
         </div>
         <Pagination page={list.data?.page ?? list.page} pageSize={list.pageSize} total={list.data?.total ?? 0} totalPages={list.data?.totalPages ?? 1}
-          busy={list.isFetching || !list.data} onPage={list.setPage} onPageSize={list.setPageSize} />
+          unknownTotal={!list.data} busy={list.isFetching || !list.data} onPage={list.setPage} onPageSize={list.setPageSize} />
       </section>
     </>
   );
