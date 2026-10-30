@@ -9,6 +9,7 @@ import { notifySuccess } from '../feedback.ts';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, PendingNotice, Select, Switch, td, th, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
+import { ListActions } from '../components/ListActions.tsx';
 
 /** 用户（设计稿「管理员 · 用户」）：用户表与共享的订阅源 / 组合 */
 export function Users() {
@@ -52,10 +53,10 @@ export function Users() {
                     <td className={td}>{u.role === 'admin' ? <span className="text-[12.5px] text-ink-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
                     <td className={td}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
                     <td className={td}>
-                      <div className="flex justify-end gap-1.5">
+                      <ListActions>
                         <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `重置 ${u.username} 的密码`, label: '新密码', description: '至少 8 位；该用户的所有登录会失效', placeholder: '设置至少 8 位的新密码', type: 'password', minLength: 8, confirmLabel: '重置' }, { submit: async password => { await api('PATCH', `/users/${u.id}`, { password }); } }); if (result.status === 'confirmed') { notifySuccess('密码已重置'); void refresh(); } }}>重置密码</Button>
                         {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
-                      </div>
+                      </ListActions>
                     </td>
                   </tr>
                 );

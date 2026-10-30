@@ -1,10 +1,11 @@
 import { RefreshCacheButton, ResourceCacheStatus, ResourceLastRefreshTime } from './ResourceCache.tsx';
 // 文档列表：服务端搜索与分页，搜索栏和分页器固定，表格占满剩余高度并独立滚动。
-// 空列表保留分页和搜索；每行操作为「删除」「编辑」，删除先弹确认。
+// 空列表保留分页和搜索；删除统一放在操作区最右侧，先弹确认。
 
 import { usePagedList } from '../hooks/usePagedList.ts';
 import { Pagination } from './Pagination.tsx';
 import { ListTable, ListTableLoading } from './ListTable.tsx';
+import { ListActions } from './ListActions.tsx';
 import { Plus } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -64,12 +65,12 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                 {refreshable && <td className={td}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
                 {refreshable && <td className={td}><ResourceLastRefreshTime kind={kind} id={d.id}/></td>}
                 <td className={cx(td, 'text-right whitespace-nowrap')}>
-                  <div className="flex items-center justify-end gap-2">
+                  <ListActions>
                     <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />
                     {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
-                    {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
                     <DocActionLink to={`/${kind}/${d.id}`} name={d.name} viewOnly={!canWrite(d.id)} />
-                  </div>
+                    {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
+                  </ListActions>
                 </td>
               </DocTableRow>
             ))}

@@ -9,6 +9,7 @@ import { api, ApiError, type ImpactEntry } from '../api.ts';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { Notice } from '../components/Notice.tsx';
 import { ListTable, ListTableLoading } from '../components/ListTable.tsx';
+import { ListActions } from '../components/ListActions.tsx';
 import { Pagination } from '../components/Pagination.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll, td, cx } from '../components/ui.tsx';
@@ -50,10 +51,10 @@ export function TemplateList() {
                 <td className={td}>{t.groups.length} 个</td>
                 <td className={td}>{t.rules.length} 条</td>
                 <td className={cx(td, 'whitespace-nowrap text-ink-2')}>{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</td>
-                <td className={cx(td, 'whitespace-nowrap text-right')}><div className="flex justify-end gap-2">
-                  <DocActionLink to={path} name={t.name ?? t.id} viewOnly />
+                <td className={cx(td, 'whitespace-nowrap text-right')}><ListActions>
                   <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
-                </div></td>
+                  <DocActionLink to={path} name={t.name ?? t.id} />
+                </ListActions></td>
               </DocTableRow>;
             })}
           </ListTable>
