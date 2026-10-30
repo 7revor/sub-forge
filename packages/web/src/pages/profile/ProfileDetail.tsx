@@ -1,17 +1,14 @@
 import { acceptProfileSave, modeLabel, syncProfileDraft } from './routing.ts';
-import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
-import { formatRelativeTime } from '../../utils/format.ts';
-// 与新建共用单页编辑，旧分区链接保留为页内定位入口。
+import { tokenOptions } from '../../hooks/documentQueries.ts';
+// 与新建共用两个标签页；旧分区链接仍进入相应设置。
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DeleteAction } from '../../components/DetailActions.tsx';
 import { Badge, Button, ErrorAlert, PageHeader, PageScroll } from '../../components/ui.tsx';
-import { TemplateCard } from './TemplateCard.tsx';
 import { useDeleteDoc, useDoc, useList, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
-import { TabOverview } from './TabsBasic.tsx';
 import { ProfileSections } from './ProfileSections.tsx';
 import { ProfileEditGuard } from './ProfileEditGuard.tsx';
 
@@ -24,7 +21,6 @@ export function ProfileDetail() {
   const del = useDeleteDoc('profiles');
   const presets = useList('presets');
   const tokens = useQuery(tokenOptions(id));
-  const log = useQuery(accessLogOptions(id));
   const [draft, setDraft] = useState<ProfileDoc>();
   const previous = useRef<ProfileDoc | undefined>(undefined);
   useEffect(() => {
@@ -42,7 +38,6 @@ export function ProfileDetail() {
   const validName = !!draft.name.trim();
   const discard = () => { setDraft(doc.data); ctx.resetBaseEditor(); };
   const preset = presets.data?.find((p) => p.id === draft.base?.presetId);
-  const warnings = log.data?.[0]?.warnings ?? 0;
   const subscriptionUrl = tokens.data?.[0]?.url;
   const duplicate = () => {
     const { id: _id, ...rest } = doc.data ?? draft;
@@ -64,14 +59,13 @@ export function ProfileDetail() {
             {modeLabel(draft, template.data?.name)}{template.data && ' · 自动更新'}
           </span>
           {preset && <Badge>基础设置 {preset.name}</Badge>}
-          {warnings > 0 && <Link to={`/profiles/${id}/preview`} className="rounded-full bg-warn-soft px-2.5 py-1 text-[12.5px] text-[#8f4508] no-underline hover:underline">{warnings} 条告警</Link>}
           {dirty && <Badge tone="warn">有未保存的修改</Badge>}
         </PageHeader>
         <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px]">
           <span className="shrink-0 text-ink-muted">订阅链接</span>
           {subscriptionUrl ? <>
             <a href={subscriptionUrl} target="_blank" rel="noreferrer" className="min-w-0 break-all font-mono text-accent-ink no-underline hover:underline">{subscriptionUrl}</a>
-            <span className="text-ink-muted">{log.data?.[0] ? `最近访问 ${formatRelativeTime(log.data[0].at)}` : '从未访问'} · 自动适配客户端</span>
+            <span className="text-ink-muted">自动适配客户端</span>
           </> : tokens.isPending ? <span className="text-ink-muted">正在加载订阅链接…</span> : <>
             <span role="alert" className="text-err">{tokens.error?.message ?? '暂未获取到订阅链接'}</span>
             <Button size="sm" onClick={() => void tokens.refetch()}>重新加载链接</Button>
@@ -84,7 +78,7 @@ export function ProfileDetail() {
       {template.error && <ErrorAlert error={template.error} />}
 
       <PageScroll>
-        <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} before={<TemplateCard />} overview={<TabOverview />} />
+        <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} />
       </PageScroll>
     </ProfileContext.Provider>
   );
