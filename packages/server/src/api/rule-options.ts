@@ -6,7 +6,7 @@ import { repositoryMatcher } from '../ruleset-reference.ts';
 import { bad, HttpError, isStr, jsonBody, requireUser, type ApiEnv } from './common.ts';
 import { RefChecker } from './validate.ts';
 
-import { searchRuleOptions } from '../rule-repos/options.ts';
+import { matchRuleFileUrls, searchRuleOptions } from '../rule-repos/options.ts';
 
 /** 本地与已启用仓库合并排序、分页，避免客户端拼接两套分页时遗漏候选。 */
 export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
@@ -28,6 +28,12 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
       return store.db.prepare('SELECT 1 FROM rule_repo_catalog WHERE repo = ?').get(r.id) ? [] : [`${r.name}：完整文件索引待更新`];
     });
     return c.json({ ...searchRuleOptions(store.db, local, q, Number(offset), Number(limit)), notices });
+  });
+  app.post('/rule-options/match-urls', async c => {
+    const { urls } = await jsonBody(c);
+    if (!Array.isArray(urls) || urls.length > 1000 || urls.some(url => typeof url !== 'string')) throw bad('规则地址列表不合法');
+    try { return c.json({ matches: matchRuleFileUrls(store.db, urls) }); }
+    catch (error) { throw bad(error instanceof Error ? error.message : String(error)); }
   });
   app.post('/rule-options/resolve', async c => {
     const body = await jsonBody(c);

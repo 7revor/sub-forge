@@ -1,6 +1,7 @@
 // 只向调用方返回当前页；旧缓存中的目录节点被过滤，缺少缓存时从已有文件索引降级读取。
-import { nameSearchRanges, normalizeNameSearch, type SearchMatch } from '@sub-forge/core';
+import { nameSearchRanges, normalizeNameSearch, normalizeRuleUrl, type SearchMatch } from '@sub-forge/core';
 import type { Store } from '../store.ts';
+import { rawUrl, type RepoDefinition } from './adapters.ts';
 
 const filesSql = `WITH files AS (
   SELECT c.repo, json_extract(n.value, '$.ref') AS ref, json_extract(n.value, '$.path') AS path,
@@ -17,6 +18,30 @@ const filesSql = `WITH files AS (
 
 export function findRuleFile(db: Store['db'], repo: string, ref: string, path: string) {
   return db.prepare(`${filesSql} SELECT entry FROM files WHERE repo = ? AND ref = ? AND path = ? LIMIT 1`).get(repo, ref, path) as { entry: string | null } | undefined;
+}
+
+export type MatchedRuleFile = { repo: string; entry: string; ref: string; path: string; label: string; hint: string };
+
+/** 只匹配已启用、可关联的索引文件；URL 全等避免将单文件扩展为整个规则集。 */
+export function matchRuleFileUrls(db: Store['db'], input: string[]): Record<string, MatchedRuleFile[]> {
+  const urls = new Set(input.map(normalizeRuleUrl));
+  const matches: Record<string, MatchedRuleFile[]> = {};
+  if (!urls.size) return matches;
+  const repos = db.prepare('SELECT id, COALESCE(indexed_definition, definition) AS definition FROM rule_repos WHERE enabled = 1').all() as { id: string; definition: string }[];
+  for (const row of repos) {
+    const definition = JSON.parse(row.definition) as RepoDefinition;
+    const prefix = `https://raw.githubusercontent.com/${definition.owner}/${definition.repo}/`;
+    if (![...urls].some(url => url.startsWith(prefix))) continue;
+    const files = db.prepare(`${filesSql} SELECT ref, path, entry FROM files WHERE repo = ? AND entry IS NOT NULL`).all(row.id) as { ref: string; path: string; entry: string }[];
+    for (const file of files) {
+      const url = rawUrl(definition, { ...file, format: 'auto' });
+      if (!urls.has(url)) continue;
+      const label = file.path.split('/').at(-1)!;
+      (matches[url] ??= []).push({ repo: row.id, entry: file.entry, ref: file.ref, path: file.path, label, hint: `${definition.name} · ${file.ref} · ${file.path}` });
+    }
+  }
+  for (const candidates of Object.values(matches)) candidates.sort((a, b) => a.hint.localeCompare(b.hint));
+  return matches;
 }
 
 type LocalOption = { id: string; name: string; hint: string };

@@ -9,6 +9,23 @@ afterEach(async () => { for (const env of envs.splice(0)) await env.stop(); });
 const setup = async () => { const env = await setupRuleReferences(); envs.push(env); return env; };
 
 describe('物理文件平铺搜索与分页', () => {
+  it('按完整 URL 提示单个仓库文件，忽略未关联文件和停用仓库', async () => {
+    const h = await setup();
+    const path = 'rule/Surge/Google/Google.list';
+    const url = `https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/${path}`;
+    const matched = await h.admin.post('/api/rule-options/match-urls', { urls: [url + '#preview', url, url + '?v=2', 'https://example.test/Google.list'] });
+    expect(matched.status).toBe(200);
+    expect(matched.json.matches[url]).toEqual([{ repo: 'blackmatrix7', entry: 'Google', ref: 'master', path, label: 'Google.list', hint: `blackmatrix7/ios_rule_script · master · ${path}` }]);
+    expect(Object.keys(matched.json.matches)).toEqual([url]);
+    expect(h.reads).toEqual([]);
+    expect((await h.admin.post('/api/rule-options/resolve', { source: 'repository', repo: 'blackmatrix7', entry: 'Google', file: { ref: 'master', path } })).json.matcher.repository.sources).toHaveLength(1);
+    h.store.db.prepare('UPDATE rule_repo_catalog SET data = ? WHERE repo = ?').run(JSON.stringify([{ kind: 'file', ref: 'master', path: 'rule/Surge/Google/unlinked.list' }]), 'blackmatrix7');
+    expect((await h.admin.post('/api/rule-options/match-urls', { urls: [url] })).json.matches).toEqual({});
+    h.repos.setEnabled('blackmatrix7', false);
+    expect((await h.admin.post('/api/rule-options/match-urls', { urls: [url] })).json.matches).toEqual({});
+    expect((await client(h.app).post('/api/rule-options/match-urls', { urls: [url] })).status).toBe(401);
+  });
+
   it('只缓存文本文件，完整路径与分支独立，重叠扫描不重复', () => {
     const original = BUILTIN_REPOS[0]!;
     const repo = { ...original, scans: [...original.scans, original.scans[0]!, { ...original.scans[0]!, ref: 'other' }] };
