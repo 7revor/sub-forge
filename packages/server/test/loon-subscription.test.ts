@@ -42,6 +42,7 @@ describe('Loon 订阅与管理接口', () => {
     expect(text).toContain('[General]\nip-mode = v4-only\nallow-wifi-access = false\ntest-timeout = 5');
     expect(text).toContain('节点 = trojan, example.test, 443, "example", transport=tcp');
     expect(text).toContain('[Rule]\nFINAL,DIRECT\n\n[Remote Rule]');
+    expect(text).toContain(',policy=代理,tag=loon,enabled=true');
     const links = text.split('[Remote Rule]\n')[1]!.trim().split('\n').map(line => line.split(',policy=')[0]!);
     expect(links).toHaveLength(2);
     const bodies = [];
