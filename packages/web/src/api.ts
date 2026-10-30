@@ -14,7 +14,7 @@ export const onUnauthorized = (fn: Listener) => { unauthorizedListeners.add(fn);
 
 export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    method,
+    method, cache: 'no-store',
     credentials: 'same-origin',
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

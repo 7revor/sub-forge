@@ -44,7 +44,6 @@ export type RenderServiceOptions = {
   cacheSize?: number;
 };
 
-const SOURCE_TTL_SEC = 86400;
 
 /** 流量累加，缺失字段不补零，到期时间取已知的最早值。 */
 function sumTraffic(infos: Iterable<TrafficInfo>): TrafficInfo | undefined {
@@ -244,7 +243,7 @@ export class RenderService {
     const hashes: string[] = [];
     const report: ReportItem[] = [];
     for (const src of sources) {
-      const r = await this.snapshots.get('source', src.id, src.url, { ttlSec: src.fetch?.ttlSec ?? SOURCE_TTL_SEC, ...src.fetch });
+      const r = await this.snapshots.get('source', src.id, src.url, {});
       if (r.snapshot?.body !== undefined) {
         inputs.snapshots[src.id] = [r.snapshot.body];
         hashes.push(`${src.id}|${src.url}|${r.snapshot.hash}`);

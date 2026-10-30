@@ -1,6 +1,6 @@
 // 文档详情页的通用状态：加载 → 草稿 → 保存 / 删除；新建时 id 为 new，保存后跳转到真实 id。
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useDeleteDoc, useDoc, useSaveDoc, type DocMap, type Kind } from '../hooks.ts';
 
@@ -12,7 +12,8 @@ export function useDocEditor<K extends Kind>(kind: K, empty: DocMap[K]) {
   const save = useSaveDoc(kind);
   const del = useDeleteDoc(kind);
   const [draft, setDraft] = useState<DocMap[K] | undefined>(isNew ? empty : undefined);
-  useEffect(() => { if (doc.data) setDraft(doc.data); }, [doc.data]);
+  const previous=useRef<DocMap[K]|undefined>(undefined);
+  useEffect(()=>{if(doc.data){const before=previous.current;previous.current=doc.data;setDraft(current=>!current||current.id!==doc.data!.id||JSON.stringify(current)===JSON.stringify(before)?doc.data:current);}},[doc.data]);
   useEffect(() => { if (isNew) setDraft(empty); }, [isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty = isNew || JSON.stringify(draft) !== JSON.stringify(doc.data);
@@ -20,7 +21,7 @@ export function useDocEditor<K extends Kind>(kind: K, empty: DocMap[K]) {
     if (!draft) return;
     const body = transform(draft) as Partial<DocMap[K]> & { id?: string };
     if (isNew) delete body.id;
-    save.mutate(body, { onSuccess: (item) => { if (isNew) navigate(`/${kind}/${(item as { id: string }).id}`, { replace: true }); } });
+    save.mutate(body, { onSuccess: (item) => { setDraft(item); if (isNew) navigate(`/${kind}/${(item as { id: string }).id}`, { replace: true }); } });
   };
   /** 由 DetailShell 的确认对话框调用 */
   const remove = () => {

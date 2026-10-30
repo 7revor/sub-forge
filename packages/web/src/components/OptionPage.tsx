@@ -14,7 +14,7 @@ export function useOptionPages(loadOptions: OptionLoader, query: string) {
   const result = useInfiniteQuery({
     queryKey: ['option-pages', session, query], initialPageParam: 0,
     queryFn: ({ pageParam }) => loadOptions(query, pageParam),
-    getNextPageParam: page => page.nextOffset, staleTime: Infinity, gcTime: 0, retry: false,
+    getNextPageParam: page => page.nextOffset, staleTime: 0, gcTime: 0, retry: false,
   });
   return { ...result, options: result.data?.pages.flatMap(page => page.options) ?? [],
     total: result.data?.pages.at(-1)?.total ?? 0,

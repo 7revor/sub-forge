@@ -34,7 +34,7 @@ export type DocMap = {
 };
 export type Kind = keyof DocMap;
 
-export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<{ user: User }>('GET', '/me').then((r) => r.user), retry: false, staleTime: 60_000 });
+export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<{ user: User }>('GET', '/me').then((r) => r.user), retry: false, staleTime: 0 });
 /** 引用候选包含管理员维护的公共规则集，维护列表仍只显示自己的文档。 */
 export const useRuleSetRefs = () => useQuery({ queryKey: ['ruleset-refs'], queryFn: () => api<{ items: { id: string; name: string }[] }>('GET', '/rule-options/locals').then(r => r.items) });
 
@@ -74,7 +74,7 @@ export function useNodeList(ref: import('@sub-forge/core').NodeSetID | undefined
   return useQuery({
     queryKey: ['nodes', ref?.type, ref?.id, q],
     enabled: !!ref?.id,
-    staleTime: 30_000,
+    staleTime: 0,
     queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   });
 }

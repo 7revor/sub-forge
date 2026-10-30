@@ -78,11 +78,7 @@ export function TabOverview() {
         </Card>
         <Card title="输出设置" className="min-w-0">
           <div className="flex flex-col gap-3.5">
-            <Field label="更新间隔">{(id) => (
-              <Select id={id} value={String(draft.updateIntervalSec ?? 86400)} onChange={(e) => setDraft({ ...draft, updateIntervalSec: Number(e.target.value) })}>
-                {[[86400, '24 小时'], [43200, '12 小时'], [21600, '6 小时'], [3600, '1 小时']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </Select>
-            )}</Field>
+            <p className="text-[13px] text-muted">更新间隔由管理员在系统中统一设置。</p>
             <Field label="流量 / 到期信息">{(id) => (
               <Select id={id} value={userinfo.mode === 'source' ? `source:${userinfo.sourceId}` : userinfo.mode} onChange={(e) => {
                 const v = e.target.value;

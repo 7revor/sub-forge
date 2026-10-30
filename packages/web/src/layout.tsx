@@ -35,12 +35,23 @@ export function AppLayout() {
   const location = useLocation();
   // 窄屏时导航折叠到菜单按钮里，切换页面后自动收起
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   useEffect(() => onUnauthorized(() => {
     qc.setQueryData(['me'], null);
     navigate('/login', { replace: true, state: { from: location.pathname } });
   }), [qc, navigate, location.pathname]);
+
+  useEffect(()=>{
+    if(!me.data)return;
+    const events=new EventSource('/api/events');
+    const update=()=>void qc.invalidateQueries();
+    events.addEventListener('changed',update);
+    events.onopen=()=>{setReconnecting(false);update();};
+    events.onerror=()=>setReconnecting(true);
+    return ()=>events.close();
+  },[me.data?.id,qc]);
 
   if (me.isLoading) return <div className="p-8 text-muted">加载中…</div>;
   if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -87,6 +98,7 @@ export function AppLayout() {
         </div>
       </nav>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {reconnecting && <div role="status" className="border-b border-line bg-amber-50 px-4 py-2 text-[12px] text-amber-800">实时连接已断开，正在重连；可刷新页面重新读取。</div>}
         <div className="page-layout">
           <Outlet />
         </div>

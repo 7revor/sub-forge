@@ -9,7 +9,7 @@ import { Button, FieldError, Modal } from './ui.tsx';
 export function RuleSourcePreview({ open, matcher, onClose }: { open: boolean; matcher: Matcher; onClose: () => void }) {
   const preview = useQuery({
     queryKey: ['rule-matcher-source', matcher],
-    enabled: matcher.kind === 'ruleset', retry: false, staleTime: 60_000,
+    enabled: matcher.kind === 'ruleset', retry: false, staleTime: 0,
     queryFn: () => api<{ name: string; content: string; sources: number }>('POST', '/rules/matcher-source', { matcher }),
   });
   const single = matcher.kind === 'rule';

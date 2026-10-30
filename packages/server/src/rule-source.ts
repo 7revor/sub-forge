@@ -4,7 +4,7 @@ import type { SnapshotService } from './snapshots.ts';
 import { RuleConverter } from './rule-converter.ts';
 
 export class RuleSourceService {
-  private readonly drafts = new Map<string, { at?: number; value: Promise<{ body?: string; error?: string }> }>();
+  private readonly drafts = new Map<string, Promise<{ body?: string; error?: string }>>();
   private active = 0;
   private readonly waiting: (() => void)[] = [];
   private async limited<T>(read: () => Promise<T>): Promise<T> {
@@ -23,24 +23,19 @@ export class RuleSourceService {
     if (source.kind === 'remote') {
       const prior = saved?.sources.find(s => s.kind === 'remote' && s.url === source.url && JSON.stringify({ua:s.fetch?.ua,timeoutMs:s.fetch?.timeoutMs}) === JSON.stringify({ua:source.fetch?.ua,timeoutMs:source.fetch?.timeoutMs}));
       if (saved && prior) {
-        const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ttlSec: 86400, ...source.fetch, format: source.format, scope: source.repository && !source.fetch?.ua ? 'public-repository' : userId }, { waitForFresh: true, refresh }));
+        const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ...source.fetch, format: source.format, scope: source.repository && !source.fetch?.ua ? 'public-repository' : userId }, { waitForFresh: true, refresh }));
         content = result.snapshot?.body; fetchedAt = result.snapshot?.fetchedAt; error = result.error; stale = result.stale;
       } else {
         const key = JSON.stringify([userId, source.url, source.format, source.fetch ?? {}]);
 
-        let hit = this.drafts.get(key);
-        if (refresh && hit?.at !== undefined) hit = undefined;
-        if (!hit) {
-          hit = { value: this.limited(() => this.snapshots.peekRuleContent(source.url!, source.fetch)) };
-          this.drafts.set(key, hit);
-          while (this.drafts.size > 32) this.drafts.delete(this.drafts.keys().next().value!);
+        let pending = this.drafts.get(key);
+        if (!pending) {
+          pending = this.limited(() => this.snapshots.peekRuleContent(source.url!, source.fetch))
+            .finally(() => this.drafts.delete(key));
+          this.drafts.set(key, pending);
         }
-        const result = await hit.value;
-        // 失败不进入缓存；并发重试复用在途请求，成功后从完成时起计算 TTL。
-        if (this.drafts.get(key) === hit) {
-          if (result.error) this.drafts.delete(key);
-          else this.drafts.delete(key);
-        }
+        // 仅合并仍在执行的请求；完成后立即移除，不保存草稿时间缓存。
+        const result = await pending;
         content = result.body; error = result.error;
       }
     }

@@ -22,7 +22,7 @@ export function useRepositoryUrlMatches(urls: string[]) {
         api<{ matches: Record<string, RepositoryUrlMatch[]> }>('POST', '/rule-options/match-urls', { urls: urls.slice(i * 1000, (i + 1) * 1000) })));
       return { matches: Object.assign({}, ...pages.map(page => page.matches)) as Record<string, RepositoryUrlMatch[]> };
     },
-    staleTime: 60_000,
+    staleTime: 0,
   });
   return { ...query, matches: debounced === key ? query.data?.matches ?? {} : {} };
 }

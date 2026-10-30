@@ -65,7 +65,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
       }
       let content = src.content ?? '';
       if (src.kind === 'remote') {
-        const result = await snapshots.get('ruleset', id, src.url!, { ttlSec: src.fetch?.ttlSec ?? 86400, ...src.fetch, format: src.format });
+        const result = await snapshots.get('ruleset', id, src.url!, { ...src.fetch, format: src.format });
         if (!result.snapshot) {
           report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `${label}没有可用快照：${result.error ?? '无法拉取'}`, where });
           continue;

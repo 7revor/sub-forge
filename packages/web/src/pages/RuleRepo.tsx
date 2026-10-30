@@ -1,3 +1,4 @@
+import { RefreshCacheButton } from '../components/ResourceCache.tsx';
 // 文件搜索分页读取数据库索引，点击表格中的文件后弹窗预览原文。
 import { nameSearchRanges } from '@sub-forge/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,7 +22,7 @@ function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos:
   return <>
     <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
       <table aria-label="规则文件" aria-busy={page.isFetching} className="w-full min-w-[640px] border-collapse">
-        <thead className="sticky top-0 z-10 bg-panel"><tr>{['文件名', '路径', '仓库', '分支'].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
+        <thead className="sticky top-0 z-10 bg-panel"><tr>{['文件名', '路径', '仓库', '分支', '操作'].map(label => <th key={label} scope="col" className={th}>{label}</th>)}</tr></thead>
         <tbody>{page.options.map(option => {
           const selection = JSON.parse(option.value) as RepositoryFile;
           const repoName = repos.find(repo => repo.id === selection.repo)?.name ?? selection.repo;
@@ -34,6 +35,7 @@ function RepositoryFileTable({ query, repos, onSelect }: { query: string; repos:
             <td className={`${td} break-all font-mono text-[12px] text-muted`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></td>
             <td className={`${td} text-muted`}>{repoName}</td>
             <td className={`${td} text-muted`}>{selection.file.ref}</td>
+            <td className={td}><RefreshCacheButton kind="repository-file" id={selection.file.path} name={option.label} endpoint="/rule-repos/file-refresh" body={{repo:selection.repo,ref:selection.file.ref,path:selection.file.path}}/></td>
           </tr>;
         })}</tbody>
       </table>
