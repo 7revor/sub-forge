@@ -59,12 +59,12 @@ describe('来源获取与服务端转换分离', () => {
     expect(calls[2]!.ua).toBe('different');
   });
 
-  it('已保存来源 GET 鉴权，草稿不落快照，用户缓存相互隔离', async () => {
+  it('已保存公共来源跨用户可读，未保存草稿不落快照', async () => {
     const { alice, bob, store, calls } = await scenario();
     const saved = await alice.post('/api/rulesets', { name: '示例', sources: [remote] });
     const id = saved.json.item.id;
-    expect((await bob.get(`/api/rulesets/${id}/sources/a/content`)).status).toBe(404);
-    expect((await bob.post('/api/rulesets/source', { id, source: remote })).status).toBe(404);
+    expect((await bob.get(`/api/rulesets/${id}/sources/a/content`)).status).toBe(200);
+    expect((await bob.post('/api/rulesets/source', { id, source: remote })).status).toBe(200);
     expect((await alice.get(`/api/rulesets/${id}/sources/a/content`)).json.content).toBe(content);
     expect(store.latestSnapshot('ruleset', id, remote.url)?.body).toBe(content);
     await alice.post('/api/rulesets/source', { source: remote });

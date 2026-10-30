@@ -44,13 +44,13 @@ describe('规则引用完整源文件预览', () => {
     expect(h.store.list('ruleset')).toHaveLength(2);
   });
 
-  it('先检查登录与规则引用权限，公共规则集可读，其他用户私有规则集不可读', async () => {
+  it('先检查登录与规则引用权限，公共规则集可读，其他用户创建的规则增强也可读', async () => {
     const h = await setup(); const anonymous = client(h.app);
     const publicMatcher = { kind: 'ruleset', id: 'local-google' };
     expect((await anonymous.post(path, { matcher: publicMatcher })).status).toBe(401);
     const reader = client(h.app); await reader.login('reference-user');
     expect((await reader.post(path, { matcher: publicMatcher })).json.content).toBe('DOMAIN,local.example.test');
-    expect((await h.admin.post(path, { matcher: { kind: 'ruleset', id: 'private-google' } })).status).toBe(404);
+    expect((await h.admin.post(path, { matcher: { kind: 'ruleset', id: 'private-google' } })).status).toBe(200);
     for (const matcher of [null, [], {}, { kind: 'rule' }, { kind: 'ruleset' }, { kind: 'ruleset', id: 'missing' }]) {
       expect((await h.admin.post(path, { matcher })).status).toBeGreaterThanOrEqual(400);
     }

@@ -11,6 +11,7 @@ import { useDeleteDoc, type DocMap, type Kind } from '../hooks.ts';
 import { Button, buttonClass, cx, Empty, ErrorAlert, Input, PageHeader, td, th } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { Frame } from '../modals/Frame.tsx';
+import { ResourceLinkButton } from './ResourceLinkButton.tsx';
 
 export type Column<K extends Kind> = { header: string; cell: (d: DocMap[K]) => ReactNode; className?: string };
 
@@ -33,6 +34,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
     ? <Button variant={variant} size={size} onClick={onCreate}>{size === 'md' && <Plus size={16} />}新建{name}</Button>
     : <Link to={`/${kind}/new`} className={buttonClass(variant, size)}>{size === 'md' && <Plus size={16} />}新建{name}</Link>;
   const rows = list.data?.items ?? [];
+  const canWrite = (id: string) => kind !== 'rulesets' || list.data?.writableIds?.includes(id) === true;
   const refreshable=['sources','collections','rulesets','profiles'].includes(kind);
   const canRefresh=(d:DocMap[K])=>kind!=='rulesets'||(d as DocMap['rulesets']).sources.some(s=>s.kind==='remote'&&s.enabled!==false);
   return (
@@ -62,9 +64,10 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                     {refreshable && <td className={td}><ResourceLastRefreshTime kind={kind} id={d.id}/></td>}
                     <td className={cx(td, 'text-right whitespace-nowrap')}>
                       <div className="flex items-center justify-end gap-2">
+                        {kind !== 'presets' && <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />}
                         {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
-                        <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>
-                        <DocActionLink to={`/${kind}/${d.id}`} name={d.name} />
+                        {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
+                        <DocActionLink to={`/${kind}/${d.id}`} name={d.name} viewOnly={!canWrite(d.id)} />
                       </div>
                     </td>
                   </DocTableRow>

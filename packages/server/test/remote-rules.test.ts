@@ -19,15 +19,15 @@ describe('外部 URL 与系统 ID 分开引用', () => {
         : { template: { id: published.json.item.id, follow: 'latest' } };
       const p = await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], overlay: {}, ...routing });
       expect(p.status, p.text).toBe(201);
-      const token = h.store.createToken(p.json.item.id).token;
-      const main = await h.app.request(`/sub/${token}`);
+      const token = h.store.createToken(user.id).token;
+      const main = await h.app.request(`/sub/${token}/${p.json.item.id}`);
       expect(main.status).toBe(200);
       const config = parse(await main.text());
       const provider = Object.values(config['rule-providers'])[0] as { url: string; format: string; behavior: string };
       expect(provider).toMatchObject({ format: 'text', behavior: 'classical' });
       const nested = new URL(provider.url);
-      expect(nested.pathname).toBe('/api/rules/convert');
-      expect(nested.searchParams.get('url')).toBe(url);
+      expect(nested.pathname).toMatch(/\/r\/[^/]+\/[0-9a-f]{64}$/);
+      expect(nested.searchParams.get('url')).toBeNull();
       expect(h.store.list('ruleset')).toEqual([]);
       const download = await h.app.request(provider.url);
       expect(download.status).toBe(200);
@@ -38,13 +38,14 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(output).toContain('IP-CIDR,192.0.2.0/24,no-resolve');
       expect(published.json.item.rules[0].options?.noResolve).toBeUndefined();
       expect(download.headers.get('content-type')).toContain('text/plain');
-      expect(calls).toEqual([url,url]); // 模板校验与个人订阅使用隔离的资源范围
+      expect(calls).toEqual([url]); // 公共规则原文跨模板与订阅共享
       const edited = new URL(provider.url); edited.searchParams.set('url', 'https://unrelated.test/list');
-      expect((await h.app.request(edited.href)).status).toBe(404);
-      expect(calls).toEqual([url,url]); // 模板校验与个人订阅使用隔离的资源范围
-      const other = h.store.createToken('unrelated').token;
-      edited.searchParams.set('url', url); edited.searchParams.set('token', other);
-      expect((await h.app.request(edited.href)).status).toBe(404);
+      expect(await (await h.app.request(edited.href)).text()).toBe(output);
+      expect(calls).toEqual([url]); // 公共规则原文跨模板与订阅共享
+      const otherUser = await addUser(h.store, 'other');
+      const other = h.store.userToken(otherUser.id)!.token;
+      expect((await h.app.request(provider.url.replace(token, other))).status).toBe(200);
+      expect((await h.app.request(`/api/rules/convert?token=${token}&url=${encodeURIComponent(url)}`)).status).toBe(404);
       const changed = await c.post(`/api/templates/${published.json.item.id}/publish`, draft(remoteRuleMatcher('https://example.test/new.list')));
       expect(changed.status, changed.text).toBe(200);
       expect((await h.app.request(provider.url)).status).toBe(200);
@@ -55,7 +56,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
     } finally { await h.snapshots.settled(); h.store.close(); }
   });
 
-  it.each(['legacy', 'independent'])('%s 模式可直接引用 URL；系统 ID 不根据地址自动替换，私有 ID 权限不变', async mode => {
+  it.each(['legacy', 'independent'])('%s 模式可直接引用 URL；系统 ID 不根据地址自动替换，公共 ID 可跨用户引用', async mode => {
     const h = setupApp({ fetcher: async () => ({ status: 200, body: 'DOMAIN,example.test' }) });
     try {
       const alice = await addUser(h.store, 'alice'); const bob = await addUser(h.store, 'bob'); const c = client(h.app); await c.login('alice');
@@ -73,12 +74,12 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(external.json.item.routing.mode).toBe('independent');
       expect(internal.json.item.routing.config.rules[0].matcher).toEqual({ kind:'ruleset',id:'system' });
       expect(external.json.item.routing.config.rules[0].matcher.remote).toEqual({ url });
-      const token = h.store.createToken(external.json.item.id).token;
-      const config = parse(await (await h.app.request(`/sub/${token}`)).text());
+      const token = h.store.createToken(alice.id).token;
+      const config = parse(await (await h.app.request(`/sub/${token}/${external.json.item.id}`)).text());
       const provider = Object.values(config['rule-providers'])[0] as { url: string };
-      expect(new URL(provider.url).searchParams.get('url')).toBe(url);
+      expect(new URL(provider.url).searchParams.get('url')).toBeNull();
       expect(await (await h.app.request(provider.url)).text()).toContain('DOMAIN,example.test');
-      expect((await create({ kind: 'ruleset', id: 'private' })).status).toBe(400);
+      expect((await create({ kind: 'ruleset', id: 'private' })).status).toBe(201);
       expect((await create({ ...remoteRuleMatcher(url), id: 'system' })).status).toBe(400);
       expect((await create({ ...remoteRuleMatcher(url), repository: {} })).status).toBe(400);
     } finally { await h.snapshots.settled(); h.store.close(); }
@@ -87,7 +88,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
   it('绑定模板转为独立配置后保留远程引用，保存和下载继续有效', async () => {
     const h = setupApp({ fetcher: async () => ({ status: 200, body: 'DOMAIN,example.test' }) });
     try {
-      await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
+      const user = await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
       const published = await c.post('/api/templates/new/publish', draft());
       const profile = await c.post('/api/profiles', { name: '转为独立配置', nodeSets: [], overlay: {}, routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} }, templateVersion: 1 });
       expect(profile.status, profile.text).toBe(201);
@@ -97,10 +98,10 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       const saved = await c.put(`/api/profiles/${profile.json.item.id}`, converted.json.item);
       expect(saved.status, saved.text).toBe(200);
       expect((await c.post(`/api/templates/${published.json.item.id}/publish`, draft(remoteRuleMatcher('https://example.test/changed.list')))).status).toBe(200);
-      const token = h.store.createToken(profile.json.item.id).token;
-      const config = parse(await (await h.app.request(`/sub/${token}`)).text());
+      const token = h.store.createToken(user.id).token;
+      const config = parse(await (await h.app.request(`/sub/${token}/${profile.json.item.id}`)).text());
       const provider = Object.values(config['rule-providers'])[0] as { url: string };
-      expect(new URL(provider.url).searchParams.get('url')).toBe(url);
+      expect(new URL(provider.url).searchParams.get('url')).toBeNull();
       expect(await (await h.app.request(provider.url)).text()).toContain('DOMAIN,example.test');
       expect(h.store.list('ruleset')).toEqual([]);
     } finally { await h.snapshots.settled(); h.store.close(); }

@@ -31,7 +31,7 @@ if (process.argv.includes('--icons')) {
   env.store.importSeed({
     locals: [{ id: nodeSet.id, name: '图标验收节点', proxies: [{ name: '演示节点', type: 'socks5', server: 'node.example.test', port: 1080 }] }],
     collections: [{ id: 'icon-collection', name: '图标验收组合', members: [{ ref: nodeSet }], pipeline: [{ op: 'rename.regex', rules: [{ pattern: '演示', replace: '测试' }] }] }],
-    tokens: [{ token: 'icon-audit-demo-token', profileId: 'cards-profile', label: '图标验收链接' }],
+    tokens: [{ token: 'icon-audit-demo-token', userId: env.user.id }],
   }, env.user.id);
   const profile = env.store.get('profile', 'cards-profile')!;
   env.store.put('profile', { ...profile, nodeSets: [{ ref: nodeSet, output: 'inline' }], chains: [{ id: 'icon-chain', landing: { nodeSet }, via: direct }] }, env.user.id);

@@ -43,7 +43,7 @@ describe('Stash 完整 YAML 渲染', () => {
   });
 
   it('独立文件导出仅放入有效规则，丢弃 LIST 诊断注释且保持 no-resolve 顺序', () => {
-    const text = exportStashConfig({ config: { 'rule-providers': { rs: { url: 'https://sub.test/r/{token}/rs.list' } }, rules: ['RULE-SET,rs,代理', 'MATCH,DIRECT'] }, rulesets: { 'rs.list': { behavior: 'classical', text: '# [客户端不支持] PROCESS-NAME,App\nDOMAIN,a.test\nIP-CIDR,192.0.2.0/24,no-resolve\n' } } });
+    const text = exportStashConfig({ config: { 'rule-providers': { rs: { url: 'https://sub.test/r/{token}/rs.list' } }, rules: ['RULE-SET,rs,代理', 'MATCH,DIRECT'] }, rulesets: { 'rs.list': { behavior: 'classical', providerName: 'rs', text: '# [客户端不支持] PROCESS-NAME,App\nDOMAIN,a.test\nIP-CIDR,192.0.2.0/24,no-resolve\n' } } });
     const config = parse(text);
     expect(config.rules).toEqual(['DOMAIN,a.test,代理', 'IP-CIDR,192.0.2.0/24,代理,no-resolve', 'MATCH,DIRECT']);
     expect(config['rule-providers']).toBeUndefined();

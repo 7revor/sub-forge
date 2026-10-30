@@ -78,9 +78,9 @@ describe('用户管理（管理员）', () => {
     store.put('local', { id: 's', name: 'S', proxies: [{ name: 'A', type: 'socks5', server: 'host.test', port: 1080 }] }, user.id);
     store.put('ruleset', { id: 'rs', name: 'R', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' }] }, user.id);
     store.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'local', id: 's' }, output: 'provider' }], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } } }] }, chains: [], refPolicy: { default: 'wrap' } }, user.id);
-    const token = store.createToken('p').token;
-    const cfg = parse(await (await app.request(`/sub/${token}`)).text());
-    const paths = [`/sub/${token}`, cfg['proxy-providers'].S.url, cfg['rule-providers'].rs_rs_classical.url].map((url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; });
+    const token = store.createToken(user.id).token;
+    const cfg = parse(await (await app.request(`/sub/${token}/p`)).text());
+    const paths = [`/sub/${token}/p`, cfg['proxy-providers'].S.url, cfg['rule-providers'].R.url].map((url: string) => { const u = new URL(url, 'https://sub.test'); return u.pathname + u.search; });
     const admin = client(app); await admin.login('root');
     for (const path of paths) expect((await app.request(path)).status).toBe(200);
     await admin.patch(`/api/users/${user.id}`, { disabled: true });

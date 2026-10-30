@@ -16,7 +16,7 @@ describe('远程规则身份与域名方言', () => {
     const text='.example.test\n+.suffix.test\nexact.test';
     const clash=parseRuleSourceContent(text,{format:'auto',url:'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/test.list'});
     const surge=parseRuleSourceContent(text,{format:'auto',url:'https://example.com/rules.list'});
-    if(clash.passthrough || surge.passthrough) throw new Error('应为文本解析');
+    if(clash.binary || surge.binary) throw new Error('应为文本解析');
     expect(clash.rules.map(x=>x.rule)).toEqual([{type:'DOMAIN-WILDCARD',value:'*.example.test'},{type:'DOMAIN-SUFFIX',value:'suffix.test'},{type:'DOMAIN',value:'exact.test'}]);
     expect(surge.rules[0]!.rule).toEqual({type:'DOMAIN-SUFFIX',value:'example.test'});
   });

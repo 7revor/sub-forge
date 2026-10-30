@@ -50,7 +50,7 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       if (line.startsWith('MATCH,')) return ['FINAL,' + iniName(line.slice(6))];
       const match = /^RULE-SET,([^,]+),(.+)$/.exec(line);
       if (!match) return [line];
-      const file = result.rulesets[match[1] + '.list'];
+      const file = Object.values(result.rulesets).find(file => file.providerName === match[1]);
       if (!file) throw new Error('Loon 缺少可内嵌的规则文本');
       const target = iniName(match[2]);
       return file.text.split(/\r?\n/).filter(rule => rule.trim() && !rule.trimStart().startsWith('#')).map(rule => composeRule(rawRuleParts(rule), target));

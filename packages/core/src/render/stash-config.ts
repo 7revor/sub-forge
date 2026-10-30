@@ -81,15 +81,16 @@ export function stashBenchmarks(groups: Record<string, unknown>[], nodes: Record
   }
 }
 
-/** 导出可独立导入的快照文件；托管规则内嵌，原生远程 provider 保留其真实 URL。 */
+/** 导出可独立导入的快照文件；文本托管规则内嵌；二进制规则不能导出为独立文本文件。 */
 export function exportStashConfig(result: Pick<MihomoRenderResult, 'config' | 'rulesets'>): string {
   const config = structuredClone(result.config);
   const providers = config['rule-providers'] as Record<string, unknown> | undefined;
   config.rules = (config.rules as string[]).flatMap(line => {
     const match = /^RULE-SET,([^,]+),(.+)$/.exec(line);
     if (!match) return [line];
-    const file = result.rulesets[`${match[1]}.list`];
+    const file = Object.values(result.rulesets).find(file => file.providerName === match[1]);
     if (!file) return [line];
+    if (file.text.startsWith('#subforge-binary-mrs\n')) throw new Error('二进制规则不能内嵌到独立文本配置，请使用托管订阅');
     if (providers) delete providers[match[1]!];
     return file.text.split(/\r?\n/).filter(rule => rule.trim() && !rule.trimStart().startsWith('#')).map(rule => composeRule(rawRuleParts(rule), match[2]));
   });

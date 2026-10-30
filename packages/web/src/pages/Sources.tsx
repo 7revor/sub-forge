@@ -3,6 +3,7 @@ import { Frame } from '../modals/Frame.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 import { NodeSetCount } from '../components/NodeSetCount.tsx';
+import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 // 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展示最近拉取状态。
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -129,6 +130,7 @@ export function SourceEdit() {
       <PageHeader crumbs={<><Link to="/sources" className="text-ink-muted no-underline">订阅源</Link> / {doc.data?.name}</>}
         title={draft.name || '未命名'}
         actions={<>
+          <ResourceLinkButton kind="sources" id={draft.id} name={draft.name} disabled={dirty} />
           <Button onClick={saveAndRefresh} disabled={busy || !ready}><RefreshCw size={15} />{refresh.isPending ? '拉取中…' : dirty ? '保存并拉取' : '立即拉取'}</Button>
           <Button variant="primary" onClick={submit} disabled={busy || !dirty || !ready}>{save.isPending ? '保存中…' : dirty ? '保存修改' : '已保存'}</Button>
           <Button variant="danger" onClick={openDelete}>删除</Button>

@@ -138,7 +138,7 @@ export type RuleSetSource = {
   content?: string;
   /** 自动识别内容；历史值仅兼容域名方言与二进制来源。 */
   format: RuleSetFormat;
-  /** 透传的二进制规则集（mrs）必须声明 behavior，其余格式解析后自动拆分 */
+  /** 原字节托管的二进制规则集（mrs）必须声明 behavior，其余格式解析后统一输出 classical LIST */
   behavior?: 'domain' | 'ipcidr' | 'classical';
   /** 仅兼容旧数据；新改写统一存放在 RuleSet.overrides，按规则内容定位 */
   overrides?: { line?: number; match?: string; override: ClientOverride }[];
@@ -148,7 +148,7 @@ export type RuleSetSource = {
 
 /**
  * 规则集：一个或多个来源（远程 URL / 本地规则）合并成一项，只配一个出口。
- * 单一兼容远程来源可透传；需要处理时合并去重后输出 classical LIST（原「规则包」并入规则集，2026-10-29）。
+ * 文本统一解析、合并去重后托管 classical LIST；单一合法 MRS 来源原字节托管。
  */
 export type RuleSet = {
   id: ID;

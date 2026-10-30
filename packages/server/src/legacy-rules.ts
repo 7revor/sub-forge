@@ -96,7 +96,7 @@ export function promoteRuleSetOverrides(rs: RuleSetDoc, snapshot: (src: RuleSetS
       const matches = new Set<string>();
       if (item.match?.trim()) matches.add(item.match);
       if (item.line !== undefined) {
-        const row = parsed && !parsed.passthrough ? parsed.rules.find((r) => r.line === item.line) : undefined;
+        const row = parsed && !parsed.binary ? parsed.rules.find((r) => r.line === item.line) : undefined;
         if (!row) return src;
         matches.add(row.text);
       }

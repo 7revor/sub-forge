@@ -24,13 +24,13 @@ describe('规则选项在解析与最终输出之间保真', () => {
 
   it('规则集 CIDR 上的 no-resolve 保留在 classical 行内', () => {
     const r = render('IP-CIDR,192.0.2.0/24,no-resolve');
-    expect(r.config.rules).toEqual(['RULE-SET,rs_rs_classical,DIRECT', 'MATCH,DIRECT']);
+    expect(r.config.rules).toEqual(['RULE-SET,R,DIRECT', 'MATCH,DIRECT']);
     expect(r.rulesets['rs_rs_classical.list']!.text).toBe('IP-CIDR,192.0.2.0/24,no-resolve\n');
   });
 
   it('混合选项逐行输出，不把需要解析的规则一起禁止解析', () => {
     const r = render('IP-CIDR,192.0.2.0/24,no-resolve\nIP-CIDR,198.51.100.0/24\nIP-CIDR,203.0.113.0/24,no-resolve,src');
-    expect(r.config.rules).toEqual(['RULE-SET,rs_rs_classical,DIRECT', 'MATCH,DIRECT']);
+    expect(r.config.rules).toEqual(['RULE-SET,R,DIRECT', 'MATCH,DIRECT']);
     expect(Object.values(r.rulesets).map(x => x.text)).toEqual(['IP-CIDR,192.0.2.0/24,no-resolve\nIP-CIDR,198.51.100.0/24\nIP-CIDR,203.0.113.0/24,no-resolve,src\n']);
   });
 
@@ -39,8 +39,8 @@ describe('规则选项在解析与最终输出之间保真', () => {
     const r = render('DOMAIN,example.test\nGEOIP,CN\nIP-CIDR,192.0.2.0/24', [plain, { ...plain, id: 'src', options: { noResolve: true, src: true } }]);
     expect(r.rulesets['rs_rs_classical.list']!.text).toBe('DOMAIN,example.test\nGEOIP,CN\nIP-CIDR,192.0.2.0/24\n');
     expect(r.rulesets['rs_rs_src_classical.list']!.text).toBe('DOMAIN,example.test\nGEOIP,CN,src\nIP-CIDR,192.0.2.0/24,src\n');
-    expect(r.config.rules).toContain('RULE-SET,rs_rs_src_classical,DIRECT');
-    expect(r.config.rules).toContain('RULE-SET,rs_rs_classical,DIRECT');
+    expect(r.config.rules).toContain('RULE-SET,R (2),DIRECT');
+    expect(r.config.rules).toContain('RULE-SET,R,DIRECT');
   });
 
   it('单条规则的规则级 src 进入最终输出', () => {

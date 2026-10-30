@@ -79,7 +79,7 @@ const SCENARIOS: [string, Partial<Profile>][] = [
     nodeSets: [{ ref: S('A'), output: 'provider' }, { ref: S('T'), output: 'provider' }],
     overlay: { groupPatches: { hk: { addMembers: [{ kind: 'nodeset', ref: S('A') }, { kind: 'nodeset', ref: S('T') }], set: { filter: '(?i)港|HK' } } } },
   }],
-  ['场景 3：整源走前置（包装组 + override.dialer-proxy）', {
+  ['场景 3：整源走前置（包装组 + 服务端注入节点 dialer-proxy）', {
     nodeSets: [{ ref: S('L'), output: 'provider' }, { ref: S('T'), output: 'provider' }],
     chains: [{ id: 'c1', landing: { nodeSet: S('L') }, via: toNode('T', '🇭🇰 IPLC-01') }],
   }],

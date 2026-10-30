@@ -13,7 +13,7 @@ describe('绑定订阅的前置单条规则', () => {
     const first = rule('first');
     const second = rule('second', { kind: 'group', groupId: 'sel' });
     const result = render({ routing: bound([first, { ...rule('off'), enabled: false }, second]) });
-    expect((result.config.rules as string[]).slice(0, 3)).toEqual(['DOMAIN,first.test,DIRECT', 'DOMAIN,second.test,🚀 节点选择', 'RULE-SET,rs_fin_classical,🚀 节点选择']);
+    expect((result.config.rules as string[]).slice(0, 3)).toEqual(['DOMAIN,first.test,DIRECT', 'DOMAIN,second.test,🚀 节点选择', 'RULE-SET,金融服务,🚀 节点选择']);
     expect((result.config.rules as string[]).at(-1)).toBe('MATCH,🚀 节点选择');
     expect(profileEditorOverlay({ overlay: {}, routing: bound([first, second]) }).extraRules?.map(extra => extra.rule.id)).toEqual(['second', 'first']);
   });

@@ -8,7 +8,7 @@ export type RuleDiagnostic = { sourceId: string; line: number; text: string; rea
 export type RuleDocumentRow = { line: number; text: string; parsed?: ParsedRule; diagnostic?: RuleDiagnostic };
 export type RuleDocument = {
   sourceId: string; rows: RuleDocumentRow[]; diagnostics: RuleDiagnostic[]; parsed: number;
-  format: string; behavior?: Behavior; passthrough: boolean;
+  format: string; behavior?: Behavior; binary: boolean;
 };
 export type RuleConversion = {
   lines: string[];
@@ -24,12 +24,12 @@ export function prepareRuleDocument(content: string, source: RuleSetSource): Rul
   const rows: RuleDocumentRow[] = content.split(/\r?\n/).map((text, i) => ({ line: i + 1, text }));
   // 末尾换行是结束符，不额外制造一行。
   if (rows.length > 1 && rows.at(-1)!.text === '') rows.pop();
-  const result: RuleDocument = { sourceId: source.id, rows, diagnostics: [], parsed: 0, format: 'auto', passthrough: false };
+  const result: RuleDocument = { sourceId: source.id, rows, diagnostics: [], parsed: 0, format: 'auto', binary: false };
   try {
     const parsed = parseRuleSourceContent(content, source);
     result.format = parsed.format;
-    result.passthrough = parsed.passthrough;
-    if (parsed.passthrough) { result.rows = []; return result; }
+    result.binary = parsed.binary;
+    if (parsed.binary) { result.rows = []; return result; }
     result.behavior = parsed.behavior;
     result.parsed = parsed.rules.length;
     let yamlLines: number[] | undefined;
@@ -104,7 +104,7 @@ export function convertRuleDocuments(
   for (const src of rs.sources) {
     if (options.sourceId ? src.id !== options.sourceId : src.enabled === false) continue;
     const doc = documents.get(src.id);
-    if (!doc || doc.passthrough) continue;
+    if (!doc || doc.binary) continue;
     out.stats.parsed += doc.parsed;
     out.stats.rejected += doc.diagnostics.length;
     out.diagnostics.push(...doc.diagnostics);

@@ -1,0 +1,27 @@
+
+> @sub-forge/server@0.0.0 test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources/packages/server
+> vitest run
+
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/user-token-managed-resources/packages/server
+
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'replacement'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+
+ Test Files  56 passed | 2 skipped (58)
+      Tests  501 passed | 5 skipped (506)
+   Start at  14:12:04
+   Duration  10.79s (transform 3.73s, setup 0ms, import 20.11s, tests 68.03s, environment 3ms)

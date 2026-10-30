@@ -17,7 +17,7 @@ describe('来源失败状态与显式重试', () => {
     expect(rulesetSourceState([source], [failed]).ready).toBe(false);
     expect(rulesetSourceState([source], [failed], 's').ready).toBe(false);
     expect(rulesetSourceState([source, { ...source, id: 'good' }], [failed, result(success)], 'good').ready).toBe(true);
-    expect(rulesetSourceState([source], [result({ status: { id: 's', ok: true, passthrough: true } })]).ready).toBe(true);
+    expect(rulesetSourceState([source], [result({ status: { id: 's', ok: true, binary: true } })]).ready).toBe(true);
   });
 
   it.each(['业务错误', 'HTTP 错误'])('%s 后重试更新同一查询，并重新允许转换', async failure => {

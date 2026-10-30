@@ -5,7 +5,7 @@ import { normalizeRulePresence } from '../rule-presence.ts';
 //      出现孤儿覆盖项或空组的为警告。
 // 草稿只存在于前端，编辑时调用 validate 即时检查（TPL-11）。
 
-import { ruleSetDelivery, parseRuleSourceContent, rejectedRuleReport, validateTemplate, sourceLabel, type ReportItem, type Template } from '@sub-forge/core';
+import { managedRuleDelivery, parseRuleSourceContent, rejectedRuleReport, validateTemplate, sourceLabel, type ReportItem, type Template } from '@sub-forge/core';
 import { readPagination } from './pagination.ts';
 import { Hono, type Context } from 'hono';
 import { randomId } from '../crypto.ts';
@@ -49,10 +49,10 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
   for (const id of ids) {
     const rs = rulesets[id]!;
     const where = `ruleset:${id}`;
-    // 二进制只有无需处理的单来源可以透传；保存前也必须执行相同约束。
+    // 二进制只有无需处理的单来源可以原样托管；保存前也必须执行相同约束。
     if (rs.sources.some(src => src.enabled !== false && (src.format === 'mrs' || src.format === 'srs'))) {
       for (const entry of t.rules.filter(r => r.enabled !== false && r.matcher.kind === 'ruleset' && r.matcher.id === id)) {
-        const delivery = ruleSetDelivery(rs, { rulesets, snapshots: {} }, { client: 'mihomo' }, entry.options);
+        const delivery = managedRuleDelivery(rs, { client: 'mihomo' }, entry.options);
         if (delivery.mode === 'unsupported') report.push({ level: 'error', code: 'template.ruleset-invalid', message: delivery.reason, where });
       }
     }
@@ -65,7 +65,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
       }
       let content = src.content ?? '';
       if (src.kind === 'remote') {
-        const result = await snapshots.get('ruleset', id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: src.repository && !src.fetch?.ua ? 'public-repository' : store.getWithOwner('ruleset', id)?.owner ?? 'public-template' });
+        const result = await snapshots.get('ruleset', id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
         if (!result.snapshot) {
           report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `${label}没有可用快照：${result.error ?? '无法拉取'}`, where });
           continue;
@@ -83,7 +83,7 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
         continue;
       }
       const parsed = parseRuleSourceContent(content, src);
-      if (!parsed.passthrough && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', ...rejectedRuleReport(content, src, rs.sources.indexOf(src)), where });
+      if (!parsed.binary && parsed.rejected.length) report.push({ level: 'warn', code: 'template.ruleset-rejected-lines', ...rejectedRuleReport(content, src, rs.sources.indexOf(src)), where });
     }
   }
   // 保留资源诊断，同时提供可直接展开定位的规则行错误。

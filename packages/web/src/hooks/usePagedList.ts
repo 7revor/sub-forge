@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router';
 import { api } from '../api.ts';
 import type { DocMap, Kind, TemplateDoc } from '../hooks.ts';
 
-export type PageResult<T> = { items: T[]; total: number; page: number; pageSize: number; totalPages: number };
+export type PageResult<T> = { items: T[]; total: number; page: number; pageSize: number; totalPages: number; writableIds?: string[] };
 type ListMap = DocMap & { templates: TemplateDoc };
 export const PAGE_SIZES = [10, 20, 50, 100];
 

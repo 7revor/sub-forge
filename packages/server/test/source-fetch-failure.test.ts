@@ -1,3 +1,4 @@
+import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { setupApp } from './helpers.ts';
@@ -19,7 +20,7 @@ function setup(url: string) {
   envs.push(h);
   h.store.put('source', { id: 's', name: '单地址源', url, pipeline: [] });
   h.store.put('profile', { id: 'p', name: '测试订阅', nodeSets: [{ ref: { type: 'source', id: 's' }, output: 'inline' }], overlay: {}, chains: [], refPolicy: { default: 'wrap' } });
-  h.store.putToken({ token: 'token', profileId: 'p' });
+  issueProfileToken(h.store, { token: 'token', profileId: 'p' });
   return { ...h, responses };
 }
 
@@ -27,13 +28,13 @@ describe('单地址订阅源的失败回退', () => {
   it('单个 URL 从未成功时返回 503', async () => {
     const h = setup(good);
     h.responses[good] = new Error('模拟失败');
-    expect((await h.app.request('/sub/token')).status).toBe(503);
+    expect((await h.app.request('/sub/token/p')).status).toBe(503);
     expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
   });
 
   it('当前拉取失败时继续输出该 URL 的成功快照', async () => {
     const h = setup(good);
-    expect((await h.app.request('/sub/token')).status).toBe(200);
+    expect((await h.app.request('/sub/token/p')).status).toBe(200);
     h.responses[good] = new Error('已用地址也不可用'); h.advance(1000);
     await h.snapshots.refresh('source', 's', good);
     const res = await h.renderer.render('p', { client: 'mihomo' });
@@ -46,7 +47,7 @@ describe('单地址订阅源的失败回退', () => {
 
   it('先有成功结果，后来换成完全不可用的地址时返回上一份成功配置', async () => {
     const h = setup(good);
-    const before = await (await h.app.request('/sub/token')).text();
+    const before = await (await h.app.request('/sub/token/p')).text();
     h.store.put('source', { ...h.store.get('source', 's')!, url: bad });
     const res = await h.renderer.render('p', { client: 'mihomo' });
     expect(res.ok && res.source).toBe('last-good');
@@ -58,6 +59,6 @@ describe('单地址订阅源的失败回退', () => {
     h.store.put('source', { id: 'failed', name: '失败成员', url: bad, pipeline: [] });
     h.store.put('collection', { id: 'c', name: '组合', members: [{ ref: { type: 'source', id: 's' } }, { ref: { type: 'source', id: 'failed' } }], pipeline: [] });
     h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: [{ ref: { type: 'collection', id: 'c' }, output: 'inline' }] });
-    expect((await h.app.request('/sub/token')).status).toBe(503);
+    expect((await h.app.request('/sub/token/p')).status).toBe(503);
   });
 });

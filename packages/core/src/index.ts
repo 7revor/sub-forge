@@ -43,3 +43,5 @@ export * from './render/surge-config.ts';
 export * from './render/loon-config.ts';
 export * from './proxy/loon.ts';
 export * from './nodeset/chain.ts';
+
+export * from './rules/provider-name.ts';

@@ -1,9 +1,9 @@
 // 服务端转换器：不访问上游，按内容缓存解析结果，供规则预览与其他管理模块复用。
 import { createHash } from 'node:crypto';
-import { convertRuleDocuments, prepareRuleDocument, ruleSetDelivery, sourceKey, type ClientCtx, type RuleConversion, type RuleDocument, type RuleSet, type RuleSetDelivery, type RuleSetSource } from '@sub-forge/core';
+import { convertRuleDocuments, prepareRuleDocument, managedRuleDelivery, type ClientCtx, type RuleConversion, type RuleDocument, type RuleSet, type RuleSetDelivery, type RuleSetSource } from '@sub-forge/core';
 
 export type ConversionInput = { source: RuleSetSource; content?: string };
-export type ConversionResult = RuleConversion & { delivery: RuleSetDelivery; passthrough: boolean };
+export type ConversionResult = RuleConversion & { delivery: RuleSetDelivery; binary: boolean };
 export class RuleConverter {
   private readonly parsed = new Map<string, { document: RuleDocument; bytes: number }>();
   private bytes = 0;
@@ -25,12 +25,9 @@ export class RuleConverter {
   convert(inputs: ConversionInput[], options: Pick<RuleSet, 'overrides' | 'noResolve'>, ctx: ClientCtx, sourceId?: string): ConversionResult {
     const rs: RuleSet = { id: 'conversion', name: '', sources: inputs.map(i => i.source), overrides: options.overrides };
     const documents = new Map(inputs.filter(i => i.content !== undefined || ['mrs', 'srs'].includes(i.source.format)).map(i => [i.source.id, this.prepare(i.content ?? '', i.source)]));
-    const snapshots = Object.fromEntries(inputs.filter(i => i.content !== undefined).map(i => [sourceKey(rs.id, i.source.id), i.content!]));
     const scope = sourceId ? { ...rs, sources: rs.sources.filter(s => s.id === sourceId).map(s => ({ ...s, enabled: true })) } : rs;
-    // 无法解析的输入仍以注释呈现；不能让输出方式判定阻断其他有效来源。
-    const invalid = scope.sources.filter(s => s.enabled !== false).some(s => documents.get(s.id)?.diagnostics.some(x => x.kind === 'invalid'));
-    const delivery = invalid ? { mode: 'managed' as const, format: 'text' as const, behavior: 'classical' as const } : ruleSetDelivery(scope, { rulesets: { [rs.id]: scope }, snapshots }, ctx, undefined, documents);
-    return { ...convertRuleDocuments(rs, documents, ctx, { sourceId }), delivery: delivery.mode === 'unsupported' ? delivery : {mode:'managed',format:'text',behavior:'classical'},
-      passthrough: scope.sources.length > 0 && scope.sources.every(s => ['mrs', 'srs'].includes(s.format)) };
+    const delivery = managedRuleDelivery(scope, ctx);
+    return { ...convertRuleDocuments(rs, documents, ctx, { sourceId }), delivery,
+      binary: scope.sources.length > 0 && scope.sources.every(s => ['mrs', 'srs'].includes(s.format)) };
   }
 }
