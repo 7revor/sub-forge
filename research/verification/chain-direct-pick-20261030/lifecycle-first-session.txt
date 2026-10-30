@@ -1,0 +1,16 @@
+退场验收：7 项
+通过：直接点选代理链退场本机 → 自建落地 · 🇺🇸 GCP [01] →；121 帧；高度 680px，标题、正文、输入值保持一致
+通过：直接点选代理链退场本机 → 自建落地 · 🇸🇬 新加坡 → 🇺🇸；121 帧；高度 680px，标题、正文、输入值保持一致
+通过：直接点选代理链退场本机 → 自建落地 · 🇸🇬 新加坡 → 🇺🇸；121 帧；高度 680px，标题、正文、输入值保持一致
+通过：直接点选代理链退场本机 → 自建落地 · 🇸🇬 新加坡 → 🇺🇸；121 帧；高度 680px，标题、正文、输入值保持一致
+通过：直接点选代理链退场本机 → 自建落地 · 🇸🇬 新加坡 → 🇺🇸；120 帧；高度 680px，标题、正文、输入值保持一致
+通过：直接点选代理链退场本机 → 备用前置组 → 🇺🇸 GCP [01] ；120 帧；高度 680px，标题、正文、输入值保持一致
+通过：代理链退场验收本机 → 中转机场 · /日本/ → 自建落地 · 筛选节；121 帧；高度 680px，标题、正文、输入值保持一致
+Promise 结果：7 项
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"confirmed","data":{"id":"click-chain","landing":{"nodeSet":{"type":"local","id":"self"},"filter":"^🇺🇸 GCP \\[01\\]$"},"via":{"kind":"node","ref":{"nodeSet":{"type":"local","id":"self"},"match":{"exact":"🇸🇬 新加坡"}}}}}
+{"status":"confirmed","data":{"id":"click-chain","landing":{"nodeSet":{"type":"local","id":"self"},"filter":"^🇺🇸 GCP \\[01\\]$"},"via":{"kind":"group","groupId":"backup"}}}
+{"status":"cancelled","reason":"dismissed"}
