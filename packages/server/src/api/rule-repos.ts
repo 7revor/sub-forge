@@ -1,3 +1,4 @@
+import { profileEditorOverlay } from '@sub-forge/core';
 import type { ResourceService } from '../resources.ts';
 import { Hono } from 'hono';
 import { randomId } from '../crypto.ts';
@@ -61,7 +62,7 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService, resources?:
   app.delete('/rule-repos/:id', requireAdmin, async c => {
     const id = c.req.param('id');
     const referrers = store.listLatestTemplates().filter(t => t.rules.some(r => r.matcher.kind === 'ruleset' && r.matcher.repository?.repo === id)).map(t => `模板「${t.name}」`);
-    for (const p of store.list('profile')) if ((p.routing?.mode === 'independent' ? p.routing.config.rules : p.overlay.extraRules?.map(r => r.rule) ?? []).some(r => r.matcher.kind === 'ruleset' && r.matcher.repository?.repo === id)) referrers.push(`配置订阅「${p.name}」`);
+    for (const p of store.list('profile')) if ((profileEditorOverlay(p).extraRules ?? []).some(({ rule: r }) => r.matcher.kind === 'ruleset' && r.matcher.repository?.repo === id)) referrers.push(`配置订阅「${p.name}」`);
     if (referrers.length) throw new HttpError(409, `仓库仍被引用，不能删除：${referrers.join('、')}`, { referrers });
     await repos.removeCustom(id);
     return c.json({ ok: true });

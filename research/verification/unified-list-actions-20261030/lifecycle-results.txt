@@ -1,0 +1,21 @@
+退场验收：9 项
+通过：删除第一份文档？被 3 个策略组引用，删除后引用将失效。取消删除Clos；121 帧；高度 154px，标题、正文、输入值保持一致
+通过：删除第一份文档？被 3 个策略组引用，删除后引用将失效。取消删除Clos；120 帧；高度 154px，标题、正文、输入值保持一致
+通过：删除第一份文档？被 3 个策略组引用，删除后引用将失效。取消删除Clos；120 帧；高度 154px，标题、正文、输入值保持一致
+通过：删除第一份文档？被 3 个策略组引用，删除后引用将失效。取消删除Clos；120 帧；高度 154px，标题、正文、输入值保持一致
+通过：删除第二份文档，名称较长以验证重开更新？第二份文档的独立说明。取消确认C；121 帧；高度 154px，标题、正文、输入值保持一致
+通过：保存失败后重试名称取消处理中…模拟保存失败，请重试Close；121 帧；高度 238px，标题、正文、输入值保持一致
+通过：子弹窗名称取消保存Close；120 帧；高度 203px，标题、正文、输入值保持一致
+通过：嵌套草稿与路由验收打开子弹窗打开嵌套查询预览切换路由取消保存Close；121 帧；高度 383px，标题、正文、输入值保持一致
+通过：嵌套草稿与路由验收打开子弹窗打开嵌套查询预览切换路由取消保存Close；120 帧；高度 383px，标题、正文、输入值保持一致
+
+Promise 结果：9 项
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"confirmed","data":true}
+{"status":"confirmed","data":"修改后保留的草稿"}
+{"status":"confirmed","data":"子弹窗独立草稿"}
+{"status":"cancelled","reason":"navigation"}
+{"status":"cancelled","reason":"dismissed"}

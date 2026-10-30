@@ -35,7 +35,7 @@ export function System(){
         <ErrorAlert error={rules.error} />
         {!rules.data ? <p className="text-ink-muted">正在读取公共资源…</p> : !rules.data.items.length ? <p className="text-ink-muted">尚未生成公共规则资源。</p> : <ul className="flex list-none flex-col gap-3 p-0">{rules.data.items.map(resource => <li key={resource.key} className="flex items-center justify-between gap-4 rounded border border-line p-3 text-[13px]">
           <div className="min-w-0"><div className="break-all font-medium">{resource.name}</div><div className="text-ink-muted">{resource.target.client} · {resource.referenced ? '仍被引用' : '无配置引用'}</div>{resource.error && <p className="text-red-600">{resource.error} · 正在使用上次成功产物</p>}</div>
-          <Button size="sm" disabled={resource.referenced} onClick={() => void remove(resource)}>删除资源</Button>
+          <Button size="sm" variant="danger" disabled={resource.referenced} onClick={() => void remove(resource)}>删除资源</Button>
         </li>)}</ul>}
       </Card>
     </PageScroll></>;

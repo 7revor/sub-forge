@@ -1,6 +1,6 @@
 import { ruleBodies } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { Matcher } from '@sub-forge/core';
+import { remoteRuleMatcher, type Matcher } from '@sub-forge/core';
 import { setupRuleReferences } from './rule-reference-fixture.ts';
 import { client } from './helpers.ts';
 import { repositoryMatcher } from '../src/ruleset-reference.ts';
@@ -104,5 +104,65 @@ describe('模板统一规则引用', () => {
     expect(profile.status).toBe(201);
     const preview = await h.renderer.preview(profile.json.item.id, { client: 'mihomo' });
     expect(preview.ok).toBe(true);
+  });
+});
+
+
+describe('关联模板的自定义规则引用', () => {
+  it('前后规则支持远程、仓库和增强集合，保存、实际订阅及转换保持顺序', async () => {
+    const h = await setup();
+    const repository = await h.resolve();
+    const published = await h.admin.post('/api/templates/new/publish', template({ kind: 'local', content: 'DOMAIN,template.example.test' }));
+    expect(published.status).toBe(201);
+    const entry = (id: string, matcher: Matcher) => ({ id, matcher, target: { kind: 'builtin', name: 'DIRECT' } });
+    const routing = { mode: 'bound', templateId: published.json.item.id, groupAdditions: {},
+      prependRules: [entry('remote', remoteRuleMatcher('https://rules.example.test/custom.list')), entry('repository', repository)],
+      appendRules: [entry('enhanced', { kind: 'ruleset', id: 'local-google' })],
+    };
+    const saved = await h.admin.post('/api/profiles', { name: '完整自定义规则', nodeSets: [], overlay: {}, routing });
+    expect(saved.status, saved.text).toBe(201);
+    const id = saved.json.item.id;
+    const read = await h.admin.get(`/api/profiles?id=${id}`);
+    expect(read.json.item.routing).toEqual(routing);
+    const token = h.store.userToken(h.user.id)!.token;
+    const response = await h.app.request(`/subs/profile?token=${token}&id=${id}`);
+    expect(response.status).toBe(200);
+    const output = parse(await response.text());
+    expect(output.rules).toEqual([expect.stringMatching(/^RULE-SET,/), expect.stringMatching(/^RULE-SET,/), 'DOMAIN,template.example.test,REJECT', expect.stringMatching(/^RULE-SET,/), 'MATCH,DIRECT']);
+    const providers = Object.values(output['rule-providers']) as { url: string }[];
+    expect(providers).toHaveLength(3);
+    for (const provider of providers) {
+      const nested = await h.app.request(provider.url);
+      expect(nested.status).toBe(200);
+      expect(await nested.text()).toMatch(/DOMAIN,(google|local)\.example\.test/);
+    }
+    const converted = await h.admin.post('/api/profiles/routing/convert', { profile: saved.json.item, mode: 'independent' });
+    expect(converted.status).toBe(200);
+    expect(converted.json.item.routing.config.rules.map((r: { id: string }) => r.id)).toEqual(['remote', 'repository', 'r', 'enhanced']);
+    const reordered = { ...saved.json.item, routing: { ...routing, prependRules: routing.appendRules, appendRules: routing.prependRules } };
+    expect((await h.admin.put(`/api/profiles/${id}`, reordered)).status).toBe(200);
+    const preview = await h.admin.post('/api/profiles/preview', { profile: reordered });
+    expect(preview.status).toBe(200);
+    expect(preview.json.ok).toBe(true);
+    expect(parse(preview.json.yaml).rules[1]).toBe('DOMAIN,template.example.test,REJECT');
+    expect((await h.admin.del('/api/rule-repos/blackmatrix7')).status).toBe(409);
+  });
+
+  it('前后引用均校验来源身份，不允许伪造远程或仓库映射', async () => {
+    const h = await setup();
+    const repository = await h.resolve();
+    const published = await h.admin.post('/api/templates/new/publish', { name: '空模板', groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } });
+    const forged = structuredClone(repository);
+    forged.repository.sources[0].url = 'https://forged.example.test/list';
+    for (const key of ['prependRules', 'appendRules']) for (const matcher of [
+      { kind: 'ruleset', id: 'missing' },
+      { ...remoteRuleMatcher('https://rules.example.test/custom.list'), id: 'local-google' },
+      repositoryMatcher(forged.repository),
+    ]) {
+      const profile = { name: '无效引用', nodeSets: [], overlay: {}, routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {}, [key]: [{ id: 'custom', matcher, target: { kind: 'builtin', name: 'DIRECT' } }] } };
+      expect((await h.admin.post('/api/profiles', profile)).status).toBe(400);
+      expect((await h.admin.post('/api/profiles/preview', { profile })).status).toBe(400);
+    }
+    expect(h.calls).toEqual([]);
   });
 });

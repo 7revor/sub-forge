@@ -28,7 +28,7 @@ export function RuleCard({ handle, icon, children, count, hint, target, readOnly
       {hint}{count}
       {target && <div className={targetClass}>{target}</div>}
     </div>
-    {!readOnly && <div className="col-start-3 row-start-1 ml-auto"><RoutingCardActions label={label} onEdit={onEdit} onDelete={onDelete} /></div>}
+    {!readOnly && <div className="col-start-3 row-start-1 ml-auto w-[60px] shrink-0"><RoutingCardActions label={label} onEdit={onEdit} onDelete={onDelete} /></div>}
     {readOnly && <span className="col-start-3 row-start-1 w-[60px] shrink-0 text-right text-[12px] text-ink-muted">跟随模板</span>}
   </RoutingCard>;
 }

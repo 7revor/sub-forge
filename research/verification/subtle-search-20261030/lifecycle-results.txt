@@ -1,0 +1,12 @@
+退场验收：4 项
+通过：订阅独立机场SELECT本订阅的策略组组名称类型SELECT固定成员勾选；121 帧；高度 688px，标题、正文、输入值保持一致
+通过：订阅独立机场SELECT本订阅的策略组组名称类型SELECT固定成员勾选；121 帧；高度 688px，标题、正文、输入值保持一致
+通过：订阅独立机场SELECT本订阅的策略组组名称类型SELECT固定成员勾选；121 帧；高度 688px，标题、正文、输入值保持一致
+通过：订阅独立机场SELECT本订阅的策略组组名称类型SELECT固定成员勾选；121 帧；高度 688px，标题、正文、输入值保持一致
+
+Promise 结果：5 项
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}
+{"status":"cancelled","reason":"dismissed"}

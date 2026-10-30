@@ -5,8 +5,8 @@ import { GripVertical, LockKeyhole } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { cx } from './ui.tsx';
 
-function SortableRow({ id, index, locked, blocked, render }: {
-  id: UniqueIdentifier; index: number; locked: boolean; blocked: boolean; render: (handle: ReactNode) => ReactNode;
+function SortableRow({ id, index, locked, blocked, render, draggingClassName }: {
+  id: UniqueIdentifier; index: number; locked: boolean; blocked: boolean; draggingClassName?: string; render: (handle: ReactNode) => ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id, disabled: { draggable: locked, droppable: blocked },
@@ -14,19 +14,21 @@ function SortableRow({ id, index, locked, blocked, render }: {
   const handle = locked
     ? <span role="img" aria-label={`第 ${index + 1} 项已锁定`} className="grid h-8 w-6 place-items-center text-ink-muted"><LockKeyhole size={16} /></span>
     : <button ref={setActivatorNodeRef} type="button" aria-label={`拖动第 ${index + 1} 项`} className="grid h-8 w-6 touch-none cursor-grab place-items-center text-faint" {...attributes} {...listeners}><GripVertical size={16} /></button>;
-  // 阴影绘制在实际行/卡片上，沿用它的圆角；外层 li 只负责拖动和层级。
-  return <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}
-    className={cx(isDragging && 'relative z-10 [&>*]:shadow-md')}>{render(handle)}</li>;
+  // 大小不同的落点只改变位置，不能按目标区块的宽高缩放卡片。
+  // 阴影由调用方指定实际卡片，避免包装容器产生方形边缘。
+  return <li ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
+    className={cx(isDragging && 'relative z-10', isDragging && (draggingClassName ?? '[&>*]:shadow-md'))}>{render(handle)}</li>;
 }
 
 /**
  * 锁定项自身不能拖动，但未锁定项可以越过锁定项（只移动一项，锁定项之间的相对顺序不变）；
  * 需要额外限制落点时传 canDrop。
  */
-export function SortableList<T>({ items, getKey, onReorder, renderItem, isLocked, canDrop }: {
+export function SortableList<T>({ items, getKey, onReorder, renderItem, isLocked, canDrop, draggingClassName }: {
   items: T[]; getKey?: (item: T, index: number) => UniqueIdentifier; onReorder: (items: T[], move: { from: number; to: number }) => void;
   renderItem: (item: T, index: number, handle: ReactNode) => ReactNode; isLocked?: (item: T, index: number) => boolean;
   canDrop?: (from: number, to: number) => boolean;
+  draggingClassName?: string;
 }) {
   const [identity, setIdentity] = useState(() => ({ ids: items.map((_, i) => `s${i}`), seq: items.length }));
   const [active, setActive] = useState<UniqueIdentifier | null>(null);
@@ -53,7 +55,7 @@ export function SortableList<T>({ items, getKey, onReorder, renderItem, isLocked
   }}>
     <SortableContext items={keys} strategy={verticalListSortingStrategy}>
       <ol className="m-0 list-none p-0">{items.map((item, index) => <SortableRow key={keys[index]} id={keys[index]!} index={index}
-        locked={locked[index]!} blocked={activeIndex >= 0 && activeIndex !== index && !canMove(activeIndex, index)}
+        draggingClassName={draggingClassName} locked={locked[index]!} blocked={activeIndex >= 0 && activeIndex !== index && !canMove(activeIndex, index)}
         render={(handle) => renderItem(item, index, handle)} />)}</ol>
     </SortableContext>
   </DndContext>;
