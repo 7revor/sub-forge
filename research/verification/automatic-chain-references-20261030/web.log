@@ -1,0 +1,12 @@
+
+> @sub-forge/web@0.0.0 test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/member-chain-editor/packages/web
+> vitest run --passWithNoTests
+
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/member-chain-editor/packages/web
+
+
+ Test Files  40 passed (40)
+      Tests  336 passed | 2 skipped (338)
+   Start at  11:17:04
+   Duration  1.66s (transform 2.72s, setup 0ms, import 7.36s, tests 667ms, environment 2ms)

@@ -71,7 +71,7 @@ class ConcurrentRenderChange extends Error {}
 
 type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
 
-export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
+export type PreviewOutcome = { ok: boolean; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 
 const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}`;
 
@@ -141,7 +141,7 @@ export class RenderService {
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
       return a.result
-        ? { ok: !a.failure, yaml: a.result.yaml, ...(target.client === 'stash' && !a.failure ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
+        ? { ok: !a.failure, yaml: a.result.yaml, ...(target.client === 'stash' && !a.failure ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
         : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };

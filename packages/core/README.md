@@ -76,7 +76,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 `Profile.routing` 包含 `bound`（最新模板 + 按稳定组 ID 追加成员）和 `independent`（完整 groups/rules/final）两类。渲染统一调用 `resolveProfileRouting`；绑定组失效或合并成环为错误，独立配置不依赖模板。`routingConfig` 展开有效配置，`profileEditorOverlay` 仅为现有编辑器提供视图，不能作为第二份配置持久化。历史 `overlay` 入口用于旧数据迁移与兼容测试。
 
 
-绑定订阅可选 `routing.prependRules` 保存有序单条规则，渲染先于全部模板规则，MATCH 沿用模板；缺省空数组。节点出口复用代理链的 wrap/copy/inline 依赖解析。模板更新检查前置规则 ID 与引用组，模式转换通过 resolveProfileRouting 保留完整顺序。
+绑定订阅可选 `routing.prependRules` 保存有序单条规则，渲染先于全部模板规则，MATCH 沿用模板；缺省空数组。节点出口复用代理链的自动依赖解析。模板更新检查前置规则 ID 与引用组，模式转换通过 resolveProfileRouting 保留完整顺序。
 
 
 2026-10-29：规则及规则来源改为存在即生效。enabled 字段只供旧输入兼容，由服务端保存和 v17 迁移移除停用项并清除标记。处理链与仓库启停保持原语义。
@@ -104,3 +104,5 @@ Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段
 2026-10-30 订阅弹窗整合不改变渲染、Provider 前置、循环保护或客户端转换语义；空值提示仅存在于前端，false 与 0 保持真实值。领域模型与示例种子无需迁移。
 
 2026-10-30 代理链流量交互沿用现有模型：Provider 正则前置取节点顺序中的首个命中，默认隐藏组精确引用此节点；整集落地服务端覆写、Stash 内联翻译保持一致。`chain-materialization.test.ts` 新增 Provider 正则连接 Inline / Provider 两种落地的跨客户端断言。模型和示例种子无需迁移。
+
+2026-10-30 自动引用：Mihomo Provider 自动生成精确隐藏组，Inline 直接引用；Stash 沿用节点集内联转换。旧 refPolicy 不参与渲染。结果包含 chainResolutions（实际前置、落地命中/应用数量、关联问题），ReportItem.chainIds 将循环及依赖循环的入口关联到对应代理链。完整诊断和只读 dependencies 继续返回。回归覆盖旧策略、输入不变、缺失、整集覆盖及环路关联。

@@ -73,7 +73,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
 | `POST /api/templates`、`PUT /api/templates/:id` | 管理员新建或直接保存；不需要版本号，后保存的内容覆盖当前内容。自身校验不通过 400；绑定冲突返回 409，不允许 `force` 跳过。旧 `POST /api/templates/:id/publish` 兼容同一保存逻辑，不再创建历史 |
 | `GET/POST /api/profiles/:id/tokens`、`POST .../tokens/:token/reset`、`DELETE .../tokens/:token` | 订阅链接；重置后旧链接立即失效 |
-| `POST /api/profiles/:id/preview` | 预览配置、依赖节点与渲染报告；请求体可带未保存的 `profile` 草稿 |
+| `POST /api/profiles/:id/preview` | 预览配置、代理链检查结果、只读引用详情与渲染报告；请求体可带未保存的 `profile` 草稿 |
 | `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
 | `GET /api/profiles/:id/access-log` | 访问日志（保留 30 天） |
 | `POST /api/sources/:id/refresh`、`GET /api/sources/:id/snapshots` | 立即拉取、最近成功内容与最新失败状态（不含正文） |
@@ -356,3 +356,5 @@ SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，�
 2026-10-30 订阅弹窗整合继续复用 /profiles/routing/convert 生成草稿，最终保存才持久化。没有新增接口或种子迁移；填充、代理链及规则出口映射仍由服务端验证，相关 12 项测试通过。
 
 2026-10-30 代理链来源约束：保存与草稿预览同时校验落地和前置节点集均已加入本订阅；移出来源需同时移除关联链。`chain-source-removal.test.ts` 覆盖拒绝残留链、原配置不变及原子保存；手动隔离 fixture 增加历史筛选兼容场景。接口与种子格式不变。
+
+2026-10-30 自动引用：保存和草稿预览把旧 refPolicy 规范化为 `{ default: 'wrap' }`，删除 perRef；渲染层也忽略旧策略，未保存的历史数据同样自动处理。现有预览 API 增加 chainResolutions，草稿检查不落库。示例种子已核对：两份订阅均为兼容默认值，无逐项覆写，无需数据迁移。

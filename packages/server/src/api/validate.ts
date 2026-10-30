@@ -295,7 +295,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (doc.base !== undefined && isObj(doc.base) && doc.base.presetId !== undefined && !store.get('preset', String(doc.base.presetId))) throw bad('基础设置预设不存在');
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];
-      doc.refPolicy = isObj(doc.refPolicy) ? doc.refPolicy : { default: 'wrap' };
+      doc.refPolicy = { default: 'wrap' }; // 兼容旧字段，引用方式由客户端自动决定
       const extraRules = (doc.overlay as { extraRules?: unknown }).extraRules;
       if (extraRules !== undefined) {
         if (!Array.isArray(extraRules)) throw bad('extraRules 必须是数组');

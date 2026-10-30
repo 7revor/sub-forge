@@ -51,11 +51,13 @@ describe('订阅专属 Provider 服务端覆写', () => {
     expect(result.report.hasErrors).toBe(false);
     expect(result.config['proxy-groups']).toContainEqual(expect.objectContaining({ filter: '^前置$', hidden: true, 'empty-fallback': 'REJECT' }));
   });
-  it('复制到 Inline 的节点也继承整集覆写，而原始来源不变', () => {
+  it('旧复制策略不生成多余节点，整集覆写仍写入 Provider', () => {
     const f = fixture(); f.profile.refPolicy.default = 'copy';
     if (f.profile.routing?.mode !== 'independent') throw new Error('测试配置错误');
     f.profile.routing.config.groups[0]!.members.push({ kind: 'node', ref: { nodeSet: ref, match: { exact: '落地' } } });
-    expect(renderMihomo(f).config.proxies).toEqual([expect.objectContaining({ name: '落地', 'dialer-proxy': 'DIRECT' })]);
+    const result = renderMihomo(f);
+    expect(result.config.proxies).toEqual([]);
+    expect(parse(result.providers['source:s']!.yaml).proxies).toContainEqual(expect.objectContaining({ name: '落地', 'dialer-proxy': 'DIRECT' }));
   });
   it.each(['provider', 'inline'] as const)('Provider 正则前置连接 %s 落地，Mihomo 与 Stash 使用相同首个命中', output => {
     const f = fixture(); f.profile.nodeSets[0]!.output = output;

@@ -299,3 +299,13 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 - 历史落地正则显示原范围与「重新选择落地」；确认移出来源列出前置和落地受影响链，取消不变。
 
 参考本轮 `provider-to-inline.png`、`inline-to-provider.png`、`mobile-chain.png`、`remove-confirmation.png`。Mihomo 依据：[dialer-proxy](https://wiki.metacubex.one/config/proxies/dialer-proxy/)、[Provider 覆写](https://wiki.metacubex.one/config/proxy-providers/#override)、[组筛选](https://wiki.metacubex.one/config/proxy-groups/#filter)。
+
+### 2026-10-30：自动引用与代理链诊断（待同步）
+
+本轮实际打开画布仍显示「Sign in to view this page」，没有编辑远程画布。证据：`research/verification/automatic-chain-references-20261030/design-canvas-login.png`。
+
+- 删除独立「依赖节点」卡片、默认引用方式下拉、逐项策略切换。
+- 每条代理链的流量图下方增加轻量检查结果：实际前置/前置策略组、落地命中数、应用数差异；缺失、重叠、循环问题就地展示。完整错误仍保留在配置预览。
+- 草稿变化自动检查，期间不显示旧结果；请求失败提供错误提示与重新检查，不能留下过期成功状态。
+- 配置预览报告下方新增默认折叠的「自动生成的引用详情」，展示节点、生成名称与引用位置，无设置项。
+- 桌面效果见 `resolved-chains.png`，错误定位见 `chain-diagnostics.png`，只读详情见 `preview-reference-details.png`，窄屏见 `mobile-chain-check.png`。

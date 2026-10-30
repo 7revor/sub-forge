@@ -1,0 +1,12 @@
+
+> @sub-forge/core@0.0.0 test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/member-chain-editor/packages/core
+> vitest run
+
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/member-chain-editor/packages/core
+
+
+ Test Files  21 passed | 4 skipped (25)
+      Tests  274 passed | 39 skipped (313)
+   Start at  11:17:03
+   Duration  830ms (transform 1.10s, setup 0ms, import 2.83s, tests 533ms, environment 1ms)

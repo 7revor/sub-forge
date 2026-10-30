@@ -149,6 +149,7 @@ type Profile = {
   template?: { id: ID; follow: 'latest' | { pinned: number } };
   overlay: Overlay;
   chains: ChainRule[];
+  // 2026-10-30 起仅兼容旧数据；渲染忽略，保存规范化为 { default: 'wrap' }。
   refPolicy: { default: 'wrap' | 'copy' | 'inline'; perRef?: Record<RefKey, 'wrap' | 'copy' | 'inline'> };
   tokens: { token: string; label: string }[];
 };
@@ -213,7 +214,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 ### 4.2 算法
 
 ```
-输入：有效 groups、rules、chains、各 NodeSet 输出方式、refPolicy
+输入：有效 groups、rules、chains、各 NodeSet 输出方式、目标客户端（旧 refPolicy 不参与计算）
 1. 收集引用点 R：
    - 组成员中的 {kind:'node'}
    - 规则 / final 的 target {kind:'node'}
@@ -222,19 +223,16 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 2. 对每个引用 r 解析出具体节点 n（按 NodeRef.match 在 NodeSet 处理结果中查找）：
    - 找不到 → 走 fallback；无 fallback → report.error
 3. 若 n 所在 NodeSet 输出方式为 inline → 直接用 n.name，结束
-4. 否则（n 在 provider P 中）按策略：
-   wrap  → 生成/复用组 G = { name: "__ref_<P>_<hash(n._key)>", type: select,
+4. 否则（Mihomo 的 n 在 Provider P 中）自动处理：
+            生成/复用组 G = { name: "__ref_<P>_<hash(n._key)>", type: select,
                             use: [P], filter: "^" + regexEscape(n.name) + "$",
                             hidden: true, empty-fallback: REJECT }   // 防止静默直连
            r 指向 G.name
-   copy  → 在 proxies 中加入 n 的副本，名称 = n.name（冲突则 n.name + " ·local"）
-           r 指向副本名
-   inline→ 将 P 整体切换为 inline，重跑一次本步骤
+   Stash 在节点集阶段已转换为内联，由步骤 3 直接引用。
 5. ChainRule 的落地侧：
    - 落地 NodeSet 为 inline → 直接给匹配节点写 dialer-proxy
    - 落地 NodeSet 为 provider →
-       a. 若 filter 为空（整源都走同一前置）→ 输出 proxy-providers.P.override.dialer-proxy
-       b. 否则 → 在 /p/:token/P 的内容中只给匹配节点注入 dialer-proxy
+       在 /p/:token/P 的订阅专属内容中给匹配节点注入 dialer-proxy；整集规则覆盖局部规则。
 6. 上游自带 dialer-proxy 的节点（REF-04）：
    - 其前置名在同一 NodeSet 中 → 视为 NodeRef(同 NodeSet, exact) 走步骤 3–4
    - 在其他地方找不到 → report.warn，并按 fallback 处理（默认移除该字段）
@@ -440,9 +438,9 @@ type ProfileRouting =
 
 `ProfileRouting` 的 `bound` 分支增加可选 `prependRules: RuleEntry[]`，按显示顺序保存，只允许 `matcher.kind: rule`，不携带锚点，不修改模板。缺省等同空数组，已有绑定订阅无需数据库迁移。有效规则为 `prependRules + template.rules`；禁用项保留顺序但不输出，最终出口仍为 `template.final`。编辑器通过倒序 top 锚点兼容旧覆盖层视图，保存仅写 routing。
 
-前置节点出口共用 `resolveTarget / nameForNode`：默认 wrap 生成精确过滤的隐藏组，copy 复制到顶层，inline 内联节点集；与代理链重复引用时复用依赖。保存及草稿预览检查出口归属、节点集已加入订阅、匹配项和规则 ID；规则 ID 不得与模板或其他前置规则冲突。模板发布检查全部前置出口（含禁用项、节点兜底组），删除所引用组或引入冲突 ID 时不可强制发布。绑定转独立会将前置规则完整固化，绑定间转换映射前置出口及兜底组。
+前置节点出口共用 `resolveTarget / nameForNode`：按客户端自动处理，Mihomo Provider 生成精确过滤的隐藏组，Inline 直接引用，Stash 内联后直接引用；与代理链重复引用时复用依赖。保存及草稿预览检查出口归属、节点集已加入订阅、匹配项和规则 ID；规则 ID 不得与模板或其他前置规则冲突。模板发布检查全部前置出口（含禁用项、节点兜底组），删除所引用组或引入冲突 ID 时不可强制发布。绑定转独立会将前置规则完整固化，绑定间转换映射前置出口及兜底组。
 
-规则出口也会生成包装组与本地副本，因此代理链的成环与跳数检查在全部规则出口解析完成后执行，确保 `include-all-proxies` 等动态成员纳入新增副本。
+规则出口也会生成隐藏引用组，因此代理链的成环与跳数检查在全部规则出口解析完成后执行，并展开 `include-all-proxies` 等动态成员。
 
 
 ### 2026-10-29：移除规则启停状态（SQLite v17）
@@ -515,3 +513,11 @@ SQLite 文件索引、本地授权候选在同一查询中筛选、排序和 LIM
 领域格式不变：Provider 前置写 `via.ref.match.regex`，Inline 前置写 `exact`，策略组写 `groupId`；Inline 落地用转义并首尾锚定的 `landing.filter`，Provider 整集落地省略筛选字段。`NodeRef` 正则沿用解析首个匹配节点的合同，界面显示命中数及当前采用节点；默认 wrap 仍生成针对该节点的精确隐藏组，避免动态扩大前置范围。整集落地沿用服务端 Provider 内容覆写，Stash 沿用整体内联翻译。
 
 旧 `landing.filter/excludeFilter` 不迁移、不静默转整集；只有规范的精确筛选才回显为 Inline 单节点。移出来源的前端事务同时过滤节点集与直接引用它的链（含嵌套前置回退）；服务端保存/草稿预览增加落地节点集已加入本订阅的校验。策略组与规则成员继续使用原有引用校验，不在该事务中静默修改。
+
+### 2026-10-30：自动引用与代理链诊断
+
+移除手工依赖策略，不改变节点集的 Provider / Inline 选择。历史 `refPolicy.default` 与 `perRef` 仅兼容读取，渲染忽略；保存及草稿预览校验统一成 `{ default: 'wrap' }`，无需批量迁移旧库。示例种子的两份订阅已使用此兼容值，无旧逐项覆写。
+
+渲染结果新增 `chainResolutions: { chainId, viaName?, landingCount, appliedCount, issues }[]`，预览接口原样返回。`viaName` 为实际解析名称，命中与实际应用数量分开，前置缺失或被整集规则覆盖时应用数为零。`ReportItem.chainIds` 关联冲突、环路和过长链；环路反向遍历覆盖依赖该环的链，避免漏报入口或误报无关链。前置组及嵌套组问题也归入相应卡片。完整报告保留，卡片合并重复环提示。
+
+前端以持久化草稿及模板版本为查询键，防抖 450ms 自动调用现有预览接口，不写库。修改、重新检查或请求失败均不保留旧诊断。`dependencies` 留作配置预览默认折叠的只读生成详情，无策略编辑控件。

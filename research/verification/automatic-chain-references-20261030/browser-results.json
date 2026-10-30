@@ -1,0 +1,45 @@
+[
+  {
+    "scenario": "自动显示实际前置、缺失与循环，移除旧面板和策略控件",
+    "status": "passed",
+    "evidence": "chain-diagnostics.png"
+  },
+  {
+    "scenario": "修改前置后立即隐藏旧结果并自动重新检查，缺失前置修复后显示日本备用",
+    "status": "passed"
+  },
+  {
+    "scenario": "修复循环后所有链自动更新，保存刷新保留并重新解析",
+    "status": "passed",
+    "evidence": "resolved-chains.png"
+  },
+  {
+    "scenario": "Mihomo 自动保留 Provider 并生成精确隐藏组；技术详情默认折叠、展开后只读",
+    "status": "passed",
+    "evidence": "preview-reference-details.png"
+  },
+  {
+    "scenario": "Stash 自动转换",
+    "status": "passed",
+    "evidence": "stash-auto-translation.png",
+    "detail": "6 个节点内联；GCP/新加坡/中转节点 dialer-proxy 指向正确前置，无 proxy-providers，无隐藏依赖组。仅验证配置生成。"
+  },
+  {
+    "scenario": "390px 窄屏代理链结果",
+    "status": "passed",
+    "evidence": "mobile-chain-check.png",
+    "detail": "页面宽度与滚动宽度均 390px；三处诊断宽度与滚动宽度均 290px，无横向溢出。"
+  },
+  {
+    "scenario": "外部设计画布同步",
+    "status": "not_run",
+    "evidence": "design-canvas-login.png",
+    "detail": "实际访问要求登录，未编辑远程画布，已登记本地待同步说明。"
+  },
+  {
+    "scenario": "仅代理链检查请求失败",
+    "status": "not_run",
+    "evidence": "service-unavailable-login.png",
+    "detail": "停止隔离 API 后，现有认证刷新将页面返回登录；未能单独触发代理链检查失败，不能把该场景记为通过。草稿变化撤下旧诊断已单独验证。"
+  }
+]

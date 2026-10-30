@@ -1,0 +1,27 @@
+
+> @sub-forge/server@0.0.0 test /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/member-chain-editor/packages/server
+> vitest run
+
+
+ RUN  v4.1.12 /Users/7revor/dev/workspace/sub-forge/.Codex/worktrees/member-chain-editor/packages/server
+
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'replacement'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+Switched to a new branch 'other'
+Switched to branch 'main'
+
+ Test Files  51 passed | 2 skipped (53)
+      Tests  446 passed | 5 skipped (451)
+   Start at  11:19:57
+   Duration  12.12s (transform 3.17s, setup 0ms, import 25.07s, tests 74.30s, environment 4ms)

@@ -7,7 +7,7 @@ import { ruleSetDelivery } from '../rules/delivery.ts';
 
 import { parse, stringify } from 'yaml';
 import { NodeSetResolver, nodeSetKey, type NodeSetInputs } from '../nodeset/resolve.ts';
-import { Report } from '../report.ts';
+import { Report, type ReportItem } from '../report.ts';
 import { applyOverrides, composeRule, lowerRule, withIpOptions, type ClientCtx } from '../rules/client.ts';
 import { isYamlRuleUrl, type Behavior } from '../rules/parse.ts';
 import { type EffectiveGroup } from '../template/merge.ts';
@@ -37,15 +37,23 @@ export type RenderInput = {
   base?: Record<string, unknown>;
 };
 
-/** 依赖节点面板的一行（REF-07） */
+/** 配置预览中的只读引用生成详情。 */
 export type DependencyEntry = {
   refKey: string;
   nodeSet: string;
   node: string;
   strategy: RefStrategy;
-  /** 引用方实际写入的名称：包装组名或本地副本名 */
+  /** 引用方实际写入的隐藏组名称 */
   output: string;
   usedBy: string[];
+};
+
+export type ChainResolution = {
+  chainId: string;
+  viaName?: string;
+  landingCount: number;
+  appliedCount: number;
+  issues: ReportItem[];
 };
 
 export type ProviderOutput = { name: string; version: string; yaml: string };
@@ -57,6 +65,7 @@ export type MihomoRenderResult = {
   providers: Record<string, ProviderOutput>;
   rulesets: Record<string, RulesetOutput>;
   dependencies: DependencyEntry[];
+  chainResolutions: ChainResolution[];
   report: Report;
 };
 
@@ -71,11 +80,6 @@ const RULESET_INTERVAL = 86400;
 const FETCH_VIA = 'DIRECT';
 
 const safeId = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, '_');
-
-/** 某个节点集需要整体改为内联输出（refPolicy = inline），从头重新渲染 */
-class InlineRestart extends Error {
-  constructor(readonly nodeSetKey: string) { super(`inline ${nodeSetKey}`); }
-}
 
 const stashOriginalName = Symbol('stashOriginalName');
 type RenderNode = ProxyIR & { [stashOriginalName]?: string };
@@ -98,19 +102,6 @@ export function renderMihomo(input: RenderInput): MihomoRenderResult {
 
 export function renderStash(input: RenderInput): MihomoRenderResult {
   return renderYaml(input, 'stash');
-}
-
-function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult {
-  const forced = new Set<string>();
-  for (;;) {
-    try {
-      return renderOnce(input, forced, client);
-    } catch (e) {
-      if (!(e instanceof InlineRestart)) throw e;
-      if (forced.has(e.nodeSetKey)) throw new Error(`依赖解析未收敛：${e.nodeSetKey}`);
-      forced.add(e.nodeSetKey);
-    }
-  }
 }
 
 function displayName(ref: NodeSetID, inputs: NodeSetInputs): string {
@@ -137,7 +128,7 @@ function stripNode(n: ProxyIR): Record<string, unknown> {
   return out;
 }
 
-function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlClient): MihomoRenderResult {
+function renderYaml(input: RenderInput, client: YamlClient): MihomoRenderResult {
   const { profile } = input;
   const report = new Report();
   const ctx: ClientCtx = { client, ...(input.platform ? { platform: input.platform } : {}) };
@@ -159,7 +150,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
     providerNames.add(providerName);
     sets.set(key, {
       key, ref: ps.ref, providerName,
-      output: client === 'stash' || forcedInline.has(key) ? 'inline' : ps.output,
+      output: client === 'stash' ? 'inline' : ps.output,
       requestedOutput: ps.output,
       nodes: resolver.resolve(ps.ref).map((n) => client === 'stash' ? stashProxy(n, report) : ({ ...n })),
     });
@@ -189,8 +180,7 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
 
   // ---------- 引用解析 ----------
   const wrappers: MihomoGroup[] = [];
-  // 副本在输出时才生成，这样能带上之后注入的 dialer-proxy
-  const copies: { node: ProxyIR; name: string }[] = [];
+  const resolvedTargetNames = new Map<string, string>();
   const deps = new Map<string, DependencyEntry>();
   const wrapperNode = new Map<string, { set: NS; node: ProxyIR }>();
 
@@ -208,34 +198,24 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
     const refKey = `${set.key}|${node._key}`;
     const hit = deps.get(refKey);
     if (hit) { if (!hit.usedBy.includes(where)) hit.usedBy.push(where); return hit.output; }
-    const strategy = profile.refPolicy.perRef?.[refKey] ?? profile.refPolicy.default;
-    let output: string;
-    if (strategy === 'inline') throw new InlineRestart(set.key);
-    if (strategy === 'wrap') {
-      // 名称只依赖节点身份，不随显示名变化（REF-11）
-      output = `__ref_${safeId(set.ref.id)}_${shortHash(refKey, 8)}`;
-      wrappers.push({ name: output, type: 'select', use: [set.providerName], filter: exactNameRegex(node.name), hidden: true, 'empty-fallback': 'REJECT' });
-      wrapperNode.set(output, { set, node });
-    } else {
-      // 复制到本地：provider 中保留原节点，副本名冲突时加后缀
-      output = node.name;
-      for (let i = 1; topNames.has(output) || groupNames.has(output); i++) output = i === 1 ? `${node.name} ·local` : `${node.name} ·local ${i}`;
-      copies.push({ node, name: output });
-      topNames.add(output);
-    }
-    deps.set(refKey, { refKey, nodeSet: set.key, node: node.name, strategy, output, usedBy: [where] });
+    // Mihomo 的 Provider 前置自动提升为精确隐藏组；Stash 已在节点集阶段内联。
+    const output = `__ref_${safeId(set.ref.id)}_${shortHash(refKey, 8)}`;
+    wrappers.push({ name: output, type: 'select', use: [set.providerName], filter: exactNameRegex(node.name), hidden: true, 'empty-fallback': 'REJECT' });
+    wrapperNode.set(output, { set, node });
+    deps.set(refKey, { refKey, nodeSet: set.key, node: node.name, strategy: 'wrap', output, usedBy: [where] });
     return output;
   };
 
   const resolveTarget = (t: Target, where: string): string | undefined => {
-    if (t.kind === 'builtin') return t.name;
+    if (t.kind === 'builtin') { resolvedTargetNames.set(where, t.name); return t.name; }
     if (t.kind === 'group') {
       const n = groupName.get(t.groupId);
       if (n === undefined) report.error('ref.dangling-group', `引用的组 ${t.groupId} 不存在`, where);
+      if (n !== undefined) resolvedTargetNames.set(where, n);
       return n;
     }
     const found = findNode(t.ref, where);
-    if (found) return nameForNode(found.set, found.node, where);
+    if (found) { resolvedTargetNames.set(where, found.node.name); return nameForNode(found.set, found.node, where); }
     const desc = 'exact' in t.ref.match ? t.ref.match.exact : `/${t.ref.match.regex}/`;
     const fb = t.ref.fallback;
     if (fb && fb !== 'error') {
@@ -308,27 +288,34 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
   // ---------- 代理链：先确定有效前置，再写入订阅专属节点副本 ----------
   // 整集覆写保持 Mihomo override 的优先级；所有客户端共用已覆写的内容，
   // 不依赖客户端的 provider override，也不修改输入快照或原始节点。
+  const chainOwners = new Map<ProxyIR, string[]>();
+  const chainCounts = new Map<string, { landingCount: number; appliedCount: number }>();
   const resolvedChains = new Map<(typeof profile.chains)[number], string | undefined>();
   for (const set of sets.values()) {
     const rules = profile.chains.filter(c => nodeSetKey(c.landing.nodeSet) === set.key);
     const whole = rules.filter(c => !c.landing.filter && !c.landing.excludeFilter);
     const partial = rules.filter(c => c.landing.filter || c.landing.excludeFilter);
     if (whole.length > 1 && new Set(whole.map(c => JSON.stringify(c.via))).size > 1) {
-      report.error('chain.conflict', `节点集「${set.providerName}」有不同的整集前置，请保留一个`, set.key);
+      report.error('chain.conflict', `节点集「${set.providerName}」有不同的整集前置，请保留一个`, set.key, whole.map(c => c.id));
     }
-    if (whole.length && partial.length) report.warn('chain.overridden', `节点集「${set.providerName}」的 ${partial.length} 条局部规则被整集前置覆盖；要设置例外，请改为按节点配置`, set.key);
+    if (whole.length && partial.length) report.warn('chain.overridden', `节点集「${set.providerName}」的 ${partial.length} 条局部规则被整集前置覆盖；要设置例外，请先调整整集规则`, set.key, partial.map(c => c.id));
     const matches = new Map(partial.map(c => [c, new Set(filterNodes(set.nodes, c.landing))]));
-    for (const [c, nodes] of matches) if (!nodes.size) report.warn('chain.no-landing', '链规则没有命中任何落地节点', `chain:${c.id}`);
+    for (const c of rules) {
+      const landingCount = matches.get(c)?.size ?? set.nodes.length;
+      chainCounts.set(c.id, { landingCount, appliedCount: 0 });
+      if (!landingCount) report.warn('chain.no-landing', '没有命中落地节点，请检查落地来源或原筛选范围', `chain:${c.id}`);
+    }
     for (const n of set.nodes) {
       const selected = whole.length ? whole : partial.filter(c => matches.get(c)!.has(n));
       if (selected.length > 1 && new Set(selected.map(c => JSON.stringify(c.via))).size > 1) {
-        report.error('chain.conflict', `节点「${n.name}」命中不同的前置规则，请消除重叠`, set.key);
+        report.error('chain.conflict', `节点「${n.name}」命中不同的前置规则，请消除重叠`, set.key, selected.map(c => c.id));
       }
       const chain = selected.at(-1);
       if (chain) {
+        chainOwners.set(n, selected.map(c => c.id));
         if (!resolvedChains.has(chain)) resolvedChains.set(chain, resolveTarget(chain.via, `chain:${chain.id}`));
         const via = resolvedChains.get(chain);
-        if (via) n['dialer-proxy'] = via;
+        if (via) { n['dialer-proxy'] = via; chainCounts.get(chain.id)!.appliedCount++; }
       } else if (n.upstreamDialer) {
         const target = set.nodes.find(x => x !== n && (x._origName === n.upstreamDialer || x.name === n.upstreamDialer));
         const where = `node:${set.key}:${n.name}`;
@@ -433,11 +420,11 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
   const finalName = resolveTarget(eff.final, 'final') ?? 'DIRECT';
   ruleLines.push(`MATCH,${finalName}`);
 
-  // 规则出口也可能新增节点副本或包装组，全部解析后再检查 include-all 等动态成员的链环。
-  checkChains(sets, groups, wrappers, wrapperNode, copies, report);
+  // 全部引用解析后，按实际动态成员检查链环，并关联到受影响的链。
+  checkChains(sets, groups, wrappers, wrapperNode, chainOwners, report);
 
   // ---------- 输出 ----------
-  const inlineProxies = [...[...sets.values()].filter((s) => s.output === 'inline').flatMap((s) => s.nodes), ...copies.map((c) => ({ ...c.node, name: c.name }))].map(stripNode);
+  const inlineProxies = [...sets.values()].filter(s => s.output === 'inline').flatMap(s => s.nodes).map(stripNode);
   const providers: Record<string, ProviderOutput> = {};
   const proxyProviders: Record<string, Record<string, unknown>> = {};
   for (const s of sets.values()) {
@@ -464,12 +451,28 @@ function renderOnce(input: RenderInput, forcedInline: Set<string>, client: YamlC
   config.rules = ruleLines;
   if (client === 'stash') for (const provider of Object.values(ruleProviders)) delete provider.type;
 
+  const relatedGroups = (target: Target, seen = new Set<string>()): Set<string> => {
+    if (target.kind === 'group' && !seen.has(target.groupId)) {
+      seen.add(target.groupId);
+      for (const member of eff.groups.find(g => g.id === target.groupId)?.members ?? []) {
+        if (member.kind === 'group' || member.kind === 'node') relatedGroups(member, seen);
+      }
+    } else if (target.kind === 'node' && target.ref.fallback && target.ref.fallback !== 'error') relatedGroups(target.ref.fallback, seen);
+    return seen;
+  };
+  const groupIssues = (chain: Profile['chains'][number], item: ReportItem) => item.where?.startsWith('group:') && relatedGroups(chain.via).has(item.where.slice(6));
+
   return {
     config,
     yaml: stringify(config, { lineWidth: 0 }),
     providers,
     rulesets,
     dependencies: [...deps.values()],
+    chainResolutions: profile.chains.map(c => ({
+      chainId: c.id, viaName: resolvedTargetNames.get(`chain:${c.id}`),
+      ...(chainCounts.get(c.id) ?? { landingCount: 0, appliedCount: 0 }),
+      issues: report.items.filter(r => r.level !== 'info' && (r.where === `chain:${c.id}` || r.chainIds?.includes(c.id) || groupIssues(c, r))),
+    })),
     report,
   };
 }
@@ -509,7 +512,7 @@ function checkChains(
   groups: MihomoGroup[],
   wrappers: MihomoGroup[],
   wrapperNode: Map<string, { set: NS; node: ProxyIR }>,
-  copies: { node: ProxyIR; name: string }[],
+  chainOwners: Map<ProxyIR, string[]>,
   report: Report,
 ): void {
   const id = (s: NS, n: ProxyIR) => `${s.key}|${n._key}|${n.name}`;
@@ -525,10 +528,6 @@ function checkChains(
       if (s.output === 'inline') byName.set(n.name, [nid]);
     }
     if (s.output === 'provider') providerNodes.set(s.providerName, ids);
-  }
-  for (const c of copies) {
-    const entry = [...nodeById].find(([, value]) => value.node === c.node);
-    if (entry) byName.set(c.name, [entry[0]]);
   }
   const groupByName = new Map([...groups, ...wrappers].map((g) => [g.name, g]));
 
@@ -561,6 +560,10 @@ function checkChains(
     return nodeById.get(nid)!.node['dialer-proxy'] as string | undefined;
   };
 
+  const edges = new Map([...nodeById.keys()].map(nid => [nid, dialerOf(nid) ? expand(dialerOf(nid)!) : []]));
+  const reverseEdges = new Map<string, string[]>();
+  for (const [from, targets] of edges) for (const to of targets) reverseEdges.set(to, [...(reverseEdges.get(to) ?? []), from]);
+  const graphIssues: { item: ReportItem; nodes: string[] }[] = [];
   const depth = new Map<string, number>();
   const onStack = new Set<string>();
   const reported = new Set<string>();
@@ -570,20 +573,29 @@ function checkChains(
     if (onStack.has(nid)) {
       const cyc = [...path.slice(path.indexOf(nid)), nid].map((x) => nodeById.get(x)!.node.name);
       const k = [...cyc].sort().join('|');
-      if (!reported.has(k)) { reported.add(k); report.error('chain.cycle', `前置链成环：${cyc.join(' → ')}`); }
+      if (!reported.has(k)) { reported.add(k); graphIssues.push({ item: report.error('chain.cycle', `前置链成环：${cyc.join(' → ')}`), nodes: path.slice(path.indexOf(nid)) }); }
       return 0;
     }
     const d = dialerOf(nid);
     if (!d) { depth.set(nid, 0); return 0; }
     onStack.add(nid);
     let max = 0;
-    for (const next of expand(d)) max = Math.max(max, 1 + visit(next, [...path, nid]));
+    for (const next of edges.get(nid) ?? []) max = Math.max(max, 1 + visit(next, [...path, nid]));
     onStack.delete(nid);
     depth.set(nid, max);
     return max;
   };
   for (const nid of nodeById.keys()) {
     const hops = visit(nid, []);
-    if (hops > 3) report.warn('chain.too-long', `节点「${nodeById.get(nid)!.node.name}」的前置链有 ${hops} 跳`, nid);
+    if (hops > 3) graphIssues.push({ item: report.warn('chain.too-long', `节点「${nodeById.get(nid)!.node.name}」的前置链有 ${hops} 跳`, nid), nodes: [nid] });
+  }
+  // 环内节点和依赖该环的上游入口均关联到对应卡片，其他链不受牵连。
+  for (const { item, nodes } of graphIssues) {
+    const reachable = new Set(nodes), queue = [...nodes];
+    for (let i = 0; i < queue.length; i++) for (const from of reverseEdges.get(queue[i]!) ?? []) {
+      if (!reachable.has(from)) { reachable.add(from); queue.push(from); }
+    }
+    const ids = [...new Set([...reachable].flatMap(nid => chainOwners.get(nodeById.get(nid)!.node) ?? []))];
+    if (ids.length) item.chainIds = ids;
   }
 }

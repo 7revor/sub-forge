@@ -100,12 +100,12 @@ const SCENARIOS: [string, Partial<Profile>][] = [
     nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: S('T'), output: 'provider' }],
     chains: [{ id: 'c1', landing: { nodeSet: { type: 'local', id: 'self' } }, via: toNode('T', '🇭🇰 IPLC-01') }],
   }],
-  ['引用策略：复制到本地', {
+  ['旧复制策略自动转换', {
     nodeSets: [{ ref: S('S'), output: 'provider' }],
     overlay: { rulePatches: { 'r-fin': { target: toNode('S', '🇺🇸 Home-Broadband') } } },
     refPolicy: { default: 'copy' },
   }],
-  ['引用策略：整体内联', {
+  ['旧整集内联策略自动转换', {
     nodeSets: [{ ref: S('S'), output: 'provider' }],
     overlay: { rulePatches: { 'r-fin': { target: toNode('S', '🇺🇸 Home-Broadband') } } },
     refPolicy: { default: 'inline' },
