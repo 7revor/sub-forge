@@ -1,7 +1,6 @@
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { Notice } from '../../components/Notice.tsx';
-import { OptionalBoolean } from '../../components/OptionalBoolean.tsx';
 // 策略组：绑定模式只补充成员；独立模式维护完整组配置。
 
 import type { Builtin, GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
@@ -12,7 +11,7 @@ import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { NodePicker } from '../../components/NodePicker.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
@@ -152,6 +151,11 @@ export function TabGroups() {
                     </span>
                     {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
                   </button>
+                  <div className="flex shrink-0 flex-col items-center gap-1 px-2 py-2">
+                    <span className="text-[12px] text-muted">隐藏</span>
+                    {x.origin === 'template' || bound ? <span className="text-[12px] text-muted" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
+                      onChange={hidden => patchOverlay(o => ({ ...o, extraGroups: (o.extraGroups ?? []).map(item => item.group.id === x.id ? { ...item, group: { ...item.group, display: { ...item.group.display, hidden } } } : item) }))} />}
+                  </div>
                 </div>
               );
             }} /></div>
@@ -208,9 +212,6 @@ export function TabGroups() {
               </div>
 
               <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">
-                <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">hidden（mihomo）{g.origin === 'template' ? ' · 模板设定，只读' : ''}</span>
-                  {g.origin === 'template' ? <span className="text-[13px]">{eff.display?.hidden === undefined ? '不设置' : eff.display.hidden ? '开' : '关'}</span> : <OptionalBoolean label="hidden" value={eff.display?.hidden} onChange={(hidden) => setField('display', { ...eff.display, hidden })} />}
-                </div>
                 <Field label="icon" hint="mihomo icon / Surge icon-url">{(id) => <Input id={id} placeholder="图标地址" value={eff.display?.icon ?? ''} onChange={(e) => setField('display', { ...eff.display, icon: e.target.value || undefined })} />}</Field>
               </fieldset>
               <div className="flex flex-col gap-2">

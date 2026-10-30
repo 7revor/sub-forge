@@ -75,7 +75,6 @@ export function TemplateGroupsEditor({ value, onChange, selected, onSelect, repo
           <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
           <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
         </div>
-        <label className="flex items-center gap-3 text-[13px]"><Switch label="隐藏策略组" checked={group.display?.hidden ?? false} onChange={hidden => update({ display: { ...group.display, hidden } })} />隐藏策略组</label>
         <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[14px] font-semibold">成员 <span className="ml-2 text-[12px] font-normal text-muted">{group.members.length} 个</span></h3>
             <TemplateTargetSelect action label="添加成员" value={undefined} groups={value.groups.filter(g => g.id !== group.id)} onChange={member => update({ members: [...group.members, member] })} />
