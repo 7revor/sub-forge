@@ -28,7 +28,7 @@ export function ProfileWizard() {
   };
   return <ProfileContext.Provider value={ctx!}>
     <PageHeader crumbs={<><Link to="/profiles" className="text-ink-muted no-underline">配置订阅</Link> / 新建</>} title="新建配置订阅" actions={<Button variant="primary" disabled={!canSave} onClick={() => finish()}>{save.isPending ? '正在创建…' : '创建订阅'}</Button>}>
-      <span className="text-[13px] text-ink-muted">选择节点并配置分流，保存后可创建订阅链接。</span>
+      <span className="text-[13px] text-ink-muted">选择节点并配置分流，保存后自动生成唯一订阅链接。</span>
     </PageHeader>
     <ErrorAlert error={save.error} />
     {!ctx!.baseValid && <div className="flex items-center justify-between gap-2 text-[13px] text-err">请修复基础设置中的 YAML，或放弃该次编辑。<Button onClick={ctx!.resetBaseEditor}>放弃无效 YAML</Button></div>}

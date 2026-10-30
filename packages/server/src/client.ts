@@ -12,8 +12,9 @@ function platformFromUa(ua: string): Platform | undefined {
   const hit = PLATFORMS.find((p) => p === explicit);
   if (hit) return hit;
   if (/android|ClashMetaForAndroid/i.test(ua)) return 'android';
-  if (/iPhone|iPad|\biOS\b/i.test(ua)) return 'ios';
-  if (/Macintosh|macOS|Mac OS|\bMac\b|darwin/i.test(ua)) return 'macos';
+  // Darwin 同时出现在 iOS 与 macOS，不能单凭它认定为 macOS。
+  if (/iPhone|iPad|\biOS\b|\btvOS\b|AppleTV/i.test(ua)) return 'ios';
+  if (/Macintosh|macOS|Mac OS|\bMac\b|StashMac/i.test(ua)) return 'macos';
   if (/Windows|win32|win64/i.test(ua)) return 'windows';
   if (/Linux/i.test(ua)) return 'linux';
   return undefined;
@@ -28,7 +29,7 @@ export function detectClient(ua: string, query: { target?: string | undefined; p
     const platform = paramPlatform ?? platformFromUa(ua);
     return platform ? { client, platform, by: 'param' } : { client, by: 'param' };
   }
-  if (/stash/i.test(ua)) return { client: 'stash', platform: paramPlatform ?? platformFromUa(ua) ?? 'ios', by: 'ua' };
+  if (/\bstash(?:mac)?(?:[\s/]|$)/i.test(ua)) return { client: 'stash', platform: paramPlatform ?? platformFromUa(ua) ?? 'ios', by: 'ua' };
   if (/surge/i.test(ua)) {
     const platform = paramPlatform ?? (/iOS|iPhone|iPad/i.test(ua) ? 'ios' : 'macos');
     return { client: 'surge', platform, by: 'ua' };

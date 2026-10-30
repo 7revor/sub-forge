@@ -39,7 +39,7 @@ const SEED: Seed = {
     final: { kind: 'group', groupId: 'sel' },
   }],
   profiles: [PROFILE],
-  tokens: [{ token: 'tk-mac', profileId: 'p1', label: 'Mac' }, { token: 'tk-phone', profileId: 'p1', label: '手机' }],
+  tokens: [{ token: 'tk-mac', profileId: 'p1', label: 'Mac' }],
 };
 
 function setup(responses: Record<string, string | Error> = {}) {
@@ -72,9 +72,9 @@ describe('订阅接口', () => {
     const { app } = setup();
     const res = await get(app, '/sub/tk-mac', 'clash-verge/v2.2.3 Platform/macos');
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/yaml/);
+    expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8');
     expect(res.headers.get('profile-update-interval')).toBe('24');
-    expect(res.headers.get('content-disposition')).toBe(`attachment; filename*=UTF-8''${encodeURIComponent('落地链路')}`);
+    expect(res.headers.get('content-disposition')).toBe(`inline; filename*=UTF-8''${encodeURIComponent('落地链路')}`);
     expect(res.headers.get('subscription-userinfo')).toBe('upload=1; download=2; total=100; expire=1800000000');
     const cfg = parse(await res.text()) as Record<string, any>;
     expect(cfg['mixed-port']).toBe(7890);
@@ -85,11 +85,17 @@ describe('订阅接口', () => {
     expect(cfg.rules.at(-1)).toBe('MATCH,🚀 节点选择');
   });
 
-  it('另一个设备的 token 拿到的地址指向它自己', async () => {
-    const { app } = setup();
-    const text = await (await get(app, '/sub/tk-phone')).text();
-    expect(text).toContain('/p/tk-phone/');
-    expect(text).not.toContain('tk-mac');
+  it('浏览器打开同一链接直接显示 Mihomo，保留订阅更新信息', async () => {
+    const { app, store } = setup();
+    const res = await get(app, '/sub/tk-mac', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(res.headers.get('content-disposition')).toMatch(/^inline;/);
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('vary')).toBe('User-Agent');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(parse(await res.text())['mixed-port']).toBe(7890);
+    expect(store.recentAccess('p1')[0]).toMatchObject({ client: 'mihomo?', platform: 'macos' });
   });
 
   it('provider 内容与规则集内容', async () => {

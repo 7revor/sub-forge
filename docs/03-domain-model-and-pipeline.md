@@ -151,7 +151,7 @@ type Profile = {
   chains: ChainRule[];
   // 2026-10-30 起仅兼容旧数据；渲染忽略，保存规范化为 { default: 'wrap' }。
   refPolicy: { default: 'wrap' | 'copy' | 'inline'; perRef?: Record<RefKey, 'wrap' | 'copy' | 'inline'> };
-  tokens: { token: string; label: string }[];
+  token: string; // 保存时自动生成的唯一订阅令牌，独立加密存储；普通保存保持不变
 };
 
 type Overlay = {

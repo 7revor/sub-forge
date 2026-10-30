@@ -266,7 +266,7 @@
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
 | PRF-01 | 上述向导 + 之后可在单页中修改各部分 | P0 |
-| PRF-02 | 订阅链接：`/sub/<token>`，根据 UA/参数输出 mihomo 或 Surge；token 可重置；可设置多个链接（给不同设备） | P0 |
+| PRF-02 | 订阅链接：保存后自动生成唯一的 `/sub/<token>`，所有设备共用；根据 UA 自动输出 Mihomo 或 Stash，兼容显式参数；普通保存保持链接，复制配置生成新链接；浏览器直接显示 Mihomo YAML。Surge 尚未实现 | P0 |
 | PRF-03 | Profile 是"模板引用 + 覆盖层"，**不保存渲染结果**（只做缓存）；模板/基础预设/节点集任何一方变化，下次请求即反映 | P0 |
 | PRF-04 | 覆盖层孤儿处理：模板删除了某组/规则后，对应的覆盖项标为"孤儿"，不输出，在 Profile 页提示用户清理 | P0 |
 | PRF-05 | 规则出口改为单节点时，可选范围仅限本 Profile 已加入的 NodeSet 中的节点 | P0 |
@@ -316,7 +316,7 @@
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
 | OUT-01 | **主配置** `GET /sub/:token`：mihomo 输出 YAML；Surge 输出 conf，**首行**为 `#!MANAGED-CONFIG <本订阅地址> interval=<秒> strict=false`，每次下发都必须带这一行（否则 Surge 会把它退化为普通配置）。`interval` 取系统资源缓存时间，默认 86400 | P0 |
-| OUT-02 | **响应头**：<br>· `subscription-userinfo: upload=<B>; download=<B>; total=<B>; expire=<unix 秒>`，内容按 SRC-05 的设置（汇总或取某个源）；没有流量信息时不输出<br>· `profile-update-interval: <小时>`，与 OUT-01 的间隔一致<br>· `content-disposition: attachment; filename*=UTF-8''<Profile 名>`，作为客户端中的订阅显示名<br>各客户端是否读取这些头待采集（07 C4），不影响输出 | P0 |
+| OUT-02 | **响应头**：<br>· `subscription-userinfo: upload=<B>; download=<B>; total=<B>; expire=<unix 秒>`，内容按 SRC-05 的设置（汇总或取某个源）；没有流量信息时不输出<br>· `profile-update-interval: <小时>`，与 OUT-01 的间隔一致<br>· `content-disposition: inline; filename*=UTF-8''<Profile 名>`，保留客户端中的订阅显示名，浏览器以纯文本直接显示 YAML<br>各客户端是否读取这些头待采集（07 C4），不影响输出 | P0 |
 | OUT-03 | **外部节点集** `GET /p/:token/:nodeSetKey`：mihomo 输出 `proxies:` YAML；Surge 输出逐行 `[Proxy]` 格式（不带段标题）。URL 带内容版本 `?v=`（REF-11） | P0 |
 | OUT-04 | **规则集** `GET /r/:token/:rulesetKey`：按 `behavior`、`format` 输出（RS-05）；托管的仓库规则保留来源注释与许可证声明（R2） | P0 |
 | OUT-05 | **失败处理**：渲染失败或校验失败时返回上一份成功结果（REF-08、TPL-12），HTTP 200；从未成功渲染过时返回 HTTP 503 与纯文本错误说明，不返回半成品配置 | P0 |

@@ -2,7 +2,6 @@ import type { NodeSetID } from '@sub-forge/core';
 import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
 import { targetLabel } from '../../components/pickers.tsx';
 import { Frame } from '../../modals/Frame.tsx';
-import { notifySuccess } from '../../feedback.ts';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
@@ -12,10 +11,10 @@ import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 import { CopyButton } from '../../components/CopyButton.tsx';
 // Profile 标签：概览（订阅链接、输出设置、访问日志）、基础设置、节点集。
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Copy, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { api, type TokenItem } from '../../api.ts';
+import { api } from '../../api.ts';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
@@ -32,50 +31,30 @@ const SOURCE_TEXT: Record<string, string> = { fresh: '未命中', cache: '命中
 /** 概览（设计稿「Profile · 概览」）：订阅链接、输出设置、访问日志 */
 export function TabOverview() {
   const { draft, setDraft, allNodeSets } = useProfile();
-  const qc = useQueryClient();
   const tokens = useQuery(tokenOptions(draft.id));
   const log = useQuery(accessLogOptions(draft.id));
-  const refreshTokens = () => qc.invalidateQueries({ queryKey: ['tokens', draft.id] });
-  const create = async () => { const result = await Frame.modal.prompt({ title: '新增订阅链接', label: '设备备注', placeholder: '填写订阅链接的标识名称', minLength: 0, confirmLabel: '创建链接' }, { submit: async label => { await api('POST', `/profiles/${draft.id}/tokens`, label ? { label } : {}); } }); if (result.status === 'confirmed') { notifySuccess('订阅链接已创建'); void refreshTokens(); } };
-  const manage = async (token: TokenItem, reset: boolean) => {
-    const result = await Frame.modal.confirm({ title: reset ? `重置「${token.label || '未命名设备'}」的 token？` : `删除订阅链接「${token.label || '未命名设备'}」？`, description: reset ? '旧链接立即失效，这台设备需要导入新链接才能继续更新。' : '使用它的设备将无法更新。', confirmLabel: reset ? '重置' : '删除', danger: true }, { submit: async () => { await api(reset ? 'POST' : 'DELETE', `/profiles/${draft.id}/tokens/${token.token}${reset ? '/reset' : ''}`); } });
-    if (result.status === 'confirmed') { notifySuccess(reset ? '订阅链接已重置' : '订阅链接已删除'); void refreshTokens(); }
-  };
   const userinfo = draft.userinfo ?? { mode: 'sum' as const };
   const sources = allNodeSets.filter((n) => n.ref.type === 'source' && draft.nodeSets.some((p) => p.ref.type === 'source' && p.ref.id === n.ref.id));
   const rows = log.data ?? [];
-  const lastSeen = (token: string) => rows.find((r) => r.token === token)?.at;
-  const linkName = (token: string) => tokens.data?.find((t) => t.token === token)?.label ?? '已删除的链接';
+  const subscription = tokens.data?.[0];
+  const lastSeen = rows[0]?.at;
   const lastGood = rows.find((r) => r.status === 200 && (r.source === 'fresh' || r.source === 'cache'));
 
   return (
     <>
       <div className="grid grid-cols-1 gap-5">
-        <Card className="min-w-0"
-          title={`订阅链接`}
-          actions={<Button onClick={create}><Plus size={15} />新增链接</Button>}>
-          {!tokens.data?.length ? <Empty title="还没有订阅链接" /> : (
-            <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-              {tokens.data.map((t) => {
-                const seen = lastSeen(t.token);
-                return (
-                  <li key={t.token} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg border border-line px-3.5 py-3">
-                    <div className="flex flex-[1_1_160px] flex-col gap-0.5">
-                      <span className="text-[13.5px] font-semibold">{t.label || '未命名设备'}</span>
-                      <span className="text-[12px] text-ink-muted">{seen ? `最近访问 ${formatRelativeTime(seen)}` : '从未访问'}</span>
-                    </div>
-                    <code className="min-w-0 flex-[999_1_280px] truncate rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px]">{t.url}</code>
-                    <div className="flex gap-1.5">
-                      <CopyButton className="h-9" text={t.url}><Copy size={13} />复制</CopyButton>
-                      <CopyButton className="h-9" text={`${t.url}?target=stash&platform=ios`}>复制 Stash 链接</CopyButton>
-                      <Button className="h-9 text-err" onClick={() => void manage(t, true)}><RotateCcw size={13} />重置 token</Button>
-                      <Button variant="ghost" className="h-9 w-9 px-0" aria-label={`删除链接 ${t.label || ''}`} onClick={() => void manage(t, false)}><Trash2 size={14} /></Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+        <Card className="min-w-0" title="订阅链接">
+          <ErrorAlert error={tokens.error} />
+          {subscription ? (
+            <div className="flex flex-col gap-3">
+              <p className="m-0 text-[13px] text-ink-muted">所有设备使用同一链接，自动适配 Mihomo 或 Stash；浏览器打开显示 Mihomo 配置。</p>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <a className="min-w-0 flex-[1_1_280px] break-all rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px] text-accent-ink hover:underline" href={subscription.url} target="_blank" rel="noreferrer">{subscription.url}</a>
+                <CopyButton className="h-9" text={subscription.url}><Copy size={13} />复制链接</CopyButton>
+              </div>
+              <span className="text-[12px] text-ink-muted">{lastSeen ? `最近访问 ${formatRelativeTime(lastSeen)}` : '从未访问'}</span>
+            </div>
+          ) : tokens.isPending ? <p className="m-0 text-[13px] text-ink-muted">正在加载订阅链接…</p> : <Button onClick={() => void tokens.refetch()}>重新加载链接</Button>}
         </Card>
         <Card title="输出设置" className="min-w-0">
           <div className="flex flex-col gap-3.5">
@@ -98,12 +77,11 @@ export function TabOverview() {
       </div>
       <Card title="访问日志" actions={<span className="text-[12.5px] text-ink-muted">保留 30 天</span>} bodyClass="overflow-x-auto">
         <table className="w-full min-w-[860px] border-collapse">
-          <thead><tr><th className={th}>时间</th><th className={th}>链接</th><th className={th}>识别结果</th><th className={th}>User-Agent</th><th className={th}>耗时</th><th className={th}>缓存</th><th className={th}>告警</th></tr></thead>
+          <thead><tr><th className={th}>时间</th><th className={th}>识别结果</th><th className={th}>User-Agent</th><th className={th}>耗时</th><th className={th}>缓存</th><th className={th}>告警</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{formatTime(r.at).slice(5)}</td>
-                <td className={td}>{linkName(r.token)}</td>
                 <td className={cx(td, 'font-medium')}>{r.client}{r.platform ? ` · ${r.platform}` : ''}{r.status !== 200 && <Badge tone="err" className="ml-2">{r.status}</Badge>}</td>
                 <td className={cx(td, 'max-w-[280px] truncate font-mono text-[12px] text-ink-muted')}>{r.ua}</td>
                 <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{r.ms >= 1000 ? `${(r.ms / 1000).toFixed(2)} s` : `${r.ms} ms`}</td>
@@ -111,7 +89,7 @@ export function TabOverview() {
                 <td className={td}><Badge tone={r.warnings ? 'warn' : 'neutral'}>{r.warnings}</Badge></td>
               </tr>
             ))}
-            {!rows.length && <tr><td className={td} colSpan={7}><Empty title="还没有访问记录" /></td></tr>}
+            {!rows.length && <tr><td className={td} colSpan={6}><Empty title="还没有访问记录" /></td></tr>}
           </tbody>
         </table>
       </Card>

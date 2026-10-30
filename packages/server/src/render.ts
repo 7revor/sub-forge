@@ -2,7 +2,7 @@ import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
 // 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 缓存；失败时返回上一份成功结果（OUT-05 / TPL-12）。
 // 渲染结果与 token 无关：地址里先写占位符，下发时再替换成请求所用的 token，
-// 这样同一 Profile 的多个订阅链接共用缓存与"上一份成功结果"。
+// 这样重置订阅链接后仍可复用同一 Profile 的缓存与"上一份成功结果"。
 
 import { createHash } from 'node:crypto';
 import {

@@ -68,6 +68,8 @@ export function createApp(deps: AppDeps) {
   app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' }));
 
   app.get('/sub/:token', async (c) => {
+    c.header('cache-control', 'no-store');
+    c.header('vary', 'User-Agent');
     const started = now();
     const token = c.req.param('token');
     const t = store.getActiveToken(token);
@@ -100,10 +102,11 @@ export function createApp(deps: AppDeps) {
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
     }
     const interval = store.resourceCacheTtlSec;
-    c.header('content-type', 'text/yaml; charset=utf-8');
+    c.header('content-type', 'text/plain; charset=utf-8');
+    c.header('x-content-type-options', 'nosniff');
     c.header('cache-control', 'no-store');
     c.header('profile-update-interval', String(Math.max(1, Math.round(interval / 3600))));
-    c.header('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(profile.name)}`);
+    c.header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(profile.name)}`);
     const ui = userinfoHeader(outcome.render.userinfo);
     if (ui) c.header('subscription-userinfo', ui);
     log(200, outcome);
