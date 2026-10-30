@@ -92,7 +92,7 @@ type RuleSetSource = {
   kind: 'remote' | 'local';
   name?: string;                 // 缺省显示 URL 或「本地规则」
   url?: string; content?: string; format: 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
-  behavior?: 'domain' | 'ipcidr' | 'classical';   // mrs 透传必须声明
+  behavior?: 'domain' | 'ipcidr' | 'classical';   // MRS 二进制托管必须声明
   overrides?: { line?: number; match?: string; override: ClientOverride }[];  // 仅用于尚无法转换的旧配置兼容，不用于新建改写
   enabled?: boolean;
   fetch?: FetchOptions;          // 服务层：远程来源的拉取参数
@@ -202,9 +202,9 @@ type ChainRule = {
 
 | 地址 | 用途 |
 | --- | --- |
-| `GET /sub/:token` | Profile 主配置（UA 识别客户端） |
-| `GET /p/:token/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge 的 `policy-path` 也指向此地址，内容不注入前置 |
-| `GET /r/:token/:rulesetKey?behavior=domain\|ipcidr\|classical&format=yaml\|text` | 转换后的规则集拆分结果（合并全部启用来源后按 behavior 拆分） |
+| `GET /sub/:token/:profile` | Profile 主配置（UA 识别客户端） |
+| `GET /p/:token/:profile/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge 的 `policy-path` 也指向此地址，内容不注入前置 |
+| `GET /r/:token/:resourceKey` | 公共规则产物，资源键确定规则身份、处理参数与客户端/平台；不依赖订阅 |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
 
@@ -309,9 +309,9 @@ effective.final = overlay.final ?? template.final
 ```
 expand(ruleset):
   rules = concat(sources.filter(enabled).map(s => applyOverrides(parse(s.kind == 'local' ? s.content : snapshot(ruleset.id, s.url)), ruleset.overrides)))
-  单一启用的远程来源且无额外处理、客户端支持原内容：原格式透传
-  其他可解析来源：合并为一个 classical LIST；不再按桶创建多个 provider
-  mrs / srs 无解码能力，需要处理或客户端不支持时明确失败
+  所有可解析文本来源：转换并合并为一个托管 classical LIST
+  单一合法 MRS 来源：校验后二进制托管；不能合并、改写或添加 src
+  SRS 或目标无法表示的内容：明确失败，并按既有成功产物回退
   去重（按 type+value）
   内部按 behavior 分类，仅用于排序与统计：
     domain   : DOMAIN / DOMAIN-SUFFIX（可转为 mihomo domain behavior: +.suffix）
@@ -370,7 +370,7 @@ SQLite v11 的 `rule_repos.definition` 为可空 JSON：`id/name/owner/repo/refs
 
 仓库候选扩展名固定为 list/txt，自定义路径通配符不能扩大范围。zydou 仅读取 surge-rule-set 与 surge-domain-set；blackmatrix7 不再索引 YAML。服务初始化过滤旧缓存中的不支持变体（多文件变体整体过滤），删除空条目，清空受影响仓库的 revisions 与 checked_at，从而在 commit 不变时也重新构建；既有 RuleSetSource 文档不改动。旧自定义仓库 `format: yaml` 改为 auto，保留用户路径筛选。
 
-RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML 解析结果增加可选 `conversion: yaml-to-list`，预览来源状态透出同名字段，前端展示转换托管标记。输入先解析为 IR，应用改写，再分桶输出 LIST 文本；不是把 YAML URL 直接下发。保存/预览拒绝把 YAML 地址或同 URL 的既有 yaml 输入标记为 mrs/srs；内核也阻止已知 YAML 地址被透传。原生二进制透传不承担转换功能。
+RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML 解析结果增加可选 `conversion: yaml-to-list`，预览来源状态透出同名字段，前端展示转换托管标记。输入先解析为 IR，应用改写，再分桶输出 LIST 文本；不是把 YAML URL 直接下发。保存/预览拒绝把 YAML 地址或同 URL 的既有 yaml 输入标记为 mrs/srs；内核也阻止把已知 YAML 地址标成二进制。MRS 原字节托管不承担文本转换功能。
 
 ## 2026-10-29 追加：索引凭据
 
@@ -384,16 +384,11 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 登录页不复用业务页面的 page-scroll 容器；通用 Modal 使用 Portal 挂载到 body，以避免页面限宽选择器和祖先裁切影响遮罩。纯前端修复，领域模型、后端接口与示例种子不变。
 
-### 2026-10-29：输入格式自动识别与原格式透传
+### 输入格式自动识别与全局托管（2026-10-30）
 
-本节替代此前“YAML 只能托管”与“三类 provider 分桶输出”的约定。格式不再由用户选择；文本按内容自动识别，历史格式仅用于域名方言兼容。预览始终经过 IR 转换，并返回识别出的 format/behavior 与整组 delivery。
+格式按内容识别，历史格式仅用于域名方言兼容。文本先解析成 IR，再应用改写、客户端兼容转换和去重，统一输出托管 classical LIST。无法转换的行保留诊断，不以原 URL 绕过处理。Surge DOMAIN-SET 的 `.域名` 包含根域；Clash/YAML domain 的前导点只含子域，转换不扩大匹配范围。
 
-- 单个启用远程来源、无组级/来源级覆写、无 src 等处理或自定义 UA，且目标客户端支持内容语义时：引用原 URL，并按识别结果设置 format（text/yaml）与 behavior。
-- 多来源、改写、IP 选项、未知行过滤或方言翻译等情况：一个 `.list`，`format: text`、`behavior: classical`；继续去重并保留行内 IP 选项。
-- Surge DOMAIN-SET 的 `.域名` 包含根域；Clash/YAML domain 的前导点只含子域，转换不能扩大匹配范围。纯文本方言存在歧义时沿用既有领域约定，并参考仓库元数据。
-- 旧 MRS/SRS 仅保留已有透传能力，不新增解码器；无法转换时报告错误，订阅服务沿用已有失败回退。
-
-格式支持依据：[mihomo rule-providers](https://wiki.metacubex.one/en/config/rule-providers/)、[文件内容格式](https://wiki.metacubex.one/en/config/rule-providers/content/)。当前完整订阅下载实现为 mihomo；Surge 继续用于规则预览。
+单一合法 MRS 来源经校验后原字节托管，SRS 明确不支持。`managedRuleDelivery` 只检查目标输出是否可生成；没有自动透传分支。用户 token、公共资源身份、名称与清理规则见 [全局托管与鉴权](19-managed-resources.md)。
 
 ## 管理列表查询模型（2026-10-29）
 
@@ -403,7 +398,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 
 `Matcher` 仍分 `rule` / `ruleset`。旧 `{ kind: 'ruleset', id }` 表示本地规则集，不迁移已有数据。仓库引用为 `{ kind: 'ruleset', id, repository: { repo, entry, name, sources } }`，其中 sources 固定本次选定的分支、路径、URL 与文本格式；id 为 `repo:` 加映射的 SHA-256 摘要前 32 位，不依赖显示名称。
 
-`/rule-options/resolve` 根据仓库索引生成引用，不落本地文档；新引用经索引与 URL 校验，已发布引用仅在映射完全一致时按原映射使用。仓库引用内容不接受客户端改写和自定义拉取参数；需要定制时建立本地规则集。解析层将两类引用统一为 `RuleSetInputs`，之后快照、启用依赖收集、格式处理、托管/透传选择、缓存与旧版本资源保持原链路。
+`/rule-options/resolve` 根据仓库索引生成引用，不落本地文档；新引用经索引与 URL 校验，已发布引用仅在映射完全一致时按原映射使用。仓库引用内容不接受客户端改写和自定义拉取参数；需要定制时建立本地规则集。解析层将两类引用统一为 `RuleSetInputs`，之后快照、启用依赖收集、格式处理、托管输出校验、缓存与旧版本资源保持原链路。
 
 模板编辑 YAML 的 `x-sub-forge-rulesets` 保存别名到完整 Matcher 的映射，避免名称重用与跨来源重名改变引用。该元数据仅用于模板编辑器，不进入最终订阅配置。旧的无映射 YAML 按唯一名称导入；同名本地引用导出为 `local:<id>` 别名。
 
@@ -417,7 +412,7 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 2026-10-29 规则集页面移除整组 no-resolve 开关及列表列。`RuleSet.noResolve` 作为旧数据兼容字段保留，编辑其他字段时继续原样保存并参与预览与渲染；新建规则集不设置该字段。规则级选项与管线不变，无需数据迁移。
 
 
-2026-10-29：ruleKey 增加可选目标客户端；仅 mihomo 的进程 wildcard 与 DOMAIN-WILDCARD 对值执行 toLowerCase 后生成去重键，不改写 RuleIR 或来源内容。convertRuleDocuments 与 expandRuleSet 共用该键，替换及追加也参与；重复项保留来源行位并写为注释。单来源原文预览继续保留重复行。ruleSetDelivery 检测远程 wildcard 重复并强制托管（含 YAML），让实际下载与合并预览一致。客户端未指定时维持原有大小写敏感键，仓库索引计数不变。
+2026-10-29：ruleKey 增加可选目标客户端；仅 mihomo 的进程 wildcard 与 DOMAIN-WILDCARD 对值执行 toLowerCase 后生成去重键，不改写 RuleIR 或来源内容。convertRuleDocuments 与 expandRuleSet 共用该键，替换及追加也参与；重复项保留来源行位并写为注释。单来源原文预览继续保留重复行。managedRuleDelivery 仅判断能否生成托管产物；所有文本都经过相同的转换和去重，使下载与预览一致。客户端未指定时维持原有大小写敏感键，仓库索引计数不变。
 
 
 2026-10-29 RAW 为单条编辑的默认表示，text 保存完整匹配原文，不含出口；client 改为可选，不设置时在目标客户端原样输出，设置时保留旧的客户端专用语义。新建与编辑写入 RAW；已有结构化 IR 不做批量迁移。RAW 不受 parseRuleLine 的类型枚举限制，不进行客户端方言翻译，语法由目标客户端解释。末尾 no-resolve / src 在 Lowering 中拆成选项，由 composeRule 在出口之后输出，避免重复；旧 RuleEntry 选项在表单回显时合入文本，编辑后移除独立副本。RAW wildcard 与结构化 wildcard 共用 mihomo 大小写去重键。空白及多行 RAW 不允许保存 / 发布或输出。模板 YAML 识别既有 RAW 并保留原文、稳定 ID 和覆盖；未知语法回落为 RAW，已支持的既有 IR 导入逻辑继续兼容。
