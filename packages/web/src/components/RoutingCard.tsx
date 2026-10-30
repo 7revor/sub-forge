@@ -4,7 +4,7 @@ import { Button, cx } from './ui.tsx';
 
 /** 策略组、规则和增强来源共用尺寸，保留各自的信息排列。 */
 export function RoutingCard({ children, className, invalid, id }: { children: ReactNode; className?: string; invalid?: boolean; id?: string }) {
-  return <div id={id} data-routing-card className={cx('my-2 min-h-[50px] items-center gap-x-2 gap-y-2 rounded-lg border bg-panel py-2 pr-3 pl-2 text-[13px] leading-5', invalid ? 'border-err' : 'border-line', className)}>{children}</div>;
+  return <div id={id} data-routing-card className={cx('my-2 min-h-[50px] items-center gap-x-2 gap-y-2 rounded-lg border bg-panel px-4 py-2 text-[13px] leading-5', invalid ? 'border-err' : 'border-line', className)}>{children}</div>;
 }
 
 export function RoutingCardIcon({ children }: { children: ReactNode }) {

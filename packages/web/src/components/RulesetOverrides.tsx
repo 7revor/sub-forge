@@ -29,7 +29,7 @@ export function RulesetOverrides({ value, legacySources, onChange, onRemoveLegac
   onRemoveLegacy: (id: string) => void;
 }) {
   const update = (index: number, item: ContentOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
-  return <Card title="内核改写" bodyClass={value.length ? 'px-4 pb-1' : undefined} actions={<Button onClick={() => onChange([...value, { match: '', override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
+  return <Card title="内核改写" bodyClass={value.length ? 'px-4 pb-1' : undefined} actions={<Button size="sm" className="gap-1" onClick={() => onChange([...value, { match: '', override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
     {legacySources.filter((s) => s.overrides?.length).map((s) => <div key={s.id} className="mb-4 rounded-lg border border-line p-3 text-[12.5px]">
       <p className="mt-0">来源「{s.name || s.url || '本地规则'}」有 {s.overrides!.length} 条旧改写尚无法转换为内容匹配，仍按原配置生效。请补充规则内容或拉取远程内容后保存，或添加组级改写后移除旧配置。</p>
       <ul className="pl-5">{s.overrides!.map((o, i) => <li key={i} className="break-all">{o.match ? `内容 ${o.match}` : `原第 ${o.line} 行`} · {o.override.when.client} · {'drop' in o.override.action ? '丢弃' : 'append' in o.override.action ? `追加 ${o.override.action.append.map(formatRuleLine).join('；')}` : `替换为 ${o.override.action.replace.map(formatRuleLine).join('；')}`}</li>)}</ul>

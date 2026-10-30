@@ -4,7 +4,8 @@ import { NODE_SET_LABEL, sameNodeSet as same, nodeSetKey } from '../domain/nodeS
 // 通用对话框（设计稿「对话框与危险操作」）：重命名、添加节点集。
 
 import type { NodeSetID } from '@sub-forge/core';
-import { Button, Empty, Input, } from './ui.tsx';
+import { Button, Empty } from './ui.tsx';
+import { SearchInput } from './SearchInput.tsx';
 
 /** 搜索 + 多选；已加入的置灰，不能自选（如组合不能加入自己） */
 export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref: NodeSetID; name: string }[]; added: NodeSetID[]; hint?: string }, NodeSetID[]>(function NodeSetModal({ data: { title = '添加节点集', options, added, hint }, modal }) {
@@ -15,7 +16,7 @@ export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref:
   const shown = options.filter((o) => matchesNameSearch(o.name, q));
   return (
     <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{title}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
-      <Input aria-label="搜索节点集" placeholder="搜索订阅源、组合、本地节点组" value={q} onChange={(e) => setQ(e.target.value)} />
+      <SearchInput aria-label="搜索节点集" placeholder="搜索订阅源、组合、本地节点组" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex max-h-[360px] flex-col overflow-y-auto rounded-lg border border-line">
         {shown.map((o) => {
           const isAdded = added.some((a) => same(a, o.ref));

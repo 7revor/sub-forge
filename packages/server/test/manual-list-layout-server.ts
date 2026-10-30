@@ -10,7 +10,7 @@ import { RuleRepoService } from '../src/rule-repos/service.ts';
 import type { RepoCache } from '../src/rule-repos/git-cache.ts';
 import { addUser, setupApp } from './helpers.ts';
 
-type Control = { holdLists?: boolean; holdDetails?: boolean; failLists?: boolean };
+type Control = { holdLists?: boolean; holdDetails?: boolean; failLists?: boolean; holdDeletes?: boolean; failDeletes?: boolean };
 const controlPath = process.env.LIST_LAYOUT_CONTROL;
 const control = async (): Promise<Control> => controlPath ? JSON.parse(await readFile(controlPath, 'utf8')) : {};
 const publicUrl = 'http://list-layout.localhost:18947';
@@ -46,6 +46,16 @@ const app = new Hono();
 app.get('/__fixture/requests', c => c.json(requests));
 app.use('/api/*', async (c, next) => {
   const path = c.req.path;
+  if (c.req.method === 'DELETE') {
+    const key = `DELETE ${path}`;
+    requests[key] = (requests[key] ?? 0) + 1;
+    while (!stopping) {
+      const state = await control();
+      if (state.failDeletes) return c.json({ error: '模拟删除失败，请重试。' }, 503);
+      if (!state.holdDeletes) break;
+      await new Promise(resolve => setTimeout(resolve, 80));
+    }
+  }
   const list = c.req.method === 'GET' && /^\/api\/(sources|collections|locals|rulesets|profiles|templates|presets|rule-repos)$/.test(path);
   const detail = c.req.method === 'GET' && (/\/(cache|nodes)$/.test(path) || path.startsWith('/api/resource-links/'));
   if (list || detail) {

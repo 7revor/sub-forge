@@ -92,7 +92,7 @@
 | SRC-02 | 基础设置：名称置顶，编辑单个订阅 URL、自动更新时间和备注；UA 固定 clash.meta、超时固定 10 秒。超过间隔后下次读取后台更新，失败沿用最近成功内容；修改地址自动预览，保存后生效。基础设置在上，下方处理链与总览左右排列 | P0 |
 | SRC-03 | **原始快照缓存**：保存最近一次成功拉取的原始内容和时间；拉取失败时使用快照并在 UI 标红 | P0 |
 | SRC-04 | 解析主流协议：ss / ssr / vmess / vless(reality) / trojan / hysteria / hysteria2 / tuic / wireguard / anytls / snell / http / socks5 等；无法解析的节点列入"解析失败"列表而不中断 | P0 |
-| SRC-05 | 透传并聚合 `subscription-userinfo`（流量/到期），在 Profile 输出中可选择汇总或取某个源 | P1 |
+| SRC-05 | 透传并聚合 `subscription-userinfo`（流量/到期），在 Profile 输出中可多选节点订阅，汇总流量并取最早到期时间；空选不输出 | P1 |
 | SRC-06 | 处理链编辑器：可拖拽排序、单步启用/禁用、**逐步预览**（每一步之后的节点列表 + 与上一步的 diff） | P0 |
 | SRC-07 | 内置处理器（P0）：正则过滤（保留/剔除）、正则改名（**正则链**，按序多条 `pattern → replacement`）、正则删除字符、按名称排序、按正则优先级排序、去重（改名加序号 / 删除）、地区旗帜（识别地区名、代码；流量与到期说明节点不添加）、协议类型过滤、快捷设置（udp/tfo/skip-cert-verify 等）、无用节点过滤（"剩余流量""到期"等） | P0 |
 | SRC-08 | 脚本处理器：JavaScript 脚本 `(nodes, ctx) => nodes`，在**沙箱**中执行（超时、内存限制、无网络/文件访问）。**编写权限**：默认仅管理员，管理员可按用户授权；普通用户可引用管理员共享的脚本（Q8） | P1 |
@@ -319,7 +319,7 @@
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
 | OUT-01 | **主配置** `GET /subs/profile?id=P&token=T`：mihomo 输出 YAML；Surge 输出 conf，**首行**为 `#!MANAGED-CONFIG <本订阅地址> interval=<秒> strict=false`，每次下发都必须带这一行（否则 Surge 会把它退化为普通配置）。`interval` 取系统资源缓存时间，默认 86400 | P0 |
-| OUT-02 | **响应头**：<br>· `subscription-userinfo: upload=<B>; download=<B>; total=<B>; expire=<unix 秒>`，内容按 SRC-05 的设置（汇总或取某个源）；没有流量信息时不输出<br>· `profile-update-interval: <小时>`，与 OUT-01 的间隔一致<br>· `content-disposition: inline; filename*=UTF-8''<Profile 名>`，保留客户端中的订阅显示名，浏览器以纯文本直接显示 YAML<br>各客户端是否读取这些头待采集（07 C4），不影响输出 | P0 |
+| OUT-02 | **响应头**：<br>· `subscription-userinfo: upload=<B>; download=<B>; total=<B>; expire=<unix 秒>`，内容按 SRC-05 的设置（汇总勾选的节点订阅，同一上游地址只计一次）；没有流量信息时不输出<br>· `profile-update-interval: <小时>`，与 OUT-01 的间隔一致<br>· `content-disposition: inline; filename*=UTF-8''<Profile 名>`，保留客户端中的订阅显示名，浏览器以纯文本直接显示 YAML<br>各客户端是否读取这些头待采集（07 C4），不影响输出 | P0 |
 | OUT-03 | **外部节点集** `GET /subs/nodes?kind=provider&profile=P&id=K&token=T`：mihomo 输出 `proxies:` YAML；Surge 输出逐行 `[Proxy]` 格式（不带段标题）。URL 保持稳定，节点内容按当前配置生成（REF-11） | P0 |
 | OUT-04 | **规则集** `GET /resources/ruleset?key=K&token=T`：按 `behavior`、`format` 输出（RS-05）；托管的仓库规则保留来源注释与许可证声明（R2） | P0 |
 | OUT-05 | **失败处理**：渲染失败或校验失败时返回上一份成功结果（REF-08、TPL-12），HTTP 200；从未成功渲染过时返回 HTTP 503 与纯文本错误说明，不返回半成品配置 | P0 |

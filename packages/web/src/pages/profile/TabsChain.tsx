@@ -39,7 +39,7 @@ export function TabChains() {
 
   return (
     <>
-      <Card title="代理链" subtitle={`${draft.chains.length} 条`}
+      <Card title="代理链"
         actions={<>{draft.chains.length > 0 && <Button size="sm" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button size="sm" onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
         {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[13px] text-err">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}

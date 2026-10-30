@@ -332,6 +332,66 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* 共享单元格分隔线：保留边框占位，首尾向内收，与内容留白对齐。 */
+.table-cell-divider {
+  position: relative;
+  border-bottom: 1px solid transparent;
+  --table-divider-color: var(--color-line-2);
+}
+
+th.table-cell-divider {
+  --table-divider-color: var(--color-line);
+}
+
+.table-cell-divider::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: var(--table-divider-color);
+  pointer-events: none;
+}
+
+.table-cell-divider:first-child::after {
+  left: 24px;
+}
+
+.table-cell-divider:last-child::after {
+  right: 24px;
+}
+
+/* 表格工具栏、分页栏与加载状态栏也保留两端留白。 */
+.table-panel-divider,
+.table-panel-divider-bottom {
+  position: relative;
+  border-top: 1px solid transparent;
+}
+
+.table-panel-divider::before,
+.table-panel-divider-bottom::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 24px;
+  left: 24px;
+  height: 1px;
+  background: var(--color-line);
+  pointer-events: none;
+}
+
+.table-panel-divider-bottom {
+  border-top: 0;
+  border-bottom: 1px solid transparent;
+}
+
+.table-panel-divider-bottom::before {
+  top: auto;
+  bottom: 0;
+  background: var(--color-line-2);
+}
+
 /* shadcn 官方 neutral 主题；旧页面的品牌色单独命名。 */
 :root {
   --radius: 0.625rem;
@@ -361,6 +421,12 @@ body {
   --chart-5: hsl(27 87% 67%);
 }
 @theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -392,4 +458,20 @@ body {
 }
 @layer base {
   * { @apply border-border; }
+}
+
+/* Sidebar 沿用品牌深色导航，主题只作用于侧栏。 */
+.app-sidebar {
+  --sidebar: var(--color-nav);
+  --sidebar-foreground: var(--color-nav-text);
+  --sidebar-accent: var(--color-nav-hover);
+  --sidebar-accent-foreground: #fff;
+  --sidebar-border: #303743;
+  --sidebar-ring: #91b3ff;
+}
+
+@media (max-width: 767px) {
+  .app-sidebar { height: auto; }
+  .app-sidebar [data-sidebar="header"] { padding-bottom: 0; }
+  .app-sidebar:has(button[aria-expanded="true"]) [data-sidebar="header"] { padding-bottom: 1rem; }
 }

@@ -1,28 +1,32 @@
 import { ListTable, ListTableLoading } from './ListTable.tsx';
+import { ListActions } from './ListActions.tsx';
+import { actionHeader } from './DocTableRow.tsx';
+import { Frame } from '../modals/Frame.tsx';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
 import { api, type RuleRepo } from '../api.ts';
-import { Badge, Button, Card, Empty, ErrorAlert, buttonClass, formatTime, td } from './ui.tsx';
+import { Badge, Button, Empty, ErrorAlert, buttonClass, formatTime, td } from './ui.tsx';
 
 export function RepositoryManager({ repos, admin, loading = false, failed = false, onRetry }: { repos: RuleRepo[]; admin: boolean; loading?: boolean; failed?: boolean; onRetry?: () => void }) {
   const qc = useQueryClient();
   const { search } = useLocation();
-  const [deleting, setDeleting] = useState<RuleRepo>();
   const invalidate = () => qc.invalidateQueries({ queryKey: ['rule-repos'] });
   const refresh = useMutation({ meta: { successMessage: '已提交索引更新，请查看仓库状态' }, mutationFn: (id: string) => api('POST', `/rule-repos/${id}/refresh`), onSuccess: invalidate });
   const toggle = useMutation({ meta: { successMessage: '仓库状态已更新' }, mutationFn: (r: RuleRepo) => api('PATCH', `/rule-repos/${r.id}`, { enabled: !r.enabled }), onSuccess: invalidate });
-  const remove = useMutation({ meta: { successMessage: '仓库已删除' }, mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: () => { setDeleting(undefined); return invalidate(); } });
-  return <>
-    <Card title="仓库" subtitle="仅索引目录、.list 和 .txt 文件" className="shrink-0" bodyClass="px-4 pb-4" actions={admin && <><Link to={`/rule-repo/new${search}`} className={buttonClass('default', 'sm')}><Plus size={14} />添加仓库</Link></>}>
-      <div className="list-table-scroll h-[min(30vh,240px)] min-h-0 overflow-auto overscroll-contain rounded-lg border border-line-2" aria-busy={loading}>
+  const remove = useMutation({ meta: { successMessage: '仓库已删除', modalErrors: true }, mutationFn: (id: string) => api('DELETE', `/rule-repos/${id}`), onSuccess: invalidate });
+  return <section aria-label="仓库" className="flex shrink-0 flex-col gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="m-0 text-[15px] font-semibold">仓库</h2>
+      {admin && <Link to={`/rule-repo/new${search}`} className={buttonClass('default', 'sm')}><Plus size={14} />添加仓库</Link>}
+    </div>
+    <div className="list-panel">
+      <div className="list-table-scroll max-h-[min(30vh,240px)] min-h-0 overflow-auto overscroll-contain" aria-busy={loading}>
         <ListTable label="仓库管理" columns={[
-          { header: '仓库名称', width: 240 }, { header: '分支', width: 112 }, { header: '规则数', width: 80 },
-          { header: '更新时间', width: 144 }, { header: '状态', width: 112 }, ...(admin ? [{ header: '操作', width: 328 }] : []),
+          { header: '仓库名称', width: 180 }, { header: '分支', width: 136 }, { header: '规则数', width: 72 },
+          { header: '更新时间', width: 136 }, { header: '状态', width: 96 }, ...(admin ? [{ header: actionHeader, width: 288 }] : []),
         ]}>
-          {loading ? <ListTableLoading columns={admin ? 6 : 5} rows={3} rowHeight={53} /> : repos.map(r => <Fragment key={r.id}>
-            <tr>
+          {loading ? <ListTableLoading columns={admin ? 6 : 5} rows={3} rowHeight={53} /> : repos.map(r => <tr key={r.id} className="hover:bg-ground focus-within:bg-ground">
               <td className={td}><a href={r.url} target="_blank" rel="noreferrer" className="break-all font-medium text-ink hover:text-brand">{r.name}</a>
                 {r.pending && r.builtAt && <div className="mt-1 text-[12px] text-ink-muted">新配置待同步，搜索仍使用上次成功索引。</div>}
                 {r.error && <div className="mt-1 max-w-sm break-words text-[12px] text-err">{r.error}{r.builtAt ? '（保留上次索引）' : ''}</div>}
@@ -31,19 +35,13 @@ export function RepositoryManager({ repos, admin, loading = false, failed = fals
               <td className={`${td} tabular-nums`}>{r.entries}</td>
               <td className={`${td} whitespace-nowrap text-ink-muted`}>{r.builtAt ? formatTime(r.builtAt).slice(5) : '—'}</td>
               <td className={td}><Badge tone={!r.enabled ? 'neutral' : r.error ? 'err' : r.builtAt ? 'ok' : 'neutral'}>{!r.enabled ? '已停用' : r.indexing ? '更新中…' : r.error ? '更新失败' : r.builtAt ? '已索引' : '待索引'}</Badge></td>
-              {admin && <td className={`${td} w-px`}><div className="flex gap-2"><Button size="sm" disabled={!r.enabled || r.indexing || refresh.isPending} onClick={() => refresh.mutate(r.id)}>更新索引</Button><Button size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button><Link to={`/rule-repo/${encodeURIComponent(r.id)}/edit${search}`} className={buttonClass('default', 'sm')}>编辑</Link><Button size="sm" variant="ghost" aria-label={`删除 ${r.name}`} disabled={r.indexing || remove.isPending} onClick={() => { remove.reset(); setDeleting(r); }}><Trash2 size={14} />删除</Button></div></td>}
-            </tr>
-          {admin && deleting?.id === r.id && <tr><td colSpan={6} className={td}><div role="alert" aria-label="删除仓库确认" className="flex flex-col gap-2 text-[13px]">
-            <span>删除「{r.name}」及其索引？已创建的增强集合会保留；仍被模板或配置订阅直接引用时不能删除。</span>
-            <div className="flex gap-2"><Button size="sm" disabled={remove.isPending} onClick={() => setDeleting(undefined)}>取消</Button><Button size="sm" variant="danger" disabled={remove.isPending || r.indexing} onClick={() => remove.mutate(r.id)}>{remove.isPending ? '删除中…' : '确认删除'}</Button></div>
-            <ErrorAlert error={remove.error} />
-          </div></td></tr>}
-          </Fragment>)}
+              {admin && <td className={td}><ListActions><Button size="sm" disabled={!r.enabled || r.indexing || refresh.isPending} onClick={() => refresh.mutate(r.id)}>更新索引</Button><Button size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>{r.enabled ? '停用' : '启用'}</Button><Link to={`/rule-repo/${encodeURIComponent(r.id)}/edit${search}`} aria-label={`编辑 ${r.name}`} className={buttonClass('default', 'sm')}>编辑</Link><Button size="sm" variant="danger" aria-label={`删除 ${r.name}`} disabled={r.indexing || remove.isPending} onClick={() => { remove.reset(); void Frame.modal.confirm({ title: `删除仓库「${r.name}」？`, description: '仓库及其索引会被删除，无法恢复。已创建的增强集合会保留；仍被模板或配置订阅直接引用时不能删除。', confirmLabel: '删除', danger: true }, { submit: async () => { await remove.mutateAsync(r.id); } }); }}>删除</Button></ListActions></td>}
+            </tr>)}
         </ListTable>
         {failed && <div className="p-4 text-ink-muted">仓库加载失败。<Button size="sm" onClick={onRetry}>重试</Button></div>}
         {!loading && !failed && !repos.length && <div className="p-4"><Empty title="还没有仓库" /></div>}
       </div>
-      <ErrorAlert error={refresh.error ?? toggle.error} />
-    </Card>
-  </>;
+    </div>
+    <ErrorAlert error={refresh.error ?? toggle.error} />
+  </section>;
 }

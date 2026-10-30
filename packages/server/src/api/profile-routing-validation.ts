@@ -51,14 +51,15 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
       if (customRules === undefined) continue;
       if (!Array.isArray(customRules)) throw bad('自定义规则必须是数组');
       for (const rule of customRules) {
-        if (!obj(rule) || !isStr(rule.id) || !obj(rule.matcher) || (rule.matcher.kind !== 'rule' && rule.matcher.kind !== 'local')) throw bad('自定义规则只能使用本地规则');
-        if (Object.keys(rule).some(key => !['id', 'matcher', 'target', 'options'].includes(key))) throw bad('自定义规则不能指定插入位置或覆盖模板规则');
+        if (!obj(rule) || !isStr(rule.id) || !obj(rule.matcher) || !['rule', 'local', 'ruleset'].includes(String(rule.matcher.kind))) throw bad('自定义规则匹配类型不合法');
+        if (Object.keys(rule).some(key => !['id', 'matcher', 'target', 'options', 'providerName'].includes(key))) throw bad('自定义规则不能指定插入位置或覆盖模板规则');
         if (!obj(rule.target) || rule.target.kind === 'node' && !obj(rule.target.ref)) throw bad('自定义规则出口格式错误');
         if (rule.matcher.kind === 'local') {
           const error = localRulesError(rule.matcher);
           if (error) throw bad(error);
-        } else checkPrependRule(rule.matcher.rule);
-        if (rule.matcher.overrides !== undefined) {
+        } else if (rule.matcher.kind === 'rule') checkPrependRule(rule.matcher.rule);
+        if (rule.providerName !== undefined && !isStr(rule.providerName)) throw bad('规则来源名称必须是非空字符串');
+        if (rule.matcher.kind !== 'ruleset' && rule.matcher.overrides !== undefined) {
           if (!Array.isArray(rule.matcher.overrides)) throw bad('客户端覆盖必须是数组');
           for (const override of rule.matcher.overrides) {
             if (!obj(override) || !obj(override.when) || !['mihomo', 'surge', 'stash', 'loon'].includes(String(override.when.client)) || !obj(override.action)) throw bad('客户端覆盖格式错误');
@@ -124,9 +125,9 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
     ruleIds.add(rule.id);
     target(rule.target, `规则 ${rule.id}`);
     if (rule.matcher.kind === 'ruleset') {
-      // 模板内容由管理员发布；独立复制保留原引用的仓库映射。
+      // 模板内容由管理员发布；所有订阅自定义引用均校验身份，保留历史仓库映射。
       const prior = priorRules.find(p => p.id === rule.id)?.matcher;
-      if (r.mode === 'independent') {
+      if (rule.origin === 'profile') {
         checkRuleSetReference(rule.matcher, store, prior?.kind === 'ruleset' ? prior : undefined);
         if (!rule.matcher.repository && !rule.matcher.remote && !refs.ruleVisible(rule.matcher.id)) throw bad(`规则 ${rule.id}：规则集不存在`);
       }

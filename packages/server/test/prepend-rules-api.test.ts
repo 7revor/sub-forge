@@ -72,7 +72,7 @@ describe('绑定模板订阅的前置规则接口', () => {
     expect((await admin.get(`/api/templates?id=${t.id}`)).json.item).toEqual(t);
   });
 
-  it('拒绝前置规则集、非法规则、插入位置及模板覆盖，保存失败不落库', async () => {
+  it('拒绝不存在的规则集、非法规则、插入位置及模板覆盖，保存失败不落库', async () => {
     const { alice, draft } = await setup();
     for (const prependRules of [null, {}, [{ ...rule(), matcher: { kind: 'ruleset', id: 'fake' } }], [rule('template-rule')], [rule(), rule()], [{ ...rule(), anchor: 'bottom' }], [{ ...rule(), matcher: { kind: 'rule', rule: { type: 'MATCH', value: 'REJECT' } } }], [{ ...rule(), matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: '' } } }], [{ ...rule(), matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'a\nMATCH,DIRECT' } } }]]) {
       const response = await alice.post('/api/profiles', { ...draft, routing: { ...draft.routing, prependRules } });

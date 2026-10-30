@@ -34,7 +34,7 @@ export type ProfileDoc = Profile & {
   /** 仅兼容旧导入；保存时移除，下发间隔取系统资源缓存时间。 */
   updateIntervalSec?: number;
   /** subscription-userinfo 的来源（SRC-05） */
-  userinfo?: { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
+  userinfo?: { mode: 'sources'; sourceIds: string[] } | { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
 };
 
 export type TokenDoc = { token: string; userId: string; createdAt?: number };
