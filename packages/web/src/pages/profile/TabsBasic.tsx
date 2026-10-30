@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from '../../components/ui/alert-dialog.tsx';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
 import { accessLogOptions, tokenOptions } from '../../hooks/documentQueries.ts';
@@ -13,7 +15,7 @@ import { useState } from 'react';
 import { api, type TokenItem } from '../../api.ts';
 import { DeleteDialog } from '../../components/DetailActions.tsx';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Modal, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, Segmented, Select, formatTime, td, th, cx } from '../../components/ui.tsx';
 import { useList } from '../../hooks.ts';
 import { DualEditor } from '../../components/DualEditor.tsx';
 import { OverrideForm } from '../../components/OverrideField.tsx';
@@ -61,7 +63,7 @@ export function TabOverview() {
                   <li key={t.token} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg border border-line px-3.5 py-3">
                     <div className="flex flex-[1_1_160px] flex-col gap-0.5">
                       <span className="text-[13.5px] font-semibold">{t.label || '未命名设备'}</span>
-                      <span className="text-[12px] text-muted">{seen ? `最近访问 ${formatRelativeTime(seen)}` : '从未访问'}</span>
+                      <span className="text-[12px] text-ink-muted">{seen ? `最近访问 ${formatRelativeTime(seen)}` : '从未访问'}</span>
                     </div>
                     <code className="min-w-0 flex-[999_1_280px] truncate rounded-md bg-ground px-2.5 py-2 font-mono text-[12.5px]">{t.url}</code>
                     <div className="flex gap-1.5">
@@ -96,7 +98,7 @@ export function TabOverview() {
           </div>
         </Card>
       </div>
-      <Card title="访问日志" actions={<span className="text-[12.5px] text-muted">保留 30 天</span>} bodyClass="overflow-x-auto">
+      <Card title="访问日志" actions={<span className="text-[12.5px] text-ink-muted">保留 30 天</span>} bodyClass="overflow-x-auto">
         <table className="w-full min-w-[860px] border-collapse">
           <thead><tr><th className={th}>时间</th><th className={th}>链接</th><th className={th}>识别结果</th><th className={th}>User-Agent</th><th className={th}>耗时</th><th className={th}>缓存</th><th className={th}>告警</th></tr></thead>
           <tbody>
@@ -105,7 +107,7 @@ export function TabOverview() {
                 <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{formatTime(r.at).slice(5)}</td>
                 <td className={td}>{linkName(r.token)}</td>
                 <td className={cx(td, 'font-medium')}>{r.client}{r.platform ? ` · ${r.platform}` : ''}{r.status !== 200 && <Badge tone="err" className="ml-2">{r.status}</Badge>}</td>
-                <td className={cx(td, 'max-w-[280px] truncate font-mono text-[12px] text-muted')}>{r.ua}</td>
+                <td className={cx(td, 'max-w-[280px] truncate font-mono text-[12px] text-ink-muted')}>{r.ua}</td>
                 <td className={cx(td, 'font-mono text-[12.5px] whitespace-nowrap')}>{r.ms >= 1000 ? `${(r.ms / 1000).toFixed(2)} s` : `${r.ms} ms`}</td>
                 <td className={td}>{SOURCE_TEXT[r.source] ?? r.source}</td>
                 <td className={td}><Badge tone={r.warnings ? 'warn' : 'neutral'}>{r.warnings}</Badge></td>
@@ -119,15 +121,13 @@ export function TabOverview() {
         onClose={() => setDeleting(undefined)} onConfirm={() => { if (deleting) remove.mutate(deleting.token); }}>
         使用它的设备将无法更新。
       </DeleteDialog>
-      <Modal title="新增订阅链接" open={adding} onClose={() => setAdding(false)}
-        footer={<><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建链接'}</Button></>}>
+      <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"新增订阅链接"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
         <Field label="设备备注">{(id) => <Input id={id} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create.mutate(); }} />}</Field>
         <ErrorAlert error={create.error} />
-      </Modal>
-      <Modal title={`重置「${resetting?.label || '未命名设备'}」的 token？`} open={!!resetting} onClose={() => setResetting(undefined)}
-        footer={<><Button onClick={() => setResetting(undefined)}>取消</Button><Button className="border-err bg-err text-white hover:bg-[#912018]" disabled={reset.isPending} onClick={() => resetting && reset.mutate(resetting.token)}>{reset.isPending ? '重置中…' : '重置'}</Button></>}>
+      </div><DialogFooter>{<><Button onClick={() => setAdding(false)}>取消</Button><Button variant="primary" disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? '创建中…' : '创建链接'}</Button></>}</DialogFooter></DialogContent></Dialog>
+      <AlertDialog open={!!resetting} onOpenChange={next => { if (!next) (() => setResetting(undefined))(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{`重置「${resetting?.label || '未命名设备'}」的 token？`}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
         <span className="text-[13.5px] leading-relaxed">旧链接立即失效，这台设备需要导入新链接才能继续更新。</span>
-      </Modal>
+      </div></AlertDialogDescription><AlertDialogFooter>{<><AlertDialogCancel>取消</AlertDialogCancel><Button className="border-err bg-err text-white hover:bg-[#912018]" disabled={reset.isPending} onClick={() => resetting && reset.mutate(resetting.token)}>{reset.isPending ? '重置中…' : '重置'}</Button></>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
     </>
   );
 }
@@ -151,7 +151,7 @@ export function TabBase() {
     <>
       <section className="flex flex-wrap items-center gap-x-7 gap-y-4 rounded-[10px] border border-line bg-panel px-4.5 py-4">
         <fieldset disabled={!baseValid} className="m-0 flex min-w-0 flex-[1_1_260px] flex-col gap-1.5 border-0 p-0">
-          <span className="text-[12.5px] font-medium text-muted">来源</span>
+          <span className="text-[12.5px] font-medium text-ink-muted">来源</span>
           <Segmented label="基础设置来源" value={mode} options={[{ value: 'preset', label: '引用预设' }, { value: 'custom', label: '完全自定义' }, { value: 'none', label: '不输出' }]}
             onChange={(m) => {
               if (m === 'none') { const { base: _b, ...rest } = draft; setDraft(rest); }
@@ -189,11 +189,11 @@ export function TabBase() {
           </div>
           {client !== 'stash' && <section className="flex min-w-0 flex-[1_1_320px] flex-col gap-2.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
             <div className="flex items-center justify-between"><h2 className="m-0 text-[14px] font-semibold">原样片段</h2></div>
-            <label htmlFor="raw-snippet" className="text-[12.5px] text-muted">{client === 'mihomo' ? 'YAML' : 'INI'}</label>
+            <label htmlFor="raw-snippet" className="text-[12.5px] text-ink-muted">{client === 'mihomo' ? 'YAML' : 'INI'}</label>
             <YamlTextarea id="raw-snippet" rows={10} className="bg-[#fafbfc] font-mono text-[12.5px] leading-relaxed" spellCheck={false}
               disabled={client === 'surge'} placeholder={client === 'mihomo' ? 'hosts:\n  router.home: 192.168.1.1' : '暂未开放'}
               value={client === 'mihomo' ? draft.base?.raw ?? '' : ''} onChange={(e) => setDraft({ ...draft, base: { ...draft.base, raw: e.target.value || undefined } })} />
-            <span className="text-[12px] leading-normal text-muted">原样片段暂不输出。</span>
+            <span className="text-[12px] leading-normal text-ink-muted">原样片段暂不输出。</span>
           </section>}
         </div>
       )}
@@ -210,25 +210,17 @@ export function TabNodeSets() {
 
   return (
     <>
-      <Card title={`已加入的节点集`}
-        actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="overflow-x-auto">
-        {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : (
-          <table className="w-full min-w-[820px] border-collapse">
-            <thead><tr><th className={th}>节点集</th><th className={th}>类型</th><th className={th}>节点</th><th className={th}>输出方式</th><th className={th}>备注</th><th className={cx(th, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
-            <tbody>
-              {draft.nodeSets.map((n, i) => (
-                <tr key={`${n.ref.type}:${n.ref.id}`}>
-                  <td className={cx(td, 'font-medium')}>{nodeSetName(n.ref)}</td>
-                  <td className={cx(td, 'text-ink-2')}>{NODE_SET_LABEL[n.ref.type]}</td>
-                  <td className={td}><NodeSetCount nodeSet={n.ref} /></td>
-                  <td className={td}><Segmented label="输出方式" size="sm" value={n.output} options={[{ value: 'provider', label: 'provider' }, { value: 'inline', label: 'inline' }]} onChange={(output) => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => (j === i ? { ...x, output } : x)) })} /></td>
-                  <td className={cx(td, 'text-[12.5px] text-muted')}>{chained.has(`${n.ref.type}:${n.ref.id}`) ? '有链规则 · Profile 专属 provider' : '—'}</td>
-                  <td className={cx(td, 'text-right')}><Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <Card title="节点来源" subtitle="加入节点集后，在下方策略组中填充。"
+        actions={<Button onClick={() => setAdding(true)}><Plus size={15} />添加节点集</Button>} bodyClass="pb-1">
+        {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : <ul className="m-0 list-none p-0">
+          {draft.nodeSets.map((n, i) => <li key={`${n.ref.type}:${n.ref.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line-2 px-4 py-3">
+            <div className="flex min-w-0 flex-[1_1_180px] flex-col gap-1"><span className="truncate text-[13.5px] font-medium">{nodeSetName(n.ref)}</span>
+              <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
+            </div>
+            <Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} />
+            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
+          </li>)}
+        </ul>}
       </Card>
       <NodeSetPickerDialog open={adding} options={allNodeSets} added={draft.nodeSets.map((n) => n.ref)} onClose={() => setAdding(false)}
         onAdd={(refs) => setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...refs.map((ref) => ({ ref, output: 'provider' as const }))] })} />

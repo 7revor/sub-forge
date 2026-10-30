@@ -1,15 +1,16 @@
+import { MemberAdder } from './MemberAdder.tsx';
+import { ProfileGroupsEditor } from './ProfileRoutingEditors.tsx';
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { Notice } from '../../components/Notice.tsx';
 // 策略组：绑定模式只补充成员；独立模式维护完整组配置。
 
-import type { Builtin, GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
+import type { GroupMember, GroupSpec, NodeSetID } from '@sub-forge/core';
 import { Lock, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { BUILTINS, NodeSetSelect, memberLabel } from '../../components/pickers.tsx';
+import { NodeSetSelect, memberLabel } from '../../components/pickers.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
-import { NodePicker } from '../../components/NodePicker.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
@@ -18,44 +19,13 @@ import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts
 
 type Editable = Pick<GroupSpec, 'type' | 'filter' | 'excludeFilter' | 'excludeType' | 'test' | 'strategy' | 'display' | 'extra'>;
 
-function MemberAdder({ onAdd, excludeGroupId }: { onAdd: (m: GroupMember) => void; excludeGroupId: string }) {
-  const { profileNodeSets, groupOptions } = useProfile();
-  const [kind, setKind] = useState<GroupMember['kind']>('nodeset');
-  const [ns, setNs] = useState<NodeSetID | undefined>(profileNodeSets[0]?.ref);
-  const [groupId, setGroupId] = useState('');
-  const [scope, setScope] = useState<Extract<GroupMember, { kind: 'all' }>['scope']>('all');
-  const [builtin, setBuiltin] = useState<Builtin>('DIRECT');
-  const [node, setNode] = useState<{ kind: 'node'; ref: import('@sub-forge/core').NodeRef }>({ kind: 'node', ref: { nodeSet: profileNodeSets[0]?.ref ?? { type: 'source', id: '' }, match: { exact: '' }, fallback: { kind: 'builtin', name: 'REJECT' } } });
-  const groups = groupOptions.filter((g) => g.id !== excludeGroupId);
-
-  const add = () => {
-    if (kind === 'nodeset' && ns) onAdd({ kind: 'nodeset', ref: ns });
-    else if (kind === 'group' && (groupId || groups[0])) onAdd({ kind: 'group', groupId: groupId || groups[0]!.id });
-    else if (kind === 'builtin') onAdd({ kind: 'builtin', name: builtin });
-    else if (kind === 'node' && ('exact' in node.ref.match ? node.ref.match.exact : node.ref.match.regex)) onAdd({ kind: 'node', ref: node.ref });
-    else if (kind === 'all') onAdd({ kind: 'all', scope });
-  };
-
-  return (
-    <div className="flex flex-wrap items-start gap-2 rounded-lg bg-ground p-2.5">
-      <Select aria-label="成员类型" className="w-auto" value={kind} onChange={(e) => setKind(e.target.value as GroupMember['kind'])}>
-        <option value="nodeset">节点集</option>
-        <option value="group">其他组</option>
-        <option value="builtin">内置策略</option>
-        <option value="node">单个节点</option>
-        <option value="all">全部节点</option>
-      </Select>
-      {kind === 'nodeset' && <div className="min-w-48"><NodeSetSelect label="节点集" value={ns} options={profileNodeSets} onChange={setNs} placeholder={profileNodeSets.length ? '选择节点集' : '先在「节点集」中加入'} /></div>}
-      {kind === 'group' && <Select aria-label="组" className="w-auto min-w-40" value={groupId || groups[0]?.id || ''} onChange={(e) => setGroupId(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select>}
-      {kind === 'builtin' && <Select aria-label="内置策略" className="w-auto" value={builtin} onChange={(e) => setBuiltin(e.target.value as Builtin)}>{BUILTINS.map((b) => <option key={b}>{b}</option>)}</Select>}
-      {kind === 'node' && <NodePicker label="节点" value={node.ref} nodeSets={profileNodeSets} onChange={(ref) => setNode({ kind: 'node', ref })} />}
-      {kind === 'all' && <Select aria-label="全部节点范围" className="w-auto" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}><option value="all">全部</option><option value="proxies">本地节点</option><option value="providers">provider</option></Select>}
-      <Button size="sm" onClick={add}><Plus size={14} />添加成员</Button>
-    </div>
-  );
-}
 
 export function TabGroups() {
+  const { draft } = useProfile();
+  return draft.routing ? <ProfileGroupsEditor /> : <LegacyGroups />;
+}
+
+function LegacyGroups() {
   const { draft, groups, template, patchOverlay, groupName, nodeSetName, profileNodeSets } = useProfile();
   const bound = draft.routing?.mode === 'bound';
   const [regionSource, setRegionSource] = useState<NodeSetID>();
@@ -123,7 +93,7 @@ export function TabGroups() {
   const templateMembers = g?.origin === 'template' && <ul className="m-0 list-none p-0">
     {g.members.map((m, i) => {
       const l = memberLabel(m, groupName, nodeSetName);
-      return <li key={i} className="flex items-center gap-2.5 border-b border-line-2 px-3.5 py-2.5"><Badge>{l.kind}</Badge><span className="text-[13.5px]">{l.text}</span><span className="ml-auto flex items-center gap-1 text-[12px] text-muted"><Lock size={12} />来自模板</span></li>;
+      return <li key={i} className="flex items-center gap-2.5 border-b border-line-2 px-3.5 py-2.5"><Badge>{l.kind}</Badge><span className="text-[13.5px]">{l.text}</span><span className="ml-auto flex items-center gap-1 text-[12px] text-ink-muted"><Lock size={12} />来自模板</span></li>;
     })}
   </ul>;
 
@@ -134,7 +104,7 @@ export function TabGroups() {
       )}
       <div className="flex flex-wrap items-start gap-5">
         <Card title="策略组" className="min-w-0 flex-[1_1_300px]" bodyClass="px-4 pb-2">
-          {templateIds.length > 0 && <p className="mt-0 text-[12px] text-muted">模板结构只读，可在组内添加节点或引用。</p>}
+          {templateIds.length > 0 && <p className="mt-0 text-[12px] text-ink-muted">模板结构只读，可在组内添加节点或引用。</p>}
           <div className="-mx-4"><SortableList items={groups} getKey={(x) => x.id} isLocked={(x) => x.origin === 'template'}
             canDrop={(_from, to) => !templateIds.length || to > 0}
             onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraGroups: reorderExtraGroups(templateIds, ordered.map((x) => x.id), o.extraGroups ?? []) }))}
@@ -147,13 +117,13 @@ export function TabGroups() {
                   <button type="button" onClick={() => setSelectedId(x.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-2.5 text-left">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-[13.5px] font-medium">{x.name}</span>
-                      <span className="text-[12px] text-muted">{current.type.toUpperCase()} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
+                      <span className="text-[12px] text-ink-muted">{current.type.toUpperCase()} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
                     </span>
                     {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-[12px] text-ink-2">{n} 成员</span>}
                   </button>
                   <div className="flex shrink-0 flex-col items-center gap-1 px-2 py-2">
-                    <span className="text-[12px] text-muted">隐藏</span>
-                    {x.origin === 'template' || bound ? <span className="text-[12px] text-muted" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
+                    <span className="text-[12px] text-ink-muted">隐藏</span>
+                    {x.origin === 'template' || bound ? <span className="text-[12px] text-ink-muted" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
                       onChange={hidden => patchOverlay(o => ({ ...o, extraGroups: (o.extraGroups ?? []).map(item => item.group.id === x.id ? { ...item, group: { ...item.group, display: { ...item.group.display, hidden } } } : item) }))} />}
                   </div>
                 </div>
@@ -171,7 +141,7 @@ export function TabGroups() {
           <Card className="min-w-0 flex-[999_1_560px]"
             title={<div className="flex flex-col gap-1">
               <h2 className="m-0 text-lg font-semibold">{g.origin === 'template' ? g.name : <Input aria-label="组名" value={g.name} onChange={(e) => patchOverlay((o) => ({ ...o, extraGroups: (o.extraGroups ?? []).map((x) => (x.group.id === g.id ? { ...x, group: { ...x.group, name: e.target.value } } : x)) }))} />}</h2>
-              <span className="text-[12.5px] text-muted">{g.origin === 'template' ? '模板组' : '私有组'}</span>
+              <span className="text-[12.5px] text-ink-muted">{g.origin === 'template' ? '模板组' : '私有组'}</span>
             </div>}
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
@@ -208,7 +178,7 @@ export function TabGroups() {
                 {previewNodeSets.length > 1 && <Select aria-label="预览节点集" value={previewNodeSet?.[0] ?? ''} onChange={(e) => setPreviewSelection({ groupId: g.id, key: e.target.value })}>
                   {previewNodeSets.map(([key, ref]) => <option key={key} value={key}>{nodeSetName(ref)}</option>)}
                 </Select>}
-                {previewNodeSet ? <><span className="text-[12px] text-muted">节点集：{nodeSetName(previewNodeSet[1])}</span><MatchPreview nodeSet={previewNodeSet[1]} filter={eff.filter} excludeFilter={eff.excludeFilter} excludeType={eff.excludeType} /></> : <span className="text-[12px] text-muted">组里没有节点集成员，filter 不生效</span>}
+                {previewNodeSet ? <><span className="text-[12px] text-ink-muted">节点集：{nodeSetName(previewNodeSet[1])}</span><MatchPreview nodeSet={previewNodeSet[1]} filter={eff.filter} excludeFilter={eff.excludeFilter} excludeType={eff.excludeType} /></> : <span className="text-[12px] text-ink-muted">组里没有节点集成员，filter 不生效</span>}
               </div>
 
               <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">

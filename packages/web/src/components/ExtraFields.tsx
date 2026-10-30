@@ -47,7 +47,7 @@ export function ExtraFields({ value, onChange, validateName }: {
   const [text, setText] = useState('');
   return (
     <details className="rounded-lg border border-line p-3">
-      <summary className="cursor-pointer text-[13px] text-muted">其他字段 {Object.keys(value).length} 个</summary>
+      <summary className="cursor-pointer text-[13px] text-ink-muted">其他字段 {Object.keys(value).length} 个</summary>
       <div className="mt-3 flex flex-col gap-2">
         {Object.entries(value).map(([name, item]) => (
           <ValueRow key={name} name={name} value={item}

@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
 import { usePipelinePreview } from '../hooks/usePipelinePreview.ts';
 import { SourceFetchStatus } from '../components/SourceFetchStatus.tsx';
@@ -13,7 +14,7 @@ import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { DeleteDialog } from '../components/DetailActions.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
-import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, Modal, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
 function SourceState({ source }: { source: SourceDoc }) {
@@ -59,13 +60,12 @@ function NewSourceModal({ open, onClose }: { open: boolean; onClose: () => void 
     { onSuccess: (item) => navigate(`/sources/${item.id}`, { state: { justCreated: true } }) },
   );
   return (
-    <Modal title="新建订阅源" open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}>
+    <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><DialogHeader><DialogTitle>{"新建订阅源"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
       <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
       <NoteField value={note} onChange={setNote} />
       <ErrorAlert error={save.error} />
-    </Modal>
+    </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || save.isPending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</DialogFooter></DialogContent></Dialog>
   );
 }
 
@@ -82,7 +82,7 @@ function BasicSettings({ draft, set }: {
         }</Field>
       </div>
       <NoteField value={draft.note} onChange={(note) => set({ note })} />
-      <p className="m-0 text-[12px] leading-relaxed text-muted">缓存时间由管理员在系统中统一设置；到期自动拉取，失败时继续使用上次成功内容。</p>
+      <p className="m-0 text-[12px] leading-relaxed text-ink-muted">缓存时间由管理员在系统中统一设置；到期自动拉取，失败时继续使用上次成功内容。</p>
     </Card>
   );
 }
@@ -122,7 +122,7 @@ export function SourceEdit() {
   }, [justCreated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (id === 'new') return <Navigate to="/sources" replace state={{ create: true }} />;
-  if (!draft) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!draft) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const set = (patch: Partial<SourceDoc>) => setDraft({ ...draft, ...patch });
   const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
   const submit = () => {
@@ -139,7 +139,7 @@ export function SourceEdit() {
 
   return (
     <>
-      <PageHeader crumbs={<><Link to="/sources" className="text-muted no-underline">订阅源</Link> / {doc.data?.name}</>}
+      <PageHeader crumbs={<><Link to="/sources" className="text-ink-muted no-underline">订阅源</Link> / {doc.data?.name}</>}
         title={draft.name || '未命名'}
         actions={<>
           <Button onClick={saveAndRefresh} disabled={busy || !ready}><RefreshCw size={15} />{refresh.isPending ? '拉取中…' : dirty ? '保存并拉取' : '立即拉取'}</Button>

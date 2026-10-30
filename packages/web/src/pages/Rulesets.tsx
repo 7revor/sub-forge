@@ -63,7 +63,7 @@ export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const [selected, setSelected] = useState<string | undefined>();
   const sources = useRulesetSources(e.isNew ? undefined : e.id, e.draft, selected);
-  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const d = e.draft;
   const selectedSource = d.sources.find((s) => s.id === selected);
   const set = (p: Partial<RuleSetDoc>) => e.setDraft({ ...d, ...p });
@@ -150,7 +150,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
     ? [!editingUrl && src.name?.trim() && src.url, `${src.repository ? '仓库关联' : '自定义远程'} · ${detected}`].filter(Boolean).join(' · ')
     : `本地 · ${detected} · ${lines} 行`;
   return (
-    <div className={cx('my-2 rounded-lg border', active ? 'border-accent bg-[#f8faff]' : 'border-line')}>
+    <div className={cx('my-2 rounded-lg border', active ? 'border-brand bg-[#f8faff]' : 'border-line')}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 pr-3 pl-2">
         {handle}
         <button type="button" aria-pressed={active} onClick={onSelect} className="flex min-w-0 flex-[1_1_260px] cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left">
@@ -159,7 +159,7 @@ function SourceRow({ src, handle, active, status, loading, onSelect, onChange, o
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
             <span title={title} className={cx('truncate text-[13.5px] font-medium', src.kind === 'remote' && !src.name?.trim() && !editingUrl && 'font-mono text-[12.5px]')}>{title}</span>
-            <span title={sub} className="truncate text-[12px] text-muted">{sub}</span>
+            <span title={sub} className="truncate text-[12px] text-ink-muted">{sub}</span>
           </span>
         </button>
         {src.kind === 'remote' && src.repository && src.url && <CopyButton text={src.url} size="sm" variant="ghost" aria-label={`复制关联地址 ${label}`}>复制地址</CopyButton>}

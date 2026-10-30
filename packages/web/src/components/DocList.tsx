@@ -43,10 +43,10 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
       <section className="list-panel" aria-busy={list.isFetching}>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-3.5">
           <Input aria-label={`搜索${name}`} placeholder="搜索名称" className="max-w-[280px]" value={q} onChange={(e) => setQ(e.target.value)} />
-          {list.isFetching && <span className="text-[12.5px] text-muted">加载中…</span>}
+          {list.isFetching && <span className="text-[12.5px] text-ink-muted">加载中…</span>}
         </div>
         <div key={`${list.data?.page}-${list.pageSize}-${q}`} className="min-h-0 flex-1 overflow-auto overscroll-contain">
-          {!list.data ? <div className="p-4 text-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !rows.length ? (
+          {!list.data ? <div className="p-4 text-ink-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !rows.length ? (
             <div className="p-4"><Empty title={q.trim() ? `没有名称包含「${q.trim()}」的${name}` : `还没有${name}`} description={!q.trim() && empty} action={!q.trim() && canCreate && createButton('sm', 'default')} /></div>
           ) : (
             <table className="w-full border-collapse">

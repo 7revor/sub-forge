@@ -224,3 +224,10 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 ### 2026-10-30：缓存补充审查界面
 
 规则集合文件预览回退时显示琥珀色状态文字“拉取失败：…；正在显示上次成功内容（时间）”；系统异常包含已浏览但未引用的文件。刷新任务完成立即重读查询。前后端和内置浏览器验收已完成，截图见 [补充记录](../research/verification/unified-resource-cache-review-20261030/README.md)。外部画布仍因登录限制未同步，本项不能标记为设计稿同步完成。
+
+## 2026-10-30：全局直接使用 shadcn 官方组件
+
+此项替代此前基于 Radix 手动适配的弹层。官方 Dialog、AlertDialog、Select、DropdownMenu、Popover、Command、Sonner 与 Button 源码落在 `packages/web/src/components/ui/`，只更改导入路径。编辑、预览、确认、错误、规则诊断与搜索等所有弹层入口均直接调用官方组件；不覆盖默认动画参数、默认定位或默认通知外观。旧 Modal / overlays 及自定义焦点恢复删除。页面仅保留业务状态、内容、数据映射和必要的容器宽高约束。后端接口、领域模型、输出与示例种子不变；外部画布本轮未编辑，待同步见 docs/13。验收见 `research/verification/shadcn-official-20261030/`。
+
+
+2026-10-30 合并适配：缓存刷新任务弹窗直接使用主分支官方 Dialog，保留默认动画和主题命名，并隔离弹窗与列表行点击事件。内置浏览器已验证刷新、内容点击与关闭；外部画布同步状态不变。

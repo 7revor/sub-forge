@@ -70,10 +70,10 @@ export function SchemaForm({ groups, value, onChange, extra = false, collapsible
       const fields = group.fields.filter((field) => !field.showIf || field.showIf(value));
       const inputs = fields.map((field) => <SchemaField key={field.key} field={field} value={value} onChange={onChange} />);
       return collapsible ? <details key={group.title} data-section={group.title} className="group border-t border-line-2 pt-3.5">
-        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm text-[13.5px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-          <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-muted transition-transform group-open:rotate-90" />
+        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm text-[13.5px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
+          <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-ink-muted transition-transform group-open:rotate-90" />
           <span>{group.title}</span>
-          <span className="ml-auto text-[12px] font-normal text-muted">{fields.length} 项配置</span>
+          <span className="ml-auto text-[12px] font-normal text-ink-muted">{fields.length} 项配置</span>
         </summary>
         <div className="flex flex-col gap-3 pt-4">{inputs}</div>
       </details> : <FormSection key={group.title} title={group.title}>{inputs}</FormSection>;

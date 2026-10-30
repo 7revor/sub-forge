@@ -53,7 +53,7 @@ export function AppLayout() {
     return ()=>events.close();
   },[me.data?.id,qc]);
 
-  if (me.isLoading) return <div className="p-8 text-muted">加载中…</div>;
+  if (me.isLoading) return <div className="p-8 text-ink-muted">加载中…</div>;
   if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   const isAdmin = me.data.role === 'admin';
 
@@ -109,6 +109,6 @@ export function AppLayout() {
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const me = useMe();
-  if (me.data?.role !== 'admin') return <div className="text-muted">需要管理员权限。</div>;
+  if (me.data?.role !== 'admin') return <div className="text-ink-muted">需要管理员权限。</div>;
   return <>{children}</>;
 }

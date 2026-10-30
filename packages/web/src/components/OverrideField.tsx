@@ -22,7 +22,7 @@ export function OverrideForm({ groups, base, patch, onChange }: {
           return <div key={field.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#f0f2f5] px-4.5 py-2.5 last:border-b-0">
             <label htmlFor={`ov-${field.key}`} className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
               <span className="font-mono text-[12.5px]">{field.label}</span>
-              {active && field.type === 'lines' && <span className="text-[12px] text-muted">列表整体替换</span>}
+              {active && field.type === 'lines' && <span className="text-[12px] text-ink-muted">列表整体替换</span>}
             </label>
             <div className="min-w-0 flex-[2_1_260px]">
               {active ? <FieldInput id={`ov-${field.key}`} field={field} value={getPath(patch, field.key)} onChange={(next) => onChange(setPath(patch, field.key, next))} />
@@ -30,7 +30,7 @@ export function OverrideForm({ groups, base, patch, onChange }: {
             </div>
             <div className="flex flex-[0_0_96px] justify-end">
               <button type="button" title={active ? '还原为预设值' : '点击覆盖这一项'} aria-label={`${active ? '还原' : '覆盖'} ${field.label}`}
-                className={active ? 'h-7 cursor-pointer rounded-md bg-accent-soft px-2 text-[12px] text-accent-ink hover:underline' : 'h-7 cursor-pointer rounded-md px-2 text-[12px] text-muted hover:bg-ground hover:text-ink'} onClick={() => {
+                className={active ? 'h-7 cursor-pointer rounded-md bg-accent-soft px-2 text-[12px] text-accent-ink hover:underline' : 'h-7 cursor-pointer rounded-md px-2 text-[12px] text-ink-muted hover:bg-ground hover:text-ink'} onClick={() => {
                 const next = new Set(editing);
                 if (active) next.delete(field.key); else next.add(field.key);
                 setEditing(next);

@@ -1,25 +1,26 @@
-import { remoteRuleMatcher, withIpOptions, type Matcher, type ReportItem, type RuleEntry, type RuleIR } from '@sub-forge/core';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
+import { type Matcher, type ReportItem, type RuleEntry } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { api, type RuleRepo } from '../../api.ts';
-import { MatcherEditor } from '../../components/MatcherEditor.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { targetLabel } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
-import { Button, Card, Empty, ErrorAlert, Field, FieldError, Input, Modal, buttonClass, cx } from '../../components/ui.tsx';
+import { Button, Card, Empty, ErrorAlert, Field, FieldError, buttonClass, cx } from '../../components/ui.tsx';
 import { RemoteRulePicker } from '../../components/RemoteRulePicker.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSetPicker } from '../../components/RuleSetPicker.tsx';
-import { Presence } from '../../components/Presence.tsx';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { newId, type ConvertCtx, type NamedRef, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
+import { RuleEditDialog, repositoryHintClass } from './RuleEditDialog.tsx';
+import { applyRuleDraft } from './ruleDraft.ts';
 
-const columns = 'grid grid-cols-[44px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[44px_minmax(0,1fr)_16px_clamp(100px,10vw,140px)_64px]';
+const columns = 'grid grid-cols-[36px_minmax(0,1fr)_64px] items-center gap-x-2 sm:grid-cols-[36px_minmax(0,1fr)_16px_clamp(140px,14vw,200px)_64px]';
 
 function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCtx; repos: NamedRef[] }) {
-  const sourceClass = 'shrink-0 text-[12px] text-muted';
+  const sourceClass = 'shrink-0 text-[12px] text-ink-muted';
   const lineClass = 'flex min-w-0 items-center gap-2 text-[12.5px]';
   if (matcher.kind === 'rule') {
     const line = ruleToLine(matcher.rule);
@@ -34,7 +35,7 @@ function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCt
         const file = source.repository!;
         return <span key={source.id} className={cx(lineClass, 'flex-wrap gap-y-1 sm:flex-nowrap')} title={`${name} · ${file.ref} · ${file.path}`}>
           <span className="max-w-[60%] shrink-0 truncate sm:max-w-[35%]">{name}</span><span className="shrink-0 text-faint">·</span>
-          <span className="max-w-[25%] shrink-0 truncate font-mono text-muted">{file.ref}</span><span className="hidden shrink-0 text-faint sm:inline">·</span>
+          <span className="max-w-[25%] shrink-0 truncate font-mono text-ink-muted">{file.ref}</span><span className="hidden shrink-0 text-faint sm:inline">·</span>
           <span dir="rtl" className="min-w-0 basis-full truncate text-left font-mono sm:basis-auto"><bdi dir="ltr">{file.path}</bdi></span>
         </span>;
       })}</span>
@@ -48,121 +49,93 @@ function RuleMatcher({ matcher, ctx, repos }: { matcher: Matcher; ctx: ConvertCt
   return <span className={lineClass}><span className={sourceClass}>增强集合 ·</span><span className="truncate" title={name}>{name}</span></span>;
 }
 
-export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady }: {
+export function TemplateRulesEditor({ value, onChange, selected, onSelect, ctx, report, onRuleValidationReady, readOnly = false, saveHint = '保存模板后生效', title = '规则', hideFinal = false, staticOnly = false, renderTarget, renderOptions }: {
   value: TemplateBody; onChange: (value: TemplateBody) => void; selected: string | undefined; onSelect: (id: string | undefined) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
+  readOnly?: boolean; saveHint?: string; title?: string; hideFinal?: boolean; staticOnly?: boolean;
+  renderTarget?: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => ReactNode;
+  renderOptions?: (rule: RuleEntry, onChange: (rule: RuleEntry) => void) => ReactNode;
 }) {
-  const [urlError, setUrlError] = useState<string>();
   const [linkError, setLinkError] = useState<string>();
   const [linkingRule, setLinkingRule] = useState<string>();
   const [adding, setAdding] = useState(false);
+  const [newRule, setNewRule] = useState<RuleEntry>();
   const currentValue = useRef(value);
   currentValue.current = value;
-  const remoteUrls = value.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
+  const remoteUrls = readOnly ? [] : value.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
   const repositoryMatches = useRepositoryUrlMatches(remoteUrls);
   const repositories = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: value.rules.some(r => r.matcher.kind === 'ruleset' && !!r.matcher.repository) });
   const repos = repositories.data?.repos ?? [];
   const [preview, setPreview] = useState<Matcher>();
-  const rule = value.rules.find(r => r.id === selected);
+  const rule = newRule?.id === selected ? newRule : value.rules.find(r => r.id === selected);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
   const close = () => {
-    if (rule) onRuleValidationReady(rule.id, true);
+    setNewRule(undefined);
     onSelect(undefined);
   };
   const add = (matcher: Matcher) => {
     const id = newId('r');
-    if (matcher.kind === 'rule') onRuleValidationReady(id, false);
-    onChange({ ...value, rules: [...value.rules, { id, matcher, target: value.final }] });
-    if (matcher.kind === 'rule') onSelect(id);
-  };
-  const changeRule = (next: RuleIR) => {
-    if (rule?.matcher.kind !== 'rule') return;
-    const { noResolve: _noResolve, src: _src, ...options } = rule.options ?? {};
-    update({ ...rule, matcher: { ...rule.matcher, rule: next }, ...(rule.options ? { options } : {}) });
+    const next = { id, matcher, target: value.final };
+    if (matcher.kind === 'rule') { setNewRule(next); onSelect(id); }
+    else onChange({ ...value, rules: [...value.rules, next] });
   };
   const linkRepository = async (ruleId: string, url: string, match: RepositoryUrlMatch) => {
+    if (readOnly) return;
     setLinkingRule(ruleId); setLinkError(undefined);
     try {
       const matcher = await resolveRepositoryUrlMatch(url, match);
       const latest = currentValue.current;
       const selected = latest.rules.find(r => r.id === ruleId);
       if (selected?.matcher.kind !== 'ruleset' || selected.matcher.remote?.url !== url) return;
-      onChange({ ...latest, rules: latest.rules.map(r => {
-        if (r.id !== ruleId) return r;
-        const { providerName: _providerName, ...rest } = r;
-        return { ...rest, matcher };
-      }),
-        ...(latest.ruleProviders ? { ruleProviders: latest.ruleProviders.filter(p => p.url !== url || latest.rules.some(r => r.id !== ruleId && r.matcher.kind === 'ruleset' && r.matcher.remote?.url === url)) } : {}) });
+      onChange(applyRuleDraft(latest, { ...selected, matcher }));
     } catch (error) { setLinkError(error instanceof Error ? error.message : String(error)); }
     finally { setLinkingRule(undefined); }
   };
   return <>
-    <Card title="规则" subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={<>
+    <Card title={title} subtitle={`${value.rules.length} 条 · 自上而下匹配`} bodyClass="pb-1" actions={!readOnly && <>
       <Button size="sm" aria-label="添加静态规则" onClick={() => add({ kind: 'rule', rule: { type: 'RAW', text: '' } })}><Plus size={14} />静态规则</Button>
-      <RemoteRulePicker label="远程链接" ariaLabel="引用远程链接" triggerClassName={buttonClass('default', 'sm')} onSelect={add} />
-      <Button size="sm" onClick={() => setAdding(true)}>引用规则</Button>
+      {!staticOnly && <RemoteRulePicker label="远程链接" ariaLabel="引用远程链接" triggerClassName={buttonClass('default', 'sm')} onSelect={add} />}
+      {!staticOnly && <Button size="sm" onClick={() => setAdding(true)}>引用规则</Button>}
     </>}>
       <ErrorAlert error={repositories.error} />
       <ErrorAlert error={repositoryMatches.error} />
       {linkError && <FieldError error={linkError} />}
-      {!value.rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description="未匹配的流量走 MATCH。" /></div>}
-      <SortableList items={value.rules} getKey={r => r.id} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
+      {!value.rules.length && <div className="px-4 pb-4"><Empty title="没有规则" description={hideFinal ? "先于模板规则匹配，仅影响本订阅。" : "未匹配的流量走 MATCH。"} /></div>}
+      <SortableList items={value.rules} getKey={r => r.id} isLocked={() => readOnly} onReorder={rules => onChange({ ...value, rules })} renderItem={(r, i, handle) => {
         const error = report.some(item => item.level === 'error' && item.where === `rule:${r.id}`);
         return <div id={`template-rule-${r.id}`} className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px] hover:bg-ground', error && 'bg-err-soft')}>
-          <span className="flex items-center text-[12px] text-muted">{handle}{i + 1}</span>
-          <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer text-left hover:text-accent"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
+          <span className="flex items-center text-[12px] text-ink-muted">{handle}{i + 1}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <button type="button" aria-label={`预览第 ${i + 1} 条规则`} onClick={() => setPreview(r.matcher)} className="min-w-0 cursor-pointer overflow-hidden text-left hover:text-brand"><RuleMatcher matcher={r.matcher} ctx={ctx} repos={repos} /></button>
+            {!readOnly && r.matcher.kind === 'ruleset' && r.matcher.remote && repositoryMatches.matches[r.matcher.remote.url]?.map(match => <button key={`${match.repo}:${match.ref}:${match.path}`} type="button" className={repositoryHintClass} title={`匹配到仓库文件：${match.hint}`} disabled={!!linkingRule} onClick={() => void linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)}>关联仓库文件</button>)}
+          </div>
           <span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-          <span title={targetLabel(r.target, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center text-ink-2 sm:col-auto sm:row-auto">{targetLabel(r.target, groupName, ref => ref.id)}</span>
-          <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
+          <div className="col-start-2 row-start-2 min-w-0 text-ink-2 sm:col-auto sm:row-auto [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:min-w-0 [&_button[role=combobox]]:text-[12.5px]">
+            {readOnly ? <span className="block truncate text-center" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 条规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 条规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
+          </div>
+          {!readOnly && <div className="col-start-3 row-start-1 flex gap-1 sm:col-start-5">
             <Button size="sm" variant="ghost" className="px-1.5" aria-label={`设置第 ${i + 1} 条规则`} onClick={() => onSelect(r.id)}><Pencil size={14} /></Button>
             <Button size="sm" variant="ghost" className="px-1.5 hover:text-err" aria-label={`删除第 ${i + 1} 条规则`} onClick={() => { onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) }); if (selected === r.id) onSelect(undefined); }}><Trash2 size={14} /></Button>
-          </div>
-          {r.matcher.kind === 'ruleset' && r.matcher.remote && repositoryMatches.matches[r.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="col-span-full flex flex-wrap items-center gap-2 pl-6 text-[12px] text-muted">
-            <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
-            <Button size="sm" disabled={!!linkingRule} onClick={() => void linkRepository(r.id, r.matcher.kind === 'ruleset' ? r.matcher.remote!.url : '', match)}>关联仓库文件</Button>
-          </div>)}
+          </div>}
         </div>;
       }} />
-      <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
-        <span className="pl-6 text-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
-        <span title={targetLabel(value.final, groupName, ref => ref.id)} className="col-start-2 row-start-2 min-w-0 truncate text-center sm:col-auto sm:row-auto">{targetLabel(value.final, groupName, ref => ref.id)}</span>
-        <Button size="sm" variant="ghost" className="col-start-3 row-start-1 justify-self-start px-1.5 sm:col-start-5" aria-label="编辑 MATCH" onClick={() => onSelect('final')}><Pencil size={14} /></Button>
-      </div>
+      {!hideFinal && <div className={cx(columns, 'gap-y-1 border-t border-line-2 px-4 py-2.5 text-[13px]')}>
+        <span className="pl-6 text-ink-muted">—</span><span className="font-mono text-[12.5px]">MATCH</span><span aria-hidden="true" className="hidden text-faint sm:block">→</span>
+        <div id="template-rule-final" className="col-start-2 row-start-2 min-w-0 sm:col-auto sm:row-auto [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:min-w-0 [&_button[role=combobox]]:text-[12.5px]">
+          {readOnly ? <span className="block truncate text-center" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}
+        </div>
+        <div className="col-span-full"><ItemIssues report={report} where="final" /></div>
+      </div>}
     </Card>
-    <Modal title="引用规则" open={adding} onClose={() => setAdding(false)} wide footer={<Button onClick={() => setAdding(false)}>取消</Button>}>
+    <Dialog open={adding} onOpenChange={next => { if (!next) (() => setAdding(false))(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"引用规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="规则来源">{id => <RuleSetPicker id={id} label="选择规则集合或增强集合" onSelect={matcher => { add(matcher); setAdding(false); }} />}</Field>
-    </Modal>
-    <Modal title={rule ? `编辑第 ${value.rules.indexOf(rule) + 1} 条规则` : 'MATCH 出口'} open={!!rule || selected === 'final'} onClose={close} wide
-      footer={<><span className="mr-auto self-center text-[12px] text-muted">保存模板后生效</span><Button variant="primary" onClick={close}>完成</Button></>}>
-      {rule ? <>
-        <ItemIssues report={report} where={`rule:${rule.id}`} />
-        {rule.matcher.kind === 'ruleset' && rule.matcher.remote ? <><Field label="远程链接">{id => <Input id={id} type="url" value={rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : ''} onChange={e => {
-          const url = e.target.value;
-          let matcher: Matcher;
-          try { matcher = remoteRuleMatcher(url); setUrlError(undefined); }
-          catch (error) {
-            matcher = { kind: 'ruleset', id: '', remote: { url } };
-            setUrlError(error instanceof Error ? error.message : String(error));
-          }
-          update({ ...rule, matcher });
-        }} />}</Field>
-          {repositoryMatches.matches[rule.matcher.remote.url]?.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="flex flex-wrap items-center gap-2 rounded border border-line bg-ground px-3 py-2 text-[12.5px]">
-            <span className="min-w-0 flex-1">匹配到仓库文件：{match.hint}</span>
-            <Button size="sm" disabled={!!linkingRule} onClick={() => void linkRepository(rule.id, rule.matcher.kind === 'ruleset' ? rule.matcher.remote!.url : '', match)}>关联仓库文件</Button>
-          </div>)}
-        </> : rule.matcher.kind === 'ruleset' ? <Field label="规则来源">{id => <>
-          <RuleMatcher matcher={rule.matcher} ctx={ctx} repos={repos} />
-          <RuleSetPicker id={id} label="更换规则来源" onSelect={matcher => update({ ...rule, matcher })} />
-        </>}</Field> : <div className="contents" onBlur={() => onRuleValidationReady(rule.id, true)}><MatcherEditor fixedKind value={rule.matcher} rulesets={ctx.rulesets} ruleValue={withIpOptions(rule.matcher.rule, rule.options ?? {})} onRuleChange={changeRule} onChange={matcher => update({ ...rule, matcher })} /></div>}
-        {rule.matcher.kind === 'ruleset' && rule.matcher.remote && !rule.matcher.id && urlError && <FieldError error={urlError} />}
-        <Field label="出口">{() => <TemplateTargetSelect label="规则出口" value={rule.target} groups={value.groups} onChange={target => update({ ...rule, target })} />}</Field>
-      </> : <>
-        <span className="text-[13px] text-muted">以上规则均未匹配时使用。</span>
-        <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />
-        <ItemIssues report={report} where="final" />
-      </>}
-    </Modal>
-    <Presence open={!!preview}>{open => <RuleSourcePreview open={open} matcher={preview!} onClose={() => setPreview(undefined)} />}</Presence>
+    </div><DialogFooter>{<Button onClick={() => setAdding(false)}>取消</Button>}</DialogFooter></DialogContent></Dialog>
+    {!readOnly && rule && <RuleEditDialog key={rule.id} rule={rule} index={value.rules.indexOf(rule)} ctx={ctx} staticOnly={staticOnly} adding={newRule?.id === rule.id} saveHint={saveHint} renderOptions={renderOptions} onClose={close} onSave={draft => {
+      onChange(applyRuleDraft(currentValue.current, draft, newRule?.id === draft.id));
+      onRuleValidationReady(draft.id, true);
+      close();
+    }} />}
+    <RuleSourcePreview matcher={preview} onClose={() => setPreview(undefined)} />
   </>;
 }

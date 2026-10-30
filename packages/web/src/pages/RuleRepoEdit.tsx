@@ -13,8 +13,8 @@ export function RuleRepoEditorPage() {
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos'), enabled: !!id,
     refetchOnMount: 'always', refetchInterval: query => query.state.data?.repos.some(r => r.id === id && r.indexing) ? 3000 : false });
   if (id && (repos.isPending || repos.error || !repos.data?.repos.some(r => r.id === id))) return <>
-    <PageHeader title="编辑仓库" crumbs={<Link to={`/rule-repo${search}`} className="text-muted hover:text-accent">规则集合</Link>} />
-    {repos.error ? <ErrorAlert error={repos.error} /> : <div className="text-muted">{repos.isPending ? '加载中…' : '仓库不存在或已删除。'}</div>}
+    <PageHeader title="编辑仓库" crumbs={<Link to={`/rule-repo${search}`} className="text-ink-muted hover:text-brand">规则集合</Link>} />
+    {repos.error ? <ErrorAlert error={repos.error} /> : <div className="text-ink-muted">{repos.isPending ? '加载中…' : '仓库不存在或已删除。'}</div>}
   </>;
   return <RepositoryForm key={id ?? 'new'} repo={repos.data?.repos.find(r => r.id === id)} />;
 }
@@ -48,7 +48,7 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
   const updateLocation = (id: number, patch: Partial<RepoLocation>) => setLocations(locations.map(l => l.id === id ? { ...l, ...patch } : l));
   return <>
     <PageHeader title={repo ? '编辑仓库' : '新增仓库'} subtitle={repo?.name}
-      crumbs={<><Link to={back} className="text-muted hover:text-accent">规则集合</Link> / {repo ? '编辑' : '新增'}</>}
+      crumbs={<><Link to={back} className="text-ink-muted hover:text-brand">规则集合</Link> / {repo ? '编辑' : '新增'}</>}
       actions={<><Button disabled={save.isPending} onClick={() => navigate(back)}>返回列表</Button><Button variant="primary" disabled={!canSave} onClick={submit}>{save.isPending ? '保存中…' : repo ? (repo.enabled ? '保存并更新索引' : '保存配置') : '添加并建立索引'}</Button></>} />
     {blocker.state === 'blocked' && <section role="alert" aria-label="未保存修改" className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-panel p-3">
       <span className="text-[13px]">有未保存的修改，请选择如何离开。</span><div className="flex flex-wrap gap-2">
@@ -57,7 +57,7 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
         <Button variant="primary" disabled={!canSave} onClick={submit}>保存并离开</Button>
       </div>
     </section>}
-    {repo?.indexing && <p role="status" className="m-0 text-[13px] text-muted">索引正在更新，完成后可保存修改。</p>}
+    {repo?.indexing && <p role="status" className="m-0 text-[13px] text-ink-muted">索引正在更新，完成后可保存修改。</p>}
     <ErrorAlert error={save.error} />
     <PageScroll>
     <form id="repository-form" className="flex flex-col gap-5" onSubmit={e => { e.preventDefault(); submit(); }}>
@@ -65,7 +65,7 @@ function RepositoryForm({ repo }: { repo?: RuleRepo }) {
     <Card title="基本信息" bodyClass="grid gap-4 px-4 pb-4 md:grid-cols-2">
       <Field label="GitHub 仓库地址" hint="公开仓库，如 https://github.com/owner/repo；通过 Git 校验仓库和分支">{id => <Input id={id} autoFocus value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} />}</Field>
       <Field label="显示名称" hint="留空使用 owner/repo">{id => <Input id={id} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />}</Field>
-      <details className="md:col-span-2"><summary className="cursor-pointer text-[13px] text-muted">许可证说明</summary><div className="mt-3">
+      <details className="md:col-span-2"><summary className="cursor-pointer text-[13px] text-ink-muted">许可证说明</summary><div className="mt-3">
         <Field label="许可证" hint="可填写许可证名称或说明；留空请参阅上游仓库许可证">{id => <Input id={id} value={form.license} onChange={e => setForm({ ...form, license: e.target.value })} />}</Field>
       </div></details>
     </Card>

@@ -52,13 +52,13 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
     <div role="group" aria-label="客户端与平台" className="flex flex-wrap gap-1.5">
       {TARGETS.map(x => <button key={x.key} type="button" aria-pressed={x.key === target} onClick={() => setTarget(x.key)}
-        className={cx('h-[34px] shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3 text-[12.5px]', x.key === target ? 'border-accent bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
+        className={cx('h-[34px] shrink-0 cursor-pointer rounded-full border whitespace-nowrap font-medium px-3 text-[12.5px]', x.key === target ? 'border-brand bg-[#f5f8ff] text-accent-ink' : 'border-[#d5d9e0] bg-panel text-ink hover:bg-ground')}>{x.label}</button>)}
     </div>
     <CodePreview label="规则输出" text={result?.lines.join('\n') ?? ''} loading={old} className="shrink-0" bodyClassName="h-[420px]" lineNumbers />
     <div className="min-h-10 text-[12.5px] text-ink-2" aria-label="转换统计">
       {stats ? <>已解析 {stats.parsed} 条 · 未解析 {stats.rejected} 行 · 去重 {stats.duplicates} 条 · 有效输出 {stats.output} 条<br />改写移除 {stats.removed} 条 · 替换 {stats.replaced} 条 · 追加 {stats.appended} 条 · 不支持 {stats.unsupported} 条 · 降级 {stats.degraded} 条</> : '等待转换结果'}
     </div>
-    {(status || preview.error || sourceError) ? <div className="flex min-h-8 flex-wrap items-center gap-2 text-[12px] text-muted" role="status">
+    {(status || preview.error || sourceError) ? <div className="flex min-h-8 flex-wrap items-center gap-2 text-[12px] text-ink-muted" role="status">
       {status}
       {(preview.error || sourceError) ? <FieldError error={preview.error || sourceError} /> : null}
       {sourceError ? <Button size="sm" onClick={() => void onRefreshSources()} disabled={sourceReading}>重新读取来源</Button> : null}

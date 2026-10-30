@@ -213,3 +213,16 @@ Stash：规则预览/客户端覆盖、订阅最终预览、iOS/macOS 平台、�
 
 
 2026-10-30 审查补充：仓库文件预览使用旧缓存时显示失败原因与最后成功时间；刷新任务完成主动重读查询，不必等待关闭弹窗。内置浏览器已验证旧正文保留及系统异常汇总，记录见 `research/verification/unified-resource-cache-review-20261030/`。
+
+## 公共弹层与动效
+
+全站弹窗直接组合 `src/components/ui/` 中的 shadcn 官方 Dialog / AlertDialog；下拉使用 Select、DropdownMenu、Popover 与 Command，通知使用官方 Sonner 组件。文件从官方 `new-york-v4` 注册表原样获取，只替换本地导入路径；来源 URL 与原文 SHA-256 记录在 `src/components/ui/registry-sources.json`。不再保留自定义 Modal、动画常量、焦点恢复函数或定时卸载封装。不要修改官方组件中的动画、缩放、位移、透明度、持续时间或默认通知参数。
+
+`listbox.tsx` 仅保留业务选项映射、空值编码、异步搜索与分页；单选采用官方 Select 默认定位，多选采用官方 DropdownMenuCheckboxItem，自由输入候选与异步查询由官方 Command + Popover 组合。页面通过组件属性传入业务状态、内容和必要的宽高约束。官方 neutral 主题与既有页面品牌色分开命名，避免同名 accent / muted 变量覆盖官方组件。`components.json`、TypeScript 和 Vite 路径别名已配置。
+
+合并包含依赖变化的分支后，先在主工作区执行 `pnpm install --frozen-lockfile`，再启动 `pnpm --filter @sub-forge/web dev`。依赖目录应属于当前工作区，不能复用其他 worktree 的 node_modules；若安装期间 Vite 正在运行，应重启开发服务以清除旧依赖解析缓存。
+
+本次不改变后端接口、领域模型和示例种子；视觉验收见 [官方组件迁移记录](../../research/verification/shadcn-official-20261030/README.md)。
+
+
+2026-10-30 合并适配：缓存刷新任务使用官方 Dialog，弹窗事件不冒泡到列表行。完整合并验证见 `research/verification/unified-resource-cache-merge-20261030/`。

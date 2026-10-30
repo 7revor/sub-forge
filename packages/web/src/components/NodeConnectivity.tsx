@@ -47,14 +47,14 @@ export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: stri
   return <div className="flex flex-col gap-2 border-t border-line pt-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-2" role="status">
-        <span className="text-[13px] text-muted">连通性</span>
+        <span className="text-[13px] text-ink-muted">连通性</span>
         <Badge tone={running || stale ? 'neutral' : result?.data.ok ? 'ok' : result?.data.status === 'failed' ? 'err' : 'neutral'}>{status}</Badge>
         {!running && !stale && result?.data.ok && <span className="font-mono text-[13px]">{result.data.delay} ms</span>}
       </div>
       {running ? <Button size="sm" onClick={() => { cancel(); setRunning(false); setResult({ text, data: { ok: false, status: 'cancelled', message: '测试已取消', testedAt: Date.now(), target: '' } }); }}>取消测试</Button>
         : <Button size="sm" disabled={!node || !capability.data?.available} onClick={() => void run()}>测试连通性</Button>}
     </div>
-    <div className="text-[12px] leading-relaxed text-muted">
+    <div className="text-[12px] leading-relaxed text-ink-muted">
       从 Sub Forge 服务端发起，测试当前配置，无需先保存。
       {result && !running && !stale && <span> 上次测试：{new Date(result.data.testedAt).toLocaleString('zh-CN')}{result.data.target ? ` · ${result.data.target}` : ''}</span>}
       {capability.error && <Button size="sm" onClick={() => void capability.refetch()}>重试</Button>}

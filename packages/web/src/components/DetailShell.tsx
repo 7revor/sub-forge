@@ -13,7 +13,7 @@ export function DetailShell({ listPath, listLabel, isNew, name, dirty, saving, s
 }) {
   return (
     <>
-      <PageHeader crumbs={<><Link to={listPath} className="text-muted no-underline">{listLabel}</Link> / {isNew ? '新建' : name}</>}
+      <PageHeader crumbs={<><Link to={listPath} className="text-ink-muted no-underline">{listLabel}</Link> / {isNew ? '新建' : name}</>}
         title={isNew ? `新建${listLabel}` : name || '未命名'}
         actions={<>
           {extraActions}

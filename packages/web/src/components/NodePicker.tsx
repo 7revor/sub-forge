@@ -27,7 +27,7 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
           : <Input aria-label={`${label}节点正则`} className="w-auto min-w-0 flex-[2_1_176px] font-mono" placeholder="节点名称正则，支持 (?i)" value={text}
               onChange={(e) => onChange({ ...value, match: { regex: e.target.value } })} />}
         <div className="flex shrink-0 items-center gap-2">
-          <span className="whitespace-nowrap text-[12px] text-muted">找不到时</span>
+          <span className="whitespace-nowrap text-[12px] text-ink-muted">找不到时</span>
           <Select aria-label={`${label}兜底`} className="w-auto" value={value.fallback === 'error' || !value.fallback ? 'error' : value.fallback.kind === 'builtin' ? value.fallback.name : 'error'}
             onChange={(e) => onChange({ ...value, fallback: e.target.value === 'error' ? 'error' : { kind: 'builtin', name: e.target.value as Builtin } })}>
             <option value="REJECT">REJECT</option><option value="DIRECT">DIRECT</option><option value="error">报错</option>
@@ -35,14 +35,14 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
         </div>
       </div>
       <div className="flex min-w-0 flex-col gap-1 break-words text-[12px]" aria-live="polite">
-        {!value.nodeSet.id && <span className="text-muted">请选择节点集</span>}
-        {isLoading && <span className="text-muted">节点列表加载中…</span>}
+        {!value.nodeSet.id && <span className="text-ink-muted">请选择节点集</span>}
+        {isLoading && <span className="text-ink-muted">节点列表加载中…</span>}
         {error && <span className="text-err">节点列表加载失败：{error.message}</span>}
         {result.error && <span className="text-err">{result.error}</span>}
-        {data && !error && !result.error && <span className={result.count ? 'text-muted' : 'text-err'}>{data.truncated ? '当前列表：' : ''}{result.node ? `命中 ${result.count} 个，使用：${result.node.name}` : '没有命中'}</span>}
+        {data && !error && !result.error && <span className={result.count ? 'text-ink-muted' : 'text-err'}>{data.truncated ? '当前列表：' : ''}{result.node ? `命中 ${result.count} 个，使用：${result.node.name}` : '没有命中'}</span>}
         {data && !error && exact && text && !result.count && <span className="text-[#6b3406]">当前列表中没有这个节点，上游恢复后会重新解析</span>}
         {data?.truncated && <span className="text-[#6b3406]">节点列表已截断：当前 {data.nodes.length} / 总数 {data.total}，命中数与首个节点仅基于当前列表，最终以完整列表解析为准。</span>}
-        {data?.report.map((item, i) => <span key={i} className={item.level === 'error' ? 'text-err' : 'text-muted'}>{item.message}</span>)}
+        {data?.report.map((item, i) => <span key={i} className={item.level === 'error' ? 'text-err' : 'text-ink-muted'}>{item.message}</span>)}
       </div>
     </div>
   );

@@ -16,12 +16,12 @@ export function System(){
         <div className="flex max-w-[620px] flex-col gap-4">
           <Field label="资源缓存时间（小时）">{id=><Input id={id} type="number" min={1} max={8760} step={1} value={value} onChange={e=>setHours(e.target.value)} />}</Field>
           {!valid&&<p className="text-[13px] text-red-600">请输入 1 至 8760 的整数小时。</p>}
-          <p className="text-[13px] leading-relaxed text-muted">每个资源只保留最后一次成功内容。到期自动拉取，失败时保留旧内容并延后一个周期再次尝试；列表中的“刷新缓存”可立即重新拉取。</p>
-          <p className="text-[13px] text-muted">设置保存后立即应用于服务端。客户端更新间隔在其下次下载配置后生效。</p>
+          <p className="text-[13px] leading-relaxed text-ink-muted">每个资源只保留最后一次成功内容。到期自动拉取，失败时保留旧内容并延后一个周期再次尝试；列表中的“刷新缓存”可立即重新拉取。</p>
+          <p className="text-[13px] text-ink-muted">设置保存后立即应用于服务端。客户端更新间隔在其下次下载配置后生效。</p>
         </div>
       </Card>
       <Card title={`资源异常 · ${failures.length}`} subtitle="显示最后成功时间、最近失败原因和下次自动拉取时间。">
-        {!resources.data?<p className="text-muted">正在读取状态…</p>:!failures.length?<p className="text-muted">当前没有资源拉取异常。</p>:<div className="flex flex-col gap-3">{failures.map((r,i)=><div key={i} className="rounded border border-line p-3 text-[13px]"><div className="font-medium">{r.name}</div><p className="text-red-600">{r.error} · {r.available?'正在使用旧缓存':'没有可用缓存'}</p><p className="text-muted">最后成功：{r.lastSuccessAt?formatTime(r.lastSuccessAt):'从未成功'} · 下次拉取：{r.nextFetchAt?formatTime(r.nextFetchAt):'待调度'}</p></div>)}</div>}
+        {!resources.data?<p className="text-ink-muted">正在读取状态…</p>:!failures.length?<p className="text-ink-muted">当前没有资源拉取异常。</p>:<div className="flex flex-col gap-3">{failures.map((r,i)=><div key={i} className="rounded border border-line p-3 text-[13px]"><div className="font-medium">{r.name}</div><p className="text-red-600">{r.error} · {r.available?'正在使用旧缓存':'没有可用缓存'}</p><p className="text-ink-muted">最后成功：{r.lastSuccessAt?formatTime(r.lastSuccessAt):'从未成功'} · 下次拉取：{r.nextFetchAt?formatTime(r.nextFetchAt):'待调度'}</p></div>)}</div>}
       </Card>
     </PageScroll></>;
 }

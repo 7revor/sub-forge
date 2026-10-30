@@ -1,3 +1,4 @@
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem } from './ui/dropdown-menu.tsx';
 import { alertError } from '../feedback.ts';
 import { OptionalBoolean } from './OptionalBoolean.tsx';
 // 处理链编辑器（SRC-06，设计稿「订阅源 · 编辑处理步骤」「处理器参数表单」）：
@@ -69,8 +70,8 @@ export function stepSummary(s: OperatorStep): string {
   }
 }
 
-const lbl = 'text-[12.5px] font-medium text-muted';
-const hint = 'text-[12px] leading-relaxed text-muted';
+const lbl = 'text-[12.5px] font-medium text-ink-muted';
+const hint = 'text-[12px] leading-relaxed text-ink-muted';
 
 function DeleteIcon({ label, onClick }: { label: string; onClick: () => void }) {
   return <Button variant="ghost" size="sm" className="w-8 px-0" aria-label={label} onClick={onClick}><Trash2 size={14} /></Button>;
@@ -89,13 +90,13 @@ function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则
         return (
           <div key={i} className="flex flex-col gap-1">
             <div className={grid}>
-              <span className="font-mono text-[12px] text-muted">{i + 1}</span>
+              <span className="font-mono text-[12px] text-ink-muted">{i + 1}</span>
               <DraftInput aria-label={`${label} ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && error && 'border-err bg-[#fffbfa]')} placeholder={placeholder} value={p}
                 aria-invalid={!!p && !!error} onCommit={(v) => onChange(patterns.map((x, j) => (j === i ? v : x)))} />
               <span className="text-right font-mono text-[12.5px] text-ink-2">{hits?.[i] ?? '—'}</span>
               <DeleteIcon label={`删除第 ${i + 1} 条`} onClick={() => onChange(patterns.filter((_, j) => j !== i))} />
             </div>
-            {error && <span role="status" className={cx('pl-[30px] text-[12px]', p ? 'text-err' : 'text-muted')}>{error}</span>}
+            {error && <span role="status" className={cx('pl-[30px] text-[12px]', p ? 'text-err' : 'text-ink-muted')}>{error}</span>}
           </div>
         );
       })}
@@ -150,7 +151,7 @@ function TypeFilterForm({ step, onChange }: { step: Extract<OperatorStep, { op: 
       <legend className="sr-only">协议类型（至少选一个）</legend>
       {[...new Set([...PROTOCOLS, ...step.types])].map((type) => {
         const on = step.types.includes(type);
-        return <label key={type} className={cx('flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 font-mono text-[13px]', on ? 'border-accent bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel')}>
+        return <label key={type} className={cx('flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 font-mono text-[13px]', on ? 'border-brand bg-[#f5f8ff] font-medium text-accent-ink' : 'border-[#d5d9e0] bg-panel')}>
           <input type="checkbox" checked={on} onChange={(e) => {
             const types = e.target.checked ? [...step.types, type] : step.types.filter((v) => v !== type);
             if (!types.length) { alertError('至少选择一个协议类型'); return; }
@@ -201,7 +202,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
         <SortableList items={step.patterns} onReorder={(patterns) => onChange({ ...step, patterns })} renderItem={(p, i, handle) => (
           <div className="grid grid-cols-[24px_22px_minmax(0,1fr)_44px_32px] items-center gap-2 py-1">
             {handle}
-            <span className="font-mono text-[12px] text-muted">{i + 1}</span>
+            <span className="font-mono text-[12px] text-ink-muted">{i + 1}</span>
             <DraftInput aria-label={`优先级 ${i + 1}`} className={cx('h-9 min-w-0 font-mono', p && regexError(p) && 'border-err')} value={p} aria-invalid={!!p && !!regexError(p)}
               onCommit={(v) => onChange({ ...step, patterns: step.patterns.map((x, j) => (j === i ? v : x)) })} />
             <span className="text-right font-mono text-[12.5px] text-ink-2">{hits(step.patterns)?.[i] ?? '—'}</span>
@@ -220,7 +221,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
           const error = r.pattern ? regexError(r.pattern, (r.flags ?? '').replace('g', '') + 'g') : '匹配正则未填写，这条规则不会生效';
           return <div key={i} className="flex flex-col gap-1">
             <div className={grid}>
-              <span className="font-mono text-[12px] text-muted">{i + 1}</span>
+              <span className="font-mono text-[12px] text-ink-muted">{i + 1}</span>
               <DraftInput aria-label={`规则 ${i + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', r.pattern && error && 'border-err bg-[#fffbfa]')} placeholder="^香港\s*(\d+).*$" value={r.pattern}
                 aria-invalid={!!r.pattern && !!error} onCommit={(pattern) => setRule(i, { pattern })} />
               <span aria-hidden="true" className="text-center text-faint">→</span>
@@ -228,7 +229,7 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
               <span className="text-right font-mono text-[12.5px] text-ink-2">{counts?.[i] ?? '—'}</span>
               <DeleteIcon label={`删除规则 ${i + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, j) => j !== i) })} />
             </div>
-            {error && <span role="status" className={cx('pl-[30px] text-[12px]', r.pattern ? 'text-err' : 'text-muted')}>{error}</span>}
+            {error && <span role="status" className={cx('pl-[30px] text-[12px]', r.pattern ? 'text-err' : 'text-ink-muted')}>{error}</span>}
           </div>;
         })}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
@@ -272,32 +273,17 @@ function StepForm({ step, names, onChange }: { step: OperatorStep; names: string
 }
 
 function AddMenu({ onAdd }: { onAdd: (op: OperatorStep['op']) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open]);
-  return (
-    <div ref={ref} className="flex flex-col gap-2 border-t border-line-2 px-4 pt-3 pb-2">
-      <Button className="w-full border-dashed" aria-expanded={open} onClick={() => setOpen(!open)}><Plus size={16} />添加处理器</Button>
-      {open && (
-        <div role="menu" aria-label="选择处理器" className="popover-panel flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel p-1.5 shadow-[0_8px_24px_rgba(20,23,28,.10)]">
-          {OP_GROUPS.map((g) => <div key={g.title} className="flex flex-col gap-0.5">
-            <div className="px-2.5 pt-2 pb-1 text-[11px] tracking-[.08em] text-faint">{g.title}</div>
-            {g.ops.map((op) => <button key={op} type="button" role="menuitem" onClick={() => { onAdd(op); setOpen(false); }}
-              className="flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 text-left hover:bg-ground">
-              <span className="text-[13.5px] font-medium">{OP_LABEL[op]}</span>
-            </button>)}
-          </div>)}
-        </div>
-      )}
-    </div>
-  );
+  return <div className="border-t border-line-2 px-4 pt-3 pb-2">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><Button className="w-full border-dashed"><Plus size={16} />添加处理器</Button></DropdownMenuTrigger>
+      <DropdownMenuContent aria-label="选择处理器" align="start" className="w-[max(240px,var(--radix-dropdown-menu-trigger-width))]">
+        {OP_GROUPS.map(group => <DropdownMenuGroup key={group.title}>
+          <DropdownMenuLabel>{group.title}</DropdownMenuLabel>
+          {group.ops.map(op => <DropdownMenuItem key={op} onSelect={() => onAdd(op)}>{OP_LABEL[op]}</DropdownMenuItem>)}
+        </DropdownMenuGroup>)}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  </div>;
 }
 
 function StepCount({ trace }: { trace?: TraceStep }) {
@@ -318,10 +304,10 @@ function StepRow({ handle, index, step, selected, onSelect, trace }: {
     <div className={cx('flex items-center gap-1 border-t border-line-2 pl-2', selected ? 'bg-accent-soft' : 'bg-panel')}>
       {handle}
       <button type="button" onClick={onSelect} aria-current={selected || undefined} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-3 pr-4 pl-1 text-left">
-        <span className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md font-mono text-[12px]', selected ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}>{index + 1}</span>
+        <span className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md font-mono text-[12px]', selected ? 'bg-brand text-white' : 'bg-[#ebedf1] text-ink-2')}>{index + 1}</span>
         <span className={cx('flex min-w-0 flex-1 flex-col gap-0.5', !enabled && 'opacity-50')}>
-          <span className="text-[13.5px] font-medium">{OP_LABEL[step.op]}{!enabled && <span className="ml-1.5 text-[12px] font-normal text-muted">已停用</span>}</span>
-          <span className="truncate font-mono text-[12px] text-muted">{stepSummary(step)}</span>
+          <span className="text-[13.5px] font-medium">{OP_LABEL[step.op]}{!enabled && <span className="ml-1.5 text-[12px] font-normal text-ink-muted">已停用</span>}</span>
+          <span className="truncate font-mono text-[12px] text-ink-muted">{stepSummary(step)}</span>
         </span>
         {enabled && <StepCount {...(trace ? { trace } : {})} />}
       </button>
@@ -345,7 +331,7 @@ const OVERVIEW = -1;
 type Side = { names: string[]; origins: (number | null)[] };
 type MapOptions = { order: 'out' | 'in'; changedOnly: boolean };
 
-const th = 'sticky top-0 z-[1] border-b border-line bg-panel px-3 py-2 text-left text-[12px] font-medium text-muted whitespace-nowrap';
+const th = 'sticky top-0 z-[1] border-b border-line bg-panel px-3 py-2 text-left text-[12px] font-medium text-ink-muted whitespace-nowrap';
 const td = 'border-b border-line-2 px-3 py-[7px]';
 
 /** main 的下内边距（py-7）+ 卡片下边框 */
@@ -414,21 +400,21 @@ function MappingView({ before, after, inLabel, outLabel, extraLabel, extra, opti
             return (
               <tr key={`${r.in?.index ?? ''}:${r.out?.index ?? ''}`} className={cx(!r.out && 'bg-[#fafbfc]')}>
                 <td className={cx(td, 'pl-4 text-right font-mono text-[12px] text-faint')}>{r.in ? r.in.index + 1 : ''}</td>
-                <td className={cx(td, 'font-mono whitespace-nowrap', !r.in ? 'text-faint italic' : !r.out ? 'text-muted line-through decoration-[#c9a8a4]' : renamed ? 'bg-[#fdf4f3] text-[#8f2a1f]' : 'text-ink-2')}>{r.in ? r.in.name : '（新增）'}</td>
+                <td className={cx(td, 'font-mono whitespace-nowrap', !r.in ? 'text-faint italic' : !r.out ? 'text-ink-muted line-through decoration-[#c9a8a4]' : renamed ? 'bg-[#fdf4f3] text-[#8f2a1f]' : 'text-ink-2')}>{r.in ? r.in.name : '（新增）'}</td>
                 <td className={cx(td, 'text-center text-faint')} aria-hidden="true">→</td>
                 <td className={cx(td, 'text-right font-mono text-[12px] text-faint')}>{r.out ? r.out.index + 1 : ''}</td>
-                <td className={cx(td, 'font-mono whitespace-nowrap', !r.out ? 'text-muted italic' : renamed || !r.in ? 'bg-[#f2faf5] text-[#17633a]' : 'text-ink-2')}>{r.out ? r.out.name : '（移除）'}</td>
+                <td className={cx(td, 'font-mono whitespace-nowrap', !r.out ? 'text-ink-muted italic' : renamed || !r.in ? 'bg-[#f2faf5] text-[#17633a]' : 'text-ink-2')}>{r.out ? r.out.name : '（移除）'}</td>
                 <td className={cx(td, 'font-mono text-[12px] whitespace-nowrap')}>
                   {r.moved !== 0 && <span className="text-accent-ink" title={`在保留的节点中${r.moved > 0 ? '上移' : '下移'} ${Math.abs(r.moved)} 位`}>{r.moved > 0 ? '↑' : '↓'}{Math.abs(r.moved)}</span>}
                 </td>
-                {extra && <td className={cx(td, 'pr-4 font-mono text-[12px] whitespace-nowrap text-muted')}>{extra(r)}</td>}
+                {extra && <td className={cx(td, 'pr-4 font-mono text-[12px] whitespace-nowrap text-ink-muted')}>{extra(r)}</td>}
               </tr>
             );
           })}
         </tbody>
       </table>
     </div> : <div className="px-4 pb-4"><Empty title={rows.length ? '没有任何节点发生变化' : '没有节点'} /></div>}
-    <div ref={footer} className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-muted">
+    <div ref={footer} className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-ink-muted">
       显示 {shown.length} / {rows.length} 行 · 「位置」是在保留下来的节点中名次的变化{truncated && ' · 节点较多，预览只包含前 500 个'}
     </div>
   </>;
@@ -495,7 +481,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   const overviewRow = (
     <button type="button" onClick={() => setSelected(OVERVIEW)} aria-current={mode === 'overview' || undefined}
       className={cx('flex w-full cursor-pointer items-center gap-3 border-t border-line-2 py-3 pr-4 pl-4 text-left', mode === 'overview' ? 'bg-accent-soft' : 'bg-panel hover:bg-[#fafbfc]')}>
-      <span aria-hidden="true" className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md', mode === 'overview' ? 'bg-accent text-white' : 'bg-[#ebedf1] text-ink-2')}><ArrowLeftRight size={13} /></span>
+      <span aria-hidden="true" className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md', mode === 'overview' ? 'bg-brand text-white' : 'bg-[#ebedf1] text-ink-2')}><ArrowLeftRight size={13} /></span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[13.5px] font-medium">总览 · 原始 → 最终</span>
       </span>
@@ -509,7 +495,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
       <section aria-label={title} className="min-w-0 flex-[1_1_360px] rounded-[10px] border border-line bg-panel pt-4 pb-2">
         <div className="flex items-center justify-between px-4 pb-3">
           <h2 className="m-0 text-[15px] font-semibold">{title}</h2>
-          <span className="text-[12.5px] text-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
+          <span className="text-[12.5px] text-ink-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
         {overviewRow}
         <SortableList items={steps.map((s, i) => ({ step: s, id: keys[i]! }))} getKey={(item) => item.id}
@@ -525,8 +511,8 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           className={cx('flex w-full items-center gap-3 border-t border-line-2 px-4 py-3 text-left', mode === 'auto' ? 'bg-accent-soft' : 'bg-[#fafbfc]', autoDedupe && 'cursor-pointer')}>
           <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md bg-[#ebedf1] font-mono text-[12px] text-faint">✓</span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[13.5px] font-medium text-ink-2">去重 · 加序号 <span className="text-[12px] font-normal text-muted">自动</span></span>
-            <span className="font-mono text-[12px] text-muted">{autoDedupe?.renamed.length ? `${autoDedupe.renamed.length} 个重名节点追加了序号` : '同名节点追加 2、3…'}</span>
+            <span className="text-[13.5px] font-medium text-ink-2">去重 · 加序号 <span className="text-[12px] font-normal text-ink-muted">自动</span></span>
+            <span className="font-mono text-[12px] text-ink-muted">{autoDedupe?.renamed.length ? `${autoDedupe.renamed.length} 个重名节点追加了序号` : '同名节点追加 2、3…'}</span>
           </span>
           {last && <span className="font-mono text-[12.5px] text-ink-2">{last.after}{autoDedupe && <span className="text-ok"> ~{autoDedupe.renamed.length}</span>}</span>}
         </button>
@@ -547,7 +533,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
               {overviewStats.added > 0 && <Badge tone="ok">新增 {overviewStats.added}</Badge>}
               {overviewStats.moved > 0 && <Badge>调整顺序 {overviewStats.moved}</Badge>}
             </div>}
-            {loading && <span className="text-[12.5px] text-muted">预览中…</span>}
+            {loading && <span className="text-[12.5px] text-ink-muted">预览中…</span>}
           </div>
           {before && after && <MappingView before={before} after={after} inLabel="原始节点" outLabel="最终输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated}
             extraLabel="经过的步骤" extra={(r) => {
@@ -559,14 +545,14 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
                 {gone !== undefined && <StepChip index={gone} tone="err" onClick={() => setSelected(gone)}>第 {gone + 1} 步 {stepName(gone)} 移除</StepChip>}
               </span>;
             }} />}
-          {!preview && !previewError && <div className="px-4 pb-4 text-[13px] text-muted">{loading ? '预览中…' : '保存后可预览'}</div>}
+          {!preview && !previewError && <div className="px-4 pb-4 text-[13px] text-ink-muted">{loading ? '预览中…' : '保存后可预览'}</div>}
         </>}
 
         {mode === 'auto' && autoDedupe && <>
           <div className="flex flex-col gap-0.5 px-4 pt-4 pb-3">
             <h2 className="m-0 text-[15px] font-semibold">去重 · 加序号（自动兜底）</h2>
           </div>
-          <div className="border-t border-line-2 px-4 pt-3 pb-3"><h3 className="m-0 text-[13.5px] font-semibold">输入 → 输出 <span className="font-normal text-muted">· {resultText(autoDedupe)}</span></h3></div>
+          <div className="border-t border-line-2 px-4 pt-3 pb-3"><h3 className="m-0 text-[13.5px] font-semibold">输入 → 输出 <span className="font-normal text-ink-muted">· {resultText(autoDedupe)}</span></h3></div>
           {before && after && <MappingView before={before} after={after} inLabel="输入" outLabel="输出" options={mapOptions} onOptions={setMapOptions} truncated={truncated} />}
         </>}
 
@@ -589,7 +575,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-2 px-4 pt-3 pb-3">
-            <h3 className="m-0 text-[13.5px] font-semibold">这一步的输入 → 输出 <span className="font-normal text-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
+            <h3 className="m-0 text-[13.5px] font-semibold">这一步的输入 → 输出 <span className="font-normal text-ink-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
           </div>
           {cur && before && after && <MappingView before={before} after={after} inLabel={selected === 0 ? '输入（原始节点）' : `输入（第 ${selected} 步之后）`} outLabel="输出"
             options={mapOptions} onOptions={setMapOptions} truncated={truncated}
@@ -598,7 +584,7 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
 
         {preview && preview.failures.length > 0 && (
           <details className="border-t border-line-2 px-4 py-3 text-[12.5px]">
-            <summary className="cursor-pointer text-accent">{preview.failures.length} 个节点解析失败</summary>
+            <summary className="cursor-pointer text-brand">{preview.failures.length} 个节点解析失败</summary>
             <ul className="mt-2 flex flex-col gap-1 pl-4">{preview.failures.map((f, i) => <li key={i}><span className="font-mono">{f.line.slice(0, 80)}</span> — {f.reason}</li>)}</ul>
           </details>
         )}

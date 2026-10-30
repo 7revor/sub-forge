@@ -11,8 +11,8 @@ export function Empty({ title, description, action, children, className, size = 
     size === 'compact' ? 'p-3' : 'px-7 py-7', className,
   )}>
     {title && <div className={cx('max-w-full font-semibold leading-relaxed text-ink', size === 'compact' ? 'text-[12.5px]' : 'text-[14px]')}>{title}</div>}
-    {description && <div className="max-w-[420px] text-[12.5px] leading-relaxed text-muted">{description}</div>}
-    {children && <div className="max-w-full text-[12.5px] leading-relaxed text-muted">{children}</div>}
+    {description && <div className="max-w-[420px] text-[12.5px] leading-relaxed text-ink-muted">{description}</div>}
+    {children && <div className="max-w-full text-[12.5px] leading-relaxed text-ink-muted">{children}</div>}
     {action && <div className="mt-2 flex max-w-full flex-wrap justify-center gap-2">{action}</div>}
   </div>;
 }

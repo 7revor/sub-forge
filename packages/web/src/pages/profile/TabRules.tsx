@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog.tsx';
+import { ProfileRulesEditor } from './ProfileRoutingEditors.tsx';
 import { matchesNameSearch } from '@sub-forge/core';
 import { ruleToLine } from '../../components/rule.ts';
 import { MatcherEditor } from '../../components/MatcherEditor.tsx';
@@ -6,12 +8,11 @@ import { Notice } from '../../components/Notice.tsx';
 
 import { withIpOptions, type Matcher, type RuleEntry, type RuleIR, type Target } from '@sub-forge/core';
 import { Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import { Presence } from '../../components/Presence.tsx';
+import { useEffect, useState } from 'react';
 import { ClientOverrides, clientOverridesError, ruleInputError } from '../../components/ClientOverrides.tsx';
 import { TargetPicker, targetLabel } from '../../components/pickers.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, FieldError, Field, Input, Modal, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, FieldError, Field, Input, Select, Switch, cx } from '../../components/ui.tsx';
 import { useRuleSetRefs } from '../../hooks.ts';
 import { useProfile } from './context.ts';
 import { mergeRuleRows, ruleRowsToExtraRules, type ExtraRule } from './ruleOrder.ts';
@@ -52,7 +53,7 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
         const { noResolve: _noResolve, src: _src, ...options } = value.options ?? {};
         onChange({ ...value, matcher: { ...matcher, rule }, ...(value.options ? { options } : {}) });
       }} onChange={(matcher) => onChange({ ...value, matcher })} />
-    <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-muted">出口</span>
+    <div className="flex flex-col gap-1.5"><span className="text-[12.5px] font-medium text-ink-muted">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
     {matcher.kind === 'ruleset' && <div className="flex flex-wrap gap-5">
       <label className="flex items-center gap-2 text-[13px]"><Switch label="规则级 src" checked={value.options?.src === true}
@@ -69,11 +70,9 @@ function ExtraRuleModal({ open, onClose, onAdd, prepend = false }: { open: boole
   const { template } = useProfile();
   const [anchor, setAnchor] = useState('top');
   const [rule, setRule] = useState<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }));
+  useEffect(() => { if (open) { setAnchor('top'); setRule({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }); } }, [open]);
   const error = privateRuleError(rule);
-  return <Modal title={prepend ? "添加前置规则" : "插入规则"} open={open} onClose={onClose} wide footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
-    const position: ExtraRule['anchor'] = prepend ? 'top' : anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
-    onAdd(position, rule); onClose();
-  }}>插入</Button></>}>
+  return <Dialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{prepend ? "添加前置规则" : "插入规则"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
     {!prepend && <Field label="位置">{(id) => <Select id={id} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
       <option value="top">最前面</option><option value="bottom">最后面（MATCH 之前）</option>
       {(template?.rules ?? []).map((r, i) => <option key={`b${r.id}`} value={`before:${r.id}`}>模板规则 #{i + 1} 之前</option>)}
@@ -81,7 +80,10 @@ function ExtraRuleModal({ open, onClose, onAdd, prepend = false }: { open: boole
     </Select>}</Field>}
     <PrivateRuleFields single={prepend} value={rule} onChange={setRule} />
     <FieldError error={error} />
-  </Modal>;
+  </div><DialogFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!!error} onClick={() => {
+    const position: ExtraRule['anchor'] = prepend ? 'top' : anchor === 'top' || anchor === 'bottom' ? anchor : anchor.startsWith('before:') ? { before: anchor.slice(7) } : { after: anchor.slice(6) };
+    onAdd(position, rule); onClose();
+  }}>插入</Button></>}</DialogFooter></DialogContent></Dialog>;
 }
 
 function PrivateRuleEdit({ rule, onApply, onClose, single = false }: { rule: RuleEntry; onApply: (rule: RuleEntry) => void; onClose: () => void; single?: boolean }) {
@@ -95,6 +97,11 @@ function PrivateRuleEdit({ rule, onApply, onClose, single = false }: { rule: Rul
 }
 
 export function TabRules() {
+  const { draft } = useProfile();
+  return draft.routing ? <ProfileRulesEditor /> : <LegacyRules />;
+}
+
+function LegacyRules() {
   const { draft, template, patchOverlay, groupOptions, groupName, profileNodeSets, nodeSetName } = useProfile();
   const label = useMatcherLabel();
   const [adding, setAdding] = useState(false);
@@ -118,10 +125,10 @@ export function TabRules() {
         onReorder={prependRules => patchOverlay(o => ({ ...o, extraRules: [...prependRules].reverse().map(rule => ({ anchor: 'top', rule })) }))}
         renderItem={(rule, index, handle) => <div className="border-t border-line-2">
           <div className="flex flex-wrap items-center gap-3 py-3">
-            {handle}<span className="font-mono text-[12px] text-muted">{index + 1}</span>
+            {handle}<span className="font-mono text-[12px] text-ink-muted">{index + 1}</span>
             <button type="button" aria-expanded={editing === rule.id} className="min-w-0 flex-1 cursor-pointer break-all text-left font-mono text-[13px]"
               onClick={() => setEditing(editing === rule.id ? undefined : rule.id)}>{label(rule.matcher).text}</button>
-            <button type="button" className="cursor-pointer text-left text-[13px] hover:text-accent" onClick={() => setEditing(rule.id)}>{targetLabel(rule.target, groupName, nodeSetName)}</button>
+            <button type="button" className="cursor-pointer text-left text-[13px] hover:text-brand" onClick={() => setEditing(rule.id)}>{targetLabel(rule.target, groupName, nodeSetName)}</button>
             <Button size="sm" variant="ghost" aria-label={`删除前置规则 ${index + 1}`} onClick={() => { setExtra(rule.id, () => undefined); if (editing === rule.id) setEditing(undefined); }}><Trash2 size={14} /></Button>
           </div>
           {editing === rule.id && <PrivateRuleEdit single key={rule.id} rule={rule} onApply={value => setExtra(rule.id, () => value)} onClose={() => setEditing(undefined)} />}
@@ -140,7 +147,7 @@ export function TabRules() {
         <span className="font-mono">MATCH</span><span className="min-w-0 break-words text-right text-ink-2">{targetLabel(final, groupName, nodeSetName)}</span>
       </div>
     </Card>
-    <Presence open={adding}>{open => <ExtraRuleModal open={open} prepend onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay(o => ({ ...o, extraRules: [{ anchor, rule }, ...(o.extraRules ?? [])] }))} />}</Presence>
+    <ExtraRuleModal open={adding} prepend onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay(o => ({ ...o, extraRules: [{ anchor, rule }, ...(o.extraRules ?? [])] }))} />
   </>;
 
   return <>
@@ -156,13 +163,13 @@ export function TabRules() {
             <div className={cx('flex flex-wrap items-center gap-3 py-3', r.origin === 'profile' && 'cursor-pointer')}
               onClick={() => { if (r.origin === 'profile') setEditing(r.id); }}>
               <span onClick={(e) => e.stopPropagation()}>{handle}</span>
-              <span className="font-mono text-[12px] text-muted">{i + 1}</span>
+              <span className="font-mono text-[12px] text-ink-muted">{i + 1}</span>
               <button type="button" className="flex w-[calc(100%-64px)] min-w-0 flex-none cursor-pointer flex-wrap items-center gap-2 text-left sm:w-auto sm:flex-1" aria-expanded={editing === r.id}
                 onClick={(e) => { e.stopPropagation(); setEditing(editing === r.id ? undefined : r.id); }}>
                 <Badge>{l.kind}</Badge><span className="break-all font-mono text-[13px]">{l.text}</span>
               </button>
-              <button type="button" className="cursor-pointer text-left text-[13px] font-medium hover:text-accent" onClick={() => setEditing(r.id)}>
-                {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-[12px] font-normal text-accent">已改出口</span>}
+              <button type="button" className="cursor-pointer text-left text-[13px] font-medium hover:text-brand" onClick={() => setEditing(r.id)}>
+                {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-[12px] font-normal text-brand">已改出口</span>}
               </button>
               <Badge tone={r.origin === 'profile' ? 'ok' : 'neutral'}>{r.origin === 'profile' ? '私有' : '模板'}</Badge>
               <span className="flex gap-1" aria-label="客户端输出"><span className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[11.5px] text-ink-2">mihomo</span><span className="rounded border border-dashed border-line px-1.5 py-0.5 font-mono text-[11.5px] text-faint" title="Surge 暂未开放">Surge</span></span>
@@ -186,6 +193,6 @@ export function TabRules() {
         {template && draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _, ...rest } = o; return rest; })}>还原为模板</Button>}
       </div>
     </Card>
-    <Presence open={adding}>{open => <ExtraRuleModal open={open} onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />}</Presence>
+    <ExtraRuleModal open={adding} onClose={() => setAdding(false)} onAdd={(anchor, rule) => patchOverlay((o) => ({ ...o, extraRules: [...(o.extraRules ?? []), { anchor, rule }] }))} />
   </>;
 }

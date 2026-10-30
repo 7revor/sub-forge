@@ -1,8 +1,9 @@
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogDescription, AlertDialogCancel } from './ui/alert-dialog.tsx';
 // 详情页的平铺操作按钮与删除确认；删除按钮位于操作区最右侧。
 
 import { useState, type ReactNode } from 'react';
 import { deleteErrorText } from '../domain/deleteError.ts';
-import { Button, ErrorAlert, Modal } from './ui.tsx';
+import { Button, ErrorAlert, } from './ui.tsx';
 
 export type ActionItem = { label: string; onSelect: () => void };
 
@@ -17,11 +18,10 @@ export function DeleteDialog({ open, title, children, error, pending, onClose, o
 }) {
   const reason = deleteErrorText(error);
   return (
-    <Modal title={title} open={open} onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="danger-solid" disabled={pending || !!reason} onClick={onConfirm}>{pending ? '删除中…' : '删除'}</Button></>}>
+    <AlertDialog open={open} onOpenChange={next => { if (!next) (onClose)(); }}><AlertDialogContent className="max-h-[85dvh] overflow-y-auto"><AlertDialogHeader><AlertDialogTitle>{title}</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription asChild><div className="flex flex-col gap-3.5">
       {children && <div className="text-[13.5px] leading-relaxed">{children}</div>}
       {open && <ErrorAlert error={error} />}
-    </Modal>
+    </div></AlertDialogDescription><AlertDialogFooter>{<><AlertDialogCancel>取消</AlertDialogCancel><Button variant="danger-solid" disabled={pending || !!reason} onClick={onConfirm}>{pending ? '删除中…' : '删除'}</Button></>}</AlertDialogFooter></AlertDialogContent></AlertDialog>
   );
 }
 

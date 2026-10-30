@@ -60,7 +60,7 @@ export function PresetEdit() {
   const dirty = !!e.draft && (e.dirty || !rawValid);
   const { blocker, leave } = useLeaveGuard(!e.isNew && dirty);
   if (e.isNew) return <Navigate to="/presets" replace />;
-  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-muted">加载中…</div>;
+  if (!e.draft) return e.doc.error ? <ErrorAlert error={e.doc.error} /> : <div className="text-ink-muted">加载中…</div>;
   const d = e.draft;
   const refs = (profiles.data ?? []).filter((p) => p.base?.presetId === d.id);
   const publish = () => { if (rawValid) e.submit((x) => ({ ...x, version: x.version + 1 })); };
@@ -73,7 +73,7 @@ export function PresetEdit() {
   return (
     <>
       <PageHeader title={d.name} subtitle={INTRO}
-        crumbs={<><Link to="/presets" className="text-muted no-underline hover:text-accent">基础设置预设</Link> / {e.doc.data?.name}</>}
+        crumbs={<><Link to="/presets" className="text-ink-muted no-underline hover:text-brand">基础设置预设</Link> / {e.doc.data?.name}</>}
         actions={<>
           <ActionButtons items={[{ label: '重命名', onSelect: () => setRenaming(true) }]} />
           <Button disabled={!dirty || e.save.isPending} onClick={discard}>放弃</Button>
@@ -102,13 +102,13 @@ export function PresetEdit() {
 
           <Card title={`引用方${profiles.data ? ` · ${refs.length}` : ''}`} className="min-w-0 flex-[1_1_260px]" bodyClass="px-4 pb-3">
             <ErrorAlert error={profiles.error} />
-            {profiles.isLoading && <span className="text-muted">加载中…</span>}
+            {profiles.isLoading && <span className="text-ink-muted">加载中…</span>}
             {refs.map((p) => {
               const overrides = Object.keys((client === 'stash' ? p.base?.stashPatch : p.base?.patch) ?? {}).length;
               return (
                 <div key={p.id} className="flex justify-between gap-2 border-t border-line-2 py-2.5 text-[13px] first:border-0 first:pt-0">
-                  <Link to={`/profiles/${p.id}/base`} className="font-medium text-ink no-underline hover:text-accent">{p.name}</Link>
-                  <span className="text-[12px] whitespace-nowrap text-muted">{overrides ? `覆盖 ${overrides} 项` : '无覆盖'}</span>
+                  <Link to={`/profiles/${p.id}/base`} className="font-medium text-ink no-underline hover:text-brand">{p.name}</Link>
+                  <span className="text-[12px] whitespace-nowrap text-ink-muted">{overrides ? `覆盖 ${overrides} 项` : '无覆盖'}</span>
                 </div>
               );
             })}

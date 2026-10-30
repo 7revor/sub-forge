@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stableStringify, type ReportItem } from '@sub-forge/core';
 import { Pencil, Plus } from 'lucide-react';
@@ -9,7 +10,7 @@ import { LeaveDialog } from '../components/LeaveDialog.tsx';
 import { Notice } from '../components/Notice.tsx';
 import { Pagination } from '../components/Pagination.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
-import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, Modal, PageHeader, PageScroll, td, th, cx } from '../components/ui.tsx';
+import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll, td, th, cx } from '../components/ui.tsx';
 import { useList, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { usePagedList } from '../hooks/usePagedList.ts';
@@ -36,7 +37,7 @@ export function TemplateList() {
       <section className="list-panel" aria-label="模板列表" aria-busy={list.isFetching}>
         <div className="shrink-0 px-4 py-3.5"><Input aria-label="搜索模板" placeholder="搜索名称" className="max-w-[280px]" value={list.q} onChange={e => list.setQ(e.target.value)} /></div>
         <div key={`${list.data?.page}-${list.pageSize}-${list.q}`} className="min-h-0 flex-1 overflow-auto overscroll-contain">
-          {!list.data ? <div className="p-4 text-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !list.data.items.length ? (
+          {!list.data ? <div className="p-4 text-ink-muted">{list.error ? '列表加载失败，请重试。' : '加载中…'}{list.error && <Button size="sm" onClick={() => void list.refetch()}>重试</Button>}</div> : !list.data.items.length ? (
             <div className="p-4"><Empty title={list.q.trim() ? `没有名称包含「${list.q.trim()}」的模板` : '还没有模板'} action={!list.q.trim() && <Link to="/templates/new" className={buttonClass('default', 'sm')}>新建模板</Link>} /></div>
           ) : <table className="w-full border-collapse">
             <thead><tr>{['名称', '策略组', '规则', '使用情况'].map(label => <th key={label} className={th}>{label}</th>)}<th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
@@ -81,7 +82,7 @@ export function TemplateEdit() {
   const { id = 'new', tab } = useParams();
   const tpl = useQuery({ queryKey: ['template', id], enabled: id !== 'new' && !tab, queryFn: () => api<TemplateResponse>('GET', `/templates/${encodeURIComponent(id)}`) });
   if (tab) return <Navigate to={`/templates/${encodeURIComponent(id)}`} replace />;
-  if (id !== 'new' && !tpl.data) return tpl.error ? <ErrorAlert error={tpl.error} /> : <div className="text-muted">加载中…</div>;
+  if (id !== 'new' && !tpl.data) return tpl.error ? <ErrorAlert error={tpl.error} /> : <div className="text-ink-muted">加载中…</div>;
   return <TemplatePage key={id} id={id} initial={tpl.data?.item} />;
 }
 
@@ -124,7 +125,10 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const locate = (where: string) => {
     if (where.startsWith('group:')) { setGroup(where.slice(6)); setRule(undefined); }
     if (where.startsWith('rule:')) { setRule(where.slice(5)); setGroup(undefined); }
-    if (where === 'final') setRule('final');
+    if (where === 'final') {
+      setRule(undefined);
+      document.getElementById('template-rule-final')?.querySelector('button')?.focus();
+    }
   };
 
   // 实时通知更新未编辑页面，保留已经修改的草稿及 YAML 输入。
@@ -170,7 +174,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const closeYaml = () => { if (yamlDirty) setDiscardYaml(true); else setYaml(undefined); };
 
   return <>
-    <PageHeader title={isNew ? '新建模板' : '模板详情'} crumbs={<Link to="/templates" className="text-muted no-underline">模板</Link>}
+    <PageHeader title={isNew ? '新建模板' : '模板详情'} crumbs={<Link to="/templates" className="text-ink-muted no-underline">模板</Link>}
       actions={<><Link to="/templates" className={buttonClass()}>返回列表</Link><Button variant="primary" disabled={!canSave || (!isNew && !dirty)} onClick={() => save.mutate(draft)}>{save.isPending ? '检查并保存中…' : '保存模板'}</Button></>}>
       {dirty && <Badge tone="warn">未保存</Badge>}
     </PageHeader>
@@ -183,7 +187,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       {failure?.report?.length ? <Card title="保存检查"><TemplateReport items={failure.report} onLocate={locate} /></Card> : null}
       {!!failure?.impact?.length && <Card title="请先修复绑定订阅冲突">
         <ul className="m-0 flex list-none flex-col gap-3 p-0">{failure.impact.map(item => <li key={item.profileId} className="text-[13px]">
-          <Link to={`/profiles/${item.profileId}/groups`} className="font-medium text-accent">{item.profileName}</Link>
+          <Link to={`/profiles/${item.profileId}/groups`} className="font-medium text-brand">{item.profileName}</Link>
           <ul className="mt-1 pl-5 text-ink-2">{item.issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul>
         </li>)}</ul>
       </Card>}
@@ -191,8 +195,8 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-panel px-4.5 py-4">
           <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex items-center gap-2"><Pencil size={14} className="shrink-0 text-muted" aria-hidden /><input aria-label="模板名称" placeholder="填写模板名称" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} className="h-9 w-full max-w-[400px] rounded border border-transparent bg-panel px-1 text-[17px] font-semibold hover:border-line focus:border-accent" /></div>
-            <span className="text-[12.5px] text-muted">{body.groups.length} 个策略组 · {body.rules.length} 条规则{!isNew && ` · ${inUse} 个绑定订阅`}</span>
+            <div className="flex items-center gap-2"><Pencil size={14} className="shrink-0 text-ink-muted" aria-hidden /><input aria-label="模板名称" placeholder="填写模板名称" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} className="h-9 w-full max-w-[400px] rounded border border-transparent bg-panel px-1 text-[17px] font-semibold hover:border-line focus:border-brand" /></div>
+            <span className="text-[12.5px] text-ink-muted">{body.groups.length} 个策略组 · {body.rules.length} 条规则{!isNew && ` · ${inUse} 个绑定订阅`}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={openYaml}>从 YAML 导入</Button>
@@ -203,13 +207,13 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
         <TemplateRulesEditor value={body} onChange={updateBody} selected={showingLeave ? undefined : rule} onSelect={setRule} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
     </PageScroll>
-    <Modal title="从 YAML 导入" open={yaml !== undefined && !showingLeave} onClose={closeYaml} wide footer={discardYaml ? <>
-      <span className="mr-auto self-center text-[12px] text-muted">放弃这次 YAML 导入？</span><Button onClick={() => setDiscardYaml(false)}>继续导入</Button><Button variant="danger" onClick={() => { setYaml(undefined); setDiscardYaml(false); }}>放弃导入</Button>
-    </> : <><Button onClick={closeYaml}>取消</Button><Button variant="primary" disabled={!yamlResult?.ok} onClick={() => { if (yamlResult?.ok) { updateBody(yamlResult.value); setYaml(undefined); } }}>应用到模板</Button></>}>
+    <Dialog open={yaml !== undefined && !showingLeave} onOpenChange={next => { if (!next) (closeYaml)(); }}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><DialogHeader><DialogTitle>{"从 YAML 导入"}</DialogTitle></DialogHeader><div className="flex min-h-0 flex-col gap-3.5">
       <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，应用后仍需保存模板。">{fid => <YamlTextarea id={fid} rows={18} spellCheck={false} value={yaml ?? ''} onChange={e => { setYaml(e.target.value); setDiscardYaml(false); }} />}</Field>
       {!!yaml?.trim() && yamlResult && !yamlResult.ok && <FieldError error={`第 ${yamlResult.line ?? 1} 行：${yamlResult.error}`} />}
-      {yamlResult?.ok && yamlResult.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-muted">{yamlResult.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
-    </Modal>
+      {yamlResult?.ok && yamlResult.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-ink-muted">{yamlResult.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
+    </div><DialogFooter>{discardYaml ? <>
+      <span className="mr-auto self-center text-[12px] text-ink-muted">放弃这次 YAML 导入？</span><Button onClick={() => setDiscardYaml(false)}>继续导入</Button><Button variant="danger" onClick={() => { setYaml(undefined); setDiscardYaml(false); }}>放弃导入</Button>
+    </> : <><Button onClick={closeYaml}>取消</Button><Button variant="primary" disabled={!yamlResult?.ok} onClick={() => { if (yamlResult?.ok) { updateBody(yamlResult.value); setYaml(undefined); } }}>应用到模板</Button></>}</DialogFooter></DialogContent></Dialog>
     <LeaveDialog blocker={blocker} what="模板" canSave={canSave} pending={save.isPending} error={save.error}
       onSave={done => save.mutate(draft, { onSuccess: done })} onDiscard={() => { setDraft(base); setYaml(undefined); setGroup(undefined); setRule(undefined); setPendingRules(new Set()); }} />
   </>;

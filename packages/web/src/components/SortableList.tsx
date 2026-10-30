@@ -12,7 +12,7 @@ function SortableRow({ id, index, locked, blocked, render }: {
     id, disabled: { draggable: locked, droppable: blocked },
   });
   const handle = locked
-    ? <span role="img" aria-label={`第 ${index + 1} 项已锁定`} className="grid h-8 w-6 place-items-center text-muted"><LockKeyhole size={16} /></span>
+    ? <span role="img" aria-label={`第 ${index + 1} 项已锁定`} className="grid h-8 w-6 place-items-center text-ink-muted"><LockKeyhole size={16} /></span>
     : <button ref={setActivatorNodeRef} type="button" aria-label={`拖动第 ${index + 1} 项`} className="grid h-8 w-6 touch-none cursor-grab place-items-center text-faint" {...attributes} {...listeners}><GripVertical size={16} /></button>;
   return <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}
     className={cx(isDragging && 'relative z-10 shadow-md')}>{render(handle)}</li>;
