@@ -44,20 +44,17 @@ export function TabBase() {
   const enabled = draft.base !== undefined && draft.base.enabled !== false;
   return <section aria-label="基础配置追加" className="min-w-0 rounded-[10px] border border-line bg-panel">
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-      <div>
-        <h2 className="m-0 text-[15px] font-semibold">配置追加</h2>
-        <p className="mt-1 mb-0 text-[12.5px] text-ink-muted">为不同内核保存各自的原始配置。</p>
-      </div>
+      <h2 className="m-0 text-[15px] font-semibold">配置追加</h2>
       <div className="flex items-center gap-2.5">
         <span className="text-[12.5px] text-ink-2">{enabled ? '已启用' : '未启用'}</span>
         <Switch label="启用基础配置追加" checked={enabled} onChange={value => setDraft({ ...draft, base: { ...draft.base, enabled: value } })} />
       </div>
     </div>
-    {!enabled && <p className="m-0 border-t border-line px-4 py-5 text-[13px] text-ink-muted sm:px-5">当前不追加基础配置。启用后可编辑，已填写的原文会保留。</p>}
-    <div hidden={!enabled} className="border-t border-line">
+    {!enabled && <p className="m-0 px-4 pb-5 text-[13px] text-ink-muted sm:px-5">启用后编辑追加配置。</p>}
+    <div hidden={!enabled}>
       <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />
     </div>
-    {!!draft.migrationNotes?.length && <details className="border-t border-line px-4 py-3 text-[12px] sm:px-5">
+    {!!draft.migrationNotes?.length && <details className="px-4 pb-4 text-[12px] sm:px-5">
       <summary className="w-fit cursor-pointer text-warn">配置迁移记录（{draft.migrationNotes.length}）</summary>
       <div className="mt-2 space-y-2 leading-relaxed text-ink-muted">{draft.migrationNotes.map((note, i) => <p key={i} className="m-0">{note}</p>)}</div>
     </details>}

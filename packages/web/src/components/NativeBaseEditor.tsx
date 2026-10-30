@@ -26,49 +26,34 @@ export function NativeBaseEditor({ value, onChange }: {
   const indicator = (hasText: boolean) => hasText && <><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-brand" /><span className="sr-only">已填写</span></>;
   const targetButton = (target: ClientApp | undefined, title: string, hasText: boolean) => <button type="button" key={target ?? 'kernel'} aria-pressed={app === target}
     onClick={() => setSelectedApps(current => ({ ...current, [kernel]: target }))}
-    className={cx('flex min-h-10 min-w-0 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-[13px] transition-colors', app === target ? 'bg-accent-soft font-medium text-accent-ink' : 'text-ink-2 hover:bg-ground')}>
+    className={cx('flex min-h-10 min-w-0 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-[13px] transition-colors', app === target ? 'bg-panel font-semibold text-brand shadow-sm' : 'text-ink-2 hover:bg-panel/70')}>
     <span>{title}</span>{indicator(hasText)}
   </button>;
   return <div className="min-w-0">
-    <div role="group" aria-label="配置内核" className="flex border-b border-line px-3 sm:px-5">
+    <div role="group" aria-label="配置内核" className="mx-4 mb-5 flex gap-1 border-b border-line sm:mx-5">
       {KERNELS.map(k => <button key={k.id} type="button" aria-pressed={kernel === k.id} onClick={() => setKernel(k.id)}
-        className={cx('flex min-h-12 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 border-b-2 px-2 text-[13px] transition-colors sm:flex-none sm:px-5', kernel === k.id ? 'border-brand font-semibold text-brand' : 'border-transparent text-ink-muted hover:text-ink')}>
+        className={cx('flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 border-b-2 px-2 text-[13px] transition-colors sm:flex-none sm:px-5', kernel === k.id ? 'border-brand font-semibold text-brand' : 'border-transparent text-ink-muted hover:text-ink')}>
         {k.label}{indicator(filled(value.kernels?.[k.id]) || CLIENT_APPS.some(c => c.kernel === k.id && filled(value.clients?.[c.id])))}
       </button>)}
     </div>
-    <div className="grid min-w-0 md:grid-cols-[184px_minmax(0,1fr)]">
-      <div className="flex flex-col gap-4 border-b border-line p-3 md:border-r md:border-b-0 md:p-4" role="group" aria-label={`${kernelLabel} 追加层级`}>
+    <div className="grid min-w-0 gap-4 px-4 pb-5 sm:px-5 md:grid-cols-[184px_minmax(0,1fr)] md:gap-5">
+      <div className="flex flex-col gap-4 self-start rounded-lg bg-ground p-2" role="group" aria-label={`${kernelLabel} 追加层级`}>
         {targetButton(undefined, '内核公共追加', filled(value.kernels?.[kernel]))}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 pb-1">
           <p className="m-0 px-3 text-[12px] text-ink-muted">客户端追加 <span className="text-faint">可选</span></p>
           <div className="grid grid-cols-2 gap-1 md:grid-cols-1">
             {apps.map(c => targetButton(c.id, c.label, filled(value.clients?.[c.id])))}
           </div>
         </div>
-        <p className="m-0 hidden px-3 text-[12px] leading-relaxed text-ink-muted md:block">蓝点表示已填写原文。</p>
       </div>
-      <div className="flex min-w-0 flex-col gap-3 p-4 sm:p-5">
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0">
-            <label htmlFor={`${id}-source`} className="text-[14px] font-semibold">{label}</label>
-            <p id={`${id}-scope`} className="mt-1 mb-0 text-[12px] text-ink-muted">{appLabel ? `仅用于 ${appLabel}，在 ${kernelLabel} 公共配置之后追加。` : `适用于所有 ${kernelLabel} 客户端。`}</p>
-          </div>
-          <span className="rounded border border-line px-2 py-0.5 text-[11px] font-medium text-ink-muted">{format}</span>
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-h-10 min-w-0 items-center justify-between gap-3">
+          <label htmlFor={`${id}-source`} className="min-w-0 text-[14px] font-semibold">{label}</label>
+          <span className="text-[11px] font-medium text-ink-muted">{format}</span>
         </div>
-        <YamlTextarea key={`${kernel}:${app ?? 'kernel'}`} id={`${id}-source`} aria-describedby={`${id}-scope`} value={text} rows={13}
-          className="[&>textarea]:min-h-[280px]" placeholder={`粘贴 ${appLabel ?? kernelLabel} 的原始 ${format} 配置，留空表示不追加`}
+        <YamlTextarea key={`${kernel}:${app ?? 'kernel'}`} id={`${id}-source`} value={text} rows={13}
+          className="[&>textarea]:min-h-[280px]" placeholder={`粘贴 ${appLabel ?? kernelLabel} 的原始 ${format} 配置`}
           onChange={event => onChange(app ? { ...value, clients: { ...value.clients, [app]: event.target.value } } : { ...value, kernels: { ...value.kernels, [kernel]: event.target.value } })} />
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[12px] text-ink-muted">
-          <span>原文保存，生成时检查格式。</span>
-          <details className="basis-auto">
-            <summary className="cursor-pointer text-ink-2 hover:text-brand">追加规则</summary>
-            <div className="mt-2 max-w-[540px] space-y-1.5 leading-relaxed">
-              <p className="m-0">先追加内核公共配置，再追加客户端配置；不同内核之间不转换。</p>
-              <p className="m-0">YAML 映射逐键合并，数组和标量由后层替换。INI 的 General、Host、MITM 同名键由后层替换，其余段落追加。</p>
-              <p className="m-0">节点、策略组和规则在核心设置中管理。listeners 可在此填写。</p>
-            </div>
-          </details>
-        </div>
       </div>
     </div>
   </div>;
