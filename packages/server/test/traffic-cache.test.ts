@@ -30,11 +30,11 @@ function setup() {
 describe('订阅流量与渲染缓存', () => {
   it('正文不变时重新生成配置，但响应头、last-good 与保留版本使用新流量', async () => {
     const h = setup();
-    const first = await h.app.request('/sub/token/p');
+    const first = await h.app.request('/subs/profile?token=token&id=p');
     const yaml = await first.text();
     expect(first.headers.get('subscription-userinfo')).toBe('download=10; total=1000');
     h.traffic[a] = { download: 80, total: 1000, expire: 2000000000 }; await h.refresh();
-    const next = await h.app.request('/sub/token/p');
+    const next = await h.app.request('/subs/profile?token=token&id=p');
     expect(next.headers.get('subscription-userinfo')).toBe('download=80; total=1000; expire=2000000000');
     expect(await next.text()).toBe(yaml);
     expect(h.store.recentAccess('p')[0]?.source).toBe('fresh');
@@ -49,9 +49,9 @@ describe('订阅流量与渲染缓存', () => {
   });
 
   it('上游不再提供流量时移除旧响应头', async () => {
-    const h = setup(); await h.app.request('/sub/token/p');
+    const h = setup(); await h.app.request('/subs/profile?token=token&id=p');
     h.traffic[a] = undefined; await h.refresh();
-    expect((await h.app.request('/sub/token/p')).headers.get('subscription-userinfo')).toBeNull();
+    expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBeNull();
     expect(h.store.getLastGood<StoredRender>('p', 'mihomo:any')?.data.userinfo).toBeUndefined();
   });
 
@@ -63,11 +63,11 @@ describe('订阅流量与渲染缓存', () => {
     h.traffic[a] = { download: 10, total: 1000, expire: 2000000000 };
     h.traffic[b] = { upload: 2, download: 20, total: 2000, expire: 1900000000 };
     const expected = 'upload=2; download=30; total=3000; expire=1900000000';
-    expect((await h.app.request('/sub/token/p')).headers.get('subscription-userinfo')).toBe(expected);
+    expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBe(expected);
     h.store.put('profile', { ...h.store.get('profile', 'p')!, userinfo: { mode: 'source', sourceId: 's' } });
-    expect((await h.app.request('/sub/token/p')).headers.get('subscription-userinfo')).toBe('download=10; total=1000; expire=2000000000');
+    expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBe('download=10; total=1000; expire=2000000000');
     h.store.put('profile', { ...h.store.get('profile', 'p')!, userinfo: { mode: 'none' } });
-    expect((await h.app.request('/sub/token/p')).headers.get('subscription-userinfo')).toBeNull();
+    expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBeNull();
   });
 
   it('同一源经组合和直接引用重复出现时只汇总一次', async () => {
@@ -75,14 +75,14 @@ describe('订阅流量与渲染缓存', () => {
     h.store.put('collection', { id: 'c', name: '组合', members: [{ ref: { type: 'source', id: 's' } }], pipeline: [] }, h.store.getToken('token')!.userId);
     const p = h.store.get('profile', 'p')!;
     h.store.put('profile', { ...p, nodeSets: [...p.nodeSets, { ref: { type: 'collection', id: 'c' }, output: 'provider' }] });
-    expect((await h.app.request('/sub/token/p')).headers.get('subscription-userinfo')).toBe('download=10; total=1000');
+    expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBe('download=10; total=1000');
   });
 
   it('每次生成时更新拉取告警计数且保留内核告警', async () => {
     const h = setup();
     const p = h.store.get('profile', 'p')!;
     h.store.put('profile', { ...p, overlay: { extraGroups: [{ group: { id: 'g', name: '空组', type: 'select', members: [] } }] } });
-    await h.app.request('/sub/token/p');
+    await h.app.request('/subs/profile?token=token&id=p');
     h.fail(); await h.refresh();
     const result = await h.renderer.render('p', { client: 'mihomo' });
     expect(result.ok && result.source).toBe('fresh');

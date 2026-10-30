@@ -75,8 +75,8 @@ describe('规则仓库索引', () => {
     const h = setup(); await h.service.refresh('blackmatrix7');
     const reader = h.store.createUser({ username: 'file-reader', passwordHash: 'fixture', role: 'user' });
     const token = h.store.userToken(reader.id)!.token;
-    const query = new URLSearchParams({ repo: 'blackmatrix7', ref: 'master', path: 'rule/Surge/OpenAI/OpenAI.list' });
-    const url = `/api/files/${token}/repository?${query}`;
+    const query = new URLSearchParams({ id: 'blackmatrix7', ref: 'master', path: 'rule/Surge/OpenAI/OpenAI.list' });
+    const url = `/resources/repo?token=${token}&${query}`;
     const response = await h.app.request(url);
     expect(response.status).toBe(200); expect(await response.text()).toBe('DOMAIN,chatgpt.com\n');
     expect(response.headers.get('content-type')).toContain('text/plain');
@@ -84,7 +84,7 @@ describe('规则仓库索引', () => {
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect((await h.app.request(url.replace(token, 'invalid'))).status).toBe(404);
     query.set('path', 'not-indexed.list');
-    expect((await h.app.request(`/api/files/${token}/repository?${query}`)).status).toBe(400);
+    expect((await h.app.request(`/resources/repo?token=${token}&${query}`)).status).toBe(400);
     const original = h.service.filePreview.bind(h.service);
     let started!: () => void, release!: () => void;
     const began = new Promise<void>(resolve => { started = resolve; });

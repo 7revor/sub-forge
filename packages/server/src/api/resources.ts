@@ -1,3 +1,4 @@
+import { requiredQuery } from '../query.ts';
 import type { SharedRuleRecord } from '../shared-rules.ts';
 import { findReferrers } from './validate.ts';
 import { HttpError } from './common.ts';
@@ -13,8 +14,8 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
   const app=new Hono<ApiEnv>();
   const kinds = {sources:'source',collections:'collection',rulesets:'ruleset',profiles:'profile'} as const;
   for (const [path,kind] of Object.entries(kinds)) {
-    app.get(`/${path}/:id/cache`,requireUser,c=>{
-      const id=c.req.param('id')!;const doc=store.getWithOwner(kind,id);
+    app.get(`/${path}/cache`,requireUser,c=>{
+      const id=requiredQuery(c, 'id')!;const doc=store.getWithOwner(kind,id);
       if(!doc || kind !== 'ruleset' && doc.owner!==c.get('user').id)throw notFound();
       return c.json({items:resources.statuses(resources.collect(kind,id))});
     });
@@ -24,8 +25,8 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
       return c.json({job:resources.startJob(c.get('user').id,kind,id)},202);
     });
   }
-  app.get('/refresh-jobs/:id',requireUser,c=>{
-    const job=resources.getJob(c.req.param('id'));
+  app.get('/refresh-jobs',requireUser,c=>{
+    const job=resources.getJob(requiredQuery(c, 'id'));
     if(!job || job.owner!==c.get('user').id)throw notFound();
     return c.json({job});
   });

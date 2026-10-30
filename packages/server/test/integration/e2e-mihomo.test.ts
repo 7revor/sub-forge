@@ -136,7 +136,7 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     ['落地在 provider（前置注入到本服务下发的 provider 内容）', 'p-provider'],
     ['落地内联', 'p-inline'],
   ])('%s', async (_title, profileId) => {
-    const sub = await httpGet(`http://127.0.0.1:${ports.api}/sub/tk-user/${profileId}`, { ua: 'clash.meta' });
+    const sub = await httpGet(`http://127.0.0.1:${ports.api}/subs/profile?id=${profileId}&token=tk-user`, { ua: 'clash.meta' });
     expect(sub.status, sub.body).toBe(200);
 
     const mixed = await freePort();
@@ -167,11 +167,11 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     expect(entry.log().slice(e0)).toContain(`127.0.0.1:${ports.exit}`);
     expect(exit.log().slice(x0)).toContain(`127.0.0.1:${ports.target}`);
     // 客户端从本服务下载了 provider
-    expect(served.slice(before).some((p) => p.startsWith(`/p/tk-user/${profileId}/`))).toBe(true);
+    expect(served.slice(before).some((p) => p === '/subs/nodes')).toBe(true);
   }, 60000);
 
   it('订阅响应头带上游流量信息，访问日志记录识别结果', async () => {
-    const res = await new Promise<http.IncomingMessage>((resolve) => http.get(`http://127.0.0.1:${ports.api}/sub/tk-user/p-inline`, { headers: { 'user-agent': 'FlClash/v0.8.80 clash-verge Platform/android' } }, resolve));
+    const res = await new Promise<http.IncomingMessage>((resolve) => http.get(`http://127.0.0.1:${ports.api}/subs/profile?id=p-inline&token=tk-user`, { headers: { 'user-agent': 'FlClash/v0.8.80 clash-verge Platform/android' } }, resolve));
     res.resume();
     expect(res.headers['subscription-userinfo']).toBe('upload=10; download=20; total=1000; expire=1900000000');
     expect(store.recentAccess('p-inline')[0]).toMatchObject({ client: 'mihomo', platform: 'android', status: 200 });

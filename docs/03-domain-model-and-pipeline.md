@@ -204,9 +204,10 @@ Inline 点选前置保存具体来源与 `match.exact`；点选落地保存具�
 
 | 地址 | 用途 |
 | --- | --- |
-| `GET /sub/:token/:profile` | Profile 主配置（UA 识别客户端） |
-| `GET /p/:token/:profile/:nodeSetKey` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
-| `GET /r/:token/:resourceKey` | 公共规则产物，资源键确定规则身份、处理参数与客户端/平台；不依赖订阅 |
+| `GET /subs/profile?id=P&token=T` | Profile 主配置（UA 识别客户端） |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&version=V&token=T` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
+| `GET /resources/ruleset?key=K&token=T`、`GET /resources/repo?key=K&token=T` | 公共规则产物，与订阅无关 |
+| `GET /subs/ruleset?profile=P&key=K&version=V&token=T` | 订阅专属远程规则；模板不提供 token 入口 |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
 
@@ -241,7 +242,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 5. ChainRule 的落地侧：
    - 落地 NodeSet 为 inline → 直接给匹配节点写 dialer-proxy
    - 落地 NodeSet 为 provider →
-       在 /p/:token/P 的订阅专属内容中给匹配节点注入 dialer-proxy；整集规则覆盖局部规则。
+       在 /subs/nodes?kind=provider&profile=P 的订阅专属内容中给匹配节点注入 dialer-proxy；整集规则覆盖局部规则。
 6. 上游自带 dialer-proxy 的节点（REF-04）：
    - 其前置名在同一 NodeSet 中 → 视为 NodeRef(同 NodeSet, exact) 走步骤 3–4
    - 在其他地方找不到 → report.warn，并按 fallback 处理（默认移除该字段）
@@ -263,7 +264,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 - Surge 将节点级 `dialer-proxy` 转成 `underlying-proxy`；QUIC 端口跳跃与代理链不能同时使用，冲突时报错。
 - Loon 尚未适配代理链。链配置或上游前置引用会阻止发布，不删除前置后输出直连节点。
 - 四类组均以筛选后的成员名称输出，无成员补 REJECT。节点更新随主订阅刷新生效。
-- Surge 规则集采用版本化托管 LIST，独立文件导出时展开；Loon 在原规则位置内嵌转换结果，避免本地/远程来源优先级重排。
+- Surge 规则集采用版本化托管 LIST，独立文件导出时展开；Loon 将手写规则与规则集按列表顺序统一输出为 `[Remote Rule]` 托管链接，`[Rule]` 仅保留 `FINAL`，避免本地/远程来源跨段重排。手写规则属于订阅私有产物。
 - `Client` 增加 `loon`；`BaseSettings.loon`、`Profile.base.loonPatch` 与其他客户端配置隔离。完整范围、限制和测试证据见 [19](19-client-conversion.md)。
 
 ## 5. 模板 ⊕ 覆盖层 合并
@@ -580,3 +581,5 @@ URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应�
 组 ID 和名称不得与模板组或其他独立组冲突；成员来源归属、组引用和循环继续统一校验。前置规则、模板组追加成员与代理链可引用独立组。删除独立组同步清理成员引用、引用它的代理链，并将相关规则或兜底出口改为 REJECT。模板发布也检查冲突，不能覆盖订阅独立组。
 
 绑定间切换模板保留独立组及其 ID，只对其中引用的模板组按映射更新；解除绑定将全部有效组复制到独立配置。节点来源与代理链列表复用策略组、规则的 `RoutingCard`。代理链路径与前置摘要只显示节点名或组名；全部/正则范围查询匹配节点名称，查询失败明确展示失败，关闭弹窗时保留最后展示。
+
+2026-10-30 访问日志增加 `clientIp`、`peerIp`、`ipSource`，分别表示解析后的客户端地址、TCP 连接对端及来源（socket / x-forwarded-for / unknown）。SQLite v26 保留旧记录并将未知 IP 留空；访问日志仍按令牌所属用户隔离并保留 30 天。IP 解析属于服务端部署适配，核心订阅领域、渲染及种子无需改变。可信代理配置与传递链路见 [部署说明](20-deployment-client-ip.md)。

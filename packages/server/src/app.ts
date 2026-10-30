@@ -1,10 +1,16 @@
 import { accessLogger, type DownloadEnv } from './access-log.ts';
-// 订阅接口（OUT-01 – OUT-06）：
-//   GET /sub/:token/:profile          主配置
-//   GET /p/:token/:profile/:key       Profile 专属 provider 内容
-//   GET /r/:token/:key       全站共享的托管规则集
-// token 无效一律 404 且不暴露 Profile 是否存在；从未成功渲染时 503 + 纯文本说明，不返回半成品。
+import type { BlockList } from 'node:net';
+// /subs 为用户私有订阅，/resources 为公共规则；动态值只使用查询参数。
+// 资源凭证与登录会话互不替代，失效或越权不暴露资源存在性。
 
+import { resourceFileRoutes, subscriptionRuleRoutes } from './resource-files.ts';
+import { sessionRoutes } from './api/auth.ts';
+import { csrfGuard, HttpError, type ApiEnv } from './api/common.ts';
+import { allowedQuery, requiredQuery, uniqueQuery } from './query.ts';
+import { RuleRepoService } from './rule-repos/service.ts';
+import { createUpstreamFetcher } from './net/upstream.ts';
+import { parseAllowList } from './net/ssrf.ts';
+import type { SharedRuleRecord } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
@@ -28,6 +34,7 @@ const notFound = (c: Context) => c.body(null, 404);
 export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'>> & {
   /** 前端构建产物目录（packages/web/dist）；设置后托管静态文件，其余路径回落到 index.html */
   webDir?: string;
+  trustedProxies?: BlockList;
 };
 
 const MIME: Record<string, string> = {
@@ -35,7 +42,7 @@ const MIME: Record<string, string> = {
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.map': 'application/json',
 };
 /** 这些前缀属于接口，不回落到前端页面 */
-const RESERVED = ['/api/', '/sub/', '/p/', '/r/', '/rules/', '/nodes/'];
+const RESERVED = ['/api', '/auth', '/subs', '/resources', '/sub', '/p', '/r', '/rules', '/nodes'];
 
 /** 托管前端：/assets 下的文件名带内容哈希，可长期缓存；index.html 不缓存 */
 function serveWeb(app: Hono<DownloadEnv>, webDir: string) {
@@ -49,7 +56,7 @@ function serveWeb(app: Hono<DownloadEnv>, webDir: string) {
   };
   app.get('*', async (c) => {
     const path = decodeURIComponent(new URL(c.req.url).pathname);
-    if (RESERVED.some((p) => path.startsWith(p)) || path === '/api') return c.body(null, 404);
+    if (RESERVED.some(p => path === p || path.startsWith(p + '/'))) return c.body(null, 404);
     const file = normalize(join(root, path));
     if (file.startsWith(root + sep) && extname(file)) {
       const st = await stat(file).catch(() => undefined);
@@ -64,18 +71,67 @@ export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
   const now = deps.now ?? Date.now;
   const app = new Hono<DownloadEnv>();
-  app.use('*', accessLogger(store, now));
+  app.use('*', accessLogger(store, now, deps.trustedProxies));
 
   app.get('/healthz', (c) => c.text('ok'));
-  app.route('/api', createApi({ ...deps, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' }));
+  const ruleRepos = deps.ruleRepos ?? new RuleRepoService(store, createUpstreamFetcher({ allow: parseAllowList([]) }), now, undefined, deps.snapshots);
+  const apiDeps = { ...deps, ruleRepos, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' };
+  app.route('/api', createApi(apiDeps));
+  const auth = new Hono<ApiEnv>();
+  auth.use('*', async (c, next) => { c.header('cache-control', 'no-store'); await next(); });
+  auth.use('*', csrfGuard(() => apiDeps.allowedOrigins));
+  auth.onError((error, c) => {
+    if (error instanceof HttpError) return c.json({ error: error.message }, error.status);
+    console.error('登录服务失败', error);
+    return c.json({ error: '登录服务暂时不可用' }, 503);
+  });
+  auth.route('/', sessionRoutes(store, apiDeps));
+  app.route('/auth', auth);
+  app.onError((error, c) => {
+    if (!store.getActiveToken(c.req.query('token') ?? '')) return notFound(c);
+    if (error instanceof HttpError) return c.text(error.message, error.status);
+    if (error instanceof ResourceAccessError) return notFound(c);
+    console.error('资源读取失败', error);
+    return c.text('资源暂时不可用，请稍后重试', 503);
+  });
+  for (const prefix of ['/subs/*', '/resources/*']) {
+    app.use(prefix, uniqueQuery);
+    app.use(prefix, async (c, next) => {
+      c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff'); c.header('referrer-policy', 'no-referrer');
+      const token = c.req.query('token'), user = token ? store.getActiveToken(token) : undefined;
+      if (!user || !['GET', 'HEAD'].includes(c.req.method)) return notFound(c);
+      const profile = c.req.path === '/subs/profile' ? c.req.query('id') : c.req.path.startsWith('/subs/') ? c.req.query('profile') : undefined;
+      const key = c.req.query('key');
+      const shared = key && c.req.path.startsWith('/resources/') ? store.getSharedRule<SharedRuleRecord>(key)?.reference.matcher : undefined;
+      const ruleset = c.req.path === '/resources/ruleset' ? shared?.id ?? c.req.query('id') : undefined;
+      const repositories = new Set<string>([
+        ...(c.req.path === '/resources/repo' && !key && c.req.query('id') ? [c.req.query('id')!] : []),
+        ...(shared?.repository ? [shared.repository.repo] : []),
+        ...(ruleset ? store.get('ruleset', ruleset)?.sources.flatMap(source => source.repository ? [source.repository.repo] : []) ?? [] : []),
+      ]);
+      let deleted = false;
+      const invalidate = (kind: string, id: string) => {
+        if (kind === 'profile' && id === profile || kind === 'ruleset' && id === ruleset || kind === 'shared-rule' && id === key || kind === 'repository' && repositories.has(id)
+          || c.req.path === '/subs/nodes' && kind === c.req.query('kind') && id === c.req.query('id')) deleted = true;
+      };
+      store.invalidationListeners.add(invalidate);
+      try {
+        await next();
+        if (deleted || store.getActiveToken(token!)?.userId !== user.userId) c.res = new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
+      } finally { store.invalidationListeners.delete(invalidate); }
+    });
+  }
+  app.route('/resources', resourceFileRoutes(store, renderer, deps.snapshots, ruleRepos));
+  app.route('/subs', subscriptionRuleRoutes(store, renderer, deps.snapshots));
 
-  app.get('/sub/:token/:profile', async (c) => {
+  app.get('/subs/profile', async (c) => {
+    allowedQuery(c, ['id', 'target', 'platform', 'app', 'token']);
     c.header('cache-control', 'no-store');
     c.header('vary', 'User-Agent');
-    const token = c.req.param('token');
+    const token = c.req.query('token')!;
     const t = store.getActiveToken(token);
     if (!t) return notFound(c);
-    const profileId = c.req.param('profile');
+    const profileId = requiredQuery(c, 'id');
     const owned = store.getWithOwner('profile', profileId);
     if (!owned || owned.owner !== t.userId) return notFound(c);
     const profile = owned.doc;
@@ -96,6 +152,7 @@ export function createApp(deps: AppDeps) {
     const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}), ...(detected.app ? { app: detected.app } : {}) });
     if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     if (outcome.ok && !renderer.canReadNodes(outcome.render, t.userId)) return notFound(c);
+    if (outcome.ok && !renderer.canReadRules(profileId, outcome.render)) return notFound(c);
     if (!outcome.ok) {
       setAccessResult(outcome);
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
@@ -113,11 +170,13 @@ export function createApp(deps: AppDeps) {
   });
 
   /** 私有节点产物同时检查用户归属与主配置结构版本。 */
-  app.get('/p/:token/:profile/:key', async c => {
+  app.get('/subs/nodes', async (c, next) => {
+    if (c.req.query('kind') !== 'provider') return next();
+    allowedQuery(c, ['kind', 'profile', 'id', 'version', 'hash', 'target', 'platform', 'app', 'token']);
     c.header('cache-control', 'no-store');
-    const token = c.req.param('token');
+    const token = c.req.query('token')!;
     const t = store.getActiveToken(token);
-    const profileId = c.req.param('profile');
+    const profileId = requiredQuery(c, 'profile');
     if (!t || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     const qp = c.req.query('platform');
     const platform = PLATFORMS.find((p) => p === qp);
@@ -127,8 +186,8 @@ export function createApp(deps: AppDeps) {
     if (client !== 'mihomo' && platform && platform !== 'ios' && platform !== 'macos') return notFound(c);
     let target: Target;
     try { target = detectClient('', { target: client, platform, app: c.req.query('app') }); } catch (error) { if (error instanceof InvalidClientTarget) return notFound(c); throw error; }
-    const version = c.req.query('v');
-    const key = c.req.param('key');
+    const version = c.req.query('version');
+    const key = requiredQuery(c, 'id');
     if (!version) return notFound(c);
     const retained = renderer.getVersion(profileId, target, version);
     if (!retained || !renderer.canReadNodes(retained, t.userId) || typeof retained.providers[key] !== 'string') return notFound(c);
@@ -145,65 +204,14 @@ export function createApp(deps: AppDeps) {
     return c.body(selected.providers[key]!.replaceAll(TOKEN_PLACEHOLDER, token));
   });
 
-  /** 公共规则只检查有效用户 token；资源身份与用户、订阅无关。 */
-  app.get('/r/:token/:key', async c => {
-    c.header('cache-control', 'no-store');
-    const token = c.req.param('token');
-    const user = store.getActiveToken(token);
-    if (!user) return notFound(c);
-    try {
-      const body = await renderer.sharedRules.read(c.req.param('key'));
-      const resource = store.getSharedRule<{ error?: string }>(c.req.param('key'));
-      if (store.getActiveToken(token)?.userId !== user.userId || !resource || body === undefined) return notFound(c);
-      if (resource.error) c.header('x-sub-forge-warning', 'last-good-rule');
-      if (body.startsWith('#subforge-binary-mrs\n')) {
-        c.header('content-type', 'application/octet-stream');
-        return c.body(Buffer.from(body.slice('#subforge-binary-mrs\n'.length), 'base64'));
-      }
-      c.header('content-type', 'text/plain; charset=utf-8');
-      return c.body(body);
-    } catch (error) {
-      if (store.getActiveToken(token)?.userId !== user.userId) return notFound(c);
-      return c.text(`规则资源暂时不可用：${error instanceof Error ? error.message : String(error)}`, 503);
-    }
-  });
-
-  /** 增强集合的独立共享入口；客户端变体仍复用公共产物，与配置订阅无关。 */
-  app.get('/rules/:token/:id', async c => {
-    c.header('cache-control', 'no-store'); c.header('vary', 'User-Agent');
-    const token = c.req.param('token'), id = c.req.param('id');
-    const user = store.getActiveToken(token);
-    if (!user || !store.get('ruleset', id)) return notFound(c);
-    let target;
-    try { target = detectClient(c.req.header('user-agent') ?? '', c.req.query()); }
-    catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
-    const reference = { matcher: { kind: 'ruleset' as const, id } };
-    const output = { client: target.client };
-    try {
-      const body = await renderer.sharedRules.readReference(reference, output);
-      if (store.getActiveToken(token)?.userId !== user.userId || !store.get('ruleset', id) || body === undefined) return notFound(c);
-      const resource = store.getSharedRule<{ error?: string }>(renderer.sharedRules.key(reference, output));
-      if (!resource) return notFound(c);
-      if (resource.error) c.header('x-sub-forge-warning', 'last-good-rule');
-      if (body.startsWith('#subforge-binary-mrs\n')) {
-        c.header('content-type', 'application/octet-stream');
-        return c.body(Buffer.from(body.slice('#subforge-binary-mrs\n'.length), 'base64'));
-      }
-      c.header('content-type', 'text/plain; charset=utf-8');
-      return c.body(body);
-    } catch (error) {
-      if (store.getActiveToken(token)?.userId !== user.userId || !store.get('ruleset', id)) return notFound(c);
-      return c.text(`规则资源暂时不可用：${error instanceof Error ? error.message : String(error)}`, 503);
-    }
-  });
-
-  app.get('/nodes/:token/:kind/:id', async c => {
+  app.get('/subs/nodes', async c => {
+    allowedQuery(c, ['kind', 'id', 'target', 'platform', 'app', 'token']);
     c.header('cache-control', 'no-store');
     c.header('vary', 'User-Agent');
-    const token = c.req.param('token');
+    const token = c.req.query('token')!;
     const user = store.getActiveToken(token);
-    const kind = c.req.param('kind');
-    const id = c.req.param('id');
+    const kind = requiredQuery(c, 'kind');
+    const id = requiredQuery(c, 'id');
     if (!user || !['source', 'collection', 'local'].includes(kind)) return notFound(c);
     const type = kind as 'source' | 'collection' | 'local';
     if (store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);

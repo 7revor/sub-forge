@@ -37,7 +37,7 @@ it('CLI 收到退出信号后取消进行中的探测并等待子进程退出', 
   try {
     await waitUntil(async () => /已启动：http:\/\/127\.0\.0\.1:\d+/.test(output));
     const origin = /已启动：(http:\/\/127\.0\.0\.1:\d+)/.exec(output)![1]!;
-    const login = await fetch(`${origin}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'qa', password: 'qa-password' }) });
+    const login = await fetch(`${origin}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'qa', password: 'qa-password' }) });
     expect(login.status).toBe(200);
     const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
     await login.text();

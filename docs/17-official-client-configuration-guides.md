@@ -63,7 +63,7 @@ rules:
 
 配置结构及参数应直接对照 Loon 手册；不能将 Surge 的整段配置直接标记为 Loon。官方 HTTP 规则页明确列出 `USER-AGENT` 的通配匹配；规则订阅使用 Loon 支持的逐行规则语法。依据：[HTTP 规则](https://nsloon.app/en/docs/Rule/http_rule/)、[规则订阅](https://nsloon.app/en/docs/Rule/sub_rule/)。
 
-本项目：2026-10-30 已接入 Loon IR 映射、保存校验、API、基础配置、节点、策略组、规则和完整 INI 订阅。规则集原位置内嵌；代理链与未适配协议明确报错。详见 [19](19-client-conversion.md)。
+本项目：2026-10-30 已接入 Loon IR 映射、保存校验、API、基础配置、节点、策略组、规则和完整 INI 订阅。全部分流规则按顺序写入 `[Remote Rule]` 托管，手写规则也使用订阅私有产物；主配置仅保留 `FINAL`。代理链输出专用段，未适配协议明确报错。详见 [19](19-client-conversion.md)。
 
 ### Stash
 
@@ -98,8 +98,8 @@ Stash 使用 YAML；配置、节点集和规则集的形状与 Clash 家族相�
 保留现有订阅 token，显式使用：
 
 ```text
-/sub/<token>?target=stash&platform=ios
-/sub/<token>?target=stash&platform=macos
+/subs/profile?id=<配置ID>&token=<token>&target=stash&platform=ios
+/subs/profile?id=<配置ID>&token=<token>&target=stash&platform=macos
 ```
 
 Stash User-Agent 可以自动识别；显式参数优先。前端「订阅 → 概览」只提供一个无参数链接，Stash 与 Mihomo 客户端共用该链接，浏览器直接显示 Mihomo YAML；「预览」选择 Stash 和平台，可查看草稿及导出独立 YAML 文件。导出文件把本次已转换的托管规则内嵌到 `rules` 中，避免依赖预览占位 token；原始远程规则集合继续使用其真实 URL。
@@ -114,7 +114,7 @@ Stash 专属基础设置保存在预设的 `stash` 和订阅的 `base.stashPatch
 GET /api/rules/convert?url=<完整编码的上游URL>&target=stash&platform=ios
 ```
 
-转换预览需要登录；正式公共规则通过 `/r/:token/:key` 托管，任意有效用户令牌可读，旧 token 转换入口已移除。转换不会将未知类型当作可执行规则透传。规则编辑器中显式输入 RAW 仍沿用原有的原文输出语义。
+转换预览需要登录；正式公共规则通过 `/resources/ruleset?key=K&token=T` 托管，任意有效用户令牌可读，旧 token 转换入口已移除。转换不会将未知类型当作可执行规则透传。规则编辑器中显式输入 RAW 仍沿用原有的原文输出语义。
 
 ## 3. 后续同步流程
 
@@ -136,3 +136,5 @@ GET /api/rules/convert?url=<完整编码的上游URL>&target=stash&platform=ios
 | 2026-10-29 | Stash | 完整订阅、独立文件导出、规则转换及 iOS/macOS 预览接入；节点按快照内联 | 自动化及内置浏览器结果见[验收记录](../research/verification/stash-support-20261029/验收记录.md)；未进行 Stash 真机导入/转发验收 |
 | 2026-10-30 | Surge | 完整主订阅、独立导出、基础配置、节点与策略组接通 | 全量回归、内置浏览器、官方 surge-cli 离线检查；未真机转发 |
 | 2026-10-30 | Loon | 独立 INI 适配、规则集内嵌、平台规则与失败回退接通 | 全量回归和内置浏览器；未运行官方校验器或真机转发 |
+
+2026-10-30 后续修正：Loon 全部分流规则改为托管，含规则的草稿禁用独立导出，正式订阅沿用新 query API；旧内联 last-good 不再下发。见[源预览与托管验收](../research/verification/raw-source-preview-20261030/README.md)。上表内嵌记录属于初次实现基线。

@@ -63,9 +63,9 @@ describe('来源获取与服务端转换分离', () => {
     const { alice, bob, store, calls } = await scenario();
     const saved = await alice.post('/api/rulesets', { name: '示例', sources: [remote] });
     const id = saved.json.item.id;
-    expect((await bob.get(`/api/rulesets/${id}/sources/a/content`)).status).toBe(200);
+    expect((await bob.get(`/api/rulesets/sources/content?id=${id}&source=a`)).status).toBe(200);
     expect((await bob.post('/api/rulesets/source', { id, source: remote })).status).toBe(200);
-    expect((await alice.get(`/api/rulesets/${id}/sources/a/content`)).json.content).toBe(content);
+    expect((await alice.get(`/api/rulesets/sources/content?id=${id}&source=a`)).json.content).toBe(content);
     expect(store.latestSnapshot('ruleset', id, remote.url)?.body).toBe(content);
     await alice.post('/api/rulesets/source', { source: remote });
     await bob.post('/api/rulesets/source', { source: remote });
@@ -99,7 +99,7 @@ describe('来源获取与服务端转换分离', () => {
   it('GET、草稿读取和转换均要求登录，非法旧改写不会造成 500', async () => {
     const { app, alice } = await scenario();
     const anonymous = client(app);
-    expect((await anonymous.get('/api/rulesets/unknown/sources/a/content')).status).toBe(401);
+    expect((await anonymous.get('/api/rulesets/sources/content?id=unknown&source=a')).status).toBe(401);
     expect((await anonymous.post('/api/rulesets/source', { source: remote })).status).toBe(401);
     expect((await anonymous.post('/api/rules/convert', { inputs: [], client: 'mihomo' })).status).toBe(401);
     expect((await alice.post('/api/rules/convert', { inputs: [{ source: { ...remote, overrides: [{ line: 1, override: { action: 'invalid' } }] } }], client: 'mihomo' })).status).toBe(400);

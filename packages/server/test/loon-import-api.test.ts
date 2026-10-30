@@ -17,7 +17,7 @@ it('完整导入预览不落库不联网，保存资源归当前用户，Loon �
     for (const kind of ['profile','source','collection','local'] as const) for (const doc of h.store.list(kind)) expect(h.store.getWithOwner(kind, doc.id)?.owner).toBe(alice.id);
     const id = saved.json.item.id; expect((await other.get('/api/profiles/' + id)).status).toBe(404);
     const token = h.store.userToken(alice.id)!.token;
-    const out = await h.app.request('/sub/' + token + '/' + id + '?target=loon');
+    const out = await h.app.request(`/subs/profile?token=${token}&id=${id}&target=loon`);
     expect(out.status).toBe(200); expect(await out.text()).toContain('[Proxy Chain]'); expect(fetched).toBe(1);
     const incompatible = await h.renderer.render(id, { client: 'mihomo' }); expect(incompatible.ok).toBe(false);
   } finally { await h.snapshots.settled(); h.store.close(); }

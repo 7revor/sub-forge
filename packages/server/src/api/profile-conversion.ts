@@ -1,3 +1,4 @@
+import { requiredQuery } from '../query.ts';
 import { Hono } from 'hono';
 import { Report, resolveProfileRouting, type GroupMember, type Target } from '@sub-forge/core';
 import { independentProfile, profileTemplate } from '../profile-routing.ts';
@@ -71,8 +72,8 @@ export function profileConversionRoutes(store: Store) {
     validateDoc('profile', next as unknown as Record<string, unknown>, id, c.get('user'), store);
     return c.json({ item: next, changes });
   });
-  app.get('/profiles/:id/migration-backup', requireUser, c => {
-    const row = store.getWithOwner('profile', c.req.param('id'));
+  app.get('/profiles/migration-backup', requireUser, c => {
+    const row = store.getWithOwner('profile', requiredQuery(c, 'id'));
     if (!row || row.owner !== c.get('user').id) throw notFound('配置订阅');
     const backup = store.getProfileMigrationBackup(row.doc.id);
     if (!backup) throw notFound('迁移备份');

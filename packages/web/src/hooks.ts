@@ -1,3 +1,4 @@
+import { queryUrl } from '@sub-forge/core';
 import { snapshotOptions } from './hooks/documentQueries.ts';
 import { sourceFetchSummary } from './domain/sourceFetch.ts';
 // 数据读写的 React Query 封装。文档种类与后端 /api/{kind} 一一对应。
@@ -43,7 +44,7 @@ export function useList<K extends Kind>(kind: K) {
 }
 
 export function useDoc<K extends Kind>(kind: K, id: string | undefined) {
-  return useQuery({ queryKey: [kind, id], enabled: !!id && id !== 'new', queryFn: () => api<{ item: DocMap[K] }>('GET', `/${kind}/${id}`).then((r) => r.item) });
+  return useQuery({ queryKey: [kind, id], enabled: !!id && id !== 'new', queryFn: () => api<{ item: DocMap[K] }>('GET', queryUrl(`/${kind}`, { id })).then((r) => r.item) });
 }
 
 /** 新建（无 id）或更新；成功后刷新列表与该文档 */
@@ -81,7 +82,7 @@ export function nodeListOptions(ref: import('@sub-forge/core').NodeSetID | undef
     queryKey,
     enabled: !!ref?.id,
     staleTime: 0,
-    queryFn: () => api<import('./api.ts').NodeListResult>('GET', `/nodesets/${ref!.type}/${encodeURIComponent(ref!.id)}/nodes${params.size ? `?${params}` : ''}`),
+    queryFn: () => api<import('./api.ts').NodeListResult>('GET', queryUrl('/nodesets/nodes', { type: ref!.type, id: ref!.id, ...Object.fromEntries(params) })),
   };
 }
 

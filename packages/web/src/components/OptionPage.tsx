@@ -4,7 +4,7 @@ import type { SearchMatch } from '@sub-forge/core';
 import { HighlightedText } from './HighlightedText.tsx';
 import { CommandList, CommandItem } from './ui/command.tsx';
 
-export type PageOption = { value: string; label: string; hint?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
+export type PageOption = { value: string; label: string; hint?: string; url?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
 export type OptionPage = { options: PageOption[]; total: number; nextOffset?: number; notices?: string[] };
 export type OptionLoader = (query: string, offset: number) => Promise<OptionPage>;
 

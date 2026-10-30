@@ -1,3 +1,4 @@
+import { requiredQuery } from '../query.ts';
 // 来源获取与无 I/O 转换分别提供接口，客户端切换不会读取上游。
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -39,8 +40,8 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
   const app = new Hono<ApiEnv>();
   const converter = new RuleConverter();
   const getter = new RuleSourceService(snapshots, converter);
-  for (const path of ['/rulesets/preview', '/rulesets/source', '/rules/convert', '/rules/matcher-source', '/rulesets/:id/sources/:source/content']) {
-    app.use(path, (c, next) => c.req.query('token') ? Promise.reject(notFound()) : requireUser(c, next));
+  for (const path of ['/rulesets/preview', '/rulesets/source', '/rules/convert', '/rules/matcher-source', '/rulesets/sources/content']) {
+    app.use(path, requireUser);
     app.use(path, bodyLimit({ maxSize: 16 * 1024 * 1024 }));
   }
   const own = (id: unknown, userId: string): RuleSetDoc | undefined => {
@@ -69,9 +70,9 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
     }));
     return c.json({ name: ruleset.name, content: loaded.join('\n'), sources: sources.length });
   });
-  app.get('/rulesets/:id/sources/:source/content', async c => {
-    const saved = own(c.req.param('id'), c.get('user').id)!;
-    const src = saved.sources.find(s => s.id === c.req.param('source'));
+  app.get('/rulesets/sources/content', async c => {
+    const saved = own(requiredQuery(c, 'id'), c.get('user').id)!;
+    const src = saved.sources.find(s => s.id === requiredQuery(c, 'source'));
     if (!src) throw notFound('来源');
     return c.json(await getter.get(c.get('user').id, src, saved));
   });

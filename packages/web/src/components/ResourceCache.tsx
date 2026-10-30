@@ -1,3 +1,4 @@
+import { queryUrl } from '@sub-forge/core';
 import { createModal, useModalPresentation, ModalContent, ModalHeader, ModalTitle } from '../modals/index.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -13,7 +14,7 @@ function refreshItemStatus(item:RefreshItem) {
   return item.ok?'拉取成功':`${item.error} · ${item.available?'继续使用上次成功内容':'没有可用缓存'}`;
 }
 function useResourceCacheState(kind:string,id:string) {
-  return useQuery({queryKey:['resource-status',kind,id],queryFn:()=>api<{items:ResourceState[]}>('GET',`/${kind}/${id}/cache`)});
+  return useQuery({queryKey:['resource-status',kind,id],queryFn:()=>api<{items:ResourceState[]}>('GET',queryUrl(`/${kind}/cache`, { id }))});
 }
 export function ResourceLastRefreshTime({kind,id}:{kind:string;id:string}) {
   const state=useResourceCacheState(kind,id);
@@ -45,7 +46,7 @@ export function RefreshCacheButton({kind,id,name,endpoint,body,disabled=false}:{
 }
 const RefreshProgressModal = createModal<{ name: string; kind: string; jobId: string }>(function RefreshProgress({ data: { name, kind, jobId }, modal }) {
   const qc = useQueryClient();
-  const query = useQuery({ queryKey: ['refresh-job', jobId], enabled: modal.active, queryFn: () => api<{job:Job}>('GET', `/refresh-jobs/${jobId}`), refetchInterval: q => q.state.data?.job.state === 'running' ? 500 : false });
+  const query = useQuery({ queryKey: ['refresh-job', jobId], enabled: modal.active, queryFn: () => api<{job:Job}>('GET', queryUrl('/refresh-jobs', { id: jobId })), refetchInterval: q => q.state.data?.job.state === 'running' ? 500 : false });
   const job = useModalPresentation(query);
   const current = job.data?.job;
   useEffect(() => { if (current && current.state !== 'running') void qc.invalidateQueries(); }, [qc, current?.state]);

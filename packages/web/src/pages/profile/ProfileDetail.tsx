@@ -1,3 +1,4 @@
+import { queryUrl } from '@sub-forge/core';
 import { acceptProfileSave, modeLabel, syncProfileDraft } from './routing.ts';
 import { tokenOptions } from '../../hooks/documentQueries.ts';
 // 与新建共用两个标签页；旧分区链接仍进入相应设置。
@@ -6,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DeleteAction } from '../../components/DetailActions.tsx';
-import { Badge, Button, ErrorAlert, PageHeader, PageScroll } from '../../components/ui.tsx';
+import { Badge, Button, ErrorAlert, PageHeader } from '../../components/ui.tsx';
 import { useDeleteDoc, useDoc, useList, useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { ProfileContext, useProfileCtx } from './context.ts';
 import { ProfileSections } from './ProfileSections.tsx';
@@ -72,12 +73,10 @@ export function ProfileDetail() {
         </div>
       </div>
       <ErrorAlert error={save.error ?? dup.error} />
-      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={`/api/profiles/${draft.id}/migration-backup`} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
+      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={queryUrl('/api/profiles/migration-backup', { id: draft.id })} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
       {template.error && <ErrorAlert error={template.error} />}
 
-      <PageScroll>
-        <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} />
-      </PageScroll>
+      <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} />
     </ProfileContext.Provider>
   );
 }

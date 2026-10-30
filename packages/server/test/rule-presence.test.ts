@@ -39,7 +39,7 @@ describe('规则存在即生效', () => {
         rules: { rulesets: { rs: store.get('ruleset', 'rs')! }, snapshots: {} }, urls: { provider: key => key, ruleset: key => key } }).yaml;
       const before = ['p', 'independent'].map(output);
       store.db.pragma('user_version = 16'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(25);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(26);
       expect(['p', 'independent'].map(output)).toEqual(before);
       expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
       expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'p')?.owner);
@@ -77,7 +77,7 @@ describe('规则存在即生效', () => {
       const saved = await user.post('/api/profiles', profile);
       expect(saved.status).toBe(201);
       expect(saved.json.item.routing.prependRules).toEqual([rule('pre-on')]);
-      expect((await user.get(`/api/profiles/${saved.json.item.id}`)).json.item.routing.prependRules).toEqual([rule('pre-on')]);
+      expect((await user.get(`/api/profiles?id=${saved.json.item.id}`)).json.item.routing.prependRules).toEqual([rule('pre-on')]);
     } finally { await env.snapshots.settled(); env.store.close(); }
   });
 

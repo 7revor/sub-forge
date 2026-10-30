@@ -1,4 +1,9 @@
 import { migrateNativeDocument } from './native-migration.ts';
+import { ruleBinding } from './rule-binding.ts';
+import { resolveRuleSetReference } from './ruleset-reference.ts';
+import { findRuleFile } from './rule-repos/options.ts';
+import { Report, resolveProfileRouting, stableStringify } from '@sub-forge/core';
+import type { ClientAddress } from './net/client-ip.ts';
 import { normalizeRulePresence } from './rule-presence.ts';
 import { migrateProfile, profileTemplate, stripProfileRevisions } from './profile-routing.ts';
 // SQLite 存储。保存文档、快照与最近成功的配置版本；旧客户端按版本取兼容资源。
@@ -35,7 +40,7 @@ export const ACCESS_KINDS = ['subscription', 'nodes', 'rule-collection', 'enhanc
 export type AccessKind = typeof ACCESS_KINDS[number];
 export type UserAccessLogRow = Omit<AccessLogRow, 'token'> & { id: number; kind: AccessKind; resourceId: string; resourceName: string; method: string };
 
-export type AccessLogRow = {
+export type AccessLogRow = Partial<ClientAddress> & {
   token: string;
   profileId: string;
   at: number;
@@ -53,7 +58,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 25;
+const SCHEMA_VERSION = 27;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
@@ -161,7 +166,7 @@ export class Store {
   configurationRevision = 0;
   readonly listeners = new Set<() => void>();
   /** 在途资源读取用短期监听器撤销，避免相同 ID 删除后重建造成旧请求复活。 */
-  readonly invalidationListeners = new Set<(kind: DocKind | 'shared-rule', id: string) => void>();
+  readonly invalidationListeners = new Set<(kind: DocKind | 'shared-rule' | 'repository', id: string) => void>();
   eventsClosed = false;
   closeEvents(): void { this.eventsClosed = true; this.changed(); }
   changed(): void { for (const listener of this.listeners) listener(); }
@@ -218,38 +223,74 @@ export class Store {
       this.pruneUnusedResource(row.resource);
     }
   }
+  private prunePrivateRules(profileId: string): void {
+    // 订阅/模板移除专属引用时连同历史正文清理，不能保留可被旧版本再次读出的私有产物。
+    for (const table of ['last_good', 'render_generations']) {
+      for (const row of this.db.prepare(`SELECT rowid, profile_id, data FROM ${table} WHERE profile_id = ?`).all(profileId) as { rowid: number; profile_id: string; data: string }[]) {
+        const render = JSON.parse(this.cipher.decrypt(row.data)) as import('./render.ts').StoredRender;
+        const privateRules = Object.values(render.privateRules ?? {});
+        if (!privateRules.length) continue;
+        const profile = this.get('profile', row.profile_id);
+        const template = profile ? profileTemplate(profile, (id, version) => this.getTemplate(id, version)) : undefined;
+        const rules = profile ? resolveProfileRouting(profile, template, new Report()).rules : [];
+        if (privateRules.some(saved => !rules.some(rule => rule.enabled !== false && stableStringify(rule.matcher) === stableStringify(saved.reference.matcher) && !!rule.options?.src === !!saved.reference.options?.src))) this.db.prepare(`DELETE FROM ${table} WHERE rowid = ?`).run(row.rowid);
+      }
+    }
+  }
+
   pruneResourceBindings(): void {
+    // 失效公共定义不能由缓存记录自身继续保活，撤销通知同时阻止在途编译回写。
+    for (const row of this.listSharedRules<{ reference: import('@sub-forge/core').RuleResourceReference }>()) {
+      if (row.data.reference.matcher.remote || !resolveRuleSetReference(row.data.reference.matcher, this)) {
+        this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
+        for (const listener of this.invalidationListeners) listener('shared-rule', row.key);
+      }
+    }
     const keep = new Map<string, Set<string>>();
     const add = (kind: string, id: string, urls: string[]) => {
       const key = `${kind}:${id}`;
       const hashes = keep.get(key) ?? new Set<string>();
       urls.forEach(url => hashes.add(this.cipher.hmac(url))); keep.set(key, hashes);
     };
-    const walk = (value: unknown): void => {
+    const walk = (value: unknown, context?: string): void => {
       if (!value || typeof value !== 'object') return;
-      if (Array.isArray(value)) { value.forEach(walk); return; }
+      if (Array.isArray(value)) { value.forEach(item => walk(item, context)); return; }
       const v = value as Record<string, any>;
       if (v.kind === 'ruleset' && typeof v.id === 'string') {
-        if (v.remote?.url) add('ruleset', v.id, [v.remote.url]);
-        if (v.repository?.sources) add('ruleset', v.id, v.repository.sources.flatMap((s: { url?: string }) => s.url ? [s.url] : []));
+        if (v.remote?.url && context) add('ruleset', ruleBinding(v.id, context).id, [v.remote.url]);
+        if (v.repository?.sources && resolveRuleSetReference(v as import('./ruleset-reference.ts').RuleSetMatcher, this)) add('ruleset', v.id, v.repository.sources.flatMap((s: { url?: string }) => s.url ? [s.url] : []));
       }
-      Object.values(v).forEach(walk);
+      Object.values(v).forEach(item => walk(item, context));
     };
     for (const row of this.db.prepare('SELECT kind,id,data FROM docs').all() as {kind:string;id:string;data:string}[]) {
       const doc = JSON.parse(this.cipher.decrypt(row.data));
       if (row.kind === 'source' && doc.url) add('source', row.id, [doc.url]);
-      if (row.kind === 'ruleset') add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
-      if (row.kind === 'profile') walk(doc);
+      if (row.kind === 'ruleset' && resolveRuleSetReference({ kind: 'ruleset', id: row.id }, this)) add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
+      if (row.kind === 'profile') {
+        walk(doc, `profile:${row.id}`);
+        const template = profileTemplate(doc, (id, version) => this.getTemplate(id, version));
+        if (template) walk(template, `profile:${row.id}`);
+      }
     }
-    this.listLatestTemplates().forEach(walk);
+    this.listLatestTemplates().forEach(t => walk(t, `template:${t.id}`));
     this.listSharedRules<unknown>().forEach(r => walk(r.data));
     for (const row of this.db.prepare('SELECT * FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
       // 仓库正文由索引缓存维护，其生命周期不取决于配置订阅。
-      if (row.id.startsWith('repository-file:') || keep.get(`${row.kind}:${row.id}`)?.has(row.url_hash)) continue;
+      if (row.id.startsWith('repository-file:')) {
+        const match = /^repository-file:([^:]+):([^:]+):(.+)$/.exec(row.id);
+        if (match && this.db.prepare('SELECT 1 FROM rule_repos WHERE id = ? AND enabled = 1').get(match[1]!) && findRuleFile(this.db, match[1]!, match[2]!, match[3]!)) continue;
+      } else if (keep.get(`${row.kind}:${row.id}`)?.has(row.url_hash)) continue;
       this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(row.kind, row.id, row.url_hash);
       this.pruneUnusedResource(row.resource);
     }
     this.db.exec("DELETE FROM snapshots WHERE owner_id LIKE 'resource:%' AND owner_id NOT IN (SELECT resource FROM resource_bindings)");
+  }
+
+  invalidateRepository(id: string): void {
+    this.configurationRevision++;
+    this.pruneResourceBindings();
+    for (const listener of this.invalidationListeners) listener('repository', id);
+    this.changed();
   }
 
   private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
@@ -372,7 +413,21 @@ export class Store {
         // 旧日志只有截断的 token 摘要，不能可靠确定访问者；保留原记录，不猜测用户归属。
         this.db.exec('CREATE INDEX IF NOT EXISTS access_log_user_time ON access_log (user_id, at DESC, id DESC); CREATE INDEX IF NOT EXISTS access_log_user_kind ON access_log (user_id, kind, at DESC, id DESC)');
       }
-      if (version < 25) this.migrateNativeConfigs();
+      if (version < 25) {
+        // 旧配置中的路径 token 地址全部失效，不能用 last-good 再下发旧入口。
+        this.db.exec('DELETE FROM last_good; DELETE FROM render_generations');
+        for (const row of this.listSharedRules<{ reference: { matcher: { remote?: unknown } } }>()) {
+          if (row.data.reference.matcher.remote) this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
+        }
+        this.pruneResourceBindings();
+      }
+      if (version < 26) {
+        const columns = new Set((this.db.prepare('PRAGMA table_info(access_log)').all() as { name: string }[]).map(column => column.name));
+        for (const [name, definition] of Object.entries({ client_ip: 'TEXT', peer_ip: 'TEXT', ip_source: "TEXT NOT NULL DEFAULT 'unknown'" })) {
+          if (!columns.has(name)) this.db.exec(`ALTER TABLE access_log ADD COLUMN ${name} ${definition}`);
+        }
+      }
+      if (version < 27) this.migrateNativeConfigs();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -619,6 +674,7 @@ export class Store {
         .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
 
     })();
+    if (kind === 'profile') this.prunePrivateRules(doc.id);
     if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
     if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
     this.pruneResourceBindings();
@@ -686,6 +742,9 @@ export class Store {
       this.db.prepare('INSERT INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
         .run(t.id, 1, JSON.stringify(current), this.now());
     })();
+    for (const profile of this.list('profile')) {
+      if (profileTemplate(profile, (id, version) => this.getTemplate(id, version))?.id === t.id) this.prunePrivateRules(profile.id);
+    }
     this.pruneResourceBindings();
     this.changed();
   }
@@ -906,9 +965,9 @@ export class Store {
   logAccess(r: AccessLogRow & { kind?: AccessKind; resourceId?: string; resourceName?: string; method?: string }): void {
     const user = this.getActiveToken(r.token);
     if (!user) return;
-    this.db.prepare('INSERT INTO access_log (token, profile_id, at, ua, client, platform, status, ms, warnings, source, user_id, kind, resource_id, resource_name, method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    this.db.prepare('INSERT INTO access_log (token, profile_id, at, ua, client, platform, status, ms, warnings, source, user_id, kind, resource_id, resource_name, method, client_ip, peer_ip, ip_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run(this.cipher.hmac(r.token).slice(0, 8), r.profileId, r.at, r.ua.replaceAll(r.token, '[令牌]').slice(0, 512), r.client, r.platform ?? null, r.status, r.ms, r.warnings, r.source,
-        user.userId, r.kind ?? 'subscription', (r.resourceId ?? r.profileId).replaceAll(r.token, '[令牌]').slice(0, 512), (r.resourceName ?? '').replaceAll(r.token, '[令牌]').slice(0, 200), r.method ?? 'GET');
+        user.userId, r.kind ?? 'subscription', (r.resourceId ?? r.profileId).replaceAll(r.token, '[令牌]').slice(0, 512), (r.resourceName ?? '').replaceAll(r.token, '[令牌]').slice(0, 200), r.method ?? 'GET', r.clientIp ?? null, r.peerIp ?? null, r.ipSource ?? 'unknown');
   }
 
   userAccessPage(userId: string, options: PageOptions, kind?: AccessKind): PageResult<UserAccessLogRow> {
@@ -916,15 +975,15 @@ export class Store {
     const args = [userId, this.now() - 30 * 86400_000, ...(kind ? [kind] : [])];
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM access_log WHERE ${where}`).get(...args) as { n: number }).n;
     const meta = pageMeta(total, options);
-    const rows = this.db.prepare(`SELECT id, profile_id AS profileId, at, ua, client, platform, status, ms, warnings, source, kind, resource_id AS resourceId, resource_name AS resourceName, method FROM access_log WHERE ${where} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`).all(...args, meta.pageSize, (meta.page - 1) * meta.pageSize) as UserAccessLogRow[];
+    const rows = this.db.prepare(`SELECT id, profile_id AS profileId, at, ua, client, platform, status, ms, warnings, source, kind, resource_id AS resourceId, resource_name AS resourceName, method, client_ip AS clientIp, peer_ip AS peerIp, ip_source AS ipSource FROM access_log WHERE ${where} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`).all(...args, meta.pageSize, (meta.page - 1) * meta.pageSize) as UserAccessLogRow[];
     return { ...meta, items: rows };
   }
 
   recentAccess(profileId: string, limit = 50): AccessLogRow[] {
-    const rows = this.db.prepare("SELECT token, profile_id, at, ua, client, platform, status, ms, warnings, source FROM access_log WHERE profile_id = ? AND kind = 'subscription' ORDER BY at DESC, id DESC LIMIT ?")
-      .all(profileId, limit) as { token: string; profile_id: string; at: number; ua: string; client: string; platform: string | null; status: number; ms: number; warnings: number; source: string }[];
+    const rows = this.db.prepare("SELECT token, profile_id, at, ua, client, platform, status, ms, warnings, source, client_ip AS clientIp, peer_ip AS peerIp, ip_source AS ipSource FROM access_log WHERE profile_id = ? AND kind = 'subscription' ORDER BY at DESC, id DESC LIMIT ?")
+      .all(profileId, limit) as (ClientAddress & { token: string; profile_id: string; at: number; ua: string; client: string; platform: string | null; status: number; ms: number; warnings: number; source: string })[];
     return rows.map((r) => {
-      const row: AccessLogRow = { token: r.token, profileId: r.profile_id, at: r.at, ua: r.ua, client: r.client, status: r.status, ms: r.ms, warnings: r.warnings, source: r.source };
+      const row: AccessLogRow = { token: r.token, profileId: r.profile_id, at: r.at, ua: r.ua, client: r.client, status: r.status, ms: r.ms, warnings: r.warnings, source: r.source, clientIp: r.clientIp, peerIp: r.peerIp, ipSource: r.ipSource };
       if (r.platform !== null) row.platform = r.platform;
       return row;
     });

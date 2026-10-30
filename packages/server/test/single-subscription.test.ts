@@ -18,15 +18,15 @@ describe('每个用户一个资源令牌', () => {
       const alice = client(h.app), bob = client(h.app); await alice.login('alice'); await bob.login('bob');
       const one = (await alice.post('/api/profiles', { name: '订阅一', nodeSets: [] })).json.item;
       const two = (await alice.post('/api/profiles', { name: '订阅二', nodeSets: [] })).json.item;
-      const first = (await alice.get(`/api/profiles/${one.id}/link`)).json.item;
-      const second = (await alice.get(`/api/profiles/${two.id}/link`)).json.item;
+      const first = (await alice.get(`/api/profiles/link?id=${one.id}`)).json.item;
+      const second = (await alice.get(`/api/profiles/link?id=${two.id}`)).json.item;
       expect(first.token).toBe(second.token); expect(first.url).not.toBe(second.url);
       expect(first.token).toBe(h.store.userToken(a.id)!.token);
       expect(first.token).not.toBe(h.store.userToken(b.id)!.token);
-      const repeats = await Promise.all(Array.from({ length: 6 }, () => alice.get(`/api/profiles/${one.id}/link`)));
+      const repeats = await Promise.all(Array.from({ length: 6 }, () => alice.get(`/api/profiles/link?id=${one.id}`)));
       repeats.forEach(r => expect(r.json.item).toEqual(first));
       expect((await h.app.request(first.url.replace(first.token, h.store.userToken(b.id)!.token))).status).toBe(404);
-      expect((await bob.get(`/api/profiles/${one.id}/link`)).status).toBe(404);
+      expect((await bob.get(`/api/profiles/link?id=${one.id}`)).status).toBe(404);
       expect((await alice.del(`/api/profiles/${one.id}`)).status).toBe(200);
       expect(h.store.getActiveToken(first.token)?.userId).toBe(a.id);
       expect((await h.app.request(first.url)).status).toBe(404);
@@ -44,7 +44,7 @@ describe('每个用户一个资源令牌', () => {
       h.store.put('profile', { id: 'p', name: '多客户端', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890 }), stash: testYaml({ 'log-level': 'warning' }) } } });
       issueProfileToken(h.store, { token: 'test', profileId: 'p' });
       for (const ua of ['Stash/3.6.0', 'FlClash/v0.9.2 clash-verge Platform/android', 'clash-verge/v2.5.0', 'Mozilla/5.0', 'curl/8.0', 'Stash/4.3.0 (macOS)']) {
-        const res = await h.app.request('/sub/test/p', { headers: { 'user-agent': ua } });
+        const res = await h.app.request('/subs/profile?token=test&id=p', { headers: { 'user-agent': ua } });
         expect(res.status).toBe(200); expect(res.headers.get('vary')).toBe('User-Agent');
         const body = parse(await res.text());
         if (ua.startsWith('Stash')) { expect(body['log-level']).toBe('warning'); expect(body).not.toHaveProperty('mixed-port'); }

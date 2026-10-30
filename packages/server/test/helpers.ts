@@ -1,5 +1,6 @@
 // 管理接口测试用的小工具：带 cookie 的请求客户端、内存数据库上的完整应用。
 
+import { parseTrustedProxies } from '../src/net/client-ip.ts';
 import { createApp } from '../src/app.ts';
 import { hashPassword } from '../src/crypto.ts';
 import type { UpstreamFetcher } from '../src/net/upstream.ts';
@@ -7,14 +8,14 @@ import { RenderService } from '../src/render.ts';
 import { SnapshotService } from '../src/snapshots.ts';
 import { Store, type Role } from '../src/store.ts';
 
-export function setupApp(opts: { fetcher?: UpstreamFetcher; now?: () => number } = {}) {
+export function setupApp(opts: { fetcher?: UpstreamFetcher; now?: () => number; trustedProxies?: string } = {}) {
   let t = 1_700_000_000_000;
   const now = opts.now ?? (() => t);
   const store = new Store(':memory:', { now });
   const fetcher: UpstreamFetcher = opts.fetcher ?? (async (url) => { throw new Error(`测试中未提供 ${url}`); });
   const snapshots = new SnapshotService(store, fetcher, now);
   const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test' });
-  const app = createApp({ store, renderer, snapshots, now, publicUrl: 'https://sub.test' });
+  const app = createApp({ store, renderer, snapshots, now, publicUrl: 'https://sub.test', trustedProxies: parseTrustedProxies(opts.trustedProxies) });
   return { store, app, snapshots, renderer, advance: (ms: number) => { t += ms; } };
 }
 
@@ -55,7 +56,7 @@ export function client(app: ReturnType<typeof setupApp>['app']) {
     patch: (p: string, b: unknown) => call('PATCH', p, b),
     del: (p: string) => call('DELETE', p),
     raw: call,
-    login: async (username: string, password = 'password-123') => call('POST', '/api/auth/login', { username, password }),
+    login: async (username: string, password = 'password-123') => call('POST', '/auth/login', { username, password }),
   };
 }
 
@@ -67,11 +68,10 @@ export function issueProfileToken(store: Store, t: { token: string; profileId: s
   store.putToken({ token: t.token, userId: owner });
 }
 
-/** 从公共产物表读取规则，配置快照只保存资源引用，不再复制正文。 */
+/** 合并公共产物表与订阅专属规则正文，供渲染断言使用。 */
 export function ruleBodies(store: Store, render: import('../src/render.ts').StoredRender): Record<string, string> {
-  return Object.fromEntries(render.ruleResources.map(key => {
-    const r = store.getSharedRule<import('../src/shared-rules.ts').SharedRuleRecord>(key)!;
-    const name = `rs_${r.reference.matcher.id.replace(/[^A-Za-z0-9_-]/g, '_')}${r.reference.options?.src ? '_src' : ''}_${r.body.startsWith('#subforge-binary-mrs\n') ? 'binary.mrs' : 'classical.list'}`;
+  return Object.fromEntries([...render.ruleResources.map(key => store.getSharedRule<import('../src/shared-rules.ts').SharedRuleRecord>(key)!), ...Object.values(render.privateRules ?? {})].map((r, index) => {
+    const name = `rs_${(r.reference.matcher.kind === 'ruleset' ? r.reference.matcher.id : `local_${index}`).replace(/[^A-Za-z0-9_-]/g, '_')}${r.reference.options?.src ? '_src' : ''}_${r.body.startsWith('#subforge-binary-mrs\n') ? 'binary.mrs' : 'classical.list'}`;
     return [name, r.body];
   }));
 }

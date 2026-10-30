@@ -13,7 +13,7 @@ const unauthorizedListeners = new Set<Listener>();
 export const onUnauthorized = (fn: Listener) => { unauthorizedListeners.add(fn); return () => { unauthorizedListeners.delete(fn); }; };
 
 export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(path.startsWith('/auth/') ? path : `/api${path}`, {
     method, cache: 'no-store',
     credentials: 'same-origin',
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
@@ -34,7 +34,7 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export type User = { id: string; username: string; role: 'admin' | 'user'; disabled: boolean; scriptAllowed: boolean; createdAt: number };
 export type TokenItem = { token: string; userId: string; createdAt: number; url: string };
-export type AccessLogRow = { at: number; ua: string; client: string; platform?: string; status: number; ms: number; warnings: number; source: string; token: string };
+export type AccessLogRow = { clientIp?: string | null; peerIp?: string | null; ipSource?: 'socket' | 'x-forwarded-for' | 'unknown'; at: number; ua: string; client: string; platform?: string; status: number; ms: number; warnings: number; source: string; token: string };
 export type UserAccessLogRow = Omit<AccessLogRow, 'token'> & { id: number; kind: 'subscription' | 'nodes' | 'rule-collection' | 'enhancement'; resourceId: string; resourceName: string; method: string };
 export type SnapshotMeta = { id: number; url: string; fetchedAt: number; ok: boolean; status?: number; hash?: string; userinfo?: { upload?: number; download?: number; total?: number; expire?: number }; error?: string };
 export type NodeBrief = { name: string; type: string; server: string; port: number };
@@ -42,7 +42,7 @@ export type NodeListResult = { nodes: NodeBrief[]; total: number; unfilteredTota
 export type TraceStep = { index: number; op: string; enabled: boolean; before: number; after: number; renamed: { from: string; to: string }[]; removed: string[]; error?: string; nodes: NodeBrief[]; origins: (number | null)[]; truncated: boolean };
 export type PipelinePreview = { input: number; inputNodes: NodeBrief[]; failures: { line: string; reason: string }[]; report: ReportItem[]; trace: TraceStep[]; nodes: NodeBrief[] };
 export type DependencyEntry = { refKey: string; nodeSet: string; node: string; strategy: 'wrap' | 'copy' | 'inline'; output: string; usedBy: string[] };
-export type ProfilePreview = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
+export type ProfilePreview = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; exportUnavailableReason?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; forceable?: boolean; issues: ReportItem[] };
 export type RejectedRuleDetail = { line: number; text: string; reason: string };
 /** 规则集预览中每个来源的拉取 / 解析状态；不支持的行最多返回前 100 条详情 */
@@ -66,7 +66,7 @@ export type RuleRepo = { id: string; name: string; url: string; refs: string[]; 
 export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
 export type RepoFileEntry = RepoEntry & { filePath: string; ref: string; url: string };
 export type RepoFilePreview = { cache?: { error?: string; lastSuccessAt?: number; nextFetchAt?: number }; repo: string; entry?: string; ref: string; path: string; name: string; content: string; url: string; upstream: string; license: string };
-export type RuleOption = { value: string; label: string; hint: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
+export type RuleOption = { value: string; label: string; hint: string; url?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
 export type RuleOptions = { items: RuleOption[]; total: number; offset: number; limit: number; nextOffset?: number; notices: string[] };
 export type RepoFileList = RepoEntry & { license?: string; url: string; files: { ref: string; path: string; url: string; upstream: string; format: string }[] };
 export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?: RejectedRuleDetail[]; license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };

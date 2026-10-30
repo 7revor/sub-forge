@@ -21,7 +21,7 @@ const template: TemplateVersionDoc = { id: 't', version: 1, name: '模板', grou
 ], rules: [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'DOMAIN-SUFFIX', value: 'example.com' } }, target: { kind: 'group', groupId: 'g' } }], final: { kind: 'group', groupId: 'a' } };
 const node = { kind: 'nodeset' as const, ref: { type: 'local' as const, id: 'local' } };
 const base = (id: string, overlay: Overlay, ref: ProfileDoc['template'] = { id: 't', follow: 'latest' }): ProfileDoc => ({ id, name: id, ...(ref ? { template: ref } : {}), overlay, nodeSets: [{ ref: node.ref, output: 'provider' }], chains: [], refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890 }) } } });
-const normalizedYaml = (value: string) => value.replace(/v=[a-f0-9]{32}/g, 'v=结构版本');
+const normalizedYaml = (value: string) => value.replace(/version=[a-f0-9]{32}/g, 'version=结构版本');
 
 it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项均保留原始备份与有效输出，重启幂等', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'sf-modes-'));
@@ -50,7 +50,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(25);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(26);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();

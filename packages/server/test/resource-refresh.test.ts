@@ -18,7 +18,7 @@ async function setup(){
   return {...h,api,user,calls,fail:()=>{failed=true;}};
 }
 async function done(api:Awaited<ReturnType<typeof setup>>['api'],id:string){
-  for(let i=0;i<100;i++){const result=await api.get(`/api/refresh-jobs/${id}`);if(result.json.job.state!=='running')return result.json.job;await new Promise(r=>setTimeout(r,5));}throw new Error('刷新任务没有结束');
+  for(let i=0;i<100;i++){const result=await api.get(`/api/refresh-jobs?id=${id}`);if(result.json.job.state!=='running')return result.json.job;await new Promise(r=>setTimeout(r,5));}throw new Error('刷新任务没有结束');
 }
 describe('资源刷新任务',()=>{
   it('手动刷新同时重建已发布的 Surge 和 Loon 配置', async () => {
@@ -52,8 +52,8 @@ describe('资源刷新任务',()=>{
       expect(start.json.job.results.every((r:any)=>r.ok===undefined)).toBe(true);
       expect((await api.post('/api/rulesets/ordered/refresh-cache')).json.job.id).toBe(id);
       releases.get(sources[3]!.url)!();
-      await expect.poll(async()=>(await api.get(`/api/refresh-jobs/${id}`)).json.job.completed).toBe(1);
-      const progress=(await api.get(`/api/refresh-jobs/${id}`)).json.job;
+      await expect.poll(async()=>(await api.get(`/api/refresh-jobs?id=${id}`)).json.job.completed).toBe(1);
+      const progress=(await api.get(`/api/refresh-jobs?id=${id}`)).json.job;
       expect(progress.results.map((r:any)=>r.name)).toEqual(names);
       expect(progress.results[3]).toMatchObject({state:'done',ok:false,error:'模拟第三项失败'});
       expect(progress.results[4].state).toBe('running');
@@ -92,19 +92,19 @@ describe('资源刷新任务',()=>{
     const h=await setup();
     let started=await h.api.post('/api/sources/s/refresh-cache');expect(started.status).toBe(202);await done(h.api,started.json.job.id);expect(h.calls).toEqual(['https://node.test']);
     h.calls.length=0;started=await h.api.post('/api/rulesets/r/refresh-cache');await done(h.api,started.json.job.id);expect(h.calls).toEqual(['https://rules.test']);
-    const lastSuccess=(await h.api.get('/api/rulesets/r/cache')).json.items[0].lastSuccessAt;
+    const lastSuccess=(await h.api.get('/api/rulesets/cache?id=r')).json.items[0].lastSuccessAt;
     expect(lastSuccess).toBeTypeOf('number');
     h.advance(1000);
     h.calls.length=0;h.fail();started=await h.api.post('/api/profiles/p/refresh-cache');const job=await done(h.api,started.json.job.id);
     expect(job.total).toBe(2);expect(job.completed).toBe(2);expect(job.results.filter((r:any)=>!r.ok)).toHaveLength(1);expect(job.render.ok).toBe(true);
     expect(h.calls.sort()).toEqual(['https://node.test','https://rules.test']);
-    const failedState=(await h.api.get('/api/rulesets/r/cache')).json.items[0];
+    const failedState=(await h.api.get('/api/rulesets/cache?id=r')).json.items[0];
     expect(failedState).toMatchObject({lastSuccessAt:lastSuccess,available:true,error:'模拟失败'});
     expect(failedState.lastAttemptAt).toBeGreaterThan(lastSuccess);
-    expect((await h.api.get('/api/sources/s/cache')).json.items[0].lastSuccessAt).toBeGreaterThan(lastSuccess);
-    const sub=await h.app.request('/sub/t/p');const cfg=parse(await sub.text());
+    expect((await h.api.get('/api/sources/cache?id=s')).json.items[0].lastSuccessAt).toBeGreaterThan(lastSuccess);
+    const sub=await h.app.request('/subs/profile?token=t&id=p');const cfg=parse(await sub.text());
     expect(sub.headers.get('profile-update-interval')).toBe('24');
-    for(const p of Object.values(cfg['rule-providers']) as any[])expect(p.url).toContain('https://sub.test/r/');
+    for(const p of Object.values(cfg['rule-providers']) as any[])expect(p.url).toContain('https://sub.test/resources/ruleset?');
     for(const p of Object.values(cfg['proxy-providers']) as any[])expect(p.interval).toBe(86400);
   });
   it('后台调度不依赖请求，设置改变后按新周期刷新，任务及状态隔离',async()=>{
@@ -115,7 +115,7 @@ describe('资源刷新任务',()=>{
     const other=await addUser(h.store,'other');const api=client(h.app);await api.login('other');
     expect((await api.post('/api/profiles/p/refresh-cache')).status).toBe(404);
     const start=await h.api.post('/api/profiles/p/refresh-cache');await done(h.api,start.json.job.id);
-    expect((await api.get(`/api/refresh-jobs/${start.json.job.id}`)).status).toBe(404);
+    expect((await api.get(`/api/refresh-jobs?id=${start.json.job.id}`)).status).toBe(404);
     await service.stop();
   });
 });
@@ -131,7 +131,7 @@ it('MRS 校验成功后原样托管，损坏的新响应不会覆盖上次成功
   h.store.put('ruleset',{id:'r',name:'二进制',sources:[{id:'m',kind:'remote',format:'mrs',behavior:'domain',url:'https://mrs.test'}]});
   h.store.put('profile',{id:'p',name:'MRS',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{extraRules:[{anchor:'top',rule:{id:'r',matcher:{kind:'ruleset',id:'r'},target:{kind:'builtin',name:'DIRECT'}}}]}});
   issueProfileToken(h.store, {token:'binary',profileId:'p'});
-  const sub=await h.app.request('/sub/binary/p');expect(sub.status).toBe(200);
+  const sub=await h.app.request('/subs/profile?token=binary&id=p');expect(sub.status).toBe(200);
   const provider=Object.values(parse(await sub.text())['rule-providers'])[0] as {url:string;format:string};
   expect(provider.format).toBe('mrs');const url=new URL(provider.url);
   const res=await h.app.request(url.pathname+url.search);expect(Buffer.from(await res.arrayBuffer())).toEqual(bytes);

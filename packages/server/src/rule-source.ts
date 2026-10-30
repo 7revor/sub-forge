@@ -2,6 +2,7 @@
 import type { RuleSetDoc, RuleSetSourceDoc } from './docs.ts';
 import type { SnapshotService } from './snapshots.ts';
 import { RuleConverter } from './rule-converter.ts';
+import { ruleBinding } from './rule-binding.ts';
 
 export class RuleSourceService {
   private readonly drafts = new Map<string, Promise<{ body?: string; error?: string }>>();
@@ -14,7 +15,7 @@ export class RuleSourceService {
     finally { const next = this.waiting.shift(); if (next) next(); else this.active--; }
   }
   constructor(private readonly snapshots: SnapshotService, private readonly converter: RuleConverter) {}
-  async get(userId: string, source: RuleSetSourceDoc, saved?: RuleSetDoc, refresh = false) {
+  async get(userId: string, source: RuleSetSourceDoc, saved?: RuleSetDoc, refresh = false, context?: string) {
     let content = source.kind === 'local' ? source.content ?? '' : undefined;
     let error: string | undefined;
     let fetchedAt: number | undefined;
@@ -23,7 +24,8 @@ export class RuleSourceService {
     if (source.kind === 'remote') {
       const prior = saved?.sources.find(s => s.kind === 'remote' && s.url === source.url && s.format === source.format && s.behavior === source.behavior && JSON.stringify({ua:s.fetch?.ua,timeoutMs:s.fetch?.timeoutMs}) === JSON.stringify({ua:source.fetch?.ua,timeoutMs:source.fetch?.timeoutMs}));
       if (saved && prior) {
-        const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ...source.fetch, format: source.format, behavior: source.behavior, scope: 'public-rules' }, { waitForFresh: true, refresh }));
+        const binding = ruleBinding(saved.id, context);
+        const result = await this.limited(() => this.snapshots.get('ruleset', binding.id, source.url!, { ...source.fetch, format: source.format, behavior: source.behavior, scope: binding.scope }, { waitForFresh: true, refresh }));
         content = result.snapshot?.body; fetchedAt = result.snapshot?.fetchedAt; error = result.error; stale = result.stale;
       } else {
         const key = JSON.stringify([userId, source.url, source.format, source.fetch ?? {}]);

@@ -28,13 +28,14 @@ import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
-  /** Profile 专属 provider 地址（/p/:token/:key?v=） */
+  /** Profile 专属 provider 地址（/subs/nodes?kind=provider&profile=…&version=…） */
   provider(nodeSetKey: string, version: string): string;
-  /** 转换后的规则集地址（/r/:token/:key） */
-  ruleset(key: string, reference?: RuleResourceReference): string;
+  /** 转换后的公共或订阅专属规则集地址 */
+  ruleset(key: string, reference?: HostedRuleReference): string;
 };
 
-export type RuleResourceReference = { matcher: Extract<Matcher, { kind: 'ruleset' }>; options?: RuleEntry['options'] };
+export type HostedRuleReference = { matcher: Matcher; options?: RuleEntry['options'] };
+export type RuleResourceReference = HostedRuleReference & { matcher: Extract<Matcher, { kind: 'ruleset' }> };
 
 export type RenderInput = {
   resourceIntervalSec?: number;
@@ -164,7 +165,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     if (input.platform && !['ios', 'macos'].includes(input.platform)) report.error(client + '.platform', client + ' 仅支持 iOS 或 macOS');
     if (profile.nodeSets.some(s => s.output === 'provider')) report.info(client + '.nodes-inline', client + ' 节点按快照内联，随主订阅刷新，以保留筛选和空组拒绝语义');
   }
-  if (client === 'loon') report.info('loon.rule-priority', 'Loon 规则集按原位置内嵌；客户端仍按域名、IP 等阶段匹配，请在 Loon 中核对跨类型规则优先级');
+  if (client === 'loon') report.info('loon.rule-priority', 'Loon 全部分流规则按列表顺序托管；客户端仍按域名、IP 等阶段匹配，请在 Loon 中核对跨类型规则优先级');
   const eff = resolveProfileRouting(profile, input.template, report);
   const resolver = new NodeSetResolver(input.nodeSets, report);
 
@@ -408,6 +409,8 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const ruleProviders: Record<string, Record<string, unknown>> = Object.create(null);
   const rulesets: Record<string, RulesetOutput> = {};
 
+  const localProviderNames = new Set(providerDisplayNames.values());
+  let localIndex = 0;
   for (const r of eff.rules) {
     if (r.enabled === false) continue;
     const where = `rule:${r.id}`;
@@ -419,11 +422,23 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         const error = localRulesError(m);
         if (error) { report.error('rule.invalid-local', error, where); continue; }
       }
+      const localLines: string[] = [];
       for (const rule of m.kind === 'local' ? expandLocalRules(m, ctx) : applyOverrides(m.rule, m.overrides, ctx)) {
         const l = lowerRule(withIpOptions(rule, r.options ?? {}), ctx);
         if (l.kind === 'drop') { report.info('rule.dropped', l.reason, where); continue; }
         if (l.note) report.info('rule.degraded', l.note, where);
-        ruleLines.push(composeRule(l, target));
+        if (client === 'loon') localLines.push(composeRule(l));
+        else ruleLines.push(composeRule(l, target));
+      }
+      if (localLines.length) {
+        // 手写规则与规则集处于同一远程规则段，保留列表顺序；正文不携带出口。
+        let providerName: string;
+        do { providerName = `__loon_local_${++localIndex}`; } while (localProviderNames.has(providerName));
+        localProviderNames.add(providerName);
+        const file = `${providerName}.list`;
+        rulesets[file] = { behavior: 'classical', text: localLines.join('\n') + '\n', providerName };
+        ruleProviders[providerName] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, { matcher: m, ...(r.options?.src ? { options: { src: true } } : {}) }), interval: input.resourceIntervalSec ?? RULESET_INTERVAL };
+        ruleLines.push(`RULE-SET,${providerName},${target}`);
       }
       continue;
     }

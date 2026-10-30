@@ -51,7 +51,7 @@ describe('模板', () => {
       expect(saved.status).toBe(201);
       const id = saved.json.item.id;
       expect(saved.json.item.ruleProviders).toEqual(ruleProviders);
-      expect((await admin.get(`/api/templates/${id}`)).json.item.ruleProviders).toEqual(ruleProviders);
+      expect((await admin.get(`/api/templates?id=${id}`)).json.item.ruleProviders).toEqual(ruleProviders);
       expect((await admin.get(`/api/templates/${id}/versions/1`)).status).toBe(404);
       for (const invalid of [[{ name: 'file', url: 'file:///tmp/rules' }], [ruleProviders[0], ruleProviders[0]], {}]) {
         const result = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders: invalid });
@@ -80,21 +80,21 @@ describe('模板', () => {
 
   it('旧覆盖配置转为独立模式后，模板发布不影响原订阅', async () => {
     const { admin, alice, tplId, rs, profile } = await scenario();
-    expect((await alice.get(`/api/profiles/${profile}`)).json.item.routing.mode).toBe('independent');
+    expect((await alice.get(`/api/profiles?id=${profile}`)).json.item.routing.mode).toBe('independent');
     const withoutHk = { ...TEMPLATE(rs), groups: [{ id: 'sel', name: '🚀 节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], changelog: '删除香港组' };
     expect((await admin.post(`/api/templates/${tplId}/impact`, withoutHk)).json.impact).toEqual([]);
     expect((await admin.post(`/api/templates/${tplId}/publish`, withoutHk)).status).toBe(200);
     expect((await alice.post(`/api/profiles/${profile}/preview`)).json.ok).toBe(true);
-    expect((await admin.get(`/api/templates/${tplId}`)).json.item.groups).toEqual(withoutHk.groups);
+    expect((await admin.get(`/api/templates?id=${tplId}`)).json.item.groups).toEqual(withoutHk.groups);
   });
 });
 
 describe('订阅链接与预览', () => {
   it('读取用户共享凭证的订阅链接，重置撤销旧地址', async () => {
     const { alice, app, profile } = await scenario();
-    const item = (await alice.get(`/api/profiles/${profile}/link`)).json.item;
+    const item = (await alice.get(`/api/profiles/link?id=${profile}`)).json.item;
     expect((await app.request(item.url)).status).toBe(200);
-    expect((await alice.get(`/api/profiles/${profile}/link`)).json.item).toEqual(item);
+    expect((await alice.get(`/api/profiles/link?id=${profile}`)).json.item).toEqual(item);
     const reset = await alice.post('/api/me/token/reset', { token: item.token });
     expect((await app.request(item.url)).status).toBe(404);
     expect((await app.request(item.url.replace(item.token, reset.json.item.token))).status).toBe(200);
@@ -134,9 +134,9 @@ describe('订阅链接与预览', () => {
 
   it('访问日志只返回自己 Profile 的', async () => {
     const { alice, app, profile } = await scenario();
-    const token = (await alice.get(`/api/profiles/${profile}/link`)).json.item.token;
-    await app.request(`/sub/${token}/${profile}`, { headers: { 'user-agent': 'FlClash/v0.8.80 Platform/android' } });
-    const log = await alice.get(`/api/profiles/${profile}/access-log`);
+    const token = (await alice.get(`/api/profiles/link?id=${profile}`)).json.item.token;
+    await app.request(`/subs/profile?token=${token}&id=${profile}`, { headers: { 'user-agent': 'FlClash/v0.8.80 Platform/android' } });
+    const log = await alice.get(`/api/profiles/access-log?id=${profile}`);
     expect(log.json.items[0]).toMatchObject({ client: 'mihomo', platform: 'android', status: 200 });
     expect(log.json.items[0].token).not.toBe(token);
   });

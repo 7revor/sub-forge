@@ -1,3 +1,4 @@
+import { ruleBinding } from './rule-binding.ts';
 import type { SharedRuleRecord } from './shared-rules.ts';
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 import { ResourceAccessError } from './resource-access.ts';
@@ -43,7 +44,7 @@ export class ResourceService {
     return row ? JSON.parse(this.store.cipher.decrypt(row.data)) : undefined;
   }
   ruleResources(rs:RuleSetDoc,scope?:string):Resource[] {
-    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:rs.id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:'public-rules'}}));
+    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:ruleBinding(rs.id,scope).id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:ruleBinding(rs.id,scope).scope}}));
   }
   nodeResources(refs:NodeSetID[], owner?:string|null):Resource[] {
     return this.renderer.collectNodeSets(refs,owner).sources.map(s=>({kind:'source',id:s.id,name:s.name,url:s.url,options:{}}));
@@ -55,7 +56,7 @@ export class ResourceService {
     const profile = this.store.get('profile',id);
     if (!profile) throw new Error('配置订阅不存在');
     const template = profile.routing?.mode === 'independent' ? undefined : profileTemplate(profile,(key,v)=>this.store.getTemplate(key,v));
-    return [...this.nodeResources(profile.nodeSets.map(n=>n.ref),this.store.getWithOwner('profile',id)?.owner),...Object.values(this.renderer.collectRules(profile,template).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,this.store.getWithOwner('profile',id)?.owner ?? undefined))];
+    return [...this.nodeResources(profile.nodeSets.map(n=>n.ref),this.store.getWithOwner('profile',id)?.owner),...Object.values(this.renderer.collectRules(profile,template).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`profile:${id}`))];
   }
   unique(resources:Resource[]):Resource[] {
     return [...new Map(resources.map(r=>[this.snapshots.identity(r.kind,r.id,r.url,r.options),r])).values()];
@@ -78,7 +79,7 @@ export class ResourceService {
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
-      ...this.store.listLatestTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,'public-template'))),
+      ...this.store.listLatestTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
     ]);
   }
   private async each(resources:Resource[],read:(r:Resource,index:number)=>Promise<void>) {

@@ -2,12 +2,14 @@ import { accessLogRoutes } from './access-log.ts';
 import { loonImportRoutes } from './loon-import.ts';
 import { ResourceAccessError } from '../resource-access.ts';
 import { resourceLinkRoutes } from './resource-links.ts';
-import { fileRoutes } from './files.ts';
+import { templateFileRoutes } from './template-file.ts';
+import { uniqueQuery } from '../query.ts';
+import { getCookie } from 'hono/cookie';
 import { ResourceService } from '../resources.ts';
 import { resourceRoutes } from './resources.ts';
 import { systemRoutes } from './system.ts';
 import { ruleConversionRoutes } from './rule-conversion.ts';
-// 管理接口入口：/api/*。管理接口返回 JSON；/files 为带用户 token 的文本文件入口。
+// 管理接口 /api/* 统一使用登录会话；资源 token 不能调用管理接口。
 
 import { nodeProbeRoutes } from './node-probe.ts';
 import type { NodeProbe } from '../node-probe.ts';
@@ -26,7 +28,7 @@ import { docRoutes } from './docs.ts';
 import { previewRoutes } from './preview.ts';
 import { profileRoutes } from './profiles.ts';
 import { templateRoutes } from './templates.ts';
-import { csrfGuard, HttpError, sessionLoader, type ApiEnv } from './common.ts';
+import { csrfGuard, HttpError, requireUser, sessionLoader, SESSION_COOKIE, type ApiEnv } from './common.ts';
 
 export type ApiDeps = {
   store: Store;
@@ -55,11 +57,20 @@ export function createApi(deps: ApiDeps) {
   api.use('*', async (c,next)=>{c.header('cache-control','no-store');await next();if(c.res.status<400 && ['PUT','PATCH','DELETE'].includes(c.req.method))deps.store.changed();});
   api.use('*', csrfGuard(() => deps.allowedOrigins));
   api.use('*', sessionLoader(deps.store));
+  api.use('*', requireUser);
+  api.use('*', uniqueQuery);
+  api.use('*', async (c, next) => {
+    if (c.req.query('token') !== undefined) return c.json({ error: '管理接口不接受资源 token' }, 400);
+    c.header('x-content-type-options', 'nosniff'); c.header('referrer-policy', 'no-referrer');
+    const session = getCookie(c, SESSION_COOKIE), user = c.get('user');
+    await next();
+    if (['GET', 'HEAD'].includes(c.req.method) && deps.store.getSessionUser(session ?? '')?.id !== user.id) c.res = new Response(JSON.stringify({ error: '登录已失效' }), { status: 401, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+  });
   // 占位接口先于 /users/:id 等通配路由注册
   const repos = deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now,undefined,deps.snapshots);
   const resources=deps.resources ?? new ResourceService(deps.store,deps.snapshots,deps.renderer,deps.now);
   resources.setAdditionalResources(() => repos.cachedResources());
-  api.route('/files', fileRoutes(deps.store, deps.snapshots, repos));
+  api.route('/', templateFileRoutes(deps.store, deps.snapshots));
   api.route('/', ruleRepoRoutes(deps.store, repos, resources));
   api.route('/', ruleOptionRoutes(deps.store, repos));
 

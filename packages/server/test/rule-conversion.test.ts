@@ -25,12 +25,12 @@ describe('远程 YAML 转换为托管 LIST', () => {
       const output = parse(rendered.render.yaml);
       const providers = Object.values(output['rule-providers']) as {format:string;url:string}[];
       expect(providers).toHaveLength(1);
-      expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub.test/r/'))).toBe(true);
+      expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub.test/resources/ruleset?'))).toBe(true);
       expect(rendered.render.yaml).not.toContain(source.url);
       expect(Object.values(ruleBodies(h.store, rendered.render)).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
       expect(Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('# [YAML 原文] payload:');
       expect(Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('UNKNOWN,Unsupported*');
-      expect((await c.get(`/api/rulesets/${id}`)).json.item.sources[0].url).toBe(source.url);
+      expect((await c.get(`/api/rulesets?id=${id}`)).json.item.sources[0].url).toBe(source.url);
     } finally { h.store.close(); }
   });
   it('保存、草稿预览拒绝将 YAML 地址标为 mrs/srs 二进制', async () => {
@@ -55,7 +55,7 @@ describe('远程 YAML 转换为托管 LIST', () => {
         const result = await c.put(`/api/rulesets/${doc.id}`, { ...doc, sources: [{ ...doc.sources[0], format, behavior: 'domain' }] });
         expect(result.status).toBe(400);
       }
-      expect((await c.get(`/api/rulesets/${doc.id}`)).json.item.sources[0].format).toBe('yaml');
+      expect((await c.get(`/api/rulesets?id=${doc.id}`)).json.item.sources[0].format).toBe('yaml');
     } finally { h.store.close(); }
   });
 });

@@ -36,7 +36,7 @@ export class SnapshotService {
     if (kind === 'source') return { ...SOURCE_REQUEST_OPTIONS, scope: opts.scope };
     const source = this.store.get('ruleset', id)?.sources.find(s => s.url === url);
     const format = opts.format ?? source?.format ?? 'auto';
-    return { ...(format === 'mrs' ? { behavior: opts.behavior ?? source?.behavior } : {}), ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format, scope: 'public-rules' };
+    return { ...(format === 'mrs' ? { behavior: opts.behavior ?? source?.behavior } : {}), ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format, scope: opts.scope ?? 'public-rules' };
   }
   identity(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): string {
     const { scope, ...options } = this.options(kind, id, url, opts);

@@ -54,16 +54,16 @@ describe('模板统一规则引用', () => {
     expect((await h.admin.del('/api/rule-repos/blackmatrix7')).status).toBe(409);
   });
 
-  it('停用和索引移除后历史映射仍可发布新版本与渲染，新选择被拒绝', async () => {
+  it('停用或移除仓库资源后保留编辑定义，但发布、渲染与新选择均拒绝失效引用', async () => {
     const h = await setup(); const matcher = await h.resolve();
     const first = await h.admin.post('/api/templates/new/publish', template(matcher));
     h.repos.setEnabled('blackmatrix7', false);
     h.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run('blackmatrix7');
-    expect((await h.admin.post('/api/templates/validate', { ...template(matcher), id: first.json.item.id })).json.report).toEqual([]);
-    expect((await h.admin.post(`/api/templates/${first.json.item.id}/publish`, template(matcher))).status).toBe(200);
+    expect((await h.admin.post('/api/templates/validate', { ...template(matcher), id: first.json.item.id })).json.report).toContainEqual(expect.objectContaining({ level: 'error', code: 'template.dangling-ruleset' }));
+    expect((await h.admin.post(`/api/templates/${first.json.item.id}/publish`, template(matcher))).status).toBe(400);
     expect((await h.admin.post('/api/rule-options/resolve', { source: 'repository', repo: 'blackmatrix7', entry: 'Google' })).status).toBe(404);
     const preview = await h.renderer.previewDraft({ id: '', name: '草稿', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, template: { id: first.json.item.id, follow: 'latest' } }, { client: 'mihomo' });
-    expect(preview.ok).toBe(true);
+    expect(preview.ok).toBe(false);
   });
 
   it('伪造 URL、格式或身份均阻止发布，错误可定位到规则行', async () => {

@@ -21,7 +21,8 @@ it('导入全部配置段，保留原落地、两个独立命名链与 VLESS SNI
   expect(out.yaml).toContain('落地 = Shadowsocks, exit.example.test');
   expect(out.yaml).toContain('香港节点 = select, 香港远程');
   expect(out.yaml).toContain('url=https://example.test/204');
-  expect(out.yaml).toContain('IP-CIDR,192.0.2.0/24,DIRECT,no-resolve');
+  expect(Object.values(out.rulesets).some(r => r.text.includes('IP-CIDR,192.0.2.0/24,no-resolve'))).toBe(true);
+  expect(out.yaml).not.toContain('IP-CIDR,');
   expect(JSON.stringify(f)).toBe(before);
   const mihomo = renderMihomo({ ...f, base: '' });
   expect(mihomo.report.byCode('proxy.block-quic-unsupported').length).toBeGreaterThan(0);

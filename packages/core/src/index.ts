@@ -31,6 +31,7 @@ export * from './rules/remote.ts';
 export * from './template/routing.ts';
 
 export * from './util/search.ts';
+export * from './util/url.ts';
 
 export * from './rules/diagnostics.ts';
 export { exportStashConfig } from './render/stash-config.ts';

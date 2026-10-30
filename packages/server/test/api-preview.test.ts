@@ -95,7 +95,7 @@ describe('立即拉取与快照', () => {
     fail = true;
     const bad = await alice.post(`/api/sources/${id}/refresh`);
     expect(bad.json.items[0]).toMatchObject({ ok: false, error: 'HTTP 502' });
-    const hist = await alice.get(`/api/sources/${id}/snapshots`);
+    const hist = await alice.get(`/api/sources/snapshots?id=${id}`);
     expect(hist.json.items.map((s: { ok: boolean }) => s.ok).sort()).toEqual([false, true]);
     expect(hist.json.items[0]).not.toHaveProperty('body');
     // 处理链预览用最近一次成功的快照
@@ -204,7 +204,7 @@ describe('节点集最终节点列表', () => {
     const { alice } = await scenario();
     const proxies = ['a', 'b'].map((host) => ({ name: 'HK', type: 'trojan', server: `${host}.example.com`, port: 443, password: 'secret' }));
     const id = (await alice.post('/api/locals', { name: '本地组', proxies })).json.item.id;
-    const res = await alice.get(`/api/nodesets/local/${id}/nodes`);
+    const res = await alice.get(`/api/nodesets/nodes?type=local&id=${id}`);
     expect(res.status).toBe(200);
     expect(res.json).toEqual({
       nodes: proxies.map(({ password, ...p }, i) => ({ ...p, name: i ? 'HK 2' : 'HK' })),
@@ -223,10 +223,10 @@ describe('节点集最终节点列表', () => {
       name: '组合', members: [{ ref: { type: 'source', id: source }, prefix: '成员-' }, { ref: { type: 'local', id: local }, prefix: '成员-' }],
       pipeline: [{ op: 'rename.affix', suffix: '-最终' }],
     })).json.item.id;
-    const src = await alice.get(`/api/nodesets/source/${source}/nodes`);
+    const src = await alice.get(`/api/nodesets/nodes?type=source&id=${source}`);
     expect(src.status).toBe(200);
     expect(src.json.nodes.map((n: { name: string }) => n.name)).toEqual(['HK']);
-    const col = await alice.get(`/api/nodesets/collection/${collection}/nodes`);
+    const col = await alice.get(`/api/nodesets/nodes?type=collection&id=${collection}`);
     expect(col.status).toBe(200);
     expect(col.json.nodes.map((n: { name: string }) => n.name)).toEqual(['成员-HK-最终', '成员-HK-最终 2']);
     expect(col.json).toMatchObject({ total: 2, truncated: false, report: [] });
@@ -237,21 +237,21 @@ describe('节点集最终节点列表', () => {
     const path = { source: 'sources', collection: 'collections', local: 'locals' }[type];
     const body = { source: remote('源'), collection: { name: '组合', members: [] }, local: { name: '本地组', proxies: [] } }[type];
     const id = (await alice.post(`/api/${path}`, body)).json.item.id;
-    expect((await client(app).get(`/api/nodesets/${type}/${id}/nodes`)).status).toBe(401);
-    expect((await bob.get(`/api/nodesets/${type}/${id}/nodes`)).status).toBe(404);
-    expect((await alice.get(`/api/nodesets/${type}/missing/nodes`)).status).toBe(404);
+    expect((await client(app).get(`/api/nodesets/nodes?type=${type}&id=${id}`)).status).toBe(401);
+    expect((await bob.get(`/api/nodesets/nodes?type=${type}&id=${id}`)).status).toBe(404);
+    expect((await alice.get(`/api/nodesets/nodes?type=${type}&id=missing`)).status).toBe(404);
   });
 
   it('不接受其他文档类型', async () => {
     const { alice } = await scenario();
-    expect((await alice.get('/api/nodesets/preset/missing/nodes')).status).toBe(400);
+    expect((await alice.get('/api/nodesets/nodes?type=preset&id=missing')).status).toBe(400);
   });
 
   it.each([5000, 5001])('%i 个节点：截断只影响返回列表，不影响总数', async (total) => {
     const { alice } = await scenario();
     const proxies = Array.from({ length: total }, (_, i) => ({ name: `节点-${i}`, type: 'trojan', server: 'a.example.com', port: 443, password: 'pw' }));
     const id = (await alice.post('/api/locals', { name: '大节点组', proxies })).json.item.id;
-    const res = await alice.get(`/api/nodesets/local/${id}/nodes`);
+    const res = await alice.get(`/api/nodesets/nodes?type=local&id=${id}`);
     expect(res.status).toBe(200);
     expect(res.json).toMatchObject({ total, truncated: total > 5000, report: [] });
     expect(res.json.nodes).toHaveLength(5000);
@@ -264,10 +264,10 @@ describe('节点集最终节点列表', () => {
       const names = [...Array.from({ length: 5000 }, (_, index) => `ordinary-${index}`), '尾部-ClAuDe-HK', 'literal_100%', 'literalX100Y'];
       const proxies = names.map(name => ({ name, type: 'trojan', server: 'a.example.com', port: 443, password: 'pw' }));
       const id = (await alice.post('/api/locals', { name: '完整名称筛选', proxies })).json.item.id;
-      const result = await alice.get(`/api/nodesets/local/${id}/nodes?q=claude`);
+      const result = await alice.get(`/api/nodesets/nodes?type=local&id=${id}&q=claude`);
       expect(result.json).toMatchObject({ total: 1, truncated: false, nodes: [{ name: '尾部-ClAuDe-HK' }] });
-      expect((await alice.get(`/api/nodesets/local/${id}/nodes?q=ClAuDe`)).json.nodes).toEqual(result.json.nodes);
-      expect((await alice.get(`/api/nodesets/local/${id}/nodes?q=${encodeURIComponent('_100%')}`)).json.nodes.map((node: { name: string }) => node.name)).toEqual(['literal_100%']);
+      expect((await alice.get(`/api/nodesets/nodes?type=local&id=${id}&q=ClAuDe`)).json.nodes).toEqual(result.json.nodes);
+      expect((await alice.get(`/api/nodesets/nodes?type=local&id=${id}&q=${encodeURIComponent('_100%')}`)).json.nodes.map((node: { name: string }) => node.name)).toEqual(['literal_100%']);
     } finally { store.close(); }
   });
 
@@ -280,22 +280,22 @@ describe('节点集最终节点列表', () => {
       return { status: 200, body: AIRPORT + '\ntrojan://broken' };
     });
     const id = (await alice.post('/api/sources', { name: '远程源', url: 'https://example.com/sub', fetch: { ttlSec: 300 } })).json.item.id;
-    const res = await alice.get(`/api/nodesets/source/${id}/nodes`);
+    const res = await alice.get(`/api/nodesets/nodes?type=source&id=${id}`);
     expect(res.status).toBe(200);
     expect(res.json.total).toBe(3);
     expect(res.json.report.map((r: { code: string }) => r.code)).toEqual(['source.parse-failure']);
     expect(calls).toBe(1);
-    await alice.get(`/api/nodesets/source/${id}/nodes`);
+    await alice.get(`/api/nodesets/nodes?type=source&id=${id}`);
     expect(calls).toBe(1);
     fail = true;
     advance(1000);
     await alice.post(`/api/sources/${id}/refresh`);
-    const again = await alice.get(`/api/nodesets/source/${id}/nodes`);
+    const again = await alice.get(`/api/nodesets/nodes?type=source&id=${id}`);
     expect(again.json.report.map((r: { code: string }) => r.code)).toEqual(['source.fetch-failed', 'source.parse-failure']);
     expect(again.json.total).toBe(3);
     expect(calls).toBe(2);
     advance(86_401_000);
-    await alice.get(`/api/nodesets/source/${id}/nodes`);
+    await alice.get(`/api/nodesets/nodes?type=source&id=${id}`);
     await snapshots.settled();
     expect(calls).toBe(3);
   });
@@ -310,7 +310,7 @@ describe('规则集组级改写保存与预览', () => {
       { id: 'b', kind: 'remote', format: 'auto', url: 'https://example.test/rules' },
     ], overrides });
     expect(created.status).toBe(201);
-    const rs = (await alice.get(`/api/rulesets/${created.json.item.id}`)).json.item;
+    const rs = (await alice.get(`/api/rulesets?id=${created.json.item.id}`)).json.item;
     expect(rs.overrides).toEqual(overrides);
     expect(rs.sources.every((s: object) => !('overrides' in s))).toBe(true);
     for (const source of ['a', 'b', undefined]) {
@@ -341,7 +341,7 @@ describe('规则集组级改写保存与预览', () => {
       { id: 'a', kind: 'local', format: 'auto', content: 'DOMAIN,keep.test' },
     ], overrides });
     expect(created.status).toBe(201);
-    const rs = (await alice.get(`/api/rulesets/${created.json.item.id}`)).json.item;
+    const rs = (await alice.get(`/api/rulesets?id=${created.json.item.id}`)).json.item;
     expect(rs.overrides).toEqual(overrides);
     const preview = await alice.post('/api/rulesets/preview', { id: rs.id, ruleset: rs, client: 'mihomo' });
     expect(preview.status).toBe(200);

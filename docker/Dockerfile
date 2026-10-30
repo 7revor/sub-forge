@@ -1,11 +1,12 @@
 # 生产镜像（SYS-08）：单容器，订阅接口、管理接口与前端同源；SQLite 与密钥文件放在挂载的 /data。
 #
 #   docker build -f docker/Dockerfile -t sub-forge .
-#   docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
+#   docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 #     -e PUBLIC_URL=https://sub.example.com \
 #     -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD=请改成强密码 \
 #     sub-forge
 #
+# 真实 IP 透传须按 docs/20-deployment-client-ip.md 配置可信代理；不默认信任容器网关或转发头。
 # 首次启动且没有用户时按 SUBFORGE_ADMIN_* 创建管理员；之后这两个变量可以去掉。
 
 # 前端构建需要开发依赖（Vite 等），单独一个阶段，只把 dist 带走

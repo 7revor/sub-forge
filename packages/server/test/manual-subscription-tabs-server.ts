@@ -35,15 +35,15 @@ const publicUrl = 'http://127.0.0.1:18719';
 const renderer = new RenderService(store, snapshots, { publicUrl });
 const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
 const token = store.userToken(user.id)!.token;
-const ruleConfig = parse(await (await app.request(`/sub/${token}/independent`)).text());
+const ruleConfig = parse(await (await app.request(`/subs/profile?token=${token}&id=independent`)).text());
 const ruleUrl = Object.values<{ url: string }>(ruleConfig['rule-providers'])[0]!.url;
 for (let i = 0; i < 6; i++) {
-  await app.request(`/sub/${token}/bound`, { headers: { 'user-agent': 'ClashMetaForAndroid' } });
-  await app.request(`/nodes/${token}/local/dialog-nodes`, { headers: { 'user-agent': 'Stash/3.1 iOS' } });
-  await app.request(`/rules/${token}/dialog-rules`);
+  await app.request(`/subs/profile?token=${token}&id=bound`, { headers: { 'user-agent': 'ClashMetaForAndroid' } });
+  await app.request(`/subs/nodes?token=${token}&kind=local&id=dialog-nodes`, { headers: { 'user-agent': 'Stash/3.1 iOS' } });
+  await app.request(`/resources/ruleset?token=${token}&id=dialog-rules`);
   await app.request(ruleUrl);
 }
-await app.request(`/sub/${token}/bound?target=unknown`);
+await app.request(`/subs/profile?token=${token}&id=bound&target=unknown`);
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18719 });
 console.log(`隔离验收：${publicUrl}；账号 dialog-admin，密码 dialog-test-2026`);
 let stopping = false;

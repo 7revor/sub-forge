@@ -75,7 +75,7 @@ export function TabPreview() {
   useEffect(() => { preview.mutate(target); }, [client, app]); // eslint-disable-line react-hooks/exhaustive-deps
   const exportFile = () => {
     const yaml = preview.data?.exportYaml ?? preview.data?.yaml;
-    if (!yaml || !current) return;
+    if (!yaml || !current || !preview.data?.ok || preview.data.exportUnavailableReason) return;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([yaml], { type: preview.data?.format === 'ini' ? 'text/plain' : 'text/yaml' }));
     a.download = `${draft.name || 'config'}.${preview.data?.format === 'ini' ? 'conf' : 'yaml'}`;
@@ -90,12 +90,14 @@ export function TabPreview() {
         <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">客户端追加
           <Select clearable placeholder="选择客户端，留空仅应用内核公共追加" className="w-auto" value={app ?? ''} onChange={e => setApp(e.target.value ? e.target.value as ClientApp : undefined)}>{apps.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</Select></label>
         <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
-        <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml}>导出文件</Button>
+        <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml || !!preview.data.exportUnavailableReason}>导出文件</Button>
         <span className="text-[12.5px] text-ink-muted">当前草稿预览</span>
       </div>
       <ErrorAlert error={preview.error} />
       {preview.data && !current && !preview.isPending && <p role="status" className="text-[13px] text-ink-muted">配置已更改，请重新渲染预览。</p>}
-      {client !== 'mihomo' && <p className="text-[12.5px] text-ink-muted">节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
+      {client !== 'mihomo' && client !== 'loon' && <p className="text-[12.5px] text-ink-muted">节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
+      {client === 'loon' && <p className="text-[12.5px] text-ink-muted">手写规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
+      {current && preview.data.exportUnavailableReason && <p role="status" className="text-[13px] text-ink-muted">{preview.data.exportUnavailableReason}</p>}
       {current && (
         <div className="flex flex-wrap items-start gap-5">
           <CodePreview label="最终配置" className="flex-[999_1_560px] rounded-[10px]" title={`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`} text={preview.data.yaml ?? preview.data.failure ?? ''} copyable={!!preview.data.yaml} bodyClassName="max-h-[720px] p-4 text-[12.5px] leading-[1.75]" />

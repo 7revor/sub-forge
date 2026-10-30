@@ -14,7 +14,7 @@
 
 ### 已保存来源读取
 
-`GET /api/rulesets/:id/sources/:source/content`
+`GET /api/rulesets/sources/content?id=ID&source=来源ID`
 
 必须登录且拥有规则集。返回 `{ content?, status }`。二进制来源不伪造文本正文。
 

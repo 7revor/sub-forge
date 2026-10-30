@@ -35,17 +35,17 @@ describe('文档增删改查', () => {
       const created = await alice.post(path, { ...body, note });
       expect(created.status).toBe(201);
       const itemPath = `${path}/${created.json.item.id}`;
-      expect((await alice.get(itemPath)).json.item.note).toBe(note);
+      expect((await alice.get(`${path}?id=${created.json.item.id}`)).json.item.note).toBe(note);
       expect((await alice.get(path)).json.items.find((d: { id: string }) => d.id === created.json.item.id).note).toBe(note);
       const updated = await alice.put(itemPath, { ...created.json.item, note: '修改后的备注' });
       expect(updated.status).toBe(200);
-      expect((await alice.get(itemPath)).json.item.note).toBe('修改后的备注');
+      expect((await alice.get(`${path}?id=${created.json.item.id}`)).json.item.note).toBe('修改后的备注');
       for (const invalid of [null, 42, {}, []]) {
         const response = await alice.put(itemPath, { ...created.json.item, note: invalid });
         expect(response.status).toBe(400);
         expect(response.json.error).toBe('备注必须是字符串');
       }
-      expect((await alice.get(itemPath)).json.item.note).toBe('修改后的备注');
+      expect((await alice.get(`${path}?id=${created.json.item.id}`)).json.item.note).toBe('修改后的备注');
       expect((await alice.put(itemPath, { ...created.json.item, note: '' })).status).toBe(200);
       expect((await alice.get(path)).json.items.find((d: { id: string }) => d.id === created.json.item.id).note).toBe('');
       // 没有备注的旧记录也可以补填。
@@ -62,7 +62,7 @@ describe('文档增删改查', () => {
     const owner = (await alice.get('/api/me')).json.user.id;
     const p = 'legacy-pinned';
     store.importSeed({ templates: [t, { ...t, version: 2, rules: [] }], profiles: [{ id: p, name: '锁定旧版', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, template: { id: t.id, follow: { pinned: 1 } } }] }, owner);
-    expect((await alice.get(`/api/profiles/${p}`)).json.item.routing.mode).toBe('independent');
+    expect((await alice.get(`/api/profiles?id=${p}`)).json.item.routing.mode).toBe('independent');
     const res = await admin.del(`/api/rulesets/${rs}`);
     expect(res.status).toBe(409);
     expect(res.json.details.referrers).toEqual(['其他用户的配置订阅']);
@@ -91,17 +91,17 @@ describe('文档增删改查', () => {
     expect(id).toMatch(/^[\w-]{12}$/);
     expect((await alice.put(`/api/sources/${id}`, { ...remoteSource('改名'), id })).json.item.name).toBe('改名');
     expect((await alice.put(`/api/sources/${id}`, { ...remoteSource(), id: 'other' })).status).toBe(400);
-    expect((await alice.get(`/api/sources/${id}`)).json.item.name).toBe('改名');
+    expect((await alice.get(`/api/sources?id=${id}`)).json.item.name).toBe('改名');
     expect((await alice.get('/api/sources')).json.items).toHaveLength(1);
     expect((await alice.del(`/api/sources/${id}`)).status).toBe(200);
-    expect((await alice.get(`/api/sources/${id}`)).status).toBe(404);
+    expect((await alice.get(`/api/sources?id=${id}`)).status).toBe(404);
   });
 
   it('用户之间数据隔离：看不到、改不了、删不掉别人的文档', async () => {
     const { alice, bob } = await twoUsers();
     const id = (await alice.post('/api/sources', remoteSource())).json.item.id as string;
     expect((await bob.get('/api/sources')).json.items).toEqual([]);
-    expect((await bob.get(`/api/sources/${id}`)).status).toBe(404);
+    expect((await bob.get(`/api/sources?id=${id}`)).status).toBe(404);
     expect((await bob.put(`/api/sources/${id}`, remoteSource())).status).toBe(404);
     expect((await bob.del(`/api/sources/${id}`)).status).toBe(404);
     // 也不能在自己的组合里引用别人的订阅源
@@ -187,7 +187,7 @@ describe('文档增删改查', () => {
     expect((await alice.post('/api/presets', { name: 'X', config: {} })).status).toBe(403);
     const id = (await admin.post('/api/presets', { name: 'fake-ip', config: { kernels: { mihomo: 'mixed-port: 7890' } } })).json.item.id;
     expect((await alice.get('/api/presets')).json.items.map((p: { name: string }) => p.name)).toEqual(['fake-ip']);
-    expect((await alice.get(`/api/presets/${id}`)).status).toBe(200);
+    expect((await alice.get(`/api/presets?id=${id}`)).status).toBe(200);
     await alice.post('/api/profiles', { name: 'P', nodeSets: [], base: { presetId: id } });
     expect((await admin.del(`/api/presets/${id}`)).status).toBe(409);
   });
@@ -200,9 +200,9 @@ describe('预设原文配置', () => {
     const created = await admin.post('/api/presets', { name: '原文', config: { kernels: { surge } } });
     expect(created.status).toBe(201);
     const path = `/api/presets/${created.json.item.id}`;
-    expect((await alice.get(path)).json.item.config.kernels.surge).toBe(surge);
+    expect((await alice.get(`/api/presets?id=${created.json.item.id}`)).json.item.config.kernels.surge).toBe(surge);
     expect((await admin.put(path, { name: '空段', config: { kernels: { surge: '' } } })).status).toBe(200);
-    expect((await alice.get(path)).json.item.config.kernels.surge).toBe('');
+    expect((await alice.get(`/api/presets?id=${created.json.item.id}`)).json.item.config.kernels.surge).toBe('');
   });
   it.each([1, null, [], {}, { general: {} }])('只接受原文，拒绝结构对象 %j', async surge => {
     const { admin } = await twoUsers();

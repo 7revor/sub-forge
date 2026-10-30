@@ -26,6 +26,7 @@
 | [docs/09-frontend-forms-plan.md](docs/09-frontend-forms-plan.md) | 前端表单化改造方案：可视化表单 + 原始配置双模式、分期 |
 | [docs/10-m1-stabilization.md](docs/10-m1-stabilization.md) | M1 稳定化修复、订阅资源版本与模板更新策略、验收记录 |
 | [docs/11-design-coverage.md](docs/11-design-coverage.md) | 前端页面与设计稿的逐页对照，服务端待实现的功能 |
+| [docs/20-deployment-client-ip.md](docs/20-deployment-client-ip.md) | 访问日志 IP 来源、Docker / Nginx / CDN 部署与可信代理透传 |
 | [docs/12-backend-regression-fixes.md](docs/12-backend-regression-fixes.md) | 后端六项问题修复、边界约定与回归验证 |
 
 ## 状态
@@ -66,6 +67,6 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 
 规则仓库新增、编辑和同步统一通过匿名 HTTPS Git 获取信息，不依赖 GitHub API，不再提供 GitHub Token 配置。升级到 SQLite v14 自动清理旧凭据，保留订阅令牌。验收见 [Git 仓库验收](docs/16-git-only-repositories-verification.md)。
 
-资源模型（2026-10-30）：每用户一个访问令牌，公共规则全站共享，节点和配置订阅按用户鉴权；统一托管并在服务端处理代理链。升级 v23 会撤销旧单订阅链接，需要重新复制。详情见 [全局托管、资源清理与迁移](docs/19-managed-resources.md)。
+资源模型（2026-10-30）：每用户一个访问令牌，公共规则增强和仓库全站共享，节点、配置订阅及专属规则按用户鉴权；统一托管并在服务端处理代理链。统一使用查询参数入口 `/subs`、`/resources`；`/api` 仅接受登录态，模板不提供 token 入口。升级 v25 保留现有用户 token，但移除全部旧 URL，需要重新复制链接。详情见 [全局托管、资源清理与迁移](docs/19-managed-resources.md)。
 
 节点源、组合、本地节点组、配置订阅和公共规则增强支持使用当前账户令牌复制链接。规则增强可以独立订阅；Mihomo / Stash 节点链接及配置内节点 provider 支持 GET / HEAD 流量响应头，组合按唯一上游地址汇总。

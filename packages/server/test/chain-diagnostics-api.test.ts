@@ -20,7 +20,7 @@ it('保存规范化旧策略，草稿诊断返回实际前置、缺失与环且�
   expect(missing.json.chainResolutions[0]).toMatchObject({ appliedCount: 0, issues: [expect.objectContaining({ code: 'ref.unresolved' })] });
   const cycle = await user.post(`/api/profiles/${profile.id}/preview`, { profile: { ...profile, chains: [{ ...profile.chains[0], landing: { nodeSet: ref } }] } });
   expect(cycle.json.ok).toBe(false); expect(cycle.json.chainResolutions[0].issues.some((r: any) => r.code === 'chain.cycle')).toBe(true);
-  expect((await user.get(`/api/profiles/${profile.id}`)).json.item.chains).toEqual(profile.chains);
+  expect((await user.get(`/api/profiles?id=${profile.id}`)).json.item.chains).toEqual(profile.chains);
   const stash = await user.post(`/api/profiles/${profile.id}/preview`, { profile, client: 'stash', platform: 'ios' });
   expect(stash.json.ok).toBe(true); expect(stash.json.chainResolutions[0].viaName).toBe('前置');
 });
@@ -36,7 +36,7 @@ it.each(['provider', 'inline'] as const)('%s：空筛选保存后覆盖全部落
   const via = { kind: 'node', ref: { nodeSet: ref(relay.id), match: { regex: '' }, fallback: 'error' } };
   const saved = await user.post('/api/profiles', { name: '全部节点验收', nodeSets: [relay, landing].map(local => ({ ref: ref(local.id), output })), chains: [{ id: 'all', landing: { nodeSet: ref(landing.id) }, via }], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
   expect(saved.status).toBe(201);
-  const profile = (await user.get(`/api/profiles/${saved.json.item.id}`)).json.item;
+  const profile = (await user.get(`/api/profiles?id=${saved.json.item.id}`)).json.item;
   expect(profile.chains[0].via.ref.match).toEqual({ regex: '' });
   const preview = (body = profile) => user.post(`/api/profiles/${profile.id}/preview`, { profile: body, client: 'mihomo' });
   const all = await preview();
@@ -56,14 +56,14 @@ it('节点预览在截断前筛选完整列表，支持空筛选、排除和非�
   const env = setupApp(); envs.push(env); const owner = await addUser(env.store, 'alice');
   const user = client(env.app); await user.login('alice');
   env.store.put('local', { id: 'many', name: '大节点集', proxies: Array.from({ length: 5002 }, (_, i) => ({ name: i < 5000 ? `节点-${i}` : i === 5000 ? 'HK-目标' : 'HK-备用', type: 'socks5', server: `node${i}.example.test`, port: 1080 })) }, owner.id);
-  const all = await user.get('/api/nodesets/local/many/nodes');
+  const all = await user.get('/api/nodesets/nodes?type=local&id=many');
   expect(all.json).toMatchObject({ total: 5002, truncated: true });
   expect(all.json.nodes).toHaveLength(5000);
-  expect((await user.get('/api/nodesets/local/many/nodes?filter=')).json).toEqual(all.json);
-  const selected = await user.get(`/api/nodesets/local/many/nodes?filter=${encodeURIComponent('(?i)^hk')}&excludeFilter=${encodeURIComponent('备用')}`);
+  expect((await user.get('/api/nodesets/nodes?type=local&id=many&filter=')).json).toEqual(all.json);
+  const selected = await user.get(`/api/nodesets/nodes?type=local&id=many&filter=${encodeURIComponent('(?i)^hk')}&excludeFilter=${encodeURIComponent('备用')}`);
   expect(selected.json).toMatchObject({ total: 1, unfilteredTotal: 5002, truncated: false });
   expect(selected.json.nodes.map((n: { name: string }) => n.name)).toEqual(['HK-目标']);
-  expect((await user.get('/api/nodesets/local/many/nodes?filter=%5B')).status).toBe(400);
+  expect((await user.get('/api/nodesets/nodes?type=local&id=many&filter=%5B')).status).toBe(400);
 });
 
 it('保存和读回全部来源，生成跨来源代理链；非法范围不被接受', async () => {
@@ -77,7 +77,7 @@ it('保存和读回全部来源，生成跨来源代理链；非法范围不被�
   const body = { name: '全部来源', nodeSets: locals.map(item => ({ ref: ref(item.id), output: 'provider' })), chains, overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } };
   const saved = await user.post('/api/profiles', body);
   expect(saved.status).toBe(201);
-  const profile = (await user.get(`/api/profiles/${saved.json.item.id}`)).json.item;
+  const profile = (await user.get(`/api/profiles?id=${saved.json.item.id}`)).json.item;
   expect(profile.chains).toEqual(chains);
   const preview = await user.post(`/api/profiles/${profile.id}/preview`, { profile });
   expect(preview.json.ok).toBe(true);

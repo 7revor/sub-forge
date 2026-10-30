@@ -38,7 +38,7 @@ describe('no-resolve 以内容为准', () => {
       store.putRenderGeneration('bound', 'mihomo', 'old-version', historical);
       store.putLastGood('bound', 'mihomo', historical);
       store.db.pragma('user_version = 17'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(25);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(26);
       expect(store.getWithOwner('ruleset', 'rs')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { sources: [source] } });
       expect(store.get('ruleset', 'rs')).not.toHaveProperty('noResolve');
       expect(store.listLatestTemplates()).toHaveLength(1);
@@ -75,7 +75,7 @@ describe('no-resolve 以内容为准', () => {
         const preview = await api.post('/api/profiles/preview', { profile: saved.json.item });
         expect(preview.status, preview.text).toBe(200);
         const token = h.store.createToken(user.id).token;
-        const download = await h.app.request(`/sub/${token}/${saved.json.item.id}`);
+        const download = await h.app.request(`/subs/profile?token=${token}&id=${saved.json.item.id}`);
         expect(download.status).toBe(200);
         for (const output of [preview.json.yaml, await download.text()]) {
           expect(output).toContain('IP-CIDR,192.0.2.0/24,DIRECT,no-resolve');
