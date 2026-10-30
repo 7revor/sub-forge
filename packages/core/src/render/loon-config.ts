@@ -66,7 +66,7 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       if (!match) throw new Error('Loon 分流规则必须使用托管链接');
       const url = providers[match[1]!]?.url;
       if (typeof url !== 'string' || !url.trim()) throw new Error('Loon 缺少托管规则地址');
-      remoteRules.push(iniValue(url) + ',policy=' + iniName(match[2]) + ',enabled=true');
+      remoteRules.push(iniValue(url) + ',policy=' + iniName(match[2]) + ',tag=' + iniValue(match[1]) + ',enabled=true');
       return [];
     });
     return [base.trim(), '[Proxy]', ...proxies, ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ...(remoteRules.length ? ['', '[Remote Rule]', ...remoteRules] : []), ''].filter((s, i) => i !== 0 || s).join('\n');

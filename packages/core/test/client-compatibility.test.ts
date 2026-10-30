@@ -43,7 +43,7 @@ for (const target of targets) describe(`${target} 能力边界`, () => {
       expect(out.yaml.split('[Rule]\n')[1]!.split('\n\n')[0]!.trim()).toBe('FINAL,DIRECT');
       const hosted = Object.values(out.rulesets).flatMap(r => r.text.trim().split('\n'));
       expect(hosted).toHaveLength(c.category === '规则' && status !== 'omitted' ? 1 : 0);
-      if (hosted.length) expect(out.yaml).toMatch(/,policy=代理,enabled=true/);
+      if (hosted.length) expect(out.yaml).toMatch(/,policy=代理,tag=__loon_local_1,enabled=true/);
     } else {
       const textRules = ini ? out.yaml.split('[Rule]\n')[1]!.trim().split('\n') : parseYaml(out.yaml).rules as string[];
       // 被省略的规则不能计为成功转换：只剩 FINAL/MATCH；其他规则须有匹配项和出口。
@@ -134,7 +134,7 @@ it('常见规则准确改名，no-resolve 保留在出口后，端口集合不�
     const out = renderers[target](f), ini = target === 'surge' || target === 'loon';
     if (target === 'loon') {
       expect(Object.values(out.rulesets).map(r => r.text.trim())).toEqual(['DOMAIN,a.test', 'IP-CIDR,192.0.2.0/24,no-resolve', 'DEST-PORT,443', 'PROTOCOL,UDP', 'OR,((DEST-PORT,80),(DEST-PORT,443))']);
-      expect(out.yaml.match(/,policy=代理,enabled=true/g)).toHaveLength(5);
+      expect(out.yaml.match(/,policy=代理,tag=__loon_local_\d+,enabled=true/g)).toHaveLength(5);
       continue;
     }
     const rules = ini ? out.yaml.split('[Rule]\n')[1]!.trim().split('\n') : parseYaml(out.yaml).rules;
