@@ -33,25 +33,24 @@ const readFrame = (element: HTMLElement): Frame => ({
 });
 function App() {
   const [results, setResults] = useState<string[]>([]);
-  const before = useRef<Frame | undefined>(undefined);
+  const before = useRef(new WeakMap<HTMLElement, Frame>());
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const capture = () => {
-      const element = document.querySelector<HTMLElement>('[data-slot$="dialog-content"][data-state="open"]');
-      if (element) before.current = readFrame(element);
+      document.querySelectorAll<HTMLElement>('[data-slot$="dialog-content"][data-state="open"]').forEach(element => before.current.set(element, readFrame(element)));
     };
     const pending = new Set<number>();
     const sample = (event: AnimationEvent) => {
       const element = event.target;
       if (!(element instanceof HTMLElement) || !element.matches('[data-slot$="dialog-content"][data-state="closed"]')) return;
-      const expected = before.current;
+      const expected = before.current.get(element);
       if (!expected) { setResults(items => [...items, '失败：缺少关闭前的 DOM 记录']); return; }
       let frames = 0;
       let mismatch: Frame | undefined;
       const inspect = () => {
         if (!element.isConnected || element.dataset.state !== 'closed') {
           const passed = frames > 0 && !mismatch;
-          setResults(items => [...items, `${passed ? '通过' : '失败'}：${expected.text.slice(0, 36)}；${frames} 帧；高度 ${expected.height}px${mismatch ? ` → ${mismatch.height}px，内容发生变化` : '，标题、正文、输入值保持一致'}`]);
+          setResults(items => [...items, `${passed ? '通过' : '失败'}：${expected.text.slice(0, 36)}；${frames} 帧；高度 ${expected.height}px${mismatch ? ` → ${mismatch.height}px，内容发生变化：${mismatch.text}` : '，标题、正文、输入值保持一致'}`]);
           return;
         }
         frames += 1;
@@ -62,6 +61,9 @@ function App() {
       };
       inspect();
     };
+    // 异步提交会先展示处理中；比较最后一帧 open，而非点击提交前的旧文案。
+    const observer = new MutationObserver(capture);
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
     document.addEventListener('pointerdown', capture, true);
     document.addEventListener('keydown', capture, true);
     document.addEventListener('animationstart', sample);
@@ -69,6 +71,7 @@ function App() {
       document.removeEventListener('pointerdown', capture, true);
       document.removeEventListener('keydown', capture, true);
       document.removeEventListener('animationstart', sample);
+      observer.disconnect();
       pending.forEach(cancelAnimationFrame);
     };
   }, []);

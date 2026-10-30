@@ -89,7 +89,7 @@ export function RulesetEdit() {
         if (!error) e.submit((x) => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => (s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' })) }));
       }}
       saveError={e.save.error}
-      onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
+      onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
       badges={!e.isNew && <>
         <Badge>{sourceSummary(d)}</Badge>
         {failing > 0 && <Badge tone="err">{failing} 个来源拉取失败</Badge>}

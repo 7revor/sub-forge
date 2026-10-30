@@ -33,7 +33,7 @@ const GROUP_DELETE_BODY = '分组里的节点会一起删除；引用它的配�
 
 /** /locals：分组列表，与订阅源列表同一形态 */
 export function LocalList() {
-  const navigate = useNavigate(); const save = useSaveDoc('locals');
+  const navigate = useNavigate(); const save = useSaveDoc('locals', true);
   const create = async () => {
     let createdId: string | undefined;
     const result = await NamedCreateDialog.show({ title: '新建分组', label: '分组名称', placeholder: '例如：自建、家宽', note: true }, { submit: async ({ name, note }) => { createdId = (await save.mutateAsync({ name, note, proxies: [] })).id; } });
@@ -71,7 +71,7 @@ export function LocalEdit() {
           <ActionButtons items={[{ label: '分组 YAML', onSelect: async () => { const result = await LocalGroupYamlModal.show({ proxies: d.proxies }); if (result.status === 'confirmed') setProxies(result.data); } }]} />
           <Button variant="primary" onClick={() => e.submit((draft) => ({ ...draft, name: draft.name.trim() }))} disabled={e.save.isPending || !e.dirty || !validName}>{e.save.isPending ? '保存中…' : e.dirty ? '保存分组' : '已保存'}</Button>
           <DeleteAction what="分组" name={d.name} body={GROUP_DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
-            onDelete={() => e.del.mutateAsync(d.id, { onSuccess: () => leave('/locals') })} />
+            onDelete={() => e.del.mutateAsync(d.id)} onDeleted={() => leave('/locals')} />
         </>}>
         <Badge>{d.proxies.length} 个节点</Badge>
         {e.dirty && <Badge tone="warn">有未保存的修改</Badge>}

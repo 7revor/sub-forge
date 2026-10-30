@@ -26,7 +26,7 @@ describe('弹窗架构硬性规则', () => {
         if (ts.isCallExpression(node)) {
           if (/^(?:window\.)?(?:alert|confirm|prompt)$/.test(node.expression.getText())) fail(node, '禁止原生交互弹窗');
           // DualEditor 仅把视图切换按钮移到外层工具栏，不是弹窗。
-          const toolbarPortal = name === 'components/DualEditor.tsx' && node.expression.getText() === 'createPortal' && node.arguments[1]?.getText() === 'modeControlContainer';
+          const toolbarPortal = (name === 'pages/profile/ChainRuleEditor.tsx' && node.expression.getText() === 'createPortal' && node.arguments[1]?.getText() === 'footerTarget') || name === 'components/DualEditor.tsx' && node.expression.getText() === 'createPortal' && node.arguments[1]?.getText() === 'modeControlContainer';
           if (/^(?:createRoot|createPortal)$/.test(node.expression.getText()) && name !== 'main.tsx' && !toolbarPortal) fail(node, '禁止自行挂载 React 根或 Portal');
         }
         ts.forEachChild(node, visit);

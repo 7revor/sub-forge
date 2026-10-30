@@ -30,7 +30,7 @@ const queryClient = new QueryClient({
       const message = mutation.meta?.successMessage;
       if (typeof message === 'string') notifySuccess(message);
     },
-    onError: error => alertError(error),
+    onError: (error, _variables, _result, mutation) => { if (!mutation.meta?.modalErrors) alertError(error); },
   }),
   defaultOptions: {
     queries: {

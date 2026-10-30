@@ -16,9 +16,9 @@ export const RemoteRuleDialog = createModal<{ value?: string }, RuleSetMatcher>(
   const [previewUrl, setPreviewUrl] = useModalDraft<string>();
   const [linking, setLinking] = useModalDraft(false);
   const [linkError, setLinkError] = useModalDraft<string>();
-  const repositoryMatches = useRepositoryUrlMatches(matcher?.remote ? [matcher.remote.url] : []);
+  const repositoryMatches = useModalPresentation(useRepositoryUrlMatches(matcher?.remote ? [matcher.remote.url] : []));
   const source = { id: 'remote', kind: 'remote' as const, format: 'auto' as const, url: previewUrl };
-  const loaded = useRulesetSources(undefined, previewUrl ? { id: '', name: '', sources: [source] } : undefined);
+  const loaded = useModalPresentation(useRulesetSources(undefined, previewUrl ? { id: '', name: '', sources: [source] } : undefined));
   return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{"远程链接"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
     <Field label="规则地址">{id => <Input id={id} type="url" disabled={linking} value={url} placeholder="远程规则文件的 HTTP 或 HTTPS 地址" onChange={e => { setUrl(e.target.value); setPreviewUrl(undefined); setLinkError(undefined); }} />}</Field>
     <p className="m-0 text-[13px] text-ink-muted">直接引用自己或第三方维护的规则，自动识别格式并输出 .list。</p>

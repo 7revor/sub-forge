@@ -1,0 +1,146 @@
+[
+  {
+    "name": "成员",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  },
+  {
+    "name": "只读组设置",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 704,
+      "height": 688,
+      "left": 160,
+      "right": 1120,
+      "top": 16,
+      "width": 960,
+      "x": 160,
+      "y": 16
+    },
+    "footer": {
+      "bottom": 703,
+      "height": 65,
+      "left": 161,
+      "right": 1119,
+      "top": 638,
+      "width": 958,
+      "x": 161,
+      "y": 638
+    }
+  },
+  {
+    "name": "模板已选",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    },
+    "footer": {
+      "bottom": 699,
+      "height": 65,
+      "left": 305,
+      "right": 975,
+      "top": 634,
+      "width": 670,
+      "x": 305,
+      "y": 634
+    }
+  },
+  {
+    "name": "模板清空",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    },
+    "footer": {
+      "bottom": 699,
+      "height": 65,
+      "left": 305,
+      "right": 975,
+      "top": 634,
+      "width": 670,
+      "x": 305,
+      "y": 634
+    }
+  },
+  {
+    "name": "前置 Provider",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    },
+    "footer": {
+      "bottom": 699,
+      "height": 65,
+      "left": 305,
+      "right": 975,
+      "top": 634,
+      "width": 670,
+      "x": 305,
+      "y": 634
+    }
+  },
+  {
+    "name": "前置组",
+    "dashed": 0,
+    "dialog": {
+      "bottom": 700,
+      "height": 680,
+      "left": 304,
+      "right": 976,
+      "top": 20,
+      "width": 672,
+      "x": 304,
+      "y": 20
+    },
+    "footer": {
+      "bottom": 699,
+      "height": 65,
+      "left": 305,
+      "right": 975,
+      "top": 634,
+      "width": 670,
+      "x": 305,
+      "y": 634
+    }
+  }
+]

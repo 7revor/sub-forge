@@ -26,7 +26,7 @@ const EMPTY: PresetDoc = { id: '', name: '', version: 1, mihomo: DEFAULT_MIHOMO 
 export function PresetList() {
   const profiles = useList('profiles');
   const navigate = useNavigate();
-  const save = useSaveDoc('presets');
+  const save = useSaveDoc('presets', true);
   const create = async () => {
     let createdId: string | undefined;
     const result = await NamedCreateDialog.show({ title: '新建预设', placeholder: '例如：fake-ip 推荐' }, { submit: async ({ name }) => { const item = await save.mutateAsync({ name, version: 1, mihomo: DEFAULT_MIHOMO }); createdId = item.id; } });
@@ -74,7 +74,7 @@ export function PresetEdit() {
           <Button disabled={!dirty || e.save.isPending} onClick={discard}>放弃</Button>
           <Button variant="primary" disabled={!dirty || !rawValid || e.save.isPending} onClick={publish}>{e.save.isPending ? '发布中…' : `发布 v${d.version + 1}`}</Button>
           <DeleteAction what="预设" name={d.name} body={DELETE_BODY} error={e.del.error} pending={e.del.isPending} onReset={e.del.reset}
-            onDelete={() => e.del.mutateAsync(d.id, { onSuccess: () => leave('/presets') })} />
+            onDelete={() => e.del.mutateAsync(d.id)} onDeleted={() => leave('/presets')} />
         </>}>
         <span className={cx('text-[12.5px]', rawValid ? 'text-ok' : 'text-err')}>{rawValid ? (dirty ? `有未发布的修改 · 当前 v${d.version}` : `已发布 v${d.version}`) : '请先修复 YAML 中的错误'}</span>
       </PageHeader>

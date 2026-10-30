@@ -346,9 +346,13 @@ v20 清理旧记录中的并发字段，保留配置内容、绑定关系、归�
 
 SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，增加系统设置和共享资源绑定；刷新任务保存 7 天，启动将未完成任务标为中断。最终渲染取消结果内存缓存；保留解析缓存、在途合并、last_good 与最多 32 个结构版本。旧版本资源用于客户端一致性，不属于上游原文历史。生产启动会运行资源和仓库调度器。
 
+2026-10-30 刷新任务响应：`results` 自创建起包含全部去重资源，顺序固定；`state` 标记 `pending / running / done / interrupted`，`ok` 仅在拉取完成后出现。并发完成只更新对应索引，关闭或重启将未完成项标为中断。兼容旧任务缺少逐项 `state` 的已完成结果，无数据库迁移及示例种子变更。内置浏览器可通过 `pnpm --filter @sub-forge/server exec tsx test/manual-resource-refresh-server.ts` 启动独立内存验收服务，完成后必须停止。
+
 仓库 list/txt 正文通过统一快照按需读取 raw URL，与已引用公开资源共享缓存；目录仍用 Git 索引，README 仍按索引提交读取。未被引用的文件不整库预抓取。正文预览失败且存在旧内容时继续使用旧内容。此前章节中的历史 TTL/透传设计以本节及领域模型第 7 节为准。
 
 隔离验收：构建 web 后运行 `CACHE_TEST_CONTROL=/tmp/subforge-cache-control.json pnpm --filter @sub-forge/server exec tsx test/manual-resource-cache-server.ts`，控制文件为 `{"fail":false,"version":1}`。仅内存数据与虚构上游，结束须终止进程。验收记录在 `research/verification/unified-resource-cache-20261030/`。
 
 
 2026-10-30 审查修复：草稿远程资源按用户隔离，递归引用及异步下发复核权限，授权失效不允许旧版本回退；渲染检查配置和成功/尝试快照修订，避免旧任务回写。MRS 必须实际拉取并校验二进制类型。已浏览的未引用仓库正文参与调度/异常汇总；换地址或删除后回收无其他引用的原文。新增 `test/cache-review.test.ts` 19 项，完整记录见 `research/verification/unified-resource-cache-review-20261030/`。
+
+2026-10-30 订阅弹窗整合继续复用 /profiles/routing/convert 生成草稿，最终保存才持久化。没有新增接口或种子迁移；填充、代理链及规则出口映射仍由服务端验证，相关 12 项测试通过。

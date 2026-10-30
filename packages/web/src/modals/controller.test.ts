@@ -3,6 +3,17 @@ import { ModalController } from './controller.ts';
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 describe('统一弹窗会话', () => {
+  it('连续 show 的触发器在页面时，关闭顶层把焦点还给父弹窗', async () => {
+    const trigger = { isConnected: true, focus: vi.fn() };
+    const parentContent = { contains: () => false, focus: vi.fn() };
+    vi.stubGlobal('document', { activeElement: trigger, querySelector: () => parentContent });
+    try {
+      const runtime = new ModalController(); const parent = runtime.show('父', {}); const child = runtime.show('子', {});
+      const id = runtime.getSnapshot()[1]!.id; runtime.confirm(id, true); runtime.exited(id); await child;
+      expect(parentContent.focus).toHaveBeenCalledOnce(); expect(trigger.focus).not.toHaveBeenCalled();
+      runtime.cancelAll('unmounted', true); await parent;
+    } finally { vi.unstubAllGlobals(); }
+  });
   it('入参与确认结果都深拷贝，退场前不结算 Promise', async () => {
     const runtime = new ModalController(); const input = { members: [{ name: '原成员' }] };
     const done = vi.fn(); const result = runtime.show('表单', input).then(done); const session = runtime.getSnapshot()[0]!;

@@ -1,3 +1,4 @@
+import { useModalPresentation } from '../modals/index.tsx';
 import type { NodeSetID } from '@sub-forge/core';
 import { useNodeList } from '../hooks.ts';
 import { filterNodes } from './nodeMatch.ts';
@@ -5,7 +6,7 @@ import { filterNodes } from './nodeMatch.ts';
 export function MatchPreview({ nodeSet, filter, excludeFilter, excludeType, max = 30 }: {
   nodeSet: NodeSetID | undefined; filter?: string; excludeFilter?: string; excludeType?: string; max?: number;
 }) {
-  const { data, isLoading, error } = useNodeList(nodeSet);
+  const { data, isLoading, error } = useModalPresentation(useNodeList(nodeSet));
   const result = filterNodes(data?.nodes ?? [], { filter, excludeFilter, excludeType });
   const shown = result.nodes.slice(0, Math.max(0, max));
   return (

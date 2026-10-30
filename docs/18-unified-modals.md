@@ -26,10 +26,10 @@ if (name.status === 'confirmed') setDraft({ ...value, name: name.data });
 ## 数据、生命周期与错误
 
 - 打开时与输出时分别深拷贝；页面草稿、查询缓存、ProfileContext 不与弹窗共用可变对象。Profile 弹窗通过 `profileModalData` 提取 DTO，并构造只修改本会话的 Context。
-- 输入和预览不提交；确认调用 `modal.confirm(value)`，异步保存用 `modal.submit(async () => result)`。保存失败留在原窗，错误可见；重复提交被控制器拦截。导航必须在 confirmed 结果交付后执行。
+- 输入和预览不提交；确认调用 `modal.confirm(value)`，异步保存用 `modal.submit(async () => result)`。保存失败留在原窗，错误可见；弹窗提交使用的 Query mutation 标记 `meta.modalErrors: true`（`useSaveDoc(kind, true)`），由会话展示错误，避免全局重复提示；重复提交被控制器拦截。导航必须在 confirmed 结果交付后执行。
 - 取消返回 cancelled；提交期间普通关闭被阻止，路由变化与 Host 销毁仍能终止会话。运行中的请求可能已在服务器执行，取消不代表服务器回滚；客户端过期结果不能写入外部或新会话。
 - 会话从 open 进入 closing 时保留完整内容。Radix Presence 监听实际动画结束；Content ref 真正 detach 后销毁并结算 Promise。微任务只用于排除 StrictMode 同步重挂，不替代动画事件、不按毫秒猜退场。
-- 查询展示在关闭时通过 `useModalPresentation` 保留。嵌套会话独立结算，焦点回到原触发器；连续打开时不让下层退场抢走上层焦点。
+- 查询展示在关闭时通过 `useModalPresentation` 保留。嵌套会话独立结算，焦点回到原触发器；连续打开时不让下层退场抢走上层焦点；顶层关闭且仍有父弹窗时，焦点不能退到背景页面。
 - 全局一个 ModalRoot，位于 Router 与 QueryClient Provider 内。底层官方组件只供运行时使用。渲染异常有可关闭的错误界面，不能留下悬空 Promise。
 - 策略组默认展示名称、类型、成员；其他设置折叠到高级设置。
 

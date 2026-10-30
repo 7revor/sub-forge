@@ -1,6 +1,6 @@
 import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
 import { Frame } from '../../modals/Frame.tsx';
-import type { GroupSpec, ReportItem } from '@sub-forge/core';
+import { compileUserRegex, type GroupSpec, type ReportItem } from '@sub-forge/core';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
@@ -56,7 +56,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
             <span className="col-span-2 col-start-2 row-start-2 truncate text-[12.5px] text-ink-2 sm:col-span-1 sm:col-start-4 sm:row-start-1" title={members}>{members}</span>
             <div className="col-start-4 row-start-2 flex flex-col items-center justify-center gap-0.5 sm:col-start-5 sm:row-start-1 sm:flex-row">
               <span className="text-[12px] text-ink-muted sm:hidden">隐藏</span>
-              {readOnly ? <span className="text-[12px] text-ink-muted">{g.display?.hidden ? '已隐藏' : '显示'}</span> : <Switch label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />}
+              <Switch disabled={readOnly} label={`隐藏策略组「${g.name || '未命名组'}」`} checked={g.display?.hidden ?? false} onChange={hidden => onChange({ ...value, groups: value.groups.map(item => item.id === g.id ? { ...item, display: { ...item.display, hidden } } : item) })} />
             </div>
             <div className="col-start-4 row-start-1 flex gap-1 sm:col-start-6">
               <Button size="sm" variant="ghost" className="px-1.5" aria-label={`编辑策略组「${g.name}」`} onClick={() => void edit(g)}><Pencil size={14} /></Button>
@@ -72,11 +72,18 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
 export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupSpec[]; report: ReportItem[]; readOnly: boolean; saveHint: string }, GroupSpec>(function TemplateGroup({ data: { groups, report, readOnly, saveHint, group: initial }, modal }) {
   const [group, setGroup] = useModalDraft(initial);
   const value = { groups };
+  const errors: ReportItem[] = [];
+  const issue = (message: string) => errors.push({ level: 'error', code: 'group.draft', where: `group:${group.id}`, message });
+  if (!group.name.trim()) issue('请填写策略组名称');
+  if (groups.some(g => g.id !== group.id && g.name.trim() === group.name.trim())) issue('策略组名称不能重复');
+  for (const [name, expression] of [['filter', group.filter], ['exclude-filter', group.excludeFilter]]) {
+    if (expression) try { compileUserRegex(expression); } catch (error) { issue(`${name} 无效：${(error as Error).message}`); }
+  }
   const groupName = (id: string) => groups.find(g => g.id === id)?.name ?? id;
   const update = (patch: Partial<GroupSpec>) => setGroup(current => ({ ...current, ...patch }));
   return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{group ? `编辑策略组 · ${group.name || '未命名组'}` : '编辑策略组'}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
       <>
-        <ItemIssues report={report} where={`group:${group.id}`} />
+        <ItemIssues report={errors} where={`group:${group.id}`} />
         
         <fieldset disabled={readOnly} className="m-0 contents border-0 p-0">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -87,7 +94,7 @@ export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupS
           <GroupSettingsFields section="advanced" disabled={readOnly} value={group} onChange={(key, next) => update({ [key]: next })} />
           <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
           <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
-          <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
+          <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect disabled={readOnly} id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
         </div></details>
         </fieldset>
         
@@ -103,5 +110,5 @@ export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupS
           </div>}
         </section>
       </>
-    </div><ModalFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!group.name.trim()} onClick={() => modal.confirm(group)}>保存</Button></>}</ModalFooter></ModalContent>;
+    </div><ModalFooter>{<><span className="mr-auto self-center text-[12px] text-ink-muted">{saveHint}</span><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!!errors.length} onClick={() => modal.confirm(group)}>保存</Button></>}</ModalFooter></ModalContent>;
 });

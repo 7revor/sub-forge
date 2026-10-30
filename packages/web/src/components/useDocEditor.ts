@@ -26,7 +26,7 @@ export function useDocEditor<K extends Kind>(kind: K, empty: DocMap[K]) {
   /** 由 DetailShell 的确认对话框调用 */
   const remove = () => {
     if (!draft) return;
-    return del.mutateAsync((draft as { id: string }).id, { onSuccess: () => navigate(`/${kind}`) });
+    return del.mutateAsync((draft as { id: string }).id);
   };
-  return { id, isNew, doc, draft, setDraft, dirty, save, submit, del, remove };
+  return { id, isNew, doc, draft, setDraft, dirty, save, submit, del, remove, afterRemove: () => navigate(`/${kind}`) };
 }

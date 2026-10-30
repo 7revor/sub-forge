@@ -53,7 +53,7 @@ export function CollectionEdit() {
 
   const usedBy = (profiles.data ?? []).filter((p) => p.nodeSets.some((n) => n.ref.type === 'collection' && n.ref.id === d.id));
   return (
-    <DetailShell {...shell} onDelete={e.remove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
+    <DetailShell {...shell} onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
       actionItems={[{ label: '重命名', onSelect: async () => { const result = await Frame.modal.prompt({ title: '重命名组合', initialValue: d.name, unchangedValue: d.name, placeholder: '填写新的组合名称' }); if (result.status === 'confirmed') set({ name: result.data }); } }]}
       badges={<>
         <Badge>{d.members.length} 个成员{preview.data ? ` · 合并后 ${preview.data.input} 个节点` : ''}</Badge>

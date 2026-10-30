@@ -1,3 +1,4 @@
+import { deleteErrorText } from '../domain/deleteError.ts';
 export type CancelReason = 'dismissed' | 'navigation' | 'unmounted';
 export type ModalResult<R> = { status: 'confirmed'; data: R } | { status: 'cancelled'; reason: CancelReason };
 export type ModalActions<R> = { submit?: (value: R, signal: AbortSignal) => void | Promise<void> };
@@ -48,7 +49,7 @@ export class ModalController {
       if (!this.active(id)) return;
       session.result = { status: 'confirmed', data: structuredClone(value) }; session.phase = 'closing';
     } catch (error) {
-      if (this.active(id)) session.error = error instanceof Error ? error.message : String(error);
+      if (this.active(id)) session.error = deleteErrorText(error) ?? String(error);
     } finally {
       // 关闭期间保留最后一次完整展示，不清空 loading、错误或业务草稿。
       if (this.active(id)) session.pending = false;
@@ -60,7 +61,12 @@ export class ModalController {
     if (!session || session.phase !== 'closing' || !session.result) return;
     this.sessions = this.sessions.filter(s => s !== session); session.abort.abort(); this.publish();
     session.resolve(session.result);
-    if (!this.sessions.some(s => s.id > id) && session.focus?.isConnected) session.focus.focus();
+    if (this.sessions.some(s => s.id > id)) return;
+    const parent = [...this.sessions].reverse().find(s => s.phase === 'open');
+    const content = parent && typeof document !== 'undefined' ? document.querySelector<HTMLElement>(`[data-modal-session="${parent.id}"]`) : null;
+    // 连续静态 show 时两个触发器可能都在页面；有父会话时焦点必须留在父弹窗。
+    if (content && (!session.focus?.isConnected || !content.contains(session.focus))) content.focus();
+    else if (session.focus?.isConnected) session.focus.focus();
   }
   cancelAll(reason: CancelReason, immediate = false) {
     for (const session of [...this.sessions]) { this.cancel(session.id, reason); if (immediate) this.exited(session.id); }

@@ -1,3 +1,4 @@
+import { useModalActive, useModalPresentation } from '../modals/index.tsx';
 import type { Matcher } from '@sub-forge/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api.ts';
@@ -23,7 +24,9 @@ export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则�
   ariaLabel?: string; triggerClassName?: string; triggerIcon?: ReactNode;
   valueLabel?: string; placeholder?: string; modal?: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
+  const active = useModalActive();
+  const [loading, setBusy] = useState(false);
+  const busy = useModalPresentation(loading);
   const alive = useRef(true);
   const currentSelect = useRef(onSelect);
   currentSelect.current = onSelect;
@@ -35,8 +38,8 @@ export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则�
       setBusy(true);
       try {
         const result = await api<{ matcher: RuleSetMatcher }>('POST', '/rule-options/resolve', selection);
-        if (alive.current) select(result.matcher);
-      } catch (error) { if (alive.current) alertError(error); }
-      finally { if (alive.current) setBusy(false); }
+        if (alive.current && active()) select(result.matcher);
+      } catch (error) { if (alive.current && active()) alertError(error); }
+      finally { if (alive.current && active()) setBusy(false); }
     }} />;
 }

@@ -47,9 +47,9 @@ export function useDoc<K extends Kind>(kind: K, id: string | undefined) {
 }
 
 /** 新建（无 id）或更新；成功后刷新列表与该文档 */
-export function useSaveDoc<K extends Kind>(kind: K) {
+export function useSaveDoc<K extends Kind>(kind: K, modalErrors = false) {
   const qc = useQueryClient();
-  return useMutation({ meta: { successMessage: '已保存' },
+  return useMutation({ meta: { successMessage: '已保存', modalErrors },
     mutationFn: (doc: Partial<DocMap[K]> & { id?: string }) =>
       (doc.id ? api<{ item: DocMap[K] }>('PUT', `/${kind}/${doc.id}`, doc) : api<{ item: DocMap[K] }>('POST', `/${kind}`, doc)).then((r) => r.item),
     onSuccess: (item) => {
@@ -61,7 +61,7 @@ export function useSaveDoc<K extends Kind>(kind: K) {
 
 export function useDeleteDoc(kind: Kind) {
   const qc = useQueryClient();
-  return useMutation({ meta: { successMessage: '已删除' },
+  return useMutation({ meta: { successMessage: '已删除', modalErrors: true },
     mutationFn: (id: string) => api('DELETE', `/${kind}/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: [kind] }),
   });

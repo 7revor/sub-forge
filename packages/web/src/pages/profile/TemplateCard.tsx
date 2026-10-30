@@ -1,87 +1,81 @@
-import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
+import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
 import { profileModalData, useModalProfile, type ProfileModalData } from './modalProfile.ts';
 // 关联摘要与变更操作分开；转换只影响当前草稿，保存订阅后生效。
-import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { api } from '../../api.ts';
-import { Badge, Button, ErrorAlert, Field, Select, cx } from '../../components/ui.tsx';
+import { Badge, Button, Field, Select } from '../../components/ui.tsx';
 import { useTemplates, type ProfileDoc } from '../../hooks.ts';
-import { useProfile, ProfileContext } from './context.ts';
+import { useProfile } from './context.ts';
 import { boundTemplateId, persistedProfile } from './routing.ts';
+
+import { associationRequirements, inferAssociationMapping } from './associationModel.ts';
 
 type Conversion = { item: ProfileDoc; changes: string[] };
 
-function AssociationDraft({ onSave }: { onSave: (item: ProfileDoc) => void }) {
-  const { draft, template, groups } = useProfile();
-  const templates = useTemplates();
-  const currentId = boundTemplateId(draft);
-  const [selected, setSelected] = useModalDraft(boundTemplateId(draft) ?? '');
-  const [mode, setMode] = useModalDraft<'bound' | 'copy'>('bound');
-  const [mapping, setMapping] = useModalDraft<Record<string, string>>({});
-  const [staged, setStaged] = useModalDraft<Conversion | undefined>(undefined);
-  const target = templates.data?.find(t => t.id === selected);
-  const apply = onSave;
-  const change = useMutation({
-    mutationFn: async (action: 'bound' | 'copy' | 'detach') => {
-      // 转换接口复用完整文档校验；临时名称仅用于检查，不写入订阅草稿。
-      const profile = persistedProfile({ ...draft, name: draft.name.trim() || '未命名订阅' });
-      if (action === 'detach') return api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'independent' });
-      if (!target) throw new Error('请先选择模板');
-      const effectiveMapping = Object.fromEntries(groups.flatMap(g => {
-        const value = mapping[g.id] ?? (selected === currentId && target.groups.some(t => t.id === g.id) ? g.id : '');
-        return value ? [[g.id, value === '__drop' ? null : value]] : [];
-      }));
-      const bound = await api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'bound', templateId: target.id, mapping: effectiveMapping });
-      if (action === 'bound') return bound;
-      const independent = await api<Conversion>('POST', '/profiles/routing/convert', { profile: bound.item, mode: 'independent' });
-      return { ...independent, changes: [...bound.changes, ...independent.changes] };
-    },
-  });
-  const check = (action: 'bound' | 'copy' | 'detach') => change.mutate(action, {
-    onSuccess: converted => setStaged({ ...converted, item: { ...converted.item, name: draft.name } }),
-  });
-  const reset = () => { setStaged(undefined); change.reset(); };
-  return <div className="flex flex-col gap-4">
-    <ErrorAlert error={templates.error ?? change.error} />
-    <Field label="模板">{id => <Select clearable placeholder={templates.isLoading ? '正在加载模板…' : '选择要绑定的规则模板'} id={id} value={selected} disabled={change.isPending} onChange={e => { setSelected(e.target.value); setMapping({}); reset(); }}>
-      {(templates.data ?? []).map(t => <option key={t.id} value={t.id}>{t.name ?? t.id}</option>)}
-    </Select>}</Field>
-    {templates.data?.length === 0 && <p className="m-0 text-[13px] text-ink-muted">还没有模板。可以关闭此窗口，在订阅中直接创建策略组与规则。</p>}
-    <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="模板关联方式">
-      {([{ value: 'bound', title: '跟随模板更新', text: '策略组和规则由模板维护，在订阅中填充节点。' }, { value: 'copy', title: '复制后独立维护', text: '复制当前策略组和规则，之后可在订阅中自由修改。' }] as const).map(option => <button key={option.value} type="button" aria-pressed={mode === option.value} disabled={change.isPending} onClick={() => { setMode(option.value); reset(); }} className={cx('flex cursor-pointer flex-col gap-2 rounded-lg border p-3 text-left', mode === option.value ? 'border-brand bg-accent-soft' : 'border-line hover:bg-ground')}>
-        <strong className="text-[13px]">{option.title}</strong><span className="text-[12.5px] leading-relaxed text-ink-muted">{option.text}</span>
-      </button>)}
-    </div>
-    {target && <p className="m-0 text-[13px] text-ink-muted">包含 {target.groups.length} 个策略组、{target.rules.length} 条规则。</p>}
-    {target && groups.length > 0 && selected !== currentId && <details className="rounded-lg border border-line p-3" open>
-      <summary className="cursor-pointer text-[13px] font-medium">迁移现有节点填充与代理链引用</summary>
-      <p className="text-[12px] text-ink-muted">现有策略组和规则将被替换。有节点或代理链引用的组需要选择目标组。</p>
-      <div className="flex flex-col gap-3">{groups.map(g => <Field key={g.id} label={g.name}>{id => <Select clearable aria-label={`${g.name}的迁移目标`} placeholder="选择迁移节点填充的目标策略组" id={id} value={mapping[g.id] ?? ''} disabled={change.isPending} onChange={e => { setMapping({ ...mapping, [g.id]: e.target.value }); reset(); }}>
-        <option value="__drop">不迁移，移除节点填充</option>
-        {target.groups.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-      </Select>}</Field>)}</div>
-    </details>}
-    {!staged && <div className="flex flex-wrap justify-end gap-2">
-      {currentId && <Button disabled={change.isPending || !template} onClick={() => check('detach')}>解除关联，保留当前配置</Button>}
-      <Button variant="primary" disabled={change.isPending || !target || (mode === 'bound' && selected === currentId)} onClick={() => check(mode)}>{change.isPending ? '正在检查…' : groups.length ? '检查变更' : '使用此模板'}</Button>
-    </div>}
-    {staged && <div className="flex flex-col gap-3 rounded-lg border border-line bg-ground p-3">
-      <strong className="text-[13px]">{staged.item.routing?.mode === 'bound' ? '将跟随所选模板更新' : '将改为独立维护'}</strong>
-      <ul className="m-0 pl-5 text-[13px] leading-relaxed">{staged.changes.map((s, i) => <li key={i}>{s}</li>)}</ul>
-      <p className="m-0 text-[12px] text-ink-muted">应用后可继续检查和编辑，保存订阅后生效。</p>
-      <div className="flex gap-2"><Button variant="primary" onClick={() => apply(staged.item)}>保存</Button><Button onClick={() => setStaged(undefined)}>取消变更</Button></div>
-    </div>}
-  </div>;
-}
-
-export const TemplateAssociationModal = createModal<ProfileModalData, ProfileDoc>(function AssociationModal({ data, modal }) {
+const TemplateAssociationModal = createModal<ProfileModalData, ProfileDoc>(function AssociationEditor({ data, modal }) {
   const { ctx } = useModalProfile(data);
-  return <ProfileContext.Provider value={ctx}><ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"><ModalHeader><ModalTitle>{boundTemplateId(data.profile) ? '管理模板关联' : '使用模板'}</ModalTitle></ModalHeader><AssociationDraft onSave={modal.confirm} /><ModalFooter><Button onClick={modal.cancel}>取消</Button></ModalFooter></ModalContent></ProfileContext.Provider>;
+  const { draft, template, groups } = ctx;
+  const query = useTemplates();
+  const templates = useModalPresentation(query);
+  const currentId = boundTemplateId(draft);
+  const [selected, setSelected] = useModalDraft(currentId ?? '');
+  const [mode, setMode] = useModalDraft<'bound' | 'copy' | 'detach'>('bound');
+  const [mapping, setMapping] = useModalDraft<Record<string, string>>({});
+  const target = templates.data?.find(t => t.id === selected);
+  const effectiveMapping = { ...inferAssociationMapping(groups, target?.groups ?? []), ...mapping };
+  const required = associationRequirements(draft, groups, effectiveMapping);
+  const unresolved = required.some(g => !effectiveMapping[g.id] || (!g.canDrop && effectiveMapping[g.id] === '__drop'));
+  const apply = () => modal.submit(async () => {
+    const profile = persistedProfile({ ...draft, name: draft.name.trim() || '未命名订阅' });
+    let converted: Conversion;
+    if (mode === 'detach') converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'independent' });
+    else {
+      if (!target) throw new Error('请先选择模板');
+      converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'bound', templateId: target.id, mapping: Object.fromEntries(Object.entries(effectiveMapping).map(([id, value]) => [id, value === '__drop' ? null : value])) });
+      if (mode === 'copy') converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile: converted.item, mode: 'independent' });
+    }
+    return { ...converted.item, name: draft.name };
+  });
+  const options = [
+    { value: 'bound' as const, title: '跟随模板更新', text: '策略组和规则由模板维护，在订阅中填充节点。' },
+    { value: 'copy' as const, title: '复制后独立维护', text: '复制所选模板的策略组和规则，之后在本订阅中修改。' },
+    ...(currentId ? [{ value: 'detach' as const, title: '解除关联', text: '保留当前策略组、成员和规则，之后独立维护。' }] : []),
+  ];
+  const error = templates.error;
+  return <ModalContent className="flex h-[min(680px,calc(100dvh-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl" aria-describedby={undefined}><ModalHeader className="shrink-0 border-b border-line px-5 py-4"><ModalTitle>{currentId ? '管理模板关联' : '使用模板'}</ModalTitle></ModalHeader>
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
+      <fieldset disabled={modal.pending} className="m-0 flex flex-col gap-3 border-0 p-0"><legend className="mb-2 text-[13px] font-semibold">关联方式</legend>
+        {options.map(option => <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-md py-1">
+          <input type="radio" name="association-mode" value={option.value} checked={mode === option.value} onChange={() => { setMode(option.value); }} className="mt-1 accent-brand" />
+          <span><strong className="block text-[13px]">{option.title}</strong><span className="mt-1 block text-[12px] text-ink-muted">{option.text}</span></span>
+        </label>)}
+      </fieldset>
+      {mode !== 'detach' && <>
+        <Field label="模板">{id => <Select clearable aria-label="模板" id={id} value={selected} placeholder={templates.isLoading ? '正在加载模板…' : '选择用于订阅的规则模板'} disabled={modal.pending || templates.isLoading} onChange={e => { setSelected(e.target.value); setMapping({}); }}>
+          {(templates.data ?? []).map(t => <option key={t.id} value={t.id}>{t.name ?? t.id}</option>)}
+        </Select>}</Field>
+        {templates.data?.length === 0 && <p className="m-0 text-[13px] text-ink-muted">还没有模板。可在模板页面创建，或取消后直接编辑订阅。</p>}
+        {target && <div className="text-[13px] leading-relaxed"><strong>{target.name ?? target.id}</strong><span className="ml-2 text-ink-muted">{target.groups.length} 个策略组 · {target.rules.length} 条规则</span><p className="mt-1 mb-0 text-[12px] text-ink-muted">将使用此模板的策略组、参数、规则和最终出口。现有节点来源与代理链保留。</p></div>}
+        {target && !!required.length && <section className="border-t border-line pt-4"><h3 className="mt-0 mb-2 text-[13px] font-semibold">迁移现有填充与引用</h3><p className="mt-0 mb-3 text-[12px] text-ink-muted">相同 ID 或唯一同名组已匹配，可在此调整。被代理链等引用的组必须保留对应关系。</p><div className="flex flex-col gap-3">
+          {required.map(g => <Field key={g.id} label={`${g.name} · ${g.reasons.join('、')}`}>{id => <Select clearable aria-label={`${g.name}的迁移目标`} id={id} value={effectiveMapping[g.id] ?? ''} placeholder="选择迁移到哪个策略组" disabled={modal.pending} onChange={e => { setMapping({ ...mapping, [g.id]: e.target.value }); }}>
+            {g.canDrop && <option value="__drop">不迁移此组的节点填充</option>}{target.groups.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </Select>}</Field>)}
+        </div></section>}
+      </>}
+      {mode === 'detach' && <p className="m-0 text-[13px] text-ink-muted">当前「{template?.name ?? currentId}」的完整配置将复制到本订阅。</p>}
+      {error && <div role="alert" className="text-[13px] text-err">{error.message}{templates.error && <Button size="sm" onClick={() => void templates.refetch()}>重新加载</Button>}</div>}
+    </div>
+    <ModalFooter className="h-[105px] shrink-0 flex-row flex-wrap items-center justify-end border-t border-line bg-ground px-5 py-3 sm:h-[65px]"><span className="mr-auto w-full self-center text-[12px] text-ink-muted sm:w-auto">{mode !== 'detach' && target && unresolved ? '请完成上方策略组对应关系' : '应用到草稿，保存订阅后生效'}</span><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={modal.pending || (mode === 'detach' ? !template : !target || unresolved || (mode === 'bound' && selected === currentId))} onClick={() => void apply()}>{modal.pending ? '正在应用…' : '应用到订阅'}</Button></ModalFooter>
+  </ModalContent>;
 });
 
 export function TemplateCard() {
-  const profile = useProfile();
-  const { draft, setDraft, template } = profile;
+  const ctx = useProfile();
+  const { draft, template, setDraft } = ctx;
+  const edit = async () => {
+    const result = await TemplateAssociationModal.show(profileModalData(ctx));
+    if (result.status === 'confirmed') setDraft(result.data);
+  };
   const currentId = boundTemplateId(draft);
   const initialized = draft.routing?.mode === 'independent' ? draft.routing.initializedFrom : undefined;
   return <>
@@ -90,7 +84,7 @@ export function TemplateCard() {
         <div className="flex flex-wrap items-center gap-2"><h2 className="m-0 text-[14px] font-semibold">{currentId ? <Link className="text-ink no-underline hover:text-brand" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link> : '独立配置'}</h2><Badge tone={currentId ? 'accent' : 'neutral'}>{currentId ? '跟随模板更新' : '由本订阅维护'}</Badge></div>
         <p className="m-0 text-[12.5px] leading-relaxed text-ink-muted">{currentId ? '策略组和规则由模板维护；节点填充仅用于本订阅。模板保存后，下次刷新订阅时更新。' : initialized ? `复制自「${initialized.name ?? initialized.templateId}」，后续修改互不影响。` : '直接编辑策略组和规则，也可以选择模板作为起点。'}</p>
       </div>
-      <Button disabled={!!currentId && !template} onClick={async () => { const result = await TemplateAssociationModal.show(profileModalData(profile)); if (result.status === 'confirmed') setDraft(result.data); }}>{currentId ? '管理模板关联' : '使用模板'}</Button>
+      <Button onClick={() => void edit()}>{currentId ? '管理模板关联' : '使用模板'}</Button>
     </section>
   </>;
 }

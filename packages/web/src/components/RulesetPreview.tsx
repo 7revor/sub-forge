@@ -1,3 +1,4 @@
+import { useModalPresentation } from '../modals/index.tsx';
 import { useQuery } from '@tanstack/react-query';
 import type { Client, Platform, RuleConversion, RuleSetDelivery } from '@sub-forge/core';
 import { useEffect, useRef, useState } from 'react';
@@ -24,10 +25,10 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
 }) {
   const [target, setTarget] = useState('mihomo');
   const t = TARGETS.find(x => x.key === target)!;
-  const process = useDebouncedValue({ overrides }, 300);
+  const process = useModalPresentation(useDebouncedValue({ overrides }, 300));
   const body = { inputs, sourceId, ...process, client: t.client, platform: t.platform };
   const settled = JSON.stringify(process) === JSON.stringify({ overrides });
-  const preview = useQuery({
+  const query = useQuery({
     queryKey: ['rule-conversion', body], enabled: ready && settled, retry: false, staleTime: 0,
     queryFn: () => api<Result>('POST', '/rules/convert', body),
     placeholderData: (previous, query) => {
@@ -36,6 +37,7 @@ export function RulesetPreview({ inputs, ready, sourceId, overrides, sourceError
       return previousBody?.sourceId === sourceId ? previous : undefined;
     },
   });
+  const preview = useModalPresentation(query);
   const last = useRef<{ sourceId?: string; target: string; result: Result } | undefined>(undefined);
   useEffect(() => { if (preview.data && !preview.isPlaceholderData) last.current = { sourceId, target, result: preview.data }; }, [preview.data, preview.isPlaceholderData, sourceId, target]);
   const pending = !ready || !settled || preview.isFetching;

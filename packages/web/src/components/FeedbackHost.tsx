@@ -2,6 +2,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { Toaster } from './ui/sonner.tsx';
 import { alertError, feedbackStore } from '../feedback.ts';
+import { useInModal, useModalPresentation } from '../modals/index.tsx';
 import { Frame } from '../modals/Frame.tsx';
 
 export function FeedbackHost() {
@@ -41,10 +42,12 @@ export function FeedbackHost() {
 
 /** 兼容查询或受控错误状态，普通重渲染不会重复提示。 */
 export function ErrorAlert({ error }: { error: unknown }) {
+  const inModal = useInModal();
+  const shownError = useModalPresentation(error);
   const previous = useRef<unknown>(undefined);
   useEffect(() => {
-    if (error && error !== previous.current) alertError(error);
+    if (!inModal && error && error !== previous.current) alertError(error);
     previous.current = error;
-  }, [error]);
-  return null;
+  }, [error, inModal]);
+  return inModal && shownError ? <p role="alert" className="m-0 text-[13px] text-err">{shownError instanceof Error ? shownError.message : String(shownError)}</p> : null;
 }

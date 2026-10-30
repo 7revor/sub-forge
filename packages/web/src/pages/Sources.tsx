@@ -54,7 +54,7 @@ export function SourceList() {
 }
 
 const NewSourceModal = createModal<Record<string, never>, SourceDoc>(function NewSource({ modal }) {
-  const save = useSaveDoc('sources');
+  const save = useSaveDoc('sources', true);
   const [name, setName] = useModalDraft('');
   const [url, setUrl] = useModalDraft('');
   const [note, setNote] = useModalDraft('');
@@ -66,7 +66,6 @@ const NewSourceModal = createModal<Record<string, never>, SourceDoc>(function Ne
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
       <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
       <NoteField value={note} onChange={setNote} />
-      <ErrorAlert error={save.error} />
     </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</ModalFooter></ModalContent>
   );
 });

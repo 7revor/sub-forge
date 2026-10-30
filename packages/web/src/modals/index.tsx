@@ -22,11 +22,16 @@ export function useModalDraft<T>(initial?: T | (() => T)) {
   const update = useCallback((next: SetStateAction<T | undefined>) => { if (modalController.active(session.id)) setValue(next); }, [session.id]);
   return [value, update];
 }
-/** 查询结果在关闭时保留最后一次展示；业务数据仍由独立草稿管理。 */
+/** 查询结果在关闭时保留最后一次展示；页内复用组件在会话外正常更新。 */
+export function useModalActive() {
+  const session = useContext(SessionContext);
+  return useCallback(() => !session || modalController.active(session.id), [session?.id]);
+}
+export function useInModal() { return !!useContext(SessionContext); }
 export function useModalPresentation<T>(value: T): T {
-  const session = useSession(); const last = useRef(value);
-  useLayoutEffect(() => { if (session.phase === 'open') last.current = value; });
-  return session.phase === 'open' ? value : last.current;
+  const session = useContext(SessionContext); const last = useRef(value);
+  useLayoutEffect(() => { if (!session || session.phase === 'open') last.current = value; });
+  return !session || session.phase === 'open' ? value : last.current;
 }
 
 export function ModalContent(props: React.ComponentProps<typeof DialogContent>) {
@@ -37,7 +42,7 @@ export function ModalContent(props: React.ComponentProps<typeof DialogContent>) 
     attached.current = node;
     if (!node) queueMicrotask(() => { if (!attached.current) modalController.exited(session.id); });
   }).current;
-  return <DialogContent aria-describedby={undefined} {...props} ref={ref} onCloseAutoFocus={event => { event.preventDefault(); props.onCloseAutoFocus?.(event); }}>
+  return <DialogContent aria-describedby={undefined} {...props} data-modal-session={session.id} ref={ref} onCloseAutoFocus={event => { event.preventDefault(); props.onCloseAutoFocus?.(event); }}>
     <fieldset disabled={session.pending || session.phase === 'closing'} className="m-0 contents border-0 p-0">{props.children}</fieldset>
     {view.error && <p role="alert" className="m-0 whitespace-pre-wrap text-[13px] text-err">{view.error}</p>}
   </DialogContent>;
