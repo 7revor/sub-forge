@@ -63,10 +63,11 @@ export function profileConversionRoutes(store: Store) {
       changes.push(`「${group.name}」的 ${members.length} 个成员迁移到「${template.groups.find(g => g.id === target)!.name}」`);
     }
     const { template: _old, ...rest } = profile;
-    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, extraGroups: extraGroups.map(group => ({ ...group, members: group.members.map(member => member.kind === 'group' || member.kind === 'node' ? remapTarget(member) : member) })), ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
+    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, extraGroups: extraGroups.map(group => ({ ...group, members: group.members.map(member => member.kind === 'group' || member.kind === 'node' ? remapTarget(member) : member) })), ...(profile.routing?.mode === 'bound' ? { prependGroupIds: profile.routing.prependGroupIds, appendRules: profile.routing.appendRules?.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}), ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
       chains: profile.chains.map(chain => ({ ...chain, via: chain.via.kind === 'node' ? { ...chain.via, ref: { ...chain.via.ref, ...(chain.via.ref.fallback && chain.via.ref.fallback !== 'error' ? { fallback: remapTarget(chain.via.ref.fallback) } : {}) } } : remapTarget(chain.via) })),
     };
     if (profile.routing?.mode === 'bound' && profile.routing.prependRules?.length) changes.push(`保留 ${profile.routing.prependRules.length} 条前置规则，并按策略组映射更新出口`);
+    if (profile.routing?.mode === 'bound' && profile.routing.appendRules?.length) changes.push(`保留 ${profile.routing.appendRules.length} 条后置规则，并按策略组映射更新出口`);
     if (profile.routing?.mode === 'independent' && effective.groups.length) changes.push(`替换原策略组：${effective.groups.map(g => g.name).join('、')}；原有 ${effective.rules.length} 条规则改为模板的 ${template.rules.length} 条规则`);
     changes.unshift(`策略组结构、参数、规则和最终出口改用「${template.name ?? template.id}」`);
     validateDoc('profile', next as unknown as Record<string, unknown>, id, c.get('user'), store);

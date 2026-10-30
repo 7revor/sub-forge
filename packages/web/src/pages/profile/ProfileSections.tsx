@@ -6,19 +6,17 @@ import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
 import { TemplateCard } from './TemplateCard.tsx';
 
-const TABS = [['basic', '基础设置'], ['core', '核心设置']] as const;
-const sectionTab = (section?: string) => ['template', 'nodesets', 'chains', 'groups', 'rules', 'preview', 'core'].includes(section ?? '') ? 'core' : 'basic';
+const TABS = [['basic', '基础设置'], ['core', '核心设置'], ['preview', '预览']] as const;
+const sectionTab = (section?: string) => section === 'preview' ? 'preview' : ['template', 'nodesets', 'chains', 'groups', 'rules', 'core'].includes(section ?? '') ? 'core' : 'basic';
 
-/** 两个面板保持挂载，切换时保留草稿、展开状态和未解析的 YAML。 */
+/** 基础与核心面板保持挂载，切换时保留草稿、展开状态和未解析的 YAML。 */
 export function ProfileSections({ initialSection, routingReady = true, templateNotice, disabled = false, children }: { initialSection?: string; routingReady?: boolean; templateNotice?: ReactNode; disabled?: boolean; children?: ReactNode }) {
   const id = useId();
   const [active, setActive] = useState(sectionTab(initialSection));
-  const [previewOpen, setPreviewOpen] = useState(initialSection === 'preview');
   const sections = useRef<Record<string, HTMLElement | null>>({});
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   useEffect(() => {
     setActive(sectionTab(initialSection));
-    if (initialSection === 'preview') setPreviewOpen(true);
     if (initialSection && !['overview', 'basic', 'core'].includes(initialSection)) {
       const frame = requestAnimationFrame(() => sections.current[initialSection]?.scrollIntoView({ block: 'start' }));
       return () => cancelAnimationFrame(frame);
@@ -31,7 +29,7 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
         onClick={() => setActive(key)} onKeyDown={event => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
           event.preventDefault();
-          const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1 - index;
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
           setActive(TABS[next]![0]); tabs.current[next]?.focus();
         }}>{label}</button>)}
     </div>
@@ -51,9 +49,9 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
             <section ref={el => { sections.current.groups = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabGroups /></section>
             <section ref={el => { sections.current.rules = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabRules /></section>
           </>}
-          <details ref={el => { sections.current.preview = el; }} open={previewOpen} onToggle={event => setPreviewOpen(event.currentTarget.open)} className="scroll-mt-1 rounded-lg border border-line bg-panel p-4">
-            <summary className="cursor-pointer text-[14px] font-semibold">预览配置</summary>{previewOpen && <div className="mt-4 flex flex-col gap-4"><TabPreview /></div>}
-          </details>
+        </div>
+        <div role="tabpanel" id={`${id}-preview-panel`} aria-labelledby={`${id}-preview-tab`} hidden={active !== 'preview'} className={active === 'preview' ? 'flex min-w-0 flex-col gap-5' : undefined}>
+          {active === 'preview' && <TabPreview />}
         </div>
         {children}
       </fieldset>

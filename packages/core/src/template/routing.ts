@@ -1,4 +1,4 @@
-// 订阅分流配置：绑定模式补充成员与前置本地规则，独立模式拥有完整配置。
+// 订阅分流配置：绑定模式补充成员与模板前后的本地规则，独立模式拥有完整配置。
 import type { GroupMember, Overlay, Profile, RoutingConfig, Target, Template } from '../types.ts';
 import { Report } from '../report.ts';
 import { findGroupCycles, mergeTemplate, type Effective } from './merge.ts';
@@ -18,8 +18,8 @@ export function profileEditorOverlay(profile: Pick<Profile, 'routing' | 'overlay
   if (routing.mode === 'bound') return {
     extraGroups: (routing.extraGroups ?? []).map(group => ({ group })),
     groupPatches: Object.fromEntries(Object.entries(routing.groupAdditions).map(([id, addMembers]) => [id, { addMembers }])),
-    // 覆盖层逐条 unshift，倒序保存才能保持前置规则的显示顺序。
-    extraRules: [...(routing.prependRules ?? [])].reverse().map(rule => ({ anchor: 'top', rule })),
+    // 覆盖层逐条 unshift，倒序保存才能保持自定义规则的显示顺序。
+    extraRules: [...[...(routing.prependRules ?? [])].reverse().map(rule => ({ anchor: 'top' as const, rule })), ...(routing.appendRules ?? []).map(rule => ({ anchor: 'bottom' as const, rule }))],
   };
   return { extraGroups: routing.config.groups.map(group => ({ group })), extraRules: routing.config.rules.map(rule => ({ anchor: 'bottom' as const, rule })), final: routing.config.final };
 }
@@ -46,17 +46,19 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
   }
   const ruleIds = new Set(template.rules.map(rule => rule.id));
   const checkTarget = (target: Target, where: string, depth = 0): void => {
-    if (depth > 20) { report.error('binding.prepend-target', '前置规则的兜底引用过深', where); return; }
-    if (target.kind === 'group' && !groups.some(group => group.id === target.groupId)) report.error('binding.prepend-target', `前置规则引用的策略组 ${target.groupId} 已不存在`, where);
+    if (depth > 20) { report.error('binding.prepend-target', '自定义规则的兜底引用过深', where); return; }
+    if (target.kind === 'group' && !groups.some(group => group.id === target.groupId)) report.error('binding.prepend-target', `自定义规则引用的策略组 ${target.groupId} 已不存在`, where);
     if (target.kind === 'node' && target.ref.fallback && target.ref.fallback !== 'error') checkTarget(target.ref.fallback, where, depth + 1);
   };
-  for (const rule of profile.routing.prependRules ?? []) {
-    if (rule.matcher.kind !== 'rule' && rule.matcher.kind !== 'local') report.error('binding.prepend-ruleset', '前置规则只能使用本地规则', `rule:${rule.id}`);
-    if (ruleIds.has(rule.id)) report.error('binding.duplicate-rule', `前置规则 ID ${rule.id} 与现有规则重复`, `rule:${rule.id}`);
+  for (const rule of [...(profile.routing.prependRules ?? []), ...(profile.routing.appendRules ?? [])]) {
+    if (rule.matcher.kind !== 'rule' && rule.matcher.kind !== 'local') report.error('binding.prepend-ruleset', '自定义规则只能使用本地规则', `rule:${rule.id}`);
+    if (ruleIds.has(rule.id)) report.error('binding.duplicate-rule', `自定义规则 ID ${rule.id} 与现有规则重复`, `rule:${rule.id}`);
     ruleIds.add(rule.id);
     checkTarget(rule.target, `rule:${rule.id}`);
   }
   const effective = mergeTemplate(template, profileEditorOverlay(profile), report);
+  const before = new Set(profile.routing.prependGroupIds ?? []);
+  effective.groups = [...effective.groups.filter(g => g.origin === 'profile' && before.has(g.id)), ...effective.groups.filter(g => g.origin === 'template'), ...effective.groups.filter(g => g.origin === 'profile' && !before.has(g.id))];
   for (const cycle of findGroupCycles(effective.groups)) report.error('binding.group-cycle', `模板与追加成员的组引用成环：${cycle.join(' → ')}`);
   return effective;
 }

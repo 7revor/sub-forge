@@ -1,4 +1,4 @@
-// 新建与编辑共用基础设置、核心设置两个标签页。
+// 新建与编辑共用基础设置、核心设置和预览三个标签页。
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button, ErrorAlert, PageHeader } from '../../components/ui.tsx';
@@ -16,7 +16,7 @@ export function ProfileWizard() {
   const { ctx, template } = useProfileCtx(draft, setDraft);
   const { leave } = useLeaveGuard(JSON.stringify(draft) !== JSON.stringify(initial), undefined, () => ({ what: '新建订阅', canSave, saveLabel: '创建并离开', onSave: () => finish(true) }));
   const templateReady = draft.routing?.mode !== 'bound' || (!!template.data && !template.isError);
-  const body = draft.routing?.mode === 'independent' ? draft.routing.config : { groups: [...(template.data?.groups ?? []), ...(draft.routing?.extraGroups ?? [])], rules: draft.routing?.prependRules ?? [], final: template.data?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const } };
+  const body = draft.routing?.mode === 'independent' ? draft.routing.config : { groups: [...(template.data?.groups ?? []), ...(draft.routing?.extraGroups ?? [])], rules: [...(draft.routing?.prependRules ?? []), ...(draft.routing?.appendRules ?? [])], final: template.data?.final ?? { kind: 'builtin' as const, name: 'DIRECT' as const } };
   const issues = draftIssues(body);
   const canSave = !!draft.name.trim() && templateReady && !issues.length && !save.isPending;
   const finish = async (leaving = false) => {
