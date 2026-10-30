@@ -1,0 +1,26 @@
+import { afterEach, expect, it } from 'vitest';
+import { addUser, client, setupApp } from './helpers.ts';
+const envs: ReturnType<typeof setupApp>[] = [];
+afterEach(async () => { for (const e of envs.splice(0)) { await e.snapshots.settled(); e.store.close(); } });
+it('保存规范化旧策略，草稿诊断返回实际前置、缺失与环且不改已保存配置', async () => {
+  const env = setupApp(); envs.push(env); await addUser(env.store, 'alice');
+  const user = client(env.app); await user.login('alice');
+  const local = (await user.post('/api/locals', { name: '节点集', proxies: [{ name: '前置', type: 'socks5', server: 'relay.test', port: 1080 }, { name: '落地', type: 'socks5', server: 'landing.test', port: 1080 }] })).json.item;
+  const ref = { type: 'local', id: local.id };
+  const via = { kind: 'node', ref: { nodeSet: ref, match: { regex: '^前置$' } } };
+  const body = { name: '自动引用', nodeSets: [{ ref, output: 'provider' }], overlay: {}, refPolicy: { default: 'copy', perRef: { fake: 'inline' } }, chains: [{ id: 'c', landing: { nodeSet: ref, filter: '^落地$' }, via }], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } };
+  const saved = await user.post('/api/profiles', body); expect(saved.status).toBe(201);
+  const profile = saved.json.item;
+  expect(profile.refPolicy).toEqual({ default: 'wrap' });
+  const preview = await user.post(`/api/profiles/${profile.id}/preview`, { profile, client: 'mihomo' });
+  expect(preview.json.chainResolutions).toEqual([{ chainId: 'c', viaName: '前置', landingCount: 1, appliedCount: 1, issues: [] }]);
+  expect(preview.json.dependencies[0].strategy).toBe('wrap');
+  const missing = await user.post(`/api/profiles/${profile.id}/preview`, { profile: { ...profile, chains: [{ ...profile.chains[0], via: { ...via, ref: { ...via.ref, match: { exact: '不存在' } } } }] } });
+  expect(missing.json.ok).toBe(false);
+  expect(missing.json.chainResolutions[0]).toMatchObject({ appliedCount: 0, issues: [expect.objectContaining({ code: 'ref.unresolved' })] });
+  const cycle = await user.post(`/api/profiles/${profile.id}/preview`, { profile: { ...profile, chains: [{ ...profile.chains[0], landing: { nodeSet: ref } }] } });
+  expect(cycle.json.ok).toBe(false); expect(cycle.json.chainResolutions[0].issues.some((r: any) => r.code === 'chain.cycle')).toBe(true);
+  expect((await user.get(`/api/profiles/${profile.id}`)).json.item.chains).toEqual(profile.chains);
+  const stash = await user.post(`/api/profiles/${profile.id}/preview`, { profile, client: 'stash', platform: 'ios' });
+  expect(stash.json.ok).toBe(true); expect(stash.json.chainResolutions[0].viaName).toBe('前置');
+});

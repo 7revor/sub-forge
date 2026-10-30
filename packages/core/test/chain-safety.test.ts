@@ -62,7 +62,7 @@ describe('代理链的失败保护与真实成员展开', () => {
     expect(renderMihomo(input).report.byCode('ref.upstream-dialer-missing')).toEqual([expect.objectContaining({ level: 'error' })]);
   });
 
-  it('复制到本地的节点参与前置环检测', () => {
+  it('旧复制策略转换为隐藏组后仍参与前置环检测', () => {
     const input = base(group({ members: [{ kind: 'node', ref: { nodeSet: { type: 'source', id: 's' }, match: { exact: '落地' } } }] }));
     input.profile.refPolicy.default = 'copy';
     expect(renderMihomo(input).report.byCode('chain.cycle')).toHaveLength(1);

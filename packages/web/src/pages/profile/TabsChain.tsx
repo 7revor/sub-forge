@@ -1,111 +1,65 @@
+import { ChainCheckResult, useChainCheck } from './ChainCheck.tsx';
 import { chainForLanding } from './ChainRuleEditor.tsx';
-import { putChain } from './memberModel.ts';
 import { ChainRuleModal } from './ChainRuleModal.tsx';
 import { profileModalData } from './modalProfile.ts';
+import { landingNodeName } from './chainModel.ts';
+import { putChain } from './memberModel.ts';
 import { persistedProfile } from './routing.ts';
 import { CodePreview } from '../../components/CodePreview.tsx';
-// 代理链（链规则 + 依赖节点面板，REF-03 / REF-07）与预览（按平台查看最终配置与渲染报告）。
+// 代理链直接展示业务检查结果，引用生成细节仅在配置预览中按需展开。
 
 import { useMutation } from '@tanstack/react-query';
-import type { ChainRule, Platform, RefStrategy, YamlClient } from '@sub-forge/core';
-import { ArrowRight, Plus, Trash2 } from 'lucide-react';
+import type { ChainRule, Platform, YamlClient } from '@sub-forge/core';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import type { ProfileDoc } from '../../hooks.ts';
 import { targetLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, ReportList, Segmented, Select, td, th, cx } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, ReportList, Segmented, Select } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
-
-const STRATEGIES: { value: RefStrategy; label: string }[] = [{ value: 'wrap', label: '包装组' }, { value: 'copy', label: '复制到本地' }, { value: 'inline', label: '整体内联' }];
 
 function usePreview() {
   const { draft } = useProfile();
   return useMutation({ mutationFn: ({ platform, client = 'mihomo', profile = draft }: { platform?: Platform; client?: YamlClient; profile?: ProfileDoc } = {}) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: persistedProfile(profile), client, ...(platform ? { platform } : {}) }) });
 }
 
-function Hop({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
-  return (
-    <div className={`flex min-w-0 flex-col gap-0.5 rounded-lg border bg-panel px-3 py-2 ${accent ? 'border-[#a9bbea]' : 'border-[#d5d9e0]'}`}>
-      <span className="text-[11.5px] text-ink-muted">{k}</span><span className="text-[13px] font-medium">{v}</span>
-    </div>
-  );
-}
-
 export function TabChains() {
   const profile = useProfile();
   const { draft, setDraft, groupName, profileNodeSets, nodeSetName } = profile;
-  const preview = usePreview();
-  // 编辑在对话框里进行：index 为 -1 表示新增
+  const check = useChainCheck();
   const edit = async (chain: ChainRule, adding = false) => {
-    const result = await ChainRuleModal.show({ ...profileModalData(profile), chain, title: adding ? '添加前置规则' : '编辑前置规则' });
-    if (result.status === 'confirmed' && result.data) { setDraft({ ...draft, chains: putChain(draft.chains, result.data) }); preview.reset(); }
+    const result = await ChainRuleModal.show({ ...profileModalData(profile), chain, title: adding ? '添加代理链' : '编辑代理链' });
+    if (result.status === 'confirmed' && result.data) setDraft({ ...draft, chains: putChain(draft.chains, result.data) });
   };
-  const add = () => {
-    const ns = profileNodeSets[0]?.ref;
-    if (ns) void edit({ ...chainForLanding([], { nodeSet: ns }), landing: { nodeSet: ns, filter: '.*' } }, true);
-  };
-  const perRef = draft.refPolicy.perRef ?? {};
-  const chainReport = (preview.data?.report ?? []).filter((r) =>
-    (r.level === 'warn' || r.level === 'error') && (r.code.startsWith('chain.') || r.code.startsWith('ref.')));
+  const add = () => void edit(chainForLanding([], { nodeSet: { type: 'source', id: '' } }), true);
 
   return (
     <>
-      <Card title={`链规则`}
-        actions={<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加链规则</Button>}>
-        {!draft.chains.length ? <Empty title={profileNodeSets.length ? '还没有链规则' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
-          <div className="flex flex-col gap-3">
-            {draft.chains.map((c, i) => (
-              <div key={c.id} className="flex flex-col gap-3 rounded-[10px] border border-line bg-[#fafbfc] p-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[13.5px] font-semibold">#{i + 1} · {nodeSetName(c.landing.nodeSet)}{c.landing.filter ? ` 中命中 ${c.landing.filter} 的节点` : ' 全部节点'}经由「{targetLabel(c.via, groupName, nodeSetName)}」</span>
-                  <div className="flex gap-1.5">
-                    <Button size="sm" onClick={() => void edit(c)}>编辑</Button>
-                    <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除链规则 ${i + 1}`} onClick={() => setDraft({ ...draft, chains: draft.chains.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
-                  </div>
+      <Card title="代理链" subtitle={`${draft.chains.length} 条`} bodyClass=""
+        actions={<>{draft.chains.length > 0 && <Button onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={15} />添加代理链</Button></>}>
+        {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
+        {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[13px] text-err">当前配置无法生成。请修正代理链问题，其他配置错误可在「预览配置」中查看。</p>}
+        {!draft.chains.length ? <div className="px-4 pb-4"><Empty title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /></div> : (
+          <ol aria-label="代理链列表" className="m-0 list-none p-0">
+            {draft.chains.map((c, i) => {
+              const landing = landingNodeName(c.landing) ?? `${nodeSetName(c.landing.nodeSet)} · ${c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点'}`;
+              const path = `${targetLabel(c.via, groupName, nodeSetName)} → ${landing}`;
+              return <li key={c.id} aria-label={`代理链 ${i + 1}`} className="flex min-h-14 items-center gap-3 border-t border-line-2 px-4 py-2 hover:bg-ground">
+                <span className="w-4 shrink-0 text-[12px] tabular-nums text-ink-muted">{i + 1}</span>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 sm:flex-nowrap">
+                  <span title={`前置 → 落地：${path}`} className="min-w-0 max-w-full shrink-0 truncate text-[13px] text-ink-2 sm:max-w-[60%]">{path}</span>
+                  <ChainCheckResult chain={c} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === c.id)} />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Hop k="客户端" v="本机" />
-                  <ArrowRight size={18} className="text-faint" aria-hidden="true" />
-                  <Hop k={c.via.kind === 'group' ? '策略组' : c.via.kind === 'node' ? `${nodeSetName(c.via.ref.nodeSet)} 节点` : '内置'} v={targetLabel(c.via, groupName, nodeSetName)} accent />
-                  <ArrowRight size={18} className="text-faint" aria-hidden="true" />
-                  <Hop k={nodeSetName(c.landing.nodeSet)} v={c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter ?? '全部'}${c.landing.excludeFilter ? ` 排除 ${c.landing.excludeFilter}` : ''}` : '全部节点'} />
-                  <ArrowRight size={18} className="text-faint" aria-hidden="true" />
-                  <Hop k="目标" v="互联网" />
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`编辑代理链 ${i + 1}`} title="编辑代理链" onClick={() => void edit(c)}><Pencil size={14} /></Button>
+                  <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`删除链规则 ${i + 1}`} title="删除代理链" onClick={() => setDraft({ ...draft, chains: draft.chains.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
                 </div>
-              </div>
-            ))}
-          </div>
+              </li>;
+            })}
+          </ol>
         )}
       </Card>
 
-      {chainReport.length > 0 && <Card title="代理链告警" bodyClass="px-4 pb-2"><ReportList items={chainReport} /></Card>}
-      <Card title={`依赖节点`}
-        actions={<>
-          <label className="flex items-center gap-2 text-[12.5px] text-ink-2">默认引用方式
-            <Select placeholder="选择引用外部节点时的处理方式" className="h-9 w-auto" value={draft.refPolicy.default} onChange={(e) => setDraft({ ...draft, refPolicy: { ...draft.refPolicy, default: e.target.value as RefStrategy } })}>
-              {STRATEGIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </Select></label>
-          <Button onClick={() => preview.mutate({})} disabled={preview.isPending}>{preview.isPending ? '解析中…' : '解析依赖'}</Button>
-        </>} bodyClass="overflow-x-auto">
-        <ErrorAlert error={preview.error} />
-        {!preview.data ? <div className="px-4 pb-4"><Empty title="还没有依赖解析结果" /></div> : !preview.data.dependencies?.length ? <div className="px-4 pb-4"><Empty title="没有引用 Provider 中的单个节点" /></div> : (
-          <table className="w-full min-w-[760px] border-collapse">
-            <thead><tr><th className={th}>被引用的节点</th><th className={th}>生成项</th><th className={th}>引用来源</th><th className={th}>解析策略</th></tr></thead>
-            <tbody>
-              {preview.data.dependencies.map((d) => (
-                <tr key={d.refKey}>
-                  <td className={td}><div className="flex flex-col gap-0.5"><span className="font-medium">{d.node}</span><span className="text-[12px] text-ink-muted">{d.nodeSet}</span></div></td>
-                  <td className={cx(td, 'font-mono text-[12.5px]')}>{d.output}</td>
-                  <td className={cx(td, 'text-[12.5px] text-ink-2')}>{d.usedBy.join('、')}</td>
-                  <td className={td}><Segmented label="解析策略" value={perRef[d.refKey] ?? draft.refPolicy.default} options={STRATEGIES}
-                    onChange={(v) => setDraft({ ...draft, refPolicy: { ...draft.refPolicy, perRef: { ...perRef, [d.refKey]: v } } })} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {preview.data && <p className="mx-4 mt-3 mb-0 text-[12.5px] leading-relaxed text-ink-muted">依赖节点不可用时拒绝连接。</p>}
-      </Card>
     </>
   );
 }
@@ -160,6 +114,13 @@ export function TabPreview() {
               {!preview.data.ok && <div className="mb-2"><Badge tone="err">渲染失败，订阅接口会返回上一份成功结果</Badge></div>}
               <ReportList items={report} />
             </Card>
+            <details className="rounded-lg border border-line bg-panel px-4 py-3">
+              <summary className="cursor-pointer text-[13px] font-medium">自动生成的引用详情（{preview.data.dependencies?.length ?? 0}）</summary>
+              <p className="text-[12px] text-ink-muted">系统按客户端自动处理，以下为本次配置生成结果。</p>
+              {!preview.data.dependencies?.length ? <p className="text-[12px] text-ink-muted">本次配置无需生成隐藏引用组。</p> : <ul className="m-0 list-none space-y-3 p-0">{preview.data.dependencies.map(d => <li key={d.refKey} className="border-t border-line-2 pt-2 text-[12px]">
+                <div className="font-medium">{d.node}</div><div className="mt-1 break-all font-mono text-ink-muted">{d.output}</div><div className="mt-1 break-all text-ink-muted">引用位置：{d.usedBy.join('、')}</div>
+              </li>)}</ul>}
+            </details>
           </section>
         </div>
       )}

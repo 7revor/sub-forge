@@ -5,7 +5,7 @@ export function boundTemplateId(p: ProfileDoc): string | undefined {
   return p.routing?.mode === 'bound' ? p.routing.templateId : p.routing ? undefined : p.template?.id;
 }
 export function persistedProfile(p: ProfileDoc): ProfileDoc {
-  return p.routing ? { ...p, overlay: {} } : p;
+  return { ...p, refPolicy: { default: 'wrap' }, ...(p.routing ? { overlay: {} } : {}) };
 }
 export function updateEditorOverlay(p: ProfileDoc, change: (o: Overlay) => Overlay): ProfileDoc {
   const overlay = change(profileEditorOverlay(p));

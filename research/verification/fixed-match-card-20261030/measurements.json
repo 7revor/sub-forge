@@ -1,0 +1,202 @@
+{
+  "template": {
+    "match": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px",
+      "dragButtons": 0,
+      "font": "13px",
+      "height": 50,
+      "insideSortable": false,
+      "radius": "10px",
+      "width": 946
+    },
+    "order": [
+      "template-rule-remote",
+      "template-rule-local"
+    ],
+    "overflow": false,
+    "rules": [
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-remote",
+        "radius": "10px",
+        "width": 946
+      },
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-local",
+        "radius": "10px",
+        "width": 946
+      }
+    ],
+    "viewport": 1280
+  },
+  "afterReorder": {
+    "match": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px",
+      "dragButtons": 0,
+      "font": "13px",
+      "height": 50,
+      "insideSortable": false,
+      "radius": "10px",
+      "width": 946
+    },
+    "order": [
+      "template-rule-local",
+      "template-rule-remote"
+    ],
+    "overflow": false,
+    "rules": [
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-local",
+        "radius": "10px",
+        "width": 946
+      },
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-remote",
+        "radius": "10px",
+        "width": 946
+      }
+    ],
+    "viewport": 1280
+  },
+  "mobile": {
+    "match": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px",
+      "dragButtons": 0,
+      "font": "13px",
+      "height": 90,
+      "insideSortable": false,
+      "radius": "10px",
+      "width": 320
+    },
+    "order": [
+      "template-rule-local",
+      "template-rule-remote"
+    ],
+    "overflow": false,
+    "rules": [
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 90,
+        "id": "template-rule-local",
+        "radius": "10px",
+        "width": 320
+      },
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 90,
+        "id": "template-rule-remote",
+        "radius": "10px",
+        "width": 320
+      }
+    ],
+    "viewport": 390
+  },
+  "profile": {
+    "match": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px",
+      "dragButtons": 0,
+      "font": "13px",
+      "height": 50,
+      "insideSortable": false,
+      "radius": "10px",
+      "width": 946
+    },
+    "order": [
+      "template-rule-remote",
+      "template-rule-local"
+    ],
+    "overflow": false,
+    "rules": [
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-remote",
+        "radius": "10px",
+        "width": 946
+      },
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-local",
+        "radius": "10px",
+        "width": 946
+      }
+    ],
+    "viewport": 1280
+  },
+  "bound": {
+    "match": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px",
+      "dragButtons": 0,
+      "font": "13px",
+      "height": 50,
+      "insideSortable": false,
+      "radius": "10px",
+      "width": 946
+    },
+    "order": [
+      "template-rule-local",
+      "template-rule-remote",
+      "template-rule-prepend"
+    ],
+    "overflow": false,
+    "rules": [
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-local",
+        "radius": "10px",
+        "width": 946
+      },
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-remote",
+        "radius": "10px",
+        "width": 946
+      },
+      {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px",
+        "font": "13px",
+        "height": 50,
+        "id": "template-rule-prepend",
+        "radius": "10px",
+        "width": 912
+      }
+    ],
+    "viewport": 1280
+  }
+}

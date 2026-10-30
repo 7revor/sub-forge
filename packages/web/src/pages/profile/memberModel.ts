@@ -32,7 +32,6 @@ export function exactNodeFilter(name: string): string {
   return `^${escaped}$`;
 }
 export function chainInputError(chain: ChainRule): string | undefined {
-  if (!chain.landing.nodeSet.id) return '请选择落地节点来源';
   try {
     if (chain.landing.filter) compileUserRegex(chain.landing.filter);
     if (chain.landing.excludeFilter) compileUserRegex(chain.landing.excludeFilter);
@@ -41,6 +40,7 @@ export function chainInputError(chain: ChainRule): string | undefined {
       const ref = chain.via.ref;
       if (!ref.nodeSet.id || !('exact' in ref.match ? ref.match.exact : ref.match.regex).trim()) return '请选择前置节点';
       if ('regex' in ref.match) compileUserRegex(ref.match.regex);
+      if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && !chain.landing.filter && !chain.landing.excludeFilter) return '前置与整集落地不能使用同一节点集，会形成循环';
       if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && 'exact' in ref.match) {
         const included = !chain.landing.filter || compileUserRegex(chain.landing.filter).test(ref.match.exact);
         const excluded = !!chain.landing.excludeFilter && compileUserRegex(chain.landing.excludeFilter).test(ref.match.exact);
@@ -48,6 +48,7 @@ export function chainInputError(chain: ChainRule): string | undefined {
       }
     }
   } catch (error) { return error instanceof Error ? error.message : String(error); }
+  if (!chain.landing.nodeSet.id) return '请选择落地节点来源';
   return undefined;
 }
 

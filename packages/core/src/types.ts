@@ -236,6 +236,7 @@ export type Template = {
 
 // ---------- 订阅 ----------
 
+/** @deprecated 仅兼容旧配置；引用方式由目标客户端自动决定。 */
 export type RefStrategy = 'wrap' | 'copy' | 'inline';
 
 export type Overlay = {
@@ -275,5 +276,6 @@ export type Profile = {
   nodeSets: ProfileNodeSet[];
   overlay: Overlay;
   chains: ChainRule[];
+  /** @deprecated 兼容旧字段，渲染不再读取手动引用策略。 */
   refPolicy: { default: RefStrategy; perRef?: Record<string, RefStrategy> };
 };

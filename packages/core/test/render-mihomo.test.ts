@@ -91,17 +91,12 @@ describe('规则输出', () => {
 describe('依赖解析策略', () => {
   const ruleToNode = { rulePatches: { 'r-cn': { target: { kind: 'node' as const, ref: { nodeSet: { type: 'source' as const, id: 'S' }, match: { exact: '🇺🇸 Home-Broadband' } } } } } };
 
-  it('复制到本地：provider 中保留原节点，proxies 多一份副本', () => {
-    const r = render({ nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }], overlay: ruleToNode, refPolicy: { default: 'copy' } });
-    expect((r.config.proxies as { name: string }[]).map((p) => p.name)).toEqual(['🇺🇸 Home-Broadband']);
+  it.each(['copy', 'inline'] as const)('旧策略 %s 不覆盖节点集输出方式，自动生成精确隐藏组', strategy => {
+    const r = render({ nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }], overlay: ruleToNode, refPolicy: { default: strategy } });
+    expect(r.config.proxies).toEqual([]);
     expect(providerProxies(r, 'source:S')).toHaveLength(1);
-    expect(r.config.rules).toContain('GEOIP,CN,🇺🇸 Home-Broadband,no-resolve');
-  });
-
-  it('整体内联：该节点集改为 inline 输出，不再生成 provider', () => {
-    const r = render({ nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }], overlay: ruleToNode, refPolicy: { default: 'inline' } });
-    expect(r.config['proxy-providers']).toBeUndefined();
-    expect((r.config.proxies as { name: string }[]).map((p) => p.name)).toEqual(['🇺🇸 Home-Broadband']);
+    expect(r.dependencies[0]).toMatchObject({ strategy: 'wrap', node: '🇺🇸 Home-Broadband' });
+    expect(r.config.rules).toContain(`GEOIP,CN,${r.dependencies[0]!.output},no-resolve`);
   });
 
   it('引用失效时按 fallback 兜底，没有 fallback 时报错', () => {

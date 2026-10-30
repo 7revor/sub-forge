@@ -1,7 +1,7 @@
 // 单页草稿编辑：默认展示节点与分流内容，可选设置按需打开。
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Button, ErrorAlert, Field, Input, PageHeader, PageScroll } from '../../components/ui.tsx';
+import { Button, ErrorAlert, PageHeader, PageScroll } from '../../components/ui.tsx';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard.ts';
 import { useSaveDoc, type ProfileDoc } from '../../hooks.ts';
 import { draftIssues } from '../template/model.ts';
@@ -35,7 +35,6 @@ export function ProfileWizard() {
     <PageScroll>
       <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
         <ProfileSections routingReady={templateReady} before={<>
-          <section className="rounded-[10px] border border-line bg-panel px-4.5 py-4"><Field label="订阅名称">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} className="max-w-[480px]" />}</Field></section>
           <TemplateCard />
           <ErrorAlert error={template.error} />
           {!templateReady && <div className="flex items-center gap-3 text-[13px] text-ink-muted">{template.isError ? '模板加载失败，请重试或更换模板。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}

@@ -18,25 +18,20 @@ describe('绑定订阅的前置单条规则', () => {
     expect(profileEditorOverlay({ overlay: {}, routing: bound([first, second]) }).extraRules?.map(extra => extra.rule.id)).toEqual(['second', 'first']);
   });
 
-  it.each(['wrap', 'copy', 'inline'] as const)('远端 provider 节点和代理链共享 %s 依赖解析，重复引用复用依赖', strategy => {
+  it.each(['wrap', 'copy', 'inline'] as const)('旧策略 %s 自动处理，规则与代理链重复引用复用精确隐藏组', strategy => {
     const result = render({
       nodeSets: [{ ref: { type: 'source', id: 'T' }, output: 'provider' }, { ref: { type: 'source', id: 'L' }, output: 'provider' }],
       routing: bound([rule('node', node)]), refPolicy: { default: strategy },
       chains: [{ id: 'chain', landing: { nodeSet: { type: 'source', id: 'L' } }, via: node }],
     });
     expect(result.report.items.filter(item => item.level === 'error')).toEqual([]);
-    if (strategy === 'inline') {
-      expect(result.providers['source:T']).toBeUndefined();
-      expect(result.config.rules).toContain('DOMAIN,node.test,🇭🇰 IPLC-01');
-    } else {
-      expect(result.dependencies).toHaveLength(1);
-      expect(result.dependencies[0]).toMatchObject({ strategy, usedBy: ['chain:chain', 'rule:node'] });
-      const output = result.dependencies[0]!.output;
-      expect(result.config.rules).toContain(`DOMAIN,node.test,${output}`);
-      if (strategy === 'wrap') expect(result.config['proxy-groups']).toContainEqual(expect.objectContaining({ name: output, use: ['中转'], hidden: true }));
-      else expect(result.config.proxies).toContainEqual(expect.objectContaining({ name: output }));
-      expect(parse(result.providers['source:T']!.yaml).proxies).toHaveLength(2);
-    }
+    expect(result.dependencies).toHaveLength(1);
+    expect(result.dependencies[0]).toMatchObject({ strategy: 'wrap', usedBy: ['chain:chain', 'rule:node'] });
+    const output = result.dependencies[0]!.output;
+    expect(result.config.rules).toContain(`DOMAIN,node.test,${output}`);
+    expect(result.config['proxy-groups']).toContainEqual(expect.objectContaining({ name: output, use: ['中转'], hidden: true }));
+    expect(result.config.proxies).toEqual([]);
+    expect(parse(result.providers['source:T']!.yaml).proxies).toHaveLength(2);
   });
 
   it('只有规则引用的远端节点也生成依赖，未命中使用同一兜底', () => {
@@ -69,10 +64,12 @@ it('禁用前置规则与节点兜底引用的组也参与模板更新检查', (
   expect(report.byCode('binding.prepend-target').map(item => item.where)).toEqual(['rule:disabled', 'rule:fallback']);
 });
 
-it('前置规则抽取的本地副本纳入 include-all-proxies 的代理链成环检查', () => {
+it('旧复制策略不再向 include-all-proxies 注入额外节点', () => {
   const routing: Profile['routing'] = { mode: 'bound', templateId: TEMPLATE.id, groupAdditions: { sel: [{ kind: 'all', scope: 'proxies' }] }, prependRules: [rule('copy', node)] };
   const result = render({ nodeSets: [{ ref: { type: 'source', id: 'T' }, output: 'provider' }], routing, refPolicy: { default: 'copy' },
     chains: [{ id: 'loop', landing: { nodeSet: { type: 'source', id: 'T' }, filter: '^🇭🇰 IPLC-01$' }, via: { kind: 'group', groupId: 'sel' } }],
   });
-  expect(result.report.byCode('chain.cycle')).toHaveLength(1);
+  expect(result.report.byCode('chain.cycle')).toEqual([]);
+  expect(result.config.proxies).toEqual([]);
+  expect(result.dependencies[0]?.strategy).toBe('wrap');
 });

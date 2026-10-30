@@ -41,7 +41,7 @@ export type NodeListResult = { nodes: NodeBrief[]; total: number; truncated: boo
 export type TraceStep = { index: number; op: string; enabled: boolean; before: number; after: number; renamed: { from: string; to: string }[]; removed: string[]; error?: string; nodes: NodeBrief[]; origins: (number | null)[]; truncated: boolean };
 export type PipelinePreview = { input: number; inputNodes: NodeBrief[]; failures: { line: string; reason: string }[]; report: ReportItem[]; trace: TraceStep[]; nodes: NodeBrief[] };
 export type DependencyEntry = { refKey: string; nodeSet: string; node: string; strategy: 'wrap' | 'copy' | 'inline'; output: string; usedBy: string[] };
-export type ProfilePreview = { ok: boolean; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; report: ReportItem[]; failure?: string };
+export type ProfilePreview = { ok: boolean; yaml?: string; exportYaml?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; forceable?: boolean; issues: ReportItem[] };
 export type RejectedRuleDetail = { line: number; text: string; reason: string };
 /** 规则集预览中每个来源的拉取 / 解析状态；不支持的行最多返回前 100 条详情 */

@@ -127,5 +127,8 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
     } else if (rule.matcher.kind !== 'rule' || !obj(rule.matcher.rule) || !isStr(rule.matcher.rule.type)) throw bad(`规则 ${rule.id}：匹配项不合法`);
   }
   target(effective.final, '最终出口');
-  for (const chain of doc.chains) target(chain.via, `代理链 ${chain.id}`);
+  for (const chain of doc.chains) {
+    nodeSet(chain.landing.nodeSet, `代理链 ${chain.id} 的落地`);
+    target(chain.via, `代理链 ${chain.id} 的前置`);
+  }
 }

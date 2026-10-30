@@ -1,10 +1,7 @@
-import type { ChainRule } from '@sub-forge/core';
-import { chainForLanding } from './ChainRuleEditor.tsx';
-import { nodeSetKey, putChain } from './memberModel.ts';
+import type { NodeSetID } from '@sub-forge/core';
+import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
 import { targetLabel } from '../../components/pickers.tsx';
 import { Frame } from '../../modals/Frame.tsx';
-import { ChainRuleModal } from './ChainRuleModal.tsx';
-import { profileModalData } from './modalProfile.ts';
 import { notifySuccess } from '../../feedback.ts';
 import { YamlTextarea } from '../../components/YamlTextarea.tsx';
 import { formatRelativeTime } from '../../utils/format.ts';
@@ -93,7 +90,6 @@ export function TabOverview() {
                 <option value="none">不输出</option>
               </Select>
             )}</Field>
-            <Field label="客户端中的显示名">{(id) => <Input placeholder="填写配置订阅的名称" id={id} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</Field>
             {lastGood
               ? <div className="rounded-lg bg-ok-soft px-3 py-2.5 text-[12.5px] leading-relaxed text-[#17633a]">最近一次成功渲染：{formatRelativeTime(lastGood.at)}（{lastGood.client}）</div>
               : <Empty title="还没有成功渲染过" />}
@@ -195,17 +191,21 @@ export function TabBase() {
 
 /** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
 export function TabNodeSets() {
-  const profile = useProfile();
-  const { draft, setDraft, allNodeSets, nodeSetName, groupName } = profile;
-  const editChain = async (chain: ChainRule) => {
-    const result = await ChainRuleModal.show({ ...profileModalData(profile), chain, title: '节点集前置', fixedLanding: true, removable: draft.chains.some(c => c.id === chain.id) });
-    if (result.status === 'confirmed') setDraft({ ...draft, chains: result.data ? putChain(draft.chains, result.data) : draft.chains.filter(c => c.id !== chain.id) });
+  const { draft, setDraft, allNodeSets, nodeSetName, groupName } = useProfile();
+  const remove = async (ref: NodeSetID) => {
+    const affected = draft.chains.filter(c => chainUsesNodeSet(c, ref));
+    if (affected.length) {
+      const chains = affected.map(c => `${targetLabel(c.via, groupName, nodeSetName)} → ${nodeSetName(c.landing.nodeSet)} · ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? `筛选 ${c.landing.filter || '全部'}${c.landing.excludeFilter ? `，排除 ${c.landing.excludeFilter}` : ''}` : '全部节点')}`).join('\n');
+      const result = await Frame.modal.confirm({ title: `移出节点集「${nodeSetName(ref)}」？`, description: `以下 ${affected.length} 条代理链引用了此节点集，将一起移除。保存订阅后生效。\n\n${chains}`, confirmLabel: '移出并移除代理链', danger: true });
+      if (result.status !== 'confirmed') return;
+    }
+    setDraft(removeProfileNodeSet(draft, ref));
   };
   const chained = new Set(draft.chains.map((c) => `${c.landing.nodeSet.type}:${c.landing.nodeSet.id}`));
 
   return (
     <>
-      <Card title="节点来源" subtitle="加入节点集后，在下方策略组中填充。"
+      <Card title="节点来源" subtitle="选择输出方式后，可在下方设置代理链与策略组。"
         actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={15} />添加节点集</Button>} bodyClass="pb-1">
         {!draft.nodeSets.length ? <div className="px-4 pb-4"><Empty title="还没有节点集" /></div> : <ul className="m-0 list-none p-0">
           {draft.nodeSets.map((n, i) => <li key={`${n.ref.type}:${n.ref.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line-2 px-4 py-3">
@@ -213,8 +213,7 @@ export function TabNodeSets() {
               <span className="text-[12px] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点{chained.has(`${n.ref.type}:${n.ref.id}`) && ' · 已配置代理链'}</span>
             </div>
             <Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: 'Provider' }, { value: 'inline', label: 'Inline' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} />
-            <Button size="sm" onClick={() => void editChain(chainForLanding(draft.chains, { nodeSet: n.ref }))}>{(() => { const c = draft.chains.find(c => nodeSetKey(c.landing.nodeSet) === nodeSetKey(n.ref) && !c.landing.filter && !c.landing.excludeFilter); return c ? `整集前置：${targetLabel(c.via, groupName, nodeSetName)}` : '设置整集前置'; })()}</Button>
-            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.filter((_, j) => j !== i) })}><Trash2 size={14} /></Button>
+            <Button size="sm" variant="ghost" className="w-8 px-0" aria-label={`移除 ${nodeSetName(n.ref)}`} onClick={() => void remove(n.ref)}><Trash2 size={14} /></Button>
           </li>)}
         </ul>}
       </Card>
@@ -222,4 +221,3 @@ export function TabNodeSets() {
     </>
   );
 }
-

@@ -28,6 +28,14 @@ store.importSeed({
   } } }, { id: 'bound', name: '模板绑定验收', overlay: {}, nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }], refPolicy: { default: 'wrap' }, chains: [], routing: { mode: 'bound', templateId: 'tpl', groupAdditions: {} } }],
   tokens: [{ token: 'member-test-token', profileId: 'independent', label: '验收设备' }],
 }, user.id);
+// 旧落地正则需保留原范围，不能因新编辑器只提供整集 / 单节点而静默扩大。
+store.put('profile', { id: 'legacy-chain', name: '历史代理链兼容', overlay: {}, nodeSets: allProviders, refPolicy: { default: 'wrap' }, chains: [{ id: 'legacy', landing: { nodeSet: { type: 'local', id: 'self' }, filter: 'GCP', excludeFilter: '过期' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'relay' }, match: { exact: '🇭🇰 香港 IPLC' }, fallback: 'error' } } }], routing: { mode: 'independent', config: { groups: [], rules: [], final: direct } } }, user.id);
+// 自动引用与卡片诊断：正常、缺失、策略组成环各一条。
+store.put('profile', { id: 'auto-chain', name: '代理链自动处理验收', overlay: {}, nodeSets: allProviders, refPolicy: { default: 'copy', perRef: { old: 'inline' } }, chains: [
+  { id: 'good', landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^🇺🇸 GCP \\[01\\]$' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'other' }, match: { regex: '香港' } } } },
+  { id: 'missing', landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^🇸🇬 新加坡$' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'other' }, match: { exact: '已删除的前置' } } } },
+  { id: 'cycle', landing: { nodeSet: { type: 'local', id: 'relay' } }, via: { kind: 'group', groupId: 'loop' } },
+], routing: { mode: 'independent', config: { groups: [{ id: 'loop', name: '循环前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'relay' } }] }], rules: [], final: direct } } }, user.id);
 const snapshots = new SnapshotService(store, async url => { throw new Error(`验收禁止访问上游：${url}`); });
 const publicUrl = 'http://member-chain.localhost:18952';
 const renderer = new RenderService(store, snapshots, { publicUrl });
