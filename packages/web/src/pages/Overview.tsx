@@ -15,8 +15,8 @@ import { useList, useTemplates } from '../hooks.ts';
 
 const DAY = 86_400_000;
 
-type Notice = { id: string; tone: 'err' | 'warn' | 'info'; title: string; body: string; action: string; to: string };
-const DOT = { err: 'bg-err', warn: 'bg-warn', info: 'bg-brand' } as const;
+type Notice = { id: string; tone: 'warn' | 'info'; title: string; body: string; action: string; to: string };
+const DOT = { warn: 'bg-warn', info: 'bg-brand' } as const;
 
 /** 提醒放在对应列表内；无异常时不占用展示空间。 */
 function OverviewNotices({ items }: { items: Notice[] }) {
@@ -61,11 +61,6 @@ export function Overview() {
   const recent = rows.flatMap((r) => r.recent);
   const hitRate = recent.length ? Math.round((recent.filter((r) => r.source === 'cache').length / recent.length) * 100) : undefined;
 
-  const sourceNotices: Notice[] = failing.map(({ source, lastFail, lastOk }) => ({
-    id: source.id, tone: 'err', title: `「${source.name}」拉取失败`,
-    body: `${lastFail?.error ?? '未知错误'}。${lastOk ? `正在使用 ${formatTime(lastOk.fetchedAt).slice(5)} 的快照。` : '还没有可用快照，相关配置订阅暂时无法渲染。'}`,
-    action: '查看节点订阅', to: `/sources/${source.id}`,
-  }));
   const profileNotices: Notice[] = [
     ...rows.filter((r) => r.last && r.last.warnings > 0).map((r) => ({
       id: `warnings:${r.p.id}`, tone: 'warn' as const, title: `「${r.p.name}」最近一次渲染有 ${r.last!.warnings} 条告警`,
@@ -122,7 +117,6 @@ export function Overview() {
         </Card>
 
         <Card title="节点订阅" actions={<Link to="/sources" className="text-[13px] text-brand">全部节点订阅</Link>} className="min-w-0" bodyClass="">
-          <OverviewNotices items={sourceNotices} />
           <div className="overflow-x-auto">
             {!sources.data?.length ? <div className="px-4 pb-4"><Empty title="还没有节点订阅" /></div> : (
               <table className="w-full border-collapse">
