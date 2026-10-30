@@ -302,3 +302,6 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 
 2026-10-30 模板与订阅的 MATCH 使用 RuleCardFooter 复用规则行列宽，出口区域为 112px；继承模式仍无编辑入口。内置浏览器桌面/窄屏对齐误差实测为 0px。没有后端待实现项，外部画布沿用此前核实的登录限制，未编辑；待同步见 docs/13。
+
+
+2026-10-30 MATCH 改为 RuleFinalCard，与 RuleCard 共用 RoutingCard 和响应式排列，不加入 SortableList。模板与订阅同步，前置规则不增加 MATCH。无服务端待实现项；外部画布沿用此前核实的登录限制，待同步见 docs/13。

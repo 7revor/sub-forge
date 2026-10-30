@@ -308,3 +308,6 @@ Docker 验证中发现并修复的问题：
 
 
 2026-10-30 已收紧规则出口文字箭头间距并对齐 MATCH 名称/出口列；相关 7 项测试、构建及内置浏览器实测通过，证据见 research/verification/rule-footer-alignment-20261030/README.md。外部设计画布仍待同步。
+
+
+2026-10-30 MATCH 已改为同尺寸固定卡片，模板与独立/绑定订阅同步。实测规则重排后 MATCH 仍位于末尾；桌面 50px、窄屏 90px 均与同页可编辑规则卡片等高。验收见 research/verification/fixed-match-card-20261030/README.md。

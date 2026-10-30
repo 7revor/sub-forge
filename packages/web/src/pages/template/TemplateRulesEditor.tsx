@@ -7,7 +7,7 @@ import { ruleToLine } from '../../components/rule.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, FieldError } from '../../components/ui.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
-import { RuleCard, RuleCardFooter } from '../../components/RuleCard.tsx';
+import { RuleCard, RuleFinalCard } from '../../components/RuleCard.tsx';
 import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
@@ -86,10 +86,10 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);
           }}><span title={label}>{label}</span></RuleCard>;
       }} />
-      {!hideFinal && <div className="mt-3 border-t border-line-2 pt-3">
-        <RuleCardFooter targetId="template-rule-final" target={readOnly ? <span className="block truncate px-1.5" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />}>MATCH</RuleCardFooter>
+      {!hideFinal && <>
+        <RuleFinalCard readOnly={readOnly} targetId="template-rule-final" target={readOnly ? <span className="block truncate px-1.5" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />} />
         <ItemIssues report={report} where="final" />
-      </div>}
+      </>}
     </Card>
   </>;
 }

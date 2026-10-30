@@ -288,3 +288,6 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 
 
 2026-10-30 RuleCard 与 RuleCardFooter 共用 112px 出口区域；MATCH 复用规则行拖动/图标/操作列的占位，桌面和窄屏对应列对齐。RoutingTargetMenu 的文字与箭头布局间距收紧为 6px。
+
+
+2026-10-30 RuleFinalCard 替代 RuleCardFooter，与规则行共用 RoutingCard、内容布局和出口宽度；MATCH 固定在 SortableList 外，不参与排序。桌面/窄屏同尺寸，继承模式出口仍只读。

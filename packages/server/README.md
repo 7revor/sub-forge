@@ -392,3 +392,6 @@ SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，�
 
 
 2026-10-30 规则出口和 MATCH 对齐复用现有隔离卡片验收脚本；API、数据库和 examples/seed.example.json 不变。
+
+
+2026-10-30 MATCH 固定卡片沿用现有读取/保存接口及隔离验收数据，API、数据库和生产示例种子无需变更。
