@@ -332,6 +332,11 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* 列表卡片内只保留表头线和行间线：最后一行不画底线，避免与卡片边框或分页栏分隔线叠成双线。 */
+.list-panel tbody tr:last-child > .table-cell-divider::after {
+  display: none;
+}
+
 /* 共享单元格分隔线：保留边框占位，首尾向内收，与内容留白对齐。 */
 .table-cell-divider {
   position: relative;
