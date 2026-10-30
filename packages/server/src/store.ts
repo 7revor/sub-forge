@@ -47,12 +47,14 @@ export type Role = 'admin' | 'user';
 export type User = { id: string; username: string; role: Role; disabled: boolean; scriptAllowed: boolean; createdAt: number };
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
-const KEEP_OK_SNAPSHOTS = 5;
-const SCHEMA_VERSION = 20;
+const KEEP_OK_SNAPSHOTS = 1;
+const SCHEMA_VERSION = 21;
 /** 每个 Profile/客户端保留最近 32 个结构版本；节点内容刷新不增加版本数。 */
 const KEEP_RENDER_GENERATIONS = 32;
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS system_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS resource_bindings (kind TEXT NOT NULL, id TEXT NOT NULL, url_hash TEXT NOT NULL, resource TEXT NOT NULL, PRIMARY KEY(kind,id,url_hash));
 CREATE TABLE IF NOT EXISTS rule_repos (
   id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, built_at INTEGER, checked_at INTEGER,
   revisions TEXT NOT NULL DEFAULT '{}', error TEXT, definition TEXT, indexed_definition TEXT
@@ -142,7 +144,40 @@ export class Store {
     try { this.migrate(); } catch (e) { this.db.close(); throw e; }
   }
 
-  close(): void { this.db.close(); }
+  readonly listeners = new Set<() => void>();
+  changed(): void { for (const listener of this.listeners) listener(); }
+  get resourceCacheTtlSec(): number {
+    const row = this.db.prepare("SELECT value FROM system_settings WHERE name = 'resourceCacheTtlSec'").get() as { value: string } | undefined;
+    return row ? Number(row.value) : 86400;
+  }
+  setResourceCacheTtlSec(value: number): void {
+    if (!Number.isSafeInteger(value) || value < 3600 || value > 8760 * 3600 || value % 3600) throw new Error('资源缓存时间必须为 1 至 8760 的整数小时');
+    this.db.prepare("INSERT OR REPLACE INTO system_settings VALUES ('resourceCacheTtlSec', ?)").run(String(value));
+    this.changed();
+  }
+  /** 相同权限、地址与读取参数共享一份成功原文。绑定不改变文档归属。 */
+  bindResource(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string): string {
+    const owner = scope ?? this.getWithOwner(kind, id)?.owner ?? `reference:${id}`;
+    const resource = 'resource:' + this.cipher.hmac(JSON.stringify([kind, owner, url, options]));
+    const urlHash = this.cipher.hmac(url);
+    const prior = this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,urlHash) as { resource: string } | undefined;
+    if (prior?.resource === resource) return resource;
+    // 旧快照只在首次绑定时迁移；参数变化不能沿用旧读取身份的正文。
+    if (!prior) {
+      for (const ok of [true, false]) {
+        const legacy = this.latestSnapshot(kind,id,url,ok);
+        const current = this.latestSnapshot(kind,resource,url,ok);
+        if (legacy && (!current || legacy.fetchedAt > current.fetchedAt)) this.addSnapshot({ ...legacy, ownerId: resource });
+      }
+      this.db.prepare('DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?').run(kind,id,urlHash);
+    }
+    this.db.prepare('INSERT OR REPLACE INTO resource_bindings VALUES (?, ?, ?, ?)').run(kind,id,urlHash,resource);
+    return resource;
+  }
+  private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
+    return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,this.cipher.hmac(url)) as {resource:string}|undefined)?.resource ?? id;
+  }
+  close(): void { this.listeners.clear(); this.db.close(); }
 
   /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包；v7：客户端改写绑定来源；v8 及以前：订阅地址可能保存在 urls 数组） */
   private migrate(): void {
@@ -228,6 +263,15 @@ export class Store {
       if (version < 18) this.removeRuleSwitches();
       if (version < 19) this.collapseTemplateHistory();
       if (version < 20) this.removeConcurrencyMarkers();
+      if (version < 21) {
+        this.db.exec(`DELETE FROM snapshots WHERE id NOT IN (SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (PARTITION BY owner_kind, owner_id, url_hash, ok ORDER BY fetched_at DESC, id DESC) AS position FROM snapshots) WHERE position = 1)`);
+        for (const row of this.db.prepare('SELECT kind,id,data FROM docs').all() as {kind:string;id:string;data:string}[]) {
+          const doc = JSON.parse(this.cipher.decrypt(row.data));
+          this.stripResourceTiming(doc);
+          this.db.prepare('UPDATE docs SET data = ? WHERE kind = ? AND id = ?').run(this.cipher.encrypt(JSON.stringify(doc)),row.kind,row.id);
+        }
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -434,14 +478,22 @@ export class Store {
     }
   }
 
+  private stripResourceTiming(doc: Record<string, any>): void {
+    delete doc.updateIntervalSec;
+    if (doc.fetch) { delete doc.fetch.ttlSec; if (!Object.keys(doc.fetch).length) delete doc.fetch; }
+    for (const source of doc.sources ?? []) this.stripResourceTiming(source);
+  }
   // ---------- 文档 ----------
 
   /** owner 为 null 表示系统级文档（预设等），只在新建时写入，更新时保持原归属 */
   put<K extends DocKind>(kind: K, doc: DocTypes[K], owner: string | null = null): void {
+    doc = structuredClone(doc);
+    this.stripResourceTiming(doc as unknown as Record<string, any>);
     if (kind === 'profile') doc = stripProfileRevisions(doc as ProfileDoc) as DocTypes[K];
     if (kind === 'source') doc = normalizeSourceFetch(doc as SourceDoc) as DocTypes[K];
     this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
       .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
+    this.changed();
   }
 
   get<K extends DocKind>(kind: K, id: string): DocTypes[K] | undefined {
@@ -614,6 +666,7 @@ export class Store {
   }
 
   latestSnapshot(ownerKind: SnapshotOwner, ownerId: string, url: string, okOnly = true): SnapshotRow | undefined {
+    ownerId = this.snapshotOwner(ownerKind, ownerId, url);
     const row = this.db.prepare(`SELECT * FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
       .get(ownerKind, ownerId, this.cipher.hmac(url)) as RawSnapshot | undefined;
     return row ? this.toSnapshot(row) : undefined;
@@ -621,12 +674,13 @@ export class Store {
 
   /** 快照历史（不含正文），供 UI 展示 */
   snapshotHistory(ownerKind: SnapshotOwner, ownerId: string): Omit<SnapshotRow, 'body'>[] {
-    const rows = this.db.prepare('SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND owner_id = ? ORDER BY fetched_at DESC, id DESC')
-      .all(ownerKind, ownerId) as RawSnapshot[];
+    const rows = this.db.prepare('SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND (owner_id = ? OR owner_id IN (SELECT resource FROM resource_bindings WHERE kind = ? AND id = ?)) ORDER BY fetched_at DESC, id DESC')
+      .all(ownerKind, ownerId, ownerKind, ownerId) as RawSnapshot[];
     return rows.map((r) => this.toSnapshot(r));
   }
 
   countSnapshots(ownerKind: SnapshotOwner, ownerId: string, url: string): { ok: number; failed: number } {
+    ownerId = this.snapshotOwner(ownerKind, ownerId, url);
     const row = this.db.prepare('SELECT SUM(ok = 1) ok, SUM(ok = 0) failed FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?')
       .get(ownerKind, ownerId, this.cipher.hmac(url)) as { ok: number | null; failed: number | null };
     return { ok: row.ok ?? 0, failed: row.failed ?? 0 };

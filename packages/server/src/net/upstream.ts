@@ -8,7 +8,7 @@ import { assertUrlAllowed, SsrfError, type AllowList } from './ssrf.ts';
 export class UpstreamError extends Error {}
 
 export type UpstreamResponse = { status: number; body: string; userinfo?: TrafficInfo };
-export type UpstreamOptions = { ua?: string; timeoutMs?: number; ruleContent?: boolean };
+export type UpstreamOptions = { ua?: string; timeoutMs?: number; ruleContent?: boolean; rawMrs?: boolean };
 export type UpstreamFetcher = (url: string, opts?: UpstreamOptions) => Promise<UpstreamResponse>;
 
 /** 只用到 fetch 响应的这几个成员，便于测试替换 */
@@ -79,7 +79,9 @@ export function createUpstreamFetcher(opts: { allow: AllowList; fetchImpl?: Fetc
       if (Number.isFinite(len) && len > maxBytes) throw new UpstreamError(`响应过大（${len} 字节）`);
       const bytes = o.ruleContent && res.arrayBuffer ? Buffer.from(await res.arrayBuffer()) : undefined;
       if (bytes && bytes.length > maxBytes) throw new UpstreamError(`响应过大（${bytes.length} 字节）`);
-      const body = bytes ? await decodeRuleBytes(bytes) : await res.text();
+      const decoded = bytes ? await decodeRuleBytes(bytes) : await res.text();
+      if (o.rawMrs && (!bytes || !decoded.startsWith('# sub-forge: decoded-mrs-v1\n'))) throw new UpstreamError('上游没有返回有效 MRS 文件');
+      const body = o.rawMrs && bytes ? '#subforge-binary-mrs\n' + bytes.toString('base64') : decoded;
       if (body.length > maxBytes) throw new UpstreamError(`响应过大（${body.length} 字符）`);
       const userinfo = parseUserinfo(res.headers.get('subscription-userinfo'));
       return userinfo ? { status: res.status, body, userinfo } : { status: res.status, body };

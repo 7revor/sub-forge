@@ -15,8 +15,8 @@ export function sourceUrl(data: Record<string, unknown>): string {
   return url;
 }
 
-/** 兼容旧请求和种子：只保留订阅源仍支持的自动更新间隔。 */
+/** 兼容旧请求和种子：移除订阅源已停用的独立拉取选项。 */
 export function normalizeSourceFetch<T extends { fetch?: { ttlSec?: number } }>(source: T): T {
   const { fetch, ...rest } = source;
-  return { ...rest, ...(fetch?.ttlSec !== undefined ? { fetch: { ttlSec: fetch.ttlSec } } : {}) } as T;
+  return rest as T;
 }

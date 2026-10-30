@@ -1,3 +1,4 @@
+import { systemRoutes } from './system.ts';
 import { ruleConversionRoutes } from './rule-conversion.ts';
 // 管理接口入口：/api/*。所有接口都返回 JSON；错误格式为 { error, details? }。
 
@@ -48,6 +49,7 @@ export function createApi(deps: ApiDeps) {
   const repos = deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now);
   api.route('/', ruleRepoRoutes(deps.store, repos));
   api.route('/', ruleOptionRoutes(deps.store, repos));
+  api.route('/', systemRoutes(deps.store));
   api.route('/', pendingRoutes());
   api.route('/', nodeProbeRoutes(deps.nodeProbe));
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));

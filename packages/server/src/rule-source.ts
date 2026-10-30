@@ -20,15 +20,14 @@ export class RuleSourceService {
     let fetchedAt: number | undefined;
     let stale = false;
     const passthrough = ['mrs', 'srs'].includes(source.format);
-    if (source.kind === 'remote' && !passthrough) {
+    if (source.kind === 'remote') {
       const prior = saved?.sources.find(s => s.kind === 'remote' && s.url === source.url && JSON.stringify(s.fetch ?? {}) === JSON.stringify(source.fetch ?? {}));
       if (saved && prior) {
         const result = await this.limited(() => this.snapshots.get('ruleset', saved.id, source.url!, { ttlSec: 86400, ...source.fetch, format: source.format }, { waitForFresh: true, refresh }));
         content = result.snapshot?.body; fetchedAt = result.snapshot?.fetchedAt; error = result.error; stale = result.stale;
       } else {
         const key = JSON.stringify([userId, source.url, source.format, source.fetch ?? {}]);
-        const now = Date.now();
-        for (const [k, v] of this.drafts) if (v.at !== undefined && now - v.at >= 60_000) this.drafts.delete(k);
+
         let hit = this.drafts.get(key);
         if (refresh && hit?.at !== undefined) hit = undefined;
         if (!hit) {
@@ -40,12 +39,12 @@ export class RuleSourceService {
         // 失败不进入缓存；并发重试复用在途请求，成功后从完成时起计算 TTL。
         if (this.drafts.get(key) === hit) {
           if (result.error) this.drafts.delete(key);
-          else hit.at ??= Date.now();
+          else this.drafts.delete(key);
         }
         content = result.body; error = result.error;
       }
     }
-    const parsed = content !== undefined || passthrough ? this.converter.prepare(content ?? '', source) : undefined;
+    const parsed = content !== undefined || passthrough ? this.converter.prepare(passthrough ? '' : content ?? '', source) : undefined;
     return {
       content,
       status: { id: source.id, ok: !error && (content !== undefined || passthrough), error, fetchedAt, stale, ...(passthrough ? { passthrough: true } : {}),
