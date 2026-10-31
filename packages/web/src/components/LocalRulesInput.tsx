@@ -6,13 +6,13 @@ export function LocalRulesInput({ value, onChange, id, placeholder = '每行填�
   value: string; onChange: (value: string) => void; id?: string; placeholder?: string;
 }) {
   const numbers = useRef<HTMLDivElement>(null);
-  return <div className="flex min-w-0 flex-col gap-1.5">
-    <div className="flex min-w-0 overflow-hidden rounded-md border border-line">
-      <div ref={numbers} aria-hidden className="h-[240px] shrink-0 overflow-hidden bg-ground px-2 py-2 font-mono text-[12.5px] leading-6 text-ink-muted">{value.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}</div>
+  return <div className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-control-line">
+    <div className="flex min-w-0 overflow-hidden">
+      <div ref={numbers} aria-hidden className="h-[140px] shrink-0 overflow-hidden w-9 bg-panel pr-2.5 py-2.5 text-right font-mono text-[length:var(--text-control)] leading-5 text-ink-muted">{value.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}</div>
       <Textarea id={id} aria-label="本地规则内容" placeholder={placeholder} value={value} spellCheck={false} wrap="off"
-        className="h-[240px] min-w-0 flex-1 resize-none rounded-none border-0 py-2 font-mono text-[12.5px] leading-6 focus:ring-0 focus-visible:outline-none!"
+        className="h-[140px] min-w-0 flex-1 resize-none rounded-none border-0 py-2.5 font-mono text-[length:var(--text-control)] leading-5 focus:ring-0 focus-visible:outline-none!"
         onScroll={event => { if (numbers.current) numbers.current.scrollTop = event.currentTarget.scrollTop; }} onChange={event => onChange(event.target.value)} />
     </div>
-    <span className="text-[12px] text-ink-muted">{localRuleLines(value).length} 条规则</span>
+    <div className="flex justify-between border-t border-line-2 bg-inset px-3 py-1.5 text-[length:var(--text-caption)] text-ink-muted"><span>{localRuleLines(value).length} 条有效</span><span>支持 # 注释与空行</span></div>
   </div>;
 }

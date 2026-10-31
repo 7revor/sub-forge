@@ -30,7 +30,7 @@ export function ChainCheckResult({ chain, result, checking }: { chain: ChainRule
   const actual = result?.viaName && chain.via.kind === 'node' && (!('exact' in chain.via.ref.match) || result.viaName !== chain.via.ref.match.exact) ? `命中 ${result.viaName} · ` : '';
   const summary = checking ? '检查中…' : result ? `${actual}落地 ${result.landingCount} 个${result.appliedCount !== result.landingCount ? result.appliedCount ? `，应用 ${result.appliedCount} 个` : '，前置未应用' : ''}` : '暂无检查结果，请重新检查';
   const messages = issues.map(issue => `${label(issue.message)}${issue.code === 'chain.cycle' && cycles.length > 1 ? `（另有 ${cycles.length - 1} 处循环，详见配置预览）` : ''}`);
-  return <span aria-label="代理链检查结果" aria-live="polite" title={[summary, ...messages].join('；')} className="min-w-0 max-w-full truncate text-[12px] leading-6 text-ink-muted">
+  return <span aria-label="代理链检查结果" aria-live="polite" title={[summary, ...messages].join('；')} className="min-w-0 max-w-full truncate text-[length:var(--text-caption)] leading-6 text-ink-muted">
     {summary}{issues.map((issue, i) => <span key={i} className={issue.level === 'error' ? 'text-err' : 'text-warn'}> · {messages[i]}</span>)}
   </span>;
 }

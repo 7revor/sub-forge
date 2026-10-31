@@ -30,7 +30,15 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
     if(!job || job.owner!==c.get('user').id)throw notFound();
     return c.json({job});
   });
-  app.get('/system/resources',requireAdmin,c=>c.json({items:[...resources.statuses(resources.all()),...repos.list().filter(r=>r.enabled).map(r=>({name:`规则仓库索引 / ${r.name}`,lastSuccessAt:r.builtAt,lastAttemptAt:r.checkedAt,nextFetchAt:r.checkedAt ? r.checkedAt+store.resourceCacheTtlSec*1000 : undefined,refreshing:r.indexing,error:r.error,available:!!r.builtAt}))]}));
+  app.get('/system/resources',requireAdmin,c=>c.json({items:[...resources.statuses(resources.all()),...repos.list().filter(r=>r.enabled).map(r=>({repositoryId:r.id,name:`规则仓库索引 / ${r.name}`,lastSuccessAt:r.builtAt,lastAttemptAt:r.checkedAt,nextFetchAt:r.checkedAt ? r.checkedAt+store.resourceCacheTtlSec*1000 : undefined,refreshing:r.indexing,error:r.error,available:!!r.builtAt}))]}));
+  app.post('/system/resources/:resource/refresh', requireAdmin, c => {
+    const key = c.req.param('resource');
+    const all = resources.all();
+    const index = resources.statuses(all).findIndex(item => item.resource === key);
+    const resource = all[index];
+    if (!resource) throw notFound();
+    return c.json({ job: resources.startJob(c.get('user').id, 'system-resource', key, [resource]) }, 202);
+  });
   app.get('/system/rule-resources', requireAdmin, c => c.json({ items: store.listSharedRules<SharedRuleRecord>().map(r => ({
     key: r.key, rulesetId: r.rulesetId, name: r.data.name, target: r.data.target, updatedAt: r.updatedAt, error: r.data.error, referenced: findReferrers(store, c.get('user').id, 'ruleset', r.rulesetId).length > 0,
   })) }));

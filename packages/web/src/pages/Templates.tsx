@@ -1,8 +1,10 @@
+import { ActionMenu } from '../components/ActionMenu.tsx';
+import { Frame } from '../modals/Frame.tsx';
 import { queryUrl } from '@sub-forge/core';
 import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stableStringify, type ReportItem } from '@sub-forge/core';
-import { Pencil, Plus } from 'lucide-react';
+import { Info, Pencil, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
@@ -175,37 +177,59 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
     if (result.status === 'confirmed') { updateBody(result.data); setImportedUrls([...result.data.rules.flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []), ...(result.data.ruleProviders ?? []).map(p => p.url)]); }
   };
 
+  const pageActive = useRef(false);
+  useEffect(() => { pageActive.current = true; return () => { pageActive.current = false; }; }, []);
+  const checkImpact = useMutation({
+    mutationFn: () => api<{ report: ReportItem[]; impact: ImpactEntry[] }>('POST', `/templates/${encodeURIComponent(id)}/impact`, { ...body, name: draft.name.trim() }),
+    onSuccess: result => {
+      if (!pageActive.current) return;
+      const issues = [...result.report.filter(item => item.level === 'error').map(item => item.message), ...result.impact.flatMap(item => item.issues.map(issue => `${item.profileName}：${issue.message}`))];
+      void Frame.modal.alert({ title: '模板影响检查', description: issues.length ? issues.join('\n') : `已检查 ${inUse} 个跟随订阅，未发现冲突。` });
+    },
+  });
+  const copyTemplate = async () => {
+    let createdId: string | undefined;
+    const result = await Frame.modal.prompt({ title: '复制模板', description: '以当前草稿创建独立模板，原模板保持不变。', initialValue: `${draft.name} 副本`, placeholder: '填写新模板名称', confirmLabel: '创建副本' }, {
+      submit: async name => {
+        const response = await api<TemplateResponse>('POST', '/templates', { ...body, name: name.trim() });
+        createdId = response.item.id;
+        void qc.invalidateQueries({ queryKey: ['templates'] });
+      },
+    });
+    if (result.status === 'confirmed' && createdId) leave(`/templates/${encodeURIComponent(createdId)}`);
+  };
+
   return <>
-    <PageHeader title={isNew ? '新建模板' : '模板详情'} crumbs={<Link to="/templates" className="text-ink-muted no-underline">模板</Link>}
-      actions={<><Link to="/templates" className={buttonClass()}>返回列表</Link><Button variant="primary" disabled={!canSave || (!isNew && !dirty)} onClick={() => save.mutate(draft)}>{save.isPending ? '检查并保存中…' : '保存模板'}</Button></>}>
+    <PageHeader title={isNew ? '新建模板' : draft.name} crumbs={<><Link to="/templates" className="text-ink-muted no-underline">模板</Link> / {isNew ? '新建模板' : draft.name}</>}
+      actions={<><Button onClick={openYaml}>从 YAML 导入</Button>{dirty && <Button variant="ghost" onClick={() => { setDraft(base); setPendingRules(new Set()); }}>放弃修改</Button>}<Button variant="primary" disabled={!canSave || (!isNew && !dirty)} onClick={() => save.mutate(draft)}>{save.isPending ? '检查并保存中…' : dirty || isNew ? '保存' : '已保存'}</Button><ActionMenu size="md" items={[
+        { label: '修改模板名称', onSelect: async () => { const result = await Frame.modal.prompt({ title: '模板名称', initialValue: draft.name, placeholder: '填写模板名称' }); if (result.status === 'confirmed') setDraft({ ...draft, name: result.data }); } },
+        ...(!isNew ? [
+          { label: '用此模板新建订阅', onSelect: () => leave(`/profiles/new?template=${encodeURIComponent(id)}`) },
+          { label: '复制模板', onSelect: () => { void copyTemplate(); } },
+          { label: '删除模板（暂不支持）', disabled: true, danger: true, onSelect: () => {} },
+        ] : []),
+      ]} /></>}>
+      <Badge tone="accent">{inUse} 个订阅跟随</Badge>
       {dirty && <Badge tone="warn">未保存</Badge>}
     </PageHeader>
     <PageScroll>
       <ErrorAlert error={save.error ?? rulesets.error} />
-      {(initial?.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[13px] text-warn">{note}</p>)}
+      {(initial?.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[length:var(--text-control)] text-warn">{note}</p>)}
       {currentValidation?.error && <FieldError error={currentValidation.error} />}
       {visibleErrors.length > 0 && <Notice tone="err" actions={firstLocation && <Button size="sm" onClick={() => locate(firstLocation)}>定位</Button>}>
         <span>{visibleErrors[0]!.message}{visibleErrors.length > 1 ? `（共 ${visibleErrors.length} 项待修复）` : ''}</span>
       </Notice>}
       {failure?.report?.length ? <Card title="保存检查"><TemplateReport items={failure.report} onLocate={locate} /></Card> : null}
       {!!failure?.impact?.length && <Card title="请先修复绑定订阅冲突">
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">{failure.impact.map(item => <li key={item.profileId} className="text-[13px]">
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">{failure.impact.map(item => <li key={item.profileId} className="text-[length:var(--text-control)]">
           <Link to={`/profiles/${item.profileId}/groups`} className="font-medium text-brand">{item.profileName}</Link>
           <ul className="mt-1 pl-5 text-ink-2">{item.issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul>
         </li>)}</ul>
       </Card>}
       {savedWarnings.length > 0 && <Card title="已保存 · 注意事项"><TemplateReport items={savedWarnings} onLocate={locate} /></Card>}
       <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex items-center gap-2"><Pencil size={14} className="shrink-0 text-ink-muted" aria-hidden /><input aria-label="模板名称" placeholder="填写模板名称" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} className="h-9 w-full max-w-[400px] rounded border border-transparent bg-panel px-1 text-[17px] font-semibold hover:border-line focus:border-brand" /></div>
-            <span className="text-[12.5px] text-ink-muted">{body.groups.length} 个策略组 · {body.rules.length} 条规则{!isNew && ` · ${inUse} 个绑定订阅`}</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={openYaml}>从 YAML 导入</Button>
-            {!isNew && <Link to={`/profiles/new?template=${encodeURIComponent(id)}`} className={buttonClass()}>新建配置订阅</Link>}
-          </div>
-        </section>
+        {isNew && <Field label="模板名称">{id => <Input id={id} placeholder="填写模板名称" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} />}</Field>}
+        {!isNew && inUse > 0 && <Notice tone="accent" className="px-3.5 py-2.5" actions={<Button variant="ghost" size="sm" className="h-auto p-0 text-accent-ink" disabled={checkImpact.isPending} onClick={() => checkImpact.mutate()}>{checkImpact.isPending ? '检查中…' : '检查影响'}</Button>}><span className="flex items-start gap-2.5"><Info size={16} className="mt-0.5 shrink-0" />保存后会同步到 {inUse} 个跟随的订阅。删除仍被订阅引用的组会被阻止。</span></Notice>}
         <TemplateGroupsEditor value={body} onChange={updateBody} report={report} />
         <TemplateRulesEditor importedUrls={importedUrls} value={body} onChange={updateBody} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
@@ -217,10 +241,10 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
 const TemplateYamlModal = createModal<{ body: TemplateBody; ctx: ConvertCtx }, TemplateBody>(function TemplateYaml({ data: { body, ctx }, modal }) {
   const [yaml, setYaml] = useModalDraft('');
   const result = useMemo(() => templateFromYaml(yaml, body, ctx), [yaml, body, ctx]);
-  return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"><ModalHeader><ModalTitle>从 YAML 导入</ModalTitle></ModalHeader>
-    <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，保存后仍需保存模板。">{id => <YamlTextarea placeholder="粘贴包含策略组和规则的 Mihomo YAML 配置" id={id} rows={18} spellCheck={false} value={yaml} onChange={e => setYaml(e.target.value)} />}</Field>
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto"><ModalHeader><ModalTitle>从 YAML 导入</ModalTitle></ModalHeader>
+    <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，保存后仍需保存模板。">{id => <YamlTextarea placeholder="粘贴包含策略组和规则的 Mihomo YAML 配置" id={id} rows={6} spellCheck={false} value={yaml} onChange={e => setYaml(e.target.value)} />}</Field>
     {!!yaml.trim() && !result.ok && <FieldError error={`第 ${result.line ?? 1} 行：${result.error}`} />}
-    {result.ok && result.notes.length > 0 && <ul className="m-0 pl-5 text-[12.5px] text-ink-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
-    <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!result.ok} onClick={() => { if (result.ok) modal.confirm(result.value); }}>保存</Button></ModalFooter>
+    {result.ok && result.notes.length > 0 && <ul className="m-0 pl-5 text-[length:var(--text-control)] text-ink-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
+    <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!result.ok} onClick={() => { if (result.ok) modal.confirm(result.value); }}>应用</Button></ModalFooter>
   </ModalContent>;
 });

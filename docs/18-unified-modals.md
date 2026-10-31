@@ -30,6 +30,7 @@ if (name.status === 'confirmed') setDraft({ ...value, name: name.data });
 - 取消返回 cancelled；提交期间普通关闭被阻止，路由变化与 Host 销毁仍能终止会话。运行中的请求可能已在服务器执行，取消不代表服务器回滚；客户端过期结果不能写入外部或新会话。
 - 会话从 open 进入 closing 时保留完整内容。Radix Presence 监听实际动画结束；Content ref 真正 detach 后销毁并结算 Promise。微任务只用于排除 StrictMode 同步重挂，不替代动画事件、不按毫秒猜退场。
 - 查询展示在关闭时通过 `useModalPresentation` 保留。嵌套会话独立结算，焦点回到原触发器；连续打开时不让下层退场抢走上层焦点；顶层关闭且仍有父弹窗时，焦点不能退到背景页面。
+- 同一事件连续 `show` 时，Host 逐个提交新增会话，让上一层 Radix 可访问性隔离先建立，避免并发挂载互相 `aria-hidden`。尚未挂载即被取消的会话必须正常结算；不能等待不存在的退场事件。
 - 全局一个 ModalRoot，位于 Router 与 QueryClient Provider 内。底层官方组件只供运行时使用。渲染异常有可关闭的错误界面，不能留下悬空 Promise。
 - 策略组默认展示名称、类型、成员；其他设置折叠到高级设置。
 
@@ -40,3 +41,7 @@ if (name.status === 'confirmed') setDraft({ ...value, name: name.data });
 内置浏览器通过 `packages/web/test/dialog-exit.html` 逐帧验证关闭到实际卸载的高度、文本、输入值，并检查 StrictMode、无动画、嵌套和路由。业务页面使用虚构数据与内存后端验收。不得改用独立 Playwright 或其他浏览器。
 
 本次仅调整前端交互架构，不改变服务端接口、持久化数据、领域模型、渲染语义或示例种子。外部设计画布待同步状态记录在文档 13；历史验证记录保持原样。
+
+## 完整应用退场验收入口
+
+`packages/web/test/design-audit.html?path=/profiles` 在完整应用挂载前安装只读 DOM 观察器；追加 `&motion=none` 检查无动画。与独立 `dialog-exit.html` 共用 `observe-dialog-exit.ts`，记录 closed 至实际卸载期间的标题、正文、输入、展开状态及布局尺寸。隐藏的 `#dialog-motion-results` 输出 JSON；观察器不控制生产会话或动画。兼容、并发、Host 卸载等场景与结果见 [补充验收记录](verification/design-v2-motion-review/README.md)。

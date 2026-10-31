@@ -50,7 +50,7 @@ type Option = { value: string; label: string; hint: string; url?: string; disabl
 const projectMatches = (ranges: SearchMatch[], start: number, end: number, offset: number): SearchMatch[] => ranges
   .filter(range => range.start < end && range.end > start)
   .map(range => ({ start: Math.max(range.start, start) + offset, end: Math.min(range.end, end) + offset }));
-export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query: string, offset: number, limit: number) {
+export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query: string, offset: number, limit: number, repository?: string) {
   // 仓库名与分支仅作来源说明，避免 domain 中的 ai 等公共片段命中整库。
   const sql = `${filesSql}, named AS (
     SELECT f.*, json_extract(r.definition, '$.name') AS repoName,
@@ -70,11 +70,11 @@ export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query:
     FROM json_each(@locals)
   ), matches AS (
     SELECT *, CASE WHEN search_fold(name) = @query THEN 0 WHEN instr(search_fold(name), @query) = 1 THEN 1 ELSE 2 END AS rank
-    FROM options WHERE instr(search_fold(searchable), @query) > 0
+    FROM options WHERE instr(search_fold(searchable), @query) > 0 AND (@repository IS NULL OR repo = @repository)
   ), branch_counts AS (
     SELECT repo, count(DISTINCT ref) AS branches FROM matches WHERE repo IS NOT NULL GROUP BY repo
   )`;
-  const params = { locals: JSON.stringify(locals), query: normalizeNameSearch(query) };
+  const params = { locals: JSON.stringify(locals), query: normalizeNameSearch(query), repository: repository ?? null };
   const { total } = db.prepare(`${sql} SELECT count(*) AS total FROM matches`).get(params) as { total: number };
   // 按完整匹配集统计分支，再取当前页；避免跨页的另一分支加载后才改变已显示的说明。
   const rows = db.prepare(`${sql} SELECT m.value, m.label, m.hint, m.disabled, m.filePath, m.repoName, m.ref, b.branches

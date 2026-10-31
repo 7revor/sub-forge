@@ -29,9 +29,9 @@ export const RuleSourcePreview = createModal<{ matcher?: Matcher; source?: Sourc
     <ModalHeader className="shrink-0"><ModalTitle>规则预览</ModalTitle></ModalHeader>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-hidden">
       {error ? <div className="flex flex-col items-start gap-3"><FieldError error={error} /><Button size="sm" disabled={query.isFetching} onClick={() => void query.refetch()}>重新读取</Button></div> : <>
-        <span className="line-clamp-2 shrink-0 break-all text-[12.5px] text-ink-muted">{label}</span>
+        <span className="line-clamp-2 shrink-0 break-all text-[length:var(--text-control)] text-ink-muted">{label}</span>
         <CodePreview label="完整规则源文件" text={text} loading={loading} lineNumbers fill bodyClassName="overscroll-contain" />
-        {!loading && !text && <span className="text-[12.5px] text-ink-muted">源文件为空</span>}
+        {!loading && !text && <span className="text-[length:var(--text-control)] text-ink-muted">源文件为空</span>}
       </>}
     </div>
   </ModalContent>;

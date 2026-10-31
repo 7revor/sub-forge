@@ -1,3 +1,4 @@
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/ui/dropdown-menu.tsx';
 import { sourcePreviewHref } from '../domain/rulePreview.ts';
 import { queryUrl } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
@@ -15,7 +16,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 来源正文打开只读预览，编辑使用统一弹窗；下方始终显示合并结果。
 
-import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
+import { TriangleAlert, FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
@@ -41,7 +42,7 @@ function sourceSummary(rs: RuleSetDoc): string {
 
 export function RulesetList() {
   return (
-    <DocList kind="rulesets" title="增强集合"
+    <DocList kind="rulesets" title="规则集合"
       columns={[
         { header: '名称', cell: (r) => r.name },
         { header: '备注', cell: (r) => <NoteCell note={r.note} /> },
@@ -64,7 +65,7 @@ function rulesetError(d: RuleSetDoc): string | undefined {
   return overridesError(d.overrides ?? []);
 }
 
-/** 规则集（设计稿「规则集」）：来源 → 客户端改写（整个规则集）→ 输出预览，每块独占一行 */
+/** 左侧编辑来源与客户端改写，右侧即时预览合并结果。 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
   const previewRef = useCallback((element: HTMLDivElement | null) => {
@@ -104,27 +105,30 @@ export function RulesetEdit() {
     } catch (cause) { setLinkError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setLinking(undefined); }
   };
-  return <DetailShell canEdit={canEdit} listPath="/rulesets" listLabel="增强集合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
+  return <DetailShell canEdit={canEdit} listPath="/rulesets" listLabel="规则集合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
     extraActions={!e.isNew && <ResourceLinkButton kind="rulesets" id={d.id} name={d.name} disabled={e.dirty} />}
     onSave={() => {
       if (error) { alertError(error); return; }
       e.submit(x => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' }) }));
     }} saveError={e.save.error} onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
     badges={!e.isNew && <Badge>{sourceSummary(d)}</Badge>}>
-    {(d.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[13px] text-warn">{note}</p>)}
-    {!canEdit && <p className="text-[13px] text-ink-muted">公共规则增强 · 仅创建者或管理员可以修改</p>}
+    {(d.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="m-0 flex items-center gap-2.5 rounded-lg bg-warn-soft px-3.5 py-2.5 text-[length:var(--text-control)] text-warn"><TriangleAlert size={16} /><span>{note}</span></p>)}
+    {!canEdit && <p className="text-[length:var(--text-control)] text-ink-muted">公共规则增强 · 仅创建者或管理员可以修改</p>}
     <fieldset disabled={!canEdit} className="contents">
-    <Card title="基本信息" bodyClass="flex flex-col gap-4 px-4 pb-4">
+    <Card bodyClass="grid gap-4 px-5 pt-4 pb-5 sm:grid-cols-[1fr_2fr]">
       <Field label="名称">{id => <Input placeholder="填写用于区分规则集的名称" id={id} autoFocus={e.isNew} value={d.name} onChange={event => set({ name: event.target.value })} />}</Field>
-      <NoteField value={d.note} onChange={note => set({ note })} />
+      <NoteField compact value={d.note} onChange={note => set({ note })} />
     </Card>
     </fieldset>
+    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_440px]"><div className="flex min-w-0 flex-col gap-5">
     {canEdit ? <>
-    <Card title="来源" actions={<>
-      <Button size="sm" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>
-      <Button size="sm" className="gap-1" aria-label="添加本地规则" onClick={() => void edit({ source: newLocal(), adding: true })}><Plus size={15} />本地规则</Button>
-      <Button size="sm" className="gap-1" onClick={() => void edit({ source: newRemote(), adding: true })}><Plus size={15} />远程链接</Button>
-      <Button size="sm" className="gap-1" onClick={() => void edit({ source: newRemote(), adding: true, repository: true })}><Plus size={15} />引用规则</Button>
+    <Card title="来源" count={d.sources.length} actions={<>
+      <Button variant="ghost" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>
+      <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={15} />添加来源</Button></DropdownMenuTrigger><DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true, repository: true })}>规则仓库</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true })}>远程地址</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void edit({ source: newLocal(), adding: true })}>手写规则</DropdownMenuItem>
+      </DropdownMenuContent></DropdownMenu>
     </>}>
       <ErrorAlert error={matches.error} /><FieldError error={linkError} />
       <SortableList items={d.sources} getKey={s => s.id} onReorder={sources => set({ sources })} renderItem={(s, i, handle) => <RuleCard label={`第 ${i + 1} 项来源`} handle={handle}
@@ -133,7 +137,7 @@ export function RulesetEdit() {
         hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking} onLink={match => link(s.id, s.url!, match)} />}
         externalPreview={s.kind === 'remote'} previewLinks={sourcePreviewHref(s) ? [{ href: sourcePreviewHref(s)! }] : []}
         onPreview={() => void RuleSourcePreview.show({ source: { rulesetId: e.isNew ? undefined : e.id, source: s } })} onEdit={() => void edit({ source: s, adding: false })} onDelete={() => { set({ sources: d.sources.filter(x => x.id !== s.id) }); if (s.url) matches.clear([s.url]); }}>
-        <span title={sourceLabel(s)}>{sourceLabel(s)}</span>
+        <span className="block min-w-0" title={sourceLabel(s)}><span className="block truncate">{sourceLabel(s)}</span><span className="block truncate font-mono text-[length:var(--text-caption)] font-normal text-ink-muted">{s.repository?.path ?? (s.kind === 'remote' ? s.url : s.content?.split('\n').filter(Boolean).join(' · '))}</span></span>
       </RuleCard>} />
     </Card>
     </> : <Card title="来源（只读）"><div className="flex flex-col gap-2">{d.sources.map((source, i) => source.kind === 'remote' ? <a key={source.id} href={sourcePreviewHref(source)} target="_blank" rel="noreferrer noopener" className={buttonClass('default', 'sm')}>查看来源 {i + 1} · {sourceLabel(source)}</a> : <Button key={source.id} onClick={() => void RuleSourcePreview.show({ source: { rulesetId: e.id, source } })}>查看来源 {i + 1} · {sourceLabel(source)}</Button>)}</div></Card>}
@@ -141,10 +145,10 @@ export function RulesetEdit() {
     <RulesetOverrides value={d.overrides ?? []} legacySources={d.sources} onChange={overrides => set({ overrides: overrides.length ? overrides : undefined })}
       onRemoveLegacy={id => set({ sources: d.sources.map(s => s.id === id ? { ...s, overrides: undefined } : s) })} />
     </fieldset>
-    <div id="preview" className="min-w-0 scroll-mt-4" ref={previewRef}><Card className="min-w-0" title="合并结果（只读）">
-      <RulesetPreview key={e.id} inputs={sources.inputs} ready={sources.ready} sourceReading={sources.reading} onRefreshSources={sources.refresh}
+    </div><div id="preview" className="min-w-0 scroll-mt-4" ref={previewRef}><Card className="min-w-0" bodyClass="px-5 pt-4 pb-5">
+      <RulesetPreview title="合并结果" key={e.id} inputs={sources.inputs} ready={sources.ready} sourceReading={sources.reading} onRefreshSources={sources.refresh}
         overrides={d.overrides} sourceError={sources.error} sourceNames={Object.fromEntries(d.sources.map(s => [s.id, sourceLabel(s)]))} />
-    </Card></div>
+    </Card></div></div>
   </DetailShell>;
 }
 

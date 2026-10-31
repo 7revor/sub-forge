@@ -1,7 +1,7 @@
 import { remoteRuleMatcher, type RuleEntry } from '@sub-forge/core';
 import { describe, expect, it } from 'vitest';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
-import { applyRuleDraft } from './ruleDraft.ts';
+import { applyRuleDraft, applyRuleDialogResult } from './ruleDraft.ts';
 
 const url = 'https://example.test/rules.list';
 const direct = { kind: 'builtin', name: 'DIRECT' } as const;
@@ -36,5 +36,19 @@ describe('规则弹窗草稿提交', () => {
     expect(applyRuleDraft(body, draft)).toBe(body);
     expect(applyRuleDraft(body, draft, true).rules.map(rule => rule.id)).toEqual(['r', 'new']);
     expect(body.rules).toHaveLength(1);
+  });
+  it('模板前插入保留前置规则和整个模板块，回传正确边界', () => {
+    const current = { ...body, rules: ['pre', 'tpl-a', 'tpl-b', 'post'].map(id => ({ ...rule, id })) };
+    const result = applyRuleDialogResult(current, { ...rule, id: 'new' }, true, 'before', ['tpl-a', 'tpl-b'], 1);
+    expect(result.body.rules.map(r => r.id)).toEqual(['pre', 'new', 'tpl-a', 'tpl-b', 'post']);
+    expect(result.templateStart).toBe(2);
+    expect(current.rules.map(r => r.id)).toEqual(['pre', 'tpl-a', 'tpl-b', 'post']);
+  });
+  it('模板后添加与空模板的前置边界相互独立', () => {
+    const draft = { ...rule, id: 'new' };
+    expect(applyRuleDialogResult(body, draft, true, 'after', ['r'], 0).body.rules.map(r => r.id)).toEqual(['r', 'new']);
+    const emptyTemplate = applyRuleDialogResult(body, draft, true, 'before', [], 0);
+    expect(emptyTemplate.body.rules.map(r => r.id)).toEqual(['new', 'r']);
+    expect(emptyTemplate.templateStart).toBe(1);
   });
 });

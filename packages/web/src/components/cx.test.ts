@@ -10,6 +10,11 @@ describe('cx', () => {
     expect(cx('text-[13px] w-full', 'text-[#8f2a1f] max-w-[420px] min-w-40')).toBe('text-[13px] w-full text-[#8f2a1f] max-w-[420px] min-w-40');
   });
 
+  it('语义字号覆盖原字号且保留文字颜色', () => {
+    expect(cx('text-sm text-ink', 'text-[length:var(--text-control)]')).toBe('text-[length:var(--text-control)] text-ink');
+    expect(cx('md:text-[length:var(--text-body)]', 'md:text-[length:var(--text-caption)]')).toBe('md:text-[length:var(--text-caption)]');
+  });
+
   it('不同断点各自比较，并丢弃假值', () => {
     expect(cx('w-full md:w-auto', false, undefined, 'md:w-60')).toBe('w-full md:w-60');
   });

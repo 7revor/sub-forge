@@ -1,3 +1,4 @@
+import { ActionMenu } from '../components/ActionMenu.tsx';
 import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 import { Frame } from '../modals/Frame.tsx';
 import { alertError, notifySuccess } from '../feedback.ts';
@@ -34,7 +35,7 @@ export function SourceList() {
         columns={[
           { header: '名称', width: 160, cell: (s) => s.name },
           { header: '备注', width: 168, cell: (s) => <NoteCell note={s.note} /> },
-          { header: '地址', width: 200, cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[13px] text-ink-2">{s.url}</span> },
+          { header: '地址', width: 200, cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[length:var(--text-control)] text-ink-2">{s.url}</span> },
           { header: '节点', width: 68, cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
         ]} />
     </>
@@ -45,16 +46,14 @@ const NewSourceModal = createModal<Record<string, never>, SourceDoc>(function Ne
   const save = useSaveDoc('sources', true);
   const [name, setName] = useModalDraft('');
   const [url, setUrl] = useModalDraft('');
-  const [note, setNote] = useModalDraft('');
   const ready = name.trim() && url.trim();
-  const create = () => modal.submit(() => save.mutateAsync({ name: name.trim(), url: url.trim(), note, pipeline: [] }));
+  const create = () => modal.submit(() => save.mutateAsync({ name: name.trim(), url: url.trim(), pipeline: [] }));
   const onClose = modal.cancel;
   return (
-    <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"新建订阅源"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"新建订阅源"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-4">
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
-      <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
-      <NoteField value={note} onChange={setNote} />
-    </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={create}>{save.isPending ? '创建中…' : '创建并编辑'}</Button></>}</ModalFooter></ModalContent>
+      <Field label="订阅地址" hint="多个地址请分别新建，再用节点组合合并">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
+    </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={create}>{save.isPending ? '创建中…' : '创建并拉取'}</Button></>}</ModalFooter></ModalContent>
   );
 });
 
@@ -63,15 +62,15 @@ function BasicSettings({ draft, set }: {
   draft: SourceDoc; set: (patch: Partial<SourceDoc>) => void;
 }) {
   return (
-    <Card title="基础设置" bodyClass="flex flex-col gap-3.5 border-t border-line-2 px-4 pt-3 pb-3.5">
-      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(0,3fr)]">
+    <Card bodyClass="flex flex-col gap-4 px-5 pt-4 pb-5">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
         <Field label="名称" className="min-w-0">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
         <Field label="订阅地址" className="min-w-0">{(id) =>
           <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
+      <NoteField compact value={draft.note} onChange={(note) => set({ note })} />
       </div>
-      <NoteField value={draft.note} onChange={(note) => set({ note })} />
-      <p className="m-0 text-[12px] leading-relaxed text-ink-muted">缓存时间由管理员在系统中统一设置；到期自动拉取，失败时继续使用上次成功内容。</p>
+      <p className="m-0 text-[length:var(--text-caption)] text-ink-muted">到期自动重新拉取（管理员在「系统」中统一设置）；失败时继续使用上次成功的内容。</p>
     </Card>
   );
 }
@@ -133,7 +132,7 @@ export function SourceEdit() {
           <ResourceLinkButton kind="sources" id={draft.id} name={draft.name} disabled={dirty} />
           <Button onClick={saveAndRefresh} disabled={busy || !ready}><RefreshCw size={15} />{refresh.isPending ? '拉取中…' : dirty ? '保存并拉取' : '立即拉取'}</Button>
           <Button variant="primary" onClick={submit} disabled={busy || !dirty || !ready}>{save.isPending ? '保存中…' : dirty ? '保存修改' : '已保存'}</Button>
-          <Button variant="danger" onClick={openDelete}>删除</Button>
+          <ActionMenu size="md" items={[{ label: '删除订阅源', danger: true, onSelect: openDelete }]} />
         </>}>
         {state.snaps.data && (state.lastOk
           ? <Badge tone={state.failing ? 'err' : 'ok'}>{state.failing ? '最近一次拉取失败 · 使用上次成功内容' : `${formatTime(state.lastOk.fetchedAt).slice(11)} 拉取成功`}</Badge>
@@ -147,7 +146,7 @@ export function SourceEdit() {
 
       <PageScroll className="source-detail-content">
         {preview.data?.report.filter((r) => r.level === 'error' || (r.level === 'warn' && r.code !== 'source.fetch-failed')).map((r, i) => (
-          <div key={i} role="status" className={cx('rounded-lg px-3 py-2 text-[13px]', r.level === 'error' ? 'bg-err-soft text-err' : 'bg-warn-soft text-warn')}>{r.message}</div>
+          <div key={i} role="status" className={cx('rounded-lg px-3 py-2 text-[length:var(--text-control)]', r.level === 'error' ? 'bg-err-soft text-err' : 'bg-warn-soft text-warn')}>{r.message}</div>
         ))}
         <BasicSettings draft={draft} set={set} />
         <PipelineEditor steps={draft.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}

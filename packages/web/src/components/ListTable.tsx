@@ -3,10 +3,10 @@ import { cx, listTd, listTh } from './ui.tsx';
 
 export type ListTableColumn = { header: ReactNode; width: number };
 
-/** 首列吸收剩余空间，其他列按约定宽度展示；异步内容不参与列宽计算。 */
+/** 列宽按设计比例分配；窄屏由表格容器独立横向滚动，异步内容不参与列宽计算。 */
 export function ListTable({ label, columns, children }: { label: string; columns: ListTableColumn[]; children: ReactNode }) {
-  return <table aria-label={label} className="list-table" style={{ minWidth: columns.reduce((sum, column) => sum + column.width, 0) }}>
-    <colgroup>{columns.map((column, index) => <col key={index} style={index ? { width: column.width } : undefined} />)}</colgroup>
+  return <table aria-label={label} className="list-table" >
+    <colgroup>{columns.map((column, index) => <col key={index} style={{ width: `${column.width / columns.reduce((sum, c) => sum + c.width, 0) * 100}%` }} />)}</colgroup>
     <thead><tr>{columns.map((column, index) => <th key={index} scope="col" className={listTh}>{column.header}</th>)}</tr></thead>
     <tbody>{children}</tbody>
   </table>;

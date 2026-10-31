@@ -17,17 +17,17 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
     return c.json({ items: store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(({ id, name }) => ({ id, name })) });
   });
   app.get('/rule-options/search', c => {
-    const { q = '', offset = '0', limit = '30', scope = 'all' } = c.req.query();
-    if (q.length > 200 || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || !/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100 || !['all', 'repository'].includes(scope)) throw bad('规则集搜索参数不合法');
+    const { q = '', offset = '0', limit = '30', scope = 'all', repository } = c.req.query();
+    if ((repository !== undefined && (!repository || repository.length > 200 || scope !== 'repository')) || q.length > 200 || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || !/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100 || !['all', 'repository'].includes(scope)) throw bad('规则集搜索参数不合法');
     const refs = new RefChecker(store, c.get('user'));
     const local = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(rs => ({
       id: rs.id, name: rs.name, hint: `本地规则集 · ${rs.note || `${rs.sources.length} 个来源`}`,
     }));
-    const notices = repos.list().filter(r => r.enabled).flatMap(r => {
+    const notices = repos.list().filter(r => r.enabled && (!repository || r.id === repository)).flatMap(r => {
       if (r.error || !r.builtAt) return [`${r.name}：${r.error ? '索引更新失败' : '索引尚未就绪'}${r.entries ? '，使用已有索引' : ''}`];
       return store.db.prepare('SELECT 1 FROM rule_repo_catalog WHERE repo = ?').get(r.id) ? [] : [`${r.name}：完整文件索引待更新`];
     });
-    return c.json({ ...searchRuleOptions(store.db, local, q, Number(offset), Number(limit)), notices });
+    return c.json({ ...searchRuleOptions(store.db, local, q, Number(offset), Number(limit), repository), notices });
   });
   app.post('/rule-options/match-urls', async c => {
     const { urls } = await jsonBody(c);

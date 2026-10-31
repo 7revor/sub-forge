@@ -1,0 +1,1 @@
+Promise 结果：5 项{"status":"cancelled","reason":"dismissed"}{"status":"cancelled","reason":"dismissed"}{"status":"cancelled","reason":"dismissed"}{"status":"cancelled","reason":"navigation"}{"status":"cancelled","reason":"navigation"}

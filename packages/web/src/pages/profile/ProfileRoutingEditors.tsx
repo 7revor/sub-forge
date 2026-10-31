@@ -42,7 +42,7 @@ export function ProfileGroupsEditor() {
         if (result.status === 'confirmed') setDraft(removeIndependentGroup(draft, group.id));
       }}
       memberSummary={group => {
-        return group.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '尚未添加成员';
+        return group.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '没有成员，流量会被拒绝';
       }} onEditGroup={async (group, adding) => {
         const data = profileModalData(profile);
         if (adding && data.profile.routing?.mode === 'independent') data.profile = { ...data.profile, routing: { ...data.profile.routing, config: { ...data.profile.routing.config, groups: [...data.profile.routing.config.groups, group] } } };

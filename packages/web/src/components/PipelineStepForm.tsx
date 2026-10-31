@@ -10,8 +10,8 @@ import { SortableList } from './SortableList.tsx';
 import { patternHits, regexError, renameHits, setFieldsError, updateSetField } from './pipelineForm.ts';
 import { Button, DraftInput, DraftTextarea, Empty, Input, Select, cx } from './ui.tsx';
 
-const lbl = 'text-[12.5px] font-medium text-ink-muted';
-const hint = 'text-[12px] leading-relaxed text-ink-muted';
+const lbl = 'text-[length:var(--text-control)] font-medium text-ink-muted';
+const hint = 'text-[length:var(--text-caption)] leading-relaxed text-ink-muted';
 
 function DeleteIcon({ label, onClick }: { label: string; onClick: () => void }) {
   return <Button variant="ghost" size="sm" className="shrink-0 px-1.5 hover:text-err" aria-label={label} title={label} onClick={onClick}><Trash2 size={14} /></Button>;
@@ -19,7 +19,7 @@ function DeleteIcon({ label, onClick }: { label: string; onClick: () => void }) 
 
 function FormHeader({ title, action }: { title: string; action?: ReactNode }) {
   return <div className="flex flex-wrap items-center justify-between gap-2">
-    <h3 className="m-0 text-[13px] font-medium text-ink-2">{title}</h3>
+    <h3 className="m-0 text-[length:var(--text-control)] font-medium text-ink-2">{title}</h3>
     {action}
   </div>;
 }
@@ -29,7 +29,7 @@ function AddButton({ children, onClick }: { children: ReactNode; onClick: () => 
 }
 
 function HitCount({ value }: { value?: number | undefined }) {
-  return <span className="shrink-0 text-[12px] text-ink-muted">命中 <span className="font-mono text-ink-2">{value ?? '—'}</span></span>;
+  return <span className="shrink-0 text-[length:var(--text-caption)] text-ink-muted">命中 <span className="font-mono text-ink-2">{value ?? '—'}</span></span>;
 }
 
 /** 简单选择使用带标签的单选项，不增加底色或套叠面板。 */
@@ -38,9 +38,9 @@ function ChoiceField<T extends string>({ label, value, options, onChange }: {
 }) {
   const name = useId();
   return <fieldset className="m-0 min-w-0 border-0 p-0">
-    <legend className="mb-2 text-[12.5px] font-medium text-ink-muted">{label}</legend>
+    <legend className="mb-2 text-[length:var(--text-control)] font-medium text-ink-muted">{label}</legend>
     <div className="flex flex-wrap gap-x-6 gap-y-2">
-      {options.map(option => <label key={option.value} className="flex min-h-8 cursor-pointer items-center gap-2 text-[13px] text-ink-2">
+      {options.map(option => <label key={option.value} className="flex min-h-8 cursor-pointer items-center gap-2 text-[length:var(--text-control)] text-ink-2">
         <input type="radio" name={name} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} className="accent-brand" />
         {option.label}
       </label>)}
@@ -57,14 +57,14 @@ function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则
     {patterns.map((pattern, index) => {
       const error = pattern ? regexError(pattern, flags) : '未填写，这一条不会生效';
       return <RoutingCard key={index} invalid={!!pattern && !!error} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[24px_minmax(0,1fr)_auto]">
-        <span className="text-center font-mono text-[12px] text-ink-muted">{index + 1}</span>
+        <span className="text-center font-mono text-[length:var(--text-caption)] text-ink-muted">{index + 1}</span>
         <DraftInput aria-label={`${label} ${index + 1}`} className={cx('col-span-2 row-start-2 h-9 min-w-0 font-mono sm:col-span-1 sm:col-start-2 sm:row-start-1', pattern && error && 'border-err')} placeholder={placeholder} value={pattern}
           aria-invalid={!!pattern && !!error} onCommit={(value) => onChange(patterns.map((item, i) => i === index ? value : item))} />
         <div className="col-start-2 row-start-1 flex items-center gap-2 sm:col-start-3">
           <HitCount value={hits?.[index]} />
           <DeleteIcon label={`删除第 ${index + 1} 条`} onClick={() => onChange(patterns.filter((_, i) => i !== index))} />
         </div>
-        {error && <span role="status" className={cx('col-span-full text-[12px]', pattern ? 'text-err' : 'text-ink-muted')}>{error}</span>}
+        {error && <span role="status" className={cx('col-span-full text-[length:var(--text-caption)]', pattern ? 'text-err' : 'text-ink-muted')}>{error}</span>}
       </RoutingCard>;
     })}
     {!patterns.length && <div className="mt-3"><Empty title="尚未添加正则" /></div>}
@@ -102,7 +102,7 @@ function SetFieldsForm({ fields, onChange }: { fields: Record<string, unknown>; 
         if (error) return;
         onChange({ ...Object.fromEntries(Object.entries(fields).filter(([key]) => SET_KEYS.includes(key))), ...next });
       }} />
-      {(error || setFieldsError(extra)) && <div role="alert" className="text-[12px] text-err">{error || setFieldsError(extra)}</div>}
+      {(error || setFieldsError(extra)) && <div role="alert" className="text-[length:var(--text-caption)] text-err">{error || setFieldsError(extra)}</div>}
     </div>
   </div>;
 }
@@ -120,10 +120,10 @@ function TypeFilterForm({ step, onChange }: { step: Extract<OperatorStep, { op: 
       }}><Plus size={14} />添加协议</Button>
     </div>
     <fieldset className="m-0 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2 border-0 p-0">
-      <legend className="mb-2 text-[12.5px] font-medium text-ink-muted">协议类型（至少选一个）</legend>
+      <legend className="mb-2 text-[length:var(--text-control)] font-medium text-ink-muted">协议类型（至少选一个）</legend>
       {[...new Set([...PROTOCOLS, ...step.types])].map((type) => {
         const on = step.types.includes(type);
-        return <label key={type} className={cx('flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 font-mono text-[13px]', on ? 'border-brand font-medium text-accent-ink' : 'border-line')}>
+        return <label key={type} className={cx('flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 font-mono text-[length:var(--text-control)]', on ? 'border-brand font-medium text-accent-ink' : 'border-line')}>
           <input type="checkbox" checked={on} onChange={(e) => {
             const types = e.target.checked ? [...step.types, type] : step.types.filter((v) => v !== type);
             if (!types.length) { alertError('至少选择一个协议类型'); return; }
@@ -143,10 +143,10 @@ export function PipelineStepForm({ step, names, onChange }: { step: OperatorStep
       const value = step.patterns ?? [];
       return <div className="flex flex-col gap-2">
         <label htmlFor="useless" className={lbl}>关键词（正则，每行一条；命中任一条的节点被移除）</label>
-        <DraftTextarea placeholder="移除命中关键词的节点，每行填写一条正则" id="useless" rows={4} className="font-mono text-[12.5px]" value={value.join('\n')}
+        <DraftTextarea placeholder="移除命中关键词的节点，每行填写一条正则" id="useless" rows={4} className="font-mono text-[length:var(--text-control)]" value={value.join('\n')}
           aria-invalid={value.some((p) => !!regexError(p))}
           onCommit={(text) => { const lines = text.split('\n').map((l) => l.trim()).filter(Boolean); onChange({ ...step, patterns: lines.length ? lines : undefined }); }} />
-        {value.map((p, i) => ({ i, error: p.trim() ? regexError(p.trim()) : undefined })).filter((x) => x.error).map(({ i, error }) => <span key={i} role="status" className="text-[12px] text-err">第 {i + 1} 行：{error}</span>)}
+        {value.map((p, i) => ({ i, error: p.trim() ? regexError(p.trim()) : undefined })).filter((x) => x.error).map(({ i, error }) => <span key={i} role="status" className="text-[length:var(--text-caption)] text-err">第 {i + 1} 行：{error}</span>)}
         <span className={hint}>清空后使用默认关键词：{DEFAULT_USELESS_PATTERNS.slice(0, 8).join('、')}…</span>
       </div>;
     }
@@ -169,7 +169,7 @@ export function PipelineStepForm({ step, names, onChange }: { step: OperatorStep
           return <RoutingCard invalid={!!pattern && !!error} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[auto_minmax(0,1fr)_auto]">
             <div className="flex items-center gap-2">
               {handle}
-              <span className="w-5 text-center font-mono text-[12px] text-ink-muted">{index + 1}</span>
+              <span className="w-5 text-center font-mono text-[length:var(--text-caption)] text-ink-muted">{index + 1}</span>
             </div>
             <DraftInput placeholder="按此正则匹配节点，排在上面的优先" aria-label={`优先级 ${index + 1}`} className={cx('col-span-2 row-start-2 h-9 min-w-0 font-mono sm:col-span-1 sm:col-start-2 sm:row-start-1', pattern && error && 'border-err')} value={pattern} aria-invalid={!!pattern && !!error}
               onCommit={(value) => onChange({ ...step, patterns: step.patterns.map((item, i) => i === index ? value : item) })} />
@@ -177,7 +177,7 @@ export function PipelineStepForm({ step, names, onChange }: { step: OperatorStep
               <HitCount value={hits(step.patterns)?.[index]} />
               <DeleteIcon label={`删除优先级 ${index + 1}`} onClick={() => onChange({ ...step, patterns: step.patterns.filter((_, i) => i !== index) })} />
             </div>
-            {error && <span role="status" className={cx('col-span-full text-[12px]', pattern ? 'text-err' : 'text-ink-muted')}>{error}</span>}
+            {error && <span role="status" className={cx('col-span-full text-[length:var(--text-caption)]', pattern ? 'text-err' : 'text-ink-muted')}>{error}</span>}
           </RoutingCard>;
         }} />
         {!step.patterns.length && <div className="mt-3"><Empty title="尚未添加优先级" /></div>}
@@ -186,31 +186,20 @@ export function PipelineStepForm({ step, names, onChange }: { step: OperatorStep
       const counts = names ? renameHits(step.rules, names) : undefined;
       const setRule = (index: number, patch: Partial<(typeof step.rules)[number]>) => onChange({ ...step, rules: step.rules.map((rule, i) => i === index ? { ...rule, ...patch } : rule) });
       return <div>
-        <FormHeader title="改名规则" action={<AddButton onClick={() => onChange({ ...step, rules: [...step.rules, { pattern: '', replace: '' }] })}>添加规则</AddButton>} />
+        <div className="grid grid-cols-[24px_minmax(0,1fr)_minmax(0,1fr)_64px_28px] items-center gap-3 border-b border-line-2 bg-inset py-2 text-[length:var(--text-caption)] text-ink-muted"><span>#</span><span>匹配（正则）</span><span>替换为</span><span>命中</span><span /></div>
         {step.rules.map((rule, index) => {
-          const error = rule.pattern ? regexError(rule.pattern, (rule.flags ?? '').replace('g', '') + 'g') : '匹配正则未填写，这条规则不会生效';
-          return <RoutingCard key={index} invalid={!!rule.pattern && !!error} className="flex flex-col items-stretch">
-            <div className="flex items-center gap-2">
-              <span className="flex-1 text-[12.5px] font-medium text-ink-2">规则 {index + 1}</span>
-              <HitCount value={counts?.[index]} />
-              <DeleteIcon label={`删除规则 ${index + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, i) => i !== index) })} />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className={ROW}><span className={lbl}>匹配（正则）</span>
-                <DraftInput aria-label={`规则 ${index + 1} 匹配正则`} className={cx('h-9 min-w-0 font-mono', rule.pattern && error && 'border-err')} placeholder="匹配节点名称中需要替换的部分" value={rule.pattern}
-                  aria-invalid={!!rule.pattern && !!error} onCommit={(pattern) => setRule(index, { pattern })} />
-              </label>
-              <label className={ROW}><span className={lbl}>替换为</span>
-                <DraftInput aria-label={`规则 ${index + 1} 替换为`} className="h-9 min-w-0 font-mono" placeholder="替换后的文字，可用 $1 引用分组" value={rule.replace} onCommit={(replace) => setRule(index, { replace })} />
-              </label>
-            </div>
-            {error && <span role="status" className={cx('text-[12px]', rule.pattern ? 'text-err' : 'text-ink-muted')}>{error}</span>}
-          </RoutingCard>;
+          const error = rule.pattern ? regexError(rule.pattern, (rule.flags ?? '').replace('g', '') + 'g') : undefined;
+          return <div key={index} className="border-b border-line-2 py-3"><div className="grid grid-cols-[24px_minmax(0,1fr)_minmax(0,1fr)_64px_28px] items-center gap-3">
+            <span className="font-mono text-[length:var(--text-caption)] text-ink-muted">{index + 1}</span>
+            <DraftInput aria-label={`规则 ${index + 1} 匹配正则`} className={cx('min-w-0 font-mono', error && 'border-err')} placeholder="匹配节点名称的正则" value={rule.pattern} aria-invalid={!!error} onCommit={pattern => setRule(index, { pattern })} />
+            <DraftInput aria-label={`规则 ${index + 1} 替换为`} className="min-w-0 font-mono" placeholder="替换文字，可用 $1 引用分组" value={rule.replace} onCommit={replace => setRule(index, { replace })} />
+            <span className="font-mono text-[length:var(--text-control)] text-ink-muted">{counts?.[index] ?? '—'}</span><DeleteIcon label={`删除规则 ${index + 1}`} onClick={() => onChange({ ...step, rules: step.rules.filter((_, i) => i !== index) })} />
+          </div>{error && <p role="alert" className="mb-0 text-[length:var(--text-caption)] text-err">{error}</p>}</div>;
         })}
-        {!step.rules.length && <div className="my-3"><Empty title="尚未添加改名规则" /></div>}
-        <p className={cx(hint, 'm-0 mt-2')}>替换支持 $1、$2；(?i) 忽略大小写</p>
+        <div className="mt-3"><AddButton onClick={() => onChange({ ...step, rules: [...step.rules, { pattern: '', replace: '' }] })}>添加改名规则</AddButton></div>
       </div>;
     }
+
     case 'rename.affix': {
       const sample = names?.[0] ?? '🇭🇰 HK-01';
       return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -239,7 +228,7 @@ export function PipelineStepForm({ step, names, onChange }: { step: OperatorStep
     case 'script':
       return <div className="flex flex-col gap-2">
         <label htmlFor="script-code" className={lbl}>处理脚本</label>
-        <DraftTextarea placeholder="填写接收 nodes 和 ctx 并返回节点列表的脚本" id="script-code" rows={7} className="font-mono text-[12.5px]" value={step.code} onCommit={(code) => onChange({ ...step, code })} />
+        <DraftTextarea placeholder="填写接收 nodes 和 ctx 并返回节点列表的脚本" id="script-code" rows={7} className="font-mono text-[length:var(--text-control)]" value={step.code} onCommit={(code) => onChange({ ...step, code })} />
         <span className={hint}>需要脚本权限；执行失败时跳过。</span>
       </div>;
   }

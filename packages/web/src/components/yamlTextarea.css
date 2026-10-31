@@ -6,10 +6,10 @@
   overflow: hidden;
   border: 1px solid #d5d9e0;
   border-radius: 8px;
-  background: #fafbfc;
+  background: #ffffff;
   font-family: var(--font-mono);
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 20px;
 }
 
 .yaml-textarea:focus-within {
@@ -78,19 +78,22 @@
 
 /* 可选行号仅按换行计数，不解析配置。三层共享行高，滚动保持对齐。 */
 .yaml-textarea-numbered > textarea,
-.yaml-textarea-numbered > .yaml-textarea-highlight { padding-left: 60px; }
+.yaml-textarea-numbered > .yaml-textarea-highlight { padding-left: 40px; }
 .yaml-textarea-gutter {
   position: absolute;
   inset: 0 auto auto 0;
   z-index: 1;
-  width: 48px;
+  width: 32px;
   margin: 0;
-  padding: 10px 12px 10px 0;
+  padding: 10px 8px 10px 0;
   overflow: hidden;
-  background: #fafbfc;
+  background: #ffffff;
   color: var(--color-faint);
   font: inherit;
   text-align: right;
   pointer-events: none;
   user-select: none;
 }
+
+/* 本地节点工作区：工具栏和源码共享同一边框。 */
+.local-node-source { flex: 1; height: 100%; min-height: 470px; border: 0; border-radius: 0; }
