@@ -48,7 +48,7 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
   const { groupOptions, profileNodeSets } = useProfile();
   const rulesets = useRuleSetRefs().data ?? [];
   const matcher = value.matcher;
-  return <div className="flex flex-col gap-3.5">
+  return <div className="flex flex-col gap-4">
     <MatcherEditor fixedKind={single} value={matcher} rulesets={rulesets}
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, value.options ?? {}) : undefined}
       onRuleChange={(rule) => {
@@ -58,21 +58,21 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
       }} onChange={(matcher) => onChange({ ...value, matcher })} />
     <div className="flex flex-col gap-1.5"><span className="text-[length:var(--text-control)] font-medium text-ink-muted">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
-    {matcher.kind !== 'ruleset' && <details>
-      <summary className="cursor-pointer text-[length:var(--text-control)] font-medium">客户端覆盖（{matcher.overrides?.length ?? 0} 条）</summary>
+    {matcher.kind !== 'ruleset' && <details className="advanced-settings border-t border-line-2 pt-4">
+      <summary className="cursor-pointer text-[length:var(--text-control)] font-medium">按客户端改写 · {matcher.overrides?.length ?? 0} 条</summary>
       <div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={(overrides) => onChange({ ...value, matcher: { ...matcher, overrides } })} /></div>
     </details>}
   </div>;
 }
 
-const ExtraRuleModal = createModal<ProfileModalData & { prepend: boolean }, ExtraRule>(function ExtraRuleForm({ data, modal }) {
+export const ExtraRuleModal = createModal<ProfileModalData & { prepend: boolean }, ExtraRule>(function ExtraRuleForm({ data, modal }) {
   const { ctx } = useModalProfile(data);
   const { template } = ctx;
   const { prepend } = data;
   const [anchor, setAnchor] = useModalDraft('top');
   const [rule, setRule] = useModalDraft<RuleEntry>(() => ({ id: `p_${crypto.randomUUID()}`, matcher: { kind: 'rule', rule: { type: 'RAW', text: '' } }, target: { kind: 'builtin', name: 'DIRECT' } }));
   const error = privateRuleError(rule);
-  return <ProfileContext.Provider value={ctx}><ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{prepend ? "添加前置规则" : "插入规则"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
+  return <ProfileContext.Provider value={ctx}><ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-[520px]" aria-describedby={undefined}><ModalHeader><ModalTitle>{prepend ? "添加前置规则" : "插入规则"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-4">
     {!prepend && <Field label="位置">{(id) => <Select placeholder="选择新规则插入的位置" id={id} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
       <option value="top">最前面</option><option value="bottom">最后面（MATCH 之前）</option>
       {(template?.rules ?? []).map((r, i) => <option key={`b${r.id}`} value={`before:${r.id}`}>模板规则 #{i + 1} 之前</option>)}

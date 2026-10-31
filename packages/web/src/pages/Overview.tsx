@@ -100,15 +100,15 @@ export function Overview() {
 
           <div className="overflow-x-auto">
             {profiles.data?.length === 0 ? <div className="px-4 pb-4"><Empty title="还没有配置订阅" action={<Link to="/profiles/new" className="text-brand">新建一个</Link>} /></div> : (
-              <table className="w-full border-collapse">
+              <table className="w-full min-w-[540px] table-fixed border-collapse"><colgroup><col /><col /><col style={{ width: 80 }} /><col style={{ width: 80 }} /><col style={{ width: 120 }} /></colgroup>
                 <thead><tr><th className={th}>名称</th><th className={th}>分流</th><th className={th}>状态</th><th className={th}>最近访问</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
                 <tbody>
                   {rows.map(({ p, last }) => (
                     <DocTableRow key={p.id} to={`/profiles/${p.id}`}>
-                      <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${p.id}`} className={docNameLinkClass}>{p.name}</Link></td>
-                      <td className={cx(td, 'whitespace-nowrap')}>{modeLabel(p, tpl(boundTemplateId(p))?.name)}</td>
+                      <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${p.id}`} className={cx(docNameLinkClass, 'block truncate')} title={p.name}>{p.name}</Link></td>
+                      <td className={cx(td, 'whitespace-nowrap')}><span className="block truncate" title={modeLabel(p, tpl(boundTemplateId(p))?.name)}>{modeLabel(p, tpl(boundTemplateId(p))?.name)}</span></td>
                       <td className={td}>{!last ? <Badge>未访问</Badge> : last.status !== 200 ? <Badge tone="err">渲染失败</Badge> : last.warnings ? <Badge tone="warn">{last.warnings} 条告警</Badge> : <Badge tone="ok">正常</Badge>}</td>
-                      <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-[length:var(--text-caption)] text-ink-muted">{last.client}</span></div> : <span className="text-ink-muted">从未访问</span>}</td>
+                      <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-[length:var(--text-caption)] text-ink-muted">{last.client}</span></div> : <span className="whitespace-nowrap text-ink-muted">从未访问</span>}</td>
                       <td className={cx(td, 'text-right')}><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="profiles" id={p.id} name={p.name} size="sm" /></div></td>
                     </DocTableRow>
                   ))}
