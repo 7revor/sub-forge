@@ -21,10 +21,10 @@ export function MatcherEditor({ value, onChange, rulesets, ruleValue, onRuleChan
     else onChange(changeMatcherKind(value, kind as Matcher['kind']));
   };
   return <div className="flex min-w-0 flex-col gap-4 [&>*]:min-w-0">
-    {!fixedKind && <Field label="匹配类型">{(id) => <Select placeholder="选择本地规则、规则集或远程规则来源" id={id} value={selectedKind} className="text-[13px]" onChange={(event) => changeKind(event.target.value)}>
+    {!fixedKind && <Field label="匹配类型">{(id) => <Select placeholder="选择本地规则、规则集或远程规则来源" id={id} value={selectedKind} className="text-[length:var(--text-control)]" onChange={(event) => changeKind(event.target.value)}>
       <option value="local">本地规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
     </Select>}</Field>}
-    {value.kind === 'local' || value.kind === 'rule' ? <Field label="本地规则" hint="每行一条，同一卡片共用出口，按输入顺序执行。">{id => <LocalRulesInput id={id}
+    {value.kind === 'local' || value.kind === 'rule' ? <Field label="规则内容" hint="每行一条，不写出口；支持 # 注释与空行">{id => <LocalRulesInput id={id}
       value={value.kind === 'local' ? value.content : ruleToLine(ruleValue ?? value.rule)} onChange={content => onChange(value.kind === 'local' ? { ...value, content } : {
         kind: 'local', content, ...(value.overrides ? { overrides: value.overrides } : {}), ...(value.rule.type === 'RAW' && value.rule.client ? { client: value.rule.client } : {}),
       })} />}</Field>

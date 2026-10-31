@@ -69,11 +69,11 @@ export function stepSummary(s: OperatorStep): string {
 
 function AddMenu({ onAdd }: { onAdd: (op: OperatorStep['op']) => void }) {
   return <DropdownMenu>
-    <DropdownMenuTrigger asChild><Button size="sm"><Plus size={14} />添加处理器</Button></DropdownMenuTrigger>
+    <DropdownMenuTrigger asChild><Button size="sm"><Plus size={14} />添加步骤</Button></DropdownMenuTrigger>
     <DropdownMenuContent aria-label="选择处理器" align="start" className="w-64 max-w-[calc(100vw-32px)]">
       {OP_GROUPS.map(group => <DropdownMenuGroup key={group.title} className="border-t border-line py-2 first:border-t-0">
-        <DropdownMenuLabel className="px-2 pb-1 text-[12px] font-medium text-ink-muted">{group.title}</DropdownMenuLabel>
-        {group.ops.map(op => <DropdownMenuItem key={op} className="pl-5 text-[13px]" onSelect={() => onAdd(op)}>{OP_LABEL[op]}</DropdownMenuItem>)}
+        <DropdownMenuLabel className="px-2 pb-1 text-[length:var(--text-caption)] font-medium text-ink-muted">{group.title}</DropdownMenuLabel>
+        {group.ops.map(op => <DropdownMenuItem key={op} className="pl-5 text-[length:var(--text-control)]" onSelect={() => onAdd(op)}>{OP_LABEL[op]}</DropdownMenuItem>)}
       </DropdownMenuGroup>)}
     </DropdownMenuContent>
   </DropdownMenu>;
@@ -83,7 +83,7 @@ function StepCount({ trace }: { trace?: TraceStep }) {
   if (!trace) return null;
   if (trace.error) return <Badge tone="err">失败</Badge>;
   const delta = trace.after - trace.before;
-  return <span className="shrink-0 font-mono text-[12.5px] text-ink-2">{trace.after}
+  return <span className="shrink-0 font-mono text-[length:var(--text-control)] text-ink-2">{trace.after}
     {delta !== 0 && <span className={delta < 0 ? 'text-err' : 'text-ok'}> {delta > 0 ? '+' : '−'}{Math.abs(delta)}</span>}
     {delta === 0 && trace.renamed.length > 0 && <span className="text-ok"> ~{trace.renamed.length}</span>}
   </span>;
@@ -94,13 +94,13 @@ function StepRow({ handle, index, step, selected, onSelect, trace }: {
 }) {
   const enabled = step.enabled !== false;
   return (
-    <div className={cx('flex min-h-[66px] items-center gap-1 border-t border-line-2 pl-2', selected ? 'bg-accent-soft' : 'bg-panel')}>
+    <div className={cx('flex min-h-[52px] items-center gap-1 rounded-[10px] border border-line pl-2', selected ? 'bg-accent-soft' : 'bg-panel')}>
       {handle}
-      <button type="button" onClick={onSelect} aria-current={selected || undefined} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-3 pr-4 pl-1 text-left">
-        <span className={cx('grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md font-mono text-[12px]', selected ? 'bg-brand text-white' : 'bg-[#ebedf1] text-ink-2')}>{index + 1}</span>
+      <button type="button" onClick={onSelect} aria-current={selected || undefined} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-2 pr-4 pl-1 text-left">
+        <span className={cx('grid h-8 w-8 shrink-0 place-items-center rounded-md font-mono text-[length:var(--text-caption)]', selected ? 'bg-brand text-white' : 'bg-accent-soft text-accent-ink')}>{index + 1}</span>
         <span className={cx('flex min-w-0 flex-1 flex-col gap-0.5', !enabled && 'opacity-50')}>
-          <span className="text-[13.5px] font-medium">{OP_LABEL[step.op]}{!enabled && <span className="ml-1.5 text-[12px] font-normal text-ink-muted">已停用</span>}</span>
-          <span className="truncate font-mono text-[12px] text-ink-muted">{stepSummary(step)}</span>
+          <span className="text-[length:var(--text-control)] font-medium">{OP_LABEL[step.op]}{!enabled && <span className="ml-1.5 text-[length:var(--text-caption)] font-normal text-ink-muted">已停用</span>}</span>
+          <span className="truncate font-mono text-[length:var(--text-caption)] text-ink-muted">{stepSummary(step)}</span>
         </span>
         {enabled && <StepCount {...(trace ? { trace } : {})} />}
       </button>
@@ -130,16 +130,16 @@ function InputOutputView({ before, after, inLabel, outLabel, truncated }: {
     <div className="pipeline-mapping-scroll mx-4 grid grid-cols-2 gap-4">
       {[{ side: before, label: inLabel }, { side: after, label: outLabel }].map(({ side, label }, column) => (
         <section key={column} aria-label={label} className="min-h-0 min-w-0 overflow-auto overscroll-contain">
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full border-collapse text-[length:var(--text-control)]">
             <thead className="sticky top-0 z-[1] bg-panel">
               <tr>
-                <th className="w-10 border-b border-line px-3 py-2 text-right text-[12px] font-medium text-faint">#</th>
-                <th className="border-b border-line px-3 py-2 text-left text-[12px] font-medium whitespace-nowrap text-ink-muted">{label} <span className="font-normal text-faint">{side.names.length}</span></th>
+                <th className="w-10 border-b border-line px-3 py-2 text-right text-[length:var(--text-caption)] font-medium text-faint">#</th>
+                <th className="border-b border-line px-3 py-2 text-left text-[length:var(--text-caption)] font-medium whitespace-nowrap text-ink-muted">{label} <span className="font-normal text-faint">{side.names.length}</span></th>
               </tr>
             </thead>
             <tbody>
               {side.names.map((name, index) => <tr key={index}>
-                <td className="border-b border-line-2 px-3 py-[7px] text-right font-mono text-[12px] text-faint">{index + 1}</td>
+                <td className="border-b border-line-2 px-3 py-[7px] text-right font-mono text-[length:var(--text-caption)] text-faint">{index + 1}</td>
                 <td className="border-b border-line-2 px-3 py-[7px] font-mono whitespace-nowrap text-ink-2">{name}</td>
               </tr>)}
             </tbody>
@@ -148,13 +148,14 @@ function InputOutputView({ before, after, inLabel, outLabel, truncated }: {
         </section>
       ))}
     </div>
-    <div className="border-t border-line-2 px-4 pt-3 pb-4 text-[12.5px] text-ink-muted">
+    <div className="border-t border-line-2 px-4 pt-3 pb-4 text-[length:var(--text-control)] text-ink-muted">
       输入 {before.names.length} 个 · 输出 {after.names.length} 个{truncated && ' · 节点较多，预览只包含前 500 个'}
     </div>
   </>;
 }
 
-export function PipelineEditor({ steps, onChange, preview, previewError, loading, inputLabel, title = '处理链' }: {
+export function PipelineEditor({ compactOverview = false, steps, onChange, preview, previewError, loading, inputLabel, title = '处理链' }: {
+  compactOverview?: boolean;
   steps: OperatorStep[];
   onChange: (s: OperatorStep[]) => void;
   preview?: PipelinePreview;
@@ -221,13 +222,13 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
   const overviewStats = useMemo(() => (sides && finalSide ? mapStats(mapRows(sides[0]!, finalSide)) : undefined), [sides, finalSide]);
 
   return (
-    <div className="pipeline-workspace" onPointerDownCapture={() => { pointerStartedInside.current = true; }} onClickCapture={(event) => internalClicks.current.add(event.nativeEvent)}>
+    <div className={cx("pipeline-workspace", compactOverview && mode === 'overview' && 'pipeline-compact')} onPointerDownCapture={() => { pointerStartedInside.current = true; }} onClickCapture={(event) => internalClicks.current.add(event.nativeEvent)}>
       <ErrorAlert error={previewError} />
-      <section aria-label={title} className="pipeline-steps rounded-[10px] border border-line bg-panel pt-4 pb-2">
+      <section aria-label={title} className="pipeline-steps rounded-xl border border-line bg-panel pt-4 pb-2">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 pb-3">
-          <h2 className="m-0 text-[15px] font-semibold">{title}</h2>
+          <h2 className="m-0 text-[length:var(--text-section)] font-semibold">{title}</h2>
           <AddMenu onAdd={add} />
-          <span className="w-full text-[12.5px] text-ink-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
+          <span className="w-full text-[length:var(--text-control)] text-ink-muted">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
         <div className="pipeline-step-scroll">
         {!steps.length && <div className="px-4 pb-2"><Empty title="暂无处理器" /></div>}
@@ -241,13 +242,14 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
             <StepRow handle={handle} index={i} step={s} selected={mode === 'step' && i === selected} onSelect={() => setSelected(i)} {...(trace?.[i] ? { trace: trace[i] } : {})} />
           )} />
         </div>
+        {compactOverview && <p className="m-0 px-5 pt-3 pb-2 text-[length:var(--text-control)] font-medium">最终 {last?.after ?? preview?.input ?? '—'} 个节点</p>}
       </section>
 
-      <section aria-label="编辑与预览" className="pipeline-preview rounded-[10px] border border-line bg-panel">
+      {!(compactOverview && mode === 'overview') && <section aria-label="编辑与预览" className="pipeline-preview rounded-xl border border-line bg-panel">
         {mode === 'overview' && <>
           <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">
-              <h2 className="m-0 text-[15px] font-semibold">总览 · 原始 → 最终</h2>
+              <h2 className="m-0 text-[length:var(--text-section)] font-semibold">总览 · 原始 → 最终</h2>
             </div>
             {preview && overviewStats && <div className="flex flex-wrap gap-1.5">
               <Badge>原始 {preview.input}</Badge>
@@ -257,43 +259,43 @@ export function PipelineEditor({ steps, onChange, preview, previewError, loading
               {overviewStats.added > 0 && <Badge tone="ok">新增 {overviewStats.added}</Badge>}
               {overviewStats.moved > 0 && <Badge>调整顺序 {overviewStats.moved}</Badge>}
             </div>}
-            {loading && <span className="text-[12.5px] text-ink-muted">预览中…</span>}
+            {loading && <span className="text-[length:var(--text-control)] text-ink-muted">预览中…</span>}
           </div>
           {before && after && <InputOutputView before={before} after={after} inLabel="输入" outLabel="输出" truncated={truncated} />}
-          {!preview && !previewError && <div className="px-4 pb-4 text-[13px] text-ink-muted">{loading ? '预览中…' : '保存后可预览'}</div>}
+          {!preview && !previewError && <div className="px-4 pb-4 text-[length:var(--text-control)] text-ink-muted">{loading ? '预览中…' : '保存后可预览'}</div>}
         </>}
 
         {mode === 'step' && step && <>
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">
-              <h2 className="m-0 text-[15px] font-semibold">第 {selected + 1} 步 · {OP_LABEL[step.op]}</h2>
+              <h2 className="m-0 text-[length:var(--text-section)] font-semibold">第 {selected + 1} 步 · {OP_LABEL[step.op]}</h2>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="flex items-center gap-2 text-[13px] text-ink-2">
+              <span className="flex items-center gap-2 text-[length:var(--text-control)] text-ink-2">
                 <Switch label="启用这一步" checked={enabled} onChange={(v) => onChange(steps.map((x, j) => (j === selected ? { ...x, enabled: v } : x)))} />启用
               </span>
               <Button variant="ghost" size="sm" className="text-err" onClick={() => remove(selected)}><Trash2 size={14} />删除步骤</Button>
             </div>
           </div>
-          {cur?.error && <div role="alert" className="mx-4 mb-3 rounded-lg border border-err px-3 py-2 text-[13px] text-err">这一步失败，已跳过：{cur.error}</div>}
+          {cur?.error && <div role="alert" className="mx-4 mb-3 rounded-lg border border-err px-3 py-2 text-[length:var(--text-control)] text-err">这一步失败，已跳过：{cur.error}</div>}
           <div className="pipeline-parameters mx-4 mb-4 min-w-0">
             <PipelineStepForm key={`${keys[selected]}-${step.op}`} step={step} names={before?.names}
               onChange={(s) => onChange(steps.map((x, j) => (j === selected ? { ...s, ...(x.enabled === false ? { enabled: false } : {}) } : x)))} />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-2 px-4 pt-3 pb-3">
-            <h3 className="m-0 text-[13.5px] font-semibold">这一步的输入 → 输出 <span className="font-normal text-ink-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
+            <h3 className="m-0 text-[length:var(--text-control)] font-semibold">这一步的输入 → 输出 <span className="font-normal text-ink-muted">· {loading ? '预览中…' : cur ? resultText(cur) : '保存后可预览'}</span></h3>
           </div>
           {cur && before && after && <InputOutputView before={before} after={after} inLabel="输入" outLabel="输出" truncated={truncated} />}
         </>}
 
         {preview && preview.failures.length > 0 && (
-          <details className="border-t border-line-2 px-4 py-3 text-[12.5px]">
+          <details className="border-t border-line-2 px-4 py-3 text-[length:var(--text-control)]">
             <summary className="cursor-pointer text-brand">{preview.failures.length} 个节点解析失败</summary>
             <ul className="mt-2 flex flex-col gap-1 pl-4">{preview.failures.map((f, i) => <li key={i}><span className="font-mono">{f.line.slice(0, 80)}</span> — {f.reason}</li>)}</ul>
           </details>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

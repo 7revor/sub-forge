@@ -38,11 +38,11 @@ export function RepositoryMatchHint({ matches, busy, onLink, label = '发现可�
       onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && !anchor.current?.contains(event.relatedTarget)) close(); }}
       onOpenAutoFocus={event => event.preventDefault()} onCloseAutoFocus={event => event.preventDefault()}
       onInteractOutside={event => { if (event.target instanceof Node && anchor.current?.contains(event.target)) event.preventDefault(); }}>
-      <p className="m-0 text-[13px] font-medium">可关联仓库文件</p>
-      <p className="mt-1 mb-3 text-[12px] leading-5 text-ink-muted">此地址已收录在规则仓库中。关联后使用对应的仓库文件，保留规则顺序和出口。</p>
+      <p className="m-0 text-[length:var(--text-control)] font-medium">可关联仓库文件</p>
+      <p className="mt-1 mb-3 text-[length:var(--text-caption)] leading-5 text-ink-muted">此地址已收录在规则仓库中。关联后使用对应的仓库文件，保留规则顺序和出口。</p>
       <div className="flex max-h-[240px] flex-col gap-3 overflow-y-auto">
         {matches.map(match => <div key={`${match.repo}:${match.ref}:${match.path}`} className="flex min-w-0 flex-col items-start gap-2 border-t border-line-2 pt-2.5">
-          <span className="break-all text-[12px] leading-5 text-ink-muted">{match.hint}</span>
+          <span className="break-all text-[length:var(--text-caption)] leading-5 text-ink-muted">{match.hint}</span>
           <Button size="sm" disabled={busy} onClick={async () => { await onLink(match); close(); }}>{busy ? '关联中…' : '关联仓库文件'}</Button>
         </div>)}
       </div>

@@ -3,6 +3,7 @@ import { Field, Input, Select } from './ui.tsx';
 import { groupPlaceholders } from '../schemas/placeholders.ts';
 
 type Settings = Pick<GroupSpec, 'type' | 'test' | 'strategy'>;
+export const GROUP_TYPE_LABEL = { select: '手动选择', 'url-test': '自动测速', fallback: '故障转移', 'load-balance': '负载均衡' };
 const TYPES = ['select', 'url-test', 'fallback', 'load-balance'] as const;
 const TEST_FIELDS = [
   ['url', '测速地址', false, groupPlaceholders.url],
@@ -19,7 +20,7 @@ export function GroupSettingsFields({ value, onChange, disabled = false, section
   const test = value.test ?? {};
   return <>
     {section !== 'advanced' && <Field label="类型">{(id) => <Select disabled={disabled} placeholder={groupPlaceholders.type} id={id} value={value.type} onChange={(event) => onChange('type', event.target.value as GroupSpec['type'])}>
-      {TYPES.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}
+      {TYPES.map((type) => <option key={type} value={type} data-hint={type}>{GROUP_TYPE_LABEL[type]}</option>)}
     </Select>}</Field>}
     {section !== 'type' && <>{value.type !== 'select' && <>
       {TEST_FIELDS.filter(([key]) => (key !== 'tolerance' || value.type === 'url-test') && (key !== 'maxTimeout' || ['fallback', 'load-balance'].includes(value.type))).map(([key, label, numeric, placeholder]) => <Field key={key} label={label}>{(id) => <Input disabled={disabled} id={id}

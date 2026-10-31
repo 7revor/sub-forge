@@ -3,7 +3,7 @@ import { CornerDownRight, LockKeyhole } from 'lucide-react';
 import { RoutingCard, RoutingCardActions, RoutingCardIcon } from './RoutingCard.tsx';
 import type { RulePreviewLink } from '../domain/rulePreview.ts';
 
-const targetClass = 'w-[112px] min-w-0 shrink-0';
+const targetClass = 'w-[180px] min-w-0 shrink-0';
 const layoutClass = 'grid grid-cols-[24px_minmax(0,1fr)_60px] sm:flex sm:flex-wrap';
 const contentClass = 'flex min-w-0 items-center gap-2 text-left sm:flex-[1_1_160px]';
 
@@ -18,10 +18,10 @@ export function RuleCard({ handle, icon, children, count, hint, target, readOnly
       {(previewLinks.length ? previewLinks : [{ href: undefined, label: undefined, title: undefined }]).map((link, index) => <a key={index} href={link.href} target="_blank" rel="noreferrer noopener"
         aria-label={`打开${label}的文件${previewLinks.length > 1 ? ` ${index + 1}` : ''}`} aria-disabled={!link.href}
         title={link.href ? link.title ?? '在新标签页查看源文件' : '请填写有效的源文件地址'} className="flex min-w-0 cursor-pointer items-center gap-2 rounded-lg no-underline">
-        <RoutingCardIcon>{icon}</RoutingCardIcon><span className="min-w-0 truncate font-medium">{previewLinks.length > 1 ? link.label : children}</span>
+        <RoutingCardIcon muted={readOnly}>{icon}</RoutingCardIcon><span className="min-w-0 truncate font-medium">{previewLinks.length > 1 ? link.label : children}</span>
       </a>)}
     </div> : <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg ${contentClass}`}>
-      <RoutingCardIcon>{icon}</RoutingCardIcon>
+      <RoutingCardIcon muted={readOnly}>{icon}</RoutingCardIcon>
       <span className="min-w-0 truncate font-medium">{children}</span>
     </button>}
     <div className="col-span-2 col-start-2 row-start-2 flex min-w-0 items-center justify-end gap-2 empty:hidden sm:contents">
@@ -29,7 +29,7 @@ export function RuleCard({ handle, icon, children, count, hint, target, readOnly
       {target && <div className={targetClass}>{target}</div>}
     </div>
     {!readOnly && <div className="col-start-3 row-start-1 ml-auto w-[60px] shrink-0"><RoutingCardActions label={label} onEdit={onEdit} onDelete={onDelete} /></div>}
-    {readOnly && <span className="col-start-3 row-start-1 w-[60px] shrink-0 text-right text-[12px] text-ink-muted">跟随模板</span>}
+    {readOnly && <span className="col-start-3 row-start-1 w-[60px] shrink-0 text-right text-[length:var(--text-caption)] text-ink-muted" aria-label="来自模板"><LockKeyhole size={14} className="ml-auto" /></span>}
   </RoutingCard>;
 }
 
@@ -37,8 +37,8 @@ export function RuleCard({ handle, icon, children, count, hint, target, readOnly
 export function RuleFinalCard({ target, targetId, readOnly }: { target: ReactNode; targetId: string; readOnly?: boolean }) {
   return <RoutingCard className={layoutClass}>
     <span role="img" aria-label="MATCH 固定在末尾" title="固定在末尾" className="grid h-8 w-6 shrink-0 place-items-center text-faint"><LockKeyhole size={16} /></span>
-    <div className={contentClass}><RoutingCardIcon><CornerDownRight size={16} /></RoutingCardIcon><span className="font-medium">MATCH</span></div>
+    <div className={contentClass}><RoutingCardIcon><CornerDownRight size={16} /></RoutingCardIcon><span className="font-medium">其余流量 <span className="ml-2 font-mono text-[length:var(--text-caption)] text-ink-muted">MATCH</span></span></div>
     <div className="col-span-2 col-start-2 row-start-2 flex min-w-0 justify-end sm:contents"><div id={targetId} className={targetClass}>{target}</div></div>
-    {readOnly ? <span className="col-start-3 row-start-1 w-[60px] shrink-0 text-right text-[12px] text-ink-muted">跟随模板</span> : <span className="col-start-3 row-start-1 w-[60px] shrink-0" aria-hidden />}
+    {readOnly ? <span className="col-start-3 row-start-1 w-[60px] shrink-0 text-right text-[length:var(--text-caption)] text-ink-muted" aria-label="来自模板"><LockKeyhole size={14} className="ml-auto" /></span> : <span className="col-start-3 row-start-1 w-[60px] shrink-0" aria-hidden />}
   </RoutingCard>;
 }

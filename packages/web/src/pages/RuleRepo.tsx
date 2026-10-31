@@ -28,7 +28,7 @@ function RepositoryFileLoading({ failed }: { failed: boolean }) {
     <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
       <ListTable label="规则文件" columns={FILE_COLUMNS}>{!failed && <ListTableLoading columns={FILE_COLUMNS.length} rowHeight={45} />}</ListTable>
     </div>
-    <div role="status" className="shrink-0 table-panel-divider px-3 py-2 text-center text-[12px] text-ink-muted">{failed ? '仓库加载失败，无法读取文件列表。' : '正在加载…'}</div>
+    <div role="status" className="shrink-0 table-panel-divider px-3 py-2 text-center text-[length:var(--text-caption)] text-ink-muted">{failed ? '仓库加载失败，无法读取文件列表。' : '正在加载…'}</div>
   </>;
 }
 
@@ -81,14 +81,14 @@ export function RuleRepoPage() {
   const revision = repos.data?.repos.map(repo => `${repo.id}:${repo.builtAt}:${repo.enabled}:${repo.configRevision}`).join('|');
   const pending = q.trim() !== query;
   return <>
-    <PageHeader title="规则集合" />
+    <PageHeader title="规则仓库" />
     <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} loading={!repos.data && !repos.error} failed={!!repos.error && !repos.data} onRetry={() => void repos.refetch()} />
-    {ruleset && <div className="text-[13px] text-ink-muted">点击文件查看源文件；添加来源请返回增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-brand">返回增强集合</Link></div>}
+    {ruleset && <div className="text-[length:var(--text-control)] text-ink-muted">点击文件查看源文件；添加来源请返回增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-brand">返回增强集合</Link></div>}
     <ErrorAlert error={repos.error} />
-    <section aria-label="规则文件列表" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-line bg-panel">
+    <section aria-label="规则文件列表" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex shrink-0 flex-wrap items-center gap-3 table-panel-divider-bottom px-6 py-4">
         <h2 className="m-0 text-base font-semibold">规则文件</h2>
-        <span role="status" className="text-[12px] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
+        <span role="status" className="text-[length:var(--text-caption)] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
         <SearchInput size="md" aria-label="搜索规则名称或路径" placeholder="按文件名或路径搜索，例如 115.list" value={q} onChange={event => setQ(event.target.value)}  />
       </div>
       {!pending && repos.data ? <RepositoryFileTable key={`${query}:${revision}`} query={query} repos={repos.data.repos} /> : <RepositoryFileLoading failed={!!repos.error && !repos.data} />}

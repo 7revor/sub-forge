@@ -1,3 +1,6 @@
+import type { GroupSpec } from '@sub-forge/core';
+import { Field } from '../../components/ui.tsx';
+import { TemplateTargetSelect } from './TemplateFields.tsx';
 import { localRulesError, remoteRuleMatcher, withIpOptions, type Matcher, type RuleEntry } from '@sub-forge/core';
 import { createModal, useModalDraft } from '../../modals/index.tsx';
 import { ClientOverrides } from '../../components/ClientOverrides.tsx';
@@ -7,7 +10,7 @@ import { RuleEditShell } from '../../components/RuleEditShell.tsx';
 import type { ConvertCtx } from '../../convert/templateYaml.ts';
 
 /** 编辑只修改弹窗草稿；URL 检测由列表在新增或导入时显式触发。 */
-export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx: ConvertCtx; staticOnly: boolean; adding: boolean; extendedOptions?: boolean }, RuleEntry>(function RuleEdit({ data: { rule, index, ctx, staticOnly, adding, extendedOptions }, modal }) {
+export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx: ConvertCtx; staticOnly: boolean; adding: boolean; extendedOptions?: boolean; groups?: GroupSpec[] }, RuleEntry>(function RuleEdit({ data: { rule, index, ctx, staticOnly, adding, extendedOptions, groups = [] }, modal }) {
   const onSave = modal.confirm, onClose = modal.cancel;
   const [draft, setDraft] = useModalDraft(rule);
   const [attempted, setAttempted] = useModalDraft(false);
@@ -20,12 +23,13 @@ export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx:
     try { normalized = { ...matcher, ...remoteRuleMatcher(matcher.remote.url) }; }
     catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
   } else if (!matcher.id) error = '请选择规则集';
-  return <RuleEditShell tall={matcher.kind !== 'ruleset'} title={adding ? '添加规则' : `编辑第 ${index + 1} 项规则`}
+  return <RuleEditShell tall={matcher.kind !== 'ruleset'} title={adding ? `添加规则 · ${matcher.kind !== 'ruleset' ? '手写' : matcher.remote ? '远程地址' : '引用规则'}` : `编辑第 ${index + 1} 项规则`}
     error={attempted ? error : undefined} onClose={onClose} onApply={() => { setAttempted(true); if (!error) onSave({ ...draft, matcher: normalized }); }}>
-    <MatcherEditor directRemote fixedKind={staticOnly} value={matcher} rulesets={ctx.rulesets}
+    <MatcherEditor directRemote fixedKind value={matcher} rulesets={ctx.rulesets}
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}
       onRuleChange={rule => { if (matcher.kind === 'rule') setDraft({ ...draft, matcher: { ...matcher, rule } }); }}
       onChange={matcher => setDraft({ ...draft, matcher })} />
-    {extendedOptions && matcher.kind !== 'ruleset' && <div className="min-w-0 border-t border-line-2 pt-4"><details><summary className="cursor-pointer text-[13px]">内核改写</summary><div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={overrides => setDraft({ ...draft, matcher: { ...matcher, overrides } })} /></div></details></div>}
+    <Field label="出口">{id => <div id={id}><TemplateTargetSelect label="规则出口" value={draft.target} groups={groups} onChange={target => setDraft({ ...draft, target })} /></div>}</Field>
+    {extendedOptions && matcher.kind !== 'ruleset' && <div className="min-w-0 border-t border-line-2 pt-4"><details><summary className="cursor-pointer text-[length:var(--text-control)]">内核改写</summary><div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={overrides => setDraft({ ...draft, matcher: { ...matcher, overrides } })} /></div></details></div>}
   </RuleEditShell>;
 });

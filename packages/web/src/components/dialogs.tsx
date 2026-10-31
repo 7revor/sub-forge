@@ -24,14 +24,14 @@ export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref:
           return (
             <label key={nodeSetKey(o.ref)} className={`flex items-center gap-2.5 border-b border-line-2 px-3 py-2.5 last:border-0 ${isAdded ? 'text-faint' : 'cursor-pointer hover:bg-ground'}`}>
               <input type="checkbox" disabled={isAdded} checked={on || isAdded} onChange={(e) => setPicked(e.target.checked ? [...picked, o.ref] : picked.filter((p) => !same(p, o.ref)))} />
-              <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{o.name}</span>
-              <span className="text-[12px] text-ink-muted">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>
+              <span className="min-w-0 flex-1 truncate text-[length:var(--text-control)] font-medium">{o.name}</span>
+              <span className="text-[length:var(--text-caption)] text-ink-muted">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>
             </label>
           );
         })}
         {!shown.length && <div className="p-3"><Empty title={options.length ? '没有匹配的节点集' : '还没有可加入的节点集'} /></div>}
       </div>
-      {hint && <span className="text-[12px] leading-relaxed text-ink-muted">{hint}</span>}
+      {hint && <span className="text-[length:var(--text-caption)] leading-relaxed text-ink-muted">{hint}</span>}
     </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); }}>加入 {picked.length || ''} 个</Button></>}</ModalFooter></ModalContent>
   );
 });

@@ -8,12 +8,12 @@ export function RuleEditShell({ title, description, error, children, onApply, on
 }) {
   return <>
     <ModalContent className={cx('flex max-h-[85dvh] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg', tall && 'h-[min(600px,85dvh)]')}>
-      <ModalHeader className={cx('shrink-0 px-5 text-left sm:px-6', description ? 'border-b border-line-2 py-4' : 'pt-4')}>
-        <ModalTitle className="pr-6 text-[16px] leading-6">{title}</ModalTitle>
-        {description && <ModalDescription className="text-[12.5px]">{description}</ModalDescription>}
+      <ModalHeader className={cx('shrink-0 px-5 text-left sm:px-6', 'pt-5 pb-4')}>
+        <ModalTitle className="pr-6 text-[length:var(--text-section)] leading-6">{title}</ModalTitle>
+        {description && <ModalDescription className="text-[length:var(--text-control)]">{description}</ModalDescription>}
       </ModalHeader>
       <form noValidate className="flex min-h-0 min-w-0 flex-1 flex-col" onSubmit={event => { event.preventDefault(); onApply(); }}>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 [&>*]:min-w-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6 [&>*]:min-w-0">
           {children}<FieldError error={error} />
         </div>
         <ModalFooter className="shrink-0 flex-row flex-wrap items-center justify-end border-t border-line-2 bg-ground px-5 py-3 sm:px-6">

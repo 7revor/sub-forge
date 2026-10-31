@@ -23,8 +23,8 @@ export function useOptionPages(loadOptions: OptionLoader, query: string) {
 
 export function OptionPageStatus({ page, inset = false }: { page: ReturnType<typeof useOptionPages>; inset?: boolean }) {
   return <>
-    {!!page.notices.length && <div role="status" className="px-3 py-2 text-[12px] text-ink-muted">{page.notices.join('；')}</div>}
-    <div role={page.isError ? 'alert' : 'status'} className={`shrink-0 px-3 py-2 text-center text-[12px] text-ink-muted ${inset ? 'table-panel-divider' : 'border-t border-line-2'}`}>
+    {!!page.notices.length && <div role="status" className="px-3 py-2 text-[length:var(--text-caption)] text-ink-muted">{page.notices.join('；')}</div>}
+    <div role={page.isError ? 'alert' : 'status'} className={`shrink-0 px-3 py-2 text-center text-[length:var(--text-caption)] text-ink-muted ${inset ? 'table-panel-divider' : 'border-t border-line-2'}`}>
       {page.isFetching ? '正在加载…' : page.isError ? <><span title={page.error?.message}>加载失败</span><button type="button" className="ml-2 cursor-pointer text-brand" onClick={() => void (page.data ? page.fetchNextPage({ cancelRefetch: false }) : page.refetch())}>重试</button></> : <>
         <span>{page.total ? `已加载 ${page.options.length} / ${page.total} 项` : '没有匹配的文件或规则集'}</span>
         {page.hasNextPage && <button type="button" className="ml-2 cursor-pointer text-brand" onClick={() => void page.fetchNextPage({ cancelRefetch: false })}>加载更多</button>}
@@ -44,7 +44,7 @@ export function PagedOptionList({ loadOptions, query, onSelect, selected, allowU
       {page.options.map(option => <CommandItem key={option.value} value={option.value} data-checked={selected === option.value}
         disabled={!allowUnavailable && option.disabled} onSelect={() => onSelect(option.value)} className="flex flex-col items-start">
         <span className="w-full truncate" title={option.label}><HighlightedText text={option.label} matches={option.matches?.label} /></span>
-        <span className="w-full truncate text-[11.5px] text-ink-muted" title={option.hint}><HighlightedText text={option.hint ?? ''} matches={option.matches?.hint} /></span>
+        <span className="w-full truncate text-[length:var(--text-caption)] text-ink-muted" title={option.hint}><HighlightedText text={option.hint ?? ''} matches={option.matches?.hint} /></span>
       </CommandItem>)}
     </CommandList>
     <OptionPageStatus page={page} />

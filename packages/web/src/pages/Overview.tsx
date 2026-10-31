@@ -30,10 +30,10 @@ function OverviewNotices({ items }: { items: Notice[] }) {
           <span aria-hidden="true" className={cx('mt-[7px] h-2 w-2 shrink-0 rounded-full', DOT[item.tone])} />
           <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-x-5 gap-y-2">
             <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1 break-words">
-              <span className="text-[13px] font-medium">{item.title}</span>
-              <span className="text-[12.5px] leading-normal text-ink-muted">{item.body}</span>
+              <span className="text-[length:var(--text-control)] font-medium">{item.title}</span>
+              <span className="text-[length:var(--text-control)] leading-normal text-ink-muted">{item.body}</span>
             </div>
-            <Link to={item.to} className="shrink-0 text-[12.5px] font-medium text-brand">{item.action}</Link>
+            <Link to={item.to} className="shrink-0 text-[length:var(--text-control)] font-medium text-brand">{item.action}</Link>
           </div>
         </li>
       ))}
@@ -85,31 +85,31 @@ export function Overview() {
         actions={<Link to="/profiles/new" className={buttonClass('primary')}><Plus size={16} />新建配置订阅</Link>} />
 
       <PageScroll>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
           {stats.map(([label, value, sub]) => (
-            <div key={label} className="flex flex-col gap-1.5 rounded-[10px] border border-line bg-panel px-4.5 py-4">
-              <span className="text-[12.5px] text-ink-muted">{label}</span>
-              <span className="text-[28px] font-semibold tracking-tight">{value}</span>
-              <span className="text-[12.5px] text-ink-muted">{sub}</span>
+            <div key={label} className="flex flex-col gap-0.5 rounded-xl border border-line bg-panel px-5 py-4">
+              <span className="text-[length:var(--text-control)] text-ink-muted">{label}</span>
+              <span className="text-[length:var(--text-display)] font-semibold tracking-tight">{value}</span>
+              <span className="text-[length:var(--text-control)] text-ink-muted">{sub}</span>
             </div>
           ))}
         </div>
 
-        <Card title="配置订阅" actions={<span className="text-[12.5px] text-ink-muted">{profiles.data?.length ?? 0} 个</span>} className="min-w-0" bodyClass="">
-          <OverviewNotices items={profileNotices} />
+        <div className="grid items-start gap-5 xl:grid-cols-2">
+        <Card title="配置订阅" actions={<Link to="/profiles" className="text-[length:var(--text-control)] text-brand">全部</Link>} className="min-w-0" bodyClass="">
+
           <div className="overflow-x-auto">
             {profiles.data?.length === 0 ? <div className="px-4 pb-4"><Empty title="还没有配置订阅" action={<Link to="/profiles/new" className="text-brand">新建一个</Link>} /></div> : (
               <table className="w-full border-collapse">
-                <thead><tr><th className={th}>名称</th><th className={th}>模板</th><th className={th}>节点集</th><th className={th}>最近访问</th><th className={th}>状态</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
+                <thead><tr><th className={th}>名称</th><th className={th}>分流</th><th className={th}>最近访问</th><th className={th}>状态</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
                 <tbody>
                   {rows.map(({ p, last }) => (
                     <DocTableRow key={p.id} to={`/profiles/${p.id}`}>
                       <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${p.id}`} className={docNameLinkClass}>{p.name}</Link></td>
                       <td className={cx(td, 'whitespace-nowrap')}>{modeLabel(p, tpl(boundTemplateId(p))?.name)}</td>
-                      <td className={cx(td, 'font-mono')}>{p.nodeSets.length}</td>
-                      <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-[12px] text-ink-muted">{last.client}</span></div> : <span className="text-ink-muted">从未访问</span>}</td>
+                      <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-[length:var(--text-caption)] text-ink-muted">{last.client}</span></div> : <span className="text-ink-muted">从未访问</span>}</td>
                       <td className={td}>{!last ? <Badge>未访问</Badge> : last.status !== 200 ? <Badge tone="err">渲染失败</Badge> : last.warnings ? <Badge tone="warn">{last.warnings} 条告警</Badge> : <Badge tone="ok">正常</Badge>}</td>
-                      <td className={cx(td, 'text-right')}><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="profiles" id={p.id} name={p.name} size="sm" /><DocActionLink to={`/profiles/${p.id}`} name={p.name} /></div></td>
+                      <td className={cx(td, 'text-right')}><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="profiles" id={p.id} name={p.name} size="sm" /></div></td>
                     </DocTableRow>
                   ))}
                 </tbody>
@@ -118,11 +118,11 @@ export function Overview() {
           </div>
         </Card>
 
-        <Card title="节点订阅" actions={<Link to="/sources" className="text-[13px] text-brand">全部节点订阅</Link>} className="min-w-0" bodyClass="">
+        <Card title="节点订阅" actions={<Link to="/sources" className="text-[length:var(--text-control)] text-brand">全部</Link>} className="min-w-0" bodyClass="">
           <div className="overflow-x-auto">
             {!sources.data?.length ? <div className="px-4 pb-4"><Empty title="还没有节点订阅" /></div> : (
               <table className="w-full border-collapse">
-                <thead><tr><th className={th}>名称</th><th className={th}>节点</th><th className={th}>上次成功</th><th className={th}>流量</th><th className={th}>到期</th><th className={th}>状态</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
+                <thead><tr><th className={th}>名称</th><th className={th}>节点</th><th className={th}>流量</th><th className={th}>到期</th><th className={th}>状态</th></tr></thead>
                 <tbody>
                   {(sources.data ?? []).map((source) => {
                     const st = status.find((x) => x.source.id === source.id);
@@ -133,16 +133,13 @@ export function Overview() {
                       <DocTableRow key={source.id} to={`/sources/${source.id}`}>
                         <td className={cx(td, 'whitespace-nowrap')}><Link to={`/sources/${source.id}`} className={docNameLinkClass}>{source.name}</Link></td>
                         <td className={cx(td, 'font-mono')}><NodeSetCount nodeSet={{ type: 'source', id: source.id }} /></td>
-                        <td className={cx(td, 'whitespace-nowrap')}>{st?.lastOk ? formatTime(st.lastOk.fetchedAt).slice(5) : '—'}</td>
                         <td className={td}>{u?.total ? (
                           <div className="flex items-center gap-2.5">
-                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line-2"><div className="h-1.5 bg-brand" style={{ width: `${pct}%` }} /></div>
-                            <span className="text-[12.5px] whitespace-nowrap text-ink-muted">{formatBytes(used)} / {formatBytes(u.total)}</span>
+                            <span className="text-[length:var(--text-control)] whitespace-nowrap text-ink-muted">{formatBytes(used)} / {formatBytes(u.total)}</span>
                           </div>
-                        ) : <span className="text-[12.5px] text-ink-muted">—</span>}</td>
+                        ) : <span className="text-[length:var(--text-control)] text-ink-muted">—</span>}</td>
                         <td className={cx(td, 'whitespace-nowrap text-ink-muted')}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
                         <td className={td}><SourceFetchStatus state={st ?? { failing: false, lastOk: undefined }} /></td>
-                        <td className={cx(td, 'text-right')}><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="sources" id={source.id} name={source.name} size="sm" /><DocActionLink to={`/sources/${source.id}`} name={source.name} /></div></td>
                       </DocTableRow>
                     );
                   })}
@@ -151,6 +148,7 @@ export function Overview() {
             )}
           </div>
         </Card>
+        </div>
         <AccessLogCard />
       </PageScroll>
     </>

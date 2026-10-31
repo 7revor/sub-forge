@@ -31,41 +31,22 @@ export function Account() {
     change.mutate(undefined, { onSuccess: () => { setCurrent(''); setNext(''); setConfirm(''); } });
   };
 
-  const kv = 'grid grid-cols-[120px_minmax(0,1fr)] gap-2.5 border-t border-line-2 py-2 text-[13.5px]';
   const scripts = me?.role === 'admin' || me?.scriptAllowed;
-  return (
-    <>
-      <PageHeader title="账户" />
-      <PageScroll>
-        <div className="flex flex-wrap items-start gap-5">
-          <Card title="当前用户" className="min-w-0 flex-[1_1_360px]">
-            <div className="flex flex-col">
-              <div className={kv}><span className="text-ink-muted">用户名</span><span>{me?.username}</span></div>
-              <div className={kv}><span className="text-ink-muted">角色</span><span>{me?.role === 'admin' ? '管理员' : '普通用户'}</span></div>
-              <div className={kv}><span className="text-ink-muted">脚本处理器</span><span>{scripts ? '可以编写' : '未授权 · 需要管理员开启'}</span></div>
-            </div>
-          </Card>
-          <Card title="资源访问令牌" className="min-w-0 flex-[1_1_360px]">
-            <p className="text-[13px] text-ink-muted">同一账户的所有订阅共用一个令牌。公共规则可共享，节点和配置订阅仅限所属账户访问。</p>
-            <ErrorAlert error={token.error} />
-            <div className="flex flex-wrap gap-2">
-              <CopyButton text={token.data ?? ''} disabled={!token.data}>复制令牌</CopyButton>
-              <Button disabled={!token.data} onClick={() => void resetToken()}>重置令牌</Button>
-            </div>
-          </Card>
-          <Card title="修改密码" className="min-w-0 flex-[1_1_360px]">
-            <form onSubmit={submit} className="flex flex-col gap-3.5">
-              <Field label="当前密码">{(id) => <Input placeholder="输入当前登录密码" id={id} type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />}</Field>
-              <Field label="新密码（至少 8 位）">{(id) => <Input placeholder="设置至少 8 位的新密码" id={id} type="password" autoComplete="new-password" minLength={8} value={next} onChange={(e) => setNext(e.target.value)} required />}</Field>
-              <Field label="再次输入新密码" hint={confirm && confirm !== next ? '两次输入不一致' : undefined}>{(id) => <Input placeholder="再次输入新密码以确认" id={id} type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />}</Field>
-              <ErrorAlert error={change.error} />
-              <div className="flex items-center justify-end gap-3">
-                <Button type="submit" variant="primary" disabled={change.isPending || next !== confirm}>{change.isPending ? '更新中…' : '更新密码'}</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      </PageScroll>
-    </>
-  );
+  return <>
+    <PageHeader title="账户" />
+    <PageScroll><section className="settings-panel">
+      <div className="settings-row"><div><h2>{me?.username}</h2><p>{me?.role === 'admin' ? '管理员' : '普通用户'} · {scripts ? '脚本处理器可写' : '未授权脚本处理器'}</p></div></div>
+      <div className="settings-row"><div><h2>资源访问令牌</h2><p>所有订阅链接共用；重置后旧链接立即失效</p></div>
+        <div className="flex flex-col gap-3"><ErrorAlert error={token.error} /><div className="flex flex-wrap items-center gap-2"><span className="mr-2 font-mono text-[length:var(--text-control)]">{token.data ? `${token.data.slice(0, 4)}••••••••••••${token.data.slice(-4)}` : '正在读取…'}</span><CopyButton size="sm" text={token.data ?? ''} disabled={!token.data}>复制</CopyButton><Button size="sm" disabled={!token.data} onClick={() => void resetToken()}>重置令牌…</Button></div></div>
+      </div>
+      <div className="settings-row"><div><h2>密码</h2><p>修改后其他设备需要重新登录</p></div>
+        <form onSubmit={submit} className="flex max-w-md flex-col gap-4">
+          <Field label="当前密码">{id => <Input placeholder="输入当前登录密码" id={id} type="password" autoComplete="current-password" value={current} onChange={event => setCurrent(event.target.value)} required />}</Field>
+          <Field label="新密码">{id => <Input placeholder="设置至少 8 位的新密码" id={id} type="password" autoComplete="new-password" minLength={8} value={next} onChange={event => setNext(event.target.value)} required />}</Field>
+          <Field label="确认新密码" hint={confirm && confirm !== next ? '两次输入不一致' : undefined}>{id => <Input placeholder="再次输入新密码以确认" id={id} type="password" autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} required />}</Field>
+          <ErrorAlert error={change.error} /><div><Button type="submit" variant="primary" disabled={change.isPending || !next || next !== confirm}>{change.isPending ? '更新中…' : '更新密码'}</Button></div>
+        </form>
+      </div>
+    </section></PageScroll>
+  </>;
 }

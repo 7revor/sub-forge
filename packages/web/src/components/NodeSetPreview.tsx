@@ -37,7 +37,7 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
   const key = JSON.stringify([sources.map(source => source.ref), filter, excludeFilter]);
   const size = page.key === key ? page.size : 100;
   if (!sources.length) return <Empty variant="plain" title="当前类型没有节点来源" />;
-  return <div className="flex min-w-0 flex-col gap-2 text-[12px]" aria-label={`${label}预览`}>
+  return <div className="flex min-w-0 flex-col gap-2 text-[length:var(--text-caption)]" aria-label={`${label}预览`}>
     {query.isLoading && <p className="m-0 text-ink-muted">正在加载节点…</p>}
     {query.error && <div role="alert" className="text-err">节点加载失败：{query.error.message}<Button size="sm" variant="ghost" onClick={() => void query.refetch()}>重新加载</Button></div>}
     {validation.error && <p role="alert" className="m-0 text-err">{validation.error}</p>}
@@ -49,13 +49,13 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
         {nodes.slice(0, size).map((node, i) => {
           const active = selection ? selectedNodes.has(node) : firstMatch && i === 0;
           const content = <>
-            <span className="min-w-0 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-[11px] text-ink-muted">{node.sourceName}</span>}</span>
-            <span className="flex shrink-0 items-center gap-2 text-[11px] text-ink-muted">
+            <span className="min-w-0 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-[length:var(--text-caption)] text-ink-muted">{node.sourceName}</span>}</span>
+            <span className="flex shrink-0 items-center gap-2 text-[length:var(--text-caption)] text-ink-muted">
               {active && <span>{firstMatch ? '当前采用' : '已选'}</span>}
               <span>{node.type.toUpperCase()}</span>
             </span>
           </>;
-          const className = 'flex w-full items-center justify-between gap-3 border-b border-line-2 px-3 py-2.5 text-left text-[13px] last:border-0';
+          const className = 'flex w-full items-center justify-between gap-3 border-b border-line-2 px-3 py-2.5 text-left text-[length:var(--text-control)] last:border-0';
           return onSelect ? <button key={`${i}:${node.name}`} type="button" aria-pressed={selection ? active : undefined} className={`${className} cursor-pointer hover:bg-ground focus-visible:bg-ground ${selection && active ? 'bg-ground font-medium' : ''}`} title={`仅使用 ${node.name}`} onClick={() => onSelect(node.name, node.nodeSet)}>{content}</button> : <div key={`${i}:${node.name}`} className={className}>{content}</div>;
         })}
         {!nodes.length && <Empty variant="plain" title="没有匹配节点" />}

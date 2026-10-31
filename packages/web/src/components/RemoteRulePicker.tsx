@@ -16,7 +16,7 @@ export const RemoteRuleDialog = createModal<{ value?: string }, RuleSetMatcher>(
   const loaded = useModalPresentation(useRulesetSources(undefined, previewUrl ? { id: '', name: '', sources: [source] } : undefined));
   return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl" aria-describedby={undefined}><ModalHeader><ModalTitle>{"远程链接"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
     <Field label="规则地址">{id => <Input id={id} type="url" value={url} placeholder="远程规则文件的 HTTP 或 HTTPS 地址" onChange={e => { setUrl(e.target.value); setPreviewUrl(undefined); }} />}</Field>
-    <p className="m-0 text-[13px] text-ink-muted">直接引用自己或第三方维护的规则，自动识别格式并输出 .list。</p>
+    <p className="m-0 text-[length:var(--text-control)] text-ink-muted">直接引用自己或第三方维护的规则，自动识别格式并输出 .list。</p>
     {url && error && <FieldError error={error} />}
     <div><Button disabled={!matcher || loaded.reading && !!previewUrl} onClick={() => { if (matcher) setPreviewUrl(matcher.remote!.url); }}>读取并预览</Button></div>
     {previewUrl && <RulesetPreview key={previewUrl} inputs={loaded.inputs} ready={loaded.ready} overrides={undefined} sourceError={loaded.error} sourceNames={{ remote: '远程规则' }} sourceReading={loaded.reading} onRefreshSources={loaded.refresh} />}

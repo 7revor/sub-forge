@@ -18,7 +18,7 @@ function useResourceCacheState(kind:string,id:string) {
 }
 export function ResourceLastRefreshTime({kind,id}:{kind:string;id:string}) {
   const state=useResourceCacheState(kind,id);
-  if(state.error)return <span className="text-[12px] text-red-600">状态读取失败</span>;
+  if(state.error)return <span className="text-[length:var(--text-caption)] text-red-600">状态读取失败</span>;
   if(!state.data)return <span className="text-ink-muted">读取中…</span>;
   const successful=state.data.items.filter((r):r is ResourceState & {lastSuccessAt:number}=>r.lastSuccessAt!==undefined);
   const lastSuccessAt=successful.length?Math.max(...successful.map(r=>r.lastSuccessAt)):undefined;
@@ -28,7 +28,7 @@ export function ResourceLastRefreshTime({kind,id}:{kind:string;id:string}) {
 }
 export function ResourceCacheStatus({kind,id}:{kind:string;id:string}) {
   const state=useResourceCacheState(kind,id);
-  if(state.error)return <span className="text-[12px] text-red-600">状态读取失败</span>;
+  if(state.error)return <span className="text-[length:var(--text-caption)] text-red-600">状态读取失败</span>;
   if(!state.data)return <span className="text-ink-muted">读取中…</span>;
   const items=state.data.items, failed=items.filter(r=>r.error), missing=items.filter(r=>!r.available), refreshing=items.some(r=>r.refreshing);
   return <span title={items.map(r=>`${r.name}：最后成功 ${r.lastSuccessAt?formatTime(r.lastSuccessAt):'无'}；下次拉取 ${r.nextFetchAt?formatTime(r.nextFetchAt):'待拉取'}${r.error?`；${r.error}`:''}`).join('\n')}>
@@ -54,7 +54,7 @@ const RefreshProgressModal = createModal<{ name: string; kind: string; jobId: st
       <ErrorAlert error={job.error??current?.error} />
       {current && <div className="flex min-w-0 flex-col gap-3 whitespace-normal text-left">
         {!current.total && <p className="text-ink-muted">没有需要拉取的远程资源。</p>}
-        {current.results.map((r,i)=><div key={i} className="min-w-0 rounded border border-line p-3 text-[13px]"><div className="break-words font-medium">{r.name}</div><div className={`truncate ${r.ok===false||r.state==='interrupted'?'text-red-600':'text-ink-muted'}`} title={refreshItemStatus(r)}>{refreshItemStatus(r)}</div></div>)}
+        {current.results.map((r,i)=><div key={i} className="min-w-0 rounded border border-line p-3 text-[length:var(--text-control)]"><div className="break-words font-medium">{r.name}</div><div className={`truncate ${r.ok===false||r.state==='interrupted'?'text-red-600':'text-ink-muted'}`} title={refreshItemStatus(r)}>{refreshItemStatus(r)}</div></div>)}
         {kind==='profiles' && <p className={`truncate ${current.render?.ok===false?'text-red-600':'text-ink-muted'}`} title={current.render?.error}>{current.render?current.render.ok?'订阅配置已重新生成':`订阅生成失败：${current.render.error}`:current.state==='interrupted'?'订阅生成已中断':current.completed===current.total?'正在重新生成订阅配置…':'等待资源刷新后重新生成订阅配置'}</p>}
         <p role="status" className="truncate" title={current.error??job.error?.message}>{job.error?'状态读取失败，正在重试…':current.state==='running'?`正在刷新：${current.completed} / ${current.total}`:current.state==='interrupted'?`刷新已中断${current.error?`：${current.error}`:''}`:`已完成：${current.results.filter(r=>r.ok===true).length} 项成功，${current.results.filter(r=>r.ok===false).length} 项失败`}</p>
       </div>}

@@ -1,3 +1,4 @@
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../../components/ui/dropdown-menu.tsx';
 import { rulePreviewLinks } from '../../domain/rulePreview.ts';
 import { type Matcher, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
 import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
@@ -42,7 +43,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
   const edit = async (rule: RuleEntry, adding = false) => {
-    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions });
+    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions, groups: value.groups });
     if (result.status !== 'confirmed') return;
     const draft = result.data;
     const old = currentValue.current.rules.find(r => r.id === draft.id)?.matcher;
@@ -69,8 +70,11 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   return <>
     <Card title={title} actions={!readOnly && <>
       {!staticOnly && <Button size="sm" disabled={!remoteUrls.length || repositoryMatches.isPending} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
-      <Button size="sm" className="gap-1" aria-label="添加本地规则" onClick={() => add({ kind: 'local', content: '' })}><Plus size={15} />本地规则</Button>
-      {!staticOnly && <><Button size="sm" className="gap-1" onClick={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><Plus size={15} />远程链接</Button><Button size="sm" className="gap-1" onClick={() => add({ kind: 'ruleset', id: '' })}><Plus size={15} />引用规则</Button></>}
+      <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={16} />添加规则</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuItem onSelect={() => add({ kind: 'local', content: '' })}><span><span className="block">手写规则</span><span className="text-[length:var(--text-caption)] text-ink-muted">每行一条，如 DOMAIN-SUFFIX,openai.com</span></span></DropdownMenuItem>
+        {!staticOnly && <><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' })}><span><span className="block">从规则仓库选择 / 引用规则集合</span><span className="text-[length:var(--text-caption)] text-ink-muted">复用已索引的文件或多来源集合</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><span><span className="block">远程规则地址</span><span className="text-[length:var(--text-caption)] text-ink-muted">填写 HTTP(S) 规则文件 URL</span></span></DropdownMenuItem></>}
+      </DropdownMenuContent></DropdownMenu>
+
     </>}>
       <ErrorAlert error={repositoryMatches.error} />{linkError && <FieldError error={linkError} />}
       {!value.rules.length && <Empty title="没有规则" description={hideFinal ? '先于模板规则匹配，仅影响本订阅。' : '未匹配的流量走 MATCH。'} />}
@@ -84,7 +88,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           icon={local ? <FileText size={16} /> : matcher.remote ? <Globe size={16} /> : <Link2 size={16} />}
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
           hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
-          target={readOnly ? <span className="block truncate pr-1.5 pl-3 text-[13px]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
+          target={readOnly ? <span className="block truncate pr-1.5 pl-3 text-[length:var(--text-control)]" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
           externalPreview={!local} previewLinks={rulePreviewLinks(matcher)} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);

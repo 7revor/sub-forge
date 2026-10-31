@@ -1,3 +1,4 @@
+import { ActionMenu } from './ActionMenu.tsx';
 import { RefreshCacheButton, ResourceCacheStatus, ResourceLastRefreshTime } from './ResourceCache.tsx';
 // 文档列表：服务端搜索与分页；搜索与新建放在页头，表格卡片只含表格和分页器，表格占满剩余高度并独立滚动。
 // 空列表保留分页和搜索；删除统一放在操作区最右侧，先弹确认。
@@ -42,18 +43,18 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
   const canRefresh=(d:DocMap[K])=>kind!=='rulesets'||(d as DocMap['rulesets']).sources.some(s=>s.kind==='remote'&&s.enabled!==false);
   const tableColumns = [
     ...columns.map(column => ({ header: column.header, width: column.width ?? 180 })),
-    ...(refreshable ? [{ header: '状态', width: 164 }, { header: '上次刷新时间', width: 164 }] : []),
-    { header: actionHeader, width: kind === 'profiles' ? 348 : refreshable ? 324 : 240 },
+    ...(refreshable ? [{ header: '状态', width: 136 }, { header: '上次刷新时间', width: 164 }] : []),
+    { header: actionHeader, width: 144 },
   ];
   return (
     <>
       <PageHeader title={title} subtitle={intro} actions={<>
-        <span role="status" className={cx('self-center text-[12.5px] text-ink-muted', !list.isFetching && 'sr-only')}>{list.isFetching ? '加载中…' : ''}</span>
+        <span role="status" className={cx('self-center text-[length:var(--text-control)] text-ink-muted', !list.isFetching && 'sr-only')}>{list.isFetching ? '加载中…' : ''}</span>
         <SearchInput size="md" aria-label={`搜索${name}`} placeholder="搜索名称" value={q} onChange={(e) => setQ(e.target.value)} />
         {canCreate && createButton('md', 'primary')}
-      </>} />
+      </>}><span className="text-[length:var(--text-control)] font-normal text-ink-muted">{list.data?.total ?? 0} 个</span></PageHeader>
       <ErrorAlert error={list.error} />
-      <section className="list-panel" aria-label={`${title}列表`} aria-busy={list.isFetching}>
+      {list.data && !list.data.total && !q.trim() ? <Empty variant="panel" title={`还没有${name}`} description={empty} action={canCreate && createButton('md', 'default')} /> : <section className="list-panel" aria-label={`${title}列表`} aria-busy={list.isFetching}>
         <div key={`${list.page}-${list.pageSize}-${q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
           <ListTable label={`${title}列表`} columns={tableColumns}>
             {!list.data && !list.error ? <ListTableLoading columns={tableColumns.length} /> : rows.map((d) => (
@@ -68,10 +69,11 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                 <td className={cx(listTd, 'text-right whitespace-nowrap')}>
                   <ListActions>
                     <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />
+                    <ActionMenu label={`${d.name}更多操作`}>
                     {refreshable&&canRefresh(d)&&<RefreshCacheButton kind={kind} id={d.id} name={d.name}/>}
                     <DocActionLink to={`/${kind}/${d.id}`} name={d.name} viewOnly={!canWrite(d.id)} />
                     {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
-                  </ListActions>
+                  </ActionMenu></ListActions>
                 </td>
               </DocTableRow>
             ))}
@@ -81,7 +83,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
         </div>
         <Pagination page={list.data?.page ?? list.page} pageSize={list.pageSize} total={list.data?.total ?? 0} totalPages={list.data?.totalPages ?? 1}
           unknownTotal={!list.data} busy={list.isFetching || !list.data} onPage={list.setPage} onPageSize={list.setPageSize} />
-      </section>
+      </section>}
 
     </>
   );

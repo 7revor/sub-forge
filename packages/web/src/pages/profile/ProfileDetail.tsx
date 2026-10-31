@@ -1,3 +1,8 @@
+import { useLeaveGuard } from '../../hooks/useLeaveGuard.ts';
+import { ActionMenu } from '../../components/ActionMenu.tsx';
+import { CopyField } from '../../components/CopyField.tsx';
+import { Frame } from '../../modals/Frame.tsx';
+import { ProfileInfoModal } from './ProfileInfoModal.tsx';
 import { queryUrl } from '@sub-forge/core';
 import { acceptProfileSave, modeLabel, syncProfileDraft } from './routing.ts';
 import { tokenOptions } from '../../hooks/documentQueries.ts';
@@ -31,8 +36,9 @@ export function ProfileDetail() {
 
   const { ctx, template } = useProfileCtx(draft, setDraft);
 
+  const dirty = !!draft && JSON.stringify(draft) !== JSON.stringify(doc.data);
+  const { leave } = useLeaveGuard(dirty, ({ nextLocation }) => !nextLocation.pathname.startsWith(`/profiles/${id}/`) && nextLocation.pathname !== `/profiles/${id}`, () => ({ what: draft?.name ?? '配置订阅', canSave: !!draft?.name.trim(), onSave: async () => { if (draft) { const saved = await save.mutateAsync({ ...draft, name: draft.name.trim() }); setDraft(saved); } } }));
   if (!draft || !ctx) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-ink-muted">加载中…</div>;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
   const validName = !!draft.name.trim();
   const discard = () => { setDraft(doc.data);  };
   const subscriptionUrl = tokens.data?.[0]?.url;
@@ -42,21 +48,22 @@ export function ProfileDetail() {
       <div className="flex flex-col gap-2.5">
         <PageHeader crumbs={<><Link to="/profiles" className="text-ink-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
           actions={<>
-            {dirty && <Button onClick={discard}>放弃修改</Button>}
+            {dirty && <Button variant="ghost" onClick={discard}>放弃修改</Button>}
             <Button variant="primary" disabled={!validName || !dirty || save.isPending} onClick={() => { if (validName) save.mutate({ ...draft, name: draft.name.trim() }, { onSuccess: saved => setDraft(current => acceptProfileSave(current, draft, saved)) }); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
-            <DeleteAction what="配置订阅" name={draft.name} body="它的订阅链接会立即失效，客户端将无法更新。" error={del.error} pending={del.isPending}
-              onReset={del.reset} onDelete={() => del.mutateAsync(draft.id)} onDeleted={() => navigate('/profiles')} />
+            <ActionMenu size="md" items={[
+              { label: '编辑名称与备注', onSelect: async () => { const result = await ProfileInfoModal.show({ name: draft.name, note: draft.note }); if (result.status === 'confirmed') setDraft({ ...draft, ...result.data }); } },
+              { label: '删除配置订阅…', danger: true, onSelect: async () => { const result = await Frame.modal.confirm({ title: `删除配置订阅「${draft.name}」？`, description: '它的订阅链接会立即失效，客户端将无法更新。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(draft.id); } }); if (result.status === 'confirmed') leave('/profiles'); } },
+            ]} />
           </>}>
-          <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[12.5px] text-accent-ink">
-            {modeLabel(draft, template.data?.name)}{template.data && ' · 自动更新'}
+          <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[length:var(--text-control)] text-accent-ink">
+            {modeLabel(draft, template.data?.name)}
           </span>
-          {dirty && <Badge tone="warn">有未保存的修改</Badge>}
+          {dirty && <Badge tone="warn">未保存</Badge>}
         </PageHeader>
-        <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px]">
-          <span className="shrink-0 text-ink-muted">订阅链接</span>
+        <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[length:var(--text-control)]">
           {subscriptionUrl ? <>
-            <a href={subscriptionUrl} target="_blank" rel="noreferrer" className="min-w-0 break-all font-mono text-accent-ink no-underline hover:underline">{subscriptionUrl}</a>
-            <span className="text-ink-muted">自动适配客户端</span>
+            <CopyField value={subscriptionUrl} />
+            <span className="text-[length:var(--text-caption)] text-ink-muted">自动适配客户端{draft.note ? ` · 备注：${draft.note}` : ''}</span>
           </> : tokens.isPending ? <span className="text-ink-muted">正在加载订阅链接…</span> : <>
             <span role="alert" className="text-err">{tokens.error?.message ?? '暂未获取到订阅链接'}</span>
             <Button size="sm" onClick={() => void tokens.refetch()}>重新加载链接</Button>
@@ -64,7 +71,7 @@ export function ProfileDetail() {
         </div>
       </div>
       <ErrorAlert error={save.error} />
-      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[13px]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={queryUrl('/api/profiles/migration-backup', { id: draft.id })} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
+      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[length:var(--text-control)]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={queryUrl('/api/profiles/migration-backup', { id: draft.id })} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
       {template.error && <ErrorAlert error={template.error} />}
 
       <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} />

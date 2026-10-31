@@ -42,7 +42,7 @@ export function TabChains() {
       <Card title="代理链"
         actions={<>{draft.chains.length > 0 && <Button size="sm" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button size="sm" onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
-        {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[13px] text-err">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
+        {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[length:var(--text-control)] text-err">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
         {!draft.chains.length ? <div className="px-4 pb-4"><Empty title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /></div> : (
           <div aria-label="代理链列表"><SortableList items={draft.chains} getKey={chain => chain.id} onReorder={chains => setDraft({ ...draft, chains })} renderItem={(chain, i, handle) => <ChainCard chain={chain} index={i} handle={handle} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === chain.id)} onEdit={() => void edit(chain)} onDelete={() => setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== chain.id) })} /> } /></div>
         )}
@@ -68,11 +68,13 @@ export function TabPreview() {
   const preview = usePreview();
   const [located, setLocated] = useState<{ result: ProfilePreview; index: number; range: CodeRange }>();
   const [app, setApp] = useState<ClientApp>();
+  const [level, setLevel] = useState<'all' | 'error' | 'warn' | 'info'>('all');
   const [client, setClient] = useState<Client>('mihomo');
   const apps = CLIENT_APPS.filter(a => a.kernel === client);
   const target = { client, profile: persistedProfile(draft), ...(app ? { app } : {}) };
   const current = preview.data && !preview.isPending && !preview.error && JSON.stringify(preview.variables) === JSON.stringify(target);
   const report = preview.data?.report ?? [];
+  const filtered = report.map((item, index) => ({ item, index })).filter(({ item }) => level === 'all' || item.level === level);
   const outputIndex = useMemo(() => indexPreview(preview.data?.yaml ?? '', preview.data?.format), [preview.data]);
   const locations = report.map(item => locatePreviewIssue(item, outputIndex, groups));
   const selection = located?.result === preview.data ? located : undefined;
@@ -92,35 +94,31 @@ export function TabPreview() {
   return (
     <>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <Segmented label="预览内核" value={client} options={[{ value: 'mihomo', label: 'mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setApp(undefined); }} />
-        <label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink-2">客户端追加
+        <Segmented label="预览内核" value={client} options={[{ value: 'mihomo', label: 'Mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setApp(undefined); }} />
+        <label className="flex items-center gap-2 whitespace-nowrap text-[length:var(--text-control)] text-ink-2">客户端追加
           <Select clearable placeholder="选择客户端，留空仅应用内核公共追加" className="w-auto" value={app ?? ''} onChange={e => setApp(e.target.value ? e.target.value as ClientApp : undefined)}>{apps.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</Select></label>
-        <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新渲染'}</Button>
-        <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml || !!preview.data.exportUnavailableReason}>导出文件</Button>
-        <span className="text-[12.5px] text-ink-muted">当前草稿预览</span>
+        <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新生成'}</Button>
+        <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml || !!preview.data.exportUnavailableReason}>下载配置文件</Button>
+        <span className="text-[length:var(--text-control)] text-ink-muted">预览包含当前草稿中的修改</span>
       </div>
       <ErrorAlert error={preview.error} />
-      {preview.data && !current && !preview.isPending && <p role="status" className="text-[13px] text-ink-muted">配置已更改，请重新渲染预览。</p>}
-      {client !== 'mihomo' && client !== 'loon' && <p className="text-[12.5px] text-ink-muted">节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。导出文件会内嵌已转换的规则，可直接导入。</p>}
-      {client === 'loon' && <p className="text-[12.5px] text-ink-muted">手写规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
-      {current && preview.data.exportUnavailableReason && <p role="status" className="text-[13px] text-ink-muted">{preview.data.exportUnavailableReason}</p>}
+      {preview.data && !current && !preview.isPending && <p role="status" className="text-[length:var(--text-control)] text-ink-muted">配置已更改，请重新生成预览。</p>}
+      {client !== 'mihomo' && client !== 'loon' && <p className="text-[length:var(--text-control)] text-ink-muted">节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。下载配置文件会内嵌已转换的规则，可直接导入。</p>}
+      {client === 'loon' && <p className="text-[length:var(--text-control)] text-ink-muted">手写规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
+      {current && preview.data.exportUnavailableReason && <p role="status" className="text-[length:var(--text-control)] text-ink-muted">{preview.data.exportUnavailableReason}</p>}
       {current && (
         <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
-          <CodePreview fill label="最终配置" className="rounded-[10px]" title={<>{`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`}{selection && <span role="status" className="ml-3 text-[#b8ccff]">已定位第 {selection.range.startLine} 行</span>}</>} text={preview.data.yaml ?? preview.data.failure ?? ''} highlight={selection?.range} bodyClassName="overscroll-contain p-4 text-[12.5px] leading-[1.75]" />
-          <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-auto overscroll-contain [overflow-wrap:anywhere] [&>*]:shrink-0">
-            <div className="grid grid-cols-3 gap-2">
-              {[['错误', count('error'), 'text-err'], ['告警', count('warn'), 'text-warn'], ['提示', count('info'), 'text-accent-ink']].map(([t, n, c]) => (
-                <div key={t as string} className="flex flex-col gap-0.5 rounded-[10px] border border-line bg-panel px-3 py-2.5"><span className="text-[12px] text-ink-muted">{t}</span><span className={`text-[22px] font-semibold ${c}`}>{n}</span></div>
-              ))}
+          <CodePreview fill lineNumbers label="最终配置" className="rounded-xl" title={<>{`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`}{selection && <span role="status" className="ml-3 text-[#b8ccff]">已定位第 {selection.range.startLine} 行</span>}</>} text={preview.data.yaml ?? preview.data.failure ?? ''} highlight={selection?.range} bodyClassName="overscroll-contain p-4 text-[length:var(--text-control)] leading-[22px]" />
+          <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-line bg-panel [overflow-wrap:anywhere]">
+            <div className="flex items-center justify-between px-5 pt-4"><h2 className="m-0 text-[length:var(--text-section)] font-semibold">检查结果</h2><Badge tone={preview.data.ok ? 'ok' : 'err'}>{preview.data.ok ? '可以导入' : '渲染失败'}</Badge></div>
+            <div className="px-5"><Segmented size="sm" label="筛选检查结果" value={level} onChange={setLevel} options={[{ value: 'all', label: `全部 ${report.length}` }, { value: 'error', label: `错误 ${count('error')}` }, { value: 'warn', label: `告警 ${count('warn')}` }, { value: 'info', label: `提示 ${count('info')}` }]} /></div>
+            <div className="min-h-0 flex-1 overflow-auto px-3">
+              <PreviewReport items={filtered.map(item => item.item)} locations={filtered.map(item => locations[item.index])} selected={filtered.findIndex(item => item.index === selection?.index)} onLocate={index => { const original = filtered[index]!.index; const range = locations[original]; if (range) setLocated({ result: preview.data, index: original, range: { ...range } }); }} />
             </div>
-            <Card title="渲染报告" bodyClass="px-2 pb-2">
-              {!preview.data.ok && <div className="mb-2 px-2"><Badge tone="err">渲染失败，请修正错误</Badge></div>}
-              <PreviewReport items={report} locations={locations} selected={selection?.index} onLocate={index => { const range = locations[index]; if (range) setLocated({ result: preview.data, index, range: { ...range } }); }} />
-            </Card>
-            <details className="rounded-lg border border-line bg-panel px-4 py-3">
-              <summary className="cursor-pointer text-[13px] font-medium">自动生成的引用详情（{preview.data.dependencies?.length ?? 0}）</summary>
-              <p className="text-[12px] text-ink-muted">系统按客户端自动处理，以下为本次配置生成结果。</p>
-              {!preview.data.dependencies?.length ? <p className="text-[12px] text-ink-muted">本次配置无需生成隐藏引用组。</p> : <ul className="m-0 list-none space-y-3 p-0">{preview.data.dependencies.map(d => <li key={d.refKey} className="border-t border-line-2 pt-2 text-[12px]">
+            <details className="border-t border-line-2 px-5 py-3">
+              <summary className="cursor-pointer text-[length:var(--text-control)] font-medium">自动生成的引用详情（{preview.data.dependencies?.length ?? 0}）</summary>
+              <p className="text-[length:var(--text-caption)] text-ink-muted">系统按客户端自动处理，以下为本次配置生成结果。</p>
+              {!preview.data.dependencies?.length ? <p className="text-[length:var(--text-caption)] text-ink-muted">本次配置无需生成隐藏引用组。</p> : <ul className="m-0 list-none space-y-3 p-0">{preview.data.dependencies.map(d => <li key={d.refKey} className="border-t border-line-2 pt-2 text-[length:var(--text-caption)]">
                 <div className="font-medium">{d.node}</div><div className="mt-1 break-all font-mono text-ink-muted">{d.output}</div><div className="mt-1 break-all text-ink-muted">引用位置：{d.usedBy.join('、')}</div>
               </li>)}</ul>}
             </details>
