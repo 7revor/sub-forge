@@ -112,7 +112,7 @@ export function RulesetEdit() {
       e.submit(x => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' }) }));
     }} saveError={e.save.error} onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
     badges={!e.isNew && <Badge>{sourceSummary(d)}</Badge>}>
-    {(d.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[length:var(--text-control)] text-warn">{note}</p>)}
+    {(d.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="m-0 rounded-lg bg-warn-soft px-4 py-2.5 text-[length:var(--text-control)] text-warn">{note}</p>)}
     {!canEdit && <p className="text-[length:var(--text-control)] text-ink-muted">公共规则增强 · 仅创建者或管理员可以修改</p>}
     <fieldset disabled={!canEdit} className="contents">
     <Card bodyClass="grid gap-4 p-5 sm:grid-cols-[1fr_2fr]">
@@ -120,11 +120,11 @@ export function RulesetEdit() {
       <NoteField compact value={d.note} onChange={note => set({ note })} />
     </Card>
     </fieldset>
-    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,1fr)]"><div className="flex min-w-0 flex-col gap-5">
+    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_440px]"><div className="flex min-w-0 flex-col gap-5">
     {canEdit ? <>
-    <Card title="来源" actions={<>
-      <Button size="sm" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>
-      <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Plus size={15} />添加来源</Button></DropdownMenuTrigger><DropdownMenuContent align="end">
+    <Card title="来源" count={d.sources.length} actions={<>
+      <Button variant="ghost" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>
+      <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={15} />添加来源</Button></DropdownMenuTrigger><DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true, repository: true })}>规则仓库</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true })}>远程地址</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void edit({ source: newLocal(), adding: true })}>手写规则</DropdownMenuItem>
@@ -137,7 +137,7 @@ export function RulesetEdit() {
         hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking} onLink={match => link(s.id, s.url!, match)} />}
         externalPreview={s.kind === 'remote'} previewLinks={sourcePreviewHref(s) ? [{ href: sourcePreviewHref(s)! }] : []}
         onPreview={() => void RuleSourcePreview.show({ source: { rulesetId: e.isNew ? undefined : e.id, source: s } })} onEdit={() => void edit({ source: s, adding: false })} onDelete={() => { set({ sources: d.sources.filter(x => x.id !== s.id) }); if (s.url) matches.clear([s.url]); }}>
-        <span title={sourceLabel(s)}>{sourceLabel(s)}</span>
+        <span className="block min-w-0" title={sourceLabel(s)}><span className="block truncate">{sourceLabel(s)}</span><span className="block truncate font-mono text-[length:var(--text-caption)] font-normal text-ink-muted">{s.repository?.path ?? (s.kind === 'remote' ? s.url : s.content?.split('\n').filter(Boolean).join(' · '))}</span></span>
       </RuleCard>} />
     </Card>
     </> : <Card title="来源（只读）"><div className="flex flex-col gap-2">{d.sources.map((source, i) => source.kind === 'remote' ? <a key={source.id} href={sourcePreviewHref(source)} target="_blank" rel="noreferrer noopener" className={buttonClass('default', 'sm')}>查看来源 {i + 1} · {sourceLabel(source)}</a> : <Button key={source.id} onClick={() => void RuleSourcePreview.show({ source: { rulesetId: e.id, source } })}>查看来源 {i + 1} · {sourceLabel(source)}</Button>)}</div></Card>}

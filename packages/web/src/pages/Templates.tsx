@@ -212,10 +212,10 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
 const TemplateYamlModal = createModal<{ body: TemplateBody; ctx: ConvertCtx }, TemplateBody>(function TemplateYaml({ data: { body, ctx }, modal }) {
   const [yaml, setYaml] = useModalDraft('');
   const result = useMemo(() => templateFromYaml(yaml, body, ctx), [yaml, body, ctx]);
-  return <ModalContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl"><ModalHeader><ModalTitle>从 YAML 导入</ModalTitle></ModalHeader>
-    <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，保存后仍需保存模板。">{id => <YamlTextarea placeholder="粘贴包含策略组和规则的 Mihomo YAML 配置" id={id} rows={18} spellCheck={false} value={yaml} onChange={e => setYaml(e.target.value)} />}</Field>
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto"><ModalHeader><ModalTitle>从 YAML 导入</ModalTitle></ModalHeader>
+    <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，保存后仍需保存模板。">{id => <YamlTextarea placeholder="粘贴包含策略组和规则的 Mihomo YAML 配置" id={id} rows={6} spellCheck={false} value={yaml} onChange={e => setYaml(e.target.value)} />}</Field>
     {!!yaml.trim() && !result.ok && <FieldError error={`第 ${result.line ?? 1} 行：${result.error}`} />}
     {result.ok && result.notes.length > 0 && <ul className="m-0 pl-5 text-[length:var(--text-control)] text-ink-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
-    <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!result.ok} onClick={() => { if (result.ok) modal.confirm(result.value); }}>保存</Button></ModalFooter>
+    <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!result.ok} onClick={() => { if (result.ok) modal.confirm(result.value); }}>应用</Button></ModalFooter>
   </ModalContent>;
 });

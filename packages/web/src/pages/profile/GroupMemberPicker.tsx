@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useQueries } from '@tanstack/react-query';
+import { nodeListOptions } from '../../hooks.ts';
+import { filterNodes } from '../../components/nodeMatch.ts';
 import { chainSources, type GroupMember, type GroupSpec, type NodeSetID } from '@sub-forge/core';
-import { Plus, X, LockKeyhole, Link2 } from 'lucide-react';
+import { Plus, X, LockKeyhole, Link2, Layers, Server, Crosshair } from 'lucide-react';
 import { useNodeList } from '../../hooks.ts';
 import { useModalPresentation } from '../../modals/index.tsx';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
@@ -10,16 +13,15 @@ import { BUILTINS, memberLabel } from '../../components/pickers.tsx';
 import { Badge, Button, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { SearchInput } from '../../components/SearchInput.tsx';
-import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { GROUP_TYPE_LABEL } from '../../components/GroupSettingsFields.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, memberKey, nodeSetKey, toggleMember } from './memberModel.ts';
 import { useChainNames } from './useChainNames.ts';
 
-type Props = { group: GroupSpec; members: GroupMember[]; inherited: GroupMember[]; onChange: (members: GroupMember[]) => void; onGroupChange: (patch: Partial<GroupSpec>) => void; readOnlySettings: boolean };
+type Props = { group: GroupSpec; members: GroupMember[]; inherited: GroupMember[]; onChange: (members: GroupMember[]) => void; onGroupChange: (patch: Partial<GroupSpec>) => void; readOnlySettings: boolean; advanced?: ReactNode };
 
 /** 成员编辑集中于会话副本；候选浮层与右侧预览不创建另一套弹窗。 */
-export function GroupMemberPicker({ group, members, inherited, onChange, onGroupChange, readOnlySettings }: Props) {
+export function GroupMemberPicker({ group, members, inherited, onChange, onGroupChange, readOnlySettings, advanced }: Props) {
   const { draft, setDraft, groups, groupName, nodeSetName, profileNodeSets } = useProfile();
   const [category, setCategory] = useState<'source' | 'node' | 'group' | 'builtin'>('source');
   const [source, setSource] = useState('');
@@ -46,16 +48,18 @@ export function GroupMemberPicker({ group, members, inherited, onChange, onGroup
   };
   const nodeMember = (name: string): GroupMember => ({ kind: 'node', ref: { nodeSet: active!.ref, match: { exact: name }, fallback: 'error' } });
   const memberText = (member: GroupMember) => member.kind === 'all' ? (member.scope === 'providers' ? '全部引用来源' : member.scope === 'proxies' ? '全部展开节点' : '全部节点来源') : memberLabel(member, groupName, nodeSetName).text;
-  const memberRow = (member: GroupMember, index: number, handle?: React.ReactNode) => <div className="flex min-h-[44px] items-center gap-2 border-b border-line-2 py-2 text-[length:var(--text-control)] last:border-0">
-    {handle ?? <LockKeyhole size={14} className="mx-1 text-ink-muted" />}<div className="min-w-0 flex-1"><span className="block truncate font-medium">{memberText(member)}</span>{member.kind === 'node' && <NodeChainHint nodeSet={member.ref.nodeSet} />}</div>
-    {handle && <Button size="sm" variant="ghost" className="w-7 px-0" title={`移除 ${memberText(member)}`} aria-label={`移除 ${memberText(member)}`} onClick={() => onChange(members.filter((_, i) => i !== index))}><X size={14} /></Button>}
+  const memberRow = (member: GroupMember, index: number, handle?: ReactNode) => <div className="my-2 grid min-h-[44px] grid-cols-[20px_28px_minmax(0,1fr)_28px] items-center gap-2.5 rounded-[10px] border border-line px-3 py-1.5 text-[length:var(--text-control)]">
+    {handle ?? <LockKeyhole size={14} className="text-faint" />}
+    <span className={cx('grid size-7 place-items-center rounded-md', member.kind === 'node' ? 'bg-accent-soft text-accent-ink' : 'bg-neutral-soft text-ink-muted')}>{member.kind === 'builtin' ? <span className="text-[10px] font-semibold">{member.name.slice(0,2)}</span> : member.kind === 'node' ? <Crosshair size={14} /> : member.kind === 'group' ? <Layers size={14} /> : <Server size={14} />}</span>
+    <div className="min-w-0"><span className="block truncate">{memberText(member)}</span>{member.kind === 'node' && <NodeChainHint nodeSet={member.ref.nodeSet} />}</div>
+    {handle ? <Button size="sm" variant="ghost" className="w-7 px-0" title={`移除 ${memberText(member)}`} aria-label={`移除 ${memberText(member)}`} onClick={() => onChange(members.filter((_, i) => i !== index))}><X size={14} /></Button> : <span />}
   </div>;
-  return <div className="grid min-h-0 gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
-    <div className="flex min-w-0 flex-col gap-6">
+  return <div className="grid min-h-0 flex-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_360px] md:overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-col gap-5 p-5 md:overflow-y-auto md:border-r md:border-line-2">
       <section aria-label="策略组成员">
-        <div className="mb-3 flex items-center justify-between"><h3 className="m-0 text-[length:var(--text-section)] font-semibold">成员</h3>
+        <div className="mb-2 flex items-center justify-between"><h3 className="m-0 text-[length:var(--text-body)] font-medium">成员</h3>
           <Popover><PopoverTrigger asChild><Button size="sm"><Plus size={14} />添加成员</Button></PopoverTrigger>
-            <PopoverContent align="start" className="w-[min(420px,calc(100vw-48px))] p-3">
+            <PopoverContent align="end" className="w-[min(380px,calc(100vw-48px))] p-3">
               <div className="flex flex-col gap-3"><Segmented size="sm" label="成员分类" value={category} options={[{ value: 'source', label: '节点来源' }, { value: 'node', label: '单个节点' }, { value: 'group', label: '策略组' }, { value: 'builtin', label: '内置' }]} onChange={category => { setCategory(category); setSearch(''); }} />
                 {category === 'node' && inline.length > 0 && <Select placeholder="选择要浏览的节点来源" value={active ? nodeSetKey(active.ref) : ''} onChange={event => setSource(event.target.value)}>{inline.map(s => <option key={nodeSetKey(s.ref)} value={nodeSetKey(s.ref)}>{s.name}</option>)}</Select>}
                 <SearchInput aria-label="搜索候选成员" placeholder="搜索成员名称" value={search} onChange={event => setSearch(event.target.value)} />
@@ -74,22 +78,36 @@ export function GroupMemberPicker({ group, members, inherited, onChange, onGroup
         <SortableList items={members} onReorder={onChange} renderItem={(m, i, handle) => memberRow(m, i, handle)} />
         {!effective.length && <Empty title="还没有成员" />}
       </section>
-      {previewSets.length > 0 && <section className="border-t border-line-2 pt-4"><h3 className="m-0 mb-3 text-[length:var(--text-section)] font-semibold">筛选 <span className="ml-2 text-[length:var(--text-caption)] font-normal text-ink-muted">作用于来源成员</span></h3>
-        <fieldset disabled={readOnlySettings} className="m-0 grid gap-4 border-0 p-0 sm:grid-cols-2">
+      {previewSets.length > 0 && <section className=""><h3 className="m-0 mb-3 text-[length:var(--text-body)] font-medium">筛选 <span className="ml-2 text-[length:var(--text-caption)] font-normal text-ink-muted">作用于来源成员</span></h3>
+        <fieldset disabled={readOnlySettings} className="m-0 grid gap-3 border-0 p-0 sm:grid-cols-3">
           <Field label="名称包含">{id => <Input id={id} placeholder="保留匹配正则的节点" value={group.filter ?? ''} onChange={event => onGroupChange({ filter: event.target.value || undefined })} />}</Field>
           <Field label="名称排除">{id => <Input id={id} placeholder="排除匹配正则的节点" value={group.excludeFilter ?? ''} onChange={event => onGroupChange({ excludeFilter: event.target.value || undefined })} />}</Field>
           <Field label="排除协议">{id => <ExcludeTypeSelect id={id} disabled={readOnlySettings} value={group.excludeType} onChange={excludeType => onGroupChange({ excludeType })} />}</Field>
         </fieldset>
       </section>}
+      {advanced}
     </div>
-    <aside aria-label="客户端成员预览" className="flex min-w-0 flex-col gap-4 border-t border-line-2 pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-5">
-      <h3 className="m-0 text-[length:var(--text-body)] font-medium">客户端里显示</h3>
-      {effective.filter(m => m.kind !== 'all' && m.kind !== 'nodeset').map((m, i) => <div key={i} className="flex justify-between gap-2 text-[length:var(--text-control)]"><span className="truncate">{memberText(m)}</span><span className="shrink-0 text-[length:var(--text-caption)] text-ink-muted">{m.kind === 'builtin' ? '内置' : m.kind === 'group' ? '策略组' : nodeSetName(m.ref.nodeSet)}</span></div>)}
-      {previewSets.map(s => <div key={nodeSetKey(s.ref)} className="group-preview-list"><div className="mb-2 text-[length:var(--text-caption)] text-ink-muted">{s.name}</div><MatchPreview nodeSet={s.ref} filter={group.filter} excludeFilter={group.excludeFilter} excludeType={group.excludeType} max={8} /></div>)}
-      {!effective.length && <p className="m-0 text-[length:var(--text-caption)] text-ink-muted">添加成员后显示预览</p>}
-    </aside>
+    <MemberPreview effective={effective} sources={previewSets} group={group} memberText={memberText} nodeSetName={nodeSetName} />
   </div>;
 }
+function MemberPreview({ effective, sources, group, memberText, nodeSetName }: { effective: GroupMember[]; sources: { ref: NodeSetID; name: string }[]; group: GroupSpec; memberText: (member: GroupMember) => string; nodeSetName: (ref: NodeSetID) => string }) {
+  const queries = useQueries({ queries: sources.map(source => nodeListOptions(source.ref)) });
+  const view = useModalPresentation({ loading: queries.some(query => query.isLoading), truncated: queries.some(query => query.data?.truncated), errors: queries.flatMap(query => query.error ? [query.error.message] : []), rows: queries.flatMap((query, i) => filterNodes(query.data?.nodes ?? [], { filter: group.filter, excludeFilter: group.excludeFilter, excludeType: group.excludeType }).nodes.map(node => ({ name: node.name, source: sources[i]!.name }))), total: queries.reduce((sum, query) => sum + (query.data?.total ?? 0), 0) });
+  const direct = effective.filter(member => member.kind !== 'all' && member.kind !== 'nodeset');
+  return <aside aria-label="客户端成员预览" className="flex min-h-0 min-w-0 flex-col border-t border-line-2 bg-[#FCFCFD] md:border-t-0">
+    <div className="flex items-baseline justify-between px-5 pt-5 pb-3"><h3 className="m-0 text-[length:var(--text-body)] font-medium">客户端里显示</h3><span className="text-[length:var(--text-caption)] text-ink-muted">{direct.length + view.rows.length} 项</span></div>
+    <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3 text-[length:var(--text-control)]">
+      {direct.map((member, i) => <div key={i} className="flex justify-between gap-2 rounded-md px-2 py-[7px]"><span className="truncate">{memberText(member)}</span><span className="shrink-0 text-[length:var(--text-caption)] text-ink-muted">{member.kind === 'builtin' ? '内置' : member.kind === 'group' ? '策略组' : member.kind === 'node' ? nodeSetName(member.ref.nodeSet) : ''}</span></div>)}
+      {!!direct.length && !!view.rows.length && <div className="mx-2 my-1 h-px bg-line-2" />}
+      {view.rows.slice(0,8).map((node,i) => <div key={i} className="flex justify-between gap-2 px-2 py-[7px]"><span className="truncate">{node.name}</span><span className="shrink-0 text-[length:var(--text-caption)] text-ink-muted">{node.source}</span></div>)}
+      {view.rows.length > 8 && <span className="px-2 py-[7px] text-[length:var(--text-caption)] text-ink-muted">另 {view.rows.length - 8} 个</span>}
+      {view.loading && <span className="px-2 text-ink-muted">正在加载…</span>}{view.errors.map((error,i) => <span role="alert" key={i} className="px-2 text-err">{error}</span>)}{view.errors.length > 0 && <Button size="sm" onClick={() => void Promise.allSettled(queries.map(query => query.refetch()))}>重新加载</Button>}{view.truncated && <p className="px-2 text-warn">预览列表已截断，命中数量仅统计当前返回的节点；完整结果以生成配置为准。</p>}
+      {!effective.length && <span className="px-2 text-ink-muted">添加成员后显示预览</span>}
+    </div>
+    <div className="border-t border-line-2 px-5 py-2.5 text-[length:var(--text-caption)] text-ink-muted">{view.total} 个来源节点中命中 {view.rows.length} 个</div>
+  </aside>;
+}
+
 function NodeChainHint({ nodeSet }: { nodeSet: NodeSetID }) {
   const { draft } = useProfile();
   const chain = draft.chains.find(c => chainSources(c.landing.nodeSet, draft.nodeSets).some(s => nodeSetKey(s.ref) === nodeSetKey(nodeSet)));

@@ -39,8 +39,8 @@ export function TabChains() {
 
   return (
     <>
-      <Card title="代理链"
-        actions={<>{draft.chains.length > 0 && <Button size="sm" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button size="sm" onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
+      <Card title="代理链" count={draft.chains.length}
+        actions={<>{draft.chains.length > 0 && <Button variant="ghost" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
         {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[length:var(--text-control)] text-err">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
         {!draft.chains.length ? <div className="px-4 pb-4"><Empty title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /></div> : (
@@ -94,12 +94,12 @@ export function TabPreview() {
   return (
     <>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <Segmented label="预览内核" value={client} options={[{ value: 'mihomo', label: 'Mihomo' }, { value: 'stash', label: 'Stash' }, { value: 'surge', label: 'Surge' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setApp(undefined); }} />
-        <label className="flex items-center gap-2 whitespace-nowrap text-[length:var(--text-control)] text-ink-2">客户端追加
-          <Select clearable placeholder="选择客户端，留空仅应用内核公共追加" className="w-auto" value={app ?? ''} onChange={e => setApp(e.target.value ? e.target.value as ClientApp : undefined)}>{apps.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</Select></label>
-        <Button onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新生成'}</Button>
+        <Segmented label="预览内核" value={client} options={[{ value: 'mihomo', label: 'Mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'stash', label: 'Stash' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setApp(undefined); }} />
+        <label className="flex items-center gap-2 whitespace-nowrap text-[length:var(--text-control)] text-ink-2"><span className="sr-only">客户端追加</span>
+          <Select clearable placeholder="全部客户端（只用内核公共追加）" className="w-[260px]" value={app ?? ''} onChange={e => setApp(e.target.value ? e.target.value as ClientApp : undefined)}>{apps.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</Select></label>
+        <span className="mr-auto text-[length:var(--text-caption)] text-ink-muted">包含当前未保存的修改</span>
+        <Button variant="ghost" onClick={() => preview.mutate(target)} disabled={preview.isPending}>{preview.isPending ? '渲染中…' : '重新生成'}</Button>
         <Button onClick={exportFile} disabled={!current || !preview.data?.ok || !preview.data?.yaml || !!preview.data.exportUnavailableReason}>下载配置文件</Button>
-        <span className="text-[length:var(--text-control)] text-ink-muted">预览包含当前草稿中的修改</span>
       </div>
       <ErrorAlert error={preview.error} />
       {preview.data && !current && !preview.isPending && <p role="status" className="text-[length:var(--text-control)] text-ink-muted">配置已更改，请重新生成预览。</p>}
@@ -107,7 +107,7 @@ export function TabPreview() {
       {client === 'loon' && <p className="text-[length:var(--text-control)] text-ink-muted">手写规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
       {current && preview.data.exportUnavailableReason && <p role="status" className="text-[length:var(--text-control)] text-ink-muted">{preview.data.exportUnavailableReason}</p>}
       {current && (
-        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
+        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[minmax(0,1fr)]">
           <CodePreview fill lineNumbers label="最终配置" className="rounded-xl" title={<>{`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`}{selection && <span role="status" className="ml-3 text-[#b8ccff]">已定位第 {selection.range.startLine} 行</span>}</>} text={preview.data.yaml ?? preview.data.failure ?? ''} highlight={selection?.range} bodyClassName="overscroll-contain p-4 text-[length:var(--text-control)] leading-[22px]" />
           <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-line bg-panel [overflow-wrap:anywhere]">
             <div className="flex items-center justify-between px-5 pt-4"><h2 className="m-0 text-[length:var(--text-section)] font-semibold">检查结果</h2><Badge tone={preview.data.ok ? 'ok' : 'err'}>{preview.data.ok ? '可以导入' : '渲染失败'}</Badge></div>

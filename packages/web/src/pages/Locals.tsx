@@ -12,7 +12,8 @@ import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 // 每个分组是一个节点集文档；节点子页直接保存整个分组。离开有未保存修改的页面前先确认。
 
 import type { LocalProxy, LocalProxyGroup } from '@sub-forge/core';
-import { Plus } from 'lucide-react';
+import { NodeConnectivity, type ProbeResult } from '../components/NodeConnectivity.tsx';
+import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
@@ -61,6 +62,7 @@ export function LocalEdit() {
   const route = useParams();
   const [selected, setSelected] = useState<number | 'new'>(() => route.index === 'new' ? 'new' : Number(route.index ?? 0));
   const [texts, setTexts] = useState<Record<string, string>>({});
+  const [probes, setProbes] = useState<Record<string, { text: string; result: ProbeResult }>>({});
   useEffect(() => { setTexts({}); setSelected(route.index === 'new' ? 'new' : Number(route.index ?? 0)); }, [route.id, route.index]);
   const d = e.draft;
   const proxies = d?.proxies.map((proxy, index) => {
@@ -91,18 +93,18 @@ export function LocalEdit() {
         <ActionMenu size="md"><Button onClick={async () => { const result = await ProfileInfoModal.show({ name: d.name, note: d.note }); if (result.status === 'confirmed') e.setDraft({ ...d, ...result.data }); }}>编辑名称与备注</Button><ResourceLinkButton kind="locals" id={d.id} name={d.name} /><Button variant="danger" onClick={async () => { const result = await Frame.modal.confirm({ title: `删除分组「${d.name}」？`, description: GROUP_DELETE_BODY, danger: true, confirmLabel: '删除' }, { submit: async () => { await e.del.mutateAsync(d.id); } }); if (result.status === 'confirmed') leave('/locals'); }}>删除分组…</Button></ActionMenu>
       </>}>{dirty && <Badge tone="warn">未保存</Badge>}</PageHeader>
     <ErrorAlert error={e.save.error} />
-    <PageScroll contained><div className="grid min-h-0 gap-5 lg:grid-cols-[minmax(320px,.9fr)_minmax(0,1.1fr)]">
-      <Card title="节点" className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto" actions={<Button onClick={() => { setSelected('new'); setTexts(current => ({ ...current, new: current.new ?? '' })); }}><Plus size={16} />新增节点</Button>}>
-        <table className="w-full table-fixed border-collapse"><thead><tr><th className={th}>名称</th><th className={cx(th, 'w-20')}>协议</th><th className={th}>服务器</th><th className={cx(th, 'w-10')}><span className="sr-only">操作</span></th></tr></thead><tbody>
+    <PageScroll contained><div className="grid min-h-0 gap-5 lg:min-h-[calc(100dvh-178px)] lg:grid-cols-[minmax(320px,.933fr)_minmax(0,1.067fr)]">
+      <Card title="节点" count={proxies.length} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto p-0!" actions={<Button onClick={() => { setSelected('new'); setTexts(current => ({ ...current, new: current.new ?? '' })); }}><Plus size={16} />新增节点</Button>}>
+        <table className="w-full table-fixed border-collapse"><thead><tr><th className={th}>名称</th><th className={cx(th, 'w-20')}>协议</th><th className={th}>服务器</th><th className={cx(th, 'w-24')}>连通性</th></tr></thead><tbody>
           {proxies.map((proxy, index) => <tr key={index} className={cx('hover:bg-hover', selected === index && 'bg-accent-soft')}>
             <td className={td}><button type="button" className="w-full cursor-pointer truncate text-left font-medium" onClick={() => setSelected(index)}>{proxy.name}</button></td>
             <td className={td}><span className="rounded bg-neutral-soft px-1.5 py-0.5 text-[length:var(--text-caption)]">{proxy.type.toUpperCase()}</span></td>
             <td className={cx(td, 'truncate font-mono text-[length:var(--text-caption)]')} title={`${proxy.server}:${proxy.port}`}>{proxy.server}:{proxy.port}</td>
-            <td><ActionMenu label={`${proxy.name}更多操作`} items={[{ label: '删除节点', danger: true, disabled: invalid || !!newResult, onSelect: () => { e.setDraft({ ...d, proxies: proxies.filter((_, i) => i !== index) }); setTexts({}); setSelected(0); } }]} /></td>
+            <td className={cx(td, 'text-[length:var(--text-caption)] text-ink-muted')}>{probes[index]?.text === (texts[index] ?? proxyToYaml(proxy)) ? probes[index]!.result.ok ? <span className="text-ok">{probes[index]!.result.delay} ms</span> : '失败' : '未测试'}</td>
           </tr>)}
-        </tbody></table>{!proxies.length && <Empty title="还没有节点" />}
+        </tbody></table><p className="mx-5 my-3 text-[length:var(--text-caption)] text-ink-muted">点选节点在右侧编辑；不再跳转独立页面。</p>{!proxies.length && <Empty title="还没有节点" />}
       </Card>
-      <Card title={active?.name ?? (selected === 'new' ? '新增节点' : '节点配置')} subtitle={active ? `${active.type.toUpperCase()} · ${active.server}:${active.port}` : undefined} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto px-5 pb-5">
+      <Card actions={(active || selected === 'new') && <><NodeConnectivity key={selected} compact node={result.ok ? result.value : undefined} text={text} onResult={result => setProbes(current => ({ ...current, [selected]: { text, result } }))} /><Button size="sm" variant="ghost" aria-label="删除当前节点" disabled={e.save.isPending || invalid || (selected !== 'new' && !!newResult)} onClick={() => { if (selected === 'new') { setTexts(current => { const next = { ...current }; delete next.new; return next; }); } else { e.setDraft({ ...d, proxies: proxies.filter((_, i) => i !== selected) }); setTexts({}); } setSelected(0); }}><Trash2 size={15} /></Button></>} title={active?.name ?? (selected === 'new' ? '新增节点' : '节点配置')} subtitle={active ? `${active.type.toUpperCase()} · ${active.server}:${active.port}` : undefined} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto px-5 pb-5">
         {(active || selected === 'new') ? <LocalNodeYamlEditor key={selected} disabled={e.save.isPending} text={text} onChange={text => setTexts(current => ({ ...current, [selected]: text }))} result={result} checking={false} /> : <Empty title="选择左侧节点进行编辑" />}
       </Card>
     </div></PageScroll>

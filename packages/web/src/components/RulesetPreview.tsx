@@ -52,7 +52,7 @@ export function RulesetPreview({ title, inputs, ready, sourceId, overrides, sour
     : result?.binary ? 'MRS 由服务端缓存并原样托管，无法展示文本；SRS 暂不支持。' : null;
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
     <div className="flex flex-wrap items-center justify-between gap-3">{title && <h2 className="m-0 text-[length:var(--text-section)] font-semibold">{title}</h2>}<Segmented size="sm" label="规则内核" value={target} onChange={setTarget} options={TARGETS.map(x => ({ value: x.key, label: x.label }))} /></div>
-    <CodePreview label="规则输出" text={result?.lines.join('\n') ?? ''} loading={old} className="shrink-0" bodyClassName="h-[320px]" lineNumbers />
+    <CodePreview label="规则输出" text={result?.lines.join('\n') ?? ''} loading={old} className="shrink-0" bodyClassName="h-[430px]" lineNumbers />
     <div className="min-h-10 text-[length:var(--text-control)] text-ink-2" aria-label="转换统计">
       {stats ? <div className="grid grid-cols-4 gap-2 py-1">{[['解析', stats.parsed], ['去重', stats.duplicates], ['不支持', stats.unsupported], ['有效输出', stats.output]].map(([label, value]) => <div key={label}><span className="block text-[length:var(--text-caption)] text-ink-muted">{label}</span><span className={label === '有效输出' ? 'font-medium text-ok' : 'font-medium'}>{value}</span></div>)}</div> : '等待转换结果'}
     </div>

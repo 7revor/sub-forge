@@ -46,15 +46,13 @@ const NewSourceModal = createModal<Record<string, never>, SourceDoc>(function Ne
   const save = useSaveDoc('sources', true);
   const [name, setName] = useModalDraft('');
   const [url, setUrl] = useModalDraft('');
-  const [note, setNote] = useModalDraft('');
   const ready = name.trim() && url.trim();
-  const create = () => modal.submit(() => save.mutateAsync({ name: name.trim(), url: url.trim(), note, pipeline: [] }));
+  const create = () => modal.submit(() => save.mutateAsync({ name: name.trim(), url: url.trim(), pipeline: [] }));
   const onClose = modal.cancel;
   return (
-    <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"新建订阅源"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3.5">
+    <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"新建订阅源"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-4">
       <Field label="名称">{(id) => <Input id={id} autoFocus placeholder="例如：机场 A" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
-      <Field label="订阅地址">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
-      <NoteField compact value={note} onChange={setNote} />
+      <Field label="订阅地址" hint="多个地址请分别新建，再用节点组合合并">{(id) => <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={url} onChange={(e) => setUrl(e.target.value)} />}</Field>
     </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={create}>{save.isPending ? '创建中…' : '创建并拉取'}</Button></>}</ModalFooter></ModalContent>
   );
 });
@@ -65,14 +63,14 @@ function BasicSettings({ draft, set }: {
 }) {
   return (
     <Card bodyClass="flex flex-col gap-4 p-5">
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(180px,1fr)_minmax(0,2fr)]">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
         <Field label="名称" className="min-w-0">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
         <Field label="订阅地址" className="min-w-0">{(id) =>
           <Input id={id} type="url" className="font-mono" placeholder="上游节点订阅的 HTTP 或 HTTPS 地址" value={draft.url} onChange={(e) => set({ url: e.target.value })} />
         }</Field>
-      </div>
       <NoteField compact value={draft.note} onChange={(note) => set({ note })} />
-
+      </div>
+      <p className="m-0 text-[length:var(--text-caption)] text-ink-muted">到期自动重新拉取（管理员在「系统」中统一设置）；失败时继续使用上次成功的内容。</p>
     </Card>
   );
 }

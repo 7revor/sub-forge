@@ -6,7 +6,7 @@ import { formatLocalNodeYaml, inspectLocalNodeYaml } from '../convert/localNodeY
 import { Badge, Button } from './ui.tsx';
 import { YamlTextarea } from './YamlTextarea.tsx';
 import { CopyButton } from './CopyButton.tsx';
-import { NodeConnectivity } from './NodeConnectivity.tsx';
+
 import type { RawResult } from './DualEditor.tsx';
 
 export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled = false }: { disabled?: boolean; text: string; onChange: (text: string) => void; result: RawResult<LocalProxy>; checking: boolean }) {
@@ -32,25 +32,19 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
   };
   const node = !checking && result.ok ? result.value : undefined;
   const errorText = !checking && !result.ok && text.trim() ? `${result.line ? `第 ${result.line} 行：` : ''}${result.error}` : '';
-  const details = node ? [
-    ['名称', node.name], ['协议', node.type.toUpperCase()], ['服务器', node.server], ['端口', node.port],
-    ...(node.cipher ? [['加密方式', node.cipher]] : []), ...(node.network ? [['传输方式', node.network]] : []),
-    ...(typeof node.tls === 'boolean' ? [['TLS', node.tls ? '开启' : '关闭']] : []),
-    ...(typeof node.udp === 'boolean' ? [['UDP', node.udp ? '开启' : '关闭']] : []),
-  ] : [];
-  return <div className="flex flex-col gap-3">
-    <div className="flex items-center justify-between gap-3">
-      <label htmlFor="local-node-yaml" className="text-[length:var(--text-control)] text-ink-muted">节点 YAML</label>
+  return <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex min-h-[510px] flex-1 flex-col overflow-hidden rounded-lg border border-control-line">
+    <div className="flex items-center justify-between gap-3 border-b border-line-2 bg-inset px-3 py-1">
+      <label htmlFor="local-node-yaml" className="text-[length:var(--text-control)] text-ink-muted">Mihomo YAML · 可直接粘贴分享链接 / JSON / Surge 行</label>
       <div className="flex items-center gap-2">
-        <Button size="sm" disabled={disabled || !node} onClick={() => {
+        <Button size="sm" variant="ghost" disabled={disabled || !node} onClick={() => {
           try { apply(formatLocalNodeYaml(text), '已格式化'); }
           catch (e) { alertError(e); }
         }}>格式化</Button>
         <CopyButton size="sm" text={text} />
       </div>
     </div>
-    <p className="m-0 text-[length:var(--text-caption)] text-ink-muted">支持直接编辑 YAML，粘贴节点分享链接、JSON 或 Surge 配置自动转换。</p>
-    <YamlTextarea placeholder="粘贴单个节点的分享链接、YAML、JSON 或 Surge 配置" disabled={disabled} id="local-node-yaml" aria-label="节点 YAML" aria-invalid={!!errorText} aria-describedby="local-node-status" rows={16} lineNumbers value={text}
+    <YamlTextarea className="local-node-source" placeholder="粘贴单个节点的分享链接、YAML、JSON 或 Surge 配置" disabled={disabled} id="local-node-yaml" aria-label="节点 YAML" aria-invalid={!!errorText} aria-describedby="local-node-status" rows={16} lineNumbers value={text}
       onChange={e => { clearUndo(); onChange(e.target.value); }}
       onPaste={event => {
         const input = event.clipboardData.getData('text/plain');
@@ -63,7 +57,7 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
         const after = keepYaml ? input : proxyToYaml(imported.value);
         apply(after, keepYaml ? '已导入 YAML。' : imported.notes?.join('；') || '已转换为 YAML。');
       }} />
-    <section aria-label="节点信息" className="flex flex-col gap-3 border-t border-line-2 pt-3">
+    </div><section aria-label="节点信息" className="flex flex-col gap-3">
       <div id="local-node-status" role="status" className="flex flex-wrap items-center gap-2">
 
         <Badge tone={!text.trim() || checking ? 'neutral' : node ? 'ok' : 'err'}>{!text.trim() ? '待输入' : checking ? '校验中…' : node ? '配置有效' : '配置有误'}</Badge>
@@ -71,7 +65,7 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
       </div>
       {errorText && <div role="alert" className="text-[length:var(--text-control)] text-err whitespace-pre-wrap">{errorText}</div>}
       {node && result.ok && result.notes?.map(note => <div key={note} className="text-[length:var(--text-caption)] text-warn">{note}</div>)}
-      <NodeConnectivity node={node} text={text} />
+      <p className="m-0 text-[length:var(--text-caption)] leading-relaxed text-ink-muted">一次只粘贴一个节点；多个节点请用「编辑分组 YAML」。连通性从 Sub Forge 服务端发起，测试当前草稿，无需先保存。</p>
     </section>
   </div>;
 }

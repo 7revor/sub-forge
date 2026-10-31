@@ -6,10 +6,10 @@ import { api } from '../api.ts';
 import { createProbeRequestId } from '../domain/probeRequestId.ts';
 import { Badge, Button } from './ui.tsx';
 
-type Result = { ok: boolean; status: 'success' | 'failed' | 'unavailable' | 'cancelled'; message: string; delay?: number; testedAt: number; target: string };
-export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: string }) {
+export type ProbeResult = { ok: boolean; status: 'success' | 'failed' | 'unavailable' | 'cancelled'; message: string; delay?: number; testedAt: number; target: string };
+export function NodeConnectivity({ node, text, compact = false, onResult }: { node?: LocalProxy; text: string; compact?: boolean; onResult?: (result: ProbeResult) => void }) {
   const capability = useQuery({ queryKey: ['node-probe'], queryFn: () => api<{ available: boolean }>('GET', '/node-probe'), retry: false });
-  const [result, setResult] = useState<{ text: string; data: Result }>();
+  const [result, setResult] = useState<{ text: string; data: ProbeResult }>();
   const [running, setRunning] = useState(false);
   const active = useRef<string | undefined>(undefined);
   const currentText = useRef(text);
@@ -30,9 +30,9 @@ export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: stri
     try {
       requestId = createProbeRequestId();
       active.current = requestId;
-      const data = await api<Result>('POST', '/node-probe', { node, requestId });
+      const data = await api<ProbeResult>('POST', '/node-probe', { node, requestId });
       if (active.current === requestId && currentText.current === text) {
-        setResult({ text, data });
+        setResult({ text, data }); onResult?.(data);
         if (data.ok) notifySuccess(data.message);
         else if (data.status !== 'cancelled') alertError(data.message);
       }
@@ -44,6 +44,11 @@ export function NodeConnectivity({ node, text }: { node?: LocalProxy; text: stri
   };
   const stale = !!result && result.text !== text;
   const status = running ? '测试中…' : stale ? '配置已修改，请重新测试' : result?.data.message ?? (capability.isPending ? '检查测试服务…' : capability.error ? '无法获取测试服务状态' : capability.data?.available ? '未测试' : '测试服务未配置');
+  if (compact) return <div className="flex items-center gap-2" title={status}>
+    {result && !stale && !running && <span role="status" className={`text-[length:var(--text-caption)] ${result.data.ok ? 'text-ok' : 'text-err'}`}>{result.data.ok ? `${result.data.delay} ms` : result.data.message}</span>}
+    <Button size="sm" disabled={!running && (!node || !capability.data?.available)} onClick={() => { if (running) { cancel(); setRunning(false); } else void run(); }}>{running ? '取消测试' : '测试连通性'}</Button>
+    {capability.error && <Button size="sm" variant="ghost" onClick={() => void capability.refetch()}>重试</Button>}
+  </div>;
   return <div className="flex flex-col gap-2 border-t border-line pt-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-2" role="status">

@@ -39,20 +39,20 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
     if (result.status === 'confirmed') onChange(removeGroup(value, group.id));
   };
   return <>
-    <Card title="策略组" actions={!readOnly && <>
-      <Button size="sm" disabled={REGION_GROUPS.every(region => value.groups.some(g => g.name === region.name))} onClick={() => {
+    <Card title="策略组" count={value.groups.length} actions={!readOnly && <>
+      <Button variant="ghost" disabled={REGION_GROUPS.every(region => value.groups.some(g => g.name === region.name))} onClick={() => {
         const added = createRegionGroups(value.groups);
         onChange({ ...value, groups: [...value.groups, ...added] });
       }}>添加地区组</Button>
-      <Button size="sm" onClick={() => {
+      <Button onClick={() => {
         const id = newId('g');
         void edit({ id, name: '新策略组', type: 'select', members: [] }, true);
-      }}><Plus size={14} />新建策略组</Button>
+      }}><Plus size={16} />新建策略组</Button>
     </>}>
       {!value.groups.length ? <Empty title="还没有策略组" /> : <>
         <TemplateBoundList label="策略组" items={value.groups} templateIds={templateGroupIds} templateStart={templateStart} isLocked={isGroupReadOnly} canDrop={(_from, to) => !isGroupReadOnly(value.groups[to]!)} onReorder={(groups, start) => onChange({ ...value, groups }, start)} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
-          const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '—');
+          const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '没有成员，流量会被拒绝');
           return <RoutingCard id={`template-group-${g.id}`} className={columns} invalid={error}>
             {handle}
             <RoutingCardIcon muted={isGroupReadOnly(g)}><Layers3 size={16} /></RoutingCardIcon>

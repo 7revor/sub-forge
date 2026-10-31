@@ -242,7 +242,7 @@ export function PipelineEditor({ compactOverview = false, steps, onChange, previ
             <StepRow handle={handle} index={i} step={s} selected={mode === 'step' && i === selected} onSelect={() => setSelected(i)} {...(trace?.[i] ? { trace: trace[i] } : {})} />
           )} />
         </div>
-        {compactOverview && <p className="m-0 px-5 pt-3 pb-2 text-[length:var(--text-control)] font-medium">最终 {last?.after ?? preview?.input ?? '—'} 个节点</p>}
+        <div className="flex items-center justify-between px-5 pt-3 pb-2 text-[length:var(--text-control)]"><span className="font-medium">最终 {last?.after ?? preview?.input ?? '—'} 个节点</span><Button size="sm" variant="ghost" onClick={() => setSelected(-1)}>查看全部</Button></div>
       </section>
 
       {!(compactOverview && mode === 'overview') && <section aria-label="编辑与预览" className="pipeline-preview rounded-xl border border-line bg-panel">

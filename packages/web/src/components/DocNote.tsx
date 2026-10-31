@@ -1,8 +1,8 @@
-import { Field, Textarea } from './ui.tsx';
+import { Field, Input, Textarea } from './ui.tsx';
 
 export function NoteField({ value, onChange, compact = false }: { compact?: boolean; value: string | undefined; onChange: (note: string) => void }) {
   return <Field label="备注">{(id) =>
-    <Textarea id={id} rows={compact ? 1 : 2} className={compact ? 'h-9 min-h-9 resize-none py-[7px]' : undefined} placeholder="填写用途或其他说明" value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+    <>{compact ? <Input id={id} placeholder="填写用途或其他说明" value={value ?? ''} onChange={event => onChange(event.target.value)} /> : <Textarea id={id} rows={2} placeholder="填写用途或其他说明" value={value ?? ''} onChange={event => onChange(event.target.value)} />}</>
   }</Field>;
 }
 

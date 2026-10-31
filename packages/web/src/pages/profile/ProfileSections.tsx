@@ -4,6 +4,8 @@ import { TabBase, TabNodeSets, TabProfileInfo } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
 import { TabGroups } from './TabGroups.tsx';
 import { TabRules } from './TabRules.tsx';
+import { Report, resolveProfileRouting, routingConfig } from '@sub-forge/core';
+import { useProfile } from './context.ts';
 import { TemplateCard } from './TemplateCard.tsx';
 
 const TABS = [['nodes', '节点'], ['routing', '分流'], ['client', '客户端配置'], ['preview', '预览']] as const;
@@ -12,6 +14,8 @@ const sectionTab = (section?: string) => section === 'preview' ? 'preview' : ['b
 /** 基础与核心面板保持挂载，切换时保留草稿、展开状态和未解析的 YAML。 */
 export function ProfileSections({ initialSection, routingReady = true, templateNotice, disabled = false, children }: { initialSection?: string; routingReady?: boolean; templateNotice?: ReactNode; disabled?: boolean; children?: ReactNode }) {
   const id = useId();
+  const { draft, template, groups } = useProfile();
+  const ruleCount = routingConfig(resolveProfileRouting(draft, template, new Report())).rules.length;
   const [active, setActive] = useState(sectionTab(initialSection));
   const sections = useRef<Record<string, HTMLElement | null>>({});
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -31,7 +35,7 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
           event.preventDefault();
           const next = event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
           setActive(TABS[next]![0]); tabs.current[next]?.focus();
-        }}>{label}</button>)}
+        }}>{label}{key === 'nodes' && <span className="ml-1.5 text-[length:var(--text-caption)] font-normal text-ink-muted">{draft.nodeSets.length}</span>}{key === 'routing' && <span className="ml-1.5 text-[length:var(--text-caption)] font-normal text-ink-muted">{groups.length} 组 · {ruleCount} 规则</span>}</button>)}
     </div>
     <PageScroll contained={active === 'preview'}>
       <fieldset disabled={disabled} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">

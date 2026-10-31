@@ -133,7 +133,7 @@ body {
   overscroll-behavior: contain;
   margin-top: -4px;
   margin-bottom: calc(-1 * var(--page-block-gutter));
-  padding: 4px var(--page-gutter) var(--page-block-gutter);
+  padding: 4px var(--page-gutter) 48px;
 }
 
 .page-scroll-content {
@@ -207,7 +207,7 @@ body {
   }
 
   .pipeline-workspace {
-    grid-template-columns: minmax(260px, 28%) minmax(0, 1fr);
+    grid-template-columns: 340px minmax(0, 1fr);
     height: max(360px, calc(100dvh - 420px));
   }
 
@@ -291,7 +291,7 @@ body {
 
 /* 分页列表占满剩余高度；搜索与分页器固定，仅中间内容滚动。 */
 .page-layout > .list-panel {
-  flex: 1 1 0%;
+  flex: 0 1 auto;
   min-height: 0;
 }
 
@@ -498,7 +498,7 @@ th.table-cell-divider {
 
 /* 普通弹窗共享页头、正文、页脚间距；工作区弹窗通过 p-0 显式布局。 */
 [data-slot="dialog-content"]:not(.p-0) > fieldset > [data-slot="dialog-header"] { padding-right: 28px; text-align: left; }
-[data-slot="dialog-content"]:not(.p-0) > fieldset > [data-slot="dialog-footer"] { margin: 4px -24px 0; padding: 12px 24px; border-top: 1px solid var(--color-line-2); }
+[data-slot="dialog-content"]:not(.p-0) > fieldset [data-slot="dialog-footer"] { margin: 4px -24px 0; padding: 12px 24px; border-top: 1px solid var(--color-line-2); }
 [data-slot="dialog-content"] > [role="alert"] { padding: 12px 24px; }
 
 .pipeline-step-scroll { padding: 0 20px; }
@@ -522,3 +522,31 @@ th.table-cell-divider {
 
 [data-slot="dialog-header"] { text-align: left; }
 @media (max-width: 767px) { .list-table { min-width: 640px; } }
+
+/* 画板 02 / 18：菜单内边距、悬停和禁用态。 */
+[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-radio-item"] { padding: 8px 10px; border-radius: 6px; }
+[data-slot="dropdown-menu-content"], [data-slot="popover-content"] { border: 0; }
+[data-slot="dropdown-menu-item"].p-0 { padding: 0; }
+input:disabled, textarea:disabled, [data-slot="select-trigger"]:disabled { background: var(--color-inset); color: var(--color-ink-muted); }
+[data-slot="dialog-content"]:not(.p-0) > fieldset > form { min-width: 0; }
+[data-slot="dialog-content"]:not(.p-0) > fieldset [data-slot="dialog-footer"] { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+
+.advanced-settings > summary { list-style: none; display: flex; align-items: center; }
+.advanced-settings > summary::-webkit-details-marker { display: none; }
+.advanced-settings > summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid var(--color-ink-muted); border-bottom: 1.5px solid var(--color-ink-muted); transform: rotate(45deg); margin-left: auto; margin-right: 4px; }
+.advanced-settings[open] > summary::after { transform: rotate(225deg); }
+
+/* 卡片列首尾不重复叠加行间距；相邻项目保持 8px。 */
+section > div > ol > li:first-child > [data-routing-card],
+section > div > ol > li:first-child > div > [data-routing-card],
+section > div > ol > li:first-child > section > div:first-child > [data-routing-card] { margin-top: 0; }
+section > div > ol > li:last-child > [data-routing-card],
+section > div > ol > li:last-child > div > [data-routing-card],
+section > div > ol > li:last-child > section > div:last-child > [data-routing-card] { margin-bottom: 0; }
+
+/* 代理链画板：来源选择与节点列表置于双卡片内。 */
+.chain-node-panel { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: auto; border: 1px solid var(--color-line); border-radius: 8px; background: white; }
+.chain-node-panel > [aria-label$="预览"] { flex: 1; min-height: 0; gap: 0; }
+.chain-node-panel [aria-live="polite"] { background: var(--color-inset); padding: 6px 12px; }
+.chain-node-panel [aria-label$="列表"] { flex: 1; max-height: none; }
+.chain-node-panel [aria-label$="列表"] > button { border-top: 1px solid var(--color-line-2); border-radius: 0; min-height: 40px; padding: 8px 12px; }

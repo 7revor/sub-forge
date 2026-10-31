@@ -1,4 +1,5 @@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../../components/ui/dropdown-menu.tsx';
+import { SearchInput } from '../../components/SearchInput.tsx';
 import { rulePreviewLinks } from '../../domain/rulePreview.ts';
 import { type Matcher, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
 import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
@@ -14,7 +15,7 @@ import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { RuleEditDialog } from './RuleEditDialog.tsx';
-import { applyRuleDraft } from './ruleDraft.ts';
+import { applyRuleDraft, applyRuleDialogResult } from './ruleDraft.ts';
 
 export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
   if (matcher.kind === 'local') return localRuleLines(matcher.content).map(line => line.text).join(',') || '尚未填写';
@@ -33,6 +34,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   extendedOptions?: boolean;
 }) {
   const ruleReadOnly = (rule: RuleEntry) => readOnly || !!templateRuleIds?.includes(rule.id);
+  const [search, setSearch] = useState('');
   const [linkError, setLinkError] = useState<string>();
   const [linkingRule, setLinkingRule] = useState<string>();
   const currentValue = useRef(value);
@@ -42,18 +44,19 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   useEffect(() => { if (importedUrls && !readOnly) void repositoryMatches.detect(importedUrls); }, [importedUrls, readOnly, repositoryMatches.detect]);
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
-  const edit = async (rule: RuleEntry, adding = false) => {
-    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions, groups: value.groups });
+  const edit = async (rule: RuleEntry, adding = false, scope?: 'repository' | 'local') => {
+    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions, scope, bound: !!templateRuleIds, groups: value.groups });
     if (result.status !== 'confirmed') return;
-    const draft = result.data;
+    const draft = result.data.rule;
     const old = currentValue.current.rules.find(r => r.id === draft.id)?.matcher;
     const url = draft.matcher.kind === 'ruleset' ? draft.matcher.remote?.url : undefined;
     if (old?.kind === 'ruleset' && old.remote && old.remote.url !== url) repositoryMatches.clear([old.remote.url]);
-    onChange(applyRuleDraft(currentValue.current, draft, adding));
+    const next = applyRuleDialogResult(currentValue.current, draft, adding, result.data.position, templateRuleIds, templateStart);
+    onChange(next.body, next.templateStart);
     if (adding && url) void repositoryMatches.detect([url]);
     onRuleValidationReady(draft.id, true);
   };
-  const add = (matcher: Matcher) => void edit({ id: newId('r'), matcher, target: value.final }, true);
+  const add = (matcher: Matcher, scope?: 'repository' | 'local') => void edit({ id: newId('r'), matcher, target: value.final }, true, scope);
   const linkRepository = async (ruleId: string, url: string, match: RepositoryUrlMatch) => {
     if (readOnly) return;
     setLinkingRule(ruleId); setLinkError(undefined);
@@ -68,17 +71,18 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
     finally { setLinkingRule(undefined); }
   };
   return <>
-    <Card title={title} actions={!readOnly && <>
-      {!staticOnly && <Button size="sm" disabled={!remoteUrls.length || repositoryMatches.isPending} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
+    <Card title={title} count={value.rules.length} actions={<><SearchInput className="w-[220px] shrink-0" aria-label="搜索规则" placeholder="搜索规则内容或出口" value={search} onChange={event => setSearch(event.target.value)} />{!readOnly && <>
+      {!staticOnly && remoteUrls.length > 0 && <Button variant="ghost" disabled={repositoryMatches.isPending} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
       <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={16} />添加规则</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72">
         <DropdownMenuItem onSelect={() => add({ kind: 'local', content: '' })}><span><span className="block">手写规则</span><span className="text-[length:var(--text-caption)] text-ink-muted">每行一条，如 DOMAIN-SUFFIX,openai.com</span></span></DropdownMenuItem>
-        {!staticOnly && <><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' })}><span><span className="block">从规则仓库选择 / 引用规则集合</span><span className="text-[length:var(--text-caption)] text-ink-muted">复用已索引的文件或多来源集合</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><span><span className="block">远程规则地址</span><span className="text-[length:var(--text-caption)] text-ink-muted">填写 HTTP(S) 规则文件 URL</span></span></DropdownMenuItem></>}
+        {!staticOnly && <><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'repository')}><span><span className="block">从规则仓库选择</span><span className="text-[length:var(--text-caption)] text-ink-muted">选择已索引的仓库文件</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'local')}><span><span className="block">引用规则集合</span><span className="text-[length:var(--text-caption)] text-ink-muted">复用已合并的多来源集合</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><span><span className="block">远程规则地址</span><span className="text-[length:var(--text-caption)] text-ink-muted">填写 HTTP(S) 规则文件 URL</span></span></DropdownMenuItem></>}
       </DropdownMenuContent></DropdownMenu>
 
-    </>}>
+    </>}</>}>
       <ErrorAlert error={repositoryMatches.error} />{linkError && <FieldError error={linkError} />}
       {!value.rules.length && <Empty title="没有规则" description={hideFinal ? '先于模板规则匹配，仅影响本订阅。' : '未匹配的流量走 MATCH。'} />}
-      <TemplateBoundList label="规则" items={value.rules} templateIds={templateRuleIds} templateStart={templateStart} isLocked={ruleReadOnly} onReorder={(rules, start) => onChange({ ...value, rules }, start)} renderItem={(r, i, handle) => {
+      <TemplateBoundList label="规则" items={value.rules} templateIds={templateRuleIds} templateStart={templateStart} isLocked={rule => ruleReadOnly(rule) || !!search.trim()} onReorder={(rules, start) => onChange({ ...value, rules }, start)} renderItem={(r, i, handle) => {
+        if (search.trim() && !`${ruleMatcherLabel(r.matcher, ctx)} ${targetLabel(r.target, groupName, ref => ref.id)}`.toLowerCase().includes(search.trim().toLowerCase())) return null;
         const readOnly = ruleReadOnly(r);
         const matcher = r.matcher;
         const local = matcher.kind !== 'ruleset';

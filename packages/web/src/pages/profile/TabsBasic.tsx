@@ -14,7 +14,7 @@ import { ResourceFileLink } from '../../components/ResourceLinkButton.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 // 订阅页共用的基本设置、输出设置和节点配置。
 
-import { Plus, Trash2, Boxes, ListPlus } from 'lucide-react';
+import { Plus, Trash2, Boxes, ListPlus, Server, Monitor, Layers } from 'lucide-react';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
 import { Button, Card, Empty, Field, Input, Segmented, Switch, Textarea } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
@@ -78,10 +78,10 @@ export function TabNodeSets() {
   };
   return (
     <>
-      <Card title="节点来源"
-        actions={<Button size="sm" onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={14} />添加节点来源</Button>}>
+      <Card title="节点来源" count={draft.nodeSets.length}
+        actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={16} />添加节点来源</Button>}>
         {!draft.nodeSets.length ? <Empty title="还没有节点来源" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_132px_128px_28px]">
-          {handle}<RoutingCardIcon><Boxes size={16} /></RoutingCardIcon>
+          {handle}<RoutingCardIcon>{n.ref.type === 'source' ? <Server size={16} /> : n.ref.type === 'local' ? <Monitor size={16} /> : <Layers size={16} />}</RoutingCardIcon>
           <div className="min-w-0"><ResourceFileLink kind={n.ref.type === 'source' ? 'sources' : n.ref.type === 'collection' ? 'collections' : 'locals'} id={n.ref.id} name={nodeSetName(n.ref)} className="block truncate text-[length:var(--text-body)] font-medium text-ink no-underline hover:text-brand" />
           <span className="text-[length:var(--text-caption)] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span></div>
           <div className="col-start-3 row-start-2 lg:col-auto lg:row-auto"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: '引用' }, { value: 'inline', label: '展开' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>

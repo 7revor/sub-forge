@@ -1,3 +1,5 @@
+import { FileText } from 'lucide-react';
+import { RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { Link } from 'react-router';
 import type { GroupSpec } from '@sub-forge/core';
 import { api } from '../../api.ts';
@@ -39,7 +41,7 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
     }
     return { ...converted.item, name: draft.name };
   });
-  return <ModalContent className="flex max-h-[85dvh] flex-col overflow-hidden p-0 sm:max-w-xl">
+  return <ModalContent className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[520px]">
     <ModalHeader className="px-6 pt-5 pb-4"><ModalTitle>更换分流方式</ModalTitle><ModalDescription>只改动策略组与规则；节点来源和代理链保持不变</ModalDescription></ModalHeader>
     <div className="flex min-h-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
       <div role="radiogroup" aria-label="分流方式" className="flex flex-col gap-2">{MODES.filter(m => m.value !== 'detach' || currentId).map(m => <label key={m.value} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${mode === m.value ? 'border-brand bg-accent-soft' : 'border-line'}`}>
@@ -65,8 +67,8 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
 export function TemplateCard() {
   const { draft, template, groups, setDraft } = useProfile();
   const currentId = boundTemplateId(draft);
-  return <section aria-label="模板设置" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel px-5 py-4">
-    <div className="flex items-center gap-3"><span className="text-[length:var(--text-control)] text-ink-muted">{currentId ? '跟随模板' : '独立维护'}</span>{currentId && <Link className="text-[length:var(--text-body)] font-medium text-ink no-underline hover:text-brand" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link>}</div>
-    <Button variant="ghost" onClick={async () => { const result = await TemplateAssociationModal.show({ profile: draft, groups, template }); if (result.status === 'confirmed') setDraft(result.data); }}>更换分流方式</Button>
+  return <section aria-label="模板设置" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel px-5 py-3.5">
+    <div className="flex items-center gap-4"><RoutingCardIcon><FileText size={16} /></RoutingCardIcon><span className="text-[length:var(--text-control)] text-ink-muted">{currentId ? '跟随模板' : '独立维护'}</span>{currentId && <Link className="text-[length:var(--text-body)] font-medium text-brand no-underline hover:text-brand" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link>}</div>
+    <Button onClick={async () => { const result = await TemplateAssociationModal.show({ profile: draft, groups, template }); if (result.status === 'confirmed') setDraft(result.data); }}>更换分流方式</Button>
   </section>;
 }

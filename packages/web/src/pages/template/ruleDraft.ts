@@ -17,3 +17,14 @@ export function applyRuleDraft(body: TemplateBody, draft: RuleEntry, adding = fa
     ruleProviders: body.ruleProviders.filter(provider => provider.url !== oldUrl || rules.some(rule => rule.matcher.kind === 'ruleset' && rule.matcher.remote?.url === oldUrl)),
   } : {}) };
 }
+
+/** 绑定模板时新增自定义规则，可插入模板块之前；不改动模板块内顺序。 */
+export function applyRuleDialogResult(body: TemplateBody, draft: RuleEntry, adding: boolean, position: 'before' | 'after', templateIds?: string[], templateStart = 0) {
+  const next = applyRuleDraft(body, draft, adding);
+  if (!adding || !templateIds || position === 'after') return { body: next, templateStart: undefined };
+  const first = next.rules.findIndex(rule => templateIds.includes(rule.id));
+  const rules = next.rules.filter(rule => rule.id !== draft.id);
+  const at = first < 0 ? templateStart : first;
+  rules.splice(at, 0, draft);
+  return { body: { ...next, rules }, templateStart: at + 1 };
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChainRule, GroupMember, GroupSpec } from '@sub-forge/core';
-import { canReferenceGroup, chainInputError, exactNodeFilter, putChain, toggleMember } from './memberModel.ts';
+import { canReferenceGroup, chainInputError, exactNodeFilter, selectedNodeFilter, putChain, toggleMember } from './memberModel.ts';
 const node: GroupMember = { kind: 'node', ref: { nodeSet: { type: 'local', id: 'local' }, match: { exact: 'GCP' }, fallback: { kind: 'builtin', name: 'REJECT' } } };
 describe('成员填充与链规则', () => {
   it('反复勾选不重复添加，取消勾选不影响其他成员', () => {
@@ -20,6 +20,14 @@ describe('成员填充与链规则', () => {
     expect(regex.test(name)).toBe(true);
     expect(regex.test(`${name}副本`)).toBe(false);
     expect(regex.test('US GCP111test')).toBe(false);
+  });
+  it('落地多选精确匹配各节点，空选择不退化为匹配全部', () => {
+    const regex = new RegExp(selectedNodeFilter(['香港 [1]', '日本+2', '香港 [1]']));
+    expect(regex.test('香港 [1]')).toBe(true);
+    expect(regex.test('日本+2')).toBe(true);
+    expect(regex.test('日本22')).toBe(false);
+    expect(regex.test('香港 [1]副本')).toBe(false);
+    expect(new RegExp(selectedNodeFilter([])).test('任意节点')).toBe(false);
   });
   it('拒绝直接和间接成环的组引用', () => {
     const groups: GroupSpec[] = [{ id: 'a', name: '甲', type: 'select', members: [] }, { id: 'b', name: '乙', type: 'select', members: [{ kind: 'group', groupId: 'a' }] }, { id: 'c', name: '丙', type: 'select', members: [{ kind: 'group', groupId: 'b' }] }];

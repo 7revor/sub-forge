@@ -26,6 +26,6 @@ export function CodePreview({ text, title, label, copyable = false, loading = fa
       <span className="font-mono text-[length:var(--text-control)] text-nav-text">{title}</span>
       {copyable && <CopyButton text={text} size="sm" variant="ghost" className="text-nav-text hover:bg-nav-hover" />}
     </div>}
-    <pre ref={body} tabIndex={0} className={cx('m-0 overflow-auto p-3 font-mono text-[length:var(--text-caption)] leading-[1.7] text-[#dde1e7] transition-opacity', fill ? 'min-h-0 flex-1' : 'max-h-[420px]', loading && 'opacity-70', bodyClassName)}>{lineNumbers ? <span className="flex min-w-max"><span aria-hidden="true" className="sticky left-0 mr-3 select-none border-r border-[#343a44] bg-nav pr-3 text-right text-[#8b95a5]">{lines.map((_, i) => i + 1).join('\n')}</span><code>{content}</code></span> : content}</pre>
+    <pre ref={body} tabIndex={0} className={cx('m-0 overflow-auto p-3 font-mono text-[length:var(--text-caption)] leading-[1.7] text-[#dde1e7] transition-opacity', fill ? 'min-h-0 flex-1' : '', loading && 'opacity-70', bodyClassName)}>{lineNumbers ? <span className="flex min-w-max"><span aria-hidden="true" className="sticky left-0 mr-3 select-none bg-nav text-right text-[#8b95a5]">{lines.map((_, i) => i + 1).join('\n')}</span><code>{content}</code></span> : content}</pre>
   </section>;
 }

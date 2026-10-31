@@ -29,12 +29,12 @@ export function Login() {
     }
   };
 
-  // 设计稿「登录」：深色底（叠加光晕与网格背景），标志在上，白色卡片居中
+  // 设计稿「登录」：深色底（顶部光晕），标志在上，白色卡片居中
   return (
     <div className="flex h-dvh min-h-0 flex-col login-bg">
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto overscroll-contain px-4 py-12 sm:py-12 [&>*]:shrink-0">
         <div className="flex items-center gap-2.5">
-          <LogoMark size={28} />
+          <span className="grid size-7 place-items-center rounded-lg bg-brand text-[15px] font-semibold text-white">S</span>
           <span className="font-mono text-[length:var(--text-title)] font-semibold text-white">Sub Forge</span>
         </div>
         <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-panel p-6 shadow-modal">
@@ -42,7 +42,7 @@ export function Login() {
           <Field label="用户名">{(id) => <Input placeholder="输入用户名" id={id} autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />}</Field>
           <Field label="密码">{(id) => <Input placeholder="输入密码" id={id} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}</Field>
           <Button type="submit" variant="primary" disabled={busy}>{busy ? '登录中…' : '登录'}</Button>
-          <span className="text-[length:var(--text-caption)] leading-relaxed text-ink-muted">账户由管理员创建，忘记密码请联系管理员</span>
+          <span className="text-[length:var(--text-caption)] text-center text-ink-muted">账户由管理员创建，忘记密码请联系管理员</span>
         </form>
       </div>
     </div>

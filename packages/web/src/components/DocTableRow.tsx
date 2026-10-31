@@ -4,10 +4,10 @@ import { Link, useNavigate } from 'react-router';
 import { buttonClass } from './ui.tsx';
 
 // 与设计稿一致：名称为正文色，悬停变为强调色
-export const docNameLinkClass = 'font-medium text-ink no-underline hover:text-brand';
+export const docNameLinkClass = 'text-[length:var(--text-body)] font-medium text-ink no-underline hover:text-brand';
 
 /** 行操作列的表头：设计稿中留空，只给读屏提供文字 */
-export const actionHeader = <span className="sr-only">操作</span>;
+export const actionHeader = <span className="block text-right">操作</span>;
 
 export function DocTableRow({ to, children }: { to: string; children: ReactNode }) {
   const navigate = useNavigate();

@@ -1,7 +1,7 @@
 import { compileUserRegex, excludedAdapterTypes, isExcludedAdapter, type NodeRef } from '@sub-forge/core';
 import type { NodeBrief } from '../api.ts';
 
-export function filterNodes(nodes: NodeBrief[], filters: { filter?: string; excludeFilter?: string; excludeType?: string }): { nodes: NodeBrief[]; error?: string } {
+export function filterNodes<T extends NodeBrief>(nodes: T[], filters: { filter?: string; excludeFilter?: string; excludeType?: string }): { nodes: T[]; error?: string } {
   try {
     const inc = filters.filter ? compileUserRegex(filters.filter) : undefined;
     const exc = filters.excludeFilter ? compileUserRegex(filters.excludeFilter) : undefined;

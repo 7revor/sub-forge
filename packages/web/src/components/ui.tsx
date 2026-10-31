@@ -13,10 +13,10 @@ import { cx } from './cx.ts';
 type BtnVariant = 'primary' | 'default' | 'danger' | 'danger-solid' | 'ghost';
 const BTN: Record<BtnVariant, string> = {
   primary: 'bg-brand border-brand text-white hover:bg-accent-strong',
-  default: 'bg-panel border-control-line text-ink hover:bg-hover',
+  default: 'bg-panel border-control-line text-ink hover:bg-inset',
   danger: 'bg-panel border-danger-line text-err hover:bg-err-soft',
   'danger-solid': 'bg-err border-err text-white hover:bg-[#912018]',
-  ghost: 'bg-transparent border-transparent text-ink-muted hover:bg-hover',
+  ghost: 'bg-transparent border-transparent text-ink-muted hover:bg-inset',
 };
 
 /** 按钮样式；链接需要长得像按钮时（如表格行的「编辑」）也用它 */
@@ -66,7 +66,7 @@ export function DraftTextarea({ value, onCommit, onBlur, ...p }: DraftProps<Text
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: (id: string) => ReactNode; className?: string }) {
   const id = useId();
   return (
-    <div className={cx('flex flex-col gap-1.5', className)}>
+    <div className={cx('flex min-w-0 flex-col gap-1.5', className)}>
       <label htmlFor={id} className="text-[length:var(--text-control)] font-medium text-ink-muted">{label}</label>
       {children(id)}
       {hint && <span className="text-[length:var(--text-caption)] text-ink-muted">{hint}</span>}
@@ -79,12 +79,12 @@ export function PageScroll({ children, className, contained = false }: { childre
   return <div className={cx('page-scroll', contained && 'page-scroll-contained')}><div className={cx('page-scroll-content flex flex-col gap-5', className)}>{children}</div></div>;
 }
 
-export function Card({ title, subtitle, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; subtitle?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
+export function Card({ title, count, subtitle, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; count?: number; subtitle?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
   const panel = (
     <section className={cx('rounded-xl border border-line bg-panel', className)}>
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <div className="flex min-w-0 flex-col gap-0.5">{typeof title === 'string' ? <h2 className="m-0 text-[length:var(--text-section)] font-semibold">{title}</h2> : title}{subtitle && <span className="text-[length:var(--text-control)] text-ink-muted">{subtitle}</span>}</div>
+          <div className="flex min-w-0 flex-col gap-0.5">{typeof title === 'string' ? <h2 className="m-0 text-[length:var(--text-section)] font-semibold">{title}{count !== undefined && <span className="ml-1 text-[length:var(--text-caption)] font-normal text-ink-muted">{count}</span>}</h2> : title}{subtitle && <span className="text-[length:var(--text-control)] text-ink-muted">{subtitle}</span>}</div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
       )}
@@ -143,8 +143,8 @@ export function Switch({ checked, onChange, label, disabled = false }: { checked
 
 export function PageHeader({ title, subtitle, crumbs, actions, children }: { title: ReactNode; subtitle?: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="shrink-0 flex flex-col gap-2.5 break-words">
-      {crumbs && <div className="text-[length:var(--text-control)] text-ink-muted">{crumbs}</div>}
+    <div className="shrink-0 flex flex-col gap-2 break-words">
+      {crumbs && <div className="text-[length:var(--text-caption)] text-ink-muted">{crumbs}</div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2.5">
@@ -201,7 +201,7 @@ export function ReportList({ items, onLocate, canLocate = () => true, showWhere 
         {item.where && (showWhere || locate) && <span className={locate ? 'text-[length:var(--text-caption)] text-brand' : 'font-mono text-[length:var(--text-caption)] text-ink-muted'}>{locate ? (showWhere ? `定位：${item.where}` : '定位') : item.where}</span>}
       </>;
       return <li key={index} className="border-b border-line-2 last:border-0">
-        {locate ? <button type="button" className="flex w-full cursor-pointer flex-col gap-1 py-2.5 text-left hover:bg-hover" onClick={() => onLocate!(item.where!)}>{content}</button>
+        {locate ? <button type="button" className="flex w-full cursor-pointer flex-col gap-1 py-2.5 text-left hover:bg-inset" onClick={() => onLocate!(item.where!)}>{content}</button>
           : <div className="flex flex-col gap-1 py-2.5">{content}</div>}
       </li>;
     })}
@@ -213,8 +213,8 @@ export const mono = 'font-mono';
 export const th = 'table-cell-divider first:pl-5 last:pr-5 px-3 py-2.5 bg-inset text-left text-[length:var(--text-caption)] font-medium whitespace-nowrap text-ink-muted';
 export const td = 'table-cell-divider first:pl-5 last:pr-5 px-3 py-2.5 align-middle text-[length:var(--text-control)]';
 /** 侧边栏入口列表页的统一表格尺寸：表头 12px、单元格 13.5px、左右 14px，带 32px 行操作时行高 57px。 */
-export const listTh = cx(th, 'px-3.5');
-export const listTd = 'table-cell-divider first:pl-5 last:pr-5 px-3.5 py-3 align-middle text-[length:var(--text-control)]';
+export const listTh = th;
+export const listTd = 'table-cell-divider first:pl-5 last:pr-5 px-3 py-2.5 align-middle text-[length:var(--text-control)]';
 /** 列表中的数字、路径等等宽内容统一 13px。 */
 export const listMono = 'font-mono text-[length:var(--text-control)]';
 

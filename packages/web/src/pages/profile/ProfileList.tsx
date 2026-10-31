@@ -18,13 +18,9 @@ export function ProfileList() {
   return (
     <DocList kind="profiles" title="配置订阅" onCreate={() => void create()} deleteBody="它的订阅链接会立即失效，客户端将无法更新。"
       columns={[
-        { header: '名称', cell: (p) => p.name },
-        { header: '模式', width: 200, cell: (p) => {
-          const label = modeLabel(p, templates.find(t => t.id === boundTemplateId(p))?.name);
-          return <span title={label}><Badge className="max-w-full"><span className="truncate">{label}</span></Badge></span>;
-        } },
-        { header: '节点集', width: 80, cell: (p) => <span className={listMono}>{p.nodeSets.length}</span> },
-        { header: '代理链', width: 80, cell: (p) => <span className={listMono}>{p.chains.length}</span> },
+        { header: '名称', width: 280, cell: p => p.name },
+        { header: '分流', width: 200, cell: p => <span className="block truncate">{modeLabel(p, templates.find(t => t.id === boundTemplateId(p))?.name)}</span> },
+        { header: '节点来源', width: 140, cell: p => <span>{p.nodeSets.length} 个</span> },
       ]} />
   );
 }
