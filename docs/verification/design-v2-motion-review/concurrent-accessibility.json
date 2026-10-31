@@ -1,0 +1,41 @@
+[
+  {
+    "dialogs": [
+      {
+        "hidden": "true",
+        "title": "并发一"
+      },
+      {
+        "hidden": "true",
+        "title": "并发二"
+      },
+      {
+        "hidden": null,
+        "title": "并发三"
+      }
+    ],
+    "focus": "并发三"
+  },
+  {
+    "dialogs": [
+      {
+        "hidden": "true",
+        "title": "并发一"
+      },
+      {
+        "hidden": null,
+        "title": "并发二"
+      }
+    ],
+    "focus": "并发二"
+  },
+  {
+    "dialogs": [
+      {
+        "hidden": null,
+        "title": "并发一"
+      }
+    ],
+    "focus": "并发一"
+  }
+]

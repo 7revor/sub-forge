@@ -168,3 +168,7 @@
 - [modal-chain-multiple](actual/modal-chain-multiple.jpg)
 
 参考图：[01](reference/01.jpg)、[02](reference/02.jpg)、[03](reference/03.jpg)、[04](reference/04.jpg)、[05](reference/05.jpg)、[06](reference/06.jpg)、[07](reference/07.jpg)、[08](reference/08.jpg)、[09](reference/09.jpg)、[10](reference/10.jpg)、[11](reference/11.jpg)、[12](reference/12.jpg)、[13](reference/13.jpg)、[14](reference/14.jpg)、[15](reference/15.jpg)、[16](reference/16.jpg)、[17](reference/17.jpg)、[18](reference/18.jpg)、[19](reference/19.jpg)、[20](reference/20.jpg)、[21](reference/21.jpg)。
+
+## 后续补充
+
+2026-10-31：[兼容弹窗、退场动画及全站补充复核](../design-v2-motion-review/README.md) 已补齐本记录中的兼容入口、24 个弹窗定义的正常/无动画退场和独立 Host 重挂验收，并继续修复仓库、模板、总览遗漏。上文为当时记录，不再作为最新未覆盖清单。
