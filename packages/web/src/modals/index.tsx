@@ -67,9 +67,18 @@ class ModalErrorBoundary extends Component<{ children: ReactNode }, { error?: Er
 }
 export function ModalHost() {
   const sessions = useSyncExternalStore(modalController.subscribe, modalController.getSnapshot);
+  const [mountedThrough, setMountedThrough] = useState(0);
+  // 同一事件可连续 show 多次。逐个提交挂载，让前一层的 Radix hideOthers
+  // 先建立隔离，再挂载下一层，避免两层互相设为 aria-hidden。
+  const next = sessions.find(session => session.id > mountedThrough && session.phase === 'open');
+  useEffect(() => {
+    if (next) setMountedThrough(next.id);
+    // 尚未进入 DOM 就被路由取消的会话没有退场事件，应直接结算。
+    for (const session of sessions) if (session.id > mountedThrough && session.phase === 'closing') modalController.exited(session.id);
+  }, [sessions, mountedThrough, next?.id]);
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; queueMicrotask(() => { if (!mounted.current) modalController.cancelAll('unmounted', true); }); }; }, []);
-  return <>{sessions.map(session => <ModalInstance key={session.id} session={session} />)}</>;
+  return <>{sessions.filter(session => session.id <= mountedThrough || session.id === next?.id).map(session => <ModalInstance key={session.id} session={session} />)}</>;
 }
 export function ModalRoot() {
   const location = useLocation(); const previous = useRef(location.key);

@@ -1,8 +1,17 @@
-// 仅供 Codex 内置浏览器验收，不进入生产构建；节点按钮需配合 manual-member-chain 内存服务。
+// 仅供 Codex 内置浏览器验收，不进入生产构建；节点数据使用隔离验收服务。
+import { observeDialogExits, type ExitRecord } from './observe-dialog-exit.ts';
+import { ExtraRuleModal } from '../src/pages/profile/TabRules.tsx';
+import { RemoteRuleDialog } from '../src/components/RemoteRulePicker.tsx';
+import { RuleEditDialog } from '../src/pages/template/RuleEditDialog.tsx';
+import { ProfileInfoModal } from '../src/pages/profile/ProfileInfoModal.tsx';
+import { RulesetSourceDialog } from '../src/components/RulesetSourceDialog.tsx';
+import { RepositoryModal } from '../src/components/RepositoryModal.tsx';
+import { NamedCreateDialog } from '../src/components/NamedCreateDialog.tsx';
+import { NodeSetPickerDialog } from '../src/components/dialogs.tsx';
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter, RouterProvider, Link } from 'react-router';
+import { createBrowserRouter, RouterProvider, Link, useNavigate } from 'react-router';
 import { Frame as FrameApi } from '../src/modals/Frame.tsx';
 import { createModal, ModalRoot, ModalContent, ModalHeader, ModalTitle, useModalDraft, useModalPresentation } from '../src/modals/index.tsx';
 import { ProfileGroupDialog } from '../src/pages/profile/ProfileGroupDialog.tsx';
@@ -35,57 +44,22 @@ const NestedModal = createModal<{ name: string }, string>(function NestedBody({ 
     <Link to="/test/dialog-exit.html?route=next">切换路由</Link><Button onClick={modal.cancel}>取消</Button><Button onClick={() => modal.confirm(name)}>保存</Button></ModalContent>;
 });
 
-type Frame = { height: number; text: string; inputs: string[] };
-const readFrame = (element: HTMLElement): Frame => ({
-  // offsetHeight 排除官方 zoom 退场的 transform，仅检查内容是否被清空导致布局收缩。
-  height: element.offsetHeight,
-  text: element.textContent ?? '',
-  inputs: [...element.querySelectorAll<HTMLInputElement>('input, textarea')].map(input => input.value),
+// 路由离开与 Host 真正卸载分开验证：卸载结果在 Host 外展示。
+let hostOutcome: Promise<unknown> | undefined;
+const HostUnmountModal = createModal<Record<string, never>>(function HostUnmountBody() {
+  return <ModalContent><ModalHeader><ModalTitle>Host 卸载验收</ModalTitle></ModalHeader><Input placeholder="填写卸载前的草稿" defaultValue="不能残留的会话" /><Link to="/test/host-off">卸载弹窗 Host</Link></ModalContent>;
 });
+function HostOff() {
+  const [result, setResult] = useState('等待取消结果');
+  useEffect(() => { void hostOutcome?.then(value => setResult(JSON.stringify(value))); }, []);
+  return <main className="p-8"><h1>Host 已卸载</h1><pre aria-label="Host 卸载结果">{result}</pre><Link to="/test/dialog-exit.html">重新挂载 Host</Link></main>;
+}
+
 function App() {
-  const [results, setResults] = useState<string[]>([]);
-  const before = useRef(new WeakMap<HTMLElement, Frame>());
+  const navigate = useNavigate();
+  const [results, setResults] = useState<ExitRecord[]>([]);
   const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    const capture = () => {
-      document.querySelectorAll<HTMLElement>('[data-slot$="dialog-content"][data-state="open"]').forEach(element => before.current.set(element, readFrame(element)));
-    };
-    const pending = new Set<number>();
-    const sample = (event: AnimationEvent) => {
-      const element = event.target;
-      if (!(element instanceof HTMLElement) || !element.matches('[data-slot$="dialog-content"][data-state="closed"]')) return;
-      const expected = before.current.get(element);
-      if (!expected) { setResults(items => [...items, '失败：缺少关闭前的 DOM 记录']); return; }
-      let frames = 0;
-      let mismatch: Frame | undefined;
-      const inspect = () => {
-        if (!element.isConnected || element.dataset.state !== 'closed') {
-          const passed = frames > 0 && !mismatch;
-          setResults(items => [...items, `${passed ? '通过' : '失败'}：${expected.text.slice(0, 36)}；${frames} 帧；高度 ${expected.height}px${mismatch ? ` → ${mismatch.height}px，内容发生变化：${mismatch.text}` : '，标题、正文、输入值保持一致'}`]);
-          return;
-        }
-        frames += 1;
-        const frame = readFrame(element);
-        if (JSON.stringify(frame) !== JSON.stringify(expected)) mismatch = frame;
-        const id = requestAnimationFrame(() => { pending.delete(id); inspect(); });
-        pending.add(id);
-      };
-      inspect();
-    };
-    // 异步提交会先展示处理中；比较最后一帧 open，而非点击提交前的旧文案。
-    const observer = new MutationObserver(capture);
-    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
-    document.addEventListener('pointerdown', capture, true);
-    document.addEventListener('keydown', capture, true);
-    document.addEventListener('animationstart', sample);
-    return () => {
-      document.removeEventListener('pointerdown', capture, true);
-      document.removeEventListener('keydown', capture, true);
-      document.removeEventListener('animationstart', sample);
-      observer.disconnect();
-      pending.forEach(cancelAnimationFrame);
-    };
-  }, []);
+  useEffect(() => observeDialogExits(record => setResults(items => [...items, record])), []);
   const [body, setBody] = useState<TemplateBody>({ groups: [{ id: 'first', name: '退场验收组', type: 'fallback', members: [{ kind: 'builtin', name: 'DIRECT' }], test: { interval: 300 } }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } });
   const [outcomes, setOutcomes] = useState<string[]>([]);
   const record = async (promise: Promise<unknown>) => { const result = await promise; setOutcomes(items => [...items, JSON.stringify(result)]); };
@@ -99,6 +73,18 @@ function App() {
     {slow && <style>{'[data-slot="dialog-content"][data-state="closed"], [data-slot="dialog-overlay"][data-state="closed"] { animation-duration: 2s !important; }'}</style>}
     {noAnimation && <style>{'[data-slot="dialog-content"], [data-slot="dialog-overlay"] { animation: none !important; }'}</style>}
     <div className="flex flex-wrap gap-3">
+      <Button onClick={() => void record(ExtraRuleModal.show({ ...profileFixture, profile: { ...profileFixture.profile, routing: undefined }, prepend: false }))}>兼容插入规则</Button>
+      <Button onClick={() => void record(ExtraRuleModal.show({ ...profileFixture, profile: { ...profileFixture.profile, routing: undefined }, prepend: true }))}>兼容前置规则</Button>
+      <Button onClick={() => void record(RemoteRuleDialog.show({ value: 'http://127.0.0.1:4187/rules.list' }))}>兼容远程链接</Button>
+      <Button onClick={() => void record(RuleEditDialog.show({ rule: { id: 'audit', matcher: { kind: 'local', content: 'DOMAIN-SUFFIX,example.test' }, target: { kind: 'builtin', name: 'DIRECT' } }, index: 0, ctx: { rulesets: [] }, adding: true, bound: true, staticOnly: false, extendedOptions: true }))}>手写规则退场</Button>
+      <Button onClick={() => void record(ProfileInfoModal.show({ name: '保持到最后一帧', note: '备注内容也应该保留' }))}>名称备注退场</Button>
+      <Button onClick={() => void record(RulesetSourceDialog.show({ source: { id: 'local', kind: 'local', format: 'auto', content: 'DOMAIN,example.test\nDOMAIN-SUFFIX,example.org' }, adding: true }))}>规则来源退场</Button>
+      <Button onClick={() => void record(RepositoryModal.show({}))}>仓库退场</Button>
+      <Button onClick={() => void record(NamedCreateDialog.show({ title: '新建命名对象', placeholder: '填写验收对象名称', note: true }))}>命名对象退场</Button>
+      <Button onClick={() => void record(NodeSetPickerDialog.show({ options: profileFixture.nodeSets, added: [] }))}>节点来源退场</Button>
+      <Button onClick={() => void record(FrameApi.modal.error({ title: '错误提示验收', description: '此提示只验证布局与关闭，不触发后台操作。' }))}>错误提示退场</Button>
+      <Button onClick={() => { hostOutcome = HostUnmountModal.show({}); }}>Host 卸载与重挂</Button>
+      <Button onClick={() => setResults([])}>清空验收记录</Button>
       <Button onClick={() => void record(FrameApi.modal.confirm({ title: '删除第一份文档？', description: '被 3 个策略组引用，删除后引用将失效。', confirmLabel: '删除', danger: true }))}>删除确认一</Button>
       <Button onClick={() => void record(FrameApi.modal.confirm({ title: '删除第二份文档，名称较长以验证重开更新？', description: '第二份文档的独立说明。', danger: true }))}>删除确认二</Button>
       <Button onClick={() => void record(RuleSourcePreview.show({ matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'exit.example.test' } } }))}>静态规则预览</Button>
@@ -118,12 +104,15 @@ function App() {
       <Button onClick={() => { attempt.current = 0; void record(FrameApi.modal.prompt({ title: '保存失败后重试', initialValue: '保留我的草稿', placeholder: '输入要保存的名称' }, { submit: async () => { if (++attempt.current === 1) throw new Error('模拟保存失败，请重试'); } })); }}>异步失败与重试</Button>
       <Button onClick={() => void record(NestedModal.show({ name: '外部原值' }))}>嵌套与路由</Button>
       <Button onClick={() => { void record(FrameApi.modal.alert({ title: '第一层提示' })); void record(FrameApi.modal.success({ title: '第二层提示' })); }}>连续打开</Button>
+      <Button onClick={() => { for (const title of ['并发一', '并发二', '并发三']) void record(FrameApi.modal.alert({ title })); }}>同时打开三层</Button>
+      <Button onClick={() => { void record(FrameApi.modal.alert({ title: '路由前的第一层' })); void record(FrameApi.modal.alert({ title: '尚未挂载的第二层' })); navigate('/test/dialog-exit.html?cancel=queued'); }}>打开后立即离开</Button>
     </div>
     <p aria-label="外部组名称">外部组名称：{body.groups[0]?.name}</p>
     <TemplateGroupsEditor value={body} onChange={setBody} report={[]} />
     <section aria-label="Promise 结果" className="rounded border p-4"><h2>Promise 结果：{outcomes.length} 项</h2><ol>{outcomes.map((item, i) => <li key={i}>{item}</li>)}</ol></section>
-    <section aria-label="验收结果" className="rounded border p-4"><h2 className="font-semibold">退场验收：{results.length} 项</h2><ol className="list-decimal space-y-3 pl-5">{results.map((result, index) => <li key={index} className={result.startsWith('通过') ? 'text-green-800' : 'text-red-800'}>{result}</li>)}</ol></section>
+    <section aria-label="验收结果" className="rounded border p-4"><h2 className="font-semibold">退场验收：{results.length} 项</h2><ol className="list-decimal space-y-3 pl-5">{results.map((result, index) => <li key={index} className={result.passed ? 'text-green-800' : 'text-red-800'}>{result.passed ? '通过' : '失败'}：{result.title}；{result.mode}；{result.frames.length} 帧；高度 {result.baseline.height}px；{result.error ?? '标题、正文、输入、展开状态和布局一致'}</li>)}</ol></section>
+    <pre id="dialog-motion-results" hidden>{JSON.stringify(results)}</pre>
   </main>;
 }
-const router = createBrowserRouter([{ element: <ModalRoot />, children: [{ path: '*', element: <App /> }] }]);
+const router = createBrowserRouter([{ path: '/test/host-off', element: <HostOff /> }, { element: <ModalRoot />, children: [{ path: '*', element: <App /> }] }]);
 createRoot(document.getElementById('root')!).render(<StrictMode><QueryClientProvider client={new QueryClient()}><RouterProvider router={router} /></QueryClientProvider></StrictMode>);
