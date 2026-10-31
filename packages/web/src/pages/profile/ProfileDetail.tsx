@@ -64,7 +64,7 @@ export function ProfileDetail() {
           </Badge>
           {dirty && <Badge tone="warn">未保存</Badge>}
         </PageHeader>
-        <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[length:var(--text-control)]">
+        <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-[length:var(--text-control)]">
           {subscriptionUrl ? <>
             <CopyField value={subscriptionUrl} />
             <span className="text-[length:var(--text-caption)] text-ink-muted">自动适配客户端{draft.note ? ` · 备注：${draft.note}` : ''}</span>

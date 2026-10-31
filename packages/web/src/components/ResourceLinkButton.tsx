@@ -12,7 +12,7 @@ export function ResourceLinkButton({ kind, id, name, disabled = false, size = 'm
   const link = useResourceLink(kind, id);
   return <CopyButton size={size} text={link.data ?? ''} disabled={disabled || !link.data || link.isFetching || !!link.error}
     aria-label={`复制 ${name} 的链接`} title={disabled ? '请先保存修改' : link.error ? `链接读取失败：${link.error.message}` : '使用当前账户令牌复制托管链接'}>
-    <Link2 size={14} />{link.error ? '链接不可用' : '复制链接'}
+    {size !== 'sm' && <Link2 size={14} />}{link.error ? '链接不可用' : '复制链接'}
   </CopyButton>;
 }
 

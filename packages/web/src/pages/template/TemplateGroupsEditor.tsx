@@ -16,7 +16,7 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
-const columns = 'grid grid-cols-[24px_32px_minmax(0,1fr)_60px] md:grid-cols-[24px_32px_minmax(0,1fr)_88px_minmax(0,1.4fr)_64px_60px]';
+const columns = 'grid grid-cols-[20px_32px_minmax(0,1fr)_64px] md:grid-cols-[20px_32px_minmax(160px,1fr)_88px_minmax(0,1.6fr)_96px_64px]';
 
 export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, isGroupReadOnly = () => readOnly, onRemoveGroup, onEditGroup, memberSummary, nodeSetName = ref => ref.id, templateGroupIds, templateStart }: {
   value: TemplateBody; onChange: (body: TemplateBody, templateStart?: number) => void; report: ReportItem[];
@@ -52,15 +52,15 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
       {!value.groups.length ? <Empty title="还没有策略组" /> : <>
         <TemplateBoundList label="策略组" items={value.groups} templateIds={templateGroupIds} templateStart={templateStart} isLocked={isGroupReadOnly} canDrop={(_from, to) => !isGroupReadOnly(value.groups[to]!)} onReorder={(groups, start) => onChange({ ...value, groups }, start)} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
-          const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '没有成员，流量会被拒绝');
+          const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '留空');
           return <RoutingCard id={`template-group-${g.id}`} className={columns} invalid={error}>
             {handle}
             <RoutingCardIcon muted={isGroupReadOnly(g)}><Layers3 size={16} /></RoutingCardIcon>
-            <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left font-medium', error && 'text-err')}>{g.name || '未命名组'}</span>
+            <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left text-[length:var(--text-body)] font-medium', error && 'text-err')}>{g.name || '未命名组'}</span>
             <div className="col-span-2 col-start-3 row-start-2 flex min-w-0 items-center gap-3 md:contents">
               <span className="shrink-0 text-ink-2" title="策略组类型">{GROUP_TYPE_LABEL[g.type]}</span>
-              <span className="min-w-0 flex-1 truncate text-ink-2" title={members}>{members}</span>
-              <span>{g.display?.hidden && <Badge>已隐藏</Badge>}</span>
+              <span className={cx("min-w-0 flex-1 truncate", !g.members.length ? memberSummary ? "text-warn" : "text-faint" : "text-ink-muted")} title={members}>{members}</span>
+              <span className="flex flex-wrap gap-1">{!g.members.length && memberSummary && <Badge tone="warn">空组</Badge>}{g.display?.hidden && <Badge>已隐藏</Badge>}</span>
             </div>
             <div className="col-start-4 row-start-1 md:col-start-7">
               <RoutingCardActions label={`策略组「${g.name}」`} onEdit={() => void edit(g)} onDelete={isGroupReadOnly(g) ? undefined : () => void remove(g)} />

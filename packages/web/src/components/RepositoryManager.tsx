@@ -6,7 +6,7 @@ import { GitBranch, Plus } from 'lucide-react';
 import { api, type RuleRepo } from '../api.ts';
 import { Badge, Button, Empty, ErrorAlert, cx, formatTime } from './ui.tsx';
 
-export function RepositoryManager({ repos, admin, loading = false, failed = false, onRetry }: { repos: RuleRepo[]; admin: boolean; loading?: boolean; failed?: boolean; onRetry?: () => void }) {
+export function RepositoryManager({ repos, admin, showAdd = true, loading = false, failed = false, onRetry }: { repos: RuleRepo[]; admin: boolean; showAdd?: boolean; loading?: boolean; failed?: boolean; onRetry?: () => void }) {
   const qc = useQueryClient();
   const edit = async (repo?: RuleRepo) => { const result = await RepositoryModal.show({ repo }); if (result.status === 'confirmed') void qc.invalidateQueries({ queryKey: ['rule-repos'] }); };
   const invalidate = () => qc.invalidateQueries({ queryKey: ['rule-repos'] });
@@ -16,14 +16,14 @@ export function RepositoryManager({ repos, admin, loading = false, failed = fals
   return <section aria-label="仓库" className="flex shrink-0 flex-col gap-3">
     <div className="list-panel">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-4">
-        <h2 className="m-0 text-base font-semibold">仓库</h2>
-        {admin && <Button onClick={() => void edit()}><Plus size={16} />添加仓库</Button>}
+        <h2 className="m-0 text-[length:var(--text-section)] font-semibold">仓库</h2>
+        {admin && showAdd && <Button onClick={() => void edit()}><Plus size={16} />添加仓库</Button>}
       </div>
       <div className="flex max-h-[min(30vh,240px)] min-h-0 flex-col gap-2 overflow-auto px-5 pb-5" aria-busy={loading}>
         {loading ? <div role="status" className="py-4 text-ink-muted">正在加载仓库…</div> : repos.map(r => <div key={r.id} className="grid min-h-[52px] grid-cols-[32px_minmax(0,1fr)_96px] items-center gap-3 rounded-[10px] border border-line bg-panel px-4 py-2 text-[length:var(--text-control)] md:grid-cols-[32px_minmax(0,1fr)_96px_112px_36px]">
           <span className={cx('grid size-8 place-items-center rounded-lg', r.enabled ? 'bg-accent-soft text-accent-ink' : 'bg-neutral-soft text-ink-muted')}><GitBranch size={16} /></span>
-          <div className="min-w-0"><a href={r.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-medium text-ink hover:text-brand" title={r.name}>{r.name}</a>
-            <div className="mt-0.5 truncate text-[length:var(--text-caption)] text-ink-muted">{r.refs.join('、')} · {r.entries} 个文件 · {r.builtAt ? `${formatTime(r.builtAt).slice(5)} 更新` : '等待建立索引'}</div>
+          <div className="min-w-0"><a href={r.url} target="_blank" rel="noreferrer" className="block truncate text-sm leading-5 font-medium text-ink hover:text-brand" title={r.name}>{r.name}</a>
+            <div className="truncate text-[length:var(--text-caption)] text-ink-muted">{r.refs.join('、')} · {r.entries} 个文件 · {r.builtAt ? `${formatTime(r.builtAt).slice(5)} 更新` : '等待建立索引'}</div>
             {r.pending && r.builtAt && <div className="mt-1 text-[length:var(--text-caption)] text-ink-muted">新配置待同步，搜索仍使用上次成功索引。</div>}
             {r.error && <div className="mt-1 break-words text-[length:var(--text-caption)] text-err">{r.error}{r.builtAt ? '（保留上次索引）' : ''}</div>}
           </div>

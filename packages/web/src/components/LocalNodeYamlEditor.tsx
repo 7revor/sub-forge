@@ -41,7 +41,7 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
           try { apply(formatLocalNodeYaml(text), '已格式化'); }
           catch (e) { alertError(e); }
         }}>格式化</Button>
-        <CopyButton size="sm" text={text} />
+        <CopyButton size="sm" variant="ghost" text={text} />
       </div>
     </div>
     <YamlTextarea className="local-node-source" placeholder="粘贴单个节点的分享链接、YAML、JSON 或 Surge 配置" disabled={disabled} id="local-node-yaml" aria-label="节点 YAML" aria-invalid={!!errorText} aria-describedby="local-node-status" rows={16} lineNumbers value={text}

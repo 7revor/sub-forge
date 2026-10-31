@@ -1,4 +1,3 @@
-import { ActionMenu } from './ActionMenu.tsx';
 import type { ReactNode } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button, cx } from './ui.tsx';
@@ -14,7 +13,7 @@ export function RoutingCardIcon({ children, muted = false }: { children: ReactNo
 
 export function RoutingCardActions({ label, onEdit, onDelete }: { label: string; onEdit: () => void; onDelete?: () => void }) {
   return <div className="ml-auto flex shrink-0 justify-end gap-1">
-    <Button size="sm" variant="ghost" className="px-1.5" title={`编辑${label}`} aria-label={`编辑${label}`} onClick={onEdit}><Pencil size={14} /></Button>
-    {onDelete && <ActionMenu label={`${label}更多操作`} items={[{ label: `删除${label}`, onSelect: onDelete, danger: true }]} />}
+    <Button size="sm" variant="ghost" className="size-7 p-0" title={`编辑${label}`} aria-label={`编辑${label}`} onClick={onEdit}><Pencil size={16} /></Button>
+    {onDelete && <Button size="sm" variant="ghost" className="size-7 p-0 hover:text-err" title={`删除${label}`} aria-label={`删除${label}`} onClick={onDelete}><Trash2 size={16} /></Button>}
   </div>;
 }

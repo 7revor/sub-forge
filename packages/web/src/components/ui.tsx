@@ -110,11 +110,11 @@ export function Badge({ tone = 'neutral', children, className }: { tone?: Tone; 
   return <span className={cx('inline-flex items-center gap-1 h-[22px] rounded-full px-2 text-[length:var(--text-caption)] font-medium whitespace-nowrap', TONE[tone], className)}>{children}</span>;
 }
 
-export function Segmented<T extends string>({ value, options, onChange, label, size = 'md' }: {
-  value: T; options: { value: T; label: string; disabled?: boolean; title?: string }[]; onChange: (v: T) => void; label: string; size?: 'sm' | 'md';
+export function Segmented<T extends string>({ value, options, onChange, label, size = 'md', fullWidth = false }: {
+  value: T; options: { value: T; label: string; disabled?: boolean; title?: string }[]; onChange: (v: T) => void; label: string; size?: 'sm' | 'md'; fullWidth?: boolean;
 }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex w-fit max-w-full gap-0.5 self-start rounded-lg bg-neutral-soft p-[3px]">
+    <div role="group" aria-label={label} className={cx("inline-flex max-w-full gap-0.5 self-start rounded-lg bg-neutral-soft p-[3px]", fullWidth ? "w-full" : "w-fit")}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -123,7 +123,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, s
           disabled={o.disabled}
           title={o.title}
           onClick={() => onChange(o.value)}
-          className={cx('rounded-md px-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', size === 'sm' ? 'h-[22px] px-2 text-[length:var(--text-caption)]' : 'h-[30px] text-[length:var(--text-control)]', o.value === value ? 'bg-panel font-medium shadow-[0_1px_2px_rgba(20,23,28,.08)]' : 'text-ink-2')}
+          className={cx('rounded-md cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', fullWidth && 'min-w-0 flex-1', size === 'sm' ? 'h-[22px] px-2 text-[length:var(--text-caption)]' : 'h-[30px] px-3 text-[length:var(--text-control)]', o.value === value ? 'bg-panel font-medium shadow-[0_1px_2px_rgba(20,23,28,.08)]' : 'text-ink-muted')}
         >
           {o.label}
         </button>

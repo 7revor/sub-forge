@@ -200,7 +200,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   };
 
   return <>
-    <PageHeader title={isNew ? '新建模板' : draft.name} crumbs={<Link to="/templates" className="text-ink-muted no-underline">模板</Link>}
+    <PageHeader title={isNew ? '新建模板' : draft.name} crumbs={<><Link to="/templates" className="text-ink-muted no-underline">模板</Link> / {isNew ? '新建模板' : draft.name}</>}
       actions={<><Button onClick={openYaml}>从 YAML 导入</Button>{dirty && <Button variant="ghost" onClick={() => { setDraft(base); setPendingRules(new Set()); }}>放弃修改</Button>}<Button variant="primary" disabled={!canSave || (!isNew && !dirty)} onClick={() => save.mutate(draft)}>{save.isPending ? '检查并保存中…' : dirty || isNew ? '保存' : '已保存'}</Button><ActionMenu size="md" items={[
         { label: '修改模板名称', onSelect: async () => { const result = await Frame.modal.prompt({ title: '模板名称', initialValue: draft.name, placeholder: '填写模板名称' }); if (result.status === 'confirmed') setDraft({ ...draft, name: result.data }); } },
         ...(!isNew ? [

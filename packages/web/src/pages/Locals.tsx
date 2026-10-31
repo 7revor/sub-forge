@@ -94,11 +94,11 @@ export function LocalEdit() {
       </>}>{dirty && <Badge tone="warn">未保存</Badge>}</PageHeader>
     <ErrorAlert error={e.save.error} />
     <PageScroll contained><div className="grid min-h-0 gap-5 lg:min-h-[calc(100dvh-178px)] lg:grid-cols-[minmax(320px,.933fr)_minmax(0,1.067fr)]">
-      <Card title="节点" count={proxies.length} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto p-0!" actions={<Button onClick={() => { setSelected('new'); setTexts(current => ({ ...current, new: current.new ?? '' })); }}><Plus size={16} />新增节点</Button>}>
+      <Card title="节点" count={proxies.length} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto p-0!" actions={<Button size="sm" onClick={() => { setSelected('new'); setTexts(current => ({ ...current, new: current.new ?? '' })); }}><Plus size={16} />新增节点</Button>}>
         <table className="w-full table-fixed border-collapse"><thead><tr><th className={th}>名称</th><th className={cx(th, 'w-20')}>协议</th><th className={th}>服务器</th><th className={cx(th, 'w-24')}>连通性</th></tr></thead><tbody>
           {proxies.map((proxy, index) => <tr key={index} className={cx('hover:bg-hover', selected === index && 'bg-accent-soft')}>
             <td className={td}><button type="button" className="w-full cursor-pointer truncate text-left font-medium" onClick={() => setSelected(index)}>{proxy.name}</button></td>
-            <td className={td}><span className="rounded bg-neutral-soft px-1.5 py-0.5 text-[length:var(--text-caption)]">{proxy.type.toUpperCase()}</span></td>
+            <td className={td}><span className="rounded bg-neutral-soft font-mono text-[length:var(--text-caption)] px-1.5 py-0.5 text-[length:var(--text-caption)]">{proxy.type.toUpperCase()}</span></td>
             <td className={cx(td, 'truncate font-mono text-[length:var(--text-caption)]')} title={`${proxy.server}:${proxy.port}`}>{proxy.server}:{proxy.port}</td>
             <td className={cx(td, 'text-[length:var(--text-caption)] text-ink-muted')}>{probes[index]?.text === (texts[index] ?? proxyToYaml(proxy)) ? probes[index]!.result.ok ? <span className="text-ok">{probes[index]!.result.delay} ms</span> : '失败' : '未测试'}</td>
           </tr>)}

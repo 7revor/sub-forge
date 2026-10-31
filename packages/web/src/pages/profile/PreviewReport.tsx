@@ -18,7 +18,7 @@ export function PreviewReport({ items, locations, selected, onLocate }: {
     const level = LEVEL[item.level], Icon = level.icon, location = locations[i];
     const message = previewIssueMessage(item);
     const description = `${level.label}：${item.message}${location ? `；点击定位第 ${location.startLine} 行` : ''}`;
-    const className = cx('flex min-h-9 w-full min-w-0 items-start gap-2 px-2 py-3 text-left text-[length:var(--text-control)]', location && 'cursor-pointer hover:bg-accent-soft focus-visible:outline-brand', selected === i && 'bg-accent-soft');
+    const className = cx('flex min-h-9 w-full min-w-0 items-start gap-2.5 px-5 py-3 text-left text-[length:var(--text-control)]', location && 'cursor-pointer hover:bg-accent-soft focus-visible:outline-brand', selected === i && 'bg-accent-soft');
     const content = <><Icon size={14} aria-hidden className={cx('mt-1 shrink-0', level.className)} /><span className="min-w-0 flex-1 break-words">{message}{location && <span className="mt-1 block text-[length:var(--text-caption)] text-ink-muted">{item.where?.startsWith('group:') ? '策略组' : item.where?.startsWith('rule:') ? '规则' : '配置'} · 第 {location.startLine} 行</span>}</span>{location && <LocateFixed size={13} aria-hidden className="mt-1 shrink-0 text-ink-muted" />}</>;
     return <li key={i} className="border-b border-line-2 last:border-0">{location
       ? <button type="button" title={description} aria-label={description} aria-pressed={selected === i} className={className} onClick={() => onLocate(i)}>{content}</button>

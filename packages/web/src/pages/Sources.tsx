@@ -62,7 +62,7 @@ function BasicSettings({ draft, set }: {
   draft: SourceDoc; set: (patch: Partial<SourceDoc>) => void;
 }) {
   return (
-    <Card bodyClass="flex flex-col gap-4 p-5">
+    <Card bodyClass="flex flex-col gap-4 px-5 pt-4 pb-5">
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
         <Field label="名称" className="min-w-0">{(id) => <Input id={id} placeholder="例如：机场 A" value={draft.name} onChange={(e) => set({ name: e.target.value })} />}</Field>
         <Field label="订阅地址" className="min-w-0">{(id) =>

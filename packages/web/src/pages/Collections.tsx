@@ -35,7 +35,7 @@ export function CollectionList() {
 }
 
 // 成员行：拖动手柄、成员、类型、节点数、前缀、后缀、移除
-const GRID = 'grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_160px_160px_28px] items-center gap-3 rounded-[10px] border border-line px-4 py-2';
+const GRID = 'grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_160px_160px_64px] items-center gap-3 rounded-[10px] border border-line px-4 py-2';
 
 const EMPTY: Collection = { id: '', name: '', members: [], pipeline: [] };
 
@@ -63,8 +63,8 @@ export function CollectionEdit() {
         <Badge>{d.members.length} 个成员{preview.data ? ` · 合并后 ${preview.data.input} 个节点` : ''}</Badge>
         {!e.isNew && <Badge>被配置订阅使用：{usedBy.length ? usedBy.map((p, i) => <span key={p.id}>{i > 0 && '、'}<Link to={`/profiles/${p.id}`} className="text-brand">{p.name}</Link></span>) : '还没有'}</Badge>}
       </>}>
-      <Card bodyClass="grid gap-4 p-5 sm:grid-cols-[1fr_2fr]">
-        {<Field label="名称">{(id) => <Input placeholder="填写节点组合的名称" id={id} autoFocus value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
+      <Card bodyClass="grid gap-4 px-5 pt-4 pb-5 sm:grid-cols-[1fr_2fr]">
+        {<Field label="名称">{(id) => <Input placeholder="填写节点组合的名称" id={id} value={d.name} onChange={(x) => set({ name: x.target.value })} />}</Field>}
         <NoteField compact value={d.note} onChange={(note) => set({ note })} />
       </Card>
 
@@ -76,10 +76,10 @@ export function CollectionEdit() {
             <SortableList items={d.members} onReorder={(members) => set({ members })} renderItem={(m, i, handle) => (
               <div className={GRID}>
                 {handle}<span className="grid size-8 place-items-center rounded-lg bg-accent-soft text-brand">{m.ref.type === 'source' ? <Server size={16} /> : m.ref.type === 'local' ? <Monitor size={16} /> : <Layers size={16} />}</span>
-                <div className="min-w-0"><Link to={nodeSetPath(m.ref)} className="truncate text-[length:var(--text-control)] font-medium text-ink no-underline hover:text-brand">{nameOf(m.ref)}</Link><div className="mt-0.5 flex items-center gap-1 text-[length:var(--text-caption)] text-ink-muted">{NODE_SET_LABEL[m.ref.type]} · <NodeSetCount nodeSet={m.ref} /></div></div>
+                <div className="min-w-0"><Link to={nodeSetPath(m.ref)} className="block truncate text-[length:var(--text-body)] leading-5 font-medium text-ink no-underline hover:text-brand">{nameOf(m.ref)}</Link><div className="flex items-center gap-1 text-[length:var(--text-caption)] text-ink-muted">{NODE_SET_LABEL[m.ref.type]} · <NodeSetCount nodeSet={m.ref} /></div></div>
                 <Input placeholder="名称前缀" aria-label={`${nameOf(m.ref)} 前缀`} className="col-span-2 row-start-2 h-8 lg:col-auto lg:row-auto" value={m.prefix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, prefix: x.target.value || undefined } : y)) })} />
                 <Input placeholder="名称后缀" aria-label={`${nameOf(m.ref)} 后缀`} className="col-span-2 row-start-2 h-8 lg:col-auto lg:row-auto" value={m.suffix ?? ''} onChange={(x) => set({ members: d.members.map((y, j) => (j === i ? { ...y, suffix: x.target.value || undefined } : y)) })} />
-                <div className="col-start-4 row-start-1 lg:col-auto lg:row-auto"><ActionMenu label={`${nameOf(m.ref)}更多操作`} items={[
+                <div className="col-start-4 row-start-1 flex justify-end lg:col-auto lg:row-auto"><ActionMenu label={`${nameOf(m.ref)}更多操作`} items={[
                   { label: '失败处理', onSelect: async () => { const result = await MemberOptionsModal.show({ name: nameOf(m.ref), onFail: m.onFail }); if (result.status === 'confirmed') set({ members: d.members.map((y, j) => j === i ? { ...y, onFail: result.data } : y) }); } },
                   { label: '移除成员', danger: true, onSelect: () => set({ members: d.members.filter((_, j) => j !== i) }) },
                 ]} /></div>

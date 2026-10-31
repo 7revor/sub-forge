@@ -1,8 +1,9 @@
+import { RepositoryModal } from '../components/RepositoryModal.tsx';
 // 文件搜索分页读取索引；预览和复制均直达公共仓库原文。
-import { Check, Copy } from 'lucide-react';
+import { Plus, Check, Copy } from 'lucide-react';
 import { useClipboard } from '../hooks/useClipboard.ts';
 import { nameSearchRanges } from '@sub-forge/core';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type MouseEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ListTable, ListTableLoading } from '../components/ListTable.tsx';
@@ -20,7 +21,7 @@ import { Button, cx, ErrorAlert, listMono, listTd, PageHeader } from '../compone
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
 
 const FILE_COLUMNS = [
-  { header: '文件', width: 160 }, { header: '仓库', width: 320 }, { header: '分支', width: 160 }, { header: '路径', width: 500 },
+  { header: '文件', width: 160 }, { header: '仓库', width: 390 }, { header: '分支', width: 192 }, { header: '路径', width: 385 },
 ];
 
 function RepositoryFileLoading({ failed }: { failed: boolean }) {
@@ -70,9 +71,9 @@ function RepositoryFileTable({ query, repository, repos }: { query: string; repo
           const href = option.url;
           return <tr key={option.value} className="cursor-pointer hover:bg-ground focus-within:bg-ground" onClick={event => openFileRow(event, href)} onAuxClick={event => openFileRow(event, href)}>
             <td className={cx(listTd, 'font-medium')}><a href={href} target="_blank" rel="noreferrer noopener" className="block truncate text-ink no-underline hover:text-brand" title={option.label}><HighlightedText text={option.label} matches={option.matches?.label} /></a></td>
-            <td className={cx(listTd, 'text-ink-2')}><span className="block truncate" title={repoName}>{repoName}</span></td>
-            <td className={cx(listTd, listMono, 'text-ink-2')}>{selection.file.ref}</td>
-            <td className={cx(listTd, listMono)}><span className="group/name relative inline-flex max-w-full items-center pr-8"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="min-w-0 cursor-pointer break-all rounded-sm text-left no-underline hover:text-brand focus-visible:outline-2 focus-visible:outline-brand" aria-label={`打开 ${selection.file.path}，${repoName}，${selection.file.ref}`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></a>{href && <CopyFileLink href={href} name={selection.file.path} />}</span></td>
+            <td className={cx(listTd, 'text-ink-muted')}><span className="block truncate" title={repoName}>{repoName}</span></td>
+            <td className={cx(listTd, 'text-ink-muted')}>{selection.file.ref}</td>
+            <td className={cx(listTd, listMono, 'text-[length:var(--text-caption)] leading-[normal]') }><span className="group/name relative inline-flex max-w-full items-center pr-8"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="min-w-0 cursor-pointer break-all rounded-sm text-left no-underline hover:text-brand focus-visible:outline-2 focus-visible:outline-brand" aria-label={`打开 ${selection.file.path}，${repoName}，${selection.file.ref}`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></a>{href && <CopyFileLink href={href} name={selection.file.path} />}</span></td>
           </tr>;
         })}
         {result.data?.items.length === 0 && <tr><td colSpan={FILE_COLUMNS.length} className="px-5 py-8 text-center text-ink-muted">没有匹配的规则文件</td></tr>}
@@ -86,6 +87,7 @@ function RepositoryFileTable({ query, repository, repos }: { query: string; repo
 
 export function RuleRepoPage() {
   const me = useMe();
+  const qc = useQueryClient();
   const [params] = useSearchParams();
   const ruleset = params.get('ruleset');
   const [q, setQ] = useState(params.get('q') ?? '');
@@ -95,13 +97,13 @@ export function RuleRepoPage() {
   const revision = repos.data?.repos.map(repo => `${repo.id}:${repo.builtAt}:${repo.enabled}:${repo.configRevision}`).join('|');
   const pending = q.trim() !== query;
   return <>
-    <PageHeader title="规则仓库" />
-    <RepositoryManager repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} loading={!repos.data && !repos.error} failed={!!repos.error && !repos.data} onRetry={() => void repos.refetch()} />
+    <PageHeader title="规则仓库" actions={me.data?.role === 'admin' && <Button variant="primary" onClick={async () => { const result = await RepositoryModal.show({}); if (result.status === 'confirmed') void qc.invalidateQueries({ queryKey: ['rule-repos'] }); }}><Plus size={16} />添加仓库</Button>}>{repos.data && <span className="text-[length:var(--text-control)] text-ink-muted">{repos.data.repos.length} 个仓库</span>}</PageHeader>
+    <RepositoryManager showAdd={false} repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} loading={!repos.data && !repos.error} failed={!!repos.error && !repos.data} onRetry={() => void repos.refetch()} />
     {ruleset && <div className="text-[length:var(--text-control)] text-ink-muted">点击文件查看源文件；添加来源请返回增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-brand">返回增强集合</Link></div>}
     <ErrorAlert error={repos.error} />
-    <section aria-label="规则文件列表" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel">
+    <section aria-label="规则文件列表" className="mb-5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex shrink-0 flex-wrap items-center gap-3 table-panel-divider-bottom px-5 py-4">
-        <h2 className="m-0 text-base font-semibold">规则文件</h2>
+        <h2 className="m-0 text-[length:var(--text-section)] font-semibold">规则文件</h2>
         <span role="status" className="text-[length:var(--text-caption)] text-ink-muted">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Select clearable aria-label="筛选规则仓库" placeholder="全部仓库" className="w-[200px]" value={repository} onChange={event => setRepository(event.target.value)}>{(repos.data?.repos ?? []).filter(repo => repo.enabled).map(repo => <option key={repo.id} value={repo.id}>{repo.name}</option>)}</Select>

@@ -15,7 +15,7 @@ import { indexPreview, locatePreviewIssue } from './previewReport.ts';
 
 import { useMutation } from '@tanstack/react-query';
 import { CLIENT_APPS, type ClientApp, type ChainResolution, type ChainRule, type Client } from '@sub-forge/core';
-import { Link2, Plus } from 'lucide-react';
+import { ArrowRight, Link2, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
 import type { ProfileDoc } from '../../hooks.ts';
@@ -43,7 +43,7 @@ export function TabChains() {
         actions={<>{draft.chains.length > 0 && <Button variant="ghost" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
         {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-[length:var(--text-control)] text-err">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
-        {!draft.chains.length ? <div className="px-4 pb-4"><Empty title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /></div> : (
+        {!draft.chains.length ? <Empty className="rounded-[10px] border border-dashed border-line [&>div]:text-[length:var(--text-caption)] [&>div]:leading-[18px]" title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
           <div aria-label="代理链列表"><SortableList items={draft.chains} getKey={chain => chain.id} onReorder={chains => setDraft({ ...draft, chains })} renderItem={(chain, i, handle) => <ChainCard chain={chain} index={i} handle={handle} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === chain.id)} onEdit={() => void edit(chain)} onDelete={() => setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== chain.id) })} /> } /></div>
         )}
       </Card>
@@ -55,11 +55,11 @@ export function TabChains() {
 function ChainCard({ chain, index, handle, checking, result, onEdit, onDelete }: { chain: ChainRule; index: number; handle: ReactNode; checking: boolean; result?: ChainResolution; onEdit: () => void; onDelete: () => void }) {
   const names = useChainNames(chain);
   const path = `${names.via} → ${names.landing}`;
-  return <RoutingCard className="grid grid-cols-[24px_32px_minmax(0,1fr)_60px] md:grid-cols-[24px_32px_minmax(0,1fr)_minmax(0,0.6fr)_60px]">
+  return <RoutingCard className="grid grid-cols-[20px_32px_minmax(0,1fr)_64px] lg:grid-cols-[20px_32px_minmax(0,1fr)_132px_128px_64px]">
     {handle}<RoutingCardIcon><Link2 size={16} /></RoutingCardIcon>
-    <span title={path} className="min-w-0 truncate font-medium">{path}</span>
-    <div className="col-span-2 col-start-3 row-start-2 min-w-0 md:col-auto md:row-auto"><ChainCheckResult chain={chain} checking={checking} result={result} /></div>
-    <div className="col-start-4 row-start-1 md:col-start-5"><RoutingCardActions label={`代理链 ${index + 1}`} onEdit={onEdit} onDelete={onDelete} /></div>
+    <span title={path} className="flex min-w-0 flex-wrap items-center gap-2"><span className="min-w-0 truncate rounded-md bg-inset px-2.5 py-1 font-medium">{names.via}</span><ArrowRight size={14} className="text-faint" /><span className="min-w-0 truncate rounded-md bg-inset px-2.5 py-1 font-medium">{names.landing}</span></span>
+    <div className="col-span-2 col-start-3 row-start-2 min-w-0 lg:col-auto lg:row-auto"><ChainCheckResult chain={chain} checking={checking} result={result} /></div>
+    <span className="hidden lg:block" aria-hidden /><div className="col-start-4 row-start-1 lg:col-start-6"><RoutingCardActions label={`代理链 ${index + 1}`} onEdit={onEdit} onDelete={onDelete} /></div>
   </RoutingCard>;
 }
 
@@ -111,12 +111,12 @@ export function TabPreview() {
           <CodePreview fill lineNumbers label="最终配置" className="rounded-xl" title={<>{`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`}{selection && <span role="status" className="ml-3 text-[#b8ccff]">已定位第 {selection.range.startLine} 行</span>}</>} text={preview.data.yaml ?? preview.data.failure ?? ''} highlight={selection?.range} bodyClassName="overscroll-contain p-4 text-[length:var(--text-control)] leading-[22px]" />
           <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-line bg-panel [overflow-wrap:anywhere]">
             <div className="flex items-center justify-between px-5 pt-4"><h2 className="m-0 text-[length:var(--text-section)] font-semibold">检查结果</h2><Badge tone={preview.data.ok ? 'ok' : 'err'}>{preview.data.ok ? '可以导入' : '渲染失败'}</Badge></div>
-            <div className="px-5"><Segmented size="sm" label="筛选检查结果" value={level} onChange={setLevel} options={[{ value: 'all', label: `全部 ${report.length}` }, { value: 'error', label: `错误 ${count('error')}` }, { value: 'warn', label: `告警 ${count('warn')}` }, { value: 'info', label: `提示 ${count('info')}` }]} /></div>
-            <div className="min-h-0 flex-1 overflow-auto px-3">
+            <div className="px-5"><Segmented fullWidth label="筛选检查结果" value={level} onChange={setLevel} options={[{ value: 'all', label: `全部 ${report.length}` }, { value: 'error', label: `错误 ${count('error')}` }, { value: 'warn', label: `告警 ${count('warn')}` }, { value: 'info', label: `提示 ${count('info')}` }]} /></div>
+            <div className="min-h-0 flex-1 overflow-auto border-t border-line-2">
               <PreviewReport items={filtered.map(item => item.item)} locations={filtered.map(item => locations[item.index])} selected={filtered.findIndex(item => item.index === selection?.index)} onLocate={index => { const original = filtered[index]!.index; const range = locations[original]; if (range) setLocated({ result: preview.data, index: original, range: { ...range } }); }} />
             </div>
-            <details className="border-t border-line-2 px-5 py-3">
-              <summary className="cursor-pointer text-[length:var(--text-control)] font-medium">自动生成的引用详情（{preview.data.dependencies?.length ?? 0}）</summary>
+            <details className="group border-t border-line-2 px-5 py-3">
+              <summary className="flex h-7 cursor-pointer list-none items-center justify-between text-[length:var(--text-caption)] text-ink-muted [&::-webkit-details-marker]:hidden"><span>自动生成的引用 {preview.data.dependencies?.length ?? 0} 个</span><span className="font-medium group-open:hidden">查看</span><span className="hidden font-medium group-open:inline">收起</span></summary>
               <p className="text-[length:var(--text-caption)] text-ink-muted">系统按客户端自动处理，以下为本次配置生成结果。</p>
               {!preview.data.dependencies?.length ? <p className="text-[length:var(--text-caption)] text-ink-muted">本次配置无需生成隐藏引用组。</p> : <ul className="m-0 list-none space-y-3 p-0">{preview.data.dependencies.map(d => <li key={d.refKey} className="border-t border-line-2 pt-2 text-[length:var(--text-caption)]">
                 <div className="font-medium">{d.node}</div><div className="mt-1 break-all font-mono text-ink-muted">{d.output}</div><div className="mt-1 break-all text-ink-muted">引用位置：{d.usedBy.join('、')}</div>

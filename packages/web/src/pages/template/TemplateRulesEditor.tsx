@@ -2,7 +2,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { SearchInput } from '../../components/SearchInput.tsx';
 import { rulePreviewLinks } from '../../domain/rulePreview.ts';
 import { type Matcher, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
-import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
+import { ChevronDown, FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { TemplateBoundList } from '../../components/TemplateBoundList.tsx';
 import { targetLabel } from '../../components/pickers.tsx';
@@ -73,7 +73,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   return <>
     <Card title={title} count={value.rules.length} actions={<><SearchInput className="w-[220px] shrink-0" aria-label="搜索规则" placeholder="搜索规则内容或出口" value={search} onChange={event => setSearch(event.target.value)} />{!readOnly && <>
       {!staticOnly && remoteUrls.length > 0 && <Button variant="ghost" disabled={repositoryMatches.isPending} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
-      <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={16} />添加规则</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72">
+      <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={16} />添加规则<ChevronDown size={14} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72">
         <DropdownMenuItem onSelect={() => add({ kind: 'local', content: '' })}><span><span className="block">手写规则</span><span className="text-[length:var(--text-caption)] text-ink-muted">每行一条，如 DOMAIN-SUFFIX,openai.com</span></span></DropdownMenuItem>
         {!staticOnly && <><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'repository')}><span><span className="block">从规则仓库选择</span><span className="text-[length:var(--text-caption)] text-ink-muted">选择已索引的仓库文件</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'local')}><span><span className="block">引用规则集合</span><span className="text-[length:var(--text-caption)] text-ink-muted">复用已合并的多来源集合</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><span><span className="block">远程规则地址</span><span className="text-[length:var(--text-caption)] text-ink-muted">填写 HTTP(S) 规则文件 URL</span></span></DropdownMenuItem></>}
       </DropdownMenuContent></DropdownMenu>
@@ -96,7 +96,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           externalPreview={!local} previewLinks={rulePreviewLinks(matcher)} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);
-          }}><span title={label}>{label}</span></RuleCard>;
+          }}><span title={label} className={local || matcher.kind === 'ruleset' && matcher.remote ? "font-mono text-[length:var(--text-caption)] font-normal" : undefined}>{label}</span></RuleCard>;
       }} />
       {!hideFinal && <>
         <RuleFinalCard readOnly={readOnly || !!templateRuleIds} targetId="template-rule-final" target={readOnly || templateRuleIds ? <span className="block truncate pr-1.5 pl-3" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />} />

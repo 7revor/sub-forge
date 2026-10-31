@@ -16,7 +16,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 来源正文打开只读预览，编辑使用统一弹窗；下方始终显示合并结果。
 
-import { FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
+import { TriangleAlert, FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
@@ -112,10 +112,10 @@ export function RulesetEdit() {
       e.submit(x => ({ ...x, sources: x.sources.map(({ url, content, fetch, ...s }) => s.kind === 'remote' ? { ...s, url, ...(fetch ? { fetch } : {}) } : { ...s, content: content ?? '' }) }));
     }} saveError={e.save.error} onDelete={e.remove} onDeleted={e.afterRemove} deleting={e.del.isPending} onDeleteReset={e.del.reset} deleteError={e.del.error}
     badges={!e.isNew && <Badge>{sourceSummary(d)}</Badge>}>
-    {(d.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="m-0 rounded-lg bg-warn-soft px-4 py-2.5 text-[length:var(--text-control)] text-warn">{note}</p>)}
+    {(d.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="m-0 flex items-center gap-2.5 rounded-lg bg-warn-soft px-3.5 py-2.5 text-[length:var(--text-control)] text-warn"><TriangleAlert size={16} /><span>{note}</span></p>)}
     {!canEdit && <p className="text-[length:var(--text-control)] text-ink-muted">公共规则增强 · 仅创建者或管理员可以修改</p>}
     <fieldset disabled={!canEdit} className="contents">
-    <Card bodyClass="grid gap-4 p-5 sm:grid-cols-[1fr_2fr]">
+    <Card bodyClass="grid gap-4 px-5 pt-4 pb-5 sm:grid-cols-[1fr_2fr]">
       <Field label="名称">{id => <Input placeholder="填写用于区分规则集的名称" id={id} autoFocus={e.isNew} value={d.name} onChange={event => set({ name: event.target.value })} />}</Field>
       <NoteField compact value={d.note} onChange={note => set({ note })} />
     </Card>
@@ -145,7 +145,7 @@ export function RulesetEdit() {
     <RulesetOverrides value={d.overrides ?? []} legacySources={d.sources} onChange={overrides => set({ overrides: overrides.length ? overrides : undefined })}
       onRemoveLegacy={id => set({ sources: d.sources.map(s => s.id === id ? { ...s, overrides: undefined } : s) })} />
     </fieldset>
-    </div><div id="preview" className="min-w-0 scroll-mt-4" ref={previewRef}><Card className="min-w-0" bodyClass="p-5">
+    </div><div id="preview" className="min-w-0 scroll-mt-4" ref={previewRef}><Card className="min-w-0" bodyClass="px-5 pt-4 pb-5">
       <RulesetPreview title="合并结果" key={e.id} inputs={sources.inputs} ready={sources.ready} sourceReading={sources.reading} onRefreshSources={sources.refresh}
         overrides={d.overrides} sourceError={sources.error} sourceNames={Object.fromEntries(d.sources.map(s => [s.id, sourceLabel(s)]))} />
     </Card></div></div>

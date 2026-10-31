@@ -30,7 +30,7 @@ describe('模板与订阅共享编辑器的权限边界', () => {
   it('模板和独立订阅保留结构编辑能力', () => {
     const html = renderToStaticMarkup(<TemplateGroupsEditor {...common} />);
     expect(html).toContain('新建策略组');
-    expect(html).toContain('策略组「节点选择」更多操作');
+    expect(html).toContain('删除策略组「节点选择」');
     expect(html).not.toContain('role="switch"');
     expect(html).toContain('aria-label="拖动');
   });
