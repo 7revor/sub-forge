@@ -9,6 +9,28 @@ afterEach(async () => { for (const env of envs.splice(0)) await env.stop(); });
 const setup = async () => { const env = await setupRuleReferences(); envs.push(env); return env; };
 
 describe('物理文件平铺搜索与分页', () => {
+  it('仓库筛选先于分页且不混入其他仓库、本地规则或停用仓库', async () => {
+    const h = await setup();
+    h.setPaths(['a.list', 'b.list', 'c.list']);
+    const repo = await h.repos.addCustom({ url: 'https://github.com/example/filter-fixture', name: '筛选验收', ref: 'master' });
+    await h.repos.refresh(repo);
+    const first = (await h.admin.get(`/api/rule-options/search?scope=repository&repository=${repo}&limit=2`)).json;
+    const second = (await h.admin.get(`/api/rule-options/search?scope=repository&repository=${repo}&limit=2&offset=2`)).json;
+    expect(first).toMatchObject({ total: 3, nextOffset: 2 });
+    expect(first.items).toHaveLength(2);
+    expect(second.items).toHaveLength(1);
+    expect(second.nextOffset).toBeUndefined();
+    const items = [...first.items, ...second.items];
+    expect(items.every(item => JSON.parse(item.value).repo === repo)).toBe(true);
+    expect(new Set(items.map(item => item.value)).size).toBe(3);
+    expect((await h.admin.get(`/api/rule-options/search?scope=repository&repository=${repo}&q=c.list`)).json.total).toBe(1);
+    expect((await h.admin.get('/api/rule-options/search?scope=repository&repository=missing')).json.total).toBe(0);
+    expect((await h.admin.get(`/api/rule-options/search?scope=all&repository=${repo}`)).status).toBe(400);
+    h.repos.setEnabled(repo, false);
+    expect((await h.admin.get(`/api/rule-options/search?scope=repository&repository=${repo}`)).json.total).toBe(0);
+    expect(h.reads).toEqual([]);
+  });
+
   it('文件选项返回公共 raw 地址，特殊字符逐段编码且不读取正文、不创建托管资源', async () => {
     const h = await setup();
     h.repos.setEnabled('blackmatrix7', false);
