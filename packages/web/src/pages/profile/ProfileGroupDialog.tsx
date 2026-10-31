@@ -40,9 +40,14 @@ export const ProfileGroupDialog = createModal<ProfileModalData & { groupId: stri
       <label className="w-[132px]"><span className="sr-only">类型</span><Select style={{ height: 30, opacity: 1 }} aria-label="类型" placeholder="选择策略组类型" disabled={bound} value={group.type} onChange={event => patch({ type: event.target.value as GroupSpec['type'] })}>{Object.entries(GROUP_TYPE_LABEL).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</Select></label>
       <span className="text-[length:var(--text-caption)] text-ink-muted">{group.test?.interval !== undefined && `每 ${group.test.interval} 秒测速`}{group.test?.tolerance !== undefined && ` · 容差 ${group.test.tolerance} ms`}</span>
     </ModalHeader>
-    <GroupMemberPicker group={group} members={members} inherited={inherited} onChange={setMembers} onGroupChange={patch} readOnlySettings={bound} advanced={<>
-        <details className="advanced-settings mt-auto border-t border-line-2 pt-3"><summary className="cursor-pointer text-[length:var(--text-body)] font-medium">高级设置 <span className="ml-2 text-[length:var(--text-caption)] font-normal text-ink-muted">测速参数、图标、其他字段</span></summary><fieldset disabled={bound} className="m-0 mt-4 flex flex-col gap-4 border-0 p-0">
+    <GroupMemberPicker group={group} members={members} inherited={inherited} onChange={setMembers} advanced={<>
+        <details className="advanced-settings mt-auto border-t border-line-2 pt-3"><summary className="cursor-pointer text-[length:var(--text-body)] font-medium">高级设置 <span className="ml-2 text-[length:var(--text-caption)] font-normal text-ink-muted">筛选、测速参数、图标、其他字段</span></summary><fieldset disabled={bound} className="m-0 mt-4 flex flex-col gap-4 border-0 p-0">
           {bound && <p className="m-0 text-[length:var(--text-control)] text-ink-muted">以下设置跟随模板，在模板中修改。</p>}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="名称包含">{id => <Input id={id} placeholder="保留匹配正则的节点" value={group.filter ?? ''} onChange={event => patch({ filter: event.target.value || undefined })} />}</Field>
+            <Field label="名称排除">{id => <Input id={id} placeholder="排除匹配正则的节点" value={group.excludeFilter ?? ''} onChange={event => patch({ excludeFilter: event.target.value || undefined })} />}</Field>
+            <Field label="排除协议">{id => <ExcludeTypeSelect id={id} disabled={bound} value={group.excludeType} onChange={excludeType => patch({ excludeType })} />}</Field>
+          </div>
           <label className="flex items-center gap-2 text-[length:var(--text-control)]"><Switch label="在客户端面板中隐藏" disabled={bound} checked={group.display?.hidden ?? false} onChange={hidden => patch({ display: { ...group.display, hidden } })} />在客户端面板中隐藏</label><div className="grid gap-4 sm:grid-cols-2"><GroupSettingsFields disabled={bound} section="advanced" value={group} onChange={(key, value) => patch({ [key]: value })} /><Field label="图标地址">{id => <Input placeholder={groupPlaceholders.icon} id={id} value={group.display?.icon ?? ''} onChange={e => patch({ display: { ...group.display, icon: e.target.value || undefined } })} />}</Field>
 
           </div>

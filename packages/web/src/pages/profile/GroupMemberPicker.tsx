@@ -10,18 +10,17 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { Popover, PopoverTrigger, PopoverContent } from '../../components/ui/popover.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { BUILTINS, memberLabel } from '../../components/pickers.tsx';
-import { Badge, Button, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
-import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
+import { Badge, Button, Empty, Segmented, Select, cx } from '../../components/ui.tsx';
 import { SearchInput } from '../../components/SearchInput.tsx';
 import { GROUP_TYPE_LABEL } from '../../components/GroupSettingsFields.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, memberKey, nodeSetKey, toggleMember } from './memberModel.ts';
 import { useChainNames } from './useChainNames.ts';
 
-type Props = { group: GroupSpec; members: GroupMember[]; inherited: GroupMember[]; onChange: (members: GroupMember[]) => void; onGroupChange: (patch: Partial<GroupSpec>) => void; readOnlySettings: boolean; advanced?: ReactNode };
+type Props = { group: GroupSpec; members: GroupMember[]; inherited: GroupMember[]; onChange: (members: GroupMember[]) => void; advanced?: ReactNode };
 
 /** 成员编辑集中于会话副本；候选浮层与右侧预览不创建另一套弹窗。 */
-export function GroupMemberPicker({ group, members, inherited, onChange, onGroupChange, readOnlySettings, advanced }: Props) {
+export function GroupMemberPicker({ group, members, inherited, onChange, advanced }: Props) {
   const { draft, setDraft, groups, groupName, nodeSetName, profileNodeSets } = useProfile();
   const [category, setCategory] = useState<'source' | 'node' | 'group' | 'builtin'>('source');
   const [source, setSource] = useState('');
@@ -78,13 +77,6 @@ export function GroupMemberPicker({ group, members, inherited, onChange, onGroup
         <SortableList items={members} onReorder={onChange} renderItem={(m, i, handle) => memberRow(m, i, handle)} />
         {!effective.length && <Empty title="还没有成员" />}
       </section>
-      {previewSets.length > 0 && <section className=""><h3 className="m-0 mb-3 text-[length:var(--text-body)] font-medium">筛选 <span className="ml-2 text-[length:var(--text-caption)] font-normal text-ink-muted">作用于来源成员</span></h3>
-        <fieldset disabled={readOnlySettings} className="m-0 grid gap-3 border-0 p-0 sm:grid-cols-3">
-          <Field label="名称包含">{id => <Input id={id} placeholder="保留匹配正则的节点" value={group.filter ?? ''} onChange={event => onGroupChange({ filter: event.target.value || undefined })} />}</Field>
-          <Field label="名称排除">{id => <Input id={id} placeholder="排除匹配正则的节点" value={group.excludeFilter ?? ''} onChange={event => onGroupChange({ excludeFilter: event.target.value || undefined })} />}</Field>
-          <Field label="排除协议">{id => <ExcludeTypeSelect id={id} disabled={readOnlySettings} value={group.excludeType} onChange={excludeType => onGroupChange({ excludeType })} />}</Field>
-        </fieldset>
-      </section>}
       {advanced}
     </div>
     <MemberPreview effective={effective} sources={previewSets} group={group} memberText={memberText} nodeSetName={nodeSetName} />
