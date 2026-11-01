@@ -485,7 +485,8 @@ th.table-cell-divider {
 .app-sidebar .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 :where(main, [role="dialog"], [data-slot="popover-content"], [role="menu"]) .lucide { stroke-width: 1.75; }
 :where(input, textarea)::placeholder { color: var(--color-faint); }
-[data-slot="select-trigger"], [data-slot="button"] { font-size: var(--text-control); line-height: 20px; box-shadow: none; border-radius: 8px; }
+/* 不在此处清除 box-shadow：聚焦与展开光圈由组件类名提供。 */
+[data-slot="select-trigger"], [data-slot="button"] { font-size: var(--text-control); line-height: 20px; border-radius: 8px; }
 [data-slot="select-trigger"] { height: 36px; }
 [data-slot="select-trigger"][data-placeholder] { color: var(--color-faint); }
 [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="popover-content"] { border-radius: 8px; box-shadow: var(--shadow-float); }
