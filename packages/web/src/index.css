@@ -26,6 +26,9 @@
   --color-neutral-soft: #eef0f3;
   --color-danger-line: #f0b5ae;
   --color-switch-off: #c5cad3;
+  --color-selected: #f5f8ff;
+  --color-selected-line: #c7d3f5;
+  --color-subtle: #fcfcfd;
   --text-display: 24px;
   --text-display--line-height: 32px;
   --text-title: 18px;
@@ -44,6 +47,9 @@
   --color-nav-hover: #22272f;
   --color-nav-active: #2a303a;
   --color-nav-text: #c9ced6;
+  --color-nav-label: #aab3c2;
+  --color-nav-icon: #8995a8;
+  --color-nav-icon-active: #a9c1ff;
   --color-brand: #2952cc;
   --color-accent-strong: #1c3d9e;
   --color-accent-soft: #ebf0fd;
