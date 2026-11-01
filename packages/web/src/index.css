@@ -73,9 +73,12 @@ body {
   font-size: 14px;
 }
 
-:focus-visible:not([data-slot]) {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
+/* 键盘焦点描边只给按钮、链接等；文本输入类控件统一用「品牌色边框 + 3px 浅色光圈」，避免叠加外描边。 */
+@layer base {
+  :focus-visible:not([data-slot]):not(input, textarea, select, [contenteditable]) {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
 }
 
 /* 登录与设计稿保持同一背景，不影响左侧导航。 */

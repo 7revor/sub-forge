@@ -31,14 +31,16 @@ export function Button({ variant = 'default', size = 'md', className, ...p }: Bu
   return <button type="button" {...p} className={buttonClass(variant, size, className)} />;
 }
 
-export const inputCls = 'h-9 w-full rounded-lg border border-control-line bg-panel px-3 text-[length:var(--text-control)] text-ink placeholder:text-faint hover:border-control-hover focus:border-brand focus:outline-none focus:ring-3 focus:ring-brand/15';
+/** 输入类控件共用的聚焦态：品牌色边框 + 3px 浅色光圈。 */
+export const controlFocusCls = 'focus:border-brand focus:outline-none focus:ring-3 focus:ring-brand/15';
+export const inputCls = `h-9 w-full rounded-lg border border-control-line bg-panel px-3 text-[length:var(--text-control)] text-ink placeholder:text-faint transition-[border-color,box-shadow] hover:border-control-hover ${controlFocusCls}`;
 
 export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement> & { placeholder: string }) {
   return <input {...p} className={cx(inputCls, className)} />;
 }
 
 export function Textarea({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { placeholder: string }) {
-  return <textarea {...p} className={cx('w-full rounded-lg border border-control-line bg-panel px-3 py-2 text-[length:var(--text-control)] text-ink', className)} />;
+  return <textarea {...p} className={cx(`w-full rounded-lg border border-control-line bg-panel px-3 py-2 text-[length:var(--text-control)] text-ink placeholder:text-faint transition-[border-color,box-shadow] hover:border-control-hover ${controlFocusCls}`, className)} />;
 }
 
 type DraftProps<E> = { value: string; onCommit: (value: string) => void; placeholder: string } & Omit<E, 'value' | 'onChange'>;

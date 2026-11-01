@@ -4,7 +4,7 @@
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #d5d9e0;
+  border: 1px solid var(--color-control-line);
   border-radius: 8px;
   background: #ffffff;
   font-family: var(--font-mono);
@@ -14,7 +14,7 @@
 
 .yaml-textarea:focus-within {
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 2px var(--color-accent-soft);
+  box-shadow: 0 0 0 3px rgb(41 82 204 / .15);
 }
 
 .yaml-textarea:has(textarea[aria-invalid='true']) { border-color: var(--color-err); }
