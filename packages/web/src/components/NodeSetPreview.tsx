@@ -53,8 +53,10 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
       <div className="max-h-[280px] overflow-y-auto" aria-label={`${label}列表`}>
         {displayedNodes.slice(0, size).map((node, i) => {
           const active = selection ? selectedNodes.has(node) : firstMatch && i === 0;
+          // 自动采用首个节点时只标注「当前采用」，选择框仍留给用户的明确点选。
+          const marked = !!selection && active;
           const content = <>
-            {onSelect && <span className={`flex size-3.5 shrink-0 items-center justify-center border ${multiple ? 'rounded-[2px]' : 'rounded-full'} ${active ? multiple ? 'border-brand bg-brand text-white' : 'border-[4px] border-brand' : 'border-control-line'}`}>{multiple && active && <Check size={11} />}</span>}
+            {onSelect && <span className={`flex size-3.5 shrink-0 items-center justify-center border ${multiple ? 'rounded-[2px]' : 'rounded-full'} ${marked ? multiple ? 'border-brand bg-brand text-white' : 'border-[4px] border-brand' : 'border-control-line'}`}>{multiple && marked && <Check size={11} />}</span>}
             <span className="min-w-0 flex-1 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-[length:var(--text-caption)] text-ink-muted">{node.sourceName}</span>}</span>
             <span className="flex shrink-0 items-center gap-2 text-[length:var(--text-caption)] text-ink-muted">
               {active && <span>{firstMatch ? '当前采用' : '已选'}</span>}
@@ -62,7 +64,7 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
             </span>
           </>;
           const className = 'flex w-full items-center justify-between gap-2.5 rounded-md px-2 py-2.5 text-left text-[length:var(--text-control)] last:border-0';
-          return onSelect ? <button key={`${i}:${node.name}`} type="button" role={multiple ? 'checkbox' : undefined} aria-checked={multiple ? active : undefined} aria-pressed={!multiple && selection ? active : undefined} disabled={multiple && query.data?.truncated} className={`${className} cursor-pointer hover:bg-ground focus-visible:bg-ground ${selection && active ? 'bg-[#F5F8FF]' : ''}`} title={`${multiple ? active ? '取消选择' : '选择' : '仅使用'} ${node.name}`} onClick={() => onSelect(node.name, node.nodeSet, nodes.filter(item => item.name === node.name ? !active : selectedNodes.has(item)).map(item => item.name))}>{content}</button> : <div key={`${i}:${node.name}`} className={className}>{content}</div>;
+          return onSelect ? <button key={`${i}:${node.name}`} type="button" role={multiple ? 'checkbox' : undefined} aria-checked={multiple ? active : undefined} aria-pressed={!multiple && selection ? active : undefined} disabled={multiple && query.data?.truncated} className={`${className} cursor-pointer hover:bg-ground focus-visible:bg-ground ${selection && active ? 'bg-selected' : ''}`} title={`${multiple ? active ? '取消选择' : '选择' : '仅使用'} ${node.name}`} onClick={() => onSelect(node.name, node.nodeSet, nodes.filter(item => item.name === node.name ? !active : selectedNodes.has(item)).map(item => item.name))}>{content}</button> : <div key={`${i}:${node.name}`} className={className}>{content}</div>;
         })}
         {!displayedNodes.length && <Empty variant="plain" title="没有匹配节点" />}
         {size < displayedNodes.length && <Button variant="ghost" className="w-full" onClick={() => setPage({ key, size: size + 100 })}>显示更多（剩余 {displayedNodes.length - size} 个）</Button>}
