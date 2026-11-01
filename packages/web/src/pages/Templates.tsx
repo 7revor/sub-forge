@@ -4,7 +4,7 @@ import { queryUrl } from '@sub-forge/core';
 import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stableStringify, type ReportItem } from '@sub-forge/core';
-import { Info, Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
@@ -229,7 +229,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       {savedWarnings.length > 0 && <Card title="已保存 · 注意事项"><TemplateReport items={savedWarnings} onLocate={locate} /></Card>}
       <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
         {isNew && <Field label="模板名称">{id => <Input id={id} placeholder="填写模板名称" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} />}</Field>}
-        {!isNew && inUse > 0 && <Notice tone="accent" className="px-3.5 py-2.5" actions={<Button variant="ghost" size="sm" className="h-auto p-0 text-accent-ink" disabled={checkImpact.isPending} onClick={() => checkImpact.mutate()}>{checkImpact.isPending ? '检查中…' : '检查影响'}</Button>}><span className="flex items-start gap-2.5"><Info size={16} className="mt-0.5 shrink-0" />保存后会同步到 {inUse} 个跟随的订阅。删除仍被订阅引用的组会被阻止。</span></Notice>}
+        {!isNew && inUse > 0 && <Notice tone="accent" actions={<Button variant="ghost" size="sm" className="h-auto p-0 text-accent-ink" disabled={checkImpact.isPending} onClick={() => checkImpact.mutate()}>{checkImpact.isPending ? '检查中…' : '检查影响'}</Button>}>保存后会同步到 {inUse} 个跟随的订阅。删除仍被订阅引用的组会被阻止。</Notice>}
         <TemplateGroupsEditor value={body} onChange={updateBody} report={report} />
         <TemplateRulesEditor importedUrls={importedUrls} value={body} onChange={updateBody} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>

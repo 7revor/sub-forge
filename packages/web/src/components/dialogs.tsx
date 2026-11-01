@@ -22,7 +22,7 @@ export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref:
           const isAdded = added.some((a) => same(a, o.ref));
           const on = picked.some((p) => same(p, o.ref));
           return (
-            <label key={nodeSetKey(o.ref)} className={`flex items-center gap-2.5 border-b border-line-2 px-3 py-2.5 last:border-0 ${isAdded ? 'text-faint' : on ? 'cursor-pointer bg-[#F5F8FF]' : 'cursor-pointer hover:bg-ground'}`}>
+            <label key={nodeSetKey(o.ref)} className={`flex items-center gap-2.5 border-b border-line-2 px-3 py-2.5 last:border-0 ${isAdded ? 'text-faint' : on ? 'cursor-pointer bg-selected' : 'cursor-pointer hover:bg-ground'}`}>
               <input type="checkbox" className="size-4 shrink-0 accent-brand" disabled={isAdded} checked={on || isAdded} onChange={(e) => setPicked(e.target.checked ? [...picked, o.ref] : picked.filter((p) => !same(p, o.ref)))} />
               <span className="min-w-0 flex-1 truncate text-[length:var(--text-control)] font-medium">{o.name}</span>
               <span className="text-[length:var(--text-caption)] text-ink-muted">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>

@@ -9,7 +9,7 @@ import { Plus } from 'lucide-react';
 import { notifySuccess } from '../feedback.ts';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
 import { MultiSelect } from '../components/listbox.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, PendingNotice, Select, Segmented, Switch, listMono, listTd, listTh, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Segmented, Switch, listMono, listTd, listTh, cx } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
 import { ListActions } from '../components/ListActions.tsx';
 
@@ -65,12 +65,10 @@ export function Users() {
               })}
             </tbody>
           </table>
-          {stats.data?.pending && <p className="mx-4 my-3 text-[length:var(--text-caption)] text-ink-muted">统计暂不可用。</p>}
         </Card>
 
         <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}
-          actions={<Button onClick={async () => { const result = await ShareModal.show({ sources: sources.data ?? [], collections: collections.data ?? [], users: list.filter(u => u.id !== me?.id) }); if (result.status === 'confirmed') { notifySuccess('共享已添加'); void qc.invalidateQueries({ queryKey: ['shares'] }); } }}>共享…</Button>}>
-          {shares.data?.pending && <div className="mb-3"><PendingNotice>共享暂不可用。</PendingNotice></div>}
+          actions={<Button disabled={!!shares.data?.pending} onClick={async () => { const result = await ShareModal.show({ sources: sources.data ?? [], collections: collections.data ?? [], users: list.filter(u => u.id !== me?.id) }); if (result.status === 'confirmed') { notifySuccess('共享已添加'); void qc.invalidateQueries({ queryKey: ['shares'] }); } }}>共享…</Button>}>
           <div className="flex flex-col">
             {(shares.data?.items ?? []).map((x) => (
               <div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
@@ -78,7 +76,7 @@ export function Users() {
                 <span className="text-[length:var(--text-control)] text-ink-muted">共享给：{x.to.map(nameOf).join('、') || '—'}</span>
               </div>
             ))}
-            {!shares.data?.items.length && <Empty title="还没有共享" />}
+            {!shares.data?.items.length && <Empty title={shares.data?.pending ? '共享功能暂未开放' : '还没有共享'} />}
           </div>
         </Card>
 

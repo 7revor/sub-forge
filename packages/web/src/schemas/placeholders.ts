@@ -60,5 +60,6 @@ export const groupPlaceholders = {
  * https://wiki.metacubex.one/config/proxies/dialer-proxy/
  */
 export const chainPlaceholders = {
-  viaFilter: '全部',
+  viaFilter: '按名称正则筛选，留空用全部',
+  landingFilter: '按名称正则筛选，留空用全部',
 } as const;

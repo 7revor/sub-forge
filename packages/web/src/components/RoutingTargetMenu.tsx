@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadio
 
 type TargetOption = { value: string; label: string; group?: string };
 
-/** 卡片出口：固定宽度文字和箭头，使用菜单选择，不绘制表单输入框。 */
+/** 卡片出口：文字区固定 84px（约「🚀 节点选择」宽度），箭头紧随其后并逐行对齐；使用菜单选择，不绘制表单输入框。 */
 export function RoutingTargetMenu({ value, options, onChange, label, placeholder, restoreFocus = true }: {
   value: string; options: TargetOption[]; onChange: (value: string) => void; label: string; placeholder: string; restoreFocus?: boolean;
 }) {
@@ -25,8 +25,8 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
   }, []);
   return <DropdownMenu onOpenChange={open => { if (!open) setSearch(''); }}>
     <DropdownMenuTrigger asChild><button type="button" aria-label={label} title={selected?.label ?? placeholder}
-      className="flex h-8 w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-transparent pr-1.5 pl-3 text-left text-[length:var(--text-control)] transition-colors hover:bg-ground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
-      <span className={cx('min-w-0 flex-1 truncate', !selected && 'text-ink-muted')}>{selected?.label ?? placeholder}</span>
+      className="flex h-8 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-transparent pr-1.5 pl-3 text-left text-[length:var(--text-control)] transition-colors hover:bg-ground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+      <span className={cx('w-[84px] min-w-0 flex-none truncate', !selected && 'text-ink-muted')}>{selected?.label ?? placeholder}</span>
       <ChevronDown size={14} className="shrink-0 text-faint" aria-hidden />
     </button></DropdownMenuTrigger>
     <DropdownMenuContent onCloseAutoFocus={event => {

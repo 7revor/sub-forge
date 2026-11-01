@@ -26,6 +26,9 @@
   --color-neutral-soft: #eef0f3;
   --color-danger-line: #f0b5ae;
   --color-switch-off: #c5cad3;
+  --color-selected: #f5f8ff;
+  --color-selected-line: #c7d3f5;
+  --color-subtle: #fcfcfd;
   --text-display: 24px;
   --text-display--line-height: 32px;
   --text-title: 18px;
@@ -44,6 +47,9 @@
   --color-nav-hover: #22272f;
   --color-nav-active: #2a303a;
   --color-nav-text: #c9ced6;
+  --color-nav-label: #aab3c2;
+  --color-nav-icon: #8995a8;
+  --color-nav-icon-active: #a9c1ff;
   --color-brand: #2952cc;
   --color-accent-strong: #1c3d9e;
   --color-accent-soft: #ebf0fd;
@@ -73,9 +79,12 @@ body {
   font-size: 14px;
 }
 
-:focus-visible:not([data-slot]) {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
+/* 键盘焦点描边只给按钮、链接等；文本输入类控件统一用「品牌色边框 + 3px 浅色光圈」，避免叠加外描边。 */
+@layer base {
+  :focus-visible:not([data-slot]):not(input, textarea, select, [contenteditable]) {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
 }
 
 /* 登录与设计稿保持同一背景，不影响左侧导航。 */
@@ -357,6 +366,11 @@ th.table-cell-divider {
   pointer-events: none;
 }
 
+/* 表格紧接分页栏时，末行底线与分页栏顶线重合，只保留分页栏这一条。 */
+:has(+ .list-pagination) tbody > tr:last-child > .table-cell-divider::after {
+  display: none;
+}
+
 /* 表格工具栏、分页栏与加载状态栏的分隔线同样顶格。 */
 .table-panel-divider,
 .table-panel-divider-bottom {
@@ -471,7 +485,8 @@ th.table-cell-divider {
 .app-sidebar .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 :where(main, [role="dialog"], [data-slot="popover-content"], [role="menu"]) .lucide { stroke-width: 1.75; }
 :where(input, textarea)::placeholder { color: var(--color-faint); }
-[data-slot="select-trigger"], [data-slot="button"] { font-size: var(--text-control); line-height: 20px; box-shadow: none; border-radius: 8px; }
+/* 不在此处清除 box-shadow：聚焦与展开光圈由组件类名提供。 */
+[data-slot="select-trigger"], [data-slot="button"] { font-size: var(--text-control); line-height: 20px; border-radius: 8px; }
 [data-slot="select-trigger"] { height: 36px; }
 [data-slot="select-trigger"][data-placeholder] { color: var(--color-faint); }
 [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="popover-content"] { border-radius: 8px; box-shadow: var(--shadow-float); }
