@@ -6,6 +6,7 @@ import { NODE_SET_LABEL, sameNodeSet as same, nodeSetKey } from '../domain/nodeS
 import type { NodeSetID } from '@sub-forge/core';
 import { Button, Empty } from './ui.tsx';
 import { SearchInput } from './SearchInput.tsx';
+import { Checkbox } from './ui/checkbox.tsx';
 
 /** 搜索 + 多选；已加入的置灰，不能自选（如组合不能加入自己） */
 export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref: NodeSetID; name: string }[]; added: NodeSetID[]; hint?: string }, NodeSetID[]>(function NodeSetModal({ data: { title = '添加节点来源', options, added, hint }, modal }) {
@@ -23,7 +24,7 @@ export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref:
           const on = picked.some((p) => same(p, o.ref));
           return (
             <label key={nodeSetKey(o.ref)} className={`flex items-center gap-2.5 border-b border-border px-3 py-2.5 last:border-0 ${isAdded ? 'text-muted-foreground' : on ? 'cursor-pointer bg-primary/5' : 'cursor-pointer hover:bg-accent'}`}>
-              <input type="checkbox" className="size-4 shrink-0 accent-primary" disabled={isAdded} checked={on || isAdded} onChange={(e) => setPicked(e.target.checked ? [...picked, o.ref] : picked.filter((p) => !same(p, o.ref)))} />
+              <Checkbox disabled={isAdded} checked={on || isAdded} onCheckedChange={(value) => setPicked(value === true ? [...picked, o.ref] : picked.filter((p) => !same(p, o.ref)))} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{o.name}</span>
               <span className="text-xs text-muted-foreground">{isAdded ? '已加入' : NODE_SET_LABEL[o.ref.type]}</span>
             </label>

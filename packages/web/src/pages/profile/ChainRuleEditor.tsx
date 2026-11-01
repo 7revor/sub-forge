@@ -1,5 +1,4 @@
 import { useModalDraft } from '../../modals/index.tsx';
-import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { chainSources, type ChainRule, type ChainNodeSet, type ChainTarget } from '@sub-forge/core';
@@ -10,6 +9,7 @@ import { Button, Field, Input, Select } from '../../components/ui.tsx';
 import { chainPlaceholders } from '../../schemas/placeholders.ts';
 import { useProfile } from './context.ts';
 import { chainInputError, exactNodeFilter, selectedNodeFilter, nodeSetKey, sameLanding } from './memberModel.ts';
+import { SelectIndicator } from '../../components/SelectIndicator.tsx';
 
 type SourceKind = 'inline' | 'provider';
 const emptySet: ChainNodeSet = { type: 'source', id: '' };
@@ -83,7 +83,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
 function ChoiceRow({ checked, label, radio = false, onClick }: { checked: boolean; label: string; radio?: boolean; onClick: () => void }) {
   return <button type="button" role={radio ? 'radio' : 'checkbox'} aria-checked={checked} onClick={onClick}
     className={`flex min-h-10 w-full shrink-0 cursor-pointer items-center gap-2.5 border-b border-border px-3 py-2 text-left text-sm ${checked ? 'bg-primary/5' : 'hover:bg-muted'}`}>
-    <span className={`flex size-3.5 shrink-0 items-center justify-center border ${radio ? 'rounded-full' : 'rounded-[2px]'} ${checked ? radio ? 'border-[4px] border-primary' : 'border-primary bg-primary text-white' : 'border-input'}`}>{!radio && checked && <Check size={11} />}</span>
+    <SelectIndicator checked={checked} multiple={!radio} />
     <span className="min-w-0 truncate">{label}</span>
   </button>;
 }

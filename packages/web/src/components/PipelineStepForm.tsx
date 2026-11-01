@@ -9,6 +9,9 @@ import { RoutingCard } from './RoutingCard.tsx';
 import { SortableList } from './SortableList.tsx';
 import { patternHits, regexError, renameHits, setFieldsError, updateSetField } from './pipelineForm.ts';
 import { Button, DraftInput, DraftTextarea, Empty, Input, Select, cx } from './ui.tsx';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group.tsx';
+import { Label } from './ui/label.tsx';
+import { Checkbox } from './ui/checkbox.tsx';
 
 const lbl = 'text-sm font-medium text-muted-foreground';
 const hint = 'text-xs leading-relaxed text-muted-foreground';
@@ -39,12 +42,12 @@ function ChoiceField<T extends string>({ label, value, options, onChange }: {
   const name = useId();
   return <fieldset className="m-0 min-w-0 border-0 p-0">
     <legend className="mb-2 text-sm font-medium text-muted-foreground">{label}</legend>
-    <div className="flex flex-wrap gap-x-6 gap-y-2">
-      {options.map(option => <label key={option.value} className="flex min-h-8 cursor-pointer items-center gap-2 text-sm text-foreground">
-        <input type="radio" name={name} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} className="accent-primary" />
+    <RadioGroup name={name} value={value} onValueChange={next => onChange(next as typeof value)} className="flex flex-wrap gap-x-6 gap-y-2">
+      {options.map(option => <Label key={option.value} className="min-h-8 cursor-pointer font-normal">
+        <RadioGroupItem value={option.value} />
         {option.label}
-      </label>)}
-    </div>
+      </Label>)}
+    </RadioGroup>
   </fieldset>;
 }
 
@@ -123,13 +126,13 @@ function TypeFilterForm({ step, onChange }: { step: Extract<OperatorStep, { op: 
       <legend className="mb-2 text-sm font-medium text-muted-foreground">协议类型（至少选一个）</legend>
       {[...new Set([...PROTOCOLS, ...step.types])].map((type) => {
         const on = step.types.includes(type);
-        return <label key={type} className={cx('flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 font-mono text-sm', on ? 'border-primary font-medium text-primary' : 'border-border')}>
-          <input type="checkbox" checked={on} onChange={(e) => {
-            const types = e.target.checked ? [...step.types, type] : step.types.filter((v) => v !== type);
+        return <Label key={type} className="h-9 cursor-pointer font-mono font-normal">
+          <Checkbox checked={on} onCheckedChange={(value) => {
+            const types = value === true ? [...step.types, type] : step.types.filter((v) => v !== type);
             if (!types.length) { alertError('至少选择一个协议类型'); return; }
             onChange({ ...step, types });
           }} />{type.toUpperCase()}
-        </label>;
+        </Label>;
       })}
     </fieldset>
 

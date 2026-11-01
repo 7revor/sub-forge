@@ -1,4 +1,3 @@
-import { Check } from 'lucide-react';
 import { useState } from 'react';
 import type { NodeRef, NodeSetID } from '@sub-forge/core';
 import { useQueries } from '@tanstack/react-query';
@@ -6,6 +5,7 @@ import { nodeListOptions } from '../hooks.ts';
 import { useModalPresentation } from '../modals/index.tsx';
 import { filterNodes, resolveRef } from './nodeMatch.ts';
 import { Button, Empty } from './ui.tsx';
+import { SelectIndicator } from './SelectIndicator.tsx';
 
 /** 预览与最终输出共用正则语义；留空包含全部节点，点选只缩小当前草稿范围。 */
 export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label = '节点', firstMatch = false, selection, multiple = false, search, onSelect }: {
@@ -56,7 +56,7 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
           // 自动采用首个节点时只标注「当前采用」，选择框仍留给用户的明确点选。
           const marked = !!selection && active;
           const content = <>
-            {onSelect && <span className={`flex size-3.5 shrink-0 items-center justify-center border ${multiple ? 'rounded-[2px]' : 'rounded-full'} ${marked ? multiple ? 'border-primary bg-primary text-white' : 'border-[4px] border-primary' : 'border-input'}`}>{multiple && marked && <Check size={11} />}</span>}
+            {onSelect && <SelectIndicator checked={marked} multiple={multiple} />}
             <span className="min-w-0 flex-1 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-xs text-muted-foreground">{node.sourceName}</span>}</span>
             <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               {active && <span>{firstMatch ? '当前采用' : '已选'}</span>}

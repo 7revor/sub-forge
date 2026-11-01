@@ -317,68 +317,11 @@ body {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--muted);
+  background: var(--card);
 }
 
 .list-table td {
   overflow-wrap: anywhere;
-}
-
-/* 共享单元格分隔线：保留边框占位，顶格贯通表格两侧；首尾内容仍保留 24px 留白。 */
-.table-cell-divider {
-  position: relative;
-  border-bottom: 1px solid transparent;
-  --table-divider-color: var(--border);
-}
-
-th.table-cell-divider {
-  --table-divider-color: var(--border);
-}
-
-.table-cell-divider::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 1px;
-  background: var(--table-divider-color);
-  pointer-events: none;
-}
-
-/* 表格紧接分页栏时，末行底线与分页栏顶线重合，只保留分页栏这一条。 */
-:has(+ .list-pagination) tbody > tr:last-child > .table-cell-divider::after {
-  display: none;
-}
-
-/* 表格工具栏、分页栏与加载状态栏的分隔线同样顶格。 */
-.table-panel-divider,
-.table-panel-divider-bottom {
-  position: relative;
-  border-top: 1px solid transparent;
-}
-
-.table-panel-divider::before,
-.table-panel-divider-bottom::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 1px;
-  background: var(--border);
-  pointer-events: none;
-}
-
-.table-panel-divider-bottom {
-  border-top: 0;
-  border-bottom: 1px solid transparent;
-}
-
-.table-panel-divider-bottom::before {
-  top: auto;
-  bottom: 0;
-  background: var(--border);
 }
 
 @theme inline {
@@ -419,6 +362,8 @@ th.table-cell-divider {
 }
 @layer base {
   * { @apply border-border outline-ring/50; }
+  /* 与 shadcn TableBody 一致：末行不画底线。 */
+  tbody > tr:last-child > * { border-bottom-width: 0; }
 }
 
 /* Sidebar 沿用品牌深色导航，主题只作用于侧栏。 */
@@ -477,5 +422,4 @@ section > div > ol > li:last-child > section > div:last-child > [data-routing-ca
 .chain-node-panel [aria-label$="列表"] { flex: 1; max-height: none; }
 .chain-node-panel [aria-label$="列表"] > button { border-top: 1px solid var(--border); border-radius: 0; min-height: 40px; padding: 8px 12px; }
 
-/* 设计画板的表格使用字体自然行高，避免一行数据累计多出 4px。 */
-.list-table th, .list-table td { line-height: normal; }
+

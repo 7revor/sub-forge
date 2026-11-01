@@ -16,6 +16,7 @@ import { GROUP_TYPE_LABEL } from '../../components/GroupSettingsFields.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, memberKey, nodeSetKey, toggleMember } from './memberModel.ts';
 import { useChainNames } from './useChainNames.ts';
+import { Checkbox } from '../../components/ui/checkbox.tsx';
 
 type Props = { group: GroupSpec; members: GroupMember[]; inherited: GroupMember[]; onChange: (members: GroupMember[]) => void; advanced?: ReactNode };
 
@@ -41,7 +42,7 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
   const candidate = (member: GroupMember, title: string, subtitle?: string, disabled = false) => {
     const key = memberKey(member), locked = inheritedKeys.has(key), checked = locked || selectedKeys.has(key);
     return <label key={key} className={cx('flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-accent', checked && 'bg-primary/10', (locked || disabled) && 'cursor-not-allowed')}>
-      <input type="checkbox" aria-label={`选择${title}`} checked={checked} disabled={locked || disabled} className="size-4 shrink-0 accent-primary" onChange={event => choose(member, event.target.checked)} />
+      <Checkbox aria-label={`选择${title}`} checked={checked} disabled={locked || disabled} onCheckedChange={value => choose(member, value === true)} />
       <span className="min-w-0 flex-1"><span className="block truncate">{title}</span>{subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}</span>{locked && <LockKeyhole size={14} className="text-muted-foreground" />}
     </label>;
   };

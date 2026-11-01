@@ -1,8 +1,17 @@
-// 基础组件：按设计稿的配色与尺寸（触控目标 ≥ 36–44px）。
+// 基础组件：直接使用 shadcn/ui 组件，只做业务所需的薄包装（必填 placeholder、tone 映射等），不覆盖其默认样式。
 
 import { useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import type { ReportItem } from '@sub-forge/core';
 import { cn } from 'cn';
+import { Button as ShadcnButton, buttonVariants } from './ui/button.tsx';
+import { Input as ShadcnInput } from './ui/input.tsx';
+import { Textarea as ShadcnTextarea } from './ui/textarea.tsx';
+import { Label } from './ui/label.tsx';
+import { Badge as ShadcnBadge } from './ui/badge.tsx';
+import { Switch as ShadcnSwitch } from './ui/switch.tsx';
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group.tsx';
+import { Card as ShadcnCard, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card.tsx';
+import { Alert, AlertDescription } from './ui/alert.tsx';
 
 export { ErrorAlert } from './FeedbackHost.tsx';
 export { Empty } from './Empty.tsx';
@@ -11,36 +20,24 @@ export { Select, Combobox, type SelectProps, type ComboOption } from './listbox.
 import { cx } from './cx.ts';
 
 type BtnVariant = 'primary' | 'default' | 'danger' | 'danger-solid' | 'ghost';
-const BTN: Record<BtnVariant, string> = {
-  primary: 'bg-primary border-primary text-white hover:bg-primary/90',
-  default: 'bg-card border-input text-foreground hover:bg-muted',
-  danger: 'bg-card border-destructive/40 text-destructive hover:bg-destructive/10',
-  'danger-solid': 'bg-destructive border-destructive text-white hover:bg-[#912018]',
-  ghost: 'bg-transparent border-transparent text-muted-foreground hover:bg-muted',
-};
+/** 业务语义 → shadcn 变体；danger 为描边按钮加危险色文字，其余完全沿用 shadcn。 */
+const VARIANT = { primary: 'default', default: 'outline', danger: 'outline', 'danger-solid': 'destructive', ghost: 'ghost' } as const;
+const SIZE = { sm: 'sm', md: 'default' } as const;
 
 /** 按钮样式；链接需要长得像按钮时（如表格行的「编辑」）也用它 */
-export const buttonClass = (variant: BtnVariant = 'default', size: 'sm' | 'md' = 'md', className?: string) => cn(
-  'inline-flex items-center justify-center gap-1.5 rounded-lg border font-medium whitespace-nowrap no-underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
-  size === 'sm' ? 'h-7 rounded-md px-2.5 text-xs' : 'h-9 px-3.5 text-sm',
-  BTN[variant],
-  className,
-);
+export const buttonClass = (variant: BtnVariant = 'default', size: 'sm' | 'md' = 'md', className?: string) =>
+  cn(buttonVariants({ variant: VARIANT[variant], size: SIZE[size] }), variant === 'danger' && 'text-destructive hover:text-destructive', className);
 
-export function Button({ variant = 'default', size = 'md', className, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: 'sm' | 'md' }) {
-  return <button type="button" {...p} className={buttonClass(variant, size, className)} />;
+export function Button({ variant = 'default', size = 'md', className, type = 'button', ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: 'sm' | 'md' }) {
+  return <ShadcnButton type={type} {...p} variant={VARIANT[variant]} size={SIZE[size]} className={cn(variant === 'danger' && 'text-destructive hover:text-destructive', className)} />;
 }
 
-/** 输入类控件共用的聚焦态：品牌色边框 + 3px 浅色光圈。 */
-export const controlFocusCls = 'focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/15';
-export const inputCls = `h-9 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground transition-[border-color,box-shadow]  ${controlFocusCls}`;
-
-export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement> & { placeholder: string }) {
-  return <input {...p} className={cx(inputCls, className)} />;
+export function Input(p: InputHTMLAttributes<HTMLInputElement> & { placeholder: string }) {
+  return <ShadcnInput {...p} />;
 }
 
-export function Textarea({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { placeholder: string }) {
-  return <textarea {...p} className={cx(`w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-[border-color,box-shadow]  ${controlFocusCls}`, className)} />;
+export function Textarea(p: TextareaHTMLAttributes<HTMLTextAreaElement> & { placeholder: string }) {
+  return <ShadcnTextarea {...p} />;
 }
 
 type DraftProps<E> = { value: string; onCommit: (value: string) => void; placeholder: string } & Omit<E, 'value' | 'onChange'>;
@@ -68,10 +65,10 @@ export function DraftTextarea({ value, onCommit, onBlur, ...p }: DraftProps<Text
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: (id: string) => ReactNode; className?: string }) {
   const id = useId();
   return (
-    <div className={cx('flex min-w-0 flex-col gap-1.5', className)}>
-      <label htmlFor={id} className="text-sm font-medium text-muted-foreground">{label}</label>
+    <div className={cx('flex min-w-0 flex-col gap-2', className)}>
+      <Label htmlFor={id}>{label}</Label>
       {children(id)}
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+      {hint && <p className="m-0 text-sm text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -83,64 +80,41 @@ export function PageScroll({ children, className, contained = false }: { childre
 
 export function Card({ title, count, subtitle, description, actions, children, className, bodyClass, scroll = false }: { title?: ReactNode; count?: number; subtitle?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; scroll?: boolean }) {
   const panel = (
-    <section className={cx('rounded-xl border border-border bg-card', className)}>
-      {(title || actions) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <div className="flex min-w-0 flex-col gap-0.5">{typeof title === 'string' ? <h2 className="m-0 text-base font-semibold">{title}{count !== undefined && <span className="ml-1 text-xs font-normal text-muted-foreground">{count}</span>}</h2> : title}{subtitle && <span className="text-sm text-muted-foreground">{subtitle}</span>}</div>
-          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-        </div>
-      )}
-      <div className={bodyClass ?? 'px-5 pb-5'}>
-        {description && <p className="m-0 mb-4 text-sm leading-relaxed text-muted-foreground">{description}</p>}
+    <ShadcnCard className={className}>
+      {(title || actions) && <CardHeader>
+        {title && <CardTitle>{title}{count !== undefined && <span className="ml-1.5 text-sm font-normal text-muted-foreground">{count}</span>}</CardTitle>}
+        {subtitle && <CardDescription>{subtitle}</CardDescription>}
+        {actions && <CardAction className="flex flex-wrap gap-2">{actions}</CardAction>}
+      </CardHeader>}
+      <CardContent className={bodyClass}>
+        {description && <p className="m-0 mb-4 text-sm text-muted-foreground">{description}</p>}
         {children}
-      </div>
-    </section>
+      </CardContent>
+    </ShadcnCard>
   );
   return scroll ? <PageScroll>{panel}</PageScroll> : panel;
 }
 
 type Tone = 'ok' | 'warn' | 'err' | 'accent' | 'neutral';
-const TONE: Record<Tone, string> = {
-  ok: 'bg-ok-soft text-ok',
-  warn: 'bg-warn-soft text-warn',
-  err: 'bg-destructive/10 text-destructive',
-  accent: 'bg-primary/10 text-primary',
-  neutral: 'bg-secondary text-foreground',
-};
+/** 状态色是 shadcn 未内置的唯一扩展：成功 / 告警使用浅底语义色，其余映射到 shadcn Badge 变体。 */
+const TONE_VARIANT = { ok: 'outline', warn: 'outline', err: 'destructive', accent: 'default', neutral: 'secondary' } as const;
+const TONE_CLASS: Partial<Record<Tone, string>> = { ok: 'border-transparent bg-ok-soft text-ok', warn: 'border-transparent bg-warn-soft text-warn' };
 
 export function Badge({ tone = 'neutral', children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
-  return <span className={cx('inline-flex items-center gap-1 h-[22px] rounded-full px-2 text-xs font-medium whitespace-nowrap', TONE[tone], className)}>{children}</span>;
+  return <ShadcnBadge variant={TONE_VARIANT[tone]} className={cn(TONE_CLASS[tone], className)}>{children}</ShadcnBadge>;
 }
 
 export function Segmented<T extends string>({ value, options, onChange, label, size = 'md', fullWidth = false }: {
   value: T; options: { value: T; label: string; disabled?: boolean; title?: string }[]; onChange: (v: T) => void; label: string; size?: 'sm' | 'md'; fullWidth?: boolean;
 }) {
-  return (
-    <div role="group" aria-label={label} className={cx("inline-flex max-w-full gap-0.5 self-start rounded-lg bg-secondary p-[3px]", fullWidth ? "w-full" : "w-fit")}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={o.value === value}
-          disabled={o.disabled}
-          title={o.title}
-          onClick={() => onChange(o.value)}
-          className={cx('rounded-md cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', fullWidth && 'min-w-0 flex-1', size === 'sm' ? 'h-[22px] px-2 text-xs' : 'h-[30px] px-3 text-sm', o.value === value ? 'bg-card font-medium shadow-[0_1px_2px_rgba(20,23,28,.08)]' : 'text-muted-foreground')}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <ToggleGroup type="single" variant="outline" size={size === 'sm' ? 'sm' : 'default'} aria-label={label} value={value}
+    onValueChange={next => { if (next) onChange(next as T); }} className={cn('self-start', fullWidth && 'w-full')}>
+    {options.map(o => <ToggleGroupItem key={o.value} value={o.value} disabled={o.disabled} title={o.title} aria-label={o.label} className={cn('px-3', fullWidth && 'flex-1')}>{o.label}</ToggleGroupItem>)}
+  </ToggleGroup>;
 }
 
 export function Switch({ checked, onChange, label, disabled = false }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
-  return (
-    <button type="button" role="switch" disabled={disabled} aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
-      className={cx('relative h-5 w-9 shrink-0 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', checked ? 'bg-primary' : 'bg-input')}>
-      <span className={cx('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left]', checked ? 'left-[18px]' : 'left-0.5')} />
-    </button>
-  );
+  return <ShadcnSwitch checked={checked} onCheckedChange={onChange} aria-label={label} disabled={disabled} />;
 }
 
 export function PageHeader({ title, subtitle, crumbs, actions, children }: { title: ReactNode; subtitle?: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
@@ -164,7 +138,7 @@ export function PageHeader({ title, subtitle, crumbs, actions, children }: { tit
 /** 随输入变化的字段诊断，避免每次按键打断用户。 */
 export function FieldError({ error }: { error: unknown }) {
   if (!error) return null;
-  return <div role="alert" className="rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</div>;
+  return <Alert variant="destructive"><AlertDescription>{error instanceof Error ? error.message : String(error)}</AlertDescription></Alert>;
 }
 
 /** 渲染报告条目列表；定位入口保持为可键盘操作的按钮。 */
@@ -211,18 +185,16 @@ export function ReportList({ items, onLocate, canLocate = () => true, showWhere 
 }
 
 export const mono = 'font-mono';
-/** 表格首尾内容保留 24px 留白，分隔线顶格贯通。 */
-export const th = 'table-cell-divider first:pl-5 last:pr-5 px-3 py-2.5 bg-muted text-left text-xs font-medium whitespace-nowrap text-muted-foreground';
-export const td = 'table-cell-divider first:pl-5 last:pr-5 px-3 py-2.5 align-middle text-sm';
-/** 侧边栏入口列表页的统一表格尺寸：表头 12px、单元格 13.5px、左右 14px，带 32px 行操作时行高 57px。 */
+/** 与 shadcn TableHead / TableCell 一致；首尾列补足卡片内边距，行分隔线由单元格底边提供（末行由 base 层去除）。 */
+export const th = 'h-10 border-b px-2 first:pl-6 last:pr-6 text-left align-middle font-medium whitespace-nowrap text-foreground';
+export const td = 'border-b p-2 first:pl-6 last:pr-6 align-middle';
 export const listTh = th;
-export const listTd = 'table-cell-divider first:pl-5 last:pr-5 px-3 py-2.5 align-middle text-sm';
-/** 列表中的数字、路径等等宽内容统一 13px。 */
-export const listMono = 'font-mono text-sm';
+export const listTd = td;
+export const listMono = 'font-mono';
 
 export { formatTime, formatBytes } from '../utils/format.ts';
 
 /** 服务端尚未实现的功能：界面已就位，操作会被服务端拒绝（501） */
 export function PendingNotice({ children }: { children: ReactNode }) {
-  return <div role="note" className="rounded-xl border border-dashed border-input bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">{children}</div>;
+  return <Alert role="note"><AlertDescription>{children}</AlertDescription></Alert>;
 }

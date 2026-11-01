@@ -29,7 +29,7 @@ function RepositoryFileLoading({ failed }: { failed: boolean }) {
     <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
       <ListTable label="规则文件" columns={FILE_COLUMNS}>{!failed && <ListTableLoading columns={FILE_COLUMNS.length} rowHeight={45} />}</ListTable>
     </div>
-    <div role="status" className="shrink-0 table-panel-divider px-3 py-2 text-center text-xs text-muted-foreground">{failed ? '仓库加载失败，无法读取文件列表。' : '正在加载…'}</div>
+    <div role="status" className="shrink-0 border-t px-3 py-2 text-center text-xs text-muted-foreground">{failed ? '仓库加载失败，无法读取文件列表。' : '正在加载…'}</div>
   </>;
 }
 
@@ -102,7 +102,7 @@ export function RuleRepoPage() {
     {ruleset && <div className="text-sm text-muted-foreground">点击文件查看源文件；添加来源请返回增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-primary">返回增强集合</Link></div>}
     <ErrorAlert error={repos.error} />
     <section aria-label="规则文件列表" className="mb-5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex shrink-0 flex-wrap items-center gap-3 table-panel-divider-bottom px-5 py-4">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-5 py-4">
         <h2 className="m-0 text-base font-semibold">规则文件</h2>
         <span role="status" className="text-xs text-muted-foreground">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">

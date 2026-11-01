@@ -9,6 +9,8 @@ import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHe
 import { useProfile } from './context.ts';
 import { boundTemplateId, persistedProfile } from './routing.ts';
 import { associationRequirements, inferAssociationMapping } from './associationModel.ts';
+import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group.tsx';
+import { Label } from '../../components/ui/label.tsx';
 
 type Conversion = { item: ProfileDoc; changes: string[] };
 type AssociationMode = 'bound' | 'copy' | 'detach';
@@ -44,10 +46,10 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
   return <ModalContent className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[520px]">
     <ModalHeader className="px-6 pt-5 pb-4"><ModalTitle>更换分流方式</ModalTitle><ModalDescription>只改动策略组与规则；节点来源和代理链保持不变</ModalDescription></ModalHeader>
     <div className="flex min-h-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
-      <div role="radiogroup" aria-label="分流方式" className="flex flex-col gap-2">{MODES.filter(m => m.value !== 'detach' || currentId).map(m => <label key={m.value} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${mode === m.value ? 'border-primary bg-primary/10' : 'border-border'}`}>
-        <input type="radio" name="association-mode" checked={mode === m.value} onChange={() => setMode(m.value)} className="mt-1 accent-primary" />
-        <span><span className="block text-sm font-medium">{m.title}</span><span className="text-xs text-muted-foreground">{m.detail}</span></span>
-      </label>)}</div>
+      <RadioGroup aria-label="分流方式" value={mode} onValueChange={value => setMode(value as typeof mode)} className="gap-4">{MODES.filter(m => m.value !== 'detach' || currentId).map(m => <Label key={m.value} className="cursor-pointer items-start font-normal">
+        <RadioGroupItem value={m.value} className="mt-0.5" />
+        <span className="grid gap-1"><span className="font-medium">{m.title}</span><span className="text-muted-foreground">{m.detail}</span></span>
+      </Label>)}</RadioGroup>
       {mode !== 'detach' && <Field label="模板">{id => <Select id={id} value={selected} placeholder="选择用于订阅的规则模板" onChange={event => { setSelected(event.target.value); setMapping({}); }}>
         {(templates.data ?? []).map(t => <option key={t.id} value={t.id}>{t.name} · {t.groups.length} 个策略组 · {t.rules.length} 条规则</option>)}
       </Select>}</Field>}
