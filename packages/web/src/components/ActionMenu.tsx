@@ -8,7 +8,7 @@ export type MenuAction = { label: string; onSelect: () => void; disabled?: boole
 export function ActionMenu({ label = '更多操作', items, children, size = 'sm' }: { label?: string; items?: MenuAction[]; children?: ReactNode; size?: 'sm' | 'md' }) {
   const [open, setOpen] = useState(false);
   return <DropdownMenu open={open} onOpenChange={setOpen}>
-    <DropdownMenuTrigger asChild><Button size={size} variant={size === 'md' ? 'default' : 'ghost'} className={size === 'md' ? 'w-9 px-0' : 'w-7 px-0'} aria-label={label} title={label}><MoreHorizontal size={16} /></Button></DropdownMenuTrigger>
+    <DropdownMenuTrigger asChild><Button size={size === 'md' ? 'icon' : 'icon-sm'} variant={size === 'md' ? 'default' : 'ghost'} aria-label={label} title={label}><MoreHorizontal size={16} /></Button></DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="min-w-48" onClick={event => {
       const target = (event.target as HTMLElement).closest('button,a');
       if (target && !target.hasAttribute('disabled')) setOpen(false);

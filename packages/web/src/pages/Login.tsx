@@ -34,7 +34,7 @@ export function Login() {
     <div className="flex h-dvh min-h-0 flex-col login-bg">
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto overscroll-contain px-4 py-12 sm:py-12 [&>*]:shrink-0">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-7 place-items-center rounded-lg bg-primary text-[15px] font-semibold text-white">S</span>
+          <span className="grid size-7 place-items-center rounded-lg bg-primary text-base font-semibold text-white">S</span>
           <span className="font-mono text-lg font-semibold text-white">Sub Forge</span>
         </div>
         <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-card p-6 shadow-lg">

@@ -25,7 +25,7 @@ export function TabProfileInfo() {
   const collections = useList('collections');
   const sources = allNodeSets.filter(n => n.ref.type === 'source');
   const selected = trafficSourceIds(draft, collections.data ?? []);
-  return <section aria-label="订阅基本信息" className="grid min-w-0 gap-5 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[1fr_1fr_1.2fr]">
+  return <section aria-label="订阅基本信息" className="grid min-w-0 gap-5 rounded-xl border bg-card shadow-sm p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[1fr_1fr_1.2fr]">
     <div className="min-w-0">
       <Field label="订阅名称">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} aria-invalid={!!draft.id && !draft.name.trim()} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
       {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-xs text-destructive">请填写订阅名称</p>}
@@ -43,7 +43,7 @@ export function TabProfileInfo() {
 export function TabBase() {
   const { draft, setDraft } = useProfile();
   const enabled = draft.base !== undefined && draft.base.enabled !== false;
-  return <section aria-label="基础配置追加" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+  return <section aria-label="基础配置追加" className="min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
       <div><h2 className="m-0 text-base font-semibold">配置追加</h2><p className="m-0 text-xs text-muted-foreground">把这些片段合并进生成的配置，例如端口、DNS、TUN</p></div>
       <div className="flex items-center gap-2.5">

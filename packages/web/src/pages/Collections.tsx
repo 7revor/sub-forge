@@ -35,7 +35,7 @@ export function CollectionList() {
 }
 
 // 成员行：拖动手柄、成员、类型、节点数、前缀、后缀、移除
-const GRID = 'grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_160px_160px_64px] items-center gap-3 rounded-[10px] border border-border px-4 py-2';
+const GRID = 'grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_160px_160px_64px] items-center gap-3 rounded-lg border border-border px-4 py-2';
 
 const EMPTY: Collection = { id: '', name: '', members: [], pipeline: [] };
 

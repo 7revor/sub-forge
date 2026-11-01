@@ -87,7 +87,7 @@ export function Overview() {
       <PageScroll>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
           {stats.map(([label, value, sub]) => (
-            <div key={label} className="flex flex-col gap-0.5 rounded-xl border border-border bg-card px-5 py-4">
+            <div key={label} className="flex flex-col gap-0.5 rounded-xl border bg-card shadow-sm px-5 py-4">
               <span className="text-sm text-muted-foreground">{label}</span>
               <span className="text-2xl font-semibold tracking-tight">{value}</span>
               <span className="text-xs text-muted-foreground">{sub}</span>

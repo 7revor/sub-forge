@@ -36,7 +36,7 @@ function RepositoryFileLoading({ failed }: { failed: boolean }) {
 function CopyFileLink({ href, name }: { href: string; name: string }) {
   const clipboard = useClipboard(href);
   const copied = clipboard.status === 'copied';
-  return <Button size="sm" variant="ghost" className="absolute right-0 top-1/2 size-7 -translate-y-1/2 p-0 opacity-0 group-hover/name:opacity-100 group-focus-within/name:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+  return <Button size="icon-sm" variant="ghost" className="absolute right-0 top-1/2 -translate-y-1/2 p-0 opacity-0 group-hover/name:opacity-100 group-focus-within/name:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
     aria-label={`复制 ${name} 的源文件链接`} title={copied ? '已复制' : '复制公共仓库 raw 地址'} disabled={clipboard.status === 'pending'}
     onClick={event => { event.stopPropagation(); void clipboard.copy(); }}>
     {copied ? <Check size={14} /> : <Copy size={14} />}<span className="sr-only" role="status">{copied ? '已复制' : ''}</span>
@@ -101,7 +101,7 @@ export function RuleRepoPage() {
     <RepositoryManager showAdd={false} repos={repos.data?.repos ?? []} admin={me.data?.role === 'admin'} loading={!repos.data && !repos.error} failed={!!repos.error && !repos.data} onRetry={() => void repos.refetch()} />
     {ruleset && <div className="text-sm text-muted-foreground">点击文件查看源文件；添加来源请返回增强集合。<Link to={`/rulesets/${ruleset}`} className="ml-2 text-primary">返回增强集合</Link></div>}
     <ErrorAlert error={repos.error} />
-    <section aria-label="规则文件列表" className="mb-5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+    <section aria-label="规则文件列表" className="mb-5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-5 py-4">
         <h2 className="m-0 text-base font-semibold">规则文件</h2>
         <span role="status" className="text-xs text-muted-foreground">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>

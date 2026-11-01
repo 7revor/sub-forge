@@ -22,13 +22,14 @@ import { cx } from './cx.ts';
 type BtnVariant = 'primary' | 'default' | 'danger' | 'danger-solid' | 'ghost';
 /** 业务语义 → shadcn 变体；danger 为描边按钮加危险色文字，其余完全沿用 shadcn。 */
 const VARIANT = { primary: 'default', default: 'outline', danger: 'outline', 'danger-solid': 'destructive', ghost: 'ghost' } as const;
-const SIZE = { sm: 'sm', md: 'default' } as const;
+const SIZE = { sm: 'sm', md: 'default', icon: 'icon', 'icon-sm': 'icon-sm' } as const;
+type BtnSize = keyof typeof SIZE;
 
 /** 按钮样式；链接需要长得像按钮时（如表格行的「编辑」）也用它 */
-export const buttonClass = (variant: BtnVariant = 'default', size: 'sm' | 'md' = 'md', className?: string) =>
+export const buttonClass = (variant: BtnVariant = 'default', size: BtnSize = 'md', className?: string) =>
   cn(buttonVariants({ variant: VARIANT[variant], size: SIZE[size] }), variant === 'danger' && 'text-destructive hover:text-destructive', className);
 
-export function Button({ variant = 'default', size = 'md', className, type = 'button', ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: 'sm' | 'md' }) {
+export function Button({ variant = 'default', size = 'md', className, type = 'button', ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: BtnSize }) {
   return <ShadcnButton type={type} {...p} variant={VARIANT[variant]} size={SIZE[size]} className={cn(variant === 'danger' && 'text-destructive hover:text-destructive', className)} />;
 }
 

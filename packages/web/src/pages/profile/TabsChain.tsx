@@ -43,7 +43,7 @@ export function TabChains() {
         actions={<>{draft.chains.length > 0 && <Button variant="ghost" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
         {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-sm text-destructive">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
-        {!draft.chains.length ? <Empty className="rounded-[10px] border border-dashed border-input [&>div]:text-xs [&>div]:leading-[18px]" title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
+        {!draft.chains.length ? <Empty className="rounded-lg border border-dashed border-input [&>div]:text-xs [&>div]:leading-[18px]" title={profileNodeSets.length ? '还没有代理链' : '还没有节点集'} description={profileNodeSets.length ? undefined : '先在「节点集」中加入节点集。'} /> : (
           <div aria-label="代理链列表"><SortableList items={draft.chains} getKey={chain => chain.id} onReorder={chains => setDraft({ ...draft, chains })} renderItem={(chain, i, handle) => <ChainCard chain={chain} index={i} handle={handle} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === chain.id)} onEdit={() => void edit(chain)} onDelete={() => setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== chain.id) })} /> } /></div>
         )}
       </Card>
@@ -109,7 +109,7 @@ export function TabPreview() {
       {current && (
         <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[minmax(0,1fr)]">
           <CodePreview fill lineNumbers label="最终配置" className="rounded-xl" title={<>{`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`}{selection && <span role="status" className="ml-3 text-[#b8ccff]">已定位第 {selection.range.startLine} 行</span>}</>} text={preview.data.yaml ?? preview.data.failure ?? ''} highlight={selection?.range} bodyClassName="overscroll-contain p-4 text-sm leading-[22px]" />
-          <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card [overflow-wrap:anywhere]">
+          <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border bg-card shadow-sm [overflow-wrap:anywhere]">
             <div className="flex items-center justify-between px-5 pt-4"><h2 className="m-0 text-base font-semibold">检查结果</h2><Badge tone={preview.data.ok ? 'ok' : 'err'}>{preview.data.ok ? '可以导入' : '渲染失败'}</Badge></div>
             <div className="px-5"><Segmented fullWidth label="筛选检查结果" value={level} onChange={setLevel} options={[{ value: 'all', label: `全部 ${report.length}` }, { value: 'error', label: `错误 ${count('error')}` }, { value: 'warn', label: `告警 ${count('warn')}` }, { value: 'info', label: `提示 ${count('info')}` }]} /></div>
             <div className="min-h-0 flex-1 overflow-auto border-t border-border">

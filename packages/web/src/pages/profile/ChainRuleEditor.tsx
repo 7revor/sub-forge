@@ -42,7 +42,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
   const pickSource = (key: string): ChainNodeSet => key.startsWith('all:') ? allSources(key.slice(4) as SourceKind) : profileNodeSets.find(source => nodeSetKey(source.ref) === key)?.ref ?? emptySet;
   return <section aria-label="代理链设置" className="flex min-h-0 flex-1 flex-col overflow-hidden">
     <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 pb-4 sm:grid-cols-2">
-      <section aria-label="前置节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[10px] border border-border p-4">
+      <section aria-label="前置节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-lg border border-border p-4">
         <div className="flex items-baseline gap-2"><h3 className="m-0 text-sm font-medium">① 前置</h3><p className="m-0 text-xs text-muted-foreground">先连接这里</p></div>
         <Field label="来源">{id => <Select id={id} aria-label="前置来源" placeholder="选择节点来源或策略组" value={kind === 'group' ? 'group' : kind === 'direct' ? 'direct' : chain.via.kind === 'node' ? nodeSetKey(chain.via.ref.nodeSet) : ''} onChange={event => {
           if (event.target.value === 'group') { setKind('group'); choose({ kind: 'group', groupId: '' }); }
@@ -60,7 +60,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
           {groupOptions.map(group => <ChoiceRow key={group.id} radio checked={chain.via.kind === 'group' && chain.via.groupId === group.id} label={group.name} onClick={() => choose({ kind: 'group', groupId: group.id })} />)}
         </div>}
       </section>
-      <section aria-label="落地节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[10px] border border-primary/30 bg-muted/50 p-4">
+      <section aria-label="落地节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-lg border border-primary/30 bg-muted/50 p-4">
         <div className="flex items-baseline gap-2"><h3 className="m-0 text-sm font-medium">② 落地</h3><p className="m-0 text-xs text-muted-foreground">由它访问目标</p></div>
         {fixedLanding ? <div className="rounded-md bg-muted p-3 text-sm">{landingText}</div> : <>
           <Field label="来源">{id => <Select id={id} aria-label="落地来源" placeholder="选择落地节点来源" value={nodeSetKey(chain.landing.nodeSet)} onChange={event => { const source = pickSource(event.target.value); setLandingKind(outputOf(source) ?? 'inline'); setChain({ ...chain, landing: { nodeSet: source } }); }}>{sourceChoices}</Select>}</Field>{landingKind === 'provider' ? <div className="chain-node-panel">

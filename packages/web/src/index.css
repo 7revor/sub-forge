@@ -385,7 +385,7 @@ body {
 /* 导航保留改版前的字体与图标外观，不参与内容区主题迁移。 */
 .app-sidebar { font-family: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif; }
 .app-sidebar .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.settings-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.settings-panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); overflow: hidden; }
 .settings-row { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; padding: 20px; }
 .settings-row + .settings-row { border-top: 1px solid var(--border); }
 .settings-row h2 { margin: 0 0 2px; font-size: var(--text-sm); line-height: 22px; font-weight: 500; }

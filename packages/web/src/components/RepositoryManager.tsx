@@ -20,7 +20,7 @@ export function RepositoryManager({ repos, admin, showAdd = true, loading = fals
         {admin && showAdd && <Button onClick={() => void edit()}><Plus size={16} />添加仓库</Button>}
       </div>
       <div className="flex max-h-[min(30vh,240px)] min-h-0 flex-col gap-2 overflow-auto px-5 pb-5" aria-busy={loading}>
-        {loading ? <div role="status" className="py-4 text-muted-foreground">正在加载仓库…</div> : repos.map(r => <div key={r.id} className="grid min-h-[52px] grid-cols-[32px_minmax(0,1fr)_96px] items-center gap-3 rounded-[10px] border border-border bg-card px-4 py-2 text-sm md:grid-cols-[32px_minmax(0,1fr)_96px_112px_36px]">
+        {loading ? <div role="status" className="py-4 text-muted-foreground">正在加载仓库…</div> : repos.map(r => <div key={r.id} className="grid min-h-[52px] grid-cols-[32px_minmax(0,1fr)_96px] items-center gap-3 rounded-lg border border-border bg-card px-4 py-2 text-sm md:grid-cols-[32px_minmax(0,1fr)_96px_112px_36px]">
           <span className={cx('grid size-8 place-items-center rounded-lg', r.enabled ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground')}><GitBranch size={16} /></span>
           <div className="min-w-0"><a href={r.url} target="_blank" rel="noreferrer" className="block truncate text-sm leading-5 font-medium text-foreground hover:text-primary" title={r.name}>{r.name}</a>
             <div className="truncate text-xs text-muted-foreground">{r.refs.join('、')} · {r.entries} 个文件 · {r.builtAt ? `${formatTime(r.builtAt).slice(5)} 更新` : '等待建立索引'}</div>

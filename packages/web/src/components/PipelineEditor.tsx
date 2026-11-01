@@ -94,7 +94,7 @@ function StepRow({ handle, index, step, selected, onSelect, trace }: {
 }) {
   const enabled = step.enabled !== false;
   return (
-    <div className={cx('flex min-h-[52px] items-center gap-1 rounded-[10px] border border-border pl-2', selected ? 'bg-primary/10' : 'bg-card')}>
+    <div className={cx('flex min-h-[52px] items-center gap-1 rounded-lg border border-border pl-2', selected ? 'bg-primary/10' : 'bg-card')}>
       {handle}
       <button type="button" onClick={onSelect} aria-current={selected || undefined} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-2 pr-4 pl-1 text-left">
         <span className={cx('grid h-8 w-8 shrink-0 place-items-center rounded-md font-mono text-xs', selected ? 'bg-primary text-white' : 'bg-primary/10 text-primary')}>{index + 1}</span>
@@ -139,8 +139,8 @@ function InputOutputView({ before, after, inLabel, outLabel, truncated }: {
             </thead>
             <tbody>
               {side.names.map((name, index) => <tr key={index}>
-                <td className="border-b border-border px-3 py-[7px] text-right font-mono text-xs text-muted-foreground">{index + 1}</td>
-                <td className="border-b border-border px-3 py-[7px] font-mono whitespace-nowrap text-foreground">{name}</td>
+                <td className="border-b border-border px-3 py-2 text-right font-mono text-xs text-muted-foreground">{index + 1}</td>
+                <td className="border-b border-border px-3 py-2 font-mono whitespace-nowrap text-foreground">{name}</td>
               </tr>)}
             </tbody>
           </table>
@@ -224,7 +224,7 @@ export function PipelineEditor({ compactOverview = false, steps, onChange, previ
   return (
     <div className={cx("pipeline-workspace", compactOverview && mode === 'overview' && 'pipeline-compact')} onPointerDownCapture={() => { pointerStartedInside.current = true; }} onClickCapture={(event) => internalClicks.current.add(event.nativeEvent)}>
       <ErrorAlert error={previewError} />
-      <section aria-label={title} className="pipeline-steps rounded-xl border border-border bg-card pt-4 pb-2">
+      <section aria-label={title} className="pipeline-steps rounded-xl border bg-card shadow-sm pt-4 pb-2">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 pb-3">
           <h2 className="m-0 text-base font-semibold">{title}</h2>
           <AddMenu onAdd={add} />
@@ -245,7 +245,7 @@ export function PipelineEditor({ compactOverview = false, steps, onChange, previ
         <div className="flex items-center justify-between px-5 pt-3 pb-2 text-sm"><span className="font-medium">最终 {last?.after ?? preview?.input ?? '—'} 个节点</span><Button size="sm" variant="ghost" onClick={() => setSelected(-1)}>查看全部</Button></div>
       </section>
 
-      {!(compactOverview && mode === 'overview') && <section aria-label="编辑与预览" className="pipeline-preview rounded-xl border border-border bg-card">
+      {!(compactOverview && mode === 'overview') && <section aria-label="编辑与预览" className="pipeline-preview rounded-xl border bg-card shadow-sm">
         {mode === 'overview' && <>
           <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
             <div className="flex flex-col gap-0.5">

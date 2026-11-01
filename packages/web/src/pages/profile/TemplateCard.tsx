@@ -69,7 +69,7 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
 export function TemplateCard() {
   const { draft, template, groups, setDraft } = useProfile();
   const currentId = boundTemplateId(draft);
-  return <section aria-label="模板设置" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3.5">
+  return <section aria-label="模板设置" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card shadow-sm px-5 py-3.5">
     <div className="flex items-center gap-4"><RoutingCardIcon><FileText size={16} /></RoutingCardIcon><span className="text-sm text-muted-foreground">{currentId ? '跟随模板' : '独立维护'}</span>{currentId && <Link className="text-sm font-medium text-primary no-underline hover:text-primary" to={`/templates/${encodeURIComponent(currentId)}`}>{template?.name ?? '关联模板'}</Link>}</div>
     <Button onClick={async () => { const result = await TemplateAssociationModal.show({ profile: draft, groups, template }); if (result.status === 'confirmed') setDraft(result.data); }}>更换分流方式</Button>
   </section>;
