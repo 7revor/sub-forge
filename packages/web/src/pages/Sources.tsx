@@ -16,6 +16,7 @@ import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
 import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
+import { Notice } from '../components/Notice.tsx';
 import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
 const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢复。';
@@ -146,7 +147,7 @@ export function SourceEdit() {
 
       <PageScroll className="source-detail-content">
         {preview.data?.report.filter((r) => r.level === 'error' || (r.level === 'warn' && r.code !== 'source.fetch-failed')).map((r, i) => (
-          <div key={i} role="status" className={cx('rounded-lg px-3 py-2 text-[length:var(--text-control)]', r.level === 'error' ? 'bg-err-soft text-err' : 'bg-warn-soft text-warn')}>{r.message}</div>
+          <Notice key={i} tone={r.level === 'error' ? 'err' : 'warn'} actions={r.level === 'error' && <Button size="sm" variant="ghost" className="text-err" disabled={busy || !ready} onClick={saveAndRefresh}>重试</Button>}>{r.message}</Notice>
         ))}
         <BasicSettings draft={draft} set={set} />
         <PipelineEditor steps={draft.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}

@@ -16,7 +16,7 @@ import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 
 import { Plus, Trash2, Boxes, ListPlus, Server, Monitor, Layers } from 'lucide-react';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Button, Card, Empty, Field, Input, Segmented, Switch, Textarea } from '../../components/ui.tsx';
+import { Badge, Button, Card, Empty, Field, Input, Segmented, Switch, Textarea } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 /** 名称、备注和流量信息放在同一行，配置原文使用独立编辑区。 */
@@ -51,14 +51,14 @@ export function TabBase() {
         <span className="text-[length:var(--text-control)] text-ink">启用</span>
       </div>
     </div>
-    {!enabled && <p className="m-0 pb-1 text-[length:var(--text-control)] text-ink-muted">启用后编辑追加配置。</p>}
+    {!enabled && <p className="m-0 border-t border-line-2 px-5 py-4 text-[length:var(--text-control)] text-ink-muted">启用后编辑追加配置。</p>}
     <div hidden={!enabled}>
       <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />
     </div>
-    {!!draft.migrationNotes?.length && <details className="mt-4 text-[length:var(--text-caption)]">
-      <summary className="w-fit cursor-pointer text-warn">配置迁移记录（{draft.migrationNotes.length}）</summary>
-      <div className="mt-2 space-y-2 leading-relaxed text-ink-muted">{draft.migrationNotes.map((note, i) => <p key={i} className="m-0">{note}</p>)}</div>
-    </details>}
+    {!!draft.migrationNotes?.length && <div className="flex items-start gap-3 border-t border-line-2 px-5 py-3 text-[length:var(--text-control)]">
+      <Badge className="shrink-0">迁移记录 {draft.migrationNotes.length}</Badge>
+      <div className="min-w-0 flex-1 space-y-1 leading-relaxed text-ink-muted">{draft.migrationNotes.map((note, i) => <p key={i} className="m-0">{note}</p>)}</div>
+    </div>}
   </section>;
 }
 
