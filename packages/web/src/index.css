@@ -360,6 +360,11 @@ th.table-cell-divider {
   pointer-events: none;
 }
 
+/* 表格紧接分页栏时，末行底线与分页栏顶线重合，只保留分页栏这一条。 */
+:has(+ .list-pagination) tbody > tr:last-child > .table-cell-divider::after {
+  display: none;
+}
+
 /* 表格工具栏、分页栏与加载状态栏的分隔线同样顶格。 */
 .table-panel-divider,
 .table-panel-divider-bottom {
