@@ -12,8 +12,8 @@ function SortableRow({ id, index, locked, blocked, render, draggingClassName }: 
     id, disabled: { draggable: locked, droppable: blocked },
   });
   const handle = locked
-    ? <span role="img" aria-label={`第 ${index + 1} 项已锁定`} className="grid h-8 w-5 place-items-center text-ink-muted"><LockKeyhole size={16} /></span>
-    : <button ref={setActivatorNodeRef} type="button" aria-label={`拖动第 ${index + 1} 项`} className="grid h-8 w-5 touch-none cursor-grab place-items-center text-faint" {...attributes} {...listeners}><GripVertical size={16} /></button>;
+    ? <span role="img" aria-label={`第 ${index + 1} 项已锁定`} className="grid h-8 w-5 place-items-center text-muted-foreground"><LockKeyhole size={16} /></span>
+    : <button ref={setActivatorNodeRef} type="button" aria-label={`拖动第 ${index + 1} 项`} className="grid h-8 w-5 touch-none cursor-grab place-items-center text-muted-foreground" {...attributes} {...listeners}><GripVertical size={16} /></button>;
   // 大小不同的落点只改变位置，不能按目标区块的宽高缩放卡片。
   // 阴影由调用方指定实际卡片，避免包装容器产生方形边缘。
   return <li ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}

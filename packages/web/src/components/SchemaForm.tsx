@@ -47,8 +47,8 @@ export function FieldInput({ field, value, id, onChange }: {
 
 /** 表单内的分区：嵌在卡片里使用，以分隔线区分，不再套一层卡片 */
 export function FormSection({ title, children }: { title: string; children: ReactNode }) {
-  return <section data-section={title} className="flex scroll-mt-4 flex-col gap-3 border-t border-line-2 pt-3.5">
-    <h3 className="m-0 text-[length:var(--text-control)] font-semibold">{title}</h3>
+  return <section data-section={title} className="flex scroll-mt-4 flex-col gap-3 border-t border-border pt-3.5">
+    <h3 className="m-0 text-sm font-semibold">{title}</h3>
     {children}
   </section>;
 }
@@ -68,11 +68,11 @@ export function SchemaForm({ groups, value, onChange, extra = false, collapsible
     {groups.map((group) => {
       const fields = group.fields.filter((field) => !field.showIf || field.showIf(value));
       const inputs = fields.map((field) => <SchemaField key={field.key} field={field} value={value} onChange={onChange} />);
-      return collapsible ? <details key={group.title} data-section={group.title} className="group border-t border-line-2 pt-3.5">
-        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm text-[length:var(--text-control)] font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
-          <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-ink-muted transition-transform group-open:rotate-90" />
+      return collapsible ? <details key={group.title} data-section={group.title} className="group border-t border-border pt-3.5">
+        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+          <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
           <span>{group.title}</span>
-          <span className="ml-auto text-[length:var(--text-caption)] font-normal text-ink-muted">{fields.length} 项配置</span>
+          <span className="ml-auto text-xs font-normal text-muted-foreground">{fields.length} 项配置</span>
         </summary>
         <div className="flex flex-col gap-3 pt-4">{inputs}</div>
       </details> : <FormSection key={group.title} title={group.title}>{inputs}</FormSection>;

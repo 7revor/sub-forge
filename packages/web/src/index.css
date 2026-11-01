@@ -9,40 +9,39 @@
   }
 }
 
-/* 设计稿配色（Claude Design 画布「Sub-Forge 前端页面设计」） */
+/* 主题：以 shadcn 语义变量为唯一入口，只配置品牌色、状态色与字体；组件样式沿用 shadcn 默认实现。 */
+:root {
+  --radius: 0.625rem;
+  --background: #ffffff;
+  --foreground: #15181d;
+  --card: #ffffff;
+  --card-foreground: #15181d;
+  --popover: #ffffff;
+  --popover-foreground: #15181d;
+  --primary: #2952cc;
+  --primary-foreground: #ffffff;
+  --secondary: #eef0f3;
+  --secondary-foreground: #15181d;
+  --muted: #f5f6f8;
+  --muted-foreground: #5b6270;
+  --accent: #f2f4f7;
+  --accent-foreground: #15181d;
+  --destructive: #b42318;
+  --border: #e3e6eb;
+  --input: #d5d9e0;
+  --ring: #2952cc;
+  /* 状态色：shadcn 未内置，供 Badge / Notice 使用。 */
+  --success: #1d7a46;
+  --success-soft: #e7f4ec;
+  --warning: #8f4508;
+  --warning-soft: #fdf1e4;
+}
+
 @theme {
-  --color-ink: #15181d;
-  --color-ink-2: #3d434d;
-  --color-ink-muted: #5b6270;
-  --color-faint: #8b93a1;
-  --color-line: #e3e6eb;
-  --color-line-2: #edeff2;
-  --color-ground: #f5f6f8;
-  --color-panel: #ffffff;
-  --color-inset: #f8f9fb;
-  --color-hover: #f2f4f7;
-  --color-control-line: #d5d9e0;
-  --color-control-hover: #b9bfc9;
-  --color-neutral-soft: #eef0f3;
-  --color-danger-line: #f0b5ae;
-  --color-switch-off: #c5cad3;
-  --color-selected: #f5f8ff;
-  --color-selected-line: #c7d3f5;
-  --color-subtle: #fcfcfd;
-  --text-display: 24px;
-  --text-display--line-height: 32px;
-  --text-title: 18px;
-  --text-title--line-height: 26px;
-  --text-section: 15px;
-  --text-section--line-height: 22px;
-  --text-body: 14px;
-  --text-body--line-height: 22px;
-  --text-control: 13px;
-  --text-control--line-height: 20px;
-  --text-caption: 12px;
-  --text-caption--line-height: 18px;
-  --shadow-float: 0 8px 24px rgb(20 23 28 / .12), 0 0 0 1px rgb(20 23 28 / .06);
-  --shadow-modal: 0 24px 48px rgb(20 23 28 / .18);
+  --color-ok: var(--success);
+  --color-ok-soft: var(--success-soft);
+  --color-warn: var(--warning);
+  --color-warn-soft: var(--warning-soft);
   --color-nav: #14171c;
   --color-nav-hover: #22272f;
   --color-nav-active: #2a303a;
@@ -50,16 +49,6 @@
   --color-nav-label: #aab3c2;
   --color-nav-icon: #8995a8;
   --color-nav-icon-active: #a9c1ff;
-  --color-brand: #2952cc;
-  --color-accent-strong: #1c3d9e;
-  --color-accent-soft: #ebf0fd;
-  --color-accent-ink: #1f43ad;
-  --color-ok: #1d7a46;
-  --color-ok-soft: #e7f4ec;
-  --color-warn: #8f4508;
-  --color-warn-soft: #fdf1e4;
-  --color-err: #b42318;
-  --color-err-soft: #fdecea;
   --font-sans: Inter, 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -73,18 +62,9 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-ground);
-  color: var(--color-ink);
+  background: var(--muted);
+  color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
-}
-
-/* 键盘焦点描边只给按钮、链接等；文本输入类控件统一用「品牌色边框 + 3px 浅色光圈」，避免叠加外描边。 */
-@layer base {
-  :focus-visible:not([data-slot]):not(input, textarea, select, [contenteditable]) {
-    outline: 2px solid var(--color-brand);
-    outline-offset: 2px;
-  }
 }
 
 /* 登录与设计稿保持同一背景，不影响左侧导航。 */
@@ -310,16 +290,16 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--color-panel);
+  background: var(--card);
 }
 
 .list-panel thead {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--color-panel);
+  background: var(--card);
 }
 
 /* 表格加载、空态和数据使用同一列宽；滚动条出现时也保留内容宽度。 */
@@ -337,7 +317,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--color-inset);
+  background: var(--muted);
 }
 
 .list-table td {
@@ -348,11 +328,11 @@ body {
 .table-cell-divider {
   position: relative;
   border-bottom: 1px solid transparent;
-  --table-divider-color: var(--color-line-2);
+  --table-divider-color: var(--border);
 }
 
 th.table-cell-divider {
-  --table-divider-color: var(--color-line);
+  --table-divider-color: var(--border);
 }
 
 .table-cell-divider::after {
@@ -386,7 +366,7 @@ th.table-cell-divider {
   right: 0;
   left: 0;
   height: 1px;
-  background: var(--color-line);
+  background: var(--border);
   pointer-events: none;
 }
 
@@ -398,32 +378,9 @@ th.table-cell-divider {
 .table-panel-divider-bottom::before {
   top: auto;
   bottom: 0;
-  background: var(--color-line-2);
+  background: var(--border);
 }
 
-/* 公共控件直接映射设计稿主题，避免平行 neutral 配色。 */
-:root {
-  --radius: .75rem;
-  --background: var(--color-panel);
-  --foreground: var(--color-ink);
-  --card: var(--color-panel);
-  --card-foreground: var(--color-ink);
-  --popover: var(--color-panel);
-  --popover-foreground: var(--color-ink);
-  --primary: var(--color-brand);
-  --primary-foreground: #fff;
-  --secondary: var(--color-inset);
-  --secondary-foreground: var(--color-ink);
-  --muted: var(--color-inset);
-  --muted-foreground: var(--color-ink-muted);
-  --accent: var(--color-accent-soft);
-  --accent-foreground: var(--color-accent-ink);
-  --destructive: var(--color-err);
-  --destructive-foreground: #fff;
-  --border: var(--color-line);
-  --input: var(--color-control-line);
-  --ring: var(--color-brand);
-}
 @theme inline {
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -455,13 +412,13 @@ th.table-cell-divider {
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 @layer base {
-  * { @apply border-border; }
+  * { @apply border-border outline-ring/50; }
 }
 
 /* Sidebar 沿用品牌深色导航，主题只作用于侧栏。 */
@@ -483,72 +440,26 @@ th.table-cell-divider {
 /* 导航保留改版前的字体与图标外观，不参与内容区主题迁移。 */
 .app-sidebar { font-family: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif; }
 .app-sidebar .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-:where(main, [role="dialog"], [data-slot="popover-content"], [role="menu"]) .lucide { stroke-width: 1.75; }
-:where(input, textarea)::placeholder { color: var(--color-faint); }
-/* 不在此处清除 box-shadow：聚焦与展开光圈由组件类名提供。 */
-[data-slot="select-trigger"], [data-slot="button"] { font-size: var(--text-control); line-height: 20px; border-radius: 8px; }
-[data-slot="select-trigger"] { height: 36px; }
-[data-slot="select-trigger"][data-placeholder] { color: var(--color-faint); }
-[data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="popover-content"] { border-radius: 8px; box-shadow: var(--shadow-float); }
-[data-slot="select-item"], [data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-checkbox-item"], [data-slot="command-item"] { font-size: var(--text-control); line-height: 20px; }
-[data-slot="dialog-overlay"] { background: rgb(20 23 28 / .45); }
-[data-slot="dialog-content"] { border-radius: 12px; border: 0; box-shadow: var(--shadow-modal); }
-[data-slot="dialog-title"] { font-size: var(--text-title); line-height: 26px; font-weight: 600; }
-[data-slot="dialog-description"] { font-size: var(--text-control); line-height: 20px; color: var(--color-ink-muted); }
-[data-slot="dialog-footer"] { background: var(--color-panel); }
-[data-slot="dialog-close"] { display: grid; place-items: center; width: 28px; height: 28px; top: 18px; right: 20px; }
-@media (prefers-reduced-motion: reduce) {
-  [data-slot="dialog-content"], [data-slot="dialog-overlay"] { animation: none; }
-}
-.settings-panel { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: 12px; overflow: hidden; }
+.settings-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .settings-row { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; padding: 20px; }
-.settings-row + .settings-row { border-top: 1px solid var(--color-line-2); }
-.settings-row h2 { margin: 0 0 2px; font-size: var(--text-body); line-height: 22px; font-weight: 500; }
-.settings-row p { margin: 0; font-size: var(--text-caption); line-height: 18px; color: var(--color-ink-muted); }
+.settings-row + .settings-row { border-top: 1px solid var(--border); }
+.settings-row h2 { margin: 0 0 2px; font-size: var(--text-sm); line-height: 22px; font-weight: 500; }
+.settings-row p { margin: 0; font-size: var(--text-xs); line-height: 18px; color: var(--muted-foreground); }
 @media (max-width: 767px) { .settings-row { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; } }
 
-.app-sidebar { --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px; --radius-xl: 14px; }
 .group-preview-list .flex.flex-wrap { flex-direction: column; gap: 0; }
-.group-preview-list .flex.flex-wrap > span { border: 0; background: transparent; padding: 6px 0; font-family: var(--font-sans); font-size: var(--text-control); }
-
-/* 普通弹窗共享页头、正文、页脚间距；工作区弹窗通过 p-0 显式布局。 */
-[data-slot="dialog-content"]:not(.p-0) > fieldset > [data-slot="dialog-header"] { padding-right: 28px; text-align: left; }
-[data-slot="dialog-content"]:not(.p-0) > fieldset [data-slot="dialog-footer"] { margin: 4px -24px 0; padding: 12px 24px; border-top: 1px solid var(--color-line-2); }
-[data-slot="dialog-content"] > [role="alert"] { padding: 12px 24px; }
+.group-preview-list .flex.flex-wrap > span { border: 0; background: transparent; padding: 6px 0; font-family: var(--font-sans); font-size: var(--text-sm); }
 
 .pipeline-step-scroll { padding: 0 20px; }
 .pipeline-step-scroll > ol { display: flex; flex-direction: column; gap: 8px; }
 .pipeline-workspace.pipeline-compact { grid-template-columns: minmax(0, 1fr); height: auto; }
 .pipeline-compact .pipeline-step-scroll { max-height: none; }
 
-/* inline 主题生成固定圆角值，导航用独立规则保持改版前尺寸。 */
-.app-sidebar .rounded-sm { border-radius: 6px; }
-.app-sidebar .rounded-md { border-radius: 8px; }
-.app-sidebar .rounded-lg { border-radius: 10px; }
-.app-sidebar .rounded-xl { border-radius: 14px; }
-@layer components {
-  [class~="text-[length:var(--text-display)]"] { line-height: 32px; }
-  [class~="text-[length:var(--text-title)]"] { line-height: 26px; }
-  [class~="text-[length:var(--text-section)]"] { line-height: 22px; }
-  [class~="text-[length:var(--text-body)]"] { line-height: 22px; }
-  [class~="text-[length:var(--text-control)]"] { line-height: 20px; }
-  [class~="text-[length:var(--text-caption)]"] { line-height: 18px; }
-}
-
-[data-slot="dialog-header"] { text-align: left; }
 @media (max-width: 767px) { .list-table { min-width: 640px; } }
-
-/* 画板 02 / 18：菜单内边距、悬停和禁用态。 */
-[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-radio-item"] { padding: 8px 10px; border-radius: 6px; }
-[data-slot="dropdown-menu-content"], [data-slot="popover-content"] { border: 0; }
-[data-slot="dropdown-menu-item"].p-0 { padding: 0; }
-input:disabled, textarea:disabled, [data-slot="select-trigger"]:disabled { background: var(--color-inset); color: var(--color-ink-muted); }
-[data-slot="dialog-content"]:not(.p-0) > fieldset > form { min-width: 0; }
-[data-slot="dialog-content"]:not(.p-0) > fieldset [data-slot="dialog-footer"] { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
 
 .advanced-settings > summary { list-style: none; display: flex; align-items: center; }
 .advanced-settings > summary::-webkit-details-marker { display: none; }
-.advanced-settings > summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid var(--color-ink-muted); border-bottom: 1.5px solid var(--color-ink-muted); transform: rotate(45deg); margin-left: auto; margin-right: 4px; }
+.advanced-settings > summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid var(--muted-foreground); border-bottom: 1.5px solid var(--muted-foreground); transform: rotate(45deg); margin-left: auto; margin-right: 4px; }
 .advanced-settings[open] > summary::after { transform: rotate(225deg); }
 
 /* 卡片列首尾不重复叠加行间距；相邻项目保持 8px。 */
@@ -560,11 +471,11 @@ section > div > ol > li:last-child > div > [data-routing-card],
 section > div > ol > li:last-child > section > div:last-child > [data-routing-card] { margin-bottom: 0; }
 
 /* 代理链画板：来源选择与节点列表置于双卡片内。 */
-.chain-node-panel { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: auto; border: 1px solid var(--color-line); border-radius: 8px; background: white; }
+.chain-node-panel { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: white; }
 .chain-node-panel > [aria-label$="预览"] { flex: 1; min-height: 0; gap: 0; }
-.chain-node-panel [aria-live="polite"] { background: var(--color-inset); padding: 6px 12px; }
+.chain-node-panel [aria-live="polite"] { background: var(--muted); padding: 6px 12px; }
 .chain-node-panel [aria-label$="列表"] { flex: 1; max-height: none; }
-.chain-node-panel [aria-label$="列表"] > button { border-top: 1px solid var(--color-line-2); border-radius: 0; min-height: 40px; padding: 8px 12px; }
+.chain-node-panel [aria-label$="列表"] > button { border-top: 1px solid var(--border); border-radius: 0; min-height: 40px; padding: 8px 12px; }
 
 /* 设计画板的表格使用字体自然行高，避免一行数据累计多出 4px。 */
 .list-table th, .list-table td { line-height: normal; }

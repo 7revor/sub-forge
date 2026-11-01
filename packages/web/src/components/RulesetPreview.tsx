@@ -51,18 +51,18 @@ export function RulesetPreview({ title, inputs, ready, sourceId, overrides, sour
     : result?.delivery.mode === 'unsupported' ? result.delivery.reason
     : result?.binary ? 'MRS 由服务端缓存并原样托管，无法展示文本；SRS 暂不支持。' : null;
   return <div className="flex flex-col gap-3" aria-label="规则转换预览">
-    <div className="flex flex-wrap items-center justify-between gap-3">{title && <h2 className="m-0 text-[length:var(--text-section)] font-semibold">{title}</h2>}<Segmented size="sm" label="规则内核" value={target} onChange={setTarget} options={TARGETS.map(x => ({ value: x.key, label: x.label }))} /></div>
+    <div className="flex flex-wrap items-center justify-between gap-3">{title && <h2 className="m-0 text-base font-semibold">{title}</h2>}<Segmented size="sm" label="规则内核" value={target} onChange={setTarget} options={TARGETS.map(x => ({ value: x.key, label: x.label }))} /></div>
     <CodePreview label="规则输出" text={result?.lines.join('\n') ?? ''} loading={old} className="shrink-0" bodyClassName="h-[430px]" lineNumbers />
-    <div className="min-h-10 text-[length:var(--text-control)] text-ink-2" aria-label="转换统计">
-      {stats ? <div className="grid grid-cols-4 gap-2 py-1">{[['解析', stats.parsed], ['去重', stats.duplicates], ['不支持', stats.unsupported], ['有效输出', stats.output]].map(([label, value]) => <div key={label}><span className="block text-[length:var(--text-caption)] text-ink-muted">{label}</span><span className={label === '有效输出' ? 'font-medium text-ok' : 'font-medium'}>{value}</span></div>)}</div> : '等待转换结果'}
+    <div className="min-h-10 text-sm text-foreground" aria-label="转换统计">
+      {stats ? <div className="grid grid-cols-4 gap-2 py-1">{[['解析', stats.parsed], ['去重', stats.duplicates], ['不支持', stats.unsupported], ['有效输出', stats.output]].map(([label, value]) => <div key={label}><span className="block text-xs text-muted-foreground">{label}</span><span className={label === '有效输出' ? 'font-medium text-ok' : 'font-medium'}>{value}</span></div>)}</div> : '等待转换结果'}
     </div>
-    {(status || preview.error || sourceError) ? <div className="flex min-h-8 flex-wrap items-center gap-2 text-[length:var(--text-caption)] text-ink-muted" role="status">
+    {(status || preview.error || sourceError) ? <div className="flex min-h-8 flex-wrap items-center gap-2 text-xs text-muted-foreground" role="status">
       {status}
       {(preview.error || sourceError) ? <FieldError error={preview.error || sourceError} /> : null}
       {sourceError ? <Button size="sm" onClick={() => void onRefreshSources()} disabled={sourceReading}>重新读取来源</Button> : null}
       {preview.error && <Button size="sm" onClick={() => void preview.refetch()} disabled={!ready || !settled || preview.isFetching}>重新转换</Button>}
     </div> : null}
-    <details className={cx("text-[length:var(--text-control)]", !diagnostic.length && "invisible")}><summary className="cursor-pointer">内核处理详情（{diagnostic.length} 条）</summary>
+    <details className={cx("text-sm", !diagnostic.length && "invisible")}><summary className="cursor-pointer">内核处理详情（{diagnostic.length} 条）</summary>
       <div className="mt-2 max-h-64 overflow-auto">{diagnostic.slice(0, 100).map((d, i) => <div key={i} className="flex gap-2 py-1">
         {d.kind !== 'client' && <Badge tone="accent">{d.kind === 'degraded' ? '降级' : '改写'}</Badge>}
         <span className="min-w-0 break-all">{d.sourceId === '$append' ? '组级追加' : sourceNames[d.sourceId] ?? d.sourceId} · <code>{d.text}</code> · {d.reason}</span>

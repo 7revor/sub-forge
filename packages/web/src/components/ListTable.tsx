@@ -17,7 +17,7 @@ export function ListTableLoading({ columns, rows = 6, rowHeight = 57 }: { column
   return <>{Array.from({ length: rows }, (_, row) => <tr key={row} style={{ height: rowHeight }}>
     {Array.from({ length: columns }, (_, column) => <td key={column} className={listTd}>
       {row === 0 && column === 0 && <span role="status" className="sr-only">正在加载列表…</span>}
-      <span aria-hidden="true" className={cx('block h-3 rounded bg-line-2 motion-safe:animate-pulse', column === columns - 1 ? 'ml-auto w-3/4' : row % 2 ? 'w-2/3' : 'w-4/5')} />
+      <span aria-hidden="true" className={cx('block h-3 rounded bg-border motion-safe:animate-pulse', column === columns - 1 ? 'ml-auto w-3/4' : row % 2 ? 'w-2/3' : 'w-4/5')} />
     </td>)}
   </tr>)}</>;
 }

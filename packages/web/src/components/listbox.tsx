@@ -84,7 +84,7 @@ export function MultiSelect({ value, onChange, children, placeholder, className,
   const opts = collect(children);
   return <DropdownMenu>
     <DropdownMenuTrigger asChild><Button {...rest} type="button" variant="outline" disabled={disabled} className={cx('w-full justify-between', className)}>
-      <span className={cx('truncate', !value.length && 'text-faint')}>{value.length ? <span className="flex flex-wrap gap-1">{opts.filter(option => value.includes(option.value)).map(option => <span key={option.value} className="rounded bg-neutral-soft px-1.5 text-[length:var(--text-caption)] text-ink-2">{option.text}</span>)}</span> : placeholder}</span><ChevronDown />
+      <span className={cx('truncate', !value.length && 'text-muted-foreground')}>{value.length ? <span className="flex flex-wrap gap-1">{opts.filter(option => value.includes(option.value)).map(option => <span key={option.value} className="rounded bg-secondary px-1.5 text-xs text-foreground">{option.text}</span>)}</span> : placeholder}</span><ChevronDown />
     </Button></DropdownMenuTrigger>
     <DropdownMenuContent>
       {opts.map((option, i) => <Fragment key={`${option.value}-${i}`}>
@@ -141,7 +141,7 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
   const isPlaceholder = !!placeholder && !valueLabel;
   return <Popover modal={modal} open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}>
     <PopoverTrigger asChild><Button type="button" id={id} variant="outline" role="combobox" aria-label={ariaLabel} aria-expanded={open}
-      disabled={disabled} data-placeholder={isPlaceholder ? '' : undefined} className={cx(triggerClassName ?? 'h-9 w-full justify-between text-[length:var(--text-control)]', isPlaceholder && 'font-normal text-ink-muted')}>
+      disabled={disabled} data-placeholder={isPlaceholder ? '' : undefined} className={cx(triggerClassName ?? 'h-9 w-full justify-between text-sm', isPlaceholder && 'font-normal text-muted-foreground')}>
       {triggerIcon}<span title={displayLabel} className="min-w-0 truncate">{displayLabel}</span>{!triggerClassName && <ChevronDown />}
     </Button></PopoverTrigger>
     <PopoverContent align="start" collisionPadding={12} className="flex h-[min(320px,var(--radix-popover-content-available-height))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden p-0"

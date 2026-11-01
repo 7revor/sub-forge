@@ -16,8 +16,8 @@ export function RemoteRuleInput({ id, value, onChange }: { id: string; value: st
   return <div className="flex min-w-0 flex-col gap-3">
     <div className="flex gap-2"><Input id={id} type="url" className="min-w-0 font-mono" spellCheck={false} value={value} placeholder="远程规则文件的 HTTP 或 HTTPS 地址" onChange={event => { setRequested(undefined); onChange(event.target.value); }} /><Button disabled={!valid || view.isFetching} onClick={() => { if (requested === value) void query.refetch(); else setRequested(value); }}>{view.isFetching ? '读取中…' : '读取'}</Button></div>
     {requested && <><FieldError error={view.error ?? view.data?.status.error} />
-      {view.data?.content !== undefined && <CodePreview label="远程规则预览" text={view.data.content} bodyClassName="max-h-[140px] overflow-auto px-3 py-2.5 text-[length:var(--text-caption)] leading-5" />}
-      {view.data?.status.ok && <span className="text-[length:var(--text-caption)] text-ink-muted">识别为 {view.data.status.format ?? '规则文本'} · 有效 {view.data.status.rules ?? 0} 条 · 不支持 {view.data.status.rejected ?? 0}</span>}
+      {view.data?.content !== undefined && <CodePreview label="远程规则预览" text={view.data.content} bodyClassName="max-h-[140px] overflow-auto px-3 py-2.5 text-xs leading-5" />}
+      {view.data?.status.ok && <span className="text-xs text-muted-foreground">识别为 {view.data.status.format ?? '规则文本'} · 有效 {view.data.status.rules ?? 0} 条 · 不支持 {view.data.status.rejected ?? 0}</span>}
     </>}
   </div>;
 }

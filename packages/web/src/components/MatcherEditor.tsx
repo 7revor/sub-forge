@@ -22,7 +22,7 @@ export function MatcherEditor({ value, onChange, rulesets, ruleValue, onRuleChan
     else onChange(changeMatcherKind(value, kind as Matcher['kind']));
   };
   return <div className="flex min-w-0 flex-col gap-4 [&>*]:min-w-0">
-    {!fixedKind && <Field label="匹配类型">{(id) => <Select placeholder="选择本地规则、规则集或远程规则来源" id={id} value={selectedKind} className="text-[length:var(--text-control)]" onChange={(event) => changeKind(event.target.value)}>
+    {!fixedKind && <Field label="匹配类型">{(id) => <Select placeholder="选择本地规则、规则集或远程规则来源" id={id} value={selectedKind} className="text-sm" onChange={(event) => changeKind(event.target.value)}>
       <option value="local">本地规则</option><option value="ruleset">系统规则集</option><option value="remote">远程 URL</option>
     </Select>}</Field>}
     {value.kind === 'local' || value.kind === 'rule' ? <Field label="规则内容">{id => <LocalRulesInput id={id}

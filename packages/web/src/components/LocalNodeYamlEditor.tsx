@@ -33,9 +33,9 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
   const node = !checking && result.ok ? result.value : undefined;
   const errorText = !checking && !result.ok && text.trim() ? `${result.line ? `第 ${result.line} 行：` : ''}${result.error}` : '';
   return <div className="flex h-full min-h-0 flex-col gap-3">
-    <div className="flex min-h-[510px] flex-1 flex-col overflow-hidden rounded-lg border border-control-line">
-    <div className="flex items-center justify-between gap-3 border-b border-line-2 bg-inset px-3 py-1">
-      <label htmlFor="local-node-yaml" className="text-[length:var(--text-control)] text-ink-muted">Mihomo YAML · 可直接粘贴分享链接 / JSON / Surge 行</label>
+    <div className="flex min-h-[510px] flex-1 flex-col overflow-hidden rounded-lg border border-input">
+    <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-3 py-1">
+      <label htmlFor="local-node-yaml" className="text-sm text-muted-foreground">Mihomo YAML · 可直接粘贴分享链接 / JSON / Surge 行</label>
       <div className="flex items-center gap-2">
         <Button size="sm" variant="ghost" disabled={disabled || !node} onClick={() => {
           try { apply(formatLocalNodeYaml(text), '已格式化'); }
@@ -61,11 +61,11 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
       <div id="local-node-status" role="status" className="flex flex-wrap items-center gap-2">
 
         <Badge tone={!text.trim() || checking ? 'neutral' : node ? 'ok' : 'err'}>{!text.trim() ? '待输入' : checking ? '校验中…' : node ? '配置有效' : '配置有误'}</Badge>
-        {node && <span className="text-[length:var(--text-caption)] text-ink-muted">已通过基础配置校验</span>}
+        {node && <span className="text-xs text-muted-foreground">已通过基础配置校验</span>}
       </div>
-      {errorText && <div role="alert" className="text-[length:var(--text-control)] text-err whitespace-pre-wrap">{errorText}</div>}
-      {node && result.ok && result.notes?.map(note => <div key={note} className="text-[length:var(--text-caption)] text-warn">{note}</div>)}
-      <p className="m-0 text-[length:var(--text-caption)] leading-relaxed text-ink-muted">一次只粘贴一个节点；多个节点请用「编辑分组 YAML」。连通性从 Sub Forge 服务端发起，测试当前草稿，无需先保存。</p>
+      {errorText && <div role="alert" className="text-sm text-destructive whitespace-pre-wrap">{errorText}</div>}
+      {node && result.ok && result.notes?.map(note => <div key={note} className="text-xs text-warn">{note}</div>)}
+      <p className="m-0 text-xs leading-relaxed text-muted-foreground">一次只粘贴一个节点；多个节点请用「编辑分组 YAML」。连通性从 Sub Forge 服务端发起，测试当前草稿，无需先保存。</p>
     </section>
   </div>;
 }

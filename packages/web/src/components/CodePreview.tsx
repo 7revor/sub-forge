@@ -23,9 +23,9 @@ export function CodePreview({ text, title, label, copyable = false, loading = fa
   const content = range ? <>{lines.slice(0, range.startLine - 1).join('\n')}{range.startLine > 1 && '\n'}<mark ref={marked} aria-label={`已定位第 ${range.startLine} 至 ${range.endLine} 行`} className="bg-[#394c76] text-white [box-decoration-break:clone]">{lines.slice(range.startLine - 1, range.endLine).join('\n')}</mark>{range.endLine < lines.length && '\n'}{lines.slice(range.endLine).join('\n')}</> : text;
   return <section aria-label={label} aria-busy={loading} className={cx('min-w-0 overflow-hidden rounded-lg bg-nav', fill && 'flex min-h-0 flex-1 flex-col', className)}>
     {(title || copyable) && <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#262b33] px-4 py-2.5">
-      <span className="font-mono text-[length:var(--text-control)] text-nav-text">{title}</span>
+      <span className="font-mono text-sm text-nav-text">{title}</span>
       {copyable && <CopyButton text={text} size="sm" variant="ghost" className="text-nav-text hover:bg-nav-hover" />}
     </div>}
-    <pre ref={body} tabIndex={0} className={cx('m-0 overflow-auto p-3 font-mono text-[length:var(--text-caption)] leading-[1.7] text-[#dde1e7] transition-opacity', fill ? 'min-h-0 flex-1' : '', loading && 'opacity-70', bodyClassName)}>{lineNumbers ? <span className="flex min-w-max"><span aria-hidden="true" className="sticky left-0 mr-3 select-none bg-nav text-right text-[#8b95a5]">{lines.map((_, i) => i + 1).join('\n')}</span><code>{content}</code></span> : content}</pre>
+    <pre ref={body} tabIndex={0} className={cx('m-0 overflow-auto p-3 font-mono text-xs leading-[1.7] text-[#dde1e7] transition-opacity', fill ? 'min-h-0 flex-1' : '', loading && 'opacity-70', bodyClassName)}>{lineNumbers ? <span className="flex min-w-max"><span aria-hidden="true" className="sticky left-0 mr-3 select-none bg-nav text-right text-[#8b95a5]">{lines.map((_, i) => i + 1).join('\n')}</span><code>{content}</code></span> : content}</pre>
   </section>;
 }

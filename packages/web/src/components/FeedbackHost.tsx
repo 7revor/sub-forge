@@ -49,5 +49,5 @@ export function ErrorAlert({ error }: { error: unknown }) {
     if (!inModal && error && error !== previous.current) alertError(error);
     previous.current = error;
   }, [error, inModal]);
-  return inModal && shownError ? <p role="alert" className="m-0 text-[length:var(--text-control)] text-err">{shownError instanceof Error ? shownError.message : String(shownError)}</p> : null;
+  return inModal && shownError ? <p role="alert" className="m-0 text-sm text-destructive">{shownError instanceof Error ? shownError.message : String(shownError)}</p> : null;
 }

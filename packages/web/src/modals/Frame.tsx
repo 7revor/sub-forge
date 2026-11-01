@@ -7,7 +7,7 @@ type Message = { title: string; description?: string; confirmLabel?: string; dan
 type Prompt = Message & { label?: string; placeholder: string; initialValue?: string; minLength?: number; type?: 'text' | 'password'; unchangedValue?: string };
 const MessageModal = createModal<Message & { kind: 'confirm' | 'alert' | 'success' | 'error' }, boolean>(function MessageBody({ data, modal }) {
   const Icon = data.kind === 'success' ? CheckCircle2 : data.kind === 'error' || data.danger ? AlertCircle : Info;
-  return <ModalContent className="max-h-[85dvh] overflow-y-auto"><ModalHeader><ModalTitle className="flex items-center gap-2"><Icon size={20} aria-hidden className={data.kind === 'error' || data.danger ? 'text-err' : data.kind === 'success' ? 'text-ok' : 'text-brand'} />{data.title}</ModalTitle>
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto"><ModalHeader><ModalTitle className="flex items-center gap-2"><Icon size={20} aria-hidden className={data.kind === 'error' || data.danger ? 'text-destructive' : data.kind === 'success' ? 'text-ok' : 'text-primary'} />{data.title}</ModalTitle>
     {data.description && <ModalDescription className="whitespace-pre-wrap break-words">{data.description}</ModalDescription>}</ModalHeader>
     <ModalFooter>{data.kind === 'confirm' && <Button disabled={modal.pending} onClick={modal.cancel}>取消</Button>}<Button variant={data.danger ? 'danger-solid' : 'primary'} disabled={modal.pending} onClick={() => modal.confirm(true)}>{modal.pending ? '处理中…' : data.confirmLabel ?? (data.kind === 'confirm' ? '确认' : '知道了')}</Button></ModalFooter>
   </ModalContent>;

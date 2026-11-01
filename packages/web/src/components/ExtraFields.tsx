@@ -65,8 +65,8 @@ export function ExtraFields({ value, onChange, validateName, layout = 'default' 
     </div>
   );
   return (
-    <details className="rounded-lg border border-line p-3">
-      <summary className="cursor-pointer text-[length:var(--text-control)] text-ink-muted">其他字段 {Object.keys(value).length} 个</summary>
+    <details className="rounded-lg border border-border p-3">
+      <summary className="cursor-pointer text-sm text-muted-foreground">其他字段 {Object.keys(value).length} 个</summary>
       <div className="mt-3 flex flex-col gap-2">
         {layout === 'cards' && addForm}
         {Object.entries(value).map(([name, item]) => (

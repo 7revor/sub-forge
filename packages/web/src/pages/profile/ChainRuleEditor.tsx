@@ -37,20 +37,20 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
   const choose = (via: ChainTarget) => setChain({ ...chain, via });
   const names = useChainNames(chain);
   const landingText = names.landing;
-  const actions = <>{onRemove && <Button className="text-err" onClick={onRemove}>移除前置</Button>}<Button onClick={onCancel}>取消{footerTarget ? '前置' : ''}</Button><Button variant="primary" disabled={!!error || overridden} onClick={() => onApply(chain)}>{footerTarget ? '应用前置' : '保存'}</Button></>;
+  const actions = <>{onRemove && <Button className="text-destructive" onClick={onRemove}>移除前置</Button>}<Button onClick={onCancel}>取消{footerTarget ? '前置' : ''}</Button><Button variant="primary" disabled={!!error || overridden} onClick={() => onApply(chain)}>{footerTarget ? '应用前置' : '保存'}</Button></>;
   const sourceChoices = <>{(['provider','inline'] as const).map(output => <optgroup key={output} label={output === 'provider' ? '引用来源' : '展开节点'}><option value={`all:${output}`}>{output === 'provider' ? '全部引用来源' : '全部展开节点'}</option>{sourcesFor(output).map(source => <option key={nodeSetKey(source.ref)} value={nodeSetKey(source.ref)}>{source.name} · {output === 'provider' ? '引用' : '展开'}</option>)}</optgroup>)}</>;
   const pickSource = (key: string): ChainNodeSet => key.startsWith('all:') ? allSources(key.slice(4) as SourceKind) : profileNodeSets.find(source => nodeSetKey(source.ref) === key)?.ref ?? emptySet;
   return <section aria-label="代理链设置" className="flex min-h-0 flex-1 flex-col overflow-hidden">
     <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 pb-4 sm:grid-cols-2">
-      <section aria-label="前置节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[10px] border border-line-2 p-4">
-        <div className="flex items-baseline gap-2"><h3 className="m-0 text-[length:var(--text-body)] font-medium">① 前置</h3><p className="m-0 text-[length:var(--text-caption)] text-ink-muted">先连接这里</p></div>
+      <section aria-label="前置节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[10px] border border-border p-4">
+        <div className="flex items-baseline gap-2"><h3 className="m-0 text-sm font-medium">① 前置</h3><p className="m-0 text-xs text-muted-foreground">先连接这里</p></div>
         <Field label="来源">{id => <Select id={id} aria-label="前置来源" placeholder="选择节点来源或策略组" value={kind === 'group' ? 'group' : kind === 'direct' ? 'direct' : chain.via.kind === 'node' ? nodeSetKey(chain.via.ref.nodeSet) : ''} onChange={event => {
           if (event.target.value === 'group') { setKind('group'); choose({ kind: 'group', groupId: '' }); }
           else if (event.target.value === 'direct') { setKind('direct'); choose(initial.via); }
           else { const source = pickSource(event.target.value), output = outputOf(source) ?? 'inline'; setKind(output); choose(emptyVia(source)); }
         }}>{sourceChoices}<optgroup label="策略组"><option value="group" disabled={!groupOptions.length}>策略组</option></optgroup>{initial.via.kind === 'builtin' && <option value="direct">{initial.via.name}</option>}</Select>}</Field>
         {chain.via.kind === 'node' && (kind === 'provider' ? <div className="chain-node-panel">
-          <div className="border-b border-line-2 p-2"><SearchInput className="max-w-none" aria-label="前置节点筛选（正则）" placeholder={chainPlaceholders.viaFilter} value={viaFilter} onChange={event => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, match: { regex: event.target.value } } }); }} /></div>
+          <div className="border-b border-border p-2"><SearchInput className="max-w-none" aria-label="前置节点筛选（正则）" placeholder={chainPlaceholders.viaFilter} value={viaFilter} onChange={event => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, match: { regex: event.target.value } } }); }} /></div>
           <NodeSetPreview nodeSets={previewSources(chain.via.ref.nodeSet)} filter={viaFilter} label="前置节点" firstMatch />
         </div> : <div className="chain-node-panel">
           <ChoiceRow radio checked={viaAuto} label="自动（按顺序取第一个可用）" onClick={() => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, match: { regex: '' } } }); }} />
@@ -60,11 +60,11 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
           {groupOptions.map(group => <ChoiceRow key={group.id} radio checked={chain.via.kind === 'group' && chain.via.groupId === group.id} label={group.name} onClick={() => choose({ kind: 'group', groupId: group.id })} />)}
         </div>}
       </section>
-      <section aria-label="落地节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[10px] border border-selected-line bg-subtle p-4">
-        <div className="flex items-baseline gap-2"><h3 className="m-0 text-[length:var(--text-body)] font-medium">② 落地</h3><p className="m-0 text-[length:var(--text-caption)] text-ink-muted">由它访问目标</p></div>
-        {fixedLanding ? <div className="rounded-md bg-inset p-3 text-[length:var(--text-control)]">{landingText}</div> : <>
+      <section aria-label="落地节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[10px] border border-primary/30 bg-muted/50 p-4">
+        <div className="flex items-baseline gap-2"><h3 className="m-0 text-sm font-medium">② 落地</h3><p className="m-0 text-xs text-muted-foreground">由它访问目标</p></div>
+        {fixedLanding ? <div className="rounded-md bg-muted p-3 text-sm">{landingText}</div> : <>
           <Field label="来源">{id => <Select id={id} aria-label="落地来源" placeholder="选择落地节点来源" value={nodeSetKey(chain.landing.nodeSet)} onChange={event => { const source = pickSource(event.target.value); setLandingKind(outputOf(source) ?? 'inline'); setChain({ ...chain, landing: { nodeSet: source } }); }}>{sourceChoices}</Select>}</Field>{landingKind === 'provider' ? <div className="chain-node-panel">
-          <div className="flex flex-col gap-2 border-b border-line-2 p-2"><SearchInput className="max-w-none" aria-label="落地节点筛选（正则）" placeholder={chainPlaceholders.landingFilter} value={chain.landing.filter ?? ''} onChange={event => setChain({ ...chain, landing: { ...chain.landing, filter: event.target.value || undefined } })} />
+          <div className="flex flex-col gap-2 border-b border-border p-2"><SearchInput className="max-w-none" aria-label="落地节点筛选（正则）" placeholder={chainPlaceholders.landingFilter} value={chain.landing.filter ?? ''} onChange={event => setChain({ ...chain, landing: { ...chain.landing, filter: event.target.value || undefined } })} />
             {chain.landing.excludeFilter !== undefined && <Input aria-label="排除落地节点（正则）" placeholder="输入要排除的节点名称或正则" value={chain.landing.excludeFilter} onChange={event => setChain({ ...chain, landing: { ...chain.landing, excludeFilter: event.target.value } })} />}</div>
           <NodeSetPreview nodeSets={previewSources(chain.landing.nodeSet)} filter={chain.landing.filter} excludeFilter={chain.landing.excludeFilter} label="落地节点" />
         </div> : <div className="chain-node-panel">
@@ -74,16 +74,16 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
         </>}
       </section>
     </div>
-    {(overridden || error) && <p role="alert" className="mx-6 mt-0 mb-4 rounded-lg bg-err-soft px-3 py-2.5 text-[length:var(--text-control)] text-err">{overridden ? '已有整集前置覆盖此设置，请先调整已有规则。' : error}</p>}
-    {footerTarget ? createPortal(actions, footerTarget) : <div data-slot="dialog-footer" className="flex min-h-[61px] shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line-2 px-6 py-3">{actions}</div>}
+    {(overridden || error) && <p role="alert" className="mx-6 mt-0 mb-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{overridden ? '已有整集前置覆盖此设置，请先调整已有规则。' : error}</p>}
+    {footerTarget ? createPortal(actions, footerTarget) : <div data-slot="dialog-footer" className="flex min-h-[61px] shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-6 py-3">{actions}</div>}
   </section>;
 }
 
 /** 节点面板顶部的固定选项行（自动 / 全部节点 / 策略组），与节点行同高同样式。 */
 function ChoiceRow({ checked, label, radio = false, onClick }: { checked: boolean; label: string; radio?: boolean; onClick: () => void }) {
   return <button type="button" role={radio ? 'radio' : 'checkbox'} aria-checked={checked} onClick={onClick}
-    className={`flex min-h-10 w-full shrink-0 cursor-pointer items-center gap-2.5 border-b border-line-2 px-3 py-2 text-left text-[length:var(--text-control)] ${checked ? 'bg-selected' : 'hover:bg-inset'}`}>
-    <span className={`flex size-3.5 shrink-0 items-center justify-center border ${radio ? 'rounded-full' : 'rounded-[2px]'} ${checked ? radio ? 'border-[4px] border-brand' : 'border-brand bg-brand text-white' : 'border-control-line'}`}>{!radio && checked && <Check size={11} />}</span>
+    className={`flex min-h-10 w-full shrink-0 cursor-pointer items-center gap-2.5 border-b border-border px-3 py-2 text-left text-sm ${checked ? 'bg-primary/5' : 'hover:bg-muted'}`}>
+    <span className={`flex size-3.5 shrink-0 items-center justify-center border ${radio ? 'rounded-full' : 'rounded-[2px]'} ${checked ? radio ? 'border-[4px] border-primary' : 'border-primary bg-primary text-white' : 'border-input'}`}>{!radio && checked && <Check size={11} />}</span>
     <span className="min-w-0 truncate">{label}</span>
   </button>;
 }

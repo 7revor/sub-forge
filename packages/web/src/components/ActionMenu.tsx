@@ -20,7 +20,7 @@ export function ActionMenu({ label = '更多操作', items, children, size = 'sm
         if (target && !target.hasAttribute('disabled')) { event.preventDefault(); target.click(); setOpen(false); }
       }}>{child}</DropdownMenuItem>)}
       {!!items?.some(item => item.danger) && <DropdownMenuSeparator />}
-      {items?.filter(item => item.danger).map(item => <DropdownMenuItem key={item.label} disabled={item.disabled} onSelect={item.onSelect} className="text-err focus:text-err">{item.label}</DropdownMenuItem>)}
+      {items?.filter(item => item.danger).map(item => <DropdownMenuItem key={item.label} disabled={item.disabled} onSelect={item.onSelect} className="text-destructive focus:text-destructive">{item.label}</DropdownMenuItem>)}
     </DropdownMenuContent>
   </DropdownMenu>;
 }

@@ -25,9 +25,9 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
   }, []);
   return <DropdownMenu onOpenChange={open => { if (!open) setSearch(''); }}>
     <DropdownMenuTrigger asChild><button type="button" aria-label={label} title={selected?.label ?? placeholder}
-      className="flex h-8 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-transparent pr-1.5 pl-3 text-left text-[length:var(--text-control)] transition-colors hover:bg-ground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
-      <span className={cx('w-[84px] min-w-0 flex-none truncate', !selected && 'text-ink-muted')}>{selected?.label ?? placeholder}</span>
-      <ChevronDown size={14} className="shrink-0 text-faint" aria-hidden />
+      className="flex h-8 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-transparent pr-1.5 pl-3 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+      <span className={cx('w-[84px] min-w-0 flex-none truncate', !selected && 'text-muted-foreground')}>{selected?.label ?? placeholder}</span>
+      <ChevronDown size={14} className="shrink-0 text-muted-foreground" aria-hidden />
     </button></DropdownMenuTrigger>
     <DropdownMenuContent onCloseAutoFocus={event => {
       if (openNodeAfterClose.current) {
@@ -40,12 +40,12 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
       <DropdownMenuRadioGroup value={value} onValueChange={next => { if (next === 'node') openNodeAfterClose.current = true; else if (next !== value) onChange(next); }}>
         {sections.map((section, i) => <Fragment key={i}>
           {i > 0 && <DropdownMenuSeparator />}
-          {section.label && <DropdownMenuLabel className="px-3 text-[length:var(--text-caption)] text-ink-muted">{section.label}</DropdownMenuLabel>}
-          {section.options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value} textValue={option.label} className="px-3 text-[length:var(--text-control)]">
+          {section.label && <DropdownMenuLabel className="px-3 text-xs text-muted-foreground">{section.label}</DropdownMenuLabel>}
+          {section.options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value} textValue={option.label} className="px-3 text-sm">
             <span className="min-w-0 flex-1 break-words">{option.label}</span>
-            {option.value === 'builtin:DIRECT' && <span className="text-ink-muted">直连</span>}
-            {option.value === 'builtin:REJECT' && <span className="text-ink-muted">拒绝</span>}
-            {option.value === value && <Check size={14} className="text-accent-ink" aria-hidden />}
+            {option.value === 'builtin:DIRECT' && <span className="text-muted-foreground">直连</span>}
+            {option.value === 'builtin:REJECT' && <span className="text-muted-foreground">拒绝</span>}
+            {option.value === value && <Check size={14} className="text-primary" aria-hidden />}
           </DropdownMenuRadioItem>)}
         </Fragment>)}
       </DropdownMenuRadioGroup>

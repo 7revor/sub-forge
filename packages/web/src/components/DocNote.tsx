@@ -7,5 +7,5 @@ export function NoteField({ value, onChange, compact = false }: { compact?: bool
 }
 
 export function NoteCell({ note }: { note?: string }) {
-  return <span title={note} className="block min-w-0 max-w-[320px] truncate text-ink-muted">{note?.trim() ? note : '无'}</span>;
+  return <span title={note} className="block min-w-0 max-w-[320px] truncate text-muted-foreground">{note?.trim() ? note : '无'}</span>;
 }

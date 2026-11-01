@@ -37,7 +37,7 @@ export function Account() {
     <PageScroll><section className="settings-panel">
       <div className="settings-row"><div><h2>{me?.username}</h2><p>{me?.role === 'admin' ? '管理员' : '普通用户'} · {scripts ? '脚本处理器可写' : '未授权脚本处理器'}</p></div></div>
       <div className="settings-row"><div><h2>资源访问令牌</h2><p>所有订阅链接共用；重置后旧链接立即失效</p></div>
-        <div className="flex flex-col gap-3"><ErrorAlert error={token.error} /><div className="flex flex-wrap items-center gap-2"><span className="flex h-9 w-[280px] items-center rounded-lg border border-control-line bg-inset px-3 font-mono text-[length:var(--text-control)]">{token.data ? `${token.data.slice(0, 4)}••••••••••••${token.data.slice(-4)}` : '正在读取…'}</span><CopyButton text={token.data ?? ''} disabled={!token.data}>复制</CopyButton><Button variant="danger" disabled={!token.data} onClick={() => void resetToken()}>重置令牌…</Button></div></div>
+        <div className="flex flex-col gap-3"><ErrorAlert error={token.error} /><div className="flex flex-wrap items-center gap-2"><span className="flex h-9 w-[280px] items-center rounded-lg border border-input bg-muted px-3 font-mono text-sm">{token.data ? `${token.data.slice(0, 4)}••••••••••••${token.data.slice(-4)}` : '正在读取…'}</span><CopyButton text={token.data ?? ''} disabled={!token.data}>复制</CopyButton><Button variant="danger" disabled={!token.data} onClick={() => void resetToken()}>重置令牌…</Button></div></div>
       </div>
       <div className="settings-row"><div><h2>密码</h2><p>修改后其他设备需要重新登录</p></div>
         <form onSubmit={submit} className="grid max-w-[720px] grid-cols-1 items-start gap-4 sm:grid-cols-3">
