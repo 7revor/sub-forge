@@ -96,7 +96,7 @@ function MemberPreview({ effective, sources, group, memberText, nodeSetName }: {
       {view.loading && <span className="px-2 text-ink-muted">正在加载…</span>}{view.errors.map((error,i) => <span role="alert" key={i} className="px-2 text-err">{error}</span>)}{view.errors.length > 0 && <Button size="sm" onClick={() => void Promise.allSettled(queries.map(query => query.refetch()))}>重新加载</Button>}{view.truncated && <p className="px-2 text-warn">预览列表已截断，命中数量仅统计当前返回的节点；完整结果以生成配置为准。</p>}
       {!effective.length && <span className="px-2 text-ink-muted">添加成员后显示预览</span>}
     </div>
-    <div className="border-t border-line-2 px-5 py-2.5 text-[length:var(--text-caption)] text-ink-muted">{view.total} 个来源节点中命中 {view.rows.length} 个</div>
+    {!!sources.length && <div className="border-t border-line-2 px-5 py-2.5 text-[length:var(--text-caption)] text-ink-muted">{view.total} 个来源节点中命中 {view.rows.length} 个</div>}
   </aside>;
 }
 
