@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { ruleBodies } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -44,49 +45,41 @@ describe('远程规则快照有效性', () => {
     const before = await h.renderer.render('p', { client: 'mihomo' });
     expect(before.ok).toBe(true);
     if (!before.ok) throw new Error(before.message);
-    expect(Object.keys(ruleBodies(h.store, before.render))).toHaveLength(1);
+    expect(Object.keys((await ruleBodies(h.renderer, 'p')))).toHaveLength(1);
     expect((await h.refresh(invalid)).ok).toBe(false);
     expect(h.store.latestSnapshot('ruleset', 'r', 'https://rules.example.test/list')?.body).toBe(valid);
     const after = await h.renderer.render('p', { client: 'mihomo' });
     expect(after.ok).toBe(true);
     if (!after.ok) throw new Error(after.message);
     expect(after.render.yaml).toBe(before.render.yaml);
-    expect(ruleBodies(h.store, after.render)).toEqual(ruleBodies(h.store, before.render));
+    expect((await ruleBodies(h.renderer, 'p'))).toEqual((await ruleBodies(h.renderer, 'p')));
     expect(after.report).toContainEqual(expect.objectContaining({ code: 'ruleset.fetch-failed', level: 'warn' }));
   });
 
   it('首次收到错误页面时返回 503，不生成只有兜底规则的成功配置', async () => {
     const h = setup('auto', '<html>Not available</html>');
     expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(503);
-    expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
   });
 
   it('部分行无法解析仍保留有效规则，并允许之后恢复正常更新', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test\nUNKNOWN,value');
     const before = await h.renderer.render('p', { client: 'mihomo' });
-    expect(before.ok && ruleBodies(h.store, before.render)['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n# [本系统暂未支持解析：不支持的规则类型 UNKNOWN] UNKNOWN,value\n');
+    expect(before.ok && (await ruleBodies(h.renderer, 'p'))['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n# [本系统暂未支持解析：不支持的规则类型 UNKNOWN] UNKNOWN,value\n');
     expect(before.report.some(item => ['ruleset.rejected-lines', 'rule.unimplemented'].includes(item.code))).toBe(false);
     expect((await h.refresh('<html>error</html>')).ok).toBe(false);
     expect((await h.refresh('DOMAIN,recovered.example.test')).ok).toBe(true);
     const after = await h.renderer.render('p', { client: 'mihomo' });
-    expect(after.ok && ruleBodies(h.store, after.render)['rs_r_classical.list']).toBe('DOMAIN,recovered.example.test\n');
+    expect(after.ok && (await ruleBodies(h.renderer, 'p'))['rs_r_classical.list']).toBe('DOMAIN,recovered.example.test\n');
   });
 
-  it.each([false, true])('历史库中已存在错误快照时保护主配置（已有成功配置：%s）', async hasLastGood => {
+  it('历史库中已存在错误快照时规则文件报错，不下发错误内容', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test');
-    const before = hasLastGood ? await h.renderer.render('p', { client: 'mihomo' }) : undefined;
     h.advance(1000);
     const body = '<html>旧版本错误保存的页面</html>';
     h.store.addSnapshot({ ownerKind: 'ruleset', ownerId: 'r', url: 'https://rules.example.test/list', fetchedAt: 1_700_000_001_000, ok: true, body, hash: stableHash(body) });
-    const after = await h.renderer.render('p', { client: 'mihomo' });
-    expect(after.report).toContainEqual(expect.objectContaining({ code: 'ruleset.invalid-content', level: 'error' }));
-    if (hasLastGood) {
-      expect(after.ok && after.source).toBe('last-good');
-      expect(after.ok && after.render.yaml).toBe(before?.ok && before.render.yaml);
-    } else {
-      expect(after.ok).toBe(false);
-      expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
-    }
+    expect((await h.renderer.render('p', { client: 'mihomo' })).ok).toBe(true);
+    await expect(h.renderer.sharedRules.read({ matcher: { kind: 'ruleset', id: 'r' } }, { client: 'mihomo' })).rejects.toThrow('没有可用规则');
+    expect((await h.renderer.preview('p', { client: 'mihomo' })).report).toContainEqual(expect.objectContaining({ code: 'ruleset.invalid-content', level: 'error' }));
   });
 
   it('有效规则被客户端覆盖全部丢弃时仍允许输出', async () => {
@@ -94,5 +87,15 @@ describe('远程规则快照有效性', () => {
     const rs = h.store.get('ruleset', 'r')!;
     h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, overrides: [{ line: 1, override: { when: { client: 'mihomo' }, action: { drop: true } } }] }] });
     expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(200);
+  });
+
+  it('规则全部不适用于目标内核时，主配置仍声明 provider，规则文件返回合法的空内容', async () => {
+    const h = setup('classical', 'DOMAIN,valid.example.test');
+    const rs = h.store.get('ruleset', 'r')!;
+    h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, overrides: [{ line: 1, override: { when: { client: 'mihomo' }, action: { drop: true } } }] }] });
+    const rendered = await h.renderer.render('p', { client: 'mihomo' });
+    expect(rendered.ok && parse(rendered.render.yaml).rules[0]).toContain('RULE-SET,');
+    const output = await h.renderer.sharedRules.read({ matcher: { kind: 'ruleset', id: 'r' } }, { client: 'mihomo' });
+    expect(output?.body.split('\n').filter(line => line && !line.startsWith('#'))).toEqual([]);
   });
 });

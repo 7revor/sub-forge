@@ -1,5 +1,4 @@
 import { ruleBinding } from './rule-binding.ts';
-import type { SharedRuleRecord } from './shared-rules.ts';
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 import { ResourceAccessError } from './resource-access.ts';
 // 资源调度与手动刷新使用同一依赖收集和状态。任务持久化，重启后明确标记中断。
@@ -85,7 +84,6 @@ export class ResourceService {
     };
     return [
       ...this.additionalResources(),
-      ...this.store.listSharedRules<SharedRuleRecord>().flatMap(r => { const rs = resolveRuleSetReference(r.data.reference.matcher, this.store); return rs ? this.ruleResources(rs) : []; }),
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
@@ -135,16 +133,9 @@ export class ResourceService {
         job.state='interrupted';job.error='刷新期间资源配置已变化，请重新刷新';return;
       }
       if (kind === 'profile') {
-        // 按已发布的目标重建，同时保证默认 Mihomo 配置可立即获取。
-        const targets = this.store.db.prepare('SELECT target FROM last_good WHERE profile_id = ?').all(id) as {target:string}[];
-        const failures:string[]=[];
-        for (const target of new Set(['mihomo:any',...targets.map(t=>t.target)])) {
-          const [client,platform,app] = target.split(':');
-          if(client !== 'mihomo' && client !== 'stash' && client !== 'surge' && client !== 'loon') continue;
-          const result = await this.renderer.render(id,{client,...(platform !== 'any' ? {platform:platform as 'ios'} : {}), ...(app ? { app: app as import('@sub-forge/core').ClientApp } : {})});
-          if(!result.ok || result.source==='last-good') failures.push(!result.ok ? result.message : result.report.filter(r=>r.level==='error').map(r=>r.message).join('；') || '生成失败，使用上次成功配置');
-        }
-        job.render={ok:!failures.length,...(failures.length ? {error:failures.join('；')} : {})};
+        // 确认默认 Mihomo 配置可立即生成；其他客户端在各自拉取时渲染，不把未使用的客户端限制算作失败。
+        const result = await this.renderer.render(id,{client:'mihomo'});
+        job.render=result.ok ? {ok:true} : {ok:false,error:result.message};
       }
       if (!explicit && dependencyKey(this.collect(kind,id)) !== initialDependencies) {
         job.state='interrupted';job.error='刷新期间资源配置已变化，请重新刷新';return;

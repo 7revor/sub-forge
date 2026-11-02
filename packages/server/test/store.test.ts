@@ -59,12 +59,10 @@ describe('Store', () => {
     } finally { s.close(); }
   });
 
-  it('token、最近一次成功渲染、访问日志', () => {
+  it('token、访问日志', () => {
     const s = new Store(':memory:', { now: () => 42 });
     issueProfileToken(s, { token: 'tk', profileId: 'p' });
     expect(s.getToken('tk')).toEqual({ token: 'tk', userId: 'fixture-user' });
-    s.putLastGood('p', 'mihomo', { yaml: 'a' });
-    expect(s.getLastGood('p', 'mihomo')).toEqual({ renderedAt: 42, data: { yaml: 'a' } });
     const logUser = s.createUser({ username: '日志用户', passwordHash: 'fixture', role: 'user' });
     const logToken = s.createToken(logUser.id).token;
     s.logAccess({ token: logToken, profileId: 'p', at: 1, ua: 'clash.meta', client: 'mihomo', status: 200, ms: 3, warnings: 0, source: 'fresh' });
@@ -314,4 +312,19 @@ it('v7 升级到 v9：按成功快照与本地内容迁移旧行号，无内容�
   expect(reopened.get('ruleset', 'r')).toEqual(rs);
   reopened.close();
   rmSync(dir, { recursive: true, force: true });
+});
+
+it('v32 升级删除渲染结果表，保留文档并回收空间', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sf-drop-last-good-'));
+  const file = join(dir, 'db.sqlite'), cipher = new Cipher(randomBytes(32));
+  let store = new Store(file, { cipher });
+  try {
+    store.put('ruleset', { id: 'r', name: '规则', sources: [] }, 'owner');
+    store.db.exec('CREATE TABLE last_good (profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (profile_id, target))');
+    store.db.prepare('INSERT INTO last_good VALUES (?, ?, ?, ?)').run('p', 'mihomo:any', 1, cipher.encrypt('{}'));
+    store.db.pragma('user_version = 32'); store.close(); store = new Store(file, { cipher });
+    expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+    expect(store.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'last_good'").get()).toBeUndefined();
+    expect(store.get('ruleset', 'r')?.name).toBe('规则');
+  } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });

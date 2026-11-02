@@ -1,136 +1,66 @@
-// 公共规则产物按规则身份、处理参数和客户端共享；与用户 token、配置订阅无关。
+// 公共规则按需从上游快照转换，结果不落库；与用户 token、配置订阅无关。
 import { createHash } from 'node:crypto';
-import { managedRuleDelivery, renderMihomo, renderStash, renderSurge, renderLoon, ruleProviderName, sourceKey, stableStringify, type RuleSetDelivery, type RuleResourceReference, type RuleSetInputs } from '@sub-forge/core';
+import { managedRuleDelivery, renderMihomo, renderStash, renderSurge, renderLoon, ruleProviderName, sourceKey, stableStringify, type RuleResourceReference, type RuleSetInputs } from '@sub-forge/core';
 import type { RuleSetDoc } from './docs.ts';
 type Target = { client: import('@sub-forge/core').Client };
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 import type { SnapshotService } from './snapshots.ts';
 import type { Store } from './store.ts';
 
-export type SharedRuleRecord = {
-  reference: RuleResourceReference;
-  target: Target;
-  name: string;
-  delivery?: Extract<RuleSetDelivery, { mode: 'managed' }>;
-  inputHash: string;
-  body: string;
-  error?: string;
-};
-const hash = (value: unknown) => createHash('sha256').update(stableStringify(value)).digest('hex');
-const canonical = (ref: RuleResourceReference): RuleResourceReference => ({ matcher: ref.matcher, ...(ref.options?.src ? { options: { src: true } } : {}) });
-// 转换语义变化时递增，使旧正文按需重建；不参与资源 key，保持已发布链接有效。
-// v3：Stash 公共生成保留 URL-REGEX，不再复用旧版省略该规则的正文。
-const SHARED_RULE_RENDER_VERSION = 3;
+export type SharedRuleOutput = { body: string; name: string; stale: boolean };
 
 export class SharedRuleService {
-  private readonly inflight = new Map<string, Promise<string | undefined>>();
+  private readonly inflight = new Map<string, Promise<SharedRuleOutput | undefined>>();
   constructor(private store: Store, private snapshots: SnapshotService) {}
 
-  key(reference: RuleResourceReference, target: Target): string {
-    const m = reference.matcher;
-    const identity = m.remote ? { url: m.remote.url } : m.repository ? { repo: m.repository.repo, entry: m.repository.entry, sources: m.repository.sources } : { id: m.id };
-    const rs = resolveRuleSetReference(m, this.store);
-    const delivery = rs ? managedRuleDelivery(rs, target, reference.options) : undefined;
-    return hash({ identity, options: canonical(reference).options, target: { client: target.client }, delivery: delivery?.mode === 'managed' ? delivery : undefined });
-  }
-  private inputHash(rs: RuleSetDoc, rules: RuleSetInputs, reference: RuleResourceReference, target: Target): string {
-    return hash({ version: SHARED_RULE_RENDER_VERSION, rs, target: { client: target.client }, options: canonical(reference).options, bodies: rs.sources.filter(s => s.enabled !== false).map(s => s.kind === 'local' ? s.content : rules.snapshots[sourceKey(rs.id, s.id)]) });
-  }
-  register(reference: RuleResourceReference, target: Target, rs: RuleSetDoc, rules: RuleSetInputs, body: string): void {
-    if (reference.matcher.remote) throw new Error('订阅专属规则不能注册为公共资源');
-    const delivery = managedRuleDelivery(rs, target, reference.options);
-    if (delivery.mode !== 'managed') throw new Error(delivery.reason);
-    this.store.putSharedRule(this.key(reference, target), rs.id, {
-      reference: canonical(reference), target: { client: target.client }, name: ruleProviderName(reference.matcher, rs), delivery,
-      inputHash: this.inputHash(rs, rules, reference, target), body,
-    } satisfies SharedRuleRecord);
-  }
-  read(key: string): Promise<string | undefined> {
-    return this.resolve(key);
-  }
-  /** 独立增强链接首次访问时才生成；未成功的产物不写入公共资源表。 */
-  readReference(reference: RuleResourceReference, target: Target): Promise<string | undefined> {
+  /** 同一身份和内核的并发读取共用一次转换；定义失效返回 undefined。 */
+  read(reference: RuleResourceReference, target: Target, definition: () => RuleSetDoc | undefined = () => resolveRuleSetReference(reference.matcher, this.store)): Promise<SharedRuleOutput | undefined> {
     if (reference.matcher.remote) return Promise.resolve(undefined);
-    const rs = resolveRuleSetReference(reference.matcher, this.store);
-    if (!rs) return Promise.resolve(undefined);
-    const delivery = managedRuleDelivery(rs, target, reference.options);
-    if (delivery.mode !== 'managed') return Promise.reject(new Error(delivery.reason));
-    return this.resolve(this.key(reference, target), { reference: canonical(reference), target: { client: target.client }, name: ruleProviderName(reference.matcher, rs), delivery, inputHash: '', body: '' });
-  }
-  private resolve(key: string, initial?: SharedRuleRecord): Promise<string | undefined> {
+    const key = createHash('sha256').update(stableStringify({ id: reference.matcher.id, src: !!reference.options?.src, client: target.client })).digest('hex');
     const pending = this.inflight.get(key);
     if (pending) return pending;
-    const saved = this.store.getSharedRule<SharedRuleRecord>(key);
-    const reference = (saved ?? initial)?.reference;
-    const repositories = new Set(reference ? resolveRuleSetReference(reference.matcher, this.store)?.sources.flatMap(source => source.repository ? [source.repository.repo] : []) : []);
-    if (reference?.matcher.repository) repositories.add(reference.matcher.repository.repo);
+    const repositories = new Set(definition()?.sources.flatMap(source => source.repository ? [source.repository.repo] : []));
     let cancelled = false;
-    const invalidate = (kind: string, id: string) => { if (kind === 'shared-rule' && id === key || kind === 'ruleset' && id === reference?.matcher.id || kind === 'repository' && repositories.has(id)) cancelled = true; };
+    const invalidate = (kind: string, id: string) => { if (kind === 'ruleset' && id === reference.matcher.id || kind === 'repository' && repositories.has(id)) cancelled = true; };
     this.store.invalidationListeners.add(invalidate);
-    const work = this.compile(key, () => cancelled, 0, saved ? undefined : initial).catch(error => {
-      if (cancelled) return undefined;
-      const record = this.store.getSharedRule<SharedRuleRecord>(key);
-      if (!record) {
-        if (initial && resolveRuleSetReference(initial.reference.matcher, this.store)) throw error;
-        return undefined;
-      }
-      if (!resolveRuleSetReference(record.reference.matcher, this.store)) return undefined;
-      const message = error instanceof Error ? error.message : String(error);
-      this.store.putSharedRule(key, record.reference.matcher.id, { ...record, error: message });
-      console.warn(`公共规则生成失败，保留上次成功结果：${key}：${message}`);
-      return record.body;
-    }).finally(() => { this.inflight.delete(key); this.store.invalidationListeners.delete(invalidate); });
+    const work = this.compile(reference, target, definition, () => cancelled)
+      .finally(() => { this.inflight.delete(key); this.store.invalidationListeners.delete(invalidate); });
     this.inflight.set(key, work);
     return work;
   }
-  private async compile(key: string, cancelled: () => boolean, attempt = 0, initial?: SharedRuleRecord): Promise<string | undefined> {
+
+  private async compile(reference: RuleResourceReference, target: Target, definition: () => RuleSetDoc | undefined, cancelled: () => boolean, attempt = 0): Promise<SharedRuleOutput | undefined> {
     if (cancelled()) return undefined;
-    const record = this.store.getSharedRule<SharedRuleRecord>(key) ?? initial;
-    if (!record || record.reference.matcher.remote) return undefined;
-    const rs = resolveRuleSetReference(record.reference.matcher, this.store);
-    if (!rs) { this.store.deleteSharedRule(key); return undefined; }
-    const delivery = managedRuleDelivery(rs, record.target, record.reference.options);
+    const rs = definition();
+    if (!rs) return undefined;
+    const delivery = managedRuleDelivery(rs, target, reference.options);
     if (delivery.mode !== 'managed') throw new Error(delivery.reason);
-    // 下载地址承担固定格式契约；旧主配置不能在同一文本地址收到 MRS 字节。
-    if (!record.delivery && record.body.startsWith('#subforge-binary-mrs\n')) throw new Error('旧二进制资源缺少格式契约，请刷新主订阅以使用新资源');
-    const expected = record.delivery ?? { mode: 'managed', format: 'text', behavior: 'classical' };
-    if (stableStringify(delivery) !== stableStringify(expected)) throw new Error('规则输出格式已变化，请刷新主订阅以使用新资源');
+    const retry = () => {
+      if (attempt >= 2) throw new Error('规则资源在生成期间持续变化，请重试');
+      return this.compile(reference, target, definition, cancelled, attempt + 1);
+    };
     const rules: RuleSetInputs = { rulesets: { [rs.id]: rs }, snapshots: {} };
     const loaded = [];
     for (const src of rs.sources.filter(s => s.enabled !== false && s.kind === 'remote')) {
       const result = await this.snapshots.get('ruleset', rs.id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
-      if (cancelled() || (!initial && !this.store.getSharedRule(key)) || !resolveRuleSetReference(record.reference.matcher, this.store)) return undefined;
-      if (stableStringify(resolveRuleSetReference(record.reference.matcher, this.store)) !== stableStringify(rs)) {
-        if (attempt >= 2) throw new Error('规则资源在生成期间持续变化，请重试');
-        return this.compile(key, cancelled, attempt + 1, initial);
-      }
+      if (cancelled() || !definition()) return undefined;
+      if (stableStringify(definition()) !== stableStringify(rs)) return retry();
       if (!result.snapshot?.body) throw new Error(`规则来源没有可用内容：${result.error ?? src.name ?? src.id}`);
       rules.snapshots[sourceKey(rs.id, src.id)] = result.snapshot.body;
       loaded.push(result);
     }
-    if (!initial && !this.store.getSharedRule(key)) return undefined;
-    const current = resolveRuleSetReference(record.reference.matcher, this.store);
-    if (!current) return undefined;
-    if (stableStringify(current) !== stableStringify(rs) || loaded.some(r => !this.snapshots.isCurrent(r.snapshot!, r.revision))) {
-      if (attempt >= 2) throw new Error('规则资源在生成期间持续变化，请重试');
-      return this.compile(key, cancelled, attempt + 1, initial);
-    }
-    const inputHash = this.inputHash(rs, rules, record.reference, record.target);
-    if (record.inputHash === inputHash) {
-      if (record.error) this.store.putSharedRule(key, rs.id, { ...record, error: undefined });
-      return record.body;
-    }
-    const result = (record.target.client === 'loon' ? renderLoon : record.target.client === 'surge' ? renderSurge : record.target.client === 'stash' ? renderStash : renderMihomo)({
+    if (cancelled() || !definition()) return undefined;
+    if (stableStringify(definition()) !== stableStringify(rs) || loaded.some(r => !this.snapshots.isCurrent(r.snapshot!, r.revision))) return retry();
+    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
       profile: { id: '$shared-rule', name: rs.name, nodeSets: [], chains: [], routing: { mode: 'independent', config: {
-        groups: [], rules: [{ id: 'rule', matcher: record.reference.matcher, options: record.reference.options, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' },
+        groups: [], rules: [{ id: 'rule', matcher: reference.matcher, options: reference.options, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' },
       } } },
       nodeSets: { sources: {}, locals: {}, collections: {}, snapshots: {} }, rules,
       urls: { provider: key => key, ruleset: key => key },
     });
     if (result.report.hasErrors) throw new Error(result.report.items.filter(i => i.level === 'error').map(i => i.message).join('；'));
-    const body = Object.values(result.rulesets)[0]?.text;
-    if (body === undefined) throw new Error('规则资源没有可用输出');
-    this.store.putSharedRule(key, rs.id, { ...record, inputHash, name: ruleProviderName(record.reference.matcher, rs), body, error: undefined });
-    return body;
+    // 主配置不解析正文就声明了 provider，全部规则都不适用于该内核时也要返回合法的空规则文件。
+    const body = Object.values(result.rulesets)[0]?.text ?? `# 规则集没有可用于 ${target.client} 的规则\n`;
+    return { body, name: ruleProviderName(reference.matcher, rs), stale: loaded.some(r => r.stale) };
   }
 }

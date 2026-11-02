@@ -53,7 +53,7 @@ describe('模板统一规则引用', () => {
     const config = parse(rendered.render.yaml);
     expect(Object.keys(config['rule-providers'])).toEqual(['Google']);
     expect(config.rules).toContain('RULE-SET,Google,REJECT');
-    expect(Object.values(ruleBodies(h.store, rendered.render)).join('\n')).toContain('google.example.test');
+    expect(Object.values((await ruleBodies(h.renderer, 'p'))).join('\n')).toContain('google.example.test');
     expect(h.store.list('ruleset')).toHaveLength(2);
     expect((await h.admin.del('/api/rule-repos/blackmatrix7')).status).toBe(409);
   });

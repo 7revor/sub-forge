@@ -69,28 +69,30 @@ it('不能等价折叠的类型覆盖保留两份原文并要求修复，避免�
   expect(parse(resolveNativeBase('stash', 'stash-macos', next.base))).toEqual({ dns: null });
 });
 
-it.each([28, 30, 32])('v%d 升级和旧种子导入执行相同迁移，加密备份、归属、时间、缓存与重启幂等', version => {
+it.each([28, 30, 32, 33])('v%d 升级和旧种子导入执行相同迁移，加密备份、归属、时间与重启幂等，产物表保持退役', version => {
   const dir = mkdtempSync(join(tmpdir(), 'sf-stash-common-')), file = join(dir, 'test.db'), cipher = new Cipher(randomBytes(32));
   let store = new Store(file, { cipher });
   try {
     const original = profile({ enabled: false, kernels: { mihomo: 'dns: {enable: true}\n', stash: 'dns: {enable: true, ipv6: false}\n' }, clients: { 'stash-ios': '# 保留应用优先级\nmode: rule\n' } });
     store.db.prepare('INSERT INTO docs (kind,id,owner,data,updated_at) VALUES (?,?,?,?,?)').run('profile', original.id, 'owner', cipher.encrypt(JSON.stringify(original)), 123);
     store.db.prepare('INSERT INTO native_migration_backups VALUES (?,?,?,?)').run('profile', original.id, cipher.encrypt('{"older":true}'), 1);
-    for (const id of ['sub', 'other']) store.putLastGood(id, 'stash:ios:stash-ios', { yaml: '旧结果' });
+    if (version < 33) {
+      store.db.exec('CREATE TABLE last_good (profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (profile_id, target))');
+      store.db.prepare('INSERT INTO last_good VALUES (?,?,?,?)').run('sub', 'stash:ios:stash-ios', 1, cipher.encrypt('{"yaml":"旧结果"}'));
+    }
     store.db.pragma(`user_version = ${version}`); store.close(); store = new Store(file, { cipher });
     const saved = store.get('profile', 'sub')!;
-    expect(store.db.pragma('user_version', { simple: true })).toBe(33);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(34);
     expect(saved.base?.kernels).not.toHaveProperty('stash');
     expect(parse(saved.base!.clients!['stash-ios']!)).toEqual({ dns: { ipv6: false }, mode: 'rule' });
     expect(saved.base!.clients!['stash-macos']).toBe('dns:\n  ipv6: false\n');
     expect(store.getWithOwner('profile', 'sub')).toMatchObject({ owner: 'owner', updatedAt: 123 });
-    const backup = store.db.prepare("SELECT data FROM native_migration_backups WHERE kind = 'profile-stash-common-v33' AND id = 'sub'").get() as { data: string };
+    const backup = store.db.prepare("SELECT data FROM native_migration_backups WHERE kind = 'profile-stash-common-v34' AND id = 'sub'").get() as { data: string };
     expect(backup.data).not.toContain('ipv6');
     expect(JSON.parse(cipher.decrypt(backup.data))).toMatchObject(original);
     const older = store.db.prepare("SELECT data FROM native_migration_backups WHERE kind = 'profile' AND id = 'sub'").get() as { data: string };
     expect(JSON.parse(cipher.decrypt(older.data))).toEqual({ older: true });
-    expect(store.getLastGood('sub', 'stash:ios:stash-ios')).toBeUndefined();
-    expect(store.getLastGood('other', 'stash:ios:stash-ios')).toBeDefined();
+    expect(store.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('last_good', 'shared_rule_resources')").all()).toEqual([]);
     store.close(); store = new Store(file, { cipher });
     expect(store.get('profile', 'sub')).toEqual(saved);
     store.importSeed({ profiles: [saved] });
@@ -106,6 +108,6 @@ it('损坏的旧值会回滚整个种子事务，原文档和备份不被部分�
   try {
     expect(() => store.importSeed({ profiles: [profile({ kernels: { mihomo: 'ipv6: true', stash: 'ipv6: false' } }), { ...profile({ kernels: { stash: [] } }), id: 'bad' }] } as any)).toThrow('旧 Stash 公共配置必须是原始文本');
     expect(store.list('profile')).toEqual([]);
-    expect(store.db.prepare("SELECT id FROM native_migration_backups WHERE kind = 'profile-stash-common-v33'").all()).toEqual([]);
+    expect(store.db.prepare("SELECT id FROM native_migration_backups WHERE kind = 'profile-stash-common-v34'").all()).toEqual([]);
   } finally { store.close(); }
 });

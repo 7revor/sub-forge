@@ -128,7 +128,6 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
     store.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?)').run('profile', 'p', 'owner', encrypted, 1234);
     store.db.prepare('INSERT INTO profile_migration_backups VALUES (?, ?, ?)').run('p', encrypted, 1234);
     issueProfileToken(store, { token: 'same-token', profileId: 'p' });
-    store.putLastGood('p', 'mihomo', { yaml: '原成功内容' });
     store.db.pragma('user_version = 19'); store.close(); store = new Store(file, { cipher });
     expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
     expect(store.getTemplate('t')).toEqual({ ...template, id: 't' });
@@ -138,7 +137,6 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
     expect(profile?.doc).not.toHaveProperty('templateVersion');
     expect(store.getProfileMigrationBackup('p')).toEqual(oldProfile);
     expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'p')?.owner);
-    expect(store.getLastGood('p', 'mihomo')).toBeUndefined();
     const before = [store.getTemplate('t'), profile];
     store.close(); store = new Store(file, { cipher });
     expect([store.getTemplate('t'), store.getWithOwner('profile', 'p')]).toEqual(before);

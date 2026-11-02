@@ -19,7 +19,7 @@
 }
 ```
 
-内核公共追加匹配同组客户端；客户端层可选，只匹配所选应用。2026-11-02 起，产品顶层分组统一为 Mihomo、Surge、Loon，Mihomo 下直接列出 Stash iOS、Stash macOS；Surge 下列出 Surge iOS、Surge macOS；Loon 下列出 Loon iOS、Loon macOS。不设置中间 Stash 菜单，也不再单列 FlClash、Clash Verge Rev 等标准 Mihomo 客户端。Stash 两端继承 Mihomo 公共 YAML，再应用各自追加。[Stash 官方](https://stash.wiki/)仍称其为兼容 Clash 配置的自研内核，此处是项目的配置分组与继承约定；按用户要求不增加兼容过滤或字段转换。`kernels` 仅允许 `mihomo`、`surge`、`loon`；Stash 使用 `clients.stash-ios`、`clients.stash-macos` 保存应用追加，旧 `kernels.stash` 由 v33 迁移退役。Surge 与 Loon 各自保存 INI。
+内核公共追加匹配同组客户端；客户端层可选，只匹配所选应用。2026-11-02 起，产品顶层分组统一为 Mihomo、Surge、Loon，Mihomo 下直接列出 Stash iOS、Stash macOS；Surge 下列出 Surge iOS、Surge macOS；Loon 下列出 Loon iOS、Loon macOS。不设置中间 Stash 菜单，也不再单列 FlClash、Clash Verge Rev 等标准 Mihomo 客户端。Stash 两端继承 Mihomo 公共 YAML，再应用各自追加。[Stash 官方](https://stash.wiki/)仍称其为兼容 Clash 配置的自研内核，此处是项目的配置分组与继承约定；按用户要求不增加兼容过滤或字段转换。`kernels` 仅允许 `mihomo`、`surge`、`loon`；Stash 使用 `clients.stash-ios`、`clients.stash-macos` 保存应用追加，旧 `kernels.stash` 由 v34 迁移退役。Surge 与 Loon 各自保存 INI。
 
 编辑器只提供目标和文本框，不把原文解析为表单。原文的注释、空行、引号、未完成语法均直接保存；切换选项不改写或迁移文本。清空客户端选择只是切换编辑视图，已有内容仍保存并参与相应客户端生成；要移除某应用追加，应清空其文本框。
 
@@ -47,13 +47,13 @@ Stash 的顺序为 **Mihomo 公共原文 → Stash iOS/macOS 原文（可选）*
 - 节点、节点集、策略组和规则由已有模块生成。追加中含 `proxies`、`proxy-providers`、`proxy-groups`、`rules`、`rule-providers` 或相应 INI 段时明确报错，不静默删段或覆盖生成结果。Surge `#!MANAGED-CONFIG` 与 Stash `#SUBSCRIBED` 托管更新地址由服务生成，追加中不能再次声明；Stash 继承的 Mihomo 原文也遵守这一约束。
 - INI 测速 URL/超时只为已有节点、组输出读取必要的原生值；Loon 组间及全局超时冲突继续报错。
 
-格式错误允许保存，但预览生成失败；正式订阅仅能回退到同一目标的最近成功产物。基础配置原文不是整份成品配置导入入口，不再提供独立的 Loon 完整导入。模板仅提取策略组、规则及规则集引用；节点与规则由各自模块解析，基础配置不解析成业务对象。
+格式错误允许保存，但预览生成失败；正式订阅生成失败时直接返回错误。基础配置原文不是整份成品配置导入入口，不再提供独立的 Loon 完整导入。模板仅提取策略组、规则及规则集引用；节点与规则由各自模块解析，基础配置不解析成业务对象。
 
 ## 请求与预览
 
 `target=mihomo|surge|stash|loon` 选择内核；`app` 选择可选客户端：`flclash`、`clash-verge`、`surge-ios`、`surge-macos`、`stash-ios`、`stash-macos`、`loon-ios`、`loon-macos`。不匹配的内核/应用组合返回错误。历史 `platform` 参数继续用于应用识别与日志，不参与规则转换。
 
-常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源、刷新链接和最近成功配置包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下只提供 Stash iOS/macOS 两个应用选项，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。旧 FlClash、Clash Verge Rev 应用参数及已保存的追加继续兼容，对应应用追加继续保留。
+常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源和刷新链接包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下只提供 Stash iOS/macOS 两个应用选项，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。旧 FlClash、Clash Verge Rev 应用参数及已保存的追加继续兼容，对应应用追加继续保留。
 
 ## 规则只区分内核
 
@@ -63,9 +63,9 @@ Stash 的顺序为 **Mihomo 公共原文 → Stash iOS/macOS 原文（可选）*
 
 ## 升级
 
-数据库 v33 在升级及旧种子导入的事务内退役 `kernels.stash`：递归去除与 Mihomo 公共原文重复的字段，将剩余差异合并到 Stash iOS/macOS 追加，已有应用追加优先。列表整体比较，保留 `false`、`0`、`null`、空列表及必要的空映射。没有差异时不改写应用原文；需要去重或合并时 YAML 会重新排版，原始注释、格式等可从加密备份恢复。
+数据库 v34 在升级及旧种子导入的事务内退役 `kernels.stash`：递归去除与 Mihomo 公共原文重复的字段，将剩余差异合并到 Stash iOS/macOS 追加，已有应用追加优先。列表整体比较，保留 `false`、`0`、`null`、空列表及必要的空映射。没有差异时不改写应用原文；需要去重或合并时 YAML 会重新排版，原始注释、格式等可从加密备份恢复。
 
-迁移前的文档以 `kind=profile-stash-common-v33` 独立存入 `native_migration_backups`，不覆盖以前的迁移备份，归属和更新时间不变；受影响订阅的最近成功产物清除，避免回退到旧覆盖结果。重启和重复导入当前结构均不再迁移。无效 YAML 保留到应用层并给出诊断；无法等价折叠的映射/非映射交叉覆盖保留两份原文并报告错误，修复后再生成。非法文本类型使整个事务回滚。新建、更新和草稿预览拒绝 `kernels.stash`，包括空字符串。
+迁移前的文档以 `kind=profile-stash-common-v34` 独立存入 `native_migration_backups`，不覆盖以前的迁移备份，归属和更新时间不变；当前版本不保存主配置或公共规则正文；v33 已统一移除历史产物表，v34 迁移不再访问这些表。重启和重复导入当前结构均不再迁移。无效 YAML 保留到应用层并给出诊断；无法等价折叠的映射/非映射交叉覆盖保留两份原文并报告错误，修复后再生成。非法文本类型使整个事务回滚。新建、更新和草稿预览拒绝 `kernels.stash`，包括空字符串。
 
 数据库 v28 在事务中备份受影响文档到 `native_migration_backups`，使用当前数据库密钥加密。保留原归属及更新时间；迁移失败整体回滚，重启后不重复转换原文。
 

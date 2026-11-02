@@ -84,7 +84,6 @@ describe('Loon 订阅与管理接口', () => {
       expect(res.json.exportUnavailableReason).toContain('请保存配置后');
       expect(res.json.exportYaml).toBeUndefined();
     }
-    expect(h.store.getLastGood(h.profile.id, 'loon:ios:loon-ios')).toBeUndefined();
     expect((await h.bob.post('/api/profiles/' + h.profile.id + '/preview', { client: 'loon' })).status).toBe(404);
     expect((await h.bob.post('/api/profiles/preview', { profile: h.profile, client: 'loon' })).status).toBe(400);
     const inputs = [{ source: { id: 's', kind: 'local', format: 'auto' }, content: 'DST-PORT,443\nGEOSITE,cn' }];
@@ -100,7 +99,6 @@ describe('Loon 订阅与管理接口', () => {
     const text = await main.text(), link = text.split('[Remote Rule]\n')[1]!.split(',policy=')[0]!;
     const url = new URL(link), key = url.searchParams.get('key')!;
     expect((await h.app.request(link)).status).toBe(200);
-    expect(h.store.getSharedRule(key)).toBeUndefined();
     expect((await h.app.request(`/resources/ruleset?key=${key}&token=${h.token}`)).status).toBe(404);
     const profile = h.store.get('profile', h.profile.id)!;
     if (profile.routing?.mode !== 'independent') throw new Error('测试需要独立分流');
@@ -126,27 +124,13 @@ describe('Loon 订阅与管理接口', () => {
     h.store.putTemplate({ id: 'loon-template', name: 'Loon 模板', version: 2, ...config, rules: config.rules.slice(1) });
     expect((await h.app.request(link)).status).toBe(404);
   });
-  it('旧内联 last-good 不得在失败时重新下发', async () => {
-    const h = await scenario();
-    const original = await h.renderer.render(h.profile.id, { client: 'loon', platform: 'ios' });
-    if (!original.ok) throw new Error('测试初始渲染失败');
-    const legacy = { ...original.render, yaml: '[Rule]\nDOMAIN,before.test,DIRECT\nFINAL,DIRECT\n' };
-    delete legacy.loonRuleDelivery;
-    h.store.putLastGood(h.profile.id, 'loon:ios:loon-ios', legacy);
-    h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'tuic', server: 'example.test', port: 443 }] }, h.user.id);
-    expect((await h.renderer.render(h.profile.id, { client: 'loon', platform: 'ios' })).ok).toBe(false);
-    expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=loon&platform=ios`)).status).toBe(503);
-  });
-  it('不支持的协议使用同目标 last-good，不能借用其他客户端结果', async () => {
+  it('不支持的协议直接失败，不调用 Mihomo 校验器', async () => {
     const h = await scenario(), verify = vi.fn(async () => ({ ok: true, output: '' }));
     const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify });
     const original = await renderer.render(h.profile.id, { client: 'loon', platform: 'ios' });
     expect(original.ok).toBe(true); expect(verify).not.toHaveBeenCalled();
     h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'tuic', server: 'example.test', port: 443, uuid: '0233d11c-15a4-47d3-ade3-48ffca0ce119', password: 'example' }] }, h.user.id);
-    const fallback = await renderer.render(h.profile.id, { client: 'loon', platform: 'ios' });
-    expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
-    if (fallback.ok && original.ok) expect(fallback.render.yaml).toBe(original.render.yaml);
-    expect((await renderer.render(h.profile.id, { client: 'loon', platform: 'macos' })).ok).toBe(false);
+    expect((await renderer.render(h.profile.id, { client: 'loon', platform: 'ios' })).ok).toBe(false);
     const failed = await h.alice.post('/api/profiles/preview', { profile: h.profile, client: 'loon', platform: 'ios' });
     expect(failed.json.ok).toBe(false); expect(failed.json.failure).toContain('tuic');
   });

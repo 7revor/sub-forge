@@ -377,7 +377,7 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 Stash 配置继承：V2ProfileClient 将 Stash 及 iOS/macOS 放入 Mihomo 下；编辑框上方增加默认折叠的继承原文只读区、空态和 YAML/INI 合并说明。V2RuleSet 只保留 Mihomo、Surge、Loon 预览；V2ProfilePreview 同步顶层分组，Stash 应用在 Mihomo 下选择。前端及核心继承已实现，数据模型/API 无需迁移。内置浏览器实查外部 Claude Design 画布仍要求登录，画布未同步；本地设计说明和验收截图见 [设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)。
 
 
-2026-11-02 菜单层级更正（取代上方 Stash 中间菜单）：V2ProfileClient 采用三组各两个直接子项：Mihomo → Stash iOS / Stash macOS，Surge → Surge iOS / Surge macOS，Loon → Loon iOS / Loon macOS。去掉 FlClash、Clash Verge Rev 及独立 Stash 公共菜单；V2ProfilePreview 的应用候选同步。规则集合仍只选择三个内核。已有原文和服务端识别保持兼容；v33 将历史 Stash 公共差异去重迁入应用追加，页面只展示 Mihomo 公共继承层。外部画布沿用本任务已核实的登录限制，本轮未编辑。
+2026-11-02 菜单层级更正（取代上方 Stash 中间菜单）：V2ProfileClient 采用三组各两个直接子项：Mihomo → Stash iOS / Stash macOS，Surge → Surge iOS / Surge macOS，Loon → Loon iOS / Loon macOS。去掉 FlClash、Clash Verge Rev 及独立 Stash 公共菜单；V2ProfilePreview 的应用候选同步。规则集合仍只选择三个内核。已有原文和服务端识别保持兼容；v34 将历史 Stash 公共差异去重迁入应用追加，页面只展示 Mihomo 公共继承层。外部画布沿用本任务已核实的登录限制，本轮未编辑。
 
 2026-11-02 继承区更正：取代先前的卡片、折叠标题与空态占位，非空公共原文直接只读展示，说明移到代码区内部底部，空公共配置完全隐藏。实现、文档及 YAML/INI/空态浏览器截图已同步；外部画布待同步。
 
@@ -388,3 +388,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 已同步画布：`V2ProfileClient`（配置追加工作区重绘，同时去掉旧的 FlClash / Clash Verge / Stash 菜单）、`V2GroupDialog`（添加成员浮层去掉搜索框）、`V2ProfileDialogs`（新增移出来源、删除代理链两个级联确认）。前端在 `packages/web`；服务端接口与 `packages/core` 模型无需改动，校验沿用现有逻辑，无新增后端待实现项，示例种子不变。
 
 2026-11-02 系统页公共规则资源分页与数据库备份：`/api/system/rule-resources` 改为分页（默认 20 条，页面默认 10 条，复用公共 `Pagination`，无查询参数时不再返回全量）。新增「数据库备份」行、`BackupSettingsModal`、`RestoreBackupModal`，契约见 [22](22-database-backup.md)。已同步画布：`V2Settings`（公共规则资源示例与分页、数据库备份行、两个备份弹窗）。无后端待实现项。部署增加 `docker/compose.yaml` 与 `docker/nginx.conf.example`，不涉及画板。
+
+2026-11-02 缓存收敛：v2「系统 / 用户 / 账户」画板移除「公共规则资源」区块，前端 `System.tsx` 与 `GET`、`DELETE /api/system/rule-resources` 同步删除。v1「系统」「模板发布前校验」画板的失败文案改为“订阅返回错误，客户端保留本地配置”。访问日志的 `last-good` 来源标签保留，用于展示 30 天内的历史记录和快照告警。

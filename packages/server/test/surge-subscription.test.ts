@@ -58,7 +58,7 @@ describe('Surge 主订阅和 API', () => {
     h.store.deleteToken(h.token);
     expect((await h.app.request(url)).status).toBe(404);
   });
-  it('预览和独立导出不留占位 token，预览不写 last-good，用户隔离有效', async () => {
+  it('预览和独立导出不留占位 token，用户隔离有效', async () => {
     const h = await scenario();
     for (const path of ['/api/profiles/preview', '/api/profiles/' + h.profile.id + '/preview']) {
       const res = await h.alice.post(path, { profile: { ...h.profile, nodeSets: h.profile.nodeSets.map((s: any) => ({ ...s, output: 'inline' })) }, client: 'surge', platform: 'ios' });
@@ -68,7 +68,6 @@ describe('Surge 主订阅和 API', () => {
       expect(res.json.exportYaml).not.toMatch(/__SF_|RULE-SET|#!MANAGED-CONFIG/);
       expect(res.json.exportYaml).toContain('DOMAIN,example.test,代理,extended-matching\nIP-CIDR,192.0.2.0/24,代理,no-resolve\nUSER-AGENT,Example*,代理');
     }
-    expect(h.store.getLastGood(h.profile.id, 'surge:ios:surge-ios')).toBeUndefined();
     expect((await h.bob.post('/api/profiles/' + h.profile.id + '/preview', { client: 'surge' })).status).toBe(404);
     expect((await h.bob.post('/api/profiles/preview', { profile: h.profile, client: 'surge' })).status).toBe(400);
   });
@@ -81,18 +80,15 @@ describe('Surge 主订阅和 API', () => {
     const mihomo = await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=mihomo`);
     expect(mihomo.status).toBe(200); expect(await mihomo.text()).toContain('mixed-port: 7890');
   });
-  it('失败只使用 Surge 同平台 last-good，不调用 Mihomo 校验器验证 INI', async () => {
+  it('失败时直接报错，不调用 Mihomo 校验器验证 INI', async () => {
     const h = await scenario(), verify = vi.fn(async () => ({ ok: true, output: '' }));
     const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify });
     const original = await renderer.render(h.profile.id, { client: 'surge', platform: 'ios' });
     expect(original.ok).toBe(true); expect(verify).not.toHaveBeenCalled();
     h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'vless', server: 'example.test', port: 443, uuid: 'example' }] }, h.user.id);
-    const fallback = await renderer.render(h.profile.id, { client: 'surge', platform: 'ios' });
-    expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
-    if (original.ok && fallback.ok) expect(fallback.render.yaml).toBe(original.render.yaml);
-    expect((await renderer.render(h.profile.id, { client: 'surge', platform: 'macos' })).ok).toBe(false);
+    expect((await renderer.render(h.profile.id, { client: 'surge', platform: 'ios' })).ok).toBe(false);
   });
-  it('更新地址可再次拉取，缓存间隔变化同步到正文、响应头和失败回退', async () => {
+  it('更新地址可再次拉取，缓存间隔变化同步到正文和响应头', async () => {
     const h = await scenario();
     const path = `/subs/profile?token=${h.token}&id=${h.profile.id}&target=surge&platform=macos`;
     const initial = await h.app.request(path);
@@ -104,12 +100,6 @@ describe('Surge 主订阅和 API', () => {
     expect(updated.headers.get('profile-update-interval')).toBe('2');
     expect((await updated.text()).split('\n')[0]).toBe(`#!MANAGED-CONFIG ${url} interval=7200 strict=false`);
     h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'vless', server: 'example.test', port: 443, uuid: 'example' }] }, h.user.id);
-    h.store.setResourceCacheTtlSec(3600);
-    const fallback = await h.app.request(url);
-    const text = await fallback.text();
-    expect(fallback.status).toBe(200);
-    expect(fallback.headers.get('profile-update-interval')).toBe('1');
-    expect(text.split('\n')[0]).toBe(`#!MANAGED-CONFIG ${url} interval=3600 strict=false`);
-    expect(text.match(/^#!MANAGED-CONFIG /gm)).toHaveLength(1);
+    expect((await h.app.request(url)).status).toBe(503);
   });
 });

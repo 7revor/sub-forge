@@ -1,4 +1,4 @@
-// 内置浏览器验收：临时 SQLite v32 真实升级，使用虚构文档，无拦截响应；退出时清理服务和数据库。
+// 内置浏览器验收：临时 SQLite v33 真实升级，使用虚构文档，无拦截响应；退出时清理服务和数据库。
 // 先构建前端，再从 packages/server 运行：pnpm exec tsx test/manual-stash-common-migration-server.ts
 import { serve } from '@hono/node-server';
 import { randomBytes } from 'node:crypto';
@@ -23,7 +23,7 @@ try {
     { id: 'difference', name: 'Stash 专有差异迁移', base: { kernels: { mihomo: common, stash: common + 'log-level: warning\nmixed-port: 0\n' }, clients: { 'stash-ios': 'log-level: debug\n' } } },
   ];
   for (const item of legacy) store.db.prepare('INSERT INTO docs VALUES (?,?,?,?,?)').run('profile', item.id, user.id, cipher.encrypt(JSON.stringify({ ...item, chains: [], nodeSets: [], routing: independentRouting() })), 123);
-  store.db.pragma('user_version = 32');
+  store.db.pragma('user_version = 33');
 } finally { store.close(); }
 store = new Store(file, { cipher });
 const publicUrl = 'http://127.0.0.1:5267';

@@ -31,10 +31,9 @@ it('不同用户同规则同处理共用产物和原文，平台变体独立，�
   const a = await h.main(h.tokenA, 'a'), b = await h.main(h.tokenB, 'b');
   expect(ruleUrl(a).replace(h.tokenA, '')).toBe(ruleUrl(b).replace(h.tokenB, ''));
   expect(Object.keys(a['rule-providers'])).toEqual(['规则增强']);
-  expect(h.store.listSharedRules()).toHaveLength(1); expect(h.fetcher).toHaveBeenCalledTimes(1);
-  expect(h.store.getLastGood('a', 'mihomo:any')!.data).not.toHaveProperty('rulesets');
+  expect(h.fetcher).toHaveBeenCalledTimes(1);
   const stash = await h.main(h.tokenB, 'b', '?target=stash&platform=ios');
-  expect(ruleUrl(stash)).not.toBe(ruleUrl(b)); expect(h.store.listSharedRules()).toHaveLength(2);
+  expect(ruleUrl(stash)).not.toBe(ruleUrl(b));
   expect(h.fetcher).toHaveBeenCalledTimes(1);
   expect((await h.app.request(`/subs/profile?token=${h.tokenB}&id=a`)).status).toBe(404);
   expect((await h.app.request(ruleUrl(a).replace(h.tokenA, h.tokenB))).status).toBe(200);
@@ -47,27 +46,24 @@ it('删除订阅只清理私有产物；公共规则继续更新，删除规则�
   await h.main(h.tokenA, 'a', '?target=stash&platform=ios');
   h.store.delete('profile', 'a');
   expect(h.store.getActiveToken(h.tokenA)).toBeDefined();
-  expect(h.store.db.prepare('SELECT * FROM last_good').all()).toEqual([]);
   h.update('DOMAIN,two.test'); expect(await (await h.app.request(url)).text()).toBe('DOMAIN,two.test\n');
   h.store.delete('ruleset', 'r');
   expect((await h.app.request(url)).status).toBe(404);
-  expect(h.store.listSharedRules()).toEqual([]);
   expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
   expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });
 
-it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理正文、兜底产物和原文绑定', async () => {
+it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理原文绑定', async () => {
   const h = setup(); h.profile('a', h.a.id, remoteRuleMatcher('https://rules.test/Apple.list?download=1'));
   const cfg = await h.main(h.tokenA, 'a'), url = ruleUrl(cfg), key = new URL(url).searchParams.get('key')!;
   expect(Object.keys(cfg['rule-providers'])).toEqual(['Apple']);
   expect(new URL(url).pathname).toBe('/subs/ruleset');
-  expect(h.store.listSharedRules()).toEqual([]);
   expect((await h.app.request(url)).status).toBe(200);
   expect((await h.app.request(url.replace(h.tokenA, h.tokenB))).status).toBe(404);
   expect((await h.app.request(`/resources/ruleset?key=${key}&token=${h.tokenB}`)).status).toBe(404);
   h.store.delete('profile', 'a');
   expect((await h.app.request(url)).status).toBe(404);
-  for (const table of ['last_good', 'resource_bindings', 'snapshots']) expect(h.store.db.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
+  for (const table of ['resource_bindings', 'snapshots']) expect(h.store.db.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
 });
 
 it('旧转换 token 入口不可用，修改下载参数不能把规则资源变为任意 URL 代理', async () => {
@@ -101,12 +97,13 @@ it('规则增强公共读取，普通用户不能修改他人定义；引用关�
   expect((await h.api('/rulesets/r', 'DELETE')).status).toBe(409);
 });
 
-it('上游失败使用成功原文，改写不可用保留成功产物并暴露错误，修复后恢复', async () => {
+it('上游失败使用成功原文并标记告警，改写不可用返回 409，修复后恢复', async () => {
   const h = setup(); h.profile('a', h.a.id); const url = ruleUrl(await h.main(h.tokenA, 'a'));
-  h.fail(); expect(await (await h.app.request(url)).text()).toBe('DOMAIN,one.test\n');
+  h.fail();
+  const stale = await h.app.request(url); expect(await stale.text()).toBe('DOMAIN,one.test\n'); expect(stale.headers.get('x-sub-forge-warning')).toBe('last-good-rule');
   const rs = h.store.get('ruleset', 'r')!;
   h.store.put('ruleset', { ...rs, sources: [{ id: 's', kind: 'remote', url: 'https://rules.test/unsupported.srs', format: 'srs' }] }, h.a.id);
-  const failed = await h.app.request(url); expect(await failed.text()).toBe('DOMAIN,one.test\n'); expect(failed.headers.get('x-sub-forge-warning')).toBe('last-good-rule');
+  expect((await h.app.request(url)).status).toBe(409);
   h.store.put('ruleset', { ...rs, sources: [{ id: 'l', kind: 'local', format: 'auto', content: 'DOMAIN,repaired.test' }] }, h.a.id);
   const repaired = await h.app.request(url); expect(await repaired.text()).toBe('DOMAIN,repaired.test\n'); expect(repaired.headers.get('x-sub-forge-warning')).toBeNull();
 });
@@ -133,7 +130,7 @@ it('规则和订阅刷新在途删除不会恢复缓存、产物或刷新任务'
   h.advance(86400001); const pending = h.app.request(url); await started;
   h.store.delete('profile', 'a'); h.store.delete('ruleset', 'r'); release();
   expect((await pending).status).toBe(404);
-  expect(h.store.listSharedRules()).toEqual([]); expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
+  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
   h.profile('job', h.a.id, remoteRuleMatcher('https://rules.test/job.list'));
   let startedJob!: () => void, finishJob!: () => void;
   const waitJob = new Promise<void>(r => startedJob = r), holdJob = new Promise<void>(r => finishJob = r);

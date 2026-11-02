@@ -97,7 +97,7 @@ Mihomo / Stash：统一使用 `renderClash(input, client)`；`renderMihomo` / `r
 
 ## 服务端统一资源缓存接入（2026-10-30）
 
-统一托管为内核固定行为，已移除 `RenderInput.managedResources` 开关及旧默认透传分支。`resourceIntervalSec` 指定 provider 间隔，服务端传入系统值。规则 provider 展示名与内部文件键分离，规则增强用原名、直接 URL 用无扩展名文件名，重名稳定加后缀。用户鉴权、公共产物共享与生命周期见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
+统一托管为内核固定行为，已移除 `RenderInput.managedResources` 开关及旧默认透传分支。`resourceIntervalSec` 指定 provider 间隔，服务端传入系统值。规则 provider 展示名与内部文件键分离，规则增强用原名、直接 URL 用无扩展名文件名，重名稳定加后缀。`deferRuleBody` 让主配置跳过规则正文解析，只写地址，正文由规则文件请求生成。用户鉴权、资源共享与生命周期见 [全局托管与鉴权](../../docs/19-managed-resources.md)。
 
 ### 2026-10-30：本地规则分组
 

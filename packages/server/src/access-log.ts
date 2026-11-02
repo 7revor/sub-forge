@@ -3,7 +3,6 @@ import type { HttpBindings } from '@hono/node-server';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { parseTrustedProxies, resolveClientAddress } from './net/client-ip.ts';
 import { detectClient, InvalidClientTarget } from './client.ts';
-import type { SharedRuleRecord } from './shared-rules.ts';
 import type { AccessKind, Store } from './store.ts';
 
 export type DownloadEnv = { Bindings: Partial<HttpBindings>; Variables: { accessResult: { source: string; warnings: number }; accessResource: { kind: AccessKind; resourceId: string; resourceName: string } } };
@@ -42,13 +41,9 @@ export function accessLogger(store: Store, now: () => number, trustedProxies = p
         resourceId = `${type}/${id}`;
       }
     } else if (path === '/resources/ruleset' && !key) resourceName = store.get('ruleset', id)?.name ?? resourceName;
-    if (key && path.startsWith('/resources/')) {
-      const record = store.getSharedRule<SharedRuleRecord>(key);
-      if (record && !record.reference.matcher.remote) { client = record.target.client; platform = undefined; }
-    }
     const resource = c.get('accessResource');
     if (resource) { kind = resource.kind; resourceId = resource.resourceId; resourceName = resource.resourceName; }
-    const file = c.req.query('view') === 'source' || path === '/resources/repo' && !key;
+    const file = c.req.query('view') === 'source' || path === '/resources/repo' && c.req.query('target') === undefined;
     if (file) client = '原文';
     const result = c.get('accessResult'), fallback = !!c.res.headers.get('x-sub-forge-warning');
     store.logAccess({ ...address, token: token!, profileId, kind, resourceId, resourceName, method: c.req.method, at: started, ua, client, ...(platform ? { platform } : {}),

@@ -11,7 +11,6 @@ import { allowedQuery, requiredQuery, uniqueQuery } from './query.ts';
 import { RuleRepoService } from './rule-repos/service.ts';
 import { createUpstreamFetcher } from './net/upstream.ts';
 import { parseAllowList } from './net/ssrf.ts';
-import type { SharedRuleRecord } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
@@ -104,17 +103,14 @@ export function createApp(deps: AppDeps) {
       const token = c.req.query('token'), user = token ? store.getActiveToken(token) : undefined;
       if (!user || !['GET', 'HEAD'].includes(c.req.method)) return notFound(c);
       const profile = c.req.path === '/subs/profile' ? c.req.query('id') : c.req.path.startsWith('/subs/') ? c.req.query('profile') : undefined;
-      const key = c.req.query('key');
-      const shared = key && c.req.path.startsWith('/resources/') ? store.getSharedRule<SharedRuleRecord>(key)?.reference.matcher : undefined;
-      const ruleset = c.req.path === '/resources/ruleset' ? shared?.id ?? c.req.query('id') : undefined;
+      const ruleset = c.req.path === '/resources/ruleset' ? c.req.query('id') : undefined;
       const repositories = new Set<string>([
-        ...(c.req.path === '/resources/repo' && !key && c.req.query('id') ? [c.req.query('id')!] : []),
-        ...(shared?.repository ? [shared.repository.repo] : []),
+        ...(c.req.path === '/resources/repo' && c.req.query('id') ? [c.req.query('id')!] : []),
         ...(ruleset ? store.get('ruleset', ruleset)?.sources.flatMap(source => source.repository ? [source.repository.repo] : []) ?? [] : []),
       ]);
       let deleted = false;
       const invalidate = (kind: string, id: string) => {
-        if (kind === 'profile' && id === profile || kind === 'ruleset' && id === ruleset || kind === 'shared-rule' && id === key || kind === 'repository' && repositories.has(id)
+        if (kind === 'profile' && id === profile || kind === 'ruleset' && id === ruleset || kind === 'repository' && repositories.has(id)
           || c.req.path === '/subs/nodes' && kind === c.req.query('kind') && id === c.req.query('id')) deleted = true;
       };
       store.invalidationListeners.add(invalidate);
@@ -145,7 +141,7 @@ export function createApp(deps: AppDeps) {
 
     const setAccessResult = (outcome?: RenderOutcome) => c.set('accessResult', {
       warnings: outcome?.ok ? outcome.render.warnings : 0,
-      source: outcome ? (outcome.ok ? outcome.source : 'failed') : 'unsupported',
+      source: outcome ? (outcome.ok ? 'fresh' : 'failed') : 'unsupported',
     });
 
     if (detected.client !== 'mihomo' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
@@ -155,7 +151,6 @@ export function createApp(deps: AppDeps) {
     const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}), ...(detected.app ? { app: detected.app } : {}) });
     if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     if (outcome.ok && !renderer.canReadNodes(outcome.render, t.userId)) return notFound(c);
-    if (outcome.ok && !renderer.canReadRules(profileId, outcome.render)) return notFound(c);
     if (!outcome.ok) {
       setAccessResult(outcome);
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);

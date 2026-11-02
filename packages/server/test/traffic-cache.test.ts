@@ -1,7 +1,6 @@
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import type { StoredRender } from '../src/render.ts';
 import type { TrafficInfo } from '../src/store.ts';
 import { addUser, client, setupApp } from './helpers.ts';
 
@@ -29,7 +28,7 @@ function setup() {
 }
 
 describe('订阅流量与渲染缓存', () => {
-  it('正文不变时重新生成配置，响应头、last-good 与节点资源使用新流量', async () => {
+  it('正文不变时重新生成配置，响应头与节点资源使用新流量', async () => {
     const h = setup();
     const first = await h.app.request('/subs/profile?token=token&id=p');
     const yaml = await first.text();
@@ -39,21 +38,14 @@ describe('订阅流量与渲染缓存', () => {
     expect(next.headers.get('subscription-userinfo')).toBe('download=80; total=1000; expire=2000000000');
     expect(await next.text()).toBe(yaml);
     expect(h.store.recentAccess('p')[0]?.source).toBe('fresh');
-    const last = h.store.getLastGood<StoredRender>('p', 'mihomo:any')!;
-    expect(last.data.userinfo).toEqual(h.traffic[a]);
     const provider = await h.app.request(parse(yaml)['proxy-providers']['源'].url);
     expect(provider.headers.get('subscription-userinfo')).toBe('download=80; total=1000; expire=2000000000');
-    h.store.put('profile', { ...h.store.get('profile', 'p')!, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'group', groupId: 'missing' } } } });
-    const fallback = await h.renderer.render('p', { client: 'mihomo' });
-    expect(fallback.ok && fallback.source).toBe('last-good');
-    expect(fallback.ok && fallback.render.userinfo).toEqual(h.traffic[a]);
   });
 
   it('上游不再提供流量时移除旧响应头', async () => {
     const h = setup(); await h.app.request('/subs/profile?token=token&id=p');
     h.traffic[a] = undefined; await h.refresh();
     expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBeNull();
-    expect(h.store.getLastGood<StoredRender>('p', 'mihomo:any')?.data.userinfo).toBeUndefined();
   });
 
   it('多个单地址源汇总流量、取最早到期时间，可单独选择来源', async () => {
@@ -86,7 +78,7 @@ describe('订阅流量与渲染缓存', () => {
     await h.app.request('/subs/profile?token=token&id=p');
     h.fail(); await h.refresh();
     const result = await h.renderer.render('p', { client: 'mihomo' });
-    expect(result.ok && result.source).toBe('fresh');
+    expect(result.ok).toBe(true);
     expect(result.ok && result.render.warnings).toBe(2);
     expect(result.report.map(r => r.code)).toEqual(['source.fetch-failed', 'group.empty']);
     expect(result.ok && result.render.userinfo).toEqual(h.traffic[a]);

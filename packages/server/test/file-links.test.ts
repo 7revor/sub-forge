@@ -40,7 +40,6 @@ it('订阅专属原文用所有者 token，绑定模板后也只通过订阅暴�
   expect((await h.app.request(h.sessionLink + '&token=' + h.token, { headers: h.headers })).status).toBe(400);
   const head = await h.app.request(h.link(), { method: 'HEAD' });
   expect(head.status).toBe(200); expect(await head.text()).toBe('');
-  expect(h.store.listSharedRules()).toHaveLength(0);
   expect(h.fetcher).toHaveBeenCalledTimes(2); // 两份私有订阅各有绑定，权限范围不混用。
 });
 

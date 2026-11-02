@@ -105,15 +105,15 @@ describe('模板绑定与独立模式', () => {
     detached.routing.config.rules = [{ id: 'rs-rule', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } }];
     expect((await alice.put(`/api/profiles/${profile.id}`, detached)).status).toBe(200);
     const before = await renderer.render(profile.id, { client: 'mihomo' });
-    expect(before.ok && Object.values(ruleBodies(store, before.render)).join('')).toContain('one.test');
+    expect(before.ok && Object.values((await ruleBodies(renderer, profile.id))).join('')).toContain('one.test');
     store.put('ruleset', { id: 'rs', name: '规则', sources: [{ id: 's', kind: 'local', format: 'auto', content: 'DOMAIN,two.test' }] }, user.id);
     const after = await renderer.render(profile.id, { client: 'mihomo' });
-    expect(after.ok && Object.values(ruleBodies(store, after.render)).join('')).toContain('two.test');
+    expect(after.ok && Object.values((await ruleBodies(renderer, profile.id))).join('')).toContain('two.test');
     expect((await alice.del('/api/rulesets/rs')).status).toBe(409);
   });
 });
 
-it('发布时检查模板与追加成员合并后的环，并在异常版本进入存储后沿用上次成功输出', async () => {
+it('发布时检查模板与追加成员合并后的环，异常版本进入存储后返回失败', async () => {
   const { admin, alice, t, profile, store, renderer } = await scenario();
   const first = { ...template, groups: template.groups.map(g => ({ ...g, members: [{ kind: 'builtin', name: 'DIRECT' }] })) };
   expect((await admin.put(`/api/templates/${t.id}`, first)).status).toBe(200);
@@ -124,11 +124,8 @@ it('发布时检查模板与追加成员合并后的环，并在异常版本进�
   const blocked = await admin.put(`/api/templates/${t.id}`, { ...next, force: true });
   expect(blocked.status).toBe(409);
   expect(blocked.json.details.impact[0].issues.some((i: any) => i.code === 'binding.group-cycle')).toBe(true);
-  const good = await renderer.render(profile.id, { client: 'mihomo' });
   store.putTemplate({ id: t.id, version: 3, ...next } as any);
-  const fallback = await renderer.render(profile.id, { client: 'mihomo' });
-  expect(fallback.ok && fallback.source).toBe('last-good');
-  expect(fallback.ok && fallback.render.yaml).toBe(good.ok && good.render.yaml);
+  expect((await renderer.render(profile.id, { client: 'mihomo' })).ok).toBe(false);
 });
 
 it('模板影响检查期间有订阅保存时，模板仍可正常保存', async () => {

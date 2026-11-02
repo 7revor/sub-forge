@@ -405,7 +405,7 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 - 本轮不绘制合并结果或逐字段覆盖标识。参照 [本地设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)。
 
 
-2026-11-02 菜单层级更正（取代上方 Stash 中间菜单）：V2ProfileClient 采用三组各两个直接子项：Mihomo → Stash iOS / Stash macOS，Surge → Surge iOS / Surge macOS，Loon → Loon iOS / Loon macOS。去掉 FlClash、Clash Verge Rev 及独立 Stash 公共菜单；V2ProfilePreview 的应用候选同步。规则集合仍只选择三个内核。已有原文和服务端识别保持兼容；v33 将历史 Stash 公共差异去重迁入应用追加，页面只展示 Mihomo 公共继承层。外部画布沿用本任务已核实的登录限制，本轮未编辑。
+2026-11-02 菜单层级更正（取代上方 Stash 中间菜单）：V2ProfileClient 采用三组各两个直接子项：Mihomo → Stash iOS / Stash macOS，Surge → Surge iOS / Surge macOS，Loon → Loon iOS / Loon macOS。去掉 FlClash、Clash Verge Rev 及独立 Stash 公共菜单；V2ProfilePreview 的应用候选同步。规则集合仍只选择三个内核。已有原文和服务端识别保持兼容；v34 将历史 Stash 公共差异去重迁入应用追加，页面只展示 Mihomo 公共继承层。外部画布沿用本任务已核实的登录限制，本轮未编辑。
 
 2026-11-02 菜单样式更正：V2ProfileClient 的选中与悬停背景仅覆盖文字按钮，左侧展开箭头不随之高亮；展开子项保留缩进，移除左侧边框。实现与内置浏览器截图已更新，见 [设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)；外部画布仍待登录后同步。
 

@@ -52,7 +52,7 @@
 | A01 | [types / base/native](../packages/core/src/base/native.ts)：身份和产品分组 | 四输出 Mihomo／Surge／Stash／Loon，三组产品菜单；区分 YAML／INI；应用原文独立 |
 | A02 | [server/client](../packages/server/src/client.ts)：UA 与参数识别 | 参数优先；clash 别名归 Mihomo；默认 Mihomo；应用与内核／系统匹配；Apple 应用推断 |
 | A03 | [server/render](../packages/server/src/render.ts)：目标归一和 API 校验 | 各端目标组合校验；非 Mihomo 的显式系统只允许 iOS／macOS；多入口仍各有校验 |
-| A04 | [base/native](../packages/core/src/base/native.ts)：原文继承 | Mihomo／Surge／Loon 按内核→应用；Stash 直接继承 Mihomo；v33 将旧公共差异去重迁入应用追加 |
+| A04 | [base/native](../packages/core/src/base/native.ts)：原文继承 | Mihomo／Surge／Loon 按内核→应用；Stash 直接继承 Mihomo；v34 将旧公共差异去重迁入应用追加 |
 | A05 | [base/native](../packages/core/src/base/native.ts)：原文合并 | YAML 递归映射合并、数组整体替换；INI General／Host／MITM 按键覆盖，其余追加；拒绝受管理段；INI 测速值仍供生成联动 |
 | A06 | [native-migration](../packages/server/src/native-migration.ts)：旧公共映射 | 仅 v28 升级／旧种子导入；展开 common／patch／raw／旧预设；停用并备份旧平台规则条件 |
 | A07 | [proxy/parse](../packages/core/src/proxy/parse.ts)：节点输入 | Clash YAML、Surge／Loon 节点行、URI／base64 转统一节点；不恢复整份基础配置导入 |

@@ -326,14 +326,14 @@ describe('规则集组级改写保存与预览', () => {
     const profile = await alice.post('/api/profiles', { name: '改写输出', nodeSets: [], routing: independentRouting([{ id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } }]) });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
-    expect(rendered.ok && Object.values(ruleBodies(store, rendered.render)).join('')).toContain('changed.test');
-    expect(rendered.ok && activeLines(Object.values(ruleBodies(store, rendered.render)).join('\n').split('\n')).join('\n')).not.toContain('same.test');
+    expect(rendered.ok && Object.values((await ruleBodies(renderer, profile.json.item.id))).join('')).toContain('changed.test');
+    expect(rendered.ok && activeLines(Object.values((await ruleBodies(renderer, profile.json.item.id))).join('\n').split('\n')).join('\n')).not.toContain('same.test');
     const removed = await alice.put(`/api/rulesets/${rs.id}`, { ...rs, overrides: [] });
     const restored = await previewRuleset(alice, { ruleset: removed.json.item, client: 'mihomo' });
     expect(restored.json.lines).toContain('DOMAIN,same.test');
     const rerendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
-    expect(rerendered.ok && Object.values(ruleBodies(store, rerendered.render)).join('')).toContain('same.test');
-    expect(rerendered.ok && Object.values(ruleBodies(store, rerendered.render)).join('')).not.toContain('changed.test');
+    expect(rerendered.ok && Object.values((await ruleBodies(renderer, profile.json.item.id))).join('')).toContain('same.test');
+    expect(rerendered.ok && Object.values((await ruleBodies(renderer, profile.json.item.id))).join('')).not.toContain('changed.test');
   });
 
   it('追加不需要内容匹配，保存重读、合并预览与实际渲染一致', async () => {
@@ -353,7 +353,7 @@ describe('规则集组级改写保存与预览', () => {
     const profile = await alice.post('/api/profiles', { name: '追加输出', nodeSets: [], routing: independentRouting([{ id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } }]) });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
-    expect(rendered.ok && Object.values(ruleBodies(store, rendered.render)).join('')).toContain('added.test');
+    expect(rendered.ok && Object.values((await ruleBodies(renderer, profile.json.item.id))).join('')).toContain('added.test');
   });
 
   it('保存与草稿预览拒绝行号、空内容和无效动作，避免保存后丢失改写或渲染崩溃', async () => {

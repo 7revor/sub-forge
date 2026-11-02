@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { parseContent, type Client } from '@sub-forge/core';
 import { addUser, setupApp } from './helpers.ts';
-import type { StoredRender } from '../src/render.ts';
 
 const envs: ReturnType<typeof setupApp>[] = [];
 afterEach(async () => { for (const h of envs.splice(0)) { await h.snapshots.settled(); h.store.close(); } });
@@ -96,24 +95,17 @@ for (const target of ['surge', 'loon', 'stash'] as const) describe(target + ' �
     expect(preview.exportUnavailableReason).toContain('远程节点引用');
     expect(preview.exportYaml).toBeUndefined();
     expect(links(preview.yaml!)).not.toEqual([]);
-    expect(h.store.getLastGood('p', `${target}:ios:${target}-ios`)).toBeUndefined();
     const profile = h.store.get('profile', 'p')!; profile.nodeSets[0]!.output = 'inline';
     const inline = await h.renderer.preview('p', { client: target, platform: 'ios' }, { profile });
     expect(inline.ok).toBe(true); expect(inline.exportUnavailableReason).toBeUndefined();
     expect(inline.exportYaml ?? inline.yaml).not.toContain('__SF_TOKEN__');
   });
-  it('失败时不能复活旧强制内联结果，也不能回退到不同输出设置', async () => {
-    const h = await setup(), client = { client: target, platform: 'ios' as const }, key = `${target}:ios:${target}-ios`;
+  it('生成失败时直接返回错误，不回退旧结果', async () => {
+    const h = await setup(), client = { client: target, platform: 'ios' as const };
     expect((await h.renderer.render('p', client)).ok).toBe(true);
-    const saved = h.store.getLastGood<StoredRender>('p', key)!;
-    const { nodeProviderDelivery: _version, ...old } = saved.data;
-    h.store.putLastGood('p', key, old);
     const profile = h.store.get('profile', 'p')!;
     profile.base = { kernels: { [target === 'stash' ? 'mihomo' : target]: target === 'stash' ? 'proxies: []' : '[Proxy]\n非法 = direct' } };
     h.store.put('profile', profile, h.user.id);
-    expect((await h.renderer.render('p', client)).ok).toBe(false);
-    h.store.putLastGood('p', key, saved.data);
-    profile.nodeSets[0]!.output = 'inline'; h.store.put('profile', profile, h.user.id);
     expect((await h.renderer.render('p', client)).ok).toBe(false);
   });
 });
@@ -132,18 +124,4 @@ it('Stash 正式订阅使用公共策略组前置，并返回带相同 dialer-pr
   const resource = await h.app.request(url);
   expect(resource.status).toBe(200);
   expect(parse(await resource.text()).proxies).toMatchObject([{ name: '本地', 'dialer-proxy': '代理' }]);
-});
-
-it('Stash 失败不回退旧专用生成器的成功缓存', async () => {
-  const h = await setup(), target = { client: 'stash' as const, platform: 'ios' as const };
-  expect((await h.renderer.render('p', target)).ok).toBe(true);
-  const key = 'stash:ios:stash-ios', saved = h.store.getLastGood<StoredRender>('p', key)!;
-  const { clashDelivery: _version, ...legacy } = saved.data;
-  h.store.putLastGood('p', key, legacy);
-  const profile = h.store.get('profile', 'p')!;
-  profile.base = { clients: { 'stash-ios': 'proxies: []' } };
-  h.store.put('profile', profile, h.user.id);
-  expect((await h.renderer.render('p', target)).ok).toBe(false);
-  h.store.putLastGood('p', key, saved.data);
-  expect(await h.renderer.render('p', target)).toMatchObject({ ok: true, source: 'last-good' });
 });

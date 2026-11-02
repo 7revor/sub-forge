@@ -38,7 +38,7 @@ describe('订阅 routing 边界', () => {
     } finally { store.close(); }
   });
 
-  it('v28 遗留文档事务迁移，保留归属、更新时间、令牌与 last-good，预检只读且重启幂等', async () => {
+  it('v28 遗留文档事务迁移，保留归属、更新时间与令牌，预检只读且重启幂等', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-routing-boundary-'));
     const file = join(dir, 'test.sqlite');
     const cipher = new Cipher(randomBytes(32));
@@ -49,7 +49,6 @@ describe('订阅 routing 边界', () => {
       const user = store.createUser({ username: 'fixture', passwordHash: 'fixture-only', role: 'user' });
       store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(old.id, user.id, cipher.encrypt(JSON.stringify(old)), 1234);
       store.putToken({ token: 'fixture-routing-token', userId: user.id });
-      store.putLastGood('p', 'mihomo:any', { yaml: '保留成功结果' });
       store.db.pragma('user_version = 28');
       const plan = await profileMigrationPlan(file, cipher);
       expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: SCHEMA_VERSION, profiles: [{ id: 'p', mode: 'bound' }] });
@@ -60,7 +59,6 @@ describe('订阅 routing 边界', () => {
       expect(migrated).toMatchObject({ owner: user.id, updatedAt: 1234, doc: { routing: { mode: 'bound' } } });
       expect(store.getProfileMigrationBackup('p')).toEqual(old);
       expect(store.userToken(user.id)?.token).toBe('fixture-routing-token');
-      expect(store.getLastGood('p', 'mihomo:any')?.data).toEqual({ yaml: '保留成功结果' });
       store.close(); store = new Store(file, { cipher });
       expect(store.getWithOwner('profile', 'p')).toEqual(migrated);
       expect(store.db.prepare('SELECT COUNT(*) n FROM profile_migration_backups').get()).toEqual({ n: 1 });

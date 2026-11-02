@@ -1,10 +1,9 @@
 import { Hono, type Context } from 'hono';
-import { managedRuleDelivery, Report, resolveProfileRouting } from '@sub-forge/core';
+import { managedRuleDelivery, Report, resolveProfileRouting, type RuleResourceReference, type RuleSetDelivery } from '@sub-forge/core';
 import type { DownloadEnv } from './access-log.ts';
 import type { Store } from './store.ts';
 import type { RenderService, Target } from './render.ts';
 import type { SnapshotService } from './snapshots.ts';
-import type { SharedRuleRecord } from './shared-rules.ts';
 import type { RuleRepoService } from './rule-repos/service.ts';
 import { profileTemplate } from './profile-routing.ts';
 import { RuleSourceService } from './rule-source.ts';
@@ -25,6 +24,19 @@ function target(c: Context, subscription = false): Target {
   }
 }
 
+/** 主配置写入的格式契约：旧配置的文本 provider 不能收到 MRS 字节，反之亦然。 */
+function checkDeliveryContract(c: Context, delivery: RuleSetDelivery) {
+  const format = c.req.query('format');
+  if (format === undefined) return;
+  if (delivery.mode !== 'managed' || format !== delivery.format || (delivery.format === 'mrs' && c.req.query('behavior') !== delivery.behavior)) throw new HttpError(409, '规则输出格式已变化，请刷新主订阅以使用新资源');
+}
+
+function ruleOptions(c: Context): RuleResourceReference['options'] {
+  const src = c.req.query('src');
+  if (src !== undefined && src !== '1') throw new HttpError(400, '规则处理参数不合法');
+  return src ? { src: true } : undefined;
+}
+
 function ruleBody(c: Context, body: string) {
   c.header('content-disposition', 'inline');
   if (body.startsWith('#subforge-binary-mrs\n')) {
@@ -37,45 +49,31 @@ function ruleBody(c: Context, body: string) {
 export function resourceFileRoutes(store: Store, renderer: RenderService, snapshots: SnapshotService, repos: RuleRepoService) {
   const app = new Hono<DownloadEnv>();
   const getter = new RuleSourceService(snapshots, new RuleConverter());
-  const shared = async (c: Context, repository: boolean) => {
-    allowedQuery(c, ['key', 'token']);
-    const key = requiredQuery(c, 'key');
-    const read = () => {
-      const record = store.getSharedRule<SharedRuleRecord>(key);
-      return record && !record.reference.matcher.remote && !!record.reference.matcher.repository === repository && resolveRuleSetReference(record.reference.matcher, store) ? record : undefined;
-    };
-    if (!read()) return c.body(null, 404);
-    const body = await renderer.sharedRules.read(key), record = read();
-    if (body === undefined || !record) return c.body(null, 404);
-    c.set('accessResource', { kind: repository ? 'rule-collection' : 'enhancement', resourceId: key, resourceName: record.name });
-    if (record.error) c.header('x-sub-forge-warning', 'last-good-rule');
-    return ruleBody(c, body);
-  };
+  // 2026-11-02 前主配置使用的 key 地址已失效，客户端刷新主订阅后获得新地址。
+  app.use('*', async (c, next) => { if (c.req.query('key') !== undefined) return c.body(null, 404); await next(); });
   app.get('/ruleset', async c => {
-    if (c.req.query('key') !== undefined) return shared(c, false);
-    allowedQuery(c, ['id', 'view', 'target', 'platform', 'token']);
+    allowedQuery(c, ['id', 'view', 'target', 'platform', 'format', 'behavior', 'src', 'token']);
     const id = requiredQuery(c, 'id');
     const read = () => store.get('ruleset', id) ? { kind: 'ruleset' as const, id } : undefined;
     if (!read()) return c.body(null, 404);
     if (c.req.query('view') === 'source') return ruleSourceFile(c, store, getter, store.getActiveToken(c.req.query('token')!)!.userId, read);
     if (c.req.query('view') !== undefined && c.req.query('view') !== 'output') throw new HttpError(400, '文件视图不合法');
-    const reference = { matcher: read()! }, output = target(c);
+    const options = ruleOptions(c), reference = { matcher: read()!, ...(options ? { options } : {}) }, output = target(c);
     c.header('vary', 'User-Agent');
     const definition = resolveRuleSetReference(reference.matcher, store);
-    const delivery = definition && managedRuleDelivery(definition, output);
+    const delivery = definition && managedRuleDelivery(definition, output, options);
     // 不支持是确定结果，不能落入通用 503 让客户端当作临时故障。
     if (delivery?.mode === 'unsupported') throw new HttpError(409, delivery.reason);
-    const body = await renderer.sharedRules.readReference(reference, output);
-    if (body === undefined || !read() || !resolveRuleSetReference(reference.matcher, store)) return c.body(null, 404);
-    const record = store.getSharedRule<SharedRuleRecord>(renderer.sharedRules.key(reference, output));
-    if (!record) return c.body(null, 404);
-    c.set('accessResource', { kind: 'enhancement', resourceId: id, resourceName: record.name });
-    if (record.error) c.header('x-sub-forge-warning', 'last-good-rule');
-    return ruleBody(c, body);
+    if (delivery) checkDeliveryContract(c, delivery);
+    const result = await renderer.sharedRules.read(reference, output);
+    if (!result || !read()) return c.body(null, 404);
+    c.set('accessResource', { kind: 'enhancement', resourceId: id, resourceName: result.name });
+    if (result.stale) c.header('x-sub-forge-warning', 'last-good-rule');
+    return ruleBody(c, result.body);
   });
   app.get('/repo', async c => {
-    if (c.req.query('key') !== undefined) return shared(c, true);
-    allowedQuery(c, ['id', 'ref', 'path', 'files', 'token']);
+    const convert = c.req.query('target') !== undefined;
+    allowedQuery(c, convert ? ['id', 'files', 'target', 'format', 'behavior', 'src', 'token'] : ['id', 'ref', 'path', 'files', 'token']);
     const id = requiredQuery(c, 'id');
     let files: { ref: string; path: string }[];
     if (c.req.query('files') !== undefined) {
@@ -83,6 +81,18 @@ export function resourceFileRoutes(store: Store, renderer: RenderService, snapsh
       try { files = JSON.parse(c.req.query('files')!); } catch { throw new HttpError(400, '仓库文件参数不合法'); }
       if (!Array.isArray(files) || !files.length || files.length > 50 || files.some(file => !file || typeof file.ref !== 'string' || typeof file.path !== 'string' || Object.keys(file).some(k => k !== 'ref' && k !== 'path'))) throw new HttpError(400, '仓库文件参数不合法');
     } else files = [{ ref: requiredQuery(c, 'ref'), path: requiredQuery(c, 'path') }];
+    if (convert) {
+      // 转换结果与原文入口共用索引校验：仓库停用、删除或文件失效后不可读，也不接受任意上游 URL。
+      const definition = () => repos.ruleSetFromFiles(id, files), rs = definition();
+      if (!rs) return c.body(null, 404);
+      const options = ruleOptions(c), output = target(c), delivery = managedRuleDelivery(rs, output, options);
+      checkDeliveryContract(c, delivery);
+      const result = await renderer.sharedRules.read({ matcher: { kind: 'ruleset', id: rs.id }, ...(options ? { options } : {}) }, output, definition);
+      if (!result) return c.body(null, 404);
+      c.set('accessResource', { kind: 'rule-collection', resourceId: rs.id, resourceName: rs.name });
+      if (result.stale) c.header('x-sub-forge-warning', 'last-good-rule');
+      return ruleBody(c, result.body);
+    }
     // 先验证全部文件属于当前启用索引，再读取；多来源也不接受任意上游 URL。
     const identities = files.map(file => repos.fileResource(id, file.ref, file.path).url);
     const bodies: string[] = [];
@@ -120,14 +130,12 @@ export function subscriptionRuleRoutes(store: Store, renderer: RenderService, sn
     }
     allowedQuery(c, ['profile', 'key', 'target', 'platform', 'app', 'token']);
     const key = requiredQuery(c, 'key'), output = target(c, true);
-    const result = await renderer.render(profileId, output);
+    const result = await renderer.render(profileId, output, key);
     if (!owned()) return c.body(null, 404);
     if (!result.ok) return result.accessDenied ? c.body(null, 404) : c.text(`规则暂时不可用：${result.message}`, 503);
-    const selected = result.render.privateRules?.[key];
-    if (!selected || !renderer.canReadRule(profileId, selected.reference)) return c.body(null, 404);
+    if (result.render.ruleBody === undefined) return c.body(null, 404);
     c.set('accessResource', { kind: 'rule-collection', resourceId: key, resourceName: store.get('profile', profileId)!.name + ' · 专属规则' });
-    if (result.source === 'last-good') c.header('x-sub-forge-warning', 'last-good-rule');
-    return ruleBody(c, selected.body);
+    return ruleBody(c, result.render.ruleBody);
   });
   return app;
 }

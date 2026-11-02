@@ -68,12 +68,10 @@ export function issueProfileToken(store: Store, t: { token: string; profileId: s
   store.putToken({ token: t.token, userId: owner });
 }
 
-/** 合并公共产物表与订阅专属规则正文，供渲染断言使用。 */
-export function ruleBodies(store: Store, render: import('../src/render.ts').StoredRender): Record<string, string> {
-  return Object.fromEntries([...render.ruleResources.map(key => store.getSharedRule<import('../src/shared-rules.ts').SharedRuleRecord>(key)!), ...Object.values(render.privateRules ?? {})].map((r, index) => {
-    const name = `rs_${(r.reference.matcher.kind === 'ruleset' ? r.reference.matcher.id : `local_${index}`).replace(/[^A-Za-z0-9_-]/g, '_')}${r.reference.options?.src ? '_src' : ''}_${r.body.startsWith('#subforge-binary-mrs\n') ? 'binary.mrs' : 'classical.list'}`;
-    return [name, r.body];
-  }));
+/** 按当前配置完整转换一次，返回各规则文件正文，供渲染断言使用。 */
+export async function ruleBodies(renderer: RenderService, profileId: string): Promise<Record<string, string>> {
+  const attempt = await (renderer as unknown as { attempt(id: string, target: { client: 'mihomo' }, pre: unknown[], opts: { dry: true }): Promise<{ result?: { rulesets: Record<string, { text: string }> } }> }).attempt(profileId, { client: 'mihomo' }, [], { dry: true });
+  return Object.fromEntries(Object.entries(attempt.result?.rulesets ?? {}).map(([file, output]) => [file, output.text]));
 }
 
 type TestClient = ReturnType<typeof client>;

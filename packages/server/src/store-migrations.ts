@@ -60,6 +60,8 @@ class StoreMigration {
       }
       this.db.exec(SCHEMA);
       this.db.exec(LEGACY_TEMPLATE_SCHEMA);
+      // 已退役的产物表：历史迁移步骤仍会访问，升级结束统一删除。
+      this.db.exec('CREATE TABLE IF NOT EXISTS last_good (profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (profile_id, target))');
       this.db.exec('INSERT OR IGNORE INTO template_versions SELECT id, 1, data, updated_at FROM templates');
       // 已退役表仅在旧凭据迁移期间使用，不能由当前建表脚本重建。
       if (version < 23) this.db.exec(`CREATE TABLE IF NOT EXISTS sub_tokens (
@@ -168,9 +170,6 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       if (version < 25) {
         // 旧配置中的路径 token 地址全部失效，不能用 last-good 再下发旧入口。
         this.db.exec('DELETE FROM last_good');
-        for (const row of this.store.listSharedRules<{ reference: { matcher: { remote?: unknown } } }>()) {
-          if (row.data.reference.matcher.remote) this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
-        }
         this.store.pruneResourceBindings(this.legacyTemplates);
       }
       if (version < 26) {
@@ -197,13 +196,17 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         }
         this.db.exec('DROP TABLE IF EXISTS sub_tokens');
       }
-      if (version < 33) this.retireStashCommonConfigs();
+      if (version < 34) this.retireStashCommonConfigs();
       this.finishTemplateMigration();
+      // v33：渲染结果和公共规则产物不再落库，全部按上游快照实时生成。
+      this.db.exec('DROP TABLE IF EXISTS last_good; DROP TABLE IF EXISTS shared_rule_resources');
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
     // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
     if (version < 23) this.db.pragma('wal_checkpoint(TRUNCATE)');
+    // 回收已删除产物占用的空间，避免继续增大文件和备份。
+    if (version > 0 && version < 33) this.db.exec('VACUUM');
     if (hadSnapshots && version < 3) {
       // 清除迁移前留在空闲页和 WAL 中的明文副本。
       this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -446,7 +449,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     this.db.exec("DELETE FROM docs WHERE kind = 'preset'");
   }
 
-  /** v33：公共配置收敛到三组，历史 Stash 差异只保留到可编辑的应用层。 */
+  /** v34：公共配置收敛到三组，历史 Stash 差异只保留到可编辑的应用层。 */
   private retireStashCommonConfigs(): void {
     for (const row of this.db.prepare("SELECT id,data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
       const previous = JSON.parse(this.cipher.decrypt(row.data));
@@ -454,10 +457,9 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       if (next === previous) continue;
       // 使用独立的迁移标识，避免覆盖 v28 或预设退役时已保存的原始文档。
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)')
-        .run('profile-stash-common-v33', row.id, row.data, this.now());
+        .run('profile-stash-common-v34', row.id, row.data, this.now());
       this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
         .run(this.cipher.encrypt(JSON.stringify(next)), row.id);
-      this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(row.id);
     }
   }
 

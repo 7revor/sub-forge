@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { independentRouting } from './helpers.ts';
 import { ruleBinding } from '../src/rule-binding.ts';
 import { ruleBodies } from './helpers.ts';
@@ -36,14 +37,14 @@ it('渲染校验期间更新配置与快照，旧任务不能覆盖新结果', a
   const old = renderer.render('p', { client: 'mihomo' }); await entered.promise;
   body = 'DOMAIN,new.test'; h.store.put('profile', { ...profile(), name: '新订阅' });
   await h.snapshots.refresh('ruleset', ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id, 'https://rules.test/a', { scope: 'profile:p' });
-  await renderer.render('p', { client: 'mihomo' }); held.release(); await old;
-  const saved = h.store.getLastGood<import('../src/render.ts').StoredRender>('p', 'mihomo:any')!;
-  expect(Object.values(ruleBodies(h.store, saved.data)).join('')).toContain('new.test');
+  await renderer.render('p', { client: 'mihomo' }); held.release();
+  const rendered = await old;
+  expect(rendered.ok && Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('new.test');
 });
-it('渲染等待中删除订阅，不得重新写成功配置', async () => {
+it('渲染等待中删除订阅，不得返回成功配置', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,a.test' }; } });
   h.store.put('profile', profile()); const pending = h.renderer.render('p', { client: 'mihomo' });
-  await entered.promise; h.store.delete('profile', 'p'); held.release(); expect((await pending).ok).toBe(false); expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
+  await entered.promise; h.store.delete('profile', 'p'); held.release(); expect((await pending).ok).toBe(false);
 });
 it('等待刷新时撤销 token，完成后不得下发内容', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,secret.test' }; } });
@@ -71,7 +72,7 @@ it('只刷新快照时，延迟完成的旧校验也不能回写旧原文', asyn
   const pending = renderer.render('p',{client:'mihomo'}); await entered.promise;
   body='DOMAIN,new.test'; await h.snapshots.refresh('ruleset',ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id,'https://rules.test/a',{scope:'profile:p'});
   held.release(); const result=await pending;
-  expect(result.ok && Object.values(ruleBodies(h.store, result.render)).join('')).toContain('new.test');
+  expect(result.ok && Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('new.test');
 });
 it('已保存组合的嵌套依赖不能跨用户读取或刷新', async () => {
   let calls=0; const h=setup({fetcher:async()=>{calls++;return {status:200,body:'trojan://test@node.test:443#secret'};}});
@@ -155,7 +156,7 @@ it('已删除来源的在途旧响应不会重新留下孤立缓存', async () =
 it('等待刷新时撤销 token，专属规则入口也拒绝返回正文',async()=>{
   const entered=gate(),held=gate();let block=false;const h=setup({fetcher:async()=>{if(block){entered.release();await held.promise;}return {status:200,body:'DOMAIN,private.test'};}});
   h.store.put('profile',profile());issueProfileToken(h.store, {token:'token',profileId:'p'});const result=await h.renderer.render('p',{client:'mihomo'});if(!result.ok)throw new Error('准备失败');
-  const key=Object.keys(result.render.privateRules!)[0]!;block=true;h.advance(86400001);
+  const key=new URL(Object.values<{url:string}>(parse(result.render.yaml)['rule-providers'])[0]!.url).searchParams.get('key')!;block=true;h.advance(86400001);
   const url=`/subs/ruleset?profile=p&token=token&key=${key}`;
   const pending=h.app.request(url);await entered.promise;h.store.deleteToken('token');held.release();expect((await pending).status).toBe(404);
 });
@@ -166,5 +167,5 @@ it('校验期间新发生的拉取失败不会丢失告警，仍使用最后成�
   const pending=renderer.render('p',{client:'mihomo'});await entered.promise;fail=true;
   await h.snapshots.refresh('ruleset',ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id,'https://rules.test/a',{scope:'profile:p'});held.release();
   const result=await pending;expect(result.ok).toBe(true);expect(result.report).toContainEqual(expect.objectContaining({code:'ruleset.fetch-failed',level:'warn'}));
-  expect(result.ok&&Object.values(ruleBodies(h.store, result.render)).join('')).toContain('retained.test');
+  expect(result.ok&&Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('retained.test');
 });
