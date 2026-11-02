@@ -32,6 +32,33 @@ describe('原文追加的保存与生成边界', () => {
     expect(conditional).toContain('ipv6 = false //!REQUIREMENT CORE_VERSION>=22');
     expect(conditional).toContain('ipv6 = true');
   });
+  it('Stash 按 Mihomo → Stash 公共 → 应用追加继承，列表替换且原文不回写', () => {
+    const profile: NativeBase = {
+      kernels: {
+        mihomo: '# 内核原文\nmixed-port: 7890\nipv6: true\ndns:\n  enable: true\n  nameserver: [223.5.5.5]\n',
+        stash: '# Stash 原文\nipv6: false\ndns:\n  nameserver: [1.1.1.1]\n',
+      },
+      clients: { 'stash-ios': 'mixed-port: 0\ndns:\n  nameserver: []\n', 'stash-macos': 'dns:\n  ipv6: false\n' },
+    };
+    const original = structuredClone(profile);
+    expect(parse(resolveNativeBase('stash', undefined, profile))).toEqual({ 'mixed-port': 7890, ipv6: false, dns: { enable: true, nameserver: ['1.1.1.1'] } });
+    expect(parse(resolveNativeBase('stash', 'stash-ios', profile))).toEqual({ 'mixed-port': 0, ipv6: false, dns: { enable: true, nameserver: [] } });
+    expect(parse(resolveNativeBase('stash', 'stash-macos', profile))).toEqual({ 'mixed-port': 7890, ipv6: false, dns: { enable: true, nameserver: ['1.1.1.1'], ipv6: false } });
+    expect(parse(resolveNativeBase('mihomo', 'flclash', profile))).toEqual({ 'mixed-port': 7890, ipv6: true, dns: { enable: true, nameserver: ['223.5.5.5'] } });
+    expect(profile).toEqual(original);
+    profile.kernels!.mihomo = 'mixed-port: 7899\ndns:\n  enable: false\n';
+    expect(parse(resolveNativeBase('stash', 'stash-macos', profile))).toMatchObject({ 'mixed-port': 7899, dns: { enable: false } });
+    expect(profile.kernels!.stash).toBe(original.kernels!.stash);
+    expect(profile.clients).toEqual(original.clients);
+  });
+  it('Stash 空追加仍继承 Mihomo；无效上层原文在生成时报错，其他内核不受影响', () => {
+    const profile: NativeBase = { kernels: { mihomo: 'dns: [', stash: '', surge: '[General]\nipv6 = false\n' }, clients: { 'stash-ios': '' } };
+    expect(() => validateNativeBase(profile)).not.toThrow();
+    expect(() => resolveNativeBase('stash', 'stash-ios', profile)).toThrow();
+    expect(resolveNativeBase('surge', undefined, profile)).toContain('ipv6 = false');
+    profile.kernels!.mihomo = 'dns: null\nipv6: false\n';
+    expect(parse(resolveNativeBase('stash', 'stash-ios', profile))).toEqual({ dns: null, ipv6: false });
+  });
   it('生成时拒绝覆盖订阅管理的段落，不会静默删除；listeners 仅在订阅层接受', () => {
     expect(() => validateNativeText('rules: []', 'mihomo')).toThrow('由订阅生成');
     expect(() => validateNativeText('[Proxy]\na = direct', 'surge')).toThrow('由订阅生成');

@@ -13,7 +13,7 @@ import { indexPreview, locatePreviewIssue } from './previewReport.ts';
 // 代理链直接展示业务检查结果，引用生成细节仅在配置预览中按需展开。
 
 import { useMutation } from '@tanstack/react-query';
-import { CLIENT_APPS, type ClientApp, type ChainResolution, type ChainRule, type Client } from '@sub-forge/core';
+import { BASE_KERNELS, baseKernel, CLIENT_APPS, type BaseKernel, type ClientApp, type ChainResolution, type ChainRule, type Client } from '@sub-forge/core';
 import { ArrowRight, Link2, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
@@ -68,8 +68,9 @@ export function TabPreview() {
   const [located, setLocated] = useState<{ result: ProfilePreview; index: number; range: CodeRange }>();
   const [app, setApp] = useState<ClientApp>();
   const [level, setLevel] = useState<'all' | 'error' | 'warn' | 'info'>('all');
-  const [client, setClient] = useState<Client>('mihomo');
-  const apps = CLIENT_APPS.filter(a => a.kernel === client);
+  const [kernel, setKernel] = useState<BaseKernel>('mihomo');
+  const apps = CLIENT_APPS.filter(a => baseKernel(a.kernel) === kernel);
+  const client = apps.find(a => a.id === app)?.kernel ?? kernel;
   const target = { client, profile: draft, ...(app ? { app } : {}) };
   const current = preview.data && !preview.isPending && !preview.error && JSON.stringify(preview.variables) === JSON.stringify(target);
   const report = preview.data?.report ?? [];
@@ -93,7 +94,7 @@ export function TabPreview() {
   return (
     <>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <Segmented label="预览内核" value={client} options={[{ value: 'mihomo', label: 'Mihomo' }, { value: 'surge', label: 'Surge' }, { value: 'stash', label: 'Stash' }, { value: 'loon', label: 'Loon' }]} onChange={(value) => { preview.reset(); setClient(value); setApp(undefined); }} />
+        <Segmented label="预览内核" value={kernel} options={[...BASE_KERNELS]} onChange={(value) => { preview.reset(); setKernel(value); setApp(undefined); }} />
         <label className="flex items-center gap-2 whitespace-nowrap text-sm text-foreground"><span className="sr-only">客户端追加</span>
           <Select clearable placeholder="全部客户端（只用内核公共追加）" className="w-[260px]" value={app ?? ''} onChange={e => setApp(e.target.value ? e.target.value as ClientApp : undefined)}>{apps.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</Select></label>
         <span className="mr-auto text-xs text-muted-foreground">包含当前未保存的修改</span>

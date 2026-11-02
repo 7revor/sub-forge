@@ -48,7 +48,7 @@ tun-excluded-routes = 192.168.0.0/16
 const routing = { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } };
 const draft = { name: '原文追加', nodeSets: [], chains: [], overlay: {}, routing };
 
-it('原文逐字保存，四内核隔离；仅生成时合并，不把切换目标的结果回写源文档', async () => {
+it('原文逐字保存，Stash 继承 Mihomo、其他内核隔离；仅生成时合并，不回写源文档', async () => {
   const h = setupApp();
   try {
     await addUser(h.store, 'native', 'admin'); const api = client(h.app); await api.login('native');
@@ -63,6 +63,8 @@ it('原文逐字保存，四内核隔离；仅生成时合并，不把切换目�
         const actual = parse(output.render.yaml);
         expect(actual).toMatchObject({ ...parse(mihomo), port: 0, 'allow-lan': false, dns: { ...parse(mihomo).dns, nameserver: ['9.9.9.9'] } });
         expect(actual.dns['nameserver-policy']['rule-set:custom']).toEqual(['tls://1.1.1.1']);
+      } else if (kernel === 'stash') {
+        expect(parse(output.render.yaml)).toMatchObject({ ...parse(mihomo), dns: { ...parse(mihomo).dns, nameserver: ['https://doh.pub/dns-query'] } });
       } else { expect(output.render.yaml).not.toContain('fake-ip-range'); expect(output.render.yaml).not.toContain('mips'); }
     }
     const ios = await h.renderer.preview(id, { client: 'surge', app: 'surge-ios' });

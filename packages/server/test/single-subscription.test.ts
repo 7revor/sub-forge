@@ -48,8 +48,8 @@ describe('每个用户一个资源令牌', () => {
         const res = await h.app.request('/subs/profile?token=test&id=p', { headers: { 'user-agent': ua } });
         expect(res.status).toBe(200); expect(res.headers.get('vary')).toBe('User-Agent');
         const body = parse(await res.text());
-        if (ua.startsWith('Stash')) { expect(body['log-level']).toBe('warning'); expect(body).not.toHaveProperty('mixed-port'); }
-        else expect(body['mixed-port']).toBe(7890);
+        if (ua.startsWith('Stash')) expect(body['log-level']).toBe('warning');
+        expect(body['mixed-port']).toBe(7890);
       }
     } finally { await h.snapshots.settled(); h.store.close(); }
   });

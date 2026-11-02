@@ -2,6 +2,20 @@ import { parseDocument, stringify } from 'yaml';
 import { CLIENTS, isIniClient, type Client } from '../types.ts';
 import { stripIniComment } from '../render/ini-format.ts';
 
+/** 产品中的配置分组；Stash 归入 Mihomo，但保留已有输出目标与原文槽位。 */
+export const BASE_KERNELS = [
+  { value: 'mihomo', label: 'Mihomo' },
+  { value: 'surge', label: 'Surge' },
+  { value: 'loon', label: 'Loon' },
+] as const;
+export type BaseKernel = typeof BASE_KERNELS[number]['value'];
+export const baseKernel = (client: Client): BaseKernel => client === 'stash' ? 'mihomo' : client;
+
+/** 继承顺序同时用于生成与只读展示，不将上层原文复制到下层。 */
+export function nativeBaseParents(kernel: Client, app?: ClientApp): Client[] {
+  return [...(kernel === 'stash' ? ['mihomo' as const] : []), ...(app ? [kernel] : [])];
+}
+
 /** 配置族与应用分别命名；规则转换只使用 Client（配置族）。 */
 export const CLIENT_APPS = [
   { id: 'flclash', kernel: 'mihomo', label: 'FlClash' },
@@ -128,10 +142,10 @@ export function validateNativeBase(value: unknown): asserts value is ProfileBase
   }
 }
 
-/** 内核公共内容先于可选客户端内容。原文从不回写。 */
+/** 上层公共内容先于当前追加；Stash 直接继承 Mihomo，不转换兼容字段。原文从不回写。 */
 export function resolveNativeBase(kernel: Client, app: ClientApp | undefined, profile?: NativeBase): string {
   if (app && CLIENT_APPS.find(c => c.id === app)?.kernel !== kernel) throw new Error('客户端与内核不匹配');
-  const texts = [profile?.kernels?.[kernel], app ? profile?.clients?.[app] : undefined].filter((s): s is string => s !== undefined);
+  const texts = [...nativeBaseParents(kernel, app).map(parent => profile?.kernels?.[parent]), app ? profile?.clients?.[app] : profile?.kernels?.[kernel]].filter((s): s is string => s !== undefined);
   texts.forEach(text => validateNativeText(text, kernel));
   return isIniClient(kernel) ? mergeNativeIni(texts) : texts.length ? stringify(texts.reduce((out, text) => mergeNativeObjects(out, parseNativeYaml(text)), {}), { lineWidth: 0 }) : '';
 }

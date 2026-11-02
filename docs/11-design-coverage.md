@@ -370,3 +370,6 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 2026-11-02 复制链接统一：`V2ProfileNodes`、`V2ProfileRouting`、`V2ProfileClient`、`V2ProfilePreview` 删除链接预览行，备注移到标题后；`V2LocalNode`、`V2Source` 把复制入口移出「更多」，`V2Collection`、`V2RuleSet` 文案统一为「复制链接」。画布已同步，前端已实现，后端无变化。
 2026-11-02 「节点来源」说法与空列表尺寸统一：界面文案、服务端校验提示与渲染报告中的「节点集」统一为「节点来源」，代码标识符（`nodeSets`、`NodeSet`）与报告错误码不变。`card` 空状态只用一行标题，高度统一 52px：代理链无来源时为「先添加节点来源，再配置代理链」，规则为空时为「没有规则，未匹配的流量走 MATCH」。`V2Components`、`V2ProfileNodes` 已同步，无新增后端待实现项。此条取代上一条代理链空状态的两行文案。
+
+
+2026-11-02 Stash 配置继承：V2ProfileClient 将 Stash 及 iOS/macOS 放入 Mihomo 下；编辑框上方增加默认折叠的继承原文只读区、空态和 YAML/INI 合并说明。V2RuleSet 只保留 Mihomo、Surge、Loon 预览；V2ProfilePreview 同步顶层分组，Stash 应用在 Mihomo 下选择。前端及核心继承已实现，数据模型/API 无需迁移。内置浏览器实查外部 Claude Design 画布仍要求登录，画布未同步；本地设计说明和验收截图见 [设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)。
