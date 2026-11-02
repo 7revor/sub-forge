@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { parseContent } from '../src/index.ts';
 import { renderMihomo, renderStash, renderSurge, renderLoon, type RenderInput } from '../src/render/mihomo.ts';
 import type { ChainNodeSet } from '../src/types.ts';
 const ref = (id: string) => ({ type: 'local' as const, id });
@@ -19,10 +20,10 @@ describe('代理链全部来源', () => {
       const initial = render(f);
       expect(initial.report.hasErrors).toBe(false);
       expect(initial.chainResolutions).toEqual([{ chainId: 'c', viaName: '前置-a', landingCount: 2, appliedCount: 2, issues: [] }]);
-      const nodes = (client === 'Mihomo' && output === 'provider'
-        ? Object.values(initial.providers).flatMap(provider => parse(provider.yaml).proxies)
+      const nodes = (output === 'provider'
+        ? Object.entries(initial.providers).filter(([key]) => key.startsWith('local:')).flatMap(([, provider]) => client === 'Surge' ? parseContent(provider.yaml, ref('result')).proxies.map(n => ({ ...n, 'dialer-proxy': n.upstreamDialer })) : parse(provider.yaml).proxies)
         : initial.config.proxies) as Record<string, unknown>[];
-      const dialer = client === 'Mihomo' && output === 'provider' ? initial.dependencies[0]!.output : '前置-a';
+      const dialer = output === 'provider' ? initial.dependencies[0]!.output : '前置-a';
       expect(nodes.filter(node => String(node.name).startsWith('落地')).map(node => node['dialer-proxy'])).toEqual([dialer, dialer]);
       expect(nodes.filter(node => String(node.name).startsWith('前置')).every(node => node['dialer-proxy'] === undefined)).toBe(true);
       expect(JSON.stringify(f)).toBe(before);
@@ -45,7 +46,7 @@ describe('代理链全部来源', () => {
     expect(render(f).chainResolutions[0]).toMatchObject({ landingCount: 0, appliedCount: 0, issues: [expect.objectContaining({ code: 'chain.no-landing' })] });
   });
   it('Loon 的全部来源输出代理链，保留前置', () => {
-    const out = renderLoon(fixture('provider'));
+    const out = renderLoon(fixture('inline'));
     expect(out.report.hasErrors).toBe(false);
     expect(out.yaml).toContain('[Proxy Chain]');
     expect(out.chainResolutions[0]).toMatchObject({ landingCount: 2, appliedCount: 2 });

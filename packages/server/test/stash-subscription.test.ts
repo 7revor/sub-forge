@@ -54,9 +54,12 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(yaml['mixed-port']).toBe(7890); expect(yaml['allow-lan']).toBe(true);
     expect(yaml['log-level']).toBe('warning');
     expect(yaml.dns).toEqual({ enable: true, nameserver: ['https://dns.example.test/dns-query'] });
-    expect(yaml.proxies[0]).toMatchObject({ name: '测试节点', auth: 'example-password' });
-    expect(yaml.proxies[0].password).toBeUndefined();
-    expect(yaml['proxy-providers']).toBeUndefined();
+    expect(yaml.proxies).toEqual([]);
+    const nodesResponse = await h.app.request(yaml['proxy-providers']['节点'].url);
+    expect(nodesResponse.status).toBe(200);
+    const nodes = parse(await nodesResponse.text()).proxies;
+    expect(nodes[0]).toMatchObject({ name: '测试节点', auth: 'example-password' });
+    expect(nodes[0].password).toBeUndefined();
     expect(yaml.rules).toContain('PROCESS-NAME,Example,代理');
     const provider = Object.values(yaml['rule-providers'])[0] as { url: string };
     expect(new URL(provider.url).pathname).toBe('/subs/ruleset');
@@ -90,7 +93,7 @@ describe('Stash 主订阅与资源隔离', () => {
   it('草稿预览和独立文件导出可用，不写缓存，导出没有占位 token', async () => {
     const h = await scenario();
     for (const path of ['/api/profiles/preview', `/api/profiles/${h.profile.id}/preview`]) {
-      const preview = await h.alice.post(path, { profile: h.profile, client: 'stash', platform: 'ios' });
+      const preview = await h.alice.post(path, { profile: { ...h.profile, nodeSets: h.profile.nodeSets.map((s: any) => ({ ...s, output: 'inline' })) }, client: 'stash', platform: 'ios' });
       expect(preview.status).toBe(200); expect(preview.json.ok, preview.text).toBe(true);
       if (path === '/api/profiles/preview') expect(preview.json.yaml).not.toContain('#SUBSCRIBED');
       else expect(preview.json.yaml.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token={token}`);
@@ -133,13 +136,13 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(verify).not.toHaveBeenCalled();
     expect((await renderer.render(h.profile.id, { client: 'mihomo' })).ok).toBe(true);
     expect(verify).toHaveBeenCalledTimes(1);
-    h.store.put('local', { id: 'nodes', name: '不支持的协议', proxies: [{ name: '测试节点', type: 'sudoku', server: 'example.test', port: 443 }] }, h.user.id);
+    h.store.put('local', { id: 'nodes', name: '认证冲突', proxies: [{ name: '测试节点', type: 'hysteria2', server: 'example.test', port: 443, password: 'one', auth: 'two' }] }, h.user.id);
     const fallback = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
     expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
     if (!fallback.ok) throw new Error(fallback.message);
     expect(fallback.render.yaml.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token=__SF_TOKEN__`);
     expect(fallback.render.yaml.match(/^#SUBSCRIBED /gm)).toHaveLength(1);
-    expect(parse(fallback.render.yaml).proxies[0].auth).toBe('example-password');
+    expect(parse(fallback.render.providers['local:nodes']!).proxies[0].auth).toBe('example-password');
     expect((await renderer.render(h.profile.id, { client: 'stash', platform: 'macos' })).ok).toBe(false);
   });
 });

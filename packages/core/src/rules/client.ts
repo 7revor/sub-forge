@@ -143,11 +143,9 @@ function lowerSurge(rule: RuleIR, ctx: ClientCtx): LoweredRule {
 function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
   switch (rule.type) {
     case 'DST-PORT': return lowerPort('DST-PORT', rule.value);
-    case 'RAW': return lowerRaw(rule, ctx);
-    case 'AND': case 'OR': case 'NOT':
-      return lowerLogical(rule, ctx);
+    case 'USER-AGENT':
     case 'URL-REGEX':
-      return { kind: 'drop', reason: 'Stash 尚未适配 URL-REGEX' };
+      return { kind: 'ok', text: `${rule.type},${rule.value}` };
     case 'IP-CIDR': case 'IP-CIDR6': case 'IP-ASN': case 'GEOIP':
       if (rule.src) return rule.type === 'IP-CIDR' || rule.type === 'IP-CIDR6'
         ? { kind: 'ok', text: `SRC-IP,${rule.value}`, note: 'src 转换为 Stash 的 SRC-IP（需 iOS 3.7 / macOS 4.4 或更新版本）' }
@@ -169,7 +167,7 @@ function lowerStash(rule: RuleIR, ctx: ClientCtx): LoweredRule {
         ? { kind: 'drop', reason: `进程正则 ${rule.value} 无法转为 Stash 通配` }
         : { kind: 'ok', text: `PROCESS-NAME,${wildcard}`, note: `进程正则 ${rule.value} 降级为通配 ${wildcard}` };
     }
-    default: return { kind: 'ok', text: `${rule.type},${rule.value}` };
+    default: return lowerMihomo(rule, ctx);
   }
 }
 

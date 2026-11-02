@@ -29,7 +29,7 @@ describe('订阅专属 Provider 服务端覆写', () => {
     const names = parse(m.providers['source:s']!.yaml).proxies.map((p: any) => p.name);
     const expected = names.map((name: string) => name === '落地' ? 'REJECT' : 'DIRECT');
     expect(parse(m.providers['source:s']!.yaml).proxies.map((p: any) => p['dialer-proxy'])).toEqual(expected);
-    expect((s.config.proxies as any[]).map(p => p['dialer-proxy'])).toEqual(expected);
+    expect(parse(s.providers['source:s']!.yaml).proxies.map((p: any) => p['dialer-proxy'])).toEqual(expected);
     expect(m.report.hasErrors).toBe(false);
     expect(s.report.hasErrors).toBe(false);
   });
@@ -96,12 +96,13 @@ describe('订阅专属 Provider 服务端覆写', () => {
     ] };
     f.profile.chains = [{ id: 'regex', landing: { nodeSet: ref, ...(output === 'inline' ? { filter: '^落地$' } : {}) }, via: { kind: 'node', ref: { nodeSet: via, match: { regex: '香港' }, fallback: 'error' } } }];
     const m = renderMihomo(f), stash = renderStash(f);
-    expect(m.report.hasErrors).toBe(false); expect(stash.report.hasErrors).toBe(false);
+    expect(m.report.hasErrors).toBe(false);
+    expect(stash.report.hasErrors).toBe(false);
     const wrapper = (m.config['proxy-groups'] as { name: string; hidden?: boolean }[]).find(g => g.hidden);
     expect(wrapper).toMatchObject({ type: 'select', use: ['中转'], filter: '^香港 \\[01\\]$', 'empty-fallback': 'REJECT' });
     const landings = output === 'provider' ? parse(m.providers['source:s']!.yaml).proxies : m.config.proxies;
     expect(landings.find((p: any) => p.name === '落地')['dialer-proxy']).toBe(wrapper!.name);
-    expect((stash.config.proxies as any[]).find(p => p.name === '落地')['dialer-proxy']).toBe('香港 [01]');
+    if (output === 'inline') expect((stash.config.proxies as any[]).find(p => p.name === '落地')['dialer-proxy']).toBe(stash.dependencies[0]!.output);
     if (output === 'inline') expect(landings.find((p: any) => p.name === '前置')['dialer-proxy']).toBeUndefined();
     else expect(landings.every((p: any) => p['dialer-proxy'] === wrapper!.name)).toBe(true);
   });

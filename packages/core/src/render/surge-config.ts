@@ -10,9 +10,9 @@ import { surgeProxyLine } from './surge-proxy.ts';
 
 type Fields = Record<string, unknown>;
 
-export function surgeBenchmarks(groups: Fields[], nodes: Fields[], specs: GroupSpec[], report: Report): void {
+export function surgeBenchmarks(groups: Fields[], nodes: Fields[], specs: GroupSpec[], report: Report, providers = new Map<string, Record<string, unknown>[]>(), remoteMembers = new Map<string, string[]>()): void {
   const groupMap = new Map(groups.map(g => [String(g.name), g]));
-  const nodeMap = new Map(nodes.map(n => [String(n.name), n]));
+  const nodeMap = new Map([...nodes, ...[...providers.values()].flat()].map(n => [String(n.name), n]));
   const visit = (name: string, patch: Fields, seen: Set<string>, where: string) => {
     if (seen.has(name)) return;
     seen.add(name);
@@ -22,7 +22,11 @@ export function surgeBenchmarks(groups: Fields[], nodes: Fields[], specs: GroupS
         if (node[key] !== undefined && node[key] !== value) report.error('surge.benchmark-conflict', '共享节点「' + name + '」设置了不同的 ' + key + '，请统一测速参数', where);
         else node[key] = value;
       }
-    } else for (const member of groupMap.get(name)?.proxies as string[] ?? []) visit(member, patch, seen, where);
+    } else {
+      const group = groupMap.get(name);
+      for (const member of group?.proxies as string[] ?? []) visit(member, patch, seen, where);
+      for (const member of remoteMembers.get(name) ?? []) visit(member, patch, seen, where);
+    }
   };
   for (const group of specs) {
     if (group.type === 'select') continue;
@@ -35,8 +39,9 @@ export function surgeBenchmarks(groups: Fields[], nodes: Fields[], specs: GroupS
 
 function surgeGroup(group: Fields, report: Report): string {
   const name = iniName(group.name), fields = [String(group.type), ...[...new Set(group.proxies as string[] ?? [])].map(iniName)];
-  const known = new Set(['name','type','proxies','url','timeout','interval','tolerance','hidden','icon','strategy','lazy','max-failed-times','expected-status','empty-fallback']);
+  const known = new Set(['name','type','proxies','url','timeout','interval','tolerance','hidden','icon','strategy','lazy','max-failed-times','expected-status','empty-fallback','policy-path','update-interval']);
   const add = (key: string, value: unknown) => { if (value !== undefined) fields.push(key + '=' + iniValue(value)); };
+  add('policy-path', group['policy-path']); add('update-interval', group['update-interval']);
   add('interval', group.interval); add('tolerance', group.tolerance); add('hidden', group.hidden); add('icon-url', group.icon);
   for (const key of ['no-alert', 'evaluate-before-use', 'category', 'persistent']) { known.add(key); add(key, group[key]); }
   if (group.strategy === 'consistent-hashing') add('persistent', true);

@@ -11,7 +11,7 @@ import { profileTemplate } from './profile-routing.ts';
 import { createHash } from 'node:crypto';
 import { stringify } from 'yaml';
 import {
-  resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, renderLoon, isIniClient, stringifySurge, surgeProxyLine, loonProxyLine, exportStashConfig, sourceKey, sourceLabel, stableStringify,
+  resolveProfileRouting, Report, renderClash, renderSurge, renderLoon, isIniClient, stringifySurge, surgeProxyLine, loonProxyLine, exportStashConfig, sourceKey, sourceLabel, stableStringify,
   type Client, type HostedRuleReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs, type RuleEntry,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -30,10 +30,21 @@ function normalizeTarget(target: Target): Target {
   return { client: target.client, ...(target.platform ? { platform: target.platform } : {}), ...(app ? { app: app.id, ...('platform' in app ? { platform: app.platform } : {}) } : {}) };
 }
 
+/** Stash 和 Mihomo 均进入公共 YAML 生成流程。 */
+function renderForClient(input: Parameters<typeof renderClash>[0], client: Client): MihomoRenderResult {
+  return client === 'surge' ? renderSurge(input) : client === 'loon' ? renderLoon(input) : renderClash(input, client);
+}
+
 /** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
 export type StoredRender = {
   /** Loon 全部分流规则已托管；旧内联产物不可作为回退。 */
   loonRuleDelivery?: 'remote';
+  /** 原生远程节点输出版本；禁止回退到旧版强制内联产物。 */
+  nodeProviderDelivery?: 1;
+  /** Stash 已切换到公共 Clash 生成，不回退到旧专用改写。 */
+  clashDelivery?: 1;
+  nodeOutputSignature?: string;
+  providerNodeCounts?: Record<string, number>;
   yaml: string;
   providers: Record<string, string>;
   providerUserinfo?: Record<string, TrafficInfo>;
@@ -126,7 +137,9 @@ export class RenderService {
 
     if (!this.store.get('profile', profileId)) return { ok: false, message: 'Profile 不存在', report: attempt.report };
     const saved = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
-    const last = target.client === 'loon' && saved?.data.loonRuleDelivery !== 'remote' ? undefined : saved;
+    const requiresRemote = target.client !== 'mihomo' && this.store.get('profile', profileId)?.nodeSets.some(s => s.output === 'provider');
+    const changedOutput = saved?.data.nodeOutputSignature !== undefined && saved.data.nodeOutputSignature !== stableStringify(this.store.get('profile', profileId)?.nodeSets);
+    const last = target.client === 'stash' && saved?.data.clashDelivery !== 1 || changedOutput || target.client === 'loon' && saved?.data.loonRuleDelivery !== 'remote' || requiresRemote && saved?.data.nodeProviderDelivery !== 1 ? undefined : saved;
     if (last && this.store.getWithOwner('profile', profileId)?.owner && !this.canReadNodes(last.data, this.store.getWithOwner('profile', profileId)!.owner!)) return { ok: false, accessDenied: true, message: '节点资源权限已变化', report: attempt.report };
     if (last && !this.canReadRules(profileId, last.data)) return { ok: false, accessDenied: true, message: '规则资源已移除或失效', report: attempt.report };
     if (last) return { ok: true, source: 'last-good', render: { ...last.data, yaml: this.managedProfileYaml(last.data.yaml, profileId, target) }, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
@@ -173,9 +186,18 @@ export class RenderService {
     const pre: ReportItem[] = [];
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
-      return a.result
-        ? { ok: !a.failure, yaml: this.managedProfileYaml(a.result.yaml, profileId, target), format: isIniClient(target.client) ? 'ini' : 'yaml', ...(target.client === 'loon' && Object.keys(a.result.rulesets).length ? { exportUnavailableReason: 'Loon 规则需要通过托管链接加载。请保存配置后，通过页面顶部的订阅链接在 Loon 中获取；草稿预览不能导出为可用配置。' } : {}), ...(target.client === 'surge' && !a.failure ? { exportYaml: stringifySurge(a.result, true) } : {}), ...(target.client === 'stash' && !a.failure && !Object.values(a.result.rulesets).some(r => r.text.startsWith('#subforge-binary-mrs\n')) ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
-        : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
+      if (!a.result) return { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
+      const hasProviders = Object.keys(a.result.providers).length > 0;
+      const exportUnavailableReason = hasProviders
+        ? '配置包含远程节点引用。请保存配置后使用页面顶部的订阅链接获取，草稿地址不能用于客户端下载。'
+        : target.client === 'loon' && Object.keys(a.result.rulesets).length
+          ? 'Loon 规则需要通过托管链接加载。请保存配置后，通过页面顶部的订阅链接在 Loon 中获取；草稿预览不能导出为可用配置。' : undefined;
+      return { ok: !a.failure, yaml: this.managedProfileYaml(a.result.yaml, profileId, target), format: isIniClient(target.client) ? 'ini' : 'yaml',
+        ...(exportUnavailableReason ? { exportUnavailableReason } : {}),
+        ...(target.client === 'surge' && !a.failure && !hasProviders ? { exportYaml: stringifySurge(a.result, true) } : {}),
+        ...(target.client === 'stash' && !a.failure && !hasProviders && !Object.values(a.result.rulesets).some(r => r.text.startsWith('#subforge-binary-mrs\n')) ? { exportYaml: exportStashConfig(a.result) } : {}),
+        dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}),
+      };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
     } finally { this.store.pruneResourceBindings(); }
@@ -249,7 +271,7 @@ export class RenderService {
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const output = { target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER };
     const ruleReferences = new Map<string, HostedRuleReference>();
-    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = renderForClient({
       profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
@@ -265,7 +287,7 @@ export class RenderService {
             : queryUrl(reference.matcher.repository ? '/resources/repo' : '/resources/ruleset', { key, token: TOKEN_PLACEHOLDER }, publicUrl);
         },
       },
-    });
+    }, target.client);
     const report = [...pre, ...result.report.items];
     const errors = report.filter((i) => i.level === 'error');
     if (errors.length) return { report, result, failure: errors.map((e) => e.message).join('；') };
@@ -281,6 +303,10 @@ export class RenderService {
 
     checkCurrent();
     const render: StoredRender = {
+      nodeProviderDelivery: 1,
+      ...(!isIniClient(target.client) ? { clashDelivery: 1 as const } : {}),
+      nodeOutputSignature: stableStringify(profile.nodeSets),
+      providerNodeCounts: Object.fromEntries(Object.entries(result.providers).flatMap(([key, provider]) => provider.nodeCount === undefined ? [] : [[key, provider.nodeCount]])),
       ...(target.client === 'loon' ? { loonRuleDelivery: 'remote' as const } : {}),
       yaml: this.managedProfileYaml(result.yaml, profile.id, target),
       nodeDependencies: [
@@ -289,9 +315,21 @@ export class RenderService {
         ...Object.keys(nodeSets.locals).map(id => ({ type: 'local' as const, id })),
       ],
       providers: Object.fromEntries(Object.entries(result.providers).map(([k, p]) => [k, p.yaml])),
-      providerUserinfo: Object.fromEntries(profile.nodeSets.flatMap(({ ref }) => {
-        const info = nodeTraffic(ref, nodeSets, userinfoBySource);
-        return info ? [[`${ref.type}:${ref.id}`, info]] : [];
+      providerUserinfo: Object.fromEntries(Object.entries(result.providers).flatMap(([key, provider]) => {
+        const sourceKeys = new Set(provider.sourceKeys ?? [key]);
+        const refs = profile.nodeSets.filter(({ ref }) => sourceKeys.has(`${ref.type}:${ref.id}`));
+        const infos = new Map<string, TrafficInfo>();
+        const seen = new Set<string>();
+        const visit = (ref: NodeSetID) => {
+          const key = `${ref.type}:${ref.id}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          if (ref.type === 'collection') nodeSets.collections[ref.id]?.members.forEach(m => visit(m.ref));
+          if (ref.type === 'source') { const source = nodeSets.sources[ref.id], info = userinfoBySource.get(ref.id); if (source && info) infos.set(source.url, info); }
+        };
+        refs.forEach(({ ref }) => visit(ref));
+        const info = sumTraffic(infos.values());
+        return info ? [[key, info]] : [];
       })),
       ruleResources: [...new Set([...ruleReferences.values()].filter(ref => ref.matcher.kind === 'ruleset' && !ref.matcher.remote).map(ref => this.ruleKey(ref, target)))],
       privateRules: Object.fromEntries([...ruleReferences].filter(([, ref]) => ref.matcher.kind !== 'ruleset' || ref.matcher.remote).map(([file, reference]) => [this.ruleKey(reference, target), { reference, body: result.rulesets[file]!.text }])),
@@ -338,11 +376,11 @@ export class RenderService {
     const loaded = await this.loadNodeSets([ref], owner);
     if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
     if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
-    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = renderForClient({
       profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
       platform: target.platform,
       nodeSets: loaded.inputs, rules: { rulesets: {}, snapshots: {} }, urls: { provider: key => key, ruleset: key => key },
-    });
+    }, target.client);
     const yaml = isIniClient(target.client) ? (result.config.proxies as Record<string, unknown>[]).flatMap(node => {
       const line = (target.client === 'loon' ? loonProxyLine : surgeProxyLine)(node, result.report);
       return line ? [line] : [];

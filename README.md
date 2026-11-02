@@ -31,7 +31,7 @@
 
 ## 状态
 
-**M0 内核基本完成**（[packages/core](packages/core/README.md)）；**M1 基本完成**：服务端（[packages/server](packages/server/README.md)：多用户与登录、管理接口、上游拉取、订阅接口）与前端（[packages/web](packages/web/README.md)）都已可用，生产 Docker 镜像包含两者；支持 Mihomo、Stash、Surge 与 Loon 完整输出；后三者的节点按快照内联。各里程碑进度见 [05 §1.1](docs/05-roadmap-and-open-questions.md#11-进度)。
+**M0 内核基本完成**（[packages/core](packages/core/README.md)）；**M1 基本完成**：服务端（[packages/server](packages/server/README.md)：多用户与登录、管理接口、上游拉取、订阅接口）与前端（[packages/web](packages/web/README.md)）都已可用，生产 Docker 镜像包含两者；支持 Mihomo、Stash、Surge 与 Loon 完整输出；四端节点均遵循引用 / 展开设置。各里程碑进度见 [05 §1.1](docs/05-roadmap-and-open-questions.md#11-进度)。
 
 已完成 [M1 稳定化验收](docs/10-m1-stabilization.md)：Docker 内 377 项通过、2 项原有用例跳过，并完成内置浏览器验收。跟随最新模板的订阅会在客户端下次刷新主订阅时采用新模板；主配置与节点 / 规则资源按结构版本配套，兼容的远程内容仍可独立刷新。修复已合入 main，本地服务使用主分支；尚未部署到生产环境。
 
@@ -69,6 +69,6 @@ pnpm test:docker                            # Docker 断网容器内跑全部测
 
 资源模型（2026-10-30）：每用户一个访问令牌，公共规则增强和仓库全站共享，节点、配置订阅及专属规则按用户鉴权；统一托管并在服务端处理代理链。统一使用查询参数入口 `/subs`、`/resources`；`/api` 仅接受登录态，模板不提供 token 入口。升级 v25 保留现有用户 token，但移除全部旧 URL，需要重新复制链接。详情见 [全局托管、资源清理与迁移](docs/19-managed-resources.md)。
 
-节点源、组合、本地节点组、配置订阅和公共规则增强支持使用当前账户令牌复制链接。规则增强可以独立订阅；Mihomo / Stash 节点链接及配置内节点 provider 支持 GET / HEAD 流量响应头，组合按唯一上游地址汇总。
+节点源、组合、本地节点组、配置订阅和公共规则增强支持使用当前账户令牌复制链接。规则增强可以独立订阅；四端节点链接及配置内远程节点资源支持 GET / HEAD 流量响应头，组合按唯一上游地址汇总。
 
 基础配置采用[内核公共追加＋可选客户端追加](docs/20-native-client-append.md)，直接保存原文。基础设置预设已移除，旧引用在 v28 迁移中备份并展开到订阅；模板入口位于管理员分组，规则只按内核区分。

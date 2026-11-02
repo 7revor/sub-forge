@@ -15,7 +15,9 @@ it('节点 QUIC 控制按客户端语义处理，不把被忽略字段当作成�
   f.nodeSets.locals.nodes!.proxies = [{ name: '节点', type: 'ss', server: 'example.test', port: 443, cipher: 'aes-128-gcm', password: 'example', 'block-quic': true }];
   expect(renderSurge(f).yaml).toContain('block-quic=on');
   expect(renderLoon(f).yaml).toContain('block-quic=true');
-  for (const render of [renderMihomo, renderStash]) expect(render(f).report.byCode('proxy.block-quic-unsupported')).toHaveLength(1);
+  expect(renderMihomo(f).report.byCode('proxy.block-quic-unsupported')).toHaveLength(1);
+  expect(renderStash(f).config.proxies).toMatchObject([{ 'block-quic': true }]);
+  expect(renderStash(f).report.hasErrors).toBe(false);
   f.nodeSets.locals.nodes!.proxies[0]!['block-quic'] = false;
   expect(renderSurge(f).yaml).toContain('block-quic=off');
   expect(renderMihomo(f).report.hasErrors).toBe(false);

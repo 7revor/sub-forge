@@ -12,7 +12,9 @@ function fixture(): RenderInput {
 }
 describe('自动引用与代理链诊断', () => {
   it.each([renderMihomo, renderStash])('按客户端自动处理且返回实际前置与落地数量', render => {
-    const f = fixture(), before = JSON.stringify(f);
+    const f = fixture();
+    if (render === renderStash) f.profile.nodeSets[0]!.output = 'inline';
+    const before = JSON.stringify(f);
     const r = render(f);
     expect(r.chainResolutions).toEqual([{ chainId: 'c', viaName: '香港 1', landingCount: 2, appliedCount: 2, issues: [] }]);
     expect(JSON.stringify(f)).toBe(before);
@@ -20,7 +22,7 @@ describe('自动引用与代理链诊断', () => {
       expect(r.config.proxies).toEqual([]); expect(r.dependencies[0]?.strategy).toBe('wrap');
       f.profile.refPolicy!.perRef = { [r.dependencies[0]!.refKey]: 'inline' };
       expect(render(f).config).toEqual(r.config);
-    } else expect(r.config['proxy-providers']).toBeUndefined();
+    } else { expect(r.config['proxy-providers']).toBeDefined(); expect(r.dependencies[0]?.strategy).toBe('wrap'); }
   });
   it('前置丢失、落地为空分别定位到对应链', () => {
     const f = fixture(); f.profile.chains[0]!.via = node('relay', '已删除');

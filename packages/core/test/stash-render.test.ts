@@ -5,7 +5,7 @@ import { lowerRule, exportStashConfig, parseRuleLine, renderStash, renderMihomo,
 const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
 function fixture(): RenderInput {
   return {
-    profile: { id: 'p', name: 'Stash', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: {
+    profile: { id: 'p', name: 'Stash', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'inline' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: {
       groups: [{ id: 'all', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }],
       rules: [{ id: 'ua', matcher: { kind: 'rule', rule: { type: 'USER-AGENT', value: 'PayPal*' } }, target: { kind: 'group', groupId: 'all' } }], final: direct,
     } } },
@@ -35,8 +35,9 @@ describe('Stash 完整 YAML 渲染', () => {
     expect((out.config.proxies as Record<string, unknown>[])[1]).not.toHaveProperty('password');
     expect(out.config['proxy-groups']).toEqual([{ name: '代理', type: 'select', proxies: ['香港', '日本'] }]);
     expect(out.config.rules).toEqual(['USER-AGENT,PayPal*,代理', 'MATCH,DIRECT']);
-    expect(out.report.items).toMatchObject([{ code: 'stash.nodes-inline' }]);
+    expect(out.report.byCode('stash.nodes-inline')).toHaveLength(0);
     expect(JSON.stringify(f)).toBe(before);
+    f.profile.nodeSets[0]!.output = 'provider';
     const mihomo = renderMihomo(f);
     expect(mihomo.config['proxy-providers']).toBeDefined();
     expect(mihomo.config.rules).not.toContain('USER-AGENT,PayPal*,代理');
@@ -52,12 +53,12 @@ describe('Stash 完整 YAML 渲染', () => {
 
   it('动态成员和筛选按当前节点集展开，筛空固定拒绝，不向 Stash 输出 empty-fallback', () => {
     const f = fixture();
-    groups(f)[0]!.members = [{ kind: 'all', scope: 'providers' }];
+    groups(f)[0]!.members = [{ kind: 'all', scope: 'proxies' }];
     groups(f)[0]!.excludeFilter = '日本';
     expect(renderStash(f).config['proxy-groups']).toEqual([{ name: '代理', type: 'select', proxies: ['香港'] }]);
     groups(f)[0]!.filter = '不存在';
     expect(renderStash(f).config['proxy-groups']).toEqual([{ name: '代理', type: 'select', proxies: ['REJECT'] }]);
-    groups(f)[0]!.members = [{ kind: 'all', scope: 'proxies' }];
+    groups(f)[0]!.members = [{ kind: 'all', scope: 'providers' }];
     delete groups(f)[0]!.filter;
     expect(renderStash(f).config['proxy-groups']).toEqual([{ name: '代理', type: 'select', proxies: ['REJECT'] }]);
   });
@@ -73,19 +74,23 @@ describe('Stash 完整 YAML 渲染', () => {
     expect(renderStash(f).report.items).toContainEqual(expect.objectContaining({ code: 'stash.benchmark-conflict', level: 'error' }));
   });
 
-  it('不支持的代理、组策略和参数阻止成功输出', () => {
+  it('节点及策略组扩展与公共生成保持一致，不设置 Stash 白名单', () => {
     const f = fixture();
-    f.nodeSets.locals.nodes!.proxies[0]!.type = 'sudoku';
+    f.nodeSets.locals.nodes!.proxies = [{ name: '扩展节点', type: 'sudoku', server: 'node.example.test', port: 443, 'ip-version': 'dual', smux: { enabled: true } }];
+    groups(f)[0]!.type = 'load-balance';
     groups(f)[0]!.strategy = 'sticky-sessions';
-    groups(f)[0]!.extra = { 'include-all': true };
-    const out = renderStash(f);
-    expect(out.report.items.filter(x => x.level === 'error').map(x => x.code)).toEqual(['stash.proxy-type', 'stash.group-strategy', 'stash.group-option']);
+    groups(f)[0]!.extra = { 'disable-udp': true, 'default-selected': '扩展节点' };
+    const out = renderStash(f), common = renderMihomo(f);
+    expect(out.report.hasErrors).toBe(false);
+    expect(out.config.proxies).toEqual(common.config.proxies);
+    const expected = { ...(common.config['proxy-groups'] as Record<string, unknown>[])[0] }; delete expected['empty-fallback'];
+    expect(out.config['proxy-groups']).toEqual([expected]);
   });
 
   it('内联造成的重名仍按原快照名称解析引用和筛选', () => {
     const f = fixture();
     f.nodeSets.locals.other = { id: 'other', name: '另一个节点集', proxies: [{ name: '香港', type: 'trojan', server: 'other.example.test', port: 443, password: 'other' }] };
-    f.profile.nodeSets.push({ ref: { type: 'local', id: 'other' }, output: 'provider' });
+    f.profile.nodeSets.push({ ref: { type: 'local', id: 'other' }, output: 'inline' });
     groups(f)[0]!.members = [{ kind: 'node', ref: { nodeSet: { type: 'local', id: 'other' }, match: { exact: '香港' } } }];
     const out = renderStash(f);
     expect(out.report.hasErrors).toBe(false);
@@ -95,19 +100,21 @@ describe('Stash 完整 YAML 渲染', () => {
     expect(renderStash(f).config['proxy-groups']).toEqual([{ name: '代理', type: 'select', proxies: ['香港 2'] }]);
   });
 
-  it('代理链环仍被检测，不把 interface-name 与 dialer-proxy 组合输出成功', () => {
+  it('代理链环仍被检测，前置和网卡参数沿用公共生成', () => {
     const f = fixture();
     f.profile.chains = [{ id: 'self', landing: { nodeSet: { type: 'local', id: 'nodes' } }, via: { kind: 'group', groupId: 'all' } }];
     expect(renderStash(f).report.items.some(x => x.level === 'error' && x.code.startsWith('chain.'))).toBe(true);
     const separate = fixture();
     separate.nodeSets.locals.nodes!.proxies[1]!['interface-name'] = 'en0';
     separate.profile.chains = [{ id: 'via', landing: { nodeSet: { type: 'local', id: 'nodes' }, filter: '日本' }, via: { kind: 'node', ref: { nodeSet: { type: 'local', id: 'nodes' }, match: { exact: '香港' } } } }];
-    expect(renderStash(separate).report.items).toContainEqual(expect.objectContaining({ level: 'error', code: 'stash.dialer-interface' }));
+    expect(renderStash(separate).chainResolutions).toEqual(renderMihomo(separate).chainResolutions);
+    expect(renderStash(separate).report.hasErrors).toBe(false);
+    expect(renderStash(separate).config.proxies).toMatchObject([{}, { 'interface-name': 'en0', 'dialer-proxy': '香港' }]);
   });
 });
 
 describe('Stash 规则能力独立于 Surge / Mihomo', () => {
-  it.each(['DOMAIN-REGEX,^example', 'GEOSITE,cn', 'NETWORK,tcp', 'DST-PORT,443', 'USER-AGENT,PayPal*'])('原生规则：%s', text => {
+  it.each(['DOMAIN-REGEX,^example', 'GEOSITE,cn', 'NETWORK,tcp', 'DST-PORT,443', 'USER-AGENT,PayPal*', 'URL-REGEX,^https://example.test/'])('原生规则：%s', text => {
     expect(lowerRule(parseRuleLine(text), { client: 'stash' })).toEqual({ kind: 'ok', text });
   });
   it('进程规则仅 macOS 生效，精确路径保留 PROCESS-PATH，名称正则可等价降级', () => {
