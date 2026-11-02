@@ -208,7 +208,7 @@ type ChainRule = {
 | --- | --- |
 | `GET /subs/profile?id=P&token=T` | Profile 主配置（UA 识别客户端） |
 | `GET /subs/nodes?kind=provider&profile=P&id=K&token=T` | **Profile 专属** provider：处理链结果及本订阅链设置；Mihomo／Stash 返回 YAML，Surge／Loon 返回节点行。四端按来源 provider／inline 设置决定是否引用 |
-| `GET /resources/ruleset?key=K&token=T`、`GET /resources/repo?key=K&token=T` | 公共规则产物，与订阅无关 |
+| `GET /resources/ruleset?id=R&target=T&format=F&token=T`、`GET /resources/repo?id=REPO&files=JSON&target=T&format=F&token=T` | 公共规则按需转换，与订阅无关；地址写明身份、内核和格式契约 |
 | `GET /subs/ruleset?profile=P&key=K&token=T` | 订阅专属远程规则；模板不提供 token 入口 |
 
 provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向的是该 Profile 内的组名。
@@ -324,7 +324,7 @@ SRS／不支持的交付组合明确失败；规则行不能转换则保留诊�
 | 仓库目录索引 | 最近成功的完整索引 | 同系统周期；失败保留旧索引；手动更新绕过周期 |
 | 仓库文本正文 | 与公开仓库规则引用共享成功快照，按需首次读取 | 同系统周期；手动刷新所选文件 |
 | 解析结果 | 按正文哈希与解析参数复用 | 输入变化立即失效；不另设时间 |
-| 最终配置 | 每次重新生成，不保留结果内存缓存 | 只保留 last_good 用于失败兜底，节点和专属规则按当前配置生成 |
+| 最终配置 | 每次重新生成，不落库 | 主配置只写规则地址，节点和专属规则按当前配置生成；渲染失败返回错误（2026-11-02 移除 last_good） |
 | 管理端查询 | staleTime=0、gcTime=0、HTTP no-store | 挂载、聚焦、恢复网络、SSE 变更通知重读；断连显示提示，重连全量重读 |
 | 草稿预览 | 不保留已完成请求的时间缓存 | 保留在途合并；实时更新不得覆盖未保存草稿 |
 
@@ -607,3 +607,5 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 - `backupState`：`{ lastAttemptAt, lastSuccessAt, lastFile, lastSize, lastError, lastWarning, lastRestoreAt, lastRestoreFile }`
 
 恢复时这两条保留当前实例的值，其余数据全部以备份为准。见 [22](22-database-backup.md)。
+
+2026-11-02 缓存模型：持久缓存只有上游内容，即 `snapshots`、`resource_bindings`、`data/rule-repo-cache` 裸仓库和仓库索引表；`last_good`、`shared_rule_resources` 在 v33 删除。`RenderInput.deferRuleBody` 让主配置跳过规则正文解析，规则文件请求和预览才转换。全部规则都不适用于目标内核时，主配置仍声明 provider，规则文件返回只含注释的内容。

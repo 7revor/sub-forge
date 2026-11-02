@@ -53,7 +53,7 @@ Stash 的顺序为 **Mihomo 公共原文 → 历史 Stash 公共原文（若存�
 
 `target=mihomo|surge|stash|loon` 选择内核；`app` 选择可选客户端：`flclash`、`clash-verge`、`surge-ios`、`surge-macos`、`stash-ios`、`stash-macos`、`loon-ios`、`loon-macos`。不匹配的内核/应用组合返回错误。历史 `platform` 参数继续用于应用识别与日志，不参与规则转换。
 
-常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源、刷新链接和最近成功配置包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下只提供 Stash iOS/macOS 两个应用选项，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。旧 FlClash、Clash Verge Rev 应用参数及已保存的追加继续兼容，本轮不迁移或删除已有配置。
+常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源和刷新链接包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下只提供 Stash iOS/macOS 两个应用选项，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。旧 FlClash、Clash Verge Rev 应用参数及已保存的追加继续兼容，本轮不迁移或删除已有配置。
 
 ## 规则只区分内核
 

@@ -388,3 +388,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 已同步画布：`V2ProfileClient`（配置追加工作区重绘，同时去掉旧的 FlClash / Clash Verge / Stash 菜单）、`V2GroupDialog`（添加成员浮层去掉搜索框）、`V2ProfileDialogs`（新增移出来源、删除代理链两个级联确认）。前端在 `packages/web`；服务端接口与 `packages/core` 模型无需改动，校验沿用现有逻辑，无新增后端待实现项，示例种子不变。
 
 2026-11-02 系统页公共规则资源分页与数据库备份：`/api/system/rule-resources` 改为分页（默认 20 条，页面默认 10 条，复用公共 `Pagination`，无查询参数时不再返回全量）。新增「数据库备份」行、`BackupSettingsModal`、`RestoreBackupModal`，契约见 [22](22-database-backup.md)。已同步画布：`V2Settings`（公共规则资源示例与分页、数据库备份行、两个备份弹窗）。无后端待实现项。部署增加 `docker/compose.yaml` 与 `docker/nginx.conf.example`，不涉及画板。
+
+2026-11-02 缓存收敛：v2「系统 / 用户 / 账户」画板移除「公共规则资源」区块，前端 `System.tsx` 与 `GET`、`DELETE /api/system/rule-resources` 同步删除。v1「系统」「模板发布前校验」画板的失败文案改为“订阅返回错误，客户端保留本地配置”。访问日志的 `last-good` 来源标签保留，用于展示 30 天内的历史记录和快照告警。

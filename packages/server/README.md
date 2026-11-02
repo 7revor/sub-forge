@@ -48,7 +48,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | `SUBFORGE_TRUSTED_PROXIES` | 空（不信任转发头） | 逗号分隔的可信代理 IP / CIDR；仅解析可信链上的 X-Forwarded-For，详见部署说明 |
 | `ALLOWED_ORIGINS` | 空 | 逗号分隔，允许调用管理接口写操作的 Origin。经 HTTPS 反向代理部署时**必填**，通常等于 `PUBLIC_URL`：应用只看到 http，不会判为同源，也不自动信任 `PUBLIC_URL`；缺失时启动告警，Compose 直接拒绝启动。开发时也用于前端开发服务器 |
 | `SSRF_ALLOW` | 空 | 逗号分隔的字面 IP / CIDR 白名单；兼容接受主机名，域名本身已默认放行 |
-| `MIHOMO_BIN` | 空 | 设置后每次渲染都执行 `mihomo -t` 校验，失败时返回上一份成功结果 |
+| `MIHOMO_BIN` | 空 | 设置后每次渲染都执行 `mihomo -t` 校验，失败时返回 503 |
 | `MIHOMO_DIR` | 临时目录 | `-t` 的工作目录；GEOIP 规则需要其中有 `Country.mmdb`，否则 mihomo 会尝试下载 |
 
 ## 订阅与公共文件接口
@@ -84,9 +84,8 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | `GET /api/profiles/link?id=ID` | 校验归属，返回该用户 token 与此配置订阅地址 |
 | `GET /api/resource-links?kind=类型&id=ID` | 复制当前用户令牌的节点源、组合、本地组、配置或公共规则增强链接；只生成地址，不拉取上游 |
 | `GET /api/me/token`、`POST /api/me/token/reset` | 读取或原子重置自己的唯一令牌；重置请求携带当前 `{ token }`，过期值返回 409 |
-| `GET /api/system/rule-resources`、`DELETE /api/system/rule-resources/:key` | 管理员查看公共产物与转换错误；删除仍被配置或模板引用的资源返回 409 |
 | `POST /api/profiles/:id/preview` | 预览配置、代理链检查结果、只读引用详情与渲染报告；请求体可带未保存的 `profile` 草稿 |
-| `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不读写渲染缓存、last-good 或访问日志 |
+| `POST /api/profiles/preview` | 新建草稿预览，请求体 `{ profile, platform? }`；不保存 Profile，不写访问日志 |
 | `GET /api/access-log` | 当前用户 token 的四类下载访问；可选 `kind=subscription|nodes|rule-collection|enhancement`，默认全部；`page` / `pageSize` 分页，保留 30 天，管理员也只可读自己的记录 |
 | `GET /api/profiles/access-log?id=ID` | 单个私有配置订阅的历史访问摘要，用于首页配置列表 |
 | `POST /api/sources/:id/refresh`、`GET /api/sources/snapshots?id=ID` | 立即拉取、最近成功内容与最新失败状态（不含正文） |
@@ -122,7 +121,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 - 系统统一周期默认 24 小时、最小 1 小时；后台每分钟检查到期资源，到期读取等待刷新，失败才使用旧内容并延后一个周期重试。
 - 同权限范围、资源类型、URL 与参数共享成功原文及在途请求；每种资源只保留一份成功内容和最新失败记录。
 - 文本规则集写入成功快照前按声明格式解析：空响应、错误页面、损坏的 YAML 和完全没有可用规则的内容均记为失败，继续使用旧快照；部分行有效时保留有效规则并在报告中记录被忽略的行。MRS 校验成功后通过本服务原字节下发。
-- 旧库中已保存的无效远程规则快照也不能生成成功配置：使用最近成功配置回退，没有可回退配置时返回 503。有效规则经客户端覆盖主动全部丢弃不受此限制。
+- 旧库中已保存的无效远程规则快照不会下发：规则文件请求返回错误，预览报告 `ruleset.invalid-content`；主配置不解析规则正文，仍可生成。有效规则经客户端覆盖主动全部丢弃时，规则文件返回只含注释的内容。
 - 订阅只拉取模板与个人覆盖合并后实际启用的规则依赖；禁用规则、失效锚点规则及规则集中停用的来源不会触发上游请求。
 - 地址限制：仅禁止 URL 中直接填写的内网 / 保留 IP，重定向逐跳检查协议与字面 IP；域名按系统 DNS 解析，解析结果即使是 Fake-IP 或内网地址也允许连接。此策略不提供 DNS rebinding 防护。
 
@@ -151,7 +150,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 - 模板草稿只保存在前端，服务端只保存当前内容；编辑时用 `validate` 接口即时校验。
 - 2026-10-29 前端只向管理员展示一个模板入口；普通用户仍需通过现有只读模板接口在配置订阅向导中选择当前模板。服务端的模板读写权限未变，旧种子仍兼容。
 - 管理员共享订阅源 / 组合给指定用户（SYS-06）、模板可见性（TPL-08）尚未实现：目前模板对所有人可见，管理员名下的规则集可被所有人引用。
-- 订阅源只拉取一个 URL；拉取失败时使用该地址上一份成功快照并告警，没有可用成功快照时整个 Profile 渲染失败并尝试 last-good 回退。流量读取该源的快照；跨源汇总按源 ID 去重。组合成员整体不可用时仍失败，成员级失败策略 COL-05 尚未实现：前端可设置组合成员的 `onFail` 并随文档保存，渲染尚未读取。
+- 订阅源只拉取一个 URL；拉取失败时使用该地址上一份成功快照并告警，没有可用成功快照时整个 Profile 渲染失败，返回 503。流量读取该源的快照；跨源汇总按源 ID 去重。组合成员整体不可用时仍失败，成员级失败策略 COL-05 尚未实现：前端可设置组合成员的 `onFail` 并随文档保存，渲染尚未读取。
 - 配置订阅基础设置使用 `base.kernels / base.clients` 保存 YAML／INI 原文，生成时按继承顺序合并并输出。旧 `base.raw`、公共字段与预设引用只在 v28 升级和旧种子导入时转换，保留加密备份；正常 API 不再接受这些旧字段。详见[原文追加约定](../../docs/20-native-client-append.md)。
 
 
@@ -276,7 +275,7 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 
 预检读取数据库旁 `secret.key` 或现有 `SUBFORGE_SECRET`，不会生成新密钥、修改源库或输出完整配置。它在临时一致性副本上执行迁移并清理副本；任何失败均报错退出。审核清单后启动新版服务，数据库自动在事务内升级到 v16。纯追加、跟随最新且无诊断的旧订阅继续绑定；其他配置完整展开为独立模式，原始文档另外加密保存。
 
-订阅 ID、归属、链接、基础设置、节点源、代理链及 last-good/版本资源保留；迁移前后有效分流配置必须一致。历史孤儿项原本不生效，留在备份与诊断中。缺失模板版本或旧合并错误会中止整批迁移，不能靠丢弃配置继续启动；修复旧库后再试。回退旧程序应恢复升级前整库及对应密钥，单份 Profile 备份不等于数据库降级工具。
+订阅 ID、归属、链接、基础设置、节点源、代理链保留；迁移前后有效分流配置必须一致。历史孤儿项原本不生效，留在备份与诊断中。缺失模板版本或旧合并错误会中止整批迁移，不能靠丢弃配置继续启动；修复旧库后再试。回退旧程序应恢复升级前整库及对应密钥，单份 Profile 备份不等于数据库降级工具。
 
 示例种子保留原 `demo` 的筛选配置及 `demo-token`，将其完整展开为独立模式；另有 `demo-bound` / `demo-bound-token` 演示纯成员绑定。
 
@@ -459,3 +458,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-02 一键关联：前端批量复用 `/api/rule-options/match-urls` 与 `/api/rule-options/resolve`，服务端、数据库和示例种子无变更。
 
 2026-11-02：配置节点 provider 现按内核返回 Mihomo/Stash YAML 或 Surge/Loon 节点行，四端遵循来源的引用 / 展开设置。派生筛选资源沿用用户鉴权、流量头和当前配置校验；空资源不成功下发，旧强制内联缓存不作为回退。含远程节点的草稿禁用独立下载，使用正式订阅链接；边界见 [转换说明](../../docs/19-client-conversion.md#2026-11-02遵循节点来源输出设置)。
+
+2026-11-02：SQLite v33 删除 `last_good` 和 `shared_rule_resources` 并回收空间，移除 `/api/system/rule-resources`。主配置只写规则地址；公共规则改为 `/resources/ruleset?id=…&target=…&format=…` 和 `/resources/repo?id=…&files=…&target=…&format=…`，按需转换，格式契约不符返回 409，旧 `?key=` 返回 404。渲染失败返回 503，不再回退；手动刷新配置时只校验 Mihomo 输出。
