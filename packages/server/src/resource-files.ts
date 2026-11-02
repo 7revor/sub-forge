@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { Report, resolveProfileRouting } from '@sub-forge/core';
+import { managedRuleDelivery, Report, resolveProfileRouting } from '@sub-forge/core';
 import type { DownloadEnv } from './access-log.ts';
 import type { Store } from './store.ts';
 import type { RenderService, Target } from './render.ts';
@@ -61,6 +61,10 @@ export function resourceFileRoutes(store: Store, renderer: RenderService, snapsh
     if (c.req.query('view') !== undefined && c.req.query('view') !== 'output') throw new HttpError(400, '文件视图不合法');
     const reference = { matcher: read()! }, output = target(c);
     c.header('vary', 'User-Agent');
+    const definition = resolveRuleSetReference(reference.matcher, store);
+    const delivery = definition && managedRuleDelivery(definition, output);
+    // 不支持是确定结果，不能落入通用 503 让客户端当作临时故障。
+    if (delivery?.mode === 'unsupported') throw new HttpError(409, delivery.reason);
     const body = await renderer.sharedRules.readReference(reference, output);
     if (body === undefined || !read() || !resolveRuleSetReference(reference.matcher, store)) return c.body(null, 404);
     const record = store.getSharedRule<SharedRuleRecord>(renderer.sharedRules.key(reference, output));

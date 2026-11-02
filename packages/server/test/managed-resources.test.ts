@@ -78,6 +78,17 @@ it('旧转换 token 入口不可用，修改下载参数不能把规则资源变
   expect(h.fetcher).toHaveBeenCalledTimes(1);
 });
 
+it('通用链接遇到目标客户端不支持的 MRS 来源时返回明确错误，不抓取上游', async () => {
+  const h = setup();
+  h.store.put('ruleset', { id: 'r', name: '规则增强', sources: [{ id: 's', kind: 'remote', url: 'https://rules.test/a.mrs', format: 'mrs', behavior: 'domain' }] }, h.a.id);
+  for (const ua of ['Surge iOS/3000', 'Loon/800']) {
+    const res = await h.app.request(`/resources/ruleset?id=r&token=${h.tokenA}`, { headers: { 'user-agent': ua } });
+    expect(res.status).toBe(409);
+    expect(await res.text()).toContain('不支持 MRS');
+  }
+  expect(h.fetcher).not.toHaveBeenCalled();
+});
+
 it('规则增强公共读取，普通用户不能修改他人定义；引用关系跨用户阻止删除', async () => {
   const h = setup(); h.profile('b', h.b.id);
   const session = h.store.createSession(h.b.id, 3600000), headers = { cookie: `sf_session=${session}`, 'content-type': 'application/json' };

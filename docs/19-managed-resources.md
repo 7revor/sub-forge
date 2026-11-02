@@ -26,7 +26,7 @@
 | `/subs/nodes?kind=provider&profile=P&id=K&target=mihomo&token=T` | 该配置的节点 provider；可带 `platform`，每次按当前配置生成 |
 | `/subs/ruleset?profile=P&key=K&target=mihomo&token=T` | 该配置的专属规则产物；按目标与当前有效引用生成 |
 | `/subs/ruleset?profile=P&rule=R&view=source&revision=H&token=T` | 该配置专属规则的来源原文；R 是已保存规则行 ID，H 为 matcher 摘要 |
-| `/resources/ruleset?id=R&token=T` | 公共规则增强输出，支持 `target/platform`；`view=source` 查看启用来源原文，默认或 `view=output` 为转换结果 |
+| `/resources/ruleset?id=R&token=T` | 公共规则增强输出，支持 `target/platform`；`view=source` 查看启用来源原文，默认或 `view=output` 为转换结果；目标客户端不支持该来源（如 Surge、Loon 读取 MRS）时返回 409 和具体原因 |
 | `/resources/ruleset?key=K&token=T` | 固定内核/处理参数的公共增强产物，不接受额外目标或上游 URL |
 | `/resources/repo?id=REPO&ref=分支&path=文件路径&token=T` | 启用仓库当前索引内的文件原文；不能指定任意上游 URL |
 | `/resources/repo?id=REPO&files=JSON&token=T` | 多文件来源原文；JSON 为最多 50 个 `{ref,path}` 的数组，每个文件分别验证索引成员资格，不能同时传 ref/path |
