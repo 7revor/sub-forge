@@ -320,3 +320,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-02 表格：页面表格统一使用 `components/ui/table.tsx`。外层已有滚动容器时传 `containerClassName="overflow-visible"`，保证 sticky 表头相对外层吸顶；单元格默认可折行，不折行的列显式声明 `whitespace-nowrap`。
 
 2026-11-02 分页：`Pagination` 改为图标紧凑样式，移除未被调用的 `compact` 入口；公共 `Select` 通过 `size="sm"` 使用 32px 触发框，不再用 class 覆盖高度。
+
+2026-11-02 策略组隐藏与分段控件：`TemplateGroupsEditor` 每行显示「隐藏」开关，弹窗高级设置不再提供该入口；绑定订阅的模板组写入 `routing.groupHidden`，与模板不同时显示标记。`components/ui/toggle.tsx` 的选中态改为品牌色（默认 `--accent` 与页面灰底几乎相同），全部 `Segmented` 随之更新。

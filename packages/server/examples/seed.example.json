@@ -185,6 +185,7 @@
         "mode": "bound",
         "templateId": "std",
         "prependRules": [{ "id": "pre-direct", "matcher": { "kind": "rule", "rule": { "type": "DOMAIN", "value": "priority.example.test" } }, "target": { "kind": "builtin", "name": "DIRECT" } }],
+        "groupHidden": { "ai": true },
         "groupAdditions": {
           "hk": [
             {

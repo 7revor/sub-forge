@@ -278,7 +278,7 @@ effective.groups = template.groups 按序
   对每个组 g：
     p = overlay.groupPatches[g.id]
     g.members = (p.memberOrder == 'prepend') ? p.addMembers ++ g.members : g.members ++ p.addMembers
-    g = { ...g, ...p.set }                 // 允许改 type、测速参数、高级参数；不允许改 id / name / hidden（Q6）
+    g = { ...g, ...p.set }                 // 允许改 type、测速参数、高级参数；旧覆盖层不允许改 id / name / hidden（Q6）；绑定模式的隐藏覆盖见 §Routing `groupHidden`
   按 after 锚点插入 overlay.extraGroups
 effective.rules = template.rules 按序
   对每条 r：应用 rulePatches[r.id]（enabled / target）
@@ -290,7 +290,7 @@ effective.final = overlay.final ?? template.final
 
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
-- 模板组不能在 Profile 中删除、改名或隐藏（Q6）；`groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。Profile 私有组（`extraGroups`）不受此限制。
+- 模板组不能在 Profile 中删除、改名（Q6）；旧覆盖层 `groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。绑定模式通过 `routing.groupHidden` 覆盖隐藏状态（2026-11-02 修订）。Profile 私有组（`extraGroups`）不受此限制。
 - 空组处理（TPL-10，2026-10-29 修订）：模板和私有组统一拒绝。静态无成员或内联节点筛空时补 `proxies: [REJECT]`，记录 `group.empty` 告警；所有组固定输出 `empty-fallback: REJECT`，由 Mihomo v1.19.27+ 处理运行时 provider 未加载、更新或筛选后无成员的情况。覆盖层、旧 `whenEmpty: direct` 和 `extra.empty-fallback` 都不能改变此行为。节点测速失败仍按组类型处理，不等于空组。UI 不提供空组设置；Surge/Loon 快照内联后的空组固定补 REJECT。
 
 ## 6. 规则集展开与输出
@@ -413,14 +413,14 @@ RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML �
 ```ts
 type RoutingConfig = Pick<Template, 'groups' | 'rules' | 'final'>;
 type ProfileRouting =
-  | { mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]> }
+  | { mode: 'bound'; templateId: ID; groupAdditions: Record<ID, GroupMember[]>; groupHidden?: Record<ID, boolean> }
   | { mode: 'independent'; config: RoutingConfig;
       initializedFrom?: { templateId: ID; version: number; name?: string } };
 // Profile.routing 为新持久化入口；overlay: {} 仅保留兼容形状，不再同时存 template。
 // 服务层额外存 revision、templateVersion（保存并发检查用，不锁定模板）和 migration 说明。
 ```
 
-绑定输出 = 最新模板 + 按稳定组 ID 追加的成员。`groupAdditions` 保存期望状态，无操作回放链；反复保存不会重复追加。独立输出直接读取 config，不访问初始化模板。`resolveProfileRouting` 供渲染、规则依赖收集和校验共用，旧 `mergeTemplate` 仅保留迁移与编辑器适配能力。
+绑定输出 = 最新模板 + 按稳定组 ID 追加的成员。`groupHidden` 只保存与模板不同的隐藏状态，没有记录的组跟随模板；模板删组后旧记录只告警不生效；转独立时写入组配置，改绑时随成员映射迁移，与新模板相同或目标冲突的不保留，独立订阅改绑后跟随新模板。`groupAdditions` 保存期望状态，无操作回放链；反复保存不会重复追加。独立输出直接读取 config，不访问初始化模板。`resolveProfileRouting` 供渲染、规则依赖收集和校验共用，旧 `mergeTemplate` 仅保留迁移与编辑器适配能力。
 
 数据库 v16 在同一事务中逐份展开旧配置，对迁移前后的标准化 groups/rules/final 做一致性比较；只将无诊断的 latest + append 纯成员覆盖转绑定，其余转独立。原始文档写入加密 `profile_migration_backups`，不修改 owner、updated_at、令牌、last_good 或结构版本资源。已有孤儿覆盖项原本就不生效，仍保存在原始备份中，迁移诊断保留，绝不悄悄将其激活。任一缺失版本、合并错误或输出不一致都回滚整批。旧种子导入使用同一转换；重复启动不重复迁移。
 

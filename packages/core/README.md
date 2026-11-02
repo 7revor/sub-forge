@@ -156,3 +156,5 @@ Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整�
 2026-10-30 处理器参数区仅重设计前端布局：12 种 OperatorStep 的字段、执行顺序、默认行为、origins 和独立输入输出预览契约不变；布尔 false、数值 0 与清空值保持原语义。API、数据库、核心渲染和生产示例种子无需修改。manual-resource-refresh-server.ts 增加 all-operators 虚构内存样本供全类型表单验收，并在停止时关闭测试连接；不会写入 examples/seed.example.json。
 
 2026-10-30：新增 `renderSurge` / `renderLoon`、节点输入解析、INI 基础编解码与独立导出，规则补齐逻辑表达式、URL-REGEX、extended-matching 和语义去重。架构、能力矩阵、版本要求及测试边界见 [四客户端转换](../../docs/19-client-conversion.md)。可设置 `SURGE_BIN=/path/to/surge-cli` 运行官方离线配置检查；不能用 Mihomo 校验器代替其他客户端。
+
+2026-11-02 `ProfileRouting` 绑定模式新增 `groupHidden`：`resolveProfileRouting` 在合并后应用，`withGroupHidden` 只保存与模板不同的值并清理已删除组。旧 `overlay.groupPatches.set` 仍禁止隐藏模板组。

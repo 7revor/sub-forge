@@ -341,3 +341,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 规则文件列表加载状态精简：`RuleRepo` 移除标题旁的「搜索中… / 正在加载…」和底部的「正在加载…」，加载期间只显示表格骨架（读屏仍由 `ListTableLoading` 播报）；底部保持禁用的分页栏（「共 — 条」），避免输入时页脚闪动；仓库加载失败提示不变。画板 `V2RuleRepo` 只画已加载状态，本来没有这些文案，无需改动。仅前端交互，领域模型与服务端无变化，无后端待实现项。
 
 2026-11-02 分页栏改为图标紧凑样式：只展示总数，每页条数下拉与翻页按钮统一 32px，上一页、下一页改为图标按钮，左右内边距与表格首尾列对齐；公共 `Select` 新增 `size` 入口；列表滚动容器去掉 `scrollbar-gutter`，无滚动条时行分隔线到达卡片边缘。画板 `V2Lists`、`V2RuleRepo` 已同步。仅前端样式，领域模型与服务端无变化，无后端待实现项。
+
+2026-11-02 策略组隐藏与分段控件：`V2Template`、`V2ProfileRouting`、`V2Components` 的策略组行增加「隐藏」开关列，移除「已隐藏」徽标；`V2GroupDialog` 移除隐藏开关；v2 页全部 `.seg` 改为新选中态。前端对应 `TemplateGroupsEditor`、`ProfileRoutingEditors` 与 `components/ui/toggle.tsx`，后端对应 `routing.groupHidden`。旧版 `LegacyGroups`（无 `routing` 的旧文档）保持只读显示。
