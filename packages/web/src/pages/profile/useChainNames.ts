@@ -17,16 +17,23 @@ export function useChainNames(chain: ChainRule) {
   const landingSources = exactLanding ? [] : chainSources(chain.landing.nodeSet, draft.nodeSets);
   const requests = [...viaSources.map(s => ({ ref: s.ref, filter: viaFilter, excludeFilter: undefined })), ...landingSources.map(s => ({ ref: s.ref, filter: chain.landing.filter, excludeFilter: chain.landing.excludeFilter }))];
   const queries = useQueries({ queries: requests.map(({ ref, filter, excludeFilter }) => ({ ...nodeListOptions(ref, '', { filter, excludeFilter }), enabled: !filterNodes([], { filter, excludeFilter }).error })) });
-  const names = (from: number, to: number, first: boolean) => {
-    const selected = queries.slice(from, to);
+  const landingQueries = queries.slice(viaSources.length);
+  // 自动前置跳过本条链的落地，摘要与渲染结果保持一致。
+  const landingNames = exactLanding ? [exactLanding] : [...new Set(landingQueries.flatMap(q => q.data?.nodes ?? []).map(n => n.name))];
+  const status = (from: number, to: number, watched: typeof queries) => {
     if (requests.slice(from, to).some(r => filterNodes([], r).error)) return '筛选表达式无效';
-    if (selected.some(q => q.error || q.data?.report.some(item => item.level === 'error'))) return '节点读取失败';
-    if (selected.some(q => !q.data)) return '正在读取节点…';
-    const nodes = selected.flatMap(q => q.data?.nodes ?? []).map(n => n.name);
-    return first ? nodes[0] ?? '没有匹配节点' : nodes.length ? [...new Set(nodes)].join('、') + (selected.some(q => q.data?.truncated) ? '…' : '') : '没有匹配节点';
+    if (watched.some(q => q.error || q.data?.report.some(item => item.level === 'error'))) return '节点读取失败';
+    if (watched.some(q => !q.data)) return '正在读取节点…';
+    return undefined;
   };
+  const viaNodes = queries.slice(0, viaSources.length).flatMap(q => q.data?.nodes ?? []).map(n => n.name).filter(name => !landingNames.includes(name));
+  const viaStatus = status(0, viaSources.length, queries);
+  const landingStatus = status(viaSources.length, queries.length, landingQueries);
+  const landingText = landingNames.length ? landingNames.join('、') + (landingQueries.some(q => q.data?.truncated) ? '…' : '') : '没有匹配节点';
   return useModalPresentation({
-    via: via.kind === 'group' ? via.groupId ? groupName(via.groupId) : '待选前置' : via.kind === 'builtin' ? via.name : exactVia ?? names(0, viaSources.length, true),
-    landing: exactLanding ?? names(viaSources.length, queries.length, false),
+    via: via.kind === 'group' ? via.groupId ? groupName(via.groupId) : '待选前置' : via.kind === 'builtin' ? via.name : exactVia ?? viaStatus ?? viaNodes[0] ?? '没有匹配节点',
+    landing: landingStatus ?? landingText,
+    landingNames,
+    viaEmpty: via.kind === 'node' && !exactVia && !viaStatus && !viaNodes.length,
   });
 }

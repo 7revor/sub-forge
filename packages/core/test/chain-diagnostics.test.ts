@@ -30,11 +30,12 @@ describe('自动引用与代理链诊断', () => {
     const empty = renderMihomo(f).chainResolutions[0]!;
     expect(empty.landingCount).toBe(0); expect(empty.issues.map(i => i.code)).toContain('chain.no-landing');
   });
-  it('整集覆写只在被覆盖的局部链提示，生效数区分命中数', () => {
+  it('整集规则只统计未被单节点规则接管的落地，两条链都生效', () => {
     const f = fixture(); f.profile.chains.push({ ...f.profile.chains[0]!, id: 'partial', landing: { nodeSet: ref('landing'), filter: '^落地 A$' } });
     const r = renderMihomo(f);
-    expect(r.chainResolutions[0]!.issues).toEqual([]);
-    expect(r.chainResolutions[1]).toMatchObject({ landingCount: 1, appliedCount: 0, issues: [expect.objectContaining({ code: 'chain.overridden' })] });
+    const total = r.chainResolutions[0]!.landingCount + 1;
+    expect(r.chainResolutions[0]).toMatchObject({ appliedCount: total - 1, issues: [] });
+    expect(r.chainResolutions[1]).toMatchObject({ landingCount: 1, appliedCount: 1, issues: [] });
   });
   it('环及依赖此环的链全部标记，不误报无关链', () => {
     const f = fixture();

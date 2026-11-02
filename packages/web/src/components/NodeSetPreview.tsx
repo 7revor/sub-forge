@@ -8,11 +8,13 @@ import { Button, Empty } from './ui.tsx';
 import { SelectIndicator } from './SelectIndicator.tsx';
 
 /** 预览与最终输出共用正则语义；留空包含全部节点，点选只缩小当前草稿范围。 */
-export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label = '节点', firstMatch = false, selection, multiple = false, search, onSelect }: {
+export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label = '节点', firstMatch = false, selection, multiple = false, search, skipNames, onSelect }: {
   nodeSet?: NodeSetID; nodeSets?: { ref: NodeSetID; name: string }[]; filter?: string; excludeFilter?: string; label?: string; firstMatch?: boolean;
   /** 仅标记当前采用范围，不裁剪点选列表。 */
   selection?: { match: NodeRef['match'] } | { filter?: string; excludeFilter?: string };
   multiple?: boolean; search?: string;
+  /** 自动或正则取首个命中时跳过的节点（代理链的落地节点）。 */
+  skipNames?: string[];
   onSelect?: (name: string, nodeSet: NodeSetID, selectedNames: string[]) => void;
 }) {
   const validation = filterNodes([], { filter, excludeFilter });
@@ -31,7 +33,10 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
     } : undefined,
   });
   const nodes = query.data?.nodes ?? [];
-  const resolved = selection && 'match' in selection ? resolveRef(nodes, selection.match) : undefined;
+  const skipped = new Set(skipNames);
+  const candidates = nodes.filter(node => !skipped.has(node.name));
+  const firstNode = firstMatch ? candidates[0] : undefined;
+  const resolved = selection && 'match' in selection ? resolveRef(candidates, selection.match) : undefined;
   const selected = selection && !('match' in selection) ? filterNodes(nodes, selection) : undefined;
   const selectedNodes = new Set(resolved?.node ? [resolved.node] : selected?.nodes ?? []);
   const selectionError = resolved?.error ?? selected?.error;
@@ -52,7 +57,7 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
       <p aria-live="polite" className="m-0 text-muted-foreground">{multiple ? `已选 ${selectedNodes.size} / ${query.data.total}` : `${filter || excludeFilter ? '筛选' : '全部'} ${query.data.total} / ${query.data.unfilteredTotal ?? query.data.total}`} 个节点{search && ` · 筛选 ${displayedNodes.length} 个`}</p>
       <div className="max-h-[280px] overflow-y-auto" aria-label={`${label}列表`}>
         {displayedNodes.slice(0, size).map((node, i) => {
-          const active = selection ? selectedNodes.has(node) : firstMatch && i === 0;
+          const active = selection ? selectedNodes.has(node) : node === firstNode;
           // 自动采用首个节点时只标注「当前采用」，选择框仍留给用户的明确点选。
           const marked = !!selection && active;
           const content = <>
@@ -60,6 +65,7 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
             <span className="min-w-0 flex-1 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-xs text-muted-foreground">{node.sourceName}</span>}</span>
             <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               {active && <span>{firstMatch ? '当前采用' : '已选'}</span>}
+              {skipped.has(node.name) && <span>落地，已跳过</span>}
               <span>{node.type.toUpperCase()}</span>
             </span>
           </>;

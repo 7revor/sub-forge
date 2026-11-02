@@ -53,6 +53,6 @@ describe('代理链全部来源', () => {
   it('默认全范围不能绕过循环检查', () => {
     const f = fixture('provider');
     f.profile.chains[0]!.landing.filter = undefined;
-    expect(renderMihomo(f).report.byCode('chain.cycle').length).toBeGreaterThan(0);
+    expect(renderMihomo(f).report.byCode('ref.unresolved')[0]!.message).toContain('落地以外');
   });
 });

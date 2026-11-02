@@ -19,7 +19,7 @@ it('保存规范化旧策略，草稿诊断返回实际前置、缺失与环且�
   expect(missing.json.ok).toBe(false);
   expect(missing.json.chainResolutions[0]).toMatchObject({ appliedCount: 0, issues: [expect.objectContaining({ code: 'ref.unresolved' })] });
   const cycle = await user.post(`/api/profiles/${profile.id}/preview`, { profile: { ...profile, chains: [{ ...profile.chains[0], landing: { nodeSet: ref } }] } });
-  expect(cycle.json.ok).toBe(false); expect(cycle.json.chainResolutions[0].issues.some((r: any) => r.code === 'chain.cycle')).toBe(true);
+  expect(cycle.json.ok).toBe(false); expect(cycle.json.chainResolutions[0].issues.some((r: any) => r.code === 'ref.unresolved')).toBe(true);
   expect((await user.get(`/api/profiles?id=${profile.id}`)).json.item.chains).toEqual(profile.chains);
   const stash = await user.post(`/api/profiles/${profile.id}/preview`, { profile, client: 'stash', platform: 'ios' });
   expect(stash.json.ok).toBe(true); expect(stash.json.chainResolutions[0].viaName).toBe('前置');

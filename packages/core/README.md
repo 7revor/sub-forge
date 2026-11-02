@@ -105,7 +105,7 @@ Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整�
 
 2026-10-30 订阅弹窗整合不改变渲染、Provider 前置、循环保护或客户端转换语义；空值提示仅存在于前端，false 与 0 保持真实值。领域模型与示例种子无需迁移。
 
-2026-10-30 代理链流量交互沿用现有模型：Provider 正则前置取节点顺序中的首个命中，默认隐藏组精确引用此节点；整集落地服务端覆写、Stash 内联翻译保持一致。`chain-materialization.test.ts` 新增 Provider 正则连接 Inline / Provider 两种落地的跨客户端断言。模型和示例种子无需迁移。
+2026-10-30 代理链流量交互沿用现有模型：Provider 正则前置取节点顺序中的首个命中，默认隐藏组精确引用此节点；整集落地服务端逐节点写入、Stash 内联翻译保持一致（2026-11-02 起单节点规则优先于整集规则，正则前置跳过本条链落地）。`chain-materialization.test.ts` 新增 Provider 正则连接 Inline / Provider 两种落地的跨客户端断言。模型和示例种子无需迁移。
 
 2026-10-30 自动引用：Mihomo Provider 自动生成精确隐藏组，Inline 直接引用；Stash 沿用节点集内联转换。旧 refPolicy 不参与渲染。结果包含 chainResolutions（实际前置、落地命中/应用数量、关联问题），ReportItem.chainIds 将循环及依赖循环的入口关联到对应代理链。完整诊断和只读 dependencies 继续返回。回归覆盖旧策略、输入不变、缺失、整集覆盖及环路关联。
 
