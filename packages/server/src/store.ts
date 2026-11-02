@@ -433,7 +433,11 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         // 移除结构版本历史，同时清空仍携带 version 下载地址的旧渲染结果。
         this.db.exec('DROP TABLE IF EXISTS render_generations; DELETE FROM last_good');
       }
-      if (version < 28) this.migrateNativeConfigs();
+      if (version < 28) {
+        this.migrateNativeConfigs();
+        // 清理旧基础转换产物；节点和规则按当前订阅重新生成。种子导入复用上面的转换，但不能丢失现有兜底配置。
+        this.db.exec('DELETE FROM last_good');
+      }
       if (version < 30) {
         this.normalizeProfileRouting();
         for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'source'").all() as { id: string; data: string }[]) {
@@ -695,8 +699,6 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('preset', row.id, row.data, this.now());
     }
     this.db.exec("DELETE FROM docs WHERE kind = 'preset'");
-    // 清理旧基础转换产物；节点和规则按当前订阅重新生成。
-    this.db.exec('DELETE FROM last_good');
   }
 
   private stripResourceTiming(doc: Record<string, any>): void {
