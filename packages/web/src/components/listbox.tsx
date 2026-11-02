@@ -141,8 +141,8 @@ export function AsyncSelect({ loadOptions, onChange, label, ariaLabel = label, d
   const isPlaceholder = !!placeholder && !valueLabel;
   return <Popover modal={modal} open={open} onOpenChange={next => { setOpen(next); if (next) setQuery(''); }}>
     <PopoverTrigger asChild><Button type="button" id={id} variant="outline" role="combobox" aria-label={ariaLabel} aria-expanded={open}
-      disabled={disabled} data-placeholder={isPlaceholder ? '' : undefined} className={cx(triggerClassName ?? 'h-9 w-full justify-between text-sm', isPlaceholder && 'font-normal text-muted-foreground')}>
-      {triggerIcon}<span title={displayLabel} className="min-w-0 truncate">{displayLabel}</span>{!triggerClassName && <ChevronDown />}
+      disabled={disabled} data-placeholder={isPlaceholder ? '' : undefined} className={cx(triggerClassName ?? 'h-9 w-full justify-between text-sm font-normal', isPlaceholder && 'font-normal text-muted-foreground')}>
+      {triggerIcon}<span title={displayLabel} className="min-w-0 truncate">{displayLabel}</span>{!triggerClassName && <ChevronDown className="opacity-50" />}
     </Button></PopoverTrigger>
     <PopoverContent align="start" collisionPadding={12} className="flex h-[min(320px,var(--radix-popover-content-available-height))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden p-0"
       style={placeholder ? { width: 'var(--radix-popover-trigger-width)' } : undefined} aria-label={ariaLabel} onInteractOutside={() => setOpen(false)}>

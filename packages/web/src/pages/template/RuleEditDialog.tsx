@@ -24,13 +24,13 @@ export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx:
     try { normalized = { ...matcher, ...remoteRuleMatcher(matcher.remote.url) }; }
     catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
   } else if (!matcher.id) error = '请选择规则集';
-  return <RuleEditShell description={adding && bound ? '插入本订阅的前置规则' : undefined} width={matcher.kind === 'ruleset' ? 440 : 520} confirmLabel={adding ? '添加' : '保存'} title={adding ? `添加规则 · ${matcher.kind !== 'ruleset' ? '手写' : matcher.remote ? '远程地址' : '引用规则'}` : `编辑第 ${index + 1} 项规则`}
+  return <RuleEditShell description={adding && bound ? '插入本订阅的前置规则' : undefined} width={adding && matcher.kind === 'ruleset' ? 440 : 520} confirmLabel={adding ? '添加' : '保存'} title={adding ? `添加规则 · ${matcher.kind !== 'ruleset' ? '手写' : matcher.remote ? '远程地址' : '引用规则'}` : `编辑第 ${index + 1} 项规则`}
     error={attempted ? error : undefined} onClose={onClose} onApply={() => { setAttempted(true); if (!error) onSave({ rule: { ...draft, matcher: normalized }, position }); }}>
-    <MatcherEditor directRemote fixedKind scope={scope} value={matcher} rulesets={ctx.rulesets}
+    <MatcherEditor directRemote fixedKind={adding || staticOnly} scope={scope} value={matcher} rulesets={ctx.rulesets}
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}
       onRuleChange={rule => { if (matcher.kind === 'rule') setDraft({ ...draft, matcher: { ...matcher, rule } }); }}
       onChange={matcher => setDraft({ ...draft, matcher })} />
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4"><Field label="出口">{id => <div id={id} className="h-9 rounded-lg border border-input [&_button]:h-[34px]"><TemplateTargetSelect label="规则出口" value={draft.target} groups={groups} onChange={target => setDraft({ ...draft, target })} /></div>}</Field>{adding && bound && <Field label="位置">{id => <div id={id}><Segmented label="插入位置" value={position} onChange={setPosition} options={[{ value: 'before', label: '模板规则之前' }, { value: 'after', label: '之后' }]} /></div>}</Field>}</div>
+    <div className={adding && bound ? 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4' : undefined}><Field label="出口">{id => <TemplateTargetSelect field id={id} label="规则出口" value={draft.target} groups={groups} onChange={target => setDraft({ ...draft, target })} />}</Field>{adding && bound && <Field label="位置">{id => <div id={id}><Segmented label="插入位置" value={position} onChange={setPosition} options={[{ value: 'before', label: '模板规则之前' }, { value: 'after', label: '之后' }]} /></div>}</Field>}</div>
     {extendedOptions && matcher.kind !== 'ruleset' && <div className="min-w-0 border-t border-border pt-4"><details><summary className="advanced-summary cursor-pointer text-sm"><span>按客户端改写<span className="mt-0.5 block text-xs font-normal text-muted-foreground">某个内核不支持时替换或跳过 · {matcher.overrides?.length ?? 0} 条</span></span></summary><div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={overrides => setDraft({ ...draft, matcher: { ...matcher, overrides } })} /></div></details></div>}
   </RuleEditShell>;
 });

@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
+import { MatcherEditor } from '../../components/MatcherEditor.tsx';
+import { TemplateTargetSelect } from './TemplateFields.tsx';
 import { TemplateGroupsEditor } from './TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from './TemplateRulesEditor.tsx';
 
@@ -68,5 +70,17 @@ describe('模板与订阅共享编辑器的权限边界', () => {
     const locked = rules({ readOnly: true });
     expect(locked).not.toContain('aria-label="第 1 条规则出口"');
     expect(locked).not.toContain('aria-label="MATCH 出口"');
+  });
+  it('规则弹窗的出口是整行表单下拉，列表行内保持定宽菜单', () => {
+    const select = (field: boolean) => renderToStaticMarkup(<TemplateTargetSelect field={field} id="target" label="规则出口" value={value.final} groups={value.groups} onChange={() => {}} />);
+    expect(select(true)).toContain('w-full');
+    expect(select(true)).toContain('id="target"');
+    expect(select(true)).not.toContain('w-[84px]');
+    expect(select(false)).toContain('w-[84px]');
+  });
+  it('编辑规则可切换匹配类型，添加时类型由入口固定', () => {
+    const editor = (fixedKind: boolean) => renderToStaticMarkup(<MemoryRouter><QueryClientProvider client={new QueryClient()}><MatcherEditor fixedKind={fixedKind} value={{ kind: 'local', content: '' }} rulesets={[]} onChange={() => {}} /></QueryClientProvider></MemoryRouter>);
+    expect(editor(false)).toContain('匹配类型');
+    expect(editor(true)).not.toContain('匹配类型');
   });
 });

@@ -4,8 +4,8 @@ import { buttonClass, ReportList, Select } from '../../components/ui.tsx';
 import type { NamedRef } from '../../convert/templateYaml.ts';
 import { RoutingTargetMenu } from '../../components/RoutingTargetMenu.tsx';
 
-export function TemplateTargetSelect({ value, onChange, groups, label, action = false }: {
-  value: Target | undefined; onChange: (value: Extract<Target, { kind: 'group' | 'builtin' }>) => void; groups: NamedRef[]; label: string; action?: boolean;
+export function TemplateTargetSelect({ value, onChange, groups, label, action = false, field = false, id }: {
+  value: Target | undefined; onChange: (value: Extract<Target, { kind: 'group' | 'builtin' }>) => void; groups: NamedRef[]; label: string; action?: boolean; field?: boolean; id?: string;
 }) {
   const key = value?.kind === 'group' ? (value.groupId ? `group:${value.groupId}` : '') : value?.kind === 'builtin' ? `builtin:${value.name}` : '';
   const missing = value?.kind === 'group' && !!value.groupId && !groups.some((g) => g.id === value.groupId);
@@ -13,7 +13,7 @@ export function TemplateTargetSelect({ value, onChange, groups, label, action = 
     if (key.startsWith('group:')) onChange({ kind: 'group', groupId: key.slice(6) });
     else if (key.startsWith('builtin:')) onChange({ kind: 'builtin', name: key.slice(8) as Builtin });
   };
-  if (!action) return <RoutingTargetMenu label={label} value={key} onChange={select}
+  if (!action) return <RoutingTargetMenu field={field} id={id} label={label} value={key} onChange={select}
     placeholder={value?.kind === 'node' ? '不支持节点出口，请重新选择' : '选择策略组或内置策略'} options={[
       ...(missing ? [{ value: key, label: `已不存在：${value.groupId}` }] : []),
       ...groups.map(group => ({ value: `group:${group.id}`, label: group.name || '未命名组', group: '策略组' })),
