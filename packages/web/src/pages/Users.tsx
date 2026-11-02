@@ -46,7 +46,7 @@ export function Users() {
                   <TableRow key={u.id} className={u.disabled ? 'opacity-60' : ''}>
                     <TableCell className="font-medium whitespace-nowrap">{u.username}{self && <span className="ml-2 text-xs font-normal text-muted-foreground">（我）</span>}</TableCell>
                     <TableCell>
-                      {self ? <span>管理员</span> : <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} className="h-8 w-28 data-[size=default]:h-8" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
+                      {self ? <span>管理员</span> : <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} size="sm" className="w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
                         <option value="user">用户</option><option value="admin">管理员</option>
                       </Select>}
                     </TableCell>

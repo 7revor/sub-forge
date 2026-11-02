@@ -318,3 +318,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-02 代理链编辑：引用与展开来源统一为「来源 + 查找框 + 节点点选」，点选不改变来源；正则不再是配置项，实际约束以弱提示展示，已有正则原样保留。已保存的空正则前置在列表中标注「当前采用」并跳过落地节点；2026-11-02 起编辑器不再提供「自动」，前置必须点选，两块区块配色一致。
 
 2026-11-02 表格：页面表格统一使用 `components/ui/table.tsx`。外层已有滚动容器时传 `containerClassName="overflow-visible"`，保证 sticky 表头相对外层吸顶；单元格默认可折行，不折行的列显式声明 `whitespace-nowrap`。
+
+2026-11-02 分页：`Pagination` 改为图标紧凑样式，移除未被调用的 `compact` 入口；公共 `Select` 通过 `size="sm"` 使用 32px 触发框，不再用 class 覆盖高度。

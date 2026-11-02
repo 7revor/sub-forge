@@ -39,11 +39,11 @@ function collect(children: ReactNode, group?: string, out: Opt[] = []): Opt[] {
 }
 
 export type SelectProps = Omit<HTMLAttributes<HTMLButtonElement>, 'onChange' | 'children'> & {
-  value?: string | number; onChange?: (e: { target: { value: string } }) => void; disabled?: boolean; children?: ReactNode; placeholder: string; clearable?: boolean;
+  value?: string | number; onChange?: (e: { target: { value: string } }) => void; disabled?: boolean; children?: ReactNode; placeholder: string; clearable?: boolean; size?: 'sm' | 'default';
 };
 
 /** 选项只含实际值；可选字段通过独立清空按钮恢复 placeholder。 */
-export function Select({ value, onChange, disabled, children, placeholder, clearable = false, className, style, ...rest }: SelectProps) {
+export function Select({ value, onChange, disabled, children, placeholder, clearable = false, size, className, style, ...rest }: SelectProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const opts = collect(children);
   const current = value == null ? '' : String(value);
@@ -56,7 +56,7 @@ export function Select({ value, onChange, disabled, children, placeholder, clear
   }, []);
   const select = <ShadcnSelect value={selected ? `value:${current}` : ''} disabled={disabled}
     onValueChange={next => { const value = next.slice(6); if (value !== current) onChange?.({ target: { value } }); }}>
-    <SelectTrigger {...rest} disabled={disabled} ref={triggerRef} title={selected?.text ?? placeholder} style={clearable ? undefined : style}
+    <SelectTrigger {...rest} size={size} disabled={disabled} ref={triggerRef} title={selected?.text ?? placeholder} style={clearable ? undefined : style}
       className={cx('w-full', clearable ? 'h-full min-h-9' : className, clearable && current !== '' && 'pr-16')}><SelectValue placeholder={placeholder}>{selected?.label}</SelectValue></SelectTrigger>
     <SelectContent aria-label={rest['aria-label']}>
       {groups.map((group, i) => <SelectGroup key={i}>
