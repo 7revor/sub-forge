@@ -345,3 +345,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 分页栏每页条数下拉改为无边框：平时无边框、背景和阴影，悬停显示浅色背景，键盘聚焦保留聚焦框，弹出菜单不变；仅分页处单独设置，其他下拉不受影响。画板 `V2Lists`、`V2RuleRepo` 已同步。仅前端样式，领域模型与服务端无变化，无后端待实现项。
 
 2026-11-02 策略组隐藏与分段控件：`V2Template`、`V2ProfileRouting`、`V2Components` 的策略组行增加「隐藏」开关列，移除「已隐藏」徽标；`V2GroupDialog` 移除隐藏开关；v2 页全部 `.seg` 改为新选中态。前端对应 `TemplateGroupsEditor`、`ProfileRoutingEditors` 与 `components/ui/toggle.tsx`，后端对应 `routing.groupHidden`。旧版 `LegacyGroups`（无 `routing` 的旧文档）保持只读显示。
+
+2026-11-02 策略组列表开关语义修订：`V2Template`、`V2ProfileRouting`、`V2Components` 改为开启 = 显示（无文案）、关闭 = 隐藏（右侧显示「隐藏」）。前端对应 `TemplateGroupsEditor`；仅界面变化，领域模型与服务端不变，无后端待实现项。
