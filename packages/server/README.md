@@ -73,11 +73,12 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `POST /auth/login`、`POST /auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
 | `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限 |
-| `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`，仍接受旧的单一来源写法（`kind` / `url` / `content` 平铺），保存时转成一个来源。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；被引用的文档不能删除（409 返回引用方） |
+| `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`。配置订阅必须带 `routing`；旧模板引用、覆盖层和规则集单来源写法只由存储迁移与种子导入处理，接口返回 400。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；被引用的文档不能删除（409 返回引用方） |
 | `GET /api/templates`、`GET /api/templates?id=ID` | 所有登录用户可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |
 | `POST /api/templates/:id/impact` | 管理员：用新版本对跟随最新的 Profile 试渲染，只看结果不发布 |
-| `POST /api/templates`、`PUT /api/templates/:id` | 管理员新建或直接保存；不需要版本号，后保存的内容覆盖当前内容。自身校验不通过 400；绑定冲突返回 409，不允许 `force` 跳过。旧 `POST /api/templates/:id/publish` 兼容同一保存逻辑，不再创建历史 |
+| `POST /api/templates`、`PUT /api/templates/:id` | 管理员新建或直接保存；不需要版本号，后保存的内容覆盖当前内容。自身校验不通过 400；绑定冲突返回 409，不允许 `force` 跳过。 |
+| `GET /api/templates/usage` | 管理员读取各模板的跟随数 `{ items: [{ id, followers }] }`，覆盖全部用户，范围与保存时的影响检查一致 |
 | `GET /api/profiles/link?id=ID` | 校验归属，返回该用户 token 与此配置订阅地址 |
 | `GET /api/resource-links?kind=类型&id=ID` | 复制当前用户令牌的节点源、组合、本地组、配置或公共规则增强链接；只生成地址，不拉取上游 |
 | `GET /api/me/token`、`POST /api/me/token/reset` | 读取或原子重置自己的唯一令牌；重置请求携带当前 `{ token }`，过期值返回 409 |
@@ -89,7 +90,6 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | `POST /api/sources/:id/refresh`、`GET /api/sources/snapshots?id=ID` | 立即拉取、最近成功内容与最新失败状态（不含正文） |
 | `POST /api/{sources,collections}/:id/pipeline-preview` | 处理链逐步预览，可带未保存的 `pipeline` 草稿；订阅源还可带 `source: { url, fetch }`，组合还可带 `members`（按保存规则校验引用与成环） |
 | `GET /api/nodesets/nodes?type=类型&id=ID` | 自己的节点集经已保存处理链后的节点列表；type 为 `source` / `collection` / `local`，最多返回 5000 个，附总数、截断标记与报告 |
-| `POST /api/rulesets/preview` | 规则集草稿按 `client` + `platform` 的输出，请求体 `{ ruleset, id?, source?, client, platform? }`：给出 `source` 时为该来源（含无法解析的行），否则为全部启用来源合并去重后的结果与 domain / classical / ipcidr 统计；两种预览均应用顶层 `overrides`（按规则内容精确匹配）；每个来源的拉取 / 解析状态一并返回，`rejected` 为完整计数，存在无法解析行时附带 `rejectedDetails`（行号、原文、原因，最多前 100 条），用于来源徽标的悬停与点击详情。`id` 为已保存的规则集时，已保存的远程地址读写它名下的快照；新建草稿与编辑中新填的地址只拉取、不写快照（仅合并同一用户仍在途的草稿请求） |
 
 本地节点在「原始配置」粘贴后先同步编辑草稿，点击「添加到分组 / 保存节点」时调用 `PUT /api/locals/:id`，提交完整分组；服务端校验通过后立即持久化并返回保存结果。该交互复用现有接口，不新增暂存状态或迁移。
 
@@ -101,7 +101,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | --- | --- |
 | `GET /api/users/stats` | 用户：每人的配置订阅数、订阅源数、最近订阅请求 |
 | `GET/POST /api/shares`、`DELETE /api/shares/:id` | 用户：共享订阅源 / 组合（SYS-06） |
-| `GET/PUT /api/system`、`POST /api/system/backup`、`POST /api/system/restore` | 系统：SSRF 白名单、mihomo 校验开关、备份恢复 |
+| `GET/PUT /api/system` | 系统：资源缓存时间 |
 
 订阅源保存格式为 `{ name, url, fetch?, pipeline? }`，`url` 必须是单个 HTTP(S) 地址。旧客户端的单元素 `urls` 可自动转换；空数组、多元素数组、非字符串地址以及同时提供 `url` / `urls` 均返回 400。读取只返回 `url`。多个来源应各建一个订阅源并加入组合。
 
@@ -154,9 +154,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 服务初始化自动建立 blackmatrix7 / zydou 元数据，`serve` 启动后台索引；每日检查各分支 commit，更新失败保留旧索引并在 15 分钟后重试，退出前停止定时器并等待当前任务。SQLite v10 新增公共索引表，用户规则文档仍加密存储。
 
 - `GET /api/rule-repos`：状态与数量（需要登录）。
-- `GET /api/rule-repos/search?q=&repo=&client=&offset=0&limit=50`：归一化名称搜索，最大 100 条/页。
-- `GET /api/rule-repos/entry?repo=&path=`：变体、上游链接、许可证及推荐文本预览；网络错误明确返回。
-- `POST /api/rule-repos/import`：`{ repo, path, variant?, ruleset? }`，新建当前用户的规则集或向其已有规则集追加选中文本来源，按 URL 防重复。
+- 2026-11-02：仓库搜索、关联解析统一走 `GET /api/rule-options/search` 与 `POST /api/rule-options/resolve`；原 `rule-repos` 的 search、entry、files、file-preview、file-refresh、resolve、import 已删除。
 - `POST /api/rule-repos/:id/refresh`：管理员触发，202 返回后通过列表轮询状态；同仓库并发任务合并。
 - `PATCH /api/rule-repos/:id`：管理员设置 `{ enabled: boolean }`，停用不删除索引或已导入的规则集。
 
@@ -171,7 +169,7 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 
 ### 仓库关联来源
 
-`POST /api/rule-repos/resolve` 接收 `{ repo, path, variant? }`，返回 `{ name, sources }`（含来源 ID、repository 标识与规范 URL），仅解析、不保存规则集。导入接口同样保留关联标识；新建/保存和草稿预览均拒绝伪造或修改关联地址、移除既有关联标识。旧导入按名称与完整 URL 精确命中索引后补齐标识。示例种子附带默认停用且不被配置引用的关联示例，不触发额外远程拉取。
+`POST /api/rule-options/resolve` 接收 `{ source: 'repository', repo, entry, file? }`，返回含来源 ID、repository 标识与规范 URL 的 matcher，仅解析、不保存规则集。保存和草稿读取均拒绝伪造或修改关联地址、移除既有关联标识；作者和管理员适用同一约束。旧导入按名称与完整 URL 精确命中索引后补齐标识。
 
 ### 2026-10-29：仅文本索引
 
@@ -183,7 +181,6 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 
 ### 按单文件创建规则集
 
-`GET /api/rule-repos/files` 按 `repo` 与条目 `path` 返回去重的文本文件清单，不访问上游。`POST /api/rule-repos/import` 可传 `file: { ref, path }`，只创建该文件的仓库关联来源；不得与 `variant` 同传。创建前检查索引成员资格、启用状态及实际文本内容，已有规则集继续校验归属并按 URL 去重。
 
 ### 本地节点连通性测试
 
@@ -262,7 +259,7 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 
 - `POST /api/profiles/routing/convert`：`{ profile, mode, templateId?, mapping? }`。只返回 `{ item, changes }` 草稿；mapping 以旧组 ID 映射目标 ID，null 表示明确不迁移。应用后通过原 PUT 保存，后保存的内容覆盖当前内容。
 - `GET /api/profiles/migration-backup?id=ID`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；备份在库内加密，删除订阅时一并删除。
-- 模板 impact/publish 仅影响绑定订阅。组改名保留成员；删组和合并环等冲突不能强制发布。保存不因模板或订阅在检查期间更新而中断。
+- 模板影响检查和保存仅影响绑定订阅，覆盖全部用户。组改名保留成员；删组和合并环等冲突不能强制发布。保存不因模板或订阅在检查期间更新而中断。
 
 升级前先停止写入并保留完整数据库一致性备份及原密钥（运行中的 SQLite 使用 backup API，不能只复制主文件遗漏 WAL）。可在现有库上执行只读预检：
 
@@ -305,7 +302,6 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 
 ### 2026-10-29：仓库单文件正文预览
 
-`GET /api/rule-repos/file-preview?repo&ref&path` 只读取所选 list/txt 原文，按目录索引校验成员资格并使用索引 commit；响应含 content、name、entry（可关联时）、ref、path、url、upstream、license。仅登录用户可用；目录或伪造文件返回 400，停用仓库返回 404，上游读取异常返回 502，可重试。空文件、纯注释与无有效规则文本仍能预览；创建操作另行执行既有解析校验。预览不组合文件，不请求 README，也不写本地规则集。
 
 
 ### 模板直接保存（数据库 v19）
@@ -352,9 +348,8 @@ v20 清理旧记录中的并发字段，保留配置内容、绑定关系、归�
 - `GET /api/{sources,collections,rulesets,profiles}/cache?id=ID`：当前资源状态。
 - `POST /api/{sources,collections,rulesets,profiles}/:id/refresh-cache`：返回 202 和任务；订阅递归所有生效依赖并重建配置。
 - `GET /api/refresh-jobs?id=ID`：仅任务所有者可读；逐项结果与生成结果分开显示。
-- `POST /api/rule-repos/file-refresh`：刷新已授权索引中的单个公开文件。
 - `GET /api/system/resources`：管理员汇总资源及仓库索引状态。
-- `GET /api/events`：登录用户 SSE 通知，不携带文档数据；具体读取仍校验权限。服务退出主动关闭流。
+- `GET /api/events`：登录用户 SSE 通知，不携带文档数据；具体读取仍校验权限。连接时及配置或任务变化时发送 `changed`，15 秒保活只发注释，不触发前端刷新。服务退出主动关闭流。
 
 SQLite v21 移除旧独立 TTL/订阅 interval，裁剪成功快照为一份，增加系统设置和共享资源绑定；刷新任务保存 7 天，启动将未完成任务标为中断。最终渲染取消结果内存缓存；保留解析缓存、在途合并与 last_good；节点和专属规则按当前配置生成。生产启动会运行资源和仓库调度器。
 
