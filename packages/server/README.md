@@ -156,7 +156,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 
 ## 内置与自定义规则仓库
 
-服务初始化自动建立 blackmatrix7 / zydou 元数据，`serve` 启动后由后台定时任务维护 Git 和文件目录索引：每 60 秒检查，到期的仓库自动同步，不下载规则文件内容，失败保留旧索引并在 15 分钟后重试，退出前停止定时器并等待当前任务。
+服务初始化自动建立 blackmatrix7 / zydou 元数据，没有定时同步：读取仓库目录、搜索或读取仓库规则时，到期的仓库在后台更新，失败保留旧索引并在 15 分钟后重试，退出前等待当前任务。
 
 - `GET /api/rule-repos`：状态与数量（需要登录）。
 - 2026-11-02：仓库搜索、关联解析统一走 `GET /api/rule-options/search` 与 `POST /api/rule-options/resolve`；原 `rule-repos` 的 search、entry、files、file-preview、file-refresh、resolve、import 已删除。

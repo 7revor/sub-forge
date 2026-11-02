@@ -32,7 +32,7 @@ pnpm install --offline --frozen-lockfile
 |---|---|---|---|
 | 上游 | 节点订阅 | 有，永不清理 | 见 2.2 |
 | 上游 | 规则仓库文件、远端规则 URL | 有，到期立刻失效 | 见 2.3 |
-| 上游（不算内容缓存） | 仓库索引表、Git 裸仓库 | 不清理 | **后台定时任务**：到新周期后自动同步 Git 和文件目录，不依赖请求，不下载规则文件内容；失败保留旧索引 |
+| 上游（不算内容缓存） | 仓库索引表、Git 裸仓库 | 不清理 | **后台定时任务**：跟随全局周期（24 小时即每天 0 点）自动同步 Git 和文件目录，不依赖请求，不下载规则文件内容，见 2.5 |
 | 中间 | 本地节点 | 无 | 直接读库 |
 | 中间 | 节点组合 | 无 | 实时计算，成员调用上游接口 |
 | 中间 | 自定义规则集合 | 无 | 实时计算；静态内容读库，远程和仓库来源调用上游接口 |
@@ -89,6 +89,18 @@ export function cacheCycleStart(now: number, ttlSec: number): number {
 
 下发主配置**不读规则源，也不读规则快照**，只从数据库读规则定义，确定 provider 名称和格式，然后写入规则地址（坐标）。规则内容由客户端另行请求。节点快照仍要读，因为策略组筛选和代理链需要节点名，流量信息头也来自节点快照。
 
+### 2.5 仓库的 Git 和文件目录索引
+
+| 情况 | 处理 |
+|---|---|
+| 到了新周期 | 后台定时任务自动同步，不等请求。周期和节点、规则共用，24 小时周期就是每天本地 0 点 |
+| 服务在周期切换时没运行 | 启动时补做一次 |
+| 同步失败，已有索引 | 保留旧索引，显示在“资源异常”，下个周期再试 |
+| 同步失败，从未成功 | 每次定时检查（60 秒）都重试 |
+| 手动刷新 | 立即同步 |
+
+定时任务只同步目录，不下载规则文件内容，也不会预热规则快照。
+
 ## 3. `main` 已完成的工作（不要重做）
 
 | 提交 | 内容 |
@@ -98,7 +110,7 @@ export function cacheCycleStart(now: number, ttlSec: number): number {
 | `95acd04` | 去掉后台拉取；`ResourceService.sweep` 只清理；`RuleRepoService.refreshIfDue` |
 | `8df02b0` | v35：文档、迁移备份、快照、刷新任务、令牌原文改明文，`token_enc` 改名 `token`，数据库文件 0600；`Store.legacyEncoded` 只在升级时为真 |
 | `e4d5aeb`、`7a908e7` | 文档和前端文案（部分描述会被本计划替换） |
-| `978c77e` 及之后的修改 | 仓库的 Git 和文件目录索引恢复为后台定时任务，`RuleRepoService.start()` 每 60 秒检查到期仓库并同步，不下载规则文件内容（用户 2026-11-02 决定，不走懒加载） |
+| `978c77e` | `RuleRepoService.start()` 只开启按需同步，避免测试访问真实 Git。**这里的按需同步是过渡实现，本次重构要改掉，见 5.3** |
 
 加密保留范围（已实现，不要改）：用户密码 scrypt、令牌和 URL 的 HMAC 索引、会话哈希、系统设置里的备份凭据、WebDAV 备份文件。
 
@@ -111,6 +123,7 @@ export function cacheCycleStart(now: number, ttlSec: number): number {
 5. **规则失败被缓存。** `refresh` 对规则写失败行，退避一个周期。
 6. **清理按引用判断。** `resources.ts` 的 `liveResources`、`sweep` 要简化。
 7. **`repository-file:`、`repo-read:` 这类下游身份。** `rule-repos/service.ts` 的 `readFile`、`filePreview`、`fileResource`、`ruleSetFromFiles`、`cachedResources` 依赖它们。
+8. **仓库索引是按需同步。** 现在由 `refreshIfDue` 在读取目录、搜索和读取仓库规则时触发，到期按每个仓库的 `checked_at` 计时。目标是后台定时任务，并按全局周期判定。
 
 ## 5. 详细改动
 
@@ -163,7 +176,9 @@ refreshNodeSource(source) / refreshRuleContent(url, params) // 手动刷新
   - 来源通过 `getRuleContent` 取，失败直接抛错。`SharedRuleOutput.stale` 删除。
 - **`rule-repos/service.ts`**
   - `readFile`、`filePreview`、`ruleSetFromFiles` 用规则接口，删除 `repository-file:`、`repo-read:` 身份和 `cachedResources`。
-  - `RuleRepoService.start()` 的到期条件改为 `checked_at < cacheCycleStart(...)`，保持后台定时任务，不改成按需。
+  - 仓库的 Git 和文件目录索引改为**后台定时任务**：`start()` 启动定时器，每 60 秒检查，`checked_at === null` 或 `checked_at < cacheCycleStart(...)` 的启用仓库自动同步；服务启动时补做一次；`stop()` 清除定时器。
+  - 删除 `refreshIfDue`，以及 `api/rule-options.ts`、`api/rule-repos.ts`、`resource-files.ts` 中的调用，读取目录和规则文件不再触发同步。
+  - 同步只做 `git fetch --filter=blob:none` 和 `ls-tree`，不下载规则文件内容；内容按 2.3 在请求时读取。
   - `api/index.ts` 的 `setAdditionalResources` 和 `resources.ts` 对应逻辑删除。
 - **`resources.ts`**
   - `sweep` 只做两件事：`deleteExpiredRuleSnapshots(cycleStart)`、删除 7 天前的刷新任务。删除 `liveResources`。
@@ -223,7 +238,7 @@ refreshNodeSource(source) / refreshRuleContent(url, params) // 手动刷新
 2. `refactor`：拆分节点和规则的上游接口，规则失败不写缓存，到期不再当旧数据；移除规则的限时等待和告警头。
 3. `refactor`：规则缓存键改为“URL 加读取参数”，删除 `resource_bindings`、`ruleBinding` 和相关身份，补充迁移。
 4. `refactor`：`/subs/ruleset` 不再渲染配置；预览规则并行；加全局并发上限。
-5. `refactor`：`sweep` 改为按周期删除规则快照，仓库索引定时任务按周期判定到期。
+5. `refactor`：`sweep` 改为按周期删除规则快照；仓库索引改为后台定时任务并按周期判定到期，删除 `refreshIfDue`。
 6. `feat`：系统页显示下次缓存失效时间，调整规则资源状态显示，同步设计稿。
 7. `docs`：同步全部文档，并把本文状态改为已完成。
 
@@ -240,6 +255,7 @@ refreshNodeSource(source) / refreshRuleContent(url, params) // 手动刷新
 - 权限：其他用户不能通过 `/subs/ruleset` 读到别人配置的远端规则，即使缓存已存在。
 - 节点订阅故障时，`/subs/ruleset` 和公共规则文件仍能下发。
 - 主配置请求不调用任何规则读取（上游调用次数为 0）。
+- 仓库索引：跨周期后定时器自动同步，读取目录和规则文件不触发同步；失败保留旧索引；从未成功时下次检查重试；同步过程不读取规则文件内容；`stop()` 后不再运行。
 - 全局并发上限生效，相同身份仍只拉一次。
 - 迁移：从带密文和绑定的 v34 以及带绑定的 v35 升级（如果新增 v36），节点快照可读，规则快照被清除，`resource_bindings` 已删除，重启幂等；多个订阅源绑定同一资源时都有快照。
 
@@ -264,7 +280,8 @@ pnpm -r test
 检查项：
 
 - 版本为最新结构版本，`resource_bindings` 已删除，节点快照可用，规则快照已清除。
-- 启动后内容上游（节点、规则文件）没有请求；仓库索引到期时后台 Git 同步属于预期。
+- 启动后节点和规则文件上游没有请求；仓库索引到期时的后台 Git 同步属于预期，且不下载规则文件内容。
+- 跨过周期边界后，不发任何请求，仓库索引也会自动同步。
 - 主配置只触发节点来源读取；规则文件请求才触发规则读取。
 - 把周期改短后，规则快照失效；删除上游文件后，规则文件返回错误，恢复后下次请求成功；节点上游失败时继续用旧数据。
 - 系统页显示下次缓存失效时间，规则“待拉取”不是警告色，没有控制台错误。
@@ -290,7 +307,7 @@ pnpm -r test
 | 规则快照到期立刻清理，不管有没有引用 | 用户判定规则集和 GitHub 仓库默认全天可用 | 过期后再留一个周期作为兜底；只清理没有引用的 |
 | 规则失败不缓存，可一直重试 | 失败结果不是有效数据 | 失败后退避 5 分钟或一个周期 |
 | 文档、快照、令牌原文明文存储 | 默认部署主密钥与数据库同目录，防护有限；单次解密很快但复杂度高 | 全部保留加密；连备份和 HMAC 一起去掉 |
-| 仓库索引和 Git 裸仓库不清理，由后台定时同步 | 规则引用要靠索引校验；索引被删后主配置要等仓库同步。它是定时任务，不依赖请求 | 与规则快照一样到期清理；读取时按需同步 |
+| 仓库的 Git 和文件目录索引不清理，由后台定时任务按全局周期同步，不下载文件内容 | 规则引用要靠索引校验；索引被删后主配置要等仓库同步。它是定时任务，不依赖请求 | 与规则快照一样到期清理；读取时按需同步 |
 | 同一 URL 只存一份规则快照 | 缓存属于上游，下游身份不应进入缓存键；权限在入口校验 | 按配置、模板、作用域隔离缓存 |
 
 **用户已知并接受的风险：** 周期一到，所有规则快照同时失效且没有旧数据。如果此时上游或服务器网络有问题，规则文件会一起失败直到恢复。已有设备通常继续用本地文件，新设备拿不到规则。

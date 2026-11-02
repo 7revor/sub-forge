@@ -22,7 +22,7 @@ export class RuleRepoService {
   private details = new Map<string, Promise<ReturnType<RuleRepoService['formatDetail']>>>();
   private detailJobs = new Set<Promise<ReturnType<RuleRepoService['formatDetail']>>>();
   private stopped = false;
-  private timer?: ReturnType<typeof setInterval>;
+  private started = false;
   private editing = new Set<string>();
   private cache: RepoCache;
   constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now, cache?: RepoCache, private snapshots?: SnapshotService) {
@@ -362,21 +362,17 @@ export class RuleRepoService {
       console.warn(`规则仓库 ${id} 索引更新失败：${message}`);
     }
   }
-  /** Git 和文件目录索引是定时任务：到期由后台同步，不依赖请求，也不下载规则文件内容。 */
-  start() {
-    if (this.timer || this.stopped) return;
-    const tick = () => {
-      for (const row of this.rows()) {
-        if (!this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (this.store.resourceCacheTtlSec * 1000))) void this.refresh(row.id);
-      }
-    };
-    tick();
-    this.timer = setInterval(tick, 60_000);
-    this.timer.unref();
+  /** 服务启动后才允许按需同步；本身不启动定时器，也不立即访问上游。 */
+  start() { this.started = true; }
+  /** 没有定时同步：有人读取目录或规则时，到期的仓库在后台更新，本次先用现有索引。 */
+  refreshIfDue(id?: string) {
+    if (!this.started || this.stopped) return;
+    for (const row of this.rows()) {
+      if ((id === undefined || row.id === id) && !this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (this.store.resourceCacheTtlSec * 1000))) void this.refresh(row.id);
+    }
   }
   async stop() {
     this.stopped = true;
-    clearInterval(this.timer);
     await this.cache.stop();
     await Promise.all(this.jobs.values());
     await Promise.allSettled(this.detailJobs);
