@@ -298,11 +298,12 @@ export type Profile = {
   /** 管理备注，不输出到客户端配置。 */
   note?: string;
   nodeSets: ProfileNodeSet[];
-  overlay: Overlay;
+  /** 仅供历史输入迁移；当前文档不保存。 */
+  overlay?: Overlay;
   chains: ChainRule[];
   /** @deprecated 兼容旧字段，渲染不再读取手动引用策略。 */
-  refPolicy: { default: RefStrategy; perRef?: Record<string, RefStrategy> };
+  refPolicy?: { default: RefStrategy; perRef?: Record<string, RefStrategy> };
 };
 
-/** 当前订阅必须有分流模式；overlay 仅保留空对象以兼容历史文档结构。 */
-export type RoutedProfile = Profile & { routing: ProfileRouting };
+/** 当前订阅只保存 routing；历史输入字段由迁移边界消化。 */
+export type RoutedProfile = Omit<Profile, 'routing' | 'overlay' | 'refPolicy'> & { routing: ProfileRouting };

@@ -58,7 +58,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 29;
+const SCHEMA_VERSION = 30;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS native_migration_backups (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
@@ -103,10 +103,6 @@ CREATE TABLE IF NOT EXISTS shared_rule_resources (
   key TEXT PRIMARY KEY, ruleset_id TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shared_rule_resources_ruleset ON shared_rule_resources (ruleset_id);
-CREATE TABLE IF NOT EXISTS sub_tokens (
-  token_hash TEXT PRIMARY KEY, token_enc TEXT NOT NULL, profile_id TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
 CREATE TABLE IF NOT EXISTS last_good (
   profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL,
   PRIMARY KEY (profile_id, target)
@@ -307,6 +303,12 @@ export class Store {
         this.db.exec('DROP INDEX IF EXISTS snapshots_owner');
       }
       this.db.exec(SCHEMA);
+      // 已退役表仅在旧凭据迁移期间使用，不能由当前建表脚本重建。
+      if (version < 23) this.db.exec(`CREATE TABLE IF NOT EXISTS sub_tokens (
+  token_hash TEXT PRIMARY KEY, token_enc TEXT NOT NULL, profile_id TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
+`);
       const repoCols = this.db.prepare('PRAGMA table_info(rule_repos)').all() as { name: string }[];
       if (!repoCols.some(c => c.name === 'definition')) this.db.exec('ALTER TABLE rule_repos ADD COLUMN definition TEXT');
       if (!repoCols.some(c => c.name === 'indexed_definition')) this.db.exec('ALTER TABLE rule_repos ADD COLUMN indexed_definition TEXT');
@@ -424,7 +426,15 @@ export class Store {
         this.db.exec('DROP TABLE IF EXISTS render_generations; DELETE FROM last_good');
       }
       if (version < 28) this.migrateNativeConfigs();
-      if (version < 29) this.normalizeProfileRouting();
+      if (version < 30) {
+        this.normalizeProfileRouting();
+        for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'source'").all() as { id: string; data: string }[]) {
+          const previous = JSON.parse(this.cipher.decrypt(row.data)) as SourceDoc;
+          const next = normalizeSourceFetch(previous);
+          if (JSON.stringify(next) !== JSON.stringify(previous)) this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'source' AND id = ?").run(this.cipher.encrypt(JSON.stringify(next)), row.id);
+        }
+        this.db.exec('DROP TABLE IF EXISTS sub_tokens');
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -605,7 +615,7 @@ export class Store {
     }
   }
 
-  /** v29：补齐曾由底层写入的旧订阅，历史备份与外部身份保持不变。 */
+  /** v29/v30：补齐旧订阅并移除退役字段，历史备份与外部身份保持不变。 */
   private normalizeProfileRouting(): void {
     for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
       const original = this.cipher.decrypt(row.data);
@@ -1089,6 +1099,8 @@ export class Store {
           .run(t.id, t.version ?? 1, JSON.stringify(t), this.now());
       }
       for (const d of seed.profiles ?? []) {
+        // 预设展开的备份必须保留原始输入，不能先被 routing 规范化丢掉历史字段。
+        if (d.base?.presetId) this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('profile', d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
         const next = migrateProfile(d, profileTemplate(d, (id, v) => this.getTemplate(id, v)));
         if (!d.routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)').run(d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
         this.put('profile', next, owner);

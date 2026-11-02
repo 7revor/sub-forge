@@ -18,7 +18,7 @@ describe('自动引用与代理链诊断', () => {
     expect(JSON.stringify(f)).toBe(before);
     if (render === renderMihomo) {
       expect(r.config.proxies).toEqual([]); expect(r.dependencies[0]?.strategy).toBe('wrap');
-      f.profile.refPolicy.perRef = { [r.dependencies[0]!.refKey]: 'inline' };
+      f.profile.refPolicy!.perRef = { [r.dependencies[0]!.refKey]: 'inline' };
       expect(render(f).config).toEqual(r.config);
     } else expect(r.config['proxy-providers']).toBeUndefined();
   });

@@ -30,7 +30,7 @@ function checkPrependRule(value: unknown): void {
 export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefChecker): void {
   const r = doc.routing;
   if (!obj(r) || !['bound', 'independent'].includes(r.mode)) throw bad('分流模式只能是 bound 或 independent');
-  if (doc.template !== undefined || Object.keys(doc.overlay).length) throw bad('新分流模式不能同时保存旧模板引用或覆盖层');
+  if (doc.template !== undefined || Object.keys(doc.overlay ?? {}).length) throw bad('新分流模式不能同时保存旧模板引用或覆盖层');
   let template;
   if (r.mode === 'bound') {
     if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions', 'prependRules', 'appendRules', 'extraGroups', 'prependGroupIds', 'groupHidden'].includes(k))) throw bad('绑定模式只能保存模板引用、追加成员、独立策略组、隐藏设置和自定义规则');

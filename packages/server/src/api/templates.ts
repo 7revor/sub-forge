@@ -158,7 +158,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
 /** 对所有跟随最新版本的 Profile 用新版本试渲染 */
 export async function analyzeImpact(store: Store, renderer: RenderService, draft: TemplateVersionDoc): Promise<ImpactEntry[]> {
   const out: ImpactEntry[] = [];
-  const profiles = store.list('profile').filter((p) => p.routing?.mode === 'bound' ? p.routing.templateId === draft.id : !p.routing && p.template?.id === draft.id && p.template.follow === 'latest');
+  const profiles = store.list('profile').filter((p) => p.routing.mode === 'bound' && p.routing.templateId === draft.id);
   for (const p of profiles) {
     const res = await renderer.preview(p.id, { client: 'mihomo' }, { template: draft });
     const errors = res.report.filter((i) => i.level === 'error');

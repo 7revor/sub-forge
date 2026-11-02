@@ -49,7 +49,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(29);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(30);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();
@@ -61,10 +61,10 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       const row = store.getWithOwner('profile', old.id)!;
       expect(row.owner).toBe('owner'); expect(row.updatedAt).toBe(1234);
       expect(row.doc.routing?.mode).toBe(old.id === 'bound' ? 'bound' : 'independent');
-      expect(row.doc.template).toBeUndefined();
+      expect(row.doc).not.toHaveProperty('template');
       expect(store.getProfileMigrationBackup(old.id)).toEqual(JSON.parse(JSON.stringify(old)));
       expect(store.userToken('owner')).toBeDefined();
-      const original = routingConfig(mergeTemplate(profileTemplate(old, (id, v) => historical.find(t => t.id === id && t.version === (v ?? 2))), old.overlay, new Report()));
+      const original = routingConfig(mergeTemplate(profileTemplate(old, (id, v) => historical.find(t => t.id === id && t.version === (v ?? 2))), old.overlay ?? {}, new Report()));
       original.rules = original.rules.filter(rule => rule.enabled !== false).map(({ enabled: _, ...rule }) => rule);
       expect(routingConfig(resolveProfileRouting(row.doc, profileTemplate(row.doc, (id, v) => store.getTemplate(id, v)), new Report()))).toEqual(original);
       const rendered = await nextRenderer.render(old.id, { client: 'mihomo' });

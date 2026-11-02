@@ -155,7 +155,7 @@ describe.skipIf(!MIHOMO || process.env.MIHOMO_RUNTIME !== '1')('mihomo 代理链
       base: testYaml({ 'log-level': 'debug', ipv6: false, 'geodata-mode': false, 'geo-auto-update': false }),
     };
     if (opts.viaGroup) {
-      profile.overlay.extraGroups = [{ group: { id: 'pre', name: '普通前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'source', id: 'T' } }], filter: '^前置$', whenEmpty: 'reject' } }];
+      profile.overlay!.extraGroups = [{ group: { id: 'pre', name: '普通前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'source', id: 'T' } }], filter: '^前置$', whenEmpty: 'reject' } }];
       profile.chains[0]!.via = { kind: 'group', groupId: 'pre' };
     }
     if (opts.oldSelfDialer) input.nodeSets.snapshots.L = [input.nodeSets.snapshots.L![0]!.replace(`port: ${ports.exit}`, `port: ${ports.exit}, dialer-proxy: 落地组`)];

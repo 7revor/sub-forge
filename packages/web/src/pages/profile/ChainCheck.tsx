@@ -3,12 +3,11 @@ import type { ChainResolution, ChainRule } from '@sub-forge/core';
 import { api, type ProfilePreview } from '../../api.ts';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { useProfile } from './context.ts';
-import { persistedProfile } from './routing.ts';
 
 /** 每份草稿对应独立查询；改动后立即隐藏旧结果，防抖后检查当前配置。 */
 export function useChainCheck() {
   const { draft, template } = useProfile();
-  const snapshot = JSON.stringify({ profile: persistedProfile(draft), templateVersion: template?.version });
+  const snapshot = JSON.stringify({ profile: draft, templateVersion: template?.version });
   const settled = useDebouncedValue(snapshot, 450);
   const query = useQuery({
     queryKey: ['profile-chain-check', settled], enabled: draft.chains.length > 0 && snapshot === settled,

@@ -21,7 +21,7 @@ describe('订阅 routing 边界', () => {
       const old = legacy('p');
       store.put('profile', old, 'owner');
       const current = store.get('profile', 'p')!;
-      expect(current).toMatchObject({ overlay: {}, routing: { mode: 'bound', templateId: 't', groupAdditions: { g: [{ kind: 'builtin', name: 'REJECT' }] } } });
+      expect(current).toMatchObject({ routing: { mode: 'bound', templateId: 't', groupAdditions: { g: [{ kind: 'builtin', name: 'REJECT' }] } } });
       expect(current).not.toHaveProperty('template');
       expect(store.list('profile', 'owner')).toEqual([current]);
       expect(store.listPage('profile', { page: 1, pageSize: 20, q: '' }, 'owner').items).toEqual([current]);
@@ -51,12 +51,12 @@ describe('订阅 routing 边界', () => {
       store.putLastGood('p', 'mihomo:any', { yaml: '保留成功结果' });
       store.db.pragma('user_version = 28');
       const plan = await profileMigrationPlan(file, cipher);
-      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 29, profiles: [{ id: 'p', mode: 'bound' }] });
+      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 30, profiles: [{ id: 'p', mode: 'bound' }] });
       expect(store.get('profile', 'p')!.routing).toBeUndefined();
       expect(store.getProfileMigrationBackup('p')).toBeUndefined();
       store.close(); store = new Store(file, { cipher });
       const migrated = store.getWithOwner('profile', 'p');
-      expect(migrated).toMatchObject({ owner: user.id, updatedAt: 1234, doc: { routing: { mode: 'bound' }, overlay: {} } });
+      expect(migrated).toMatchObject({ owner: user.id, updatedAt: 1234, doc: { routing: { mode: 'bound' } } });
       expect(store.getProfileMigrationBackup('p')).toEqual(old);
       expect(store.userToken(user.id)?.token).toBe('fixture-routing-token');
       expect(store.getLastGood('p', 'mihomo:any')?.data).toEqual({ yaml: '保留成功结果' });
@@ -89,7 +89,7 @@ describe('订阅 routing 边界', () => {
       expect(env.store.list('profile')).toEqual([]);
       const saved = await api.post('/api/profiles', legacy(''));
       expect(saved.status).toBe(201);
-      expect(saved.json.item).toMatchObject({ routing: { mode: 'bound' }, overlay: {} });
+      expect(saved.json.item).toMatchObject({ routing: { mode: 'bound' } });
       expect(saved.json.item).not.toHaveProperty('template');
       const currentPreview = await api.post('/api/profiles/preview', { profile: saved.json.item });
       expect(currentPreview.json.yaml).toBe(preview.json.yaml);

@@ -20,7 +20,7 @@ export const NewProfileModal = createModal<{ templateId?: string }, ProfileDoc>(
       {mode === 'template' && <Field label="模板">{id => <Select id={id} placeholder="选择作为分流起点的模板" value={templateId} onChange={event => setTemplateId(event.target.value)}>{templates.map(template => <option key={template.id} value={template.id}>{template.name} · {template.groups.length} 组 · {template.rules.length} 规则</option>)}</Select>}</Field>}
     </div>
     <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={() => modal.submit(() => save.mutateAsync({
-      name: name.trim(), userinfo: { mode: 'sources', sourceIds: [] }, nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' },
+      name: name.trim(), userinfo: { mode: 'sources', sourceIds: [] }, nodeSets: [], chains: [],
       routing: mode === 'template' ? { mode: 'bound', templateId, groupAdditions: {} } : { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } },
     }))}>{modal.pending ? '创建中…' : '创建并编辑'}</Button></ModalFooter>
   </ModalContent>;

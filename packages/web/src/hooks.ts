@@ -19,7 +19,6 @@ export type ProfileDoc = import('@sub-forge/core').RoutedProfile & {
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
   base?: import('@sub-forge/core').ProfileBase;
   migrationNotes?: string[];
-  updateIntervalSec?: number;
   userinfo?: { mode: 'sources'; sourceIds: string[] } | { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
 };
 

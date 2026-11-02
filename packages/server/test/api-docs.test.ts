@@ -177,7 +177,9 @@ describe('文档增删改查', () => {
   it('Profile 补全默认字段，模板必须存在且禁止旧预设引用', async () => {
     const { alice } = await twoUsers();
     const res = await alice.post('/api/profiles', { name: 'P', nodeSets: [] });
-    expect(res.json.item).toMatchObject({ overlay: {}, chains: [], refPolicy: { default: 'wrap' } });
+    expect(res.json.item).toMatchObject({ chains: [] });
+    expect(res.json.item).not.toHaveProperty('overlay');
+    expect(res.json.item).not.toHaveProperty('refPolicy');
     expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], template: { id: 'nope', follow: 'latest' } })).json.error).toMatch(/模板不存在/);
     expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], base: { presetId: 'nope' } })).json.error).toMatch(/不支持的基础配置字段：presetId/);
   });

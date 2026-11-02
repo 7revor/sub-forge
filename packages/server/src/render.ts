@@ -198,7 +198,7 @@ export class RenderService {
     if (!profile) return { report: pre, failure: 'Profile 不存在' };
 
     const template = profile.routing?.mode === 'independent' ? undefined : opts.template ?? profileTemplate(profile, (id, v) => this.store.getTemplate(id, v));
-    if (profile.template && !template) pre.push({ level: 'error', code: 'template.missing', message: `模板 ${profile.template.id} 不存在` });
+    if ('template' in profile && profile.template && !template) pre.push({ level: 'error', code: 'template.missing', message: `模板 ${profile.template.id} 不存在` });
 
     const owner = this.store.getWithOwner('profile', profileId)?.owner ?? opts.owner;
     const trafficRefs: NodeSetID[] = profile.userinfo?.mode === 'sources'

@@ -9,25 +9,22 @@ export function profileTemplate(profile: ProfileDoc, get: (id: string, version?:
 
 /** 不访问上游；只展开已保存的领域配置，节点与规则集仍保留引用。 */
 export function migrateProfile(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RoutedProfileDoc {
-  profile = stripProfileRevisions(profile);
+  const current = currentProfileFields(profile);
   if (profile.routing) {
-    const { template: _template, ...current } = profile;
-    return { ...current, overlay: {}, routing: profile.routing };
+    return { ...current, routing: profile.routing };
   }
   if (profile.template && !template) throw new Error(`订阅「${profile.name}」引用的模板版本缺失，迁移已中止，原配置保持不变`);
-  profile = { ...profile, overlay: profile.overlay ?? {}, nodeSets: profile.nodeSets ?? [], chains: profile.chains ?? [], refPolicy: profile.refPolicy ?? { default: 'wrap' } };
   const report = new Report();
-  const effective = mergeTemplate(template, profile.overlay, report);
+  const overlay = profile.overlay ?? {};
+  const effective = mergeTemplate(template, overlay, report);
   if (report.hasErrors) throw new Error(`订阅「${profile.name}」存在旧配置合并错误，迁移已中止：${report.items.map(i => i.message).join('；')}`);
-  const overlay = profile.overlay;
   const additions = additionsFromOverlay(overlay);
   const allowed = new Set(['groupPatches']);
   const onlyMembers = Object.entries(overlay).every(([key, value]) => allowed.has(key) || value === undefined || (Array.isArray(value) && !value.length) || (value && typeof value === 'object' && !Object.keys(value).length))
     && Object.values(overlay.groupPatches ?? {}).every(p => Object.entries(p).every(([key, value]) => key === 'addMembers' || value === undefined || key === 'memberOrder' && value === 'append' || key === 'set' && value && typeof value === 'object' && !Object.keys(value).length));
   const canBind = !!template && profile.template?.follow === 'latest' && onlyMembers && !report.items.length;
-  const { template: _template, ...rest } = profile;
   const reason = canBind ? '仅有追加成员，继续跟随模板' : profile.template?.follow !== 'latest' && profile.template ? '锁定版本已展开为独立配置' : profile.template ? '保留原有组参数、规则或私有配置，转为独立维护' : '空白订阅转为独立配置';
-  const next: RoutedProfileDoc = { ...rest, overlay: {},
+  const next: RoutedProfileDoc = { ...current,
     routing: canBind ? { mode: 'bound', templateId: template.id, groupAdditions: additions } : {
       mode: 'independent', config: routingConfig(effective),
       ...(template ? { initializedFrom: { templateId: template.id, name: template.name } } : {}),
@@ -42,10 +39,15 @@ export function independentProfile(profile: ProfileDoc, template?: Template): Ro
   const report = new Report();
   const config = routingConfig(resolveProfileRouting(profile, template, report));
   if (report.items.some(i => i.level === 'error')) throw new Error(report.items.map(i => i.message).join('；'));
-  const { template: _template, ...rest } = stripProfileRevisions(profile);
-  return { ...rest, overlay: {}, routing: { mode: 'independent', config,
+  return { ...currentProfileFields(profile), routing: { mode: 'independent', config,
     ...(template ? { initializedFrom: { templateId: template.id, ...('name' in template && typeof template.name === 'string' ? { name: template.name } : {}) } } : {}),
   } };
+}
+
+/** 保留业务字段与迁移说明，移除现用文档不再消费的历史字段。 */
+function currentProfileFields(profile: ProfileDoc) {
+  const { template: _template, overlay: _overlay, refPolicy: _refPolicy, updateIntervalSec: _interval, ...current } = stripProfileRevisions(profile);
+  return { ...current, nodeSets: current.nodeSets ?? [], chains: current.chains ?? [] };
 }
 
 /** 丢弃旧保存协议携带的并发标记。 */
