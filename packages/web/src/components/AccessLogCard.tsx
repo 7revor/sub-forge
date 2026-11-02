@@ -13,7 +13,7 @@ const SOURCES: Record<string, string> = { fresh: '新生成', cache: '缓存', '
 export function AccessLogCard() {
   const [kind, setKind] = useState('all');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const query = useQuery({
     queryKey: ['user-access-log', { kind, page, pageSize }],
     queryFn: () => api<PageResult<UserAccessLogRow>>('GET', `/access-log?${new URLSearchParams({ page: String(page), pageSize: String(pageSize), ...(kind === 'all' ? {} : { kind }) })}`),
