@@ -6,12 +6,10 @@ import { addedGroupMembers, chainSources, type GroupMember, type GroupSpec, type
 import { Plus, X, LockKeyhole, Link2, Layers, Server, Crosshair } from 'lucide-react';
 import { useNodeList } from '../../hooks.ts';
 import { useModalPresentation } from '../../modals/index.tsx';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { Popover, PopoverTrigger, PopoverContent } from '../../components/ui/popover.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { BUILTINS, memberLabel } from '../../components/pickers.tsx';
 import { Badge, Button, Empty, Segmented, Select, cx } from '../../components/ui.tsx';
-import { SearchInput } from '../../components/SearchInput.tsx';
 import { GROUP_TYPE_LABEL } from '../../components/GroupSettingsFields.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, memberKey, nodeSetKey, toggleMember } from './memberModel.ts';
@@ -25,12 +23,11 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
   const { draft, setDraft, groups, groupName, nodeSetName, profileNodeSets } = useProfile();
   const [category, setCategory] = useState<'source' | 'node' | 'group' | 'builtin'>('source');
   const [source, setSource] = useState('');
-  const [search, setSearch] = useState('');
   const output = (ref: NodeSetID) => draft.nodeSets.find(s => nodeSetKey(s.ref) === nodeSetKey(ref))?.output;
   const inline = profileNodeSets.filter(s => output(s.ref) === 'inline');
   const providers = profileNodeSets.filter(s => output(s.ref) === 'provider');
   const active = inline.find(s => nodeSetKey(s.ref) === source) ?? inline[0];
-  const nodes = useModalPresentation(useNodeList(category === 'node' ? active?.ref : undefined, useDebouncedValue(search, 200)));
+  const nodes = useModalPresentation(useNodeList(category === 'node' ? active?.ref : undefined));
   const inheritedKeys = new Set(inherited.map(memberKey));
   const selectedKeys = new Set(members.map(memberKey));
   const effective = [...inherited, ...members];
@@ -60,14 +57,13 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
         <div className="mb-2 flex items-center justify-between"><h3 className="m-0 text-sm font-medium">成员</h3>
           <Popover><PopoverTrigger asChild><Button size="sm"><Plus size={14} />添加成员</Button></PopoverTrigger>
             <PopoverContent align="end" className="w-[min(380px,calc(100vw-48px))] p-3">
-              <div className="flex flex-col gap-3"><Segmented size="sm" label="成员分类" value={category} options={[{ value: 'source', label: '节点来源' }, { value: 'node', label: '单个节点' }, { value: 'group', label: '策略组' }, { value: 'builtin', label: '内置' }]} onChange={category => { setCategory(category); setSearch(''); }} />
+              <div className="flex flex-col gap-3"><Segmented size="sm" label="成员分类" value={category} options={[{ value: 'source', label: '节点来源' }, { value: 'node', label: '单个节点' }, { value: 'group', label: '策略组' }, { value: 'builtin', label: '内置' }]} onChange={setCategory} />
                 {category === 'node' && inline.length > 0 && <Select placeholder="选择要浏览的节点来源" value={active ? nodeSetKey(active.ref) : ''} onChange={event => setSource(event.target.value)}>{inline.map(s => <option key={nodeSetKey(s.ref)} value={nodeSetKey(s.ref)}>{s.name}</option>)}</Select>}
-                <SearchInput aria-label="搜索候选成员" placeholder="搜索成员名称" value={search} onChange={event => setSearch(event.target.value)} />
                 <div className="max-h-64 overflow-y-auto">
-                  {category === 'source' && <>{candidate({ kind: 'all', scope: 'providers' }, '全部引用来源', providers.map(p => p.name).join('、'))}{candidate({ kind: 'all', scope: 'proxies' }, '全部展开节点', inline.map(p => p.name).join('、'))}{profileNodeSets.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).map(s => candidate({ kind: 'nodeset', ref: s.ref }, s.name, output(s.ref) === 'provider' ? '引用 · 自动更新' : '展开 · 可挑选节点'))}</>}
+                  {category === 'source' && <>{candidate({ kind: 'all', scope: 'providers' }, '全部引用来源', providers.map(p => p.name).join('、'))}{candidate({ kind: 'all', scope: 'proxies' }, '全部展开节点', inline.map(p => p.name).join('、'))}{profileNodeSets.map(s => candidate({ kind: 'nodeset', ref: s.ref }, s.name, output(s.ref) === 'provider' ? '引用 · 自动更新' : '展开 · 可挑选节点'))}</>}
                   {category === 'node' && <>{nodes.isLoading && <p className="text-sm text-muted-foreground">正在加载节点…</p>}{nodes.error && <p role="alert" className="text-sm text-destructive">{nodes.error.message}<Button size="sm" onClick={() => void nodes.refetch()}>重试</Button></p>}{nodes.data?.nodes.map(n => candidate(nodeMember(n.name), n.name, n.type.toUpperCase()))}{!inline.length && <Empty title="还没有展开来源" />}</>}
-                  {category === 'group' && effectiveGroups.filter(g => g.id !== group.id && g.name.toLowerCase().includes(search.toLowerCase())).map(g => candidate({ kind: 'group', groupId: g.id }, g.name, canReferenceGroup(effectiveGroups, group.id, g.id) ? GROUP_TYPE_LABEL[g.type] : '不可添加：会循环引用', !canReferenceGroup(effectiveGroups, group.id, g.id)))}
-                  {category === 'builtin' && BUILTINS.filter(n => n.toLowerCase().includes(search.toLowerCase())).map(name => candidate({ kind: 'builtin', name }, name, { DIRECT: '直连', REJECT: '拒绝', 'REJECT-DROP': '静默丢弃', PASS: '继续匹配规则' }[name]))}
+                  {category === 'group' && effectiveGroups.filter(g => g.id !== group.id).map(g => candidate({ kind: 'group', groupId: g.id }, g.name, canReferenceGroup(effectiveGroups, group.id, g.id) ? GROUP_TYPE_LABEL[g.type] : '不可添加：会循环引用', !canReferenceGroup(effectiveGroups, group.id, g.id)))}
+                  {category === 'builtin' && BUILTINS.map(name => candidate({ kind: 'builtin', name }, name, { DIRECT: '直连', REJECT: '拒绝', 'REJECT-DROP': '静默丢弃', PASS: '继续匹配规则' }[name]))}
                 </div>
                 {category === 'node' && providers.length > 0 && <div className="border-t border-border pt-3 text-xs text-muted-foreground">{providers.map(p => p.name).join('、')}为引用来源 <Button size="sm" variant="ghost" onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.map(n => n.output === 'provider' ? { ...n, output: 'inline' } : n) })}>改为展开</Button></div>}
               </div>
