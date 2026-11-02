@@ -1,4 +1,4 @@
-// 仅用于 v25 历史数据迁移，订阅运行时不进行公共字段转换。
+// 仅用于 v28 历史升级及旧种子导入，订阅运行时不进行公共字段转换。
 import type { Client, Platform } from '@sub-forge/core';
 import { Report, type ReportItem } from '@sub-forge/core';
 type Fields = Record<string, unknown>;

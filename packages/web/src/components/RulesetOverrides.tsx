@@ -35,7 +35,7 @@ export function RulesetOverrides({ value, legacySources, onChange, onRemoveLegac
       <ul className="pl-5">{s.overrides!.map((o, i) => <li key={i} className="break-all">{o.match ? `内容 ${o.match}` : `原第 ${o.line} 行`} · {o.override.when.client} · {'drop' in o.override.action ? '丢弃' : 'append' in o.override.action ? `追加 ${o.override.action.append.map(formatRuleLine).join('；')}` : `替换为 ${o.override.action.replace.map(formatRuleLine).join('；')}`}</li>)}</ul>
       <Button size="sm" onClick={() => onRemoveLegacy(s.id)}>移除该来源的旧改写</Button>
     </div>)}
-    {!value.length ? <p className="m-0 py-0.5 text-center text-xs text-muted-foreground">暂无改写，所有内核输出相同规则。</p> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => (
+    {!value.length ? <p className="m-0 py-0.5 text-center text-xs text-muted-foreground">暂无自定义改写，按目标内核自动转换。</p> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => (
       <div role="group" aria-label={`内核改写 ${i + 1}`} className="min-w-0 border-t border-border py-3">
         <ClientOverrides single allowAppend value={[item.override]} leading={handle}
           trailing={<Button size="sm" variant="ghost" aria-label={`删除内核改写 ${i + 1}`} onClick={() => onChange(value.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>}

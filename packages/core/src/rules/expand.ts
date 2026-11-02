@@ -1,10 +1,7 @@
-// 规则集展开（docs/03 §3 ④、§6）：逐个来源解析并应用组级内容改写，再按 behavior 拆分、去重。
+// 规则来源输入、标识与历史规则文本格式化；正式转换由 convertRuleDocuments 负责。
 
-import { rejectedRuleReport } from './diagnostics.ts';
-import type { Report } from '../report.ts';
 import type { ID, RuleIR, RuleSet, RuleSetSource } from '../types.ts';
-import { applyOverrides, lowerRule, composeRule, type ClientCtx } from './client.ts';
-import { behaviorOf, isYamlRuleUrl, parseRuleSourceContent, ruleKey, type Behavior } from './parse.ts';
+import { lowerRule, composeRule } from './client.ts';
 
 export type RuleSetInputs = {
   rulesets: Record<ID, RuleSet>;
@@ -17,87 +14,6 @@ export const sourceKey = (rulesetId: ID, sourceId: ID): string => `${rulesetId}/
 
 /** 来源的显示名：缺省用 URL 或「本地规则」 */
 export const sourceLabel = (src: RuleSetSource): string => src.name?.trim() || (src.kind === 'remote' ? src.url ?? '远程地址' : '本地规则');
-
-export type ExpandedSource =
-  | { binary: false; rules: RuleIR[] }
-  | { binary: true; format: 'mrs' | 'srs'; url?: string };
-
-/** 展开单个来源：解析 + 组级内容改写（兼容旧来源覆盖）。结果按 ctx 区分 */
-export function expandSource(rs: RuleSet, src: RuleSetSource, inputs: RuleSetInputs, ctx: ClientCtx, report: Report): ExpandedSource {
-  const where = `ruleset:${rs.id}`;
-  const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
-  const body = src.kind === 'local' ? src.content ?? '' : inputs.snapshots[sourceKey(rs.id, src.id)];
-  if ((src.format === 'mrs' || src.format === 'srs') && isYamlRuleUrl(src.url)) {
-    report.error('ruleset.conversion-requires-managed', `${label}的 YAML 规则只能转换为 LIST 托管，不能标记为二进制`, where);
-    return { binary: false, rules: [] };
-  }
-  const binary = (format: 'mrs' | 'srs'): ExpandedSource => (src.url ? { binary: true, format, url: src.url } : { binary: true, format });
-  if (body === undefined) {
-    if (src.format === 'mrs' || src.format === 'srs') return binary(src.format);
-    report.error('ruleset.no-snapshot', `${label}没有可用快照`, where);
-    return { binary: false, rules: [] };
-  }
-  const parsed = parseRuleSourceContent(body, src);
-  if (parsed.binary) return binary(parsed.format);
-  // 旧版本可能已经把错误页面保存为成功快照；读取时也要阻止这些内容变成空分流配置。
-  // 此处在客户端覆盖之前检查，显式 drop 所有规则仍是合法操作。
-  if (src.kind === 'remote' && !parsed.rules.length) {
-    report.error('ruleset.invalid-content', `${label}的远程快照没有可用规则，请重新拉取`, where);
-    return { binary: false, rules: [] };
-  }
-  if (parsed.rejected.length) {
-    report.items.push({ level: 'info', code: 'ruleset.rejected-lines', ...rejectedRuleReport(body, src, rs.sources.indexOf(src)), where });
-  }
-  const rules: RuleIR[] = [];
-  for (const p of parsed.rules) {
-    const group = rs.overrides?.filter((o) => !('append' in o.override.action) && o.match === p.text).map((o) => o.override) ?? [];
-    const ov = src.overrides?.filter((o) => (o.line !== undefined && o.line === p.line) || (o.match !== undefined && o.match === p.text)).map((o) => o.override);
-    rules.push(...applyOverrides(p.rule, [...group, ...(ov ?? [])], ctx));
-  }
-  return { binary: false, rules };
-}
-
-export type BinaryRuleSource = { sourceId: ID; name: string; format: 'mrs' | 'srs'; url?: string; behavior?: Behavior };
-export type RuleSetBuckets = Record<Behavior, RuleIR[]> & {
-  binary: BinaryRuleSource[];
-  /** 启用来源展开后的总条数与去重条数（界面统计用） */
-  total: number;
-  duplicates: number;
-};
-
-/**
- * 展开规则集（RS-04 / RB-03）：合并全部启用的来源，按 behavior 分桶并去重。
- * 输出顺序由调用方按 domain → classical → ipcidr 排列。
- */
-export function expandRuleSet(id: ID, inputs: RuleSetInputs, ctx: ClientCtx, report: Report): RuleSetBuckets {
-  const out: RuleSetBuckets = { domain: [], classical: [], ipcidr: [], binary: [], total: 0, duplicates: 0 };
-  const rs = inputs.rulesets[id];
-  if (!rs) { report.error('ruleset.missing', '规则集不存在', `ruleset:${id}`); return out; }
-  const seen = new Set<string>();
-  const add = (r: RuleIR) => {
-    out.total++;
-    const k = ruleKey(r, ctx.client);
-    if (seen.has(k)) { out.duplicates++; return; }
-    seen.add(k);
-    out[behaviorOf(r)].push(r);
-  };
-  for (const src of rs.sources) {
-    if (src.enabled === false) continue;
-    const ex = expandSource(rs, src, inputs, ctx, report);
-    if (ex.binary) {
-      out.binary.push({ sourceId: src.id, name: sourceLabel(src), format: ex.format, ...(ex.url ? { url: ex.url } : {}), ...(src.behavior ? { behavior: src.behavior } : {}) });
-      continue;
-    }
-    ex.rules.forEach(add);
-  }
-  // 追加作用于整个规则集，只执行一次，并沿用分桶、去重和 IP 选项。
-  for (const { override } of rs.overrides ?? []) {
-    if ('append' in override.action && override.when.client === ctx.client) {
-      override.action.append.forEach(add);
-    }
-  }
-  return out;
-}
 
 /**
  * 规则的 classical 文本（可被 parseRuleLine 读回，保留客户端专用规则）。
