@@ -15,9 +15,8 @@ export type SourceDoc = Source & { fetch?: SourceFetchOptions };
 export type RuleSetSourceDoc = RuleSetSource & { fetch?: FetchOptions };
 export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[] };
 export type TemplateDoc = Template & { name?: string };
-export type ProfileDoc = import('@sub-forge/core').Profile & {
+export type ProfileDoc = import('@sub-forge/core').RoutedProfile & {
   migration?: { reason: string; issues: import('@sub-forge/core').ReportItem[] };
-  template?: { id: string; follow: 'latest' | { pinned: number } };
   base?: import('@sub-forge/core').ProfileBase;
   migrationNotes?: string[];
   updateIntervalSec?: number;

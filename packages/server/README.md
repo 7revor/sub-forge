@@ -258,6 +258,8 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 
 新订阅保存 `routing.mode = bound | independent` 与空 `overlay`。绑定保存模板 ID、`groupAdditions`、可选的 `groupHidden`（与模板不同的隐藏状态）与可选前置规则，不需要版本号；独立保存完整 groups/rules/final，初始化来源仅作说明。旧的 template/overlay 创建请求与种子会自动转换，新模式 PUT 不允许回退为旧形状。
 
+2026-11-02：预览、模式转换和保存统一在校验入口迁移旧草稿，再校验当前 routing 及资源归属；底层 Store 写入也先迁移，详情、列表和分页只返回 RoutedProfileDoc。SQLite v29 补齐历史底层写入留下的旧订阅，保留加密原始备份、归属、更新时间、令牌及 last-good；缺少模板或合并失败时整批回滚。历史导入与迁移合并器继续保留，当前渲染不再经由编辑用覆盖层。
+
 - `POST /api/profiles/routing/convert`：`{ profile, mode, templateId?, mapping? }`。只返回 `{ item, changes }` 草稿；mapping 以旧组 ID 映射目标 ID，null 表示明确不迁移。应用后通过原 PUT 保存，后保存的内容覆盖当前内容。
 - `GET /api/profiles/migration-backup?id=ID`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；备份在库内加密，删除订阅时一并删除。
 - 模板 impact/publish 仅影响绑定订阅。组改名保留成员；删组和合并环等冲突不能强制发布。保存不因模板或订阅在检查期间更新而中断。

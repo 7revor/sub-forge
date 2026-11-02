@@ -1,31 +1,41 @@
-import { additionsFromOverlay, mergeTemplate, profileEditorOverlay, Report, routingConfig, type Overlay } from '@sub-forge/core';
-import type { ProfileDoc } from '../../hooks.ts';
+import type { GroupSpec, RoutingConfig } from '@sub-forge/core';
+import type { ProfileDoc, TemplateDoc } from '../../hooks.ts';
 
 export function boundTemplateId(p: ProfileDoc): string | undefined {
-  return p.routing?.mode === 'bound' ? p.routing.templateId : p.routing ? undefined : p.template?.id;
+  return p.routing.mode === 'bound' ? p.routing.templateId : undefined;
 }
 export function persistedProfile(p: ProfileDoc): ProfileDoc {
-  return { ...p, refPolicy: { default: 'wrap' }, ...(p.routing ? { overlay: {} } : {}) };
+  return { ...p, refPolicy: { default: 'wrap' }, overlay: {} };
 }
-export function updateEditorOverlay(p: ProfileDoc, change: (o: Overlay) => Overlay): ProfileDoc {
-  const overlay = change(profileEditorOverlay(p));
-  if (!p.routing) return { ...p, overlay };
-  if (p.routing.mode === 'independent') return { ...p, overlay: {}, routing: { ...p.routing, config: routingConfig(mergeTemplate(undefined, overlay, new Report())) } };
-  const extraGroups = (overlay.extraGroups ?? []).map(extra => extra.group);
-  const extraRules = overlay.extraRules ?? [];
-  return { ...p, overlay: {}, routing: {
-    ...p.routing,
-    groupAdditions: additionsFromOverlay(overlay),
-    ...((extraGroups.length || p.routing.extraGroups) ? { extraGroups } : {}),
-    ...(p.routing.prependGroupIds ? { prependGroupIds: p.routing.prependGroupIds.filter(id => extraGroups.some(group => group.id === id)) } : {}),
-    ...((extraRules.length || p.routing.prependRules) ? { prependRules: extraRules.filter(extra => extra.anchor === 'top').reverse().map(extra => extra.rule) } : {}),
-    ...((p.routing.appendRules || extraRules.some(extra => extra.anchor === 'bottom')) ? { appendRules: extraRules.filter(extra => extra.anchor === 'bottom').map(extra => extra.rule) } : {}),
-  } };
+
+/** 编辑器的原始组：模板成员与追加成员分开，弹窗分别展示继承项和可编辑项。 */
+export function editableProfileGroups(profile: ProfileDoc, template: TemplateDoc | undefined): (GroupSpec & { origin: 'template' | 'profile' })[] {
+  const routing = profile.routing;
+  if (routing.mode === 'independent') return routing.config.groups.map(group => ({ ...group, origin: 'profile' }));
+  return [
+    ...(template?.groups ?? []).map(group => ({ ...group, origin: 'template' as const })),
+    ...(routing.extraGroups ?? []).map(group => ({ ...group, origin: 'profile' as const })),
+  ];
 }
+
+export function withRoutingGroups(profile: ProfileDoc, config: RoutingConfig, template: TemplateDoc | undefined, templateStart?: number): ProfileDoc {
+  const routing = profile.routing;
+  if (routing.mode === 'independent') return { ...profile, routing: { ...routing, config } };
+  const extraGroups = config.groups.filter(group => !template?.groups.some(g => g.id === group.id));
+  const start = templateStart ?? (template?.groups.length ? config.groups.findIndex(g => g.id === template.groups[0]!.id) : config.groups.filter(g => routing.prependGroupIds?.includes(g.id)).length);
+  return { ...profile, routing: { ...routing, extraGroups, prependGroupIds: extraGroups.slice(0, start).map(g => g.id) } };
+}
+
+export function withRoutingRules(profile: ProfileDoc, config: RoutingConfig, template: TemplateDoc | undefined, templateStart?: number): ProfileDoc {
+  const routing = profile.routing;
+  if (routing.mode === 'independent') return { ...profile, routing: { ...routing, config } };
+  const custom = config.rules.filter(rule => !template?.rules.some(r => r.id === rule.id));
+  const start = templateStart ?? (template?.rules.length ? config.rules.findIndex(r => r.id === template.rules[0]!.id) : custom.filter(r => routing.prependRules?.some(p => p.id === r.id)).length);
+  return { ...profile, routing: { ...routing, prependRules: custom.slice(0, start), appendRules: custom.slice(start) } };
+}
+
 export function modeLabel(p: ProfileDoc, name?: string): string {
-  if (p.routing?.mode === 'bound') return `绑定模板 · ${name ?? p.routing.templateId}`;
-  if (p.routing?.mode === 'independent') return '独立配置';
-  return p.template ? '旧配置' : '独立配置';
+  return p.routing.mode === 'bound' ? `绑定模板 · ${name ?? p.routing.templateId}` : '独立配置';
 }
 
 /** 后台重新获取不能覆盖未保存的转换或编辑；订阅切换时才重建草稿。 */

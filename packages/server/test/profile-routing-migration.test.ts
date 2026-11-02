@@ -38,7 +38,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       { ...base('blank', { extraGroups: [{ group: { id: 'mine', name: '自己的组', type: 'select', members: [node] } }] }), template: undefined },
       base('orphan', { groupPatches: { missing: { addMembers: [node] } }, extraRules: [{ anchor: { before: 'gone' }, rule: { ...template.rules[0]!, id: 'orphan-rule' } }] }),
     ];
-    profiles.forEach(p => { store.put('profile', p, 'owner'); issueProfileToken(store, { token: `${p.id}-secret-token`, profileId: p.id }); });
+    profiles.forEach(p => { store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(p.id, 'owner', cipher.encrypt(JSON.stringify(p)), 1234); issueProfileToken(store, { token: `${p.id}-secret-token`, profileId: p.id }); });
     const renderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }), { publicUrl: 'https://test.local' });
     const before = new Map<string, string>();
     for (const p of profiles) {
@@ -49,7 +49,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(28);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(29);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();
@@ -80,19 +80,20 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
   } finally { store.close(); rmSync(dir, { recursive: true }); }
 });
 
-it('模板版本缺失时整批回滚，数据库版本、原配置及链接保持不变', () => {
+it.each([15, 28])('v%i 模板版本缺失时整批回滚，数据库版本、原配置及链接保持不变', version => {
   const dir = mkdtempSync(join(tmpdir(), 'sf-modes-rollback-'));
   const file = join(dir, 'test.sqlite'); const cipher = new Cipher(randomBytes(32));
   const store = new Store(file, { cipher });
   const valid = { ...base('a-valid', {}), template: undefined };
   const missing = base('z-missing', {});
-  store.put('profile', valid); store.put('profile', missing); issueProfileToken(store, { token: 'keep', profileId: missing.id });
-  store.db.pragma('user_version = 15'); store.close();
+  for (const p of [valid, missing]) store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,NULL,?,?)").run(p.id, cipher.encrypt(JSON.stringify(p)), 1234);
+  issueProfileToken(store, { token: 'keep', profileId: missing.id });
+  store.db.pragma(`user_version = ${version}`); store.close();
   try {
     expect(() => new Store(file, { cipher })).toThrow('模板版本缺失');
     const raw = new Database(file);
     try {
-      expect(raw.pragma('user_version', { simple: true })).toBe(15);
+      expect(raw.pragma('user_version', { simple: true })).toBe(version);
       expect(JSON.parse(cipher.decrypt((raw.prepare("SELECT data FROM docs WHERE id = 'a-valid'").get() as any).data))).toEqual(JSON.parse(JSON.stringify(valid)));
       expect(raw.prepare('SELECT COUNT(*) n FROM profile_migration_backups').get()).toEqual({ n: 0 });
       expect(raw.prepare('SELECT COUNT(*) n FROM user_tokens').get()).toEqual({ n: 1 });

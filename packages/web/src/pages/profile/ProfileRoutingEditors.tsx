@@ -13,21 +13,14 @@ import { useProfile } from './context.ts';
 import { Frame } from '../../modals/Frame.tsx';
 import { removeIndependentGroup } from './providerGroup.ts';
 import { ProfileGroupDialog } from './ProfileGroupDialog.tsx';
+import { withRoutingGroups, withRoutingRules } from './routing.ts';
 
 function useRoutingBody() {
   const { draft, setDraft, template } = useProfile();
   const routing = draft.routing;
-  const bound = routing?.mode === 'bound';
-  const base: TemplateBody = template ?? { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } };
-  const body: TemplateBody = routing?.mode === 'independent' ? routing.config : routing?.mode === 'bound' ? routingConfig(resolveProfileRouting(draft, template, new Report())) : base;
-  const update = (config: TemplateBody, templateStart?: number) => {
-    if (routing?.mode === 'independent') setDraft({ ...draft, routing: { ...routing, config } });
-    else if (routing?.mode === 'bound') {
-      const extraGroups = config.groups.filter(group => !template?.groups.some(g => g.id === group.id));
-      const start = templateStart ?? (template?.groups.length ? config.groups.findIndex(g => g.id === template.groups[0]!.id) : config.groups.filter(g => routing.prependGroupIds?.includes(g.id)).length);
-      setDraft({ ...draft, routing: { ...routing, extraGroups, prependGroupIds: extraGroups.slice(0, start).map(g => g.id) } });
-    }
-  };
+  const bound = routing.mode === 'bound';
+  const body: TemplateBody = routing.mode === 'independent' ? routing.config : routingConfig(resolveProfileRouting(draft, template, new Report()));
+  const update = (config: TemplateBody, templateStart?: number) => setDraft(withRoutingGroups(draft, config, template, templateStart));
   return { body, update, bound };
 }
 
@@ -59,15 +52,10 @@ export function ProfileGroupsEditor() {
 
 export function ProfileRulesEditor() {
   const { draft, setDraft, template, groupOptions, profileNodeSets } = useProfile();
-  const { body, update, bound } = useRoutingBody();
+  const { body, bound } = useRoutingBody();
   const rulesets = useRuleSetRefs();
   const props = { ctx: { rulesets: rulesets.data ?? [] }, onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, extendedOptions: true };
-  const changeRules = (next: TemplateBody, templateStart?: number) => {
-    if (draft.routing?.mode !== 'bound') { update(next); return; }
-    const custom = next.rules.filter(rule => !template?.rules.some(r => r.id === rule.id));
-    const start = templateStart ?? (template?.rules.length ? next.rules.findIndex(r => r.id === template.rules[0]!.id) : custom.filter(r => draft.routing?.mode === 'bound' && draft.routing.prependRules?.some(p => p.id === r.id)).length);
-    setDraft({ ...draft, routing: { ...draft.routing, prependRules: custom.slice(0, start), appendRules: custom.slice(start) } });
-  };
+  const changeRules = (next: TemplateBody, templateStart?: number) => setDraft(withRoutingRules(draft, next, template, templateStart));
   return <>
     <ErrorAlert error={rulesets.error} />
     <TemplateRulesEditor {...props} value={body} onChange={changeRules} report={draftIssues(body)} title="规则"

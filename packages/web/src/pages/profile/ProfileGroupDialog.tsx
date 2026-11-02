@@ -4,7 +4,7 @@ import type { ProfileDoc } from '../../hooks.ts';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { groupPlaceholders } from '../../schemas/placeholders.ts';
 import { compileUserRegex, type GroupSpec } from '@sub-forge/core';
-import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
+import { createModal, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
 import { GROUP_TYPE_LABEL, GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { Button, Field, Input, Select } from '../../components/ui.tsx';
@@ -16,7 +16,7 @@ import { GroupMemberPicker } from './GroupMemberPicker.tsx';
 export const ProfileGroupDialog = createModal<ProfileModalData & { groupId: string }, ProfileDoc>(function ProfileGroup({ data, modal }) {
   const { groupId } = data;
   const { working, setWorking, ctx } = useModalProfile(data);
-  const routing = working.routing!;
+  const routing = working.routing;
   const group = ctx?.groups.find(g => g.id === groupId);
   const bound = routing.mode === 'bound' && group?.origin === 'template';
   if (!ctx || !group) throw new Error('策略组不存在，请重新打开');
