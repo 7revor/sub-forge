@@ -18,7 +18,7 @@ let store = new Store(database, { cipher });
 const user = store.createUser({ username: 'mode-admin', passwordHash: await hashPassword('mode-test-2026'), role: 'admin' });
 store.put('local', { id: 'nodes', name: '验收节点', proxies: [{ name: '香港节点 A', type: 'socks5', server: 'node-a.example.test', port: 1080 }, { name: '香港节点 B', type: 'socks5', server: 'node-b.example.test', port: 1080 }] }, user.id);
 store.put('ruleset', { id: 'rules', name: '验收规则集', sources: [{ id: 'rules-src', kind: 'local', format: 'auto', content: 'DOMAIN,example.test' }] }, user.id);
-store.putTemplateVersion({ id: 'mode-template', name: '模式验收模板', version: 1, groups: [
+store.putTemplate({ id: 'mode-template', name: '模式验收模板', version: 1, groups: [
   { id: 'hk', name: '香港', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] },
   { id: 'auto', name: '自动', type: 'url-test', members: [{ kind: 'group', groupId: 'hk' }], test: { url: 'https://www.gstatic.com/generate_204', interval: 300 } },
 ], rules: [{ id: 'rule', matcher: { kind: 'ruleset', id: 'rules' }, target: { kind: 'group', groupId: 'hk' } }], final: { kind: 'group', groupId: 'auto' } });

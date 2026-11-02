@@ -58,7 +58,12 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 30;
+const SCHEMA_VERSION = 31;
+
+const LEGACY_TEMPLATE_SCHEMA = `CREATE TABLE IF NOT EXISTS template_versions (
+  template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL,
+  PRIMARY KEY (template_id, version)
+);`;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS native_migration_backups (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
@@ -85,9 +90,8 @@ CREATE INDEX IF NOT EXISTS docs_owner ON docs (kind, owner);
 CREATE TABLE IF NOT EXISTS profile_migration_backups (
   profile_id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS template_versions (
-  template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL,
-  PRIMARY KEY (template_id, version)
+CREATE TABLE IF NOT EXISTS templates (
+  id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,6 +156,8 @@ export class Store {
     this.db.pragma('secure_delete = ON');
     try { this.migrate(); } catch (e) { this.db.close(); throw e; }
   }
+
+  private legacyTemplateMode = false;
 
   configurationRevision = 0;
   readonly listeners = new Set<() => void>();
@@ -260,7 +266,7 @@ export class Store {
         if (template) walk(template, `profile:${row.id}`);
       }
     }
-    this.listLatestTemplates().forEach(t => walk(t, `template:${t.id}`));
+    this.listTemplates().forEach(t => walk(t, `template:${t.id}`));
     this.listSharedRules<unknown>().forEach(r => walk(r.data));
     for (const row of this.db.prepare('SELECT * FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
       // 仓库正文由索引缓存维护，其生命周期不取决于配置订阅。
@@ -303,6 +309,8 @@ export class Store {
         this.db.exec('DROP INDEX IF EXISTS snapshots_owner');
       }
       this.db.exec(SCHEMA);
+      this.db.exec(LEGACY_TEMPLATE_SCHEMA);
+      this.db.exec('INSERT OR IGNORE INTO template_versions SELECT id, 1, data, updated_at FROM templates');
       // 已退役表仅在旧凭据迁移期间使用，不能由当前建表脚本重建。
       if (version < 23) this.db.exec(`CREATE TABLE IF NOT EXISTS sub_tokens (
   token_hash TEXT PRIMARY KEY, token_enc TEXT NOT NULL, profile_id TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL
@@ -435,9 +443,11 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         }
         this.db.exec('DROP TABLE IF EXISTS sub_tokens');
       }
+      this.finishTemplateMigration();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
-    tx();
+    this.legacyTemplateMode = true;
+    try { tx(); } finally { this.legacyTemplateMode = false; }
     // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
     if (version < 23) this.db.pragma('wal_checkpoint(TRUNCATE)');
     if (hadSnapshots && version < 3) {
@@ -768,45 +778,54 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     return removed;
   }
 
-  // ---------- 当前模板（沿用旧表结构；版本列仅兼容旧数据迁移，新写入固定为 1） ----------
+  // ---------- 当前模板 ----------
 
-  putTemplateVersion(t: TemplateVersionDoc): void {
-    this.configurationRevision++;
+  putTemplate(t: TemplateVersionDoc): void {
     const { changelog: _changelog, version: _version, ...current } = t;
-    this.db.transaction(() => {
-      this.db.prepare('DELETE FROM template_versions WHERE template_id = ?').run(t.id);
-      this.db.prepare('INSERT INTO template_versions (template_id, version, data, created_at) VALUES (?, ?, ?, ?)')
-        .run(t.id, 1, JSON.stringify(current), this.now());
-    })();
+    this.db.prepare('INSERT INTO templates (id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
+      .run(t.id, JSON.stringify(current), this.now());
+    this.configurationRevision++;
     for (const profile of this.list('profile')) {
-      if (profileTemplate(profile, (id, version) => this.getTemplate(id, version))?.id === t.id) this.prunePrivateRules(profile.id);
+      if (profile.routing.mode === 'bound' && profile.routing.templateId === t.id) this.prunePrivateRules(profile.id);
     }
     this.pruneResourceBindings();
     this.changed();
   }
 
-  /** 正常读取当前模板；version 参数仅供旧数据迁移时解析历史引用。 */
+  /** version 只在历史数据库或旧种子迁移期间有效。 */
   getTemplate(id: string, version?: number): TemplateVersionDoc | undefined {
+    if (!this.legacyTemplateMode) {
+      if (version !== undefined) return undefined;
+      const row = this.db.prepare('SELECT data FROM templates WHERE id = ?').get(id) as { data: string } | undefined;
+      return row ? JSON.parse(row.data) : undefined;
+    }
     const row = (version === undefined
       ? this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? ORDER BY version DESC LIMIT 1').get(id)
       : this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? AND version = ?').get(id, version)) as { data: string } | undefined;
     const template = row ? JSON.parse(row.data) as TemplateVersionDoc : undefined;
-    // 只有尚未迁移的旧记录含有版本号，固定存储键不代表可读取的历史版本。
     return version === undefined || template?.version === version ? template : undefined;
   }
 
-  /** 每个模板的最新版本 */
-  listLatestTemplates(): TemplateVersionDoc[] {
-    const rows = this.db.prepare(`SELECT t.data FROM template_versions t
+  private templateQuery(): string {
+    if (!this.legacyTemplateMode) return 'SELECT data FROM templates ORDER BY id';
+    return `SELECT t.data FROM template_versions t
       JOIN (SELECT template_id, MAX(version) v FROM template_versions GROUP BY template_id) m ON m.template_id = t.template_id AND m.v = t.version
-      ORDER BY t.template_id`).all() as { data: string }[];
-    return rows.map((r) => JSON.parse(r.data) as TemplateVersionDoc);
+      ORDER BY t.template_id`;
   }
 
-  listLatestTemplatesPage(options: PageOptions): PageResult<TemplateVersionDoc> {
-    return this.readPage(`SELECT t.data FROM template_versions t
-      JOIN (SELECT template_id, MAX(version) v FROM template_versions GROUP BY template_id) m ON m.template_id = t.template_id AND m.v = t.version
-      ORDER BY t.template_id`, [], options, data => JSON.parse(data) as TemplateVersionDoc);
+  listTemplates(): TemplateVersionDoc[] {
+    return (this.db.prepare(this.templateQuery()).all() as { data: string }[]).map(row => JSON.parse(row.data));
+  }
+
+  listTemplatesPage(options: PageOptions): PageResult<TemplateVersionDoc> {
+    return this.readPage(this.templateQuery(), [], options, data => JSON.parse(data) as TemplateVersionDoc);
+  }
+
+  /** 历史版本已由订阅迁移器展开，活动表只留下当前模板；同一事务内完成。 */
+  private finishTemplateMigration(): void {
+    this.db.exec(`INSERT OR REPLACE INTO templates (id, data, updated_at)
+      SELECT template_id, json_remove(data, '$.version', '$.changelog'), created_at FROM template_versions;
+      DROP TABLE template_versions`);
   }
 
   // ---------- 用户资源 token ----------
@@ -1082,6 +1101,8 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
   /** owner：有归属的文档写入到该用户名下（缺省为无归属） */
   importSeed(seed: Seed, owner: string | null = null): void {
     const tx = this.db.transaction(() => {
+      this.db.exec(LEGACY_TEMPLATE_SCHEMA.replace('CREATE TABLE', 'CREATE TEMP TABLE'));
+      this.db.exec('INSERT INTO template_versions SELECT id, 1, data, updated_at FROM templates');
       for (const d of seed.sources ?? []) this.put('source', d, owner);
       for (const d of seed.collections ?? []) this.put('collection', d, owner);
       for (const d of seed.locals ?? []) this.put('local', d, owner);
@@ -1117,7 +1138,9 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.collapseTemplateHistory();
       this.removeConcurrencyMarkers();
       this.migrateNativeConfigs();
+      this.finishTemplateMigration();
     });
-    tx();
+    this.legacyTemplateMode = true;
+    try { tx(); } finally { this.legacyTemplateMode = false; }
   }
 }

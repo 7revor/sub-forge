@@ -27,8 +27,8 @@ describe('no-resolve 以内容为准', () => {
     let store = new Store(file, { cipher, now: () => 1234 });
     try {
       store.put('ruleset', { id: 'rs', name: '规则增强', noResolve: true, sources: [source] }, 'owner');
-      store.putTemplateVersion({ id: 't', name: '模板', version: 1, ...config });
-      store.putTemplateVersion({ id: 't', name: '模板', version: 2, ...config });
+      store.putTemplate({ id: 't', name: '模板', version: 1, ...config });
+      store.putTemplate({ id: 't', name: '模板', version: 2, ...config });
       const base = { name: '订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' as const } };
       store.put('profile', { ...base, id: 'bound', routing: { mode: 'bound', templateId: 't', groupAdditions: {}, prependRules: rules } }, 'owner');
       store.put('profile', { ...base, id: 'independent', routing: { mode: 'independent', config } }, 'owner');
@@ -37,10 +37,10 @@ describe('no-resolve 以内容为准', () => {
       const historical = { rulesets: { 'old.list': 'IP-CIDR,198.51.100.0/24,no-resolve\n' } };
       store.putLastGood('bound', 'mihomo', historical);
       store.db.pragma('user_version = 17'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(30);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(31);
       expect(store.getWithOwner('ruleset', 'rs')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { sources: [source] } });
       expect(store.get('ruleset', 'rs')).not.toHaveProperty('noResolve');
-      expect(store.listLatestTemplates()).toHaveLength(1);
+      expect(store.listTemplates()).toHaveLength(1);
       expect(store.getTemplate('t')).not.toHaveProperty('version');
       expect(store.getTemplate('t')!.rules).toEqual(cleaned);
       expect(store.get('profile', 'bound')!.routing).toMatchObject({ prependRules: cleaned });
@@ -49,9 +49,9 @@ describe('no-resolve 以内容为准', () => {
       expect(store.getWithOwner('profile', 'bound')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
       expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'bound')?.owner);
       expect(store.getLastGood('bound', 'mihomo')).toBeUndefined();
-      const snapshot = [store.list('profile'), store.list('ruleset'), store.listLatestTemplates()];
+      const snapshot = [store.list('profile'), store.list('ruleset'), store.listTemplates()];
       store.close(); store = new Store(file, { cipher });
-      expect([store.list('profile'), store.list('ruleset'), store.listLatestTemplates()]).toEqual(snapshot);
+      expect([store.list('profile'), store.list('ruleset'), store.listTemplates()]).toEqual(snapshot);
     } finally { store.close(); rmSync(dir, { recursive: true }); }
   });
 

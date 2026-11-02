@@ -42,14 +42,14 @@ describe('模板自身的规则可用性检查', () => {
     const publish = await h.admin.post('/api/templates/new/publish', { ...h.template, force: true });
     expect(publish.status).toBe(400);
     expect(h.calls.length).toBeGreaterThan(0);
-    expect(h.store.listLatestTemplates()).toEqual([]);
+    expect(h.store.listTemplates()).toEqual([]);
     expect(h.store.list('profile')).toEqual([]);
   });
 
   it.each(['<html>错误页面</html>', 'UNKNOWN,value'])('远程返回不可解析内容 %s 时禁止发布', async body => {
     const h = await setup(); h.respond(body);
     expect((await h.admin.post('/api/templates/new/publish', h.template)).status).toBe(400);
-    expect(h.store.listLatestTemplates()).toEqual([]);
+    expect(h.store.listTemplates()).toEqual([]);
   });
 
   it('本地来源同样检查，输出具体规则集与来源', async () => {
@@ -70,7 +70,7 @@ describe('模板自身的规则可用性检查', () => {
     const impact = await h.admin.post(`/api/templates/${id}/impact`, h.template);
     expect(impact.json.report).toContainEqual(expect.objectContaining({ level: 'error' }));
     expect((await h.admin.post(`/api/templates/${id}/publish`, { ...h.template, force: true })).status).toBe(400);
-    expect(h.store.listLatestTemplates().filter(t => t.id === id)).toEqual([first.json.item]);
+    expect(h.store.listTemplates().filter(t => t.id === id)).toEqual([first.json.item]);
   });
 
   it('远程暂时失败但有可用快照时允许发布并告警', async () => {

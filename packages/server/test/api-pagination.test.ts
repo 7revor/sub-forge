@@ -70,10 +70,10 @@ describe('列表分页', () => {
     const { store, admin, other } = await setup();
     try {
       const base = { version: 1, groups: [], rules: [], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
-      store.putTemplateVersion({ ...base, id: 'a', name: '旧名称' });
-      store.putTemplateVersion({ ...base, id: 'a', version: 2, name: '最新 Alpha' });
-      store.putTemplateVersion({ ...base, id: 'b', name: 'Beta' });
-      store.putTemplateVersion({ ...base, id: 'legacy-id' });
+      store.putTemplate({ ...base, id: 'a', name: '旧名称' });
+      store.putTemplate({ ...base, id: 'a', version: 2, name: '最新 Alpha' });
+      store.putTemplate({ ...base, id: 'b', name: 'Beta' });
+      store.putTemplate({ ...base, id: 'legacy-id' });
       const first = (await other.get('/api/templates?pageSize=1')).json;
       expect(first).toMatchObject({ total: 3, page: 1, pageSize: 1, totalPages: 3, items: [{ id: 'a', name: '最新 Alpha' }] });
       expect((await admin.get('/api/templates?page=2&pageSize=1')).json.items[0].id).toBe('b');

@@ -24,7 +24,7 @@ env.store.put('ruleset', { id: 'preview-enhanced', name: '预览增强集合', s
 const rules = [repository, remote, { kind: 'ruleset' as const, id: 'preview-enhanced' }, local]
   .map((matcher, i) => ({ id: `preview-${i}`, matcher, target: direct }));
 const config = { groups: [], rules, final: direct };
-env.store.putTemplateVersion({ id: 'preview-template', name: '源文件预览模板', version: 1, ...config });
+env.store.putTemplate({ id: 'preview-template', name: '源文件预览模板', version: 1, ...config });
 for (const bound of [false, true]) env.store.put('profile', {
   id: bound ? 'preview-bound' : 'preview-profile', name: bound ? '跟随模板预览' : '独立订阅预览', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' },
   routing: bound ? { mode: 'bound', templateId: 'preview-template', groupAdditions: {} } : { mode: 'independent', config },

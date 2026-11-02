@@ -32,7 +32,7 @@ function harness(store = new Store(':memory:')) {
 function seed(store: Store) {
   store.put('source', { id: 's', name: 'S', url: 'https://example.test/source', pipeline: [] });
   store.put('ruleset', { id: 'rs', name: 'R', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://example.test/rules' }] });
-  store.putTemplateVersion(template());
+  store.putTemplate(template());
   store.put('profile', structuredClone(profile));
   issueProfileToken(store, { token: 'token', profileId: 'p' });
 }
@@ -42,7 +42,7 @@ describe('订阅资源按当前配置独立刷新', () => {
     const h = harness(); seed(h.store);
     const oldMain = await h.main('?platform=macos');
     const oldUrls = urls(oldMain);
-    h.store.putTemplateVersion(template(2, '新前置'));
+    h.store.putTemplate(template(2, '新前置'));
     expect(parse(await (await h.get(oldUrls.provider)).text()).proxies[0]['dialer-proxy']).toBe('新前置');
     const newMain = await h.main('?platform=macos');
     const newUrls = urls(newMain);
@@ -63,7 +63,7 @@ describe('订阅资源按当前配置独立刷新', () => {
     h.store.put('profile', independentProfile(h.store.get('profile', 'p')!, h.store.getTemplate('t')));
     const before = await h.main();
     expect(before['proxy-groups'][0].name).toBe('旧前置');
-    h.store.putTemplateVersion(template(2, '新前置'));
+    h.store.putTemplate(template(2, '新前置'));
     expect(await h.main()).toEqual(before);
   });
 
@@ -96,7 +96,7 @@ describe('订阅资源按当前配置独立刷新', () => {
     h.bodies.source += '  - { name: 新落地, type: socks5, server: new.test, port: 1080 }\n'; h.advance();
     await h.get(old.provider); await h.snapshots.settled();
     expect(parse(await (await h.get(old.provider)).text()).proxies.map((n: any) => n['dialer-proxy'])).toEqual(['旧前置', '旧前置']);
-    h.store.putTemplateVersion(template(2, '新前置'));
+    h.store.putTemplate(template(2, '新前置'));
     const current = urls(await h.main());
     expect(current.provider).toBe(old.provider);
     expect(parse(await (await h.get(old.provider)).text()).proxies[0]['dialer-proxy']).toBe('新前置');
@@ -118,7 +118,7 @@ describe('订阅资源按当前配置独立刷新', () => {
   it('多次修改配置仍通过同一地址返回当前内容，不保存历史版本', async () => {
     const h = harness(); seed(h.store);
     const old = urls(await h.main());
-    for (let v = 2; v <= 34; v++) { h.store.putTemplateVersion(template(v, `前置 ${v}`)); await h.main(); }
+    for (let v = 2; v <= 34; v++) { h.store.putTemplate(template(v, `前置 ${v}`)); await h.main(); }
     expect(parse(await (await h.get(old.provider)).text()).proxies[0]['dialer-proxy']).toBe('前置 34');
     expect(h.store.db.prepare("SELECT name FROM sqlite_master WHERE name='render_generations'").get()).toBeUndefined();
     expect((await h.get(urls(await h.main()).provider)).status).toBe(200);
@@ -129,7 +129,7 @@ describe('订阅资源按当前配置独立刷新', () => {
     const first = await h.main();
     h.store.put('profile', { ...profile, name: '临时名称' }); await h.main();
     h.store.put('profile', structuredClone(profile)); expect(await h.main()).toEqual(first);
-    h.store.putTemplateVersion({ ...template(2), final: { kind: 'group', groupId: 'missing' } });
+    h.store.putTemplate({ ...template(2), final: { kind: 'group', groupId: 'missing' } });
     expect(await h.main()).toEqual(first);
     expect((await h.get(urls(first).provider)).status).toBe(200);
     expect((await h.get(urls(first).ruleset)).status).toBe(200);
@@ -142,7 +142,7 @@ describe('订阅资源按当前配置独立刷新', () => {
     try {
       const first = harness(store); seed(store);
       const old = urls(await first.main());
-      store.putTemplateVersion(template(2, '新前置')); await first.main();
+      store.putTemplate(template(2, '新前置')); await first.main();
       expect(JSON.stringify(store.db.prepare('SELECT * FROM last_good').all())).not.toContain('node.test');
       store.close(); store = new Store(file, { cipher });
       const restarted = harness(store);
@@ -166,14 +166,14 @@ it('专属规则无版本参数，订阅名称变化后原地址仍取得更新�
   const h = harness(); seed(h.store);
   try {
     const current = template();
-    h.store.putTemplateVersion({ ...current, rules: [{ ...current.rules[0]!, matcher: remoteRuleMatcher('https://example.test/rules') }] });
+    h.store.putTemplate({ ...current, rules: [{ ...current.rules[0]!, matcher: remoteRuleMatcher('https://example.test/rules') }] });
     const config = await h.main();
     const url = Object.values<{ url: string }>(config['rule-providers'])[0]!.url;
     expect(Object.fromEntries(new URL(url).searchParams)).toEqual({ profile: 'p', key: expect.any(String), target: 'mihomo', token: 'token' });
     h.store.put('profile', { ...h.store.get('profile', 'p')!, name: '新名称' });
     h.bodies.rules = 'DOMAIN,updated.example.test'; h.advance();
     expect(await (await h.get(url)).text()).toBe('DOMAIN,updated.example.test\n');
-    h.store.putTemplateVersion({ ...current, rules: [] });
+    h.store.putTemplate({ ...current, rules: [] });
     expect((await h.get(url)).status).toBe(404);
   } finally { await h.snapshots.settled(); h.store.close(); }
 });
@@ -206,7 +206,7 @@ it('v26 升级删除结构版本与旧渲染缓存，保留配置、令牌和上
     store.db.prepare('INSERT INTO render_generations VALUES (?, ?, ?, ?, ?)').run('p', 'mihomo:any', 'old', 1, cipher.encrypt(JSON.stringify(legacy)));
     store.db.pragma('user_version = 26'); store.close();
     store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(30);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(31);
     expect(store.db.prepare("SELECT name FROM sqlite_master WHERE name='render_generations'").get()).toBeUndefined();
     expect(store.getLastGood('p', 'mihomo:any')).toBeUndefined();
     expect(store.getWithOwner('profile', 'p')).toEqual(saved);

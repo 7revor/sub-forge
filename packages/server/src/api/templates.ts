@@ -110,7 +110,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
       return c.json({ item: t });
     }
     const options = readPagination(c.req.query());
-    return c.json(options ? store.listLatestTemplatesPage(options) : { items: store.listLatestTemplates() });
+    return c.json(options ? store.listTemplatesPage(options) : { items: store.listTemplates() });
   });
 
   /** 编辑器即时校验（TPL-11）：只做模板自身检查 */
@@ -134,7 +134,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     const blocking = impact.filter((i) => i.level === 'error');
     if (blocking.some(i => store.get('profile', i.profileId)?.routing?.mode === 'bound')) throw new HttpError(409, '绑定订阅存在冲突，必须先修复成员或引用，不能强制保存', { report: own, impact });
     if (blocking.length) throw new HttpError(409, `${blocking.length} 个配置订阅存在冲突，请修复后再保存`, { report: own, impact });
-    store.putTemplateVersion(draft);
+    store.putTemplate(draft);
     return c.json({ item: draft, report: own, impact }, isNew ? 201 : 200);
   };
   app.post('/templates', requireAdmin, c => save(c, true));

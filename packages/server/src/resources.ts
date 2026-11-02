@@ -79,7 +79,7 @@ export class ResourceService {
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
-      ...this.store.listLatestTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
+      ...this.store.listTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
     ]);
   }
   private async each(resources:Resource[],read:(r:Resource,index:number)=>Promise<void>) {

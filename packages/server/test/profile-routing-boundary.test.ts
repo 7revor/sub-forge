@@ -17,7 +17,7 @@ describe('订阅 routing 边界', () => {
   it('底层写入先迁移；详情、列表及分页只返回 routing，原始备份不会被后续保存覆盖', () => {
     const store = new Store(':memory:');
     try {
-      store.putTemplateVersion(template);
+      store.putTemplate(template);
       const old = legacy('p');
       store.put('profile', old, 'owner');
       const current = store.get('profile', 'p')!;
@@ -44,14 +44,14 @@ describe('订阅 routing 边界', () => {
     let store = new Store(file, { cipher });
     const old = legacy('p');
     try {
-      store.putTemplateVersion(template);
+      store.putTemplate(template);
       const user = store.createUser({ username: 'fixture', passwordHash: 'fixture-only', role: 'user' });
       store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(old.id, user.id, cipher.encrypt(JSON.stringify(old)), 1234);
       store.putToken({ token: 'fixture-routing-token', userId: user.id });
       store.putLastGood('p', 'mihomo:any', { yaml: '保留成功结果' });
       store.db.pragma('user_version = 28');
       const plan = await profileMigrationPlan(file, cipher);
-      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 30, profiles: [{ id: 'p', mode: 'bound' }] });
+      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 31, profiles: [{ id: 'p', mode: 'bound' }] });
       expect(store.get('profile', 'p')!.routing).toBeUndefined();
       expect(store.getProfileMigrationBackup('p')).toBeUndefined();
       store.close(); store = new Store(file, { cipher });
@@ -71,7 +71,7 @@ describe('订阅 routing 边界', () => {
     try {
       const alice = await addUser(env.store, 'alice');
       const bob = await addUser(env.store, 'bob');
-      env.store.putTemplateVersion(template);
+      env.store.putTemplate(template);
       env.store.put('local', { id: 'foreign', name: '别人的节点', proxies: [] }, bob.id);
       const api = client(env.app); await api.login('alice');
       const old = { ...legacy(''), overlay: { groupPatches: { g: { addMembers: [{ kind: 'nodeset', ref: { type: 'local', id: 'foreign' } }] } } } };

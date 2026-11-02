@@ -26,7 +26,7 @@ describe('Store', () => {
     expect(s.getTemplate('std')!.name).toBe('模板3');
     expect(s.getTemplate('std')).not.toHaveProperty('version');
     expect(s.getTemplate('std', 2)).toBeUndefined();
-    expect(s.db.prepare('SELECT COUNT(*) n FROM template_versions').get()).toEqual({ n: 1 });
+    expect(s.db.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({ n: 1 });
     expect(s.getTemplate('std', 9)).toBeUndefined();
     s.importSeed({ templates: [{ id: 'std', name: '无版本的新内容', groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } }] });
     expect(s.getTemplate('std')!.name).toBe('无版本的新内容');
@@ -196,7 +196,7 @@ describe('加密与迁移', () => {
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(30);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(31);
     expect(s.get('local', 'self')!.proxies.map((p) => Object.keys(p).filter((k) => k.includes('dialer') || k.includes('underlying')))).toEqual([[], [], []]);
     expect(s.get('profile', 'direct')!.chains).toEqual([{ id: expect.stringMatching(/^c_/), landing: { nodeSet: { type: 'local', id: 'self' }, filter: '^SG \\(1\\)$' }, via }]);
     expect(s.get('profile', 'via-col')!.chains).toEqual([]);
@@ -224,12 +224,12 @@ describe('加密与迁移', () => {
     const chain = { id: 'existing', landing: { nodeSet: { type: 'local' as const, id: 'self' }, filter: '^SG$' }, via };
     old.put('local', { id: 'self', name: '自建', proxies: [{ name: 'SG', type: 'trojan', server: 'sg.test', port: 443, password: 'p', ...(version < 6 ? { dialer: via } : {}) }] }, 'u2');
     old.put('profile', { id: 'p', name: 'P', nodeSets: [{ ref: { type: 'local', id: 'self' }, output: 'inline' }], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'x', matcher: { kind: 'bundle', id: 'own' } as never, target: { kind: 'builtin', name: 'DIRECT' } } }] }, chains: version < 6 ? [] : [chain], refPolicy: { default: 'wrap' } }, 'u2');
-    old.putTemplateVersion({ ...T(1), rules: [{ id: 'f', matcher: { kind: 'bundle', id: 'fin' } as never, target: { kind: 'builtin', name: 'DIRECT' } }] });
+    old.putTemplate({ ...T(1), rules: [{ id: 'f', matcher: { kind: 'bundle', id: 'fin' } as never, target: { kind: 'builtin', name: 'DIRECT' } }] });
     old.db.pragma(`user_version = ${version}`);
     old.close();
 
     const s = new Store(file, { cipher });
-    expect(s.db.pragma('user_version', { simple: true })).toBe(30);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(31);
     expect(s.get('ruleset', 'tg')).toEqual({ id: 'tg', name: 'Telegram', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list' }] });
     expect(s.get('ruleset', 'own')).toEqual({ id: 'own', name: '自定', sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [{ match: 'DOMAIN,a.test', override: overrides[0]!.override }] });
     expect(s.getWithOwner('ruleset', 'fin')).toMatchObject({ owner: 'u1', doc: { id: 'fin', name: '金融', sources: [
@@ -249,7 +249,7 @@ describe('加密与迁移', () => {
     const migratedRulesets = s.list('ruleset');
     s.close();
     const reopened = new Store(file, { cipher });
-    expect(reopened.db.pragma('user_version', { simple: true })).toBe(30);
+    expect(reopened.db.pragma('user_version', { simple: true })).toBe(31);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
     expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });

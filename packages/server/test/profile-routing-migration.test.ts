@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mergeTemplate, Report, resolveProfileRouting, routingConfig, type Overlay } from '@sub-forge/core';
 import { Store } from '../src/store.ts';
 import { Cipher } from '../src/crypto.ts';
@@ -28,6 +28,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
   const cipher = new Cipher(randomBytes(32));
   let store = new Store(file, { cipher, now: () => 1234 });
   try {
+    store.db.exec('CREATE TABLE template_versions (template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (template_id, version))');
     const historical = [template, { ...template, version: 2, groups: template.groups.map(g => ({ ...g, name: `${g.name} v2` })) }];
     for (const t of historical) store.db.prepare('INSERT INTO template_versions VALUES (?, ?, ?, ?)').run(t.id, t.version, JSON.stringify(t), 1234);
     store.put('local', { id: 'local', name: '节点', proxies: [{ name: '香港节点', type: 'socks5', server: 'node.test', port: 1080 }] }, 'owner');
@@ -40,16 +41,19 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     ];
     profiles.forEach(p => { store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(p.id, 'owner', cipher.encrypt(JSON.stringify(p)), 1234); issueProfileToken(store, { token: `${p.id}-secret-token`, profileId: p.id }); });
     const renderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }), { publicUrl: 'https://test.local' });
+    // 旧库的渲染基线仍按历史表读取；迁移时恢复真实 Store 接口。
+    const legacyRead = vi.spyOn(store, 'getTemplate').mockImplementation((id, version) => historical.find(t => t.id === id && t.version === (version ?? 2)));
     const before = new Map<string, string>();
     for (const p of profiles) {
       const r = await renderer.render(p.id, { client: 'mihomo' });
       expect(r.ok).toBe(true);
       if (r.ok) before.set(p.id, r.render.yaml);
     }
+    legacyRead.mockRestore();
     const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(30);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(31);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();
