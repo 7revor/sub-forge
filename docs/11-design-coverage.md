@@ -365,3 +365,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 规则类型命名与添加入口统一：`V2Template`、`V2ProfileRouting`、`V2RuleSet`、`V2Components` 的规则行增加 48px 类型列，名称统一 14px 中等字重；规则仓库、规则集合换用独立图标。`V2ProfileRouting` 的添加菜单收敛为三项，`V2ProfileDialogs`、`V2MoreDialogs` 的添加弹窗标题统一为「添加规则」并带类型分段控件，`V2Pickers` 候选改为「规则集合 · 名称」。前端对应 `RuleCard`、`TemplateRulesEditor`、`RuleEditDialog`、`MatcherEditor`、`Rulesets`；后端对应 `rule-repos/options.ts`、`api/rule-options.ts` 的候选文案。无后端待实现项。
 
 2026-11-02 面板内空列表统一：按 `V2Components`「空列表：同尺寸虚线卡片」，`Empty` 增加 `card` 变体（最小高 52px、14/16px 内边距、12/18px 文字），替换代理链页面内的样式覆写，并用于节点来源、节点组合成员、模板策略组与规则、处理链、处理器正则与优先级。`V2ProfileNodes` 补画「节点来源空态」，画板高度调整为 1410px；画布已同步，前端已实现，不涉及后端与领域模型，无新增待实现项。
+
+2026-11-02 代理链空状态文案：配置订阅没有节点来源时，代理链空状态改为「还没有节点来源」「先添加节点来源，再配置代理链。」，与同页「节点来源」卡片的名称一致。`V2ProfileNodes` 只绘制「还没有代理链」状态，画布无需修改；不涉及后端。
