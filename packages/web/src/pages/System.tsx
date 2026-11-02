@@ -23,7 +23,7 @@ export function System(){
         {!valid && <span className="text-sm text-destructive">请输入 1 至 8760 的整数小时。</span>}<p>到期后下次使用时重新拉取，无人使用的资源到期后自动清理；失败时继续使用旧内容。</p>
       </div></div>
       <div className="settings-row"><div><h2 className="flex items-center gap-1.5">资源异常 <Badge tone="err" className="h-5">{failures.length}</Badge></h2><p>最近失败的资源与下次可重新拉取的时间</p></div><div>
-        {!resources.data?<p className="text-muted-foreground">正在读取状态…</p>:!failures.length?<p className="text-muted-foreground">当前没有资源拉取异常。</p>:<div className="flex flex-col gap-3">{failures.map((r,i)=><div key={i} className="rounded-lg border border-border px-3 py-2.5 text-sm"><div className="flex items-center justify-between gap-3"><span className="font-medium">{r.name}</span><RetryResource resource={r}/></div><p className="text-red-600">{r.error} · {r.available?'正在使用旧缓存':'没有可用缓存'}</p><p className="text-muted-foreground">最后成功：{r.lastSuccessAt?formatTime(r.lastSuccessAt):'从未成功'} · 下次拉取：{r.nextFetchAt?formatTime(r.nextFetchAt):'待调度'}</p></div>)}</div>}
+        {!resources.data?<p className="text-muted-foreground">正在读取状态…</p>:!failures.length?<p className="text-muted-foreground">当前没有资源拉取异常。</p>:<div className="flex flex-col gap-3">{failures.map((r,i)=><div key={i} className="rounded-lg border border-border px-3 py-2.5 text-sm"><div className="flex items-center justify-between gap-3"><span className="font-medium">{r.name}</span><RetryResource resource={r}/></div><p className="text-red-600">{r.error} · {r.available?'正在使用旧缓存':'没有可用缓存'}</p><p className="text-muted-foreground">最后成功：{r.lastSuccessAt?formatTime(r.lastSuccessAt):'从未成功'} · 下次可拉取：{r.nextFetchAt?formatTime(r.nextFetchAt):'待调度'}</p></div>)}</div>}
       </div></div>
       <BackupSettings />
     </section></PageScroll></>;
