@@ -28,6 +28,8 @@ export function canReferenceGroup(groups: GroupSpec[], owner: string, target: st
   return !reachesOwner(target);
 }
 export const NO_NODE_FILTER = 'a^';
+/** 尚未点选前置是正常的待填状态：禁用保存，不显示错误提示。 */
+export const VIA_REQUIRED = '请选择前置节点';
 /** 将勾选节点转成已有落地筛选格式；空集合不能误变为全部。 */
 export function selectedNodeFilter(names: string[]): string {
   return [...new Set(names)].map(exactNodeFilter).join('|') || NO_NODE_FILTER;
@@ -43,7 +45,7 @@ export function chainInputError(chain: ChainRule): string | undefined {
     if (chain.via.kind === 'group' && !chain.via.groupId) return '请选择前置策略组';
     if (chain.via.kind === 'node') {
       const ref = chain.via.ref;
-      if (!ref.nodeSet.id || ('exact' in ref.match && !ref.match.exact.trim())) return '请选择前置节点';
+      if (!ref.nodeSet.id || ('exact' in ref.match && !ref.match.exact.trim())) return VIA_REQUIRED;
       if ('regex' in ref.match) compileUserRegex(ref.match.regex);
       if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && !chain.landing.filter && !chain.landing.excludeFilter) return '前置也在全部落地范围内，会形成循环；请缩小来源或落地筛选范围';
       if (nodeSetKey(ref.nodeSet) === nodeSetKey(chain.landing.nodeSet) && 'exact' in ref.match) {

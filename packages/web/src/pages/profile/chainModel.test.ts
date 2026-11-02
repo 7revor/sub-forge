@@ -23,7 +23,8 @@ describe('流量顺序代理链', () => {
     expect(landingNodeNames({ nodeSet: landing })).toBeUndefined();
   });
   it('弱提示区分自动、精确与已有正则，全部范围不暴露勾选生成的正则', () => {
-    expect(viaConstraintHint('全部引用来源', { regex: '' })).toContain('跳过落地');
+    expect(viaConstraintHint('全部引用来源', { regex: '' })).toContain('沿用已有规则');
+    expect(viaConstraintHint('全部引用来源', { exact: '' })).toContain('尚未选择');
     expect(viaConstraintHint('全部引用来源', { exact: 'GCP' })).toContain('精确匹配');
     expect(viaConstraintHint('全部引用来源', { regex: '香港' })).toContain('已有正则 香港');
     expect(landingConstraintHint('全部引用来源', { nodeSet: landing })).toContain('新增节点');
@@ -36,7 +37,7 @@ describe('流量顺序代理链', () => {
     expect(chainInputError({ ...chain, landing: { nodeSet: relay } })).toContain('循环');
     expect(chainInputError({ ...chain, via: { kind: 'node', ref: { nodeSet: relay, match: { regex: '[' } } } })).toContain('正则');
   });
-  it('空正则默认全部，空精确名称仍须选择节点', () => {
+  it('已保存的空正则仍可保存，未点选前置不能保存', () => {
     expect(chainInputError({ ...chain, via: { kind: 'node', ref: { nodeSet: relay, match: { regex: '' } } } })).toBeUndefined();
     expect(chainInputError({ ...chain, via: { kind: 'node', ref: { nodeSet: relay, match: { exact: '' } } } })).toContain('请选择');
   });

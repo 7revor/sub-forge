@@ -9,13 +9,13 @@ import { Button, Field, Select } from '../../components/ui.tsx';
 import { chainPlaceholders } from '../../schemas/placeholders.ts';
 import { useProfile } from './context.ts';
 import { landingConstraintHint, viaConstraintHint } from './chainModel.ts';
-import { chainInputError, NO_NODE_FILTER, selectedNodeFilter, nodeSetKey, sameLanding } from './memberModel.ts';
+import { chainInputError, NO_NODE_FILTER, selectedNodeFilter, nodeSetKey, sameLanding, VIA_REQUIRED } from './memberModel.ts';
 import { SelectIndicator } from '../../components/SelectIndicator.tsx';
 
 type SourceKind = 'inline' | 'provider';
 const emptySet: ChainNodeSet = { type: 'source', id: '' };
 const allSources = (output: SourceKind): ChainNodeSet => ({ type: 'all', id: output });
-const emptyVia = (nodeSet: ChainNodeSet = emptySet): ChainTarget => ({ kind: 'node', ref: { nodeSet, match: { regex: '' }, fallback: 'error' } });
+const emptyVia = (nodeSet: ChainNodeSet = emptySet): ChainTarget => ({ kind: 'node', ref: { nodeSet, match: { exact: '' }, fallback: 'error' } });
 
 /** 编辑顺序与流量方向一致；来源与节点列表相互独立，点选节点不改变来源范围，实际约束以弱提示说明。 */
 export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCancel, onRemove, footerTarget }: {
@@ -32,6 +32,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
   const names = useChainNames(chain);
   const whole = !chain.landing.filter && !chain.landing.excludeFilter;
   const viaRef = chain.via.kind === 'node' ? chain.via.ref : undefined;
+  // 2026-11-02 移除「自动」入口；已保存的空正则仍按原规则生效，点选后替换。
   const viaAuto = !!viaRef && 'regex' in viaRef.match && !viaRef.match.regex;
   const viaExact = viaRef && 'exact' in viaRef.match ? viaRef.match.exact : undefined;
   const overlapsLanding = !!viaRef && previewSources(viaRef.nodeSet).some(via => previewSources(chain.landing.nodeSet).some(landing => nodeSetKey(via.ref) === nodeSetKey(landing.ref)));
@@ -54,14 +55,13 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
         }}>{sourceChoices}<optgroup label="策略组"><option value="group" disabled={!groupOptions.length}>策略组</option></optgroup>{initial.via.kind === 'builtin' && <option value="direct">{initial.via.name}</option>}</Select>}</Field>
         {viaRef && <><div className="chain-node-panel">
           <NodeSearch aria-label="查找前置节点" value={viaSearch} onChange={setViaSearch} />
-          <ChoiceRow radio checked={viaAuto} label="自动（按顺序取第一个可用）" onClick={() => chooseMatch({ regex: '' })} />
-          <NodeSetPreview nodeSets={previewSources(viaRef.nodeSet)} search={viaSearch} skipNames={viaExact === undefined ? names.landingNames : undefined} selection={viaAuto ? undefined : { match: viaRef.match }} label="前置节点" firstMatch={viaAuto} onSelect={name => chooseMatch({ exact: name })} />
+          <NodeSetPreview nodeSets={previewSources(viaRef.nodeSet)} search={viaSearch} skipNames={viaExact === undefined ? names.landingNames : undefined} selection={viaAuto || viaExact === '' ? undefined : { match: viaRef.match }} label="前置节点" firstMatch={viaAuto} onSelect={name => chooseMatch({ exact: name })} />
         </div><ConstraintHint>{viaConstraintHint(scopeText(viaRef.nodeSet), viaRef.match)}</ConstraintHint></>}
         {chain.via.kind === 'group' && <div role="group" aria-label="前置策略组" className="chain-node-panel">
           {groupOptions.map(group => <ChoiceRow key={group.id} radio checked={chain.via.kind === 'group' && chain.via.groupId === group.id} label={group.name} onClick={() => choose({ kind: 'group', groupId: group.id })} />)}
         </div>}
       </section>
-      <section aria-label="落地节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-lg border border-primary/30 bg-muted/50 p-4">
+      <section aria-label="落地节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-lg border border-border p-4">
         <div className="flex items-baseline gap-2"><h3 className="m-0 text-sm font-medium">② 落地</h3><p className="m-0 text-xs text-muted-foreground">由它访问目标</p></div>
         {fixedLanding ? <div className="rounded-md bg-muted p-3 text-sm">{landingText}</div> : <>
           <Field label="来源">{id => <Select id={id} aria-label="落地来源" placeholder="选择落地节点来源" value={nodeSetKey(chain.landing.nodeSet)} onChange={event => setChain({ ...chain, landing: { nodeSet: pickSource(event.target.value) } })}>{sourceChoices}</Select>}</Field>
@@ -74,7 +74,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
         </>}
       </section>
     </div>
-    {error && <p role="alert" className="mx-6 mt-0 mb-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{error}</p>}
+    {error && error !== VIA_REQUIRED && <p role="alert" className="mx-6 mt-0 mb-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{error}</p>}
     {footerTarget ? createPortal(actions, footerTarget) : <div data-slot="dialog-footer" className="flex min-h-[61px] shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-6 py-3">{actions}</div>}
   </section>;
 }
@@ -88,7 +88,7 @@ function ConstraintHint({ children }: { children: string }) {
   return <p className="m-0 shrink-0 text-xs text-muted-foreground">{children}</p>;
 }
 
-/** 节点面板顶部的固定选项行（自动 / 全部节点 / 策略组），与节点行同高同样式。 */
+/** 节点面板顶部的固定选项行（全部节点 / 策略组），与节点行同高同样式。 */
 function ChoiceRow({ checked, label, radio = false, onClick }: { checked: boolean; label: string; radio?: boolean; onClick: () => void }) {
   return <button type="button" role={radio ? 'radio' : 'checkbox'} aria-checked={checked} onClick={onClick}
     className={`flex min-h-10 w-full shrink-0 cursor-pointer items-center gap-2.5 border-b border-border px-3 py-2 text-left text-sm ${checked ? 'bg-primary/5' : 'hover:bg-muted'}`}>
