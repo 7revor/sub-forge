@@ -23,12 +23,18 @@ export class ResourceService {
   setAdditionalResources(read: () => Resource[]) { this.additionalResources = read; }
   private ticking?: Promise<void>;
   constructor(private store:Store,private snapshots:SnapshotService,private renderer:RenderService,private now:()=>number=Date.now) {
-    store.db.exec('CREATE TABLE IF NOT EXISTS refresh_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL, at INTEGER NOT NULL)');
+    store.documentDeleteHooks.add(this.dropDocumentJobs);
     for (const row of store.db.prepare('SELECT data FROM refresh_jobs').all() as {data:string}[]) {
       const job = JSON.parse(store.cipher.decrypt(row.data)) as RefreshJob;
       if (job.state === 'running') { job.state = 'interrupted';job.error = '服务重启，刷新任务已中断，请重新刷新';this.interruptPending(job);this.save(job); }
     }
   }
+  private readonly dropDocumentJobs = (kind:string,id:string) => {
+    for (const row of this.store.db.prepare('SELECT id,data FROM refresh_jobs').all() as {id:string;data:string}[]) {
+      const job = JSON.parse(this.store.cipher.decrypt(row.data)) as RefreshJob;
+      if (job.kind === kind && job.documentId === id) this.store.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
+    }
+  };
   private interruptPending(job:RefreshJob) {
     for (const result of job.results) {
       if (result.ok === undefined) result.state = 'interrupted';
@@ -163,5 +169,5 @@ export class ResourceService {
     const run=()=>void this.tick().catch(error=>console.error('资源调度失败',error));
     run();this.timer=setInterval(run,60_000);this.timer.unref();
   }
-  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all([...this.running.values(),this.ticking]);}
+  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all([...this.running.values(),this.ticking]);this.store.documentDeleteHooks.delete(this.dropDocumentJobs);}
 }

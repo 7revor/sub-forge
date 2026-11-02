@@ -58,7 +58,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 31;
+const SCHEMA_VERSION = 32;
 
 const LEGACY_TEMPLATE_SCHEMA = `CREATE TABLE IF NOT EXISTS template_versions (
   template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL,
@@ -125,6 +125,9 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (
   id_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS refresh_jobs (
+  id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL, at INTEGER NOT NULL
+);
 `;
 
 type RawSnapshot = {
@@ -163,6 +166,8 @@ export class Store {
   readonly listeners = new Set<() => void>();
   /** 在途资源读取用短期监听器撤销，避免相同 ID 删除后重建造成旧请求复活。 */
   readonly invalidationListeners = new Set<(kind: DocKind | 'shared-rule' | 'repository', id: string) => void>();
+  /** 在删除事务内同步执行，随文档一起提交或回滚。 */
+  readonly documentDeleteHooks = new Set<(kind: DocKind, id: string) => void>();
   eventsClosed = false;
   closeEvents(): void { this.eventsClosed = true; this.changed(); }
   changed(): void { for (const listener of this.listeners) listener(); }
@@ -290,7 +295,7 @@ export class Store {
   private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
     return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,this.cipher.hmac(url)) as {resource:string}|undefined)?.resource ?? id;
   }
-  close(): void { this.closeEvents(); this.listeners.clear(); this.invalidationListeners.clear(); this.db.close(); }
+  close(): void { this.closeEvents(); this.listeners.clear(); this.invalidationListeners.clear(); this.documentDeleteHooks.clear(); this.db.close(); }
 
   /** 旧版数据库升级到当前结构（v1：docs 无 owner、token 明文；v4 及以前：订阅源可以是本地内容；v5 及以前：本地节点可以设置前置；v6 及以前：规则集单一来源、另有规则包；v7：客户端改写绑定来源；v8 及以前：订阅地址可能保存在 urls 数组） */
   private migrate(): void {
@@ -770,7 +775,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     const removed = this.db.transaction(() => {
       if (kind === 'source' || kind === 'ruleset') this.dropResourceBindings(kind,id);
       const removed = this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
-      this.deleteDocumentJobs(kind, id);
+      for (const hook of this.documentDeleteHooks) hook(kind, id);
       if (kind === 'profile') this.deleteProfileData(id);
       if (kind === 'ruleset') this.db.prepare('DELETE FROM shared_rule_resources WHERE ruleset_id = ?').run(id);
       this.pruneResourceBindings();
@@ -887,16 +892,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(profileId);
       // 访问记录独立保留 30 天；删除资源不抹除用户自己的历史。
       this.db.prepare('DELETE FROM profile_migration_backups WHERE profile_id = ?').run(profileId);
-      this.deleteDocumentJobs('profile', profileId);
     })();
-  }
-
-  private deleteDocumentJobs(kind: string, id: string): void {
-    if (!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'refresh_jobs'").get()) return;
-    for (const row of this.db.prepare('SELECT id,data FROM refresh_jobs').all() as { id: string; data: string }[]) {
-      const job = JSON.parse(this.cipher.decrypt(row.data));
-      if (job.kind === kind && job.documentId === id) this.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
-    }
   }
 
   putSharedRule(key: string, rulesetId: string, data: unknown): void {
