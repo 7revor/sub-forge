@@ -47,11 +47,13 @@ export function AppLayout() {
   useEffect(()=>{
     if(!me.data)return;
     const events=new EventSource('/api/events');
-    const update=()=>void qc.invalidateQueries();
+    // 刷新任务每步都会通知，短时间内只刷新一次。
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    const update=()=>{timer??=setTimeout(()=>{timer=undefined;void qc.invalidateQueries();},500);};
     events.addEventListener('changed',update);
     events.onopen=()=>{setReconnecting(false);update();};
     events.onerror=()=>setReconnecting(true);
-    return ()=>events.close();
+    return ()=>{clearTimeout(timer);events.close();};
   },[me.data?.id,qc]);
 
   if (me.isLoading) return <div className="p-8 text-muted-foreground">加载中…</div>;
