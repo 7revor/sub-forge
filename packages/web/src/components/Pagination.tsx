@@ -11,7 +11,7 @@ export function Pagination({ page, pageSize, total, totalPages, busy, unknownTot
   return <nav aria-label="列表分页" className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-6 py-2.5">
     <span aria-live="polite" className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">共 {unknownTotal ? '—' : total} 条</span>
     <div className="flex flex-wrap items-center gap-2">
-      <Select size="sm" placeholder="选择每页显示的记录数量" aria-label="每页条数" className="w-[112px]" value={pageSize} disabled={busy} onChange={e => onPageSize(Number(e.target.value))}>
+      <Select size="sm" placeholder="选择每页显示的记录数量" aria-label="每页条数" className="w-fit border-transparent bg-transparent shadow-none hover:bg-accent dark:bg-transparent" value={pageSize} disabled={busy} onChange={e => onPageSize(Number(e.target.value))}>
         {PAGE_SIZES.map(size => <option key={size} value={size}>{size} 条 / 页</option>)}
       </Select>
       <div className="flex items-center gap-1">
