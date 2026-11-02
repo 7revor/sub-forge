@@ -10,9 +10,9 @@ describe('绑定清理不解密无关文档', () => {
       store.put('ruleset', { id: 'r', name: '规则', sources: [{ id: 'a', kind: 'remote', url: 'https://r.test/a', format: 'auto' }] }, 'u');
       store.bindResource('ruleset', 'r', 'https://r.test/a', {}, 'public-rules');
       const raw = new Set((store.db.prepare("SELECT data FROM docs WHERE kind IN ('local','collection')").all() as { data: string }[]).map(row => row.data));
-      const decrypt = vi.spyOn(store.cipher, 'decrypt');
+      const parse = vi.spyOn(JSON, 'parse');
       store.pruneResourceBindings();
-      expect(decrypt.mock.calls.filter(([value]) => raw.has(value))).toEqual([]);
+      expect(parse.mock.calls.filter(([value]) => raw.has(value))).toEqual([]);
       expect(store.resourceBinding('ruleset', 'r', 'https://r.test/a')).toBeDefined();
     } finally { store.close(); }
   });

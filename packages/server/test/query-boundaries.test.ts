@@ -50,7 +50,7 @@ it('专属规则按订阅隔离原文及产物，客户端格式变化不改变�
   const secondLink = Object.values<{ url: string }>(parse(await second.text())['rule-providers'])[0]!.url;
   expect((await h.app.request(secondLink.replace(h.otherToken, h.token))).status).toBe(404);
   expect((await h.app.request(first.replace(h.token, h.otherToken))).status).toBe(404);
-  expect(h.fetcher).toHaveBeenCalledTimes(2);
+  expect(h.fetcher).not.toHaveBeenCalled();
   h.store.put('profile', { ...h.store.get('profile', 'p')!, routing: { mode: 'independent', config: { ...h.config, rules: [] } } }, h.owner.id);
   expect((await h.app.request(first)).status).toBe(404);
   expect((await h.app.request(secondLink)).status).toBe(200);

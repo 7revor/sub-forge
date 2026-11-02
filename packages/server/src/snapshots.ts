@@ -1,4 +1,5 @@
-// 统一资源缓存：到期等待刷新，失败保留最后一次成功内容并延后一个系统周期。
+// 统一资源缓存：没有定时拉取，请求读到过期内容时才刷新；有旧内容时最多等待 STALE_WAIT_MS，
+// 超时先返回旧内容，刷新继续在后台完成。失败保留最后一次成功内容并延后一个系统周期。
 // 已完成草稿不缓存；并发读取只合并在途请求。
 
 import { parseContent, parseRuleSourceContent, stableHash, type RuleSetFormat } from '@sub-forge/core';
@@ -7,6 +8,8 @@ import { DEFAULT_TIMEOUT_MS, DEFAULT_UA, type UpstreamFetcher } from './net/upst
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 
 const SOURCE_REQUEST_OPTIONS = { ua: DEFAULT_UA, timeoutMs: DEFAULT_TIMEOUT_MS };
+/** 已有可用内容时，请求为等待上游刷新最多停留的时间。 */
+export const STALE_WAIT_MS = 3000;
 
 export type SnapshotResult = { snapshot?: SnapshotRow; revision?: string; stale: boolean; error?: string };
 export type SnapshotFetchOptions = FetchOptions & { format?: RuleSetFormat; behavior?: 'domain' | 'ipcidr' | 'classical'; scope?: string };
@@ -58,8 +61,8 @@ export class SnapshotService {
     return this.store.resourceBinding(kind, id, url) === this.store.resourceKey(kind, id, url, options, scope);
   }
   private revision(snapshot: SnapshotRow): string {
-    const success = this.store.latestSnapshot(snapshot.ownerKind,snapshot.ownerId,snapshot.url);
-    const attempt = this.store.latestSnapshot(snapshot.ownerKind,snapshot.ownerId,snapshot.url,false);
+    const success = this.store.latestSnapshotMeta(snapshot.ownerKind,snapshot.ownerId,snapshot.url);
+    const attempt = this.store.latestSnapshotMeta(snapshot.ownerKind,snapshot.ownerId,snapshot.url,false);
     return JSON.stringify([success?.id,success?.fetchedAt,success?.hash,attempt?.id,attempt?.fetchedAt]);
   }
   isCurrent(snapshot: SnapshotRow, revision: string | undefined): boolean {
@@ -76,8 +79,8 @@ export class SnapshotService {
     const resource = this.resourceId(kind, id, url, opts);
     const legacy = migrateLegacy && !this.store.resourceBinding(kind, id, url);
     const latest = (okOnly: boolean) => {
-      const current = this.store.latestSnapshot(kind,resource,url,okOnly);
-      const previous = legacy ? this.store.latestSnapshot(kind,id,url,okOnly) : undefined;
+      const current = this.store.latestSnapshotMeta(kind,resource,url,okOnly);
+      const previous = legacy ? this.store.latestSnapshotMeta(kind,id,url,okOnly) : undefined;
       return previous && (!current || previous.fetchedAt > current.fetchedAt) ? previous : current;
     };
     const success = latest(true);
@@ -139,15 +142,24 @@ export class SnapshotService {
   async get(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}, policy: { refresh?: boolean } = {}): Promise<SnapshotResult> {
     this.identity(kind,id,url,opts);
     const status = this.status(kind,id,url,opts);
-    let latest = this.store.latestSnapshot(kind,status.resource,url);
     if (policy.refresh || status.nextFetchAt === undefined || this.now() >= status.nextFetchAt || status.refreshing) {
-      const row = await this.refresh(kind,id,url,opts);
+      const previous = policy.refresh ? undefined : this.store.latestSnapshot(kind,status.resource,url);
+      const row = await this.refreshWithin(previous ? STALE_WAIT_MS : undefined,() => this.refresh(kind,id,url,opts));
+      if (!row) return { snapshot:previous,revision:this.revision(previous!),stale:true,error:'上游响应较慢，本次使用旧快照，正在后台更新' };
       // 在途校验可以使用本次成功响应的副本；引用被清理时不重新落库。
       // 正式下载的资源存在性和归属由调用方在 await 后复核。
-      latest = this.store.latestSnapshot(kind,status.resource,url) ?? (row.ok ? row : undefined);
+      const latest = this.store.latestSnapshot(kind,status.resource,url) ?? (row.ok ? row : undefined);
       return { snapshot:latest,revision:latest ? this.revision(latest) : undefined,stale:!row.ok && !!latest,error:row.ok ? undefined : row.error };
     }
+    const latest = this.store.latestSnapshot(kind,status.resource,url);
     return { snapshot:latest,revision:latest ? this.revision(latest) : undefined,stale:!!status.error && !!latest,error:status.error };
+  }
+  /** 限时等待刷新；超时返回 undefined，刷新本身不取消。 */
+  private async refreshWithin(waitMs: number | undefined, refresh: () => Promise<SnapshotRow>): Promise<SnapshotRow | undefined> {
+    if (waitMs === undefined) return refresh();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try { return await Promise.race([refresh(),new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined),waitMs); })]); }
+    finally { clearTimeout(timer); }
   }
   async peek(url: string, opts: SnapshotFetchOptions = {}): Promise<{ body?: string; error?: string }> {
     const result = await this.peekRuleContent(url,opts);

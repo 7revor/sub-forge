@@ -47,7 +47,7 @@ describe('订阅 routing 边界', () => {
     try {
       store.putTemplate(template);
       const user = store.createUser({ username: 'fixture', passwordHash: 'fixture-only', role: 'user' });
-      store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(old.id, user.id, cipher.encrypt(JSON.stringify(old)), 1234);
+      store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(old.id, user.id, JSON.stringify(old), 1234);
       store.putToken({ token: 'fixture-routing-token', userId: user.id });
       store.db.pragma('user_version = 28');
       const plan = await profileMigrationPlan(file, cipher);

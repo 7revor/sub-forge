@@ -57,7 +57,7 @@ export function resolveRuleSetReference(matcher: RuleSetMatcher, store: Store): 
   return rs && usableRuleSet(rs, store);
 }
 
-/** 已解密的规则集可直接检查，避免批量遍历时重复读取。 */
+/** 已读取的规则集可直接检查，避免批量遍历时重复读取。 */
 export function usableRuleSet(rs: RuleSetDoc, store: Store): RuleSetDoc | undefined {
   if (!Array.isArray(rs.sources)) return undefined;
   for (const source of rs.sources.filter(source => source.enabled !== false && source.repository)) {

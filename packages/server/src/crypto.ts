@@ -1,6 +1,6 @@
-// 敏感数据加密（SYS-04）：订阅地址、节点凭据、上游快照正文、订阅 token 都在落盘前加密。
-// AES-256-GCM，密钥来自环境变量 SUBFORGE_SECRET，未设置时在数据库旁生成 secret.key（权限 0600）。
-// 订阅 token 另存 HMAC 作为查找索引，原文加密保存以便再次展示。
+// 主密钥只用于两件事：系统设置中备份凭据（WebDAV 密码、备份口令）的 AES-256-GCM 加密，以及令牌、URL 查找索引的 HMAC。
+// 文档、快照和令牌原文自 v35 起明文存储，decrypt 只再用于读取备份设置和升级旧数据。
+// 密钥来自环境变量 SUBFORGE_SECRET，未设置时在数据库旁生成 secret.key（权限 0600）。
 
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

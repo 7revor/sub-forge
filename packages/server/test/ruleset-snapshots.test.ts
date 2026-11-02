@@ -53,12 +53,13 @@ describe('远程规则快照有效性', () => {
     if (!after.ok) throw new Error(after.message);
     expect(after.render.yaml).toBe(before.render.yaml);
     expect((await ruleBodies(h.renderer, 'p'))).toEqual((await ruleBodies(h.renderer, 'p')));
-    expect(after.report).toContainEqual(expect.objectContaining({ code: 'ruleset.fetch-failed', level: 'warn' }));
+    expect((await h.renderer.preview('p', { client: 'mihomo' })).report).toContainEqual(expect.objectContaining({ code: 'ruleset.fetch-failed', level: 'warn' }));
   });
 
-  it('首次收到错误页面时返回 503，不生成只有兜底规则的成功配置', async () => {
+  it('首次收到错误页面时规则文件报错，不下发错误内容', async () => {
     const h = setup('auto', '<html>Not available</html>');
-    expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(200);
+    await expect(h.renderer.sharedRules.read({ matcher: { kind: 'ruleset', id: 'r' } }, { client: 'mihomo' })).rejects.toThrow('规则来源没有可用内容');
   });
 
   it('部分行无法解析仍保留有效规则，并允许之后恢复正常更新', async () => {

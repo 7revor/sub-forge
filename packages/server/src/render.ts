@@ -218,8 +218,13 @@ export class RenderService {
 
     const rules = this.collectRules(profile, template);
     for (const note of template?.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
+    // 主配置只写地址，不拉规则；专属规则请求只拉所需规则；预览才需要全部正文。
+    const neededRules = opts.dry ? undefined : new Set(resolveProfileRouting(profile, template, new Report()).rules
+      .filter(rule => opts.ruleKey !== undefined && rule.enabled !== false && this.ruleKey({ matcher: rule.matcher, ...(rule.options?.src ? { options: { src: true } } : {}) }, target) === opts.ruleKey)
+      .map(rule => rule.matcher.kind === 'ruleset' ? rule.matcher.id : ''));
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
       for (const note of rs.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
+      if (neededRules && !neededRules.has(rs.id)) continue;
       for (const src of rs.sources) {
         if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
         const binding = ruleBinding(rs.id, `profile:${profileId || `draft:${owner}`}`);
@@ -315,8 +320,10 @@ export class RenderService {
     const userinfo = new Map<string, TrafficInfo>();
     const snapshots: {snapshot:SnapshotRow;revision?:string}[] = [];
     const report: ReportItem[] = [];
-    for (const src of sources) {
-      const r = await this.snapshots.get('source', src.id, src.url, {});
+    // 并行拉取：等待时间取决于最慢的来源，不随来源数累加。
+    const results = await Promise.all(sources.map(src => this.snapshots.get('source', src.id, src.url, {})));
+    for (const [index, src] of sources.entries()) {
+      const r = results[index]!;
       if (configurationRevision !== this.store.configurationRevision) throw new ConcurrentRenderChange('节点依赖在拉取期间变化，请重试');
       if (r.snapshot) snapshots.push({snapshot:r.snapshot,revision:r.revision});
       if (r.snapshot?.body !== undefined) {

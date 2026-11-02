@@ -46,6 +46,7 @@ class StoreMigration {
   upgrade(): void {
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version >= SCHEMA_VERSION) return;
+    this.store.legacyEncoded = true;
     const hadSnapshots = !!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'snapshots'").get();
     const tx = this.db.transaction(() => {
       const hasDocs = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'docs'").get();
@@ -58,6 +59,9 @@ class StoreMigration {
         if (!cols.some((c) => c.name === 'url_hash')) this.db.exec('ALTER TABLE snapshots ADD COLUMN url_hash TEXT');
         this.db.exec('DROP INDEX IF EXISTS snapshots_owner');
       }
+      // v35 前用户令牌原文加密保存在 token_enc；先改列名，后续步骤统一读 token 列。
+      const hadEncryptedTokens = (this.db.prepare("SELECT 1 FROM pragma_table_info('user_tokens') WHERE name = 'token_enc'").get());
+      if (hadEncryptedTokens) this.db.exec('ALTER TABLE user_tokens RENAME COLUMN token_enc TO token');
       this.db.exec(SCHEMA);
       this.db.exec(LEGACY_TEMPLATE_SCHEMA);
       // 已退役的产物表：历史迁移步骤仍会访问，升级结束统一删除。
@@ -72,18 +76,18 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       const repoCols = this.db.prepare('PRAGMA table_info(rule_repos)').all() as { name: string }[];
       if (!repoCols.some(c => c.name === 'definition')) this.db.exec('ALTER TABLE rule_repos ADD COLUMN definition TEXT');
       if (!repoCols.some(c => c.name === 'indexed_definition')) this.db.exec('ALTER TABLE rule_repos ADD COLUMN indexed_definition TEXT');
-      // v1/v2 允许旧明文文档；本次迁移一并加密，URL 改用 HMAC 查询，错误中也可能包含 URL。
+      // v1/v2 的快照：URL 改用 HMAC 查询；正文和错误在 v35 统一为明文。
       if (version < 3) {
         for (const r of this.db.prepare('SELECT id, url, body, error FROM snapshots').all() as { id: number; url: string; body: string | null; error: string | null }[]) {
           const url = this.cipher.decrypt(r.url);
           this.db.prepare('UPDATE snapshots SET url = ?, url_hash = ?, body = ?, error = ? WHERE id = ?').run(
-            this.cipher.encrypt(url), this.cipher.hmac(url),
-            r.body === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.body)),
-            r.error === null ? null : this.cipher.encrypt(this.cipher.decrypt(r.error)), r.id);
+            url, this.cipher.hmac(url),
+            r.body === null ? null : this.cipher.decrypt(r.body),
+            r.error === null ? null : this.cipher.decrypt(r.error), r.id);
         }
         for (const table of ['docs', 'last_good'] as const) {
           for (const r of this.db.prepare(`SELECT rowid, data FROM ${table}`).all() as { rowid: number; data: string }[]) {
-            this.db.prepare(`UPDATE ${table} SET data = ? WHERE rowid = ?`).run(this.cipher.encrypt(this.cipher.decrypt(r.data)), r.rowid);
+            this.db.prepare(`UPDATE ${table} SET data = ? WHERE rowid = ?`).run(this.cipher.decrypt(r.data), r.rowid);
           }
         }
       }
@@ -92,7 +96,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         const rows = this.db.prepare('SELECT token, profile_id, label, created_at FROM tokens').all() as { token: string; profile_id: string; label: string | null; created_at: number }[];
         for (const r of rows) {
           this.db.prepare('INSERT OR REPLACE INTO sub_tokens (token_hash, token_enc, profile_id, label, created_at) VALUES (?, ?, ?, ?, ?)')
-            .run(this.cipher.hmac(r.token), this.cipher.encrypt(r.token), r.profile_id, r.label, r.created_at);
+            .run(this.cipher.hmac(r.token), r.token, r.profile_id, r.label, r.created_at);
         }
         this.db.exec('DROP TABLE tokens');
       }
@@ -110,7 +114,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'source'").all() as { id: string; data: string }[]) {
           const source = JSON.parse(this.cipher.decrypt(row.data)) as SourceDoc;
           this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'source' AND id = ?")
-            .run(this.cipher.encrypt(JSON.stringify(normalizeSourceFetch(source))), row.id);
+            .run(JSON.stringify(normalizeSourceFetch(source)), row.id);
         }
         this.db.exec(`DELETE FROM snapshots WHERE owner_kind = 'source' AND id NOT IN (
           SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY owner_id, ok ORDER BY fetched_at DESC, id DESC) AS position
@@ -127,9 +131,9 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
           if (previous.routing) continue;
           const migrated = migrateProfile(previous, profileTemplate(previous, this.legacyTemplates.get));
           this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
-            .run(row.id, this.cipher.encrypt(JSON.stringify(previous)), this.now());
+            .run(row.id, JSON.stringify(previous), this.now());
           // 不触碰归属、更新时间、订阅链接、成功配置及历史资源。
-          this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(JSON.stringify(migrated)), row.id);
+          this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(JSON.stringify(migrated), row.id);
         }
       }
       // v18 同时清除规则集和规则引用上的独立 no-resolve，保留原始内容中的标记。
@@ -142,7 +146,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         for (const row of this.db.prepare('SELECT kind,id,data FROM docs').all() as {kind:string;id:string;data:string}[]) {
           const doc = JSON.parse(this.cipher.decrypt(row.data));
           stripResourceTiming(doc);
-          this.db.prepare('UPDATE docs SET data = ? WHERE kind = ? AND id = ?').run(this.cipher.encrypt(JSON.stringify(doc)),row.kind,row.id);
+          this.db.prepare('UPDATE docs SET data = ? WHERE kind = ? AND id = ?').run(JSON.stringify(doc),row.kind,row.id);
         }
       }
       if (version < 22) {
@@ -192,7 +196,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'source'").all() as { id: string; data: string }[]) {
           const previous = JSON.parse(this.cipher.decrypt(row.data)) as SourceDoc;
           const next = normalizeSourceFetch(previous);
-          if (JSON.stringify(next) !== JSON.stringify(previous)) this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'source' AND id = ?").run(this.cipher.encrypt(JSON.stringify(next)), row.id);
+          if (JSON.stringify(next) !== JSON.stringify(previous)) this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'source' AND id = ?").run(JSON.stringify(next), row.id);
         }
         this.db.exec('DROP TABLE IF EXISTS sub_tokens');
       }
@@ -200,13 +204,15 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.finishTemplateMigration();
       // v33：渲染结果和公共规则产物不再落库，全部按上游快照实时生成。
       this.db.exec('DROP TABLE IF EXISTS last_good; DROP TABLE IF EXISTS shared_rule_resources');
+      this.decryptStoredData();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
+    this.store.legacyEncoded = false;
     // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
     if (version < 23) this.db.pragma('wal_checkpoint(TRUNCATE)');
-    // 回收已删除产物占用的空间，避免继续增大文件和备份。
-    if (version > 0 && version < 33) this.db.exec('VACUUM');
+    // 回收已删除数据和旧密文占用的空间，避免继续增大文件和备份。
+    if (version > 0 && version < 35) { this.db.exec('VACUUM'); this.db.pragma('wal_checkpoint(TRUNCATE)'); }
     if (hadSnapshots && version < 3) {
       // 清除迁移前留在空闲页和 WAL 中的明文副本。
       this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -215,13 +221,29 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     }
   }
 
+  /** v35：文档、快照、令牌原文和刷新任务改为明文；系统设置保留加密，因其含备份口令。 */
+  private decryptStoredData(): void {
+    const plain = (table: string, columns: string[]) => {
+      const update = this.db.prepare(`UPDATE ${table} SET ${columns.map(column => `${column} = ?`).join(', ')} WHERE rowid = ?`);
+      for (const row of this.db.prepare(`SELECT rowid AS sf_rowid, ${columns.join(', ')} FROM ${table}`).all() as (Record<string, string | null> & { sf_rowid: number })[]) {
+        update.run(...columns.map(column => row[column] === null ? null : this.cipher.decrypt(row[column]!)), row.sf_rowid);
+      }
+    };
+    plain('docs', ['data']);
+    plain('profile_migration_backups', ['data']);
+    plain('native_migration_backups', ['data']);
+    plain('refresh_jobs', ['data']);
+    plain('user_tokens', ['token']);
+    plain('snapshots', ['url', 'body', 'error']);
+  }
+
   /** v8：来源改写提升为组级内容匹配，远程行号只依据已有成功快照转换。 */
   private promoteRuleOverrides(): void {
     for (const rs of this.store.list('ruleset')) {
       const next = promoteRuleSetOverrides(rs, (src) => src.url ? this.store.latestSnapshot('ruleset', rs.id, src.url)?.body : undefined);
       if (JSON.stringify(next) !== JSON.stringify(rs)) {
         this.db.prepare("UPDATE docs SET data = ?, updated_at = ? WHERE kind = 'ruleset' AND id = ?")
-          .run(this.cipher.encrypt(JSON.stringify(next)), this.now(), rs.id);
+          .run(JSON.stringify(next), this.now(), rs.id);
       }
     }
   }
@@ -252,7 +274,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       const group: LocalDoc = { id, name: String(src.name), proxies };
       this.db.prepare("DELETE FROM docs WHERE kind = 'source' AND id = ?").run(id);
       this.db.prepare("INSERT OR REPLACE INTO docs (kind, id, owner, data, updated_at) VALUES ('local', ?, ?, ?, ?)")
-        .run(id, r.owner, this.cipher.encrypt(JSON.stringify(group)), this.now());
+        .run(id, r.owner, JSON.stringify(group), this.now());
       moved.add(id);
     }
     if (!moved.size) return;
@@ -266,7 +288,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     for (const r of this.db.prepare("SELECT rowid, data FROM docs WHERE kind IN ('collection', 'local', 'profile')").all() as { rowid: number; data: string }[]) {
       const before = this.cipher.decrypt(r.data);
       const after = JSON.stringify(retarget(JSON.parse(before)));
-      if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(after), r.rowid);
+      if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(after, r.rowid);
     }
   }
 
@@ -276,7 +298,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       const raw = JSON.parse(this.cipher.decrypt(row.data)) as Record<string, unknown>;
       const { urls: _, ...rest } = raw;
       const next = { ...rest, url: sourceUrl(raw) };
-      this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify(next)), row.rowid);
+      this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(JSON.stringify(next), row.rowid);
     }
   }
 
@@ -303,7 +325,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         return rest as LocalProxy;
       });
       if (!changed) continue;
-      this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify({ ...l.doc, proxies })), l.rowid);
+      this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(JSON.stringify({ ...l.doc, proxies }), l.rowid);
       if (!moved.length) continue;
       let used = false;
       for (const pr of profiles) {
@@ -315,7 +337,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       }
       if (!used) console.warn(`[迁移] 本地节点组「${l.doc.name}」的 ${moved.length} 个前置没有直接加入它的配置订阅可承接，已移除；经组合使用时请在配置订阅的「代理链」中重新设置`);
     }
-    for (const pr of profiles) if (pr.changed) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify(pr.doc)), pr.rowid);
+    for (const pr of profiles) if (pr.changed) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(JSON.stringify(pr.doc), pr.rowid);
   }
 
   /**
@@ -327,7 +349,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     for (const r of this.db.prepare("SELECT rowid, id, data FROM docs WHERE kind = 'ruleset'").all() as { rowid: number; id: string; data: string }[]) {
       const raw = JSON.parse(this.cipher.decrypt(r.data)) as Record<string, unknown>;
       const next = normalizeRuleSet(raw);
-      if (next) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(JSON.stringify(next)), r.rowid);
+      if (next) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(JSON.stringify(next), r.rowid);
       rulesets.set(r.id, next ?? (raw as unknown as RuleSetDoc));
     }
     const rows = this.db.prepare("SELECT id, owner, data FROM docs WHERE kind = 'bundle'").all() as { id: string; owner: string | null; data: string }[];
@@ -338,7 +360,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     for (const rs of converted.rulesets) {
       const bundleId = [...converted.idMap].find(([, to]) => to === rs.id)![0];
       this.db.prepare("INSERT INTO docs (kind, id, owner, data, updated_at) VALUES ('ruleset', ?, ?, ?, ?)")
-        .run(rs.id, owners.get(bundleId) ?? null, this.cipher.encrypt(JSON.stringify(rs)), this.now());
+        .run(rs.id, owners.get(bundleId) ?? null, JSON.stringify(rs), this.now());
     }
     for (const c of converted.snapshotCopies) {
       this.db.prepare(`INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error)
@@ -349,7 +371,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     for (const r of this.db.prepare("SELECT rowid, data FROM docs WHERE kind = 'profile'").all() as { rowid: number; data: string }[]) {
       const before = this.cipher.decrypt(r.data);
       const after = JSON.stringify(retargetBundleRefs(JSON.parse(before), converted.idMap));
-      if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(after), r.rowid);
+      if (after !== before) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(after, r.rowid);
     }
     for (const r of this.db.prepare('SELECT rowid, data FROM template_versions').all() as { rowid: number; data: string }[]) {
       const after = JSON.stringify(retargetBundleRefs(JSON.parse(r.data), converted.idMap));
@@ -366,10 +388,10 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         const previous = document as ProfileDoc;
         document = migrateProfile(previous, profileTemplate(previous, this.legacyTemplates.get));
         this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
-          .run(previous.id, this.cipher.encrypt(original), this.now());
+          .run(previous.id, original, this.now());
       }
       const normalized = JSON.stringify(normalizeRulePresence(row.kind, document));
-      if (normalized !== original) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(this.cipher.encrypt(normalized), row.rowid);
+      if (normalized !== original) this.db.prepare('UPDATE docs SET data = ? WHERE rowid = ?').run(normalized, row.rowid);
     }
     for (const row of this.db.prepare('SELECT rowid, data FROM template_versions').all() as { rowid: number; data: string }[]) {
       const normalized = JSON.stringify(normalizeRulePresence('template', JSON.parse(row.data)));
@@ -387,7 +409,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       if (normalized === original) continue;
       this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
         .run(previous.id, row.data, this.now());
-      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(normalized), row.id);
+      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(normalized, row.id);
     }
   }
 
@@ -400,7 +422,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
         .run(row.id, row.data, this.now());
       this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
-        .run(this.cipher.encrypt(JSON.stringify(next)), row.id);
+        .run(JSON.stringify(next), row.id);
     }
     this.db.exec(`DELETE FROM template_versions WHERE (template_id, version) NOT IN (
       SELECT template_id, MAX(version) FROM template_versions GROUP BY template_id)`);
@@ -413,7 +435,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
       const profile = JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc;
       this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
-        .run(this.cipher.encrypt(JSON.stringify(stripProfileRevisions(profile))), row.id);
+        .run(JSON.stringify(stripProfileRevisions(profile)), row.id);
     }
   }
 
@@ -426,12 +448,12 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       const next = migrateNativeDocument(row.kind, previous, presets.get(previous.base?.presetId));
       if (JSON.stringify(next) === JSON.stringify(previous)) continue;
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run(row.kind, row.id, row.data, this.now());
-      this.db.prepare('UPDATE docs SET data = ? WHERE kind = ? AND id = ?').run(this.cipher.encrypt(JSON.stringify(next)), row.kind, row.id);
+      this.db.prepare('UPDATE docs SET data = ? WHERE kind = ? AND id = ?').run(JSON.stringify(next), row.kind, row.id);
     }
     for (const row of this.db.prepare('SELECT template_id,version,data FROM template_versions').all() as {template_id:string;version:number;data:string}[]) {
       const previous = JSON.parse(row.data), next = migrateNativeDocument('template', previous);
       if (JSON.stringify(next) === JSON.stringify(previous)) continue;
-      this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('template', row.template_id + ':' + row.version, this.cipher.encrypt(row.data), this.now());
+      this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('template', row.template_id + ':' + row.version, row.data, this.now());
       this.db.prepare('UPDATE template_versions SET data = ? WHERE template_id = ? AND version = ?').run(JSON.stringify(next), row.template_id, row.version);
     }
     const nativePresets = new Map(this.store.list('preset').map(preset => [preset.id, preset]));
@@ -440,9 +462,9 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       const next = retireProfilePreset(previous, nativePresets.get(previous.base?.presetId));
       if (next === previous) continue;
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('profile', row.id, row.data, this.now());
-      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(JSON.stringify(next)), row.id);
+      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(JSON.stringify(next), row.id);
     }
-    // 包括未引用的预设也先留存加密原件，再移除已退役的活动文档。
+    // 包括未引用的预设也先留存原件，再移除已退役的活动文档。
     for (const row of this.db.prepare("SELECT id,data FROM docs WHERE kind = 'preset'").all() as { id: string; data: string }[]) {
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('preset', row.id, row.data, this.now());
     }
@@ -459,7 +481,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)')
         .run('profile-stash-common-v34', row.id, row.data, this.now());
       this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
-        .run(this.cipher.encrypt(JSON.stringify(next)), row.id);
+        .run(JSON.stringify(next), row.id);
     }
   }
 
@@ -482,7 +504,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       // 旧种子里的规则包先按原样写入，下面统一转成规则集
       for (const d of seed.bundles ?? []) {
         this.db.prepare("INSERT OR REPLACE INTO docs (kind, id, owner, data, updated_at) VALUES ('bundle', ?, ?, ?, ?)")
-          .run((d as { id: string }).id, owner, this.cipher.encrypt(JSON.stringify(d)), this.now());
+          .run((d as { id: string }).id, owner, JSON.stringify(d), this.now());
       }
       for (const d of seed.presets ?? []) this.store.put('preset', d, null, this.legacyTemplates);
 
@@ -493,9 +515,9 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       }
       for (const d of seed.profiles ?? []) {
         // 预设展开的备份必须保留原始输入，不能先被 routing 规范化丢掉历史字段。
-        if (d.base?.presetId) this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('profile', d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
+        if (d.base?.presetId) this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('profile', d.id, JSON.stringify(d), this.now());
         const next = migrateProfile(d, profileTemplate(d, this.legacyTemplates.get));
-        if (!d.routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)').run(d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
+        if (!d.routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)').run(d.id, JSON.stringify(d), this.now());
         this.store.put('profile', next, owner, this.legacyTemplates);
       }
       // 旧订阅级凭证不升级权限；新种子仅允许给明确用户设置用户级凭证。

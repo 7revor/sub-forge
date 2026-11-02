@@ -29,7 +29,7 @@ it.each([24, 27])('v%d 一次迁移原生配置、备份公共字段及平台改
     expect(store.get('ruleset', 'r')?.overrides).toHaveLength(1);
     expect((store.get('ruleset', 'r') as any).migrationNotes.join('')).toContain('已停用并备份');
     const backup = store.db.prepare("SELECT data FROM native_migration_backups WHERE kind='preset' AND id='p'").get() as { data: string };
-    expect(backup.data).not.toContain('223.5.5.5'); expect(JSON.parse(cipher.decrypt(backup.data))).toEqual(preset);
+    expect(JSON.parse(backup.data)).toEqual(preset);
     store.close(); store = new Store(file, { cipher }); expect(store.get('profile', 'sub')).toEqual(migrated);
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });
@@ -61,7 +61,7 @@ it('移除预设时保留四片段优先级、原文、停用状态和孤立备�
     expect(ini).toContain('*.example.test = server:1.1.1.1'); expect(ini).toContain('example.test = 192.0.2.1');
     expect(store.list('preset')).toEqual([]);
     const backup = store.db.prepare("SELECT data FROM native_migration_backups WHERE kind = 'profile' AND id = 'sub'").get() as { data: string };
-    expect(JSON.parse(cipher.decrypt(backup.data))).toMatchObject(old);
+    expect(JSON.parse(backup.data)).toMatchObject(old);
     expect(store.db.prepare("SELECT id FROM native_migration_backups WHERE kind = 'preset'").all()).toHaveLength(2);
     // 重新导入已经展开的订阅保持原文不变。
     const saved = store.get('profile', 'sub')!; store.importSeed({ profiles: [saved] });

@@ -38,7 +38,6 @@ env.store.db.prepare('UPDATE rule_repos SET enabled = 0').run();
 const repo = await repos.addCustom({ name: '验收仓库', url: 'https://github.com/fixture/rules', scans: [{ ref: 'main', directory: 'rules', format: 'auto', client: 'any', groupBy: 'path' }] });
 await repos.refresh(repo);
 const resources = new ResourceService(env.store, env.snapshots, env.renderer);
-await resources.tick();
 
 let stopping = false;
 const requests: Record<string, number> = {};

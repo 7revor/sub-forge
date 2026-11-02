@@ -1,6 +1,6 @@
 // 当前数据库结构。旧版结构的转换见 store-migrations.ts。
 
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS native_migration_backups (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
 );
 CREATE INDEX IF NOT EXISTS snapshots_owner ON snapshots (owner_kind, owner_id, url_hash, fetched_at);
 CREATE TABLE IF NOT EXISTS user_tokens (
-  user_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, token_enc TEXT NOT NULL, created_at INTEGER NOT NULL
+  user_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, token TEXT NOT NULL, created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS access_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

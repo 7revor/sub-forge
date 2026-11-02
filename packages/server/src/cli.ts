@@ -7,7 +7,7 @@ import { profileMigrationPlan } from './profile-migration-plan.ts';
 //   tsx src/cli.ts serve                          启动服务
 // 配置全部来自环境变量，见 packages/server/README.md。
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.ts';
 import { Cipher, hashPassword, loadMasterKey } from './crypto.ts';
@@ -32,7 +32,10 @@ const DAY_MS = 86400_000;
 
 function openStore(masterKey?: Buffer): Store {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
-  return new Store(dbPath, { cipher: new Cipher(masterKey ?? loadMasterKey(dbPath, env.SUBFORGE_SECRET)) });
+  const store = new Store(dbPath, { cipher: new Cipher(masterKey ?? loadMasterKey(dbPath, env.SUBFORGE_SECRET)) });
+  // 文档和快照明文存储，数据库及其 WAL 文件只允许运行用户读写。
+  if (dbPath !== ':memory:') for (const file of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) if (existsSync(file)) chmodSync(file, 0o600);
+  return store;
 }
 
 async function createAdmin(store: Store, username: string, password: string | undefined): Promise<void> {

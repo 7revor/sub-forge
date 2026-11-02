@@ -12,7 +12,7 @@ import { Store } from '../src/store.ts';
 
 const jobs = (store: Store) => (store.db.prepare('SELECT id FROM refresh_jobs ORDER BY id').all() as { id: string }[]).map(row => row.id);
 const putJob = (store: Store, id: string, kind: string, documentId: string) => store.db.prepare('INSERT INTO refresh_jobs VALUES (?,?,?,?)')
-  .run(id, 'owner', store.cipher.encrypt(JSON.stringify({ id, owner: 'owner', kind, documentId, state: 'done', total: 0, completed: 0, results: [] })), 1);
+  .run(id, 'owner', JSON.stringify({ id, owner: 'owner', kind, documentId, state: 'done', total: 0, completed: 0, results: [] }), 1);
 const service = (store: Store) => {
   const snapshots = new SnapshotService(store, vi.fn());
   return new ResourceService(store, snapshots, new RenderService(store, snapshots, { publicUrl: 'https://test.local' }));

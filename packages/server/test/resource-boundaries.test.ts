@@ -20,25 +20,24 @@ function setup() {
 }
 const ruleUrl = (config: any): string => Object.values<{ url: string }>(config['rule-providers'])[0]!.url;
 
-it('多来源公共规则在首个拉取期间删除后，不再启动后续来源或重建绑定', async () => {
+it('多来源公共规则在拉取期间删除后，晚到的响应不重建绑定和快照', async () => {
   const h = setup(), url = ruleUrl(await h.main()), entered = gate(), held = gate();
   h.fetcher.mockClear().mockImplementation(async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,late.test' }; });
   h.advance(86400001); const pending = h.app.request(url); await entered.promise;
   h.store.delete('profile', 'p'); h.store.delete('ruleset', 'r'); held.release();
   expect((await pending).status).toBe(404);
-  expect(h.fetcher).toHaveBeenCalledTimes(1);
   expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
   expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });
 
-it('节点依赖串行拉取期间删除订阅及来源，不拉取已删除的后续来源', async () => {
+it('节点依赖并行拉取期间删除订阅及来源，晚到的响应不重建绑定和快照', async () => {
   const h = setup(), entered = gate(), held = gate();
   for (const id of ['a', 'b']) h.store.put('source', { id, name: id, url: `https://nodes.test/${id}`, pipeline: [] }, h.user.id);
   h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: ['a', 'b'].map(id => ({ ref: { type: 'source', id }, output: 'provider' })) }, h.user.id);
   h.fetcher.mockImplementation(async () => { entered.release(); await held.promise; return { status: 200, body: 'trojan://fixture@node.test:443#节点' }; });
   const pending = h.app.request(`/subs/profile?token=${h.token}&id=p`); await entered.promise;
   h.store.delete('profile', 'p'); for (const id of ['a', 'b']) h.store.delete('source', id); held.release();
-  expect((await pending).status).toBe(404); expect(h.fetcher).toHaveBeenCalledTimes(1);
+  expect((await pending).status).toBe(404);
   expect(h.store.db.prepare("SELECT * FROM resource_bindings WHERE kind='source'").all()).toEqual([]);
   expect(h.store.db.prepare("SELECT * FROM snapshots WHERE owner_kind='source'").all()).toEqual([]);
 });
@@ -54,17 +53,6 @@ it.each([false, true])('删除规则增强时，正在执行的刷新任务不�
   held.release(); await service.stop();
   expect(service.getJob(job.id)).toBeUndefined();
   expect(h.store.invalidationListeners.size).toBe(0);
-});
-
-it('后台刷新排队期间删除的来源不会重新被请求', async () => {
-  const h = setup(), entered = gate(), held = gate();
-  h.store.delete('profile', 'p'); h.store.delete('ruleset', 'r');
-  for (let i = 0; i < 6; i++) h.store.put('source', { id: `s${i}`, name: `源${i}`, url: `https://nodes.test/${i}`, pipeline: [] }, h.user.id);
-  let calls = 0;
-  h.fetcher.mockImplementation(async () => { if (++calls === 4) entered.release(); await held.promise; return { status: 200, body: 'trojan://fixture@node.test:443#节点' }; });
-  const service = new ResourceService(h.store, h.snapshots, h.renderer), pending = service.tick(); await entered.promise;
-  h.store.delete('source', 's4'); h.store.delete('source', 's5'); held.release(); await pending; await service.stop();
-  expect(calls).toBe(4);
 });
 
 it('公共规则从文本改成 MRS 后地址变化，旧文本链接不返回二进制', async () => {

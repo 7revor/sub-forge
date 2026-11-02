@@ -55,15 +55,4 @@ describe('资源状态只读', () => {
     } finally { store.close(); }
   });
 
-  it('调度任务仍会绑定并拉取状态页只读过的资源', async () => {
-    const { store, fetcher, resources } = setup();
-    try {
-      resources.statuses(resources.all());
-      expect(fetcher).not.toHaveBeenCalled();
-      await resources.tick(); await resources.stop();
-      expect(fetcher).toHaveBeenCalledTimes(1);
-      expect(bindings(store)).toHaveLength(1);
-      expect(resources.statuses(resources.all())[0]).toMatchObject({ available: true });
-    } finally { store.close(); }
-  });
 });

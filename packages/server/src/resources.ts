@@ -20,17 +20,17 @@ export class ResourceService {
   private stopping = false;
   private additionalResources: () => Resource[] = () => [];
   setAdditionalResources(read: () => Resource[]) { this.additionalResources = read; }
-  private ticking?: Promise<void>;
+  private lastSweepAt?: number;
   constructor(private store:Store,private snapshots:SnapshotService,private renderer:RenderService,private now:()=>number=Date.now) {
     store.documentDeleteHooks.add(this.dropDocumentJobs);
     for (const row of store.db.prepare('SELECT data FROM refresh_jobs').all() as {data:string}[]) {
-      const job = JSON.parse(store.cipher.decrypt(row.data)) as RefreshJob;
+      const job = JSON.parse(row.data) as RefreshJob;
       if (job.state === 'running') { job.state = 'interrupted';job.error = '服务重启，刷新任务已中断，请重新刷新';this.interruptPending(job);this.save(job); }
     }
   }
   private readonly dropDocumentJobs = (kind:string,id:string) => {
     for (const row of this.store.db.prepare('SELECT id,data FROM refresh_jobs').all() as {id:string;data:string}[]) {
-      const job = JSON.parse(this.store.cipher.decrypt(row.data)) as RefreshJob;
+      const job = JSON.parse(row.data) as RefreshJob;
       if (job.kind === kind && job.documentId === id) this.store.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
     }
   };
@@ -41,12 +41,12 @@ export class ResourceService {
   }
   private save(job:RefreshJob) {
     if (job.documentBound !== false && ['profile', 'source', 'collection', 'ruleset'].includes(job.kind) && !this.store.get(job.kind as 'profile' | 'source' | 'collection' | 'ruleset', job.documentId)) return;
-    this.store.db.prepare('INSERT OR REPLACE INTO refresh_jobs VALUES (?,?,?,?)').run(job.id,job.owner,this.store.cipher.encrypt(JSON.stringify(job)),this.now());
+    this.store.db.prepare('INSERT OR REPLACE INTO refresh_jobs VALUES (?,?,?,?)').run(job.id,job.owner,JSON.stringify(job),this.now());
     this.store.changed();
   }
   getJob(id:string):RefreshJob|undefined {
     const row = this.store.db.prepare('SELECT data FROM refresh_jobs WHERE id = ?').get(id) as {data:string}|undefined;
-    return row ? JSON.parse(this.store.cipher.decrypt(row.data)) : undefined;
+    return row ? JSON.parse(row.data) : undefined;
   }
   ruleResources(rs:RuleSetDoc,scope?:string):Resource[] {
     return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:ruleBinding(rs.id,scope).id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:ruleBinding(rs.id,scope).scope}}));
@@ -104,7 +104,7 @@ export class ResourceService {
   startJob(owner:string,kind:string,id:string,explicit?:Resource[]):RefreshJob {
     if (this.stopping) throw new Error('服务正在关闭');
     const existing = this.store.db.prepare('SELECT data FROM refresh_jobs WHERE owner = ? ORDER BY at DESC').all(owner) as {data:string}[];
-    for (const row of existing) { const j = JSON.parse(this.store.cipher.decrypt(row.data)) as RefreshJob;if(j.state==='running' && j.kind===kind && j.documentId===id) return j; }
+    for (const row of existing) { const j = JSON.parse(row.data) as RefreshJob;if(j.state==='running' && j.kind===kind && j.documentId===id) return j; }
     const resources = this.unique(explicit ?? this.collect(kind,id));
     const dependencyKey = (items:Resource[]) => JSON.stringify(this.unique(items).map(r=>this.snapshots.identity(r.kind,r.id,r.url,r.options)).sort());
     const initialDependencies = dependencyKey(resources);
@@ -145,24 +145,36 @@ export class ResourceService {
     this.running.set(job.id,work);
     return job;
   }
-  tick():Promise<void> {
-    if (this.stopping) return Promise.resolve();
-    if (this.ticking) return this.ticking;
-    const work = (async()=>{
-      await this.each(this.unique(this.dependencies()),async r=>{
-        if (!this.snapshots.isBound(r.kind, r.id, r.url, r.options)) return;
-        const status=this.snapshots.status(r.kind,r.id,r.url,r.options);
-        if(status.nextFetchAt===undefined || this.now()>=status.nextFetchAt) await this.snapshots.get(r.kind,r.id,r.url,r.options);
-      });
-      this.store.pruneResourceBindings();
-      this.store.db.prepare('DELETE FROM refresh_jobs WHERE at < ?').run(this.now()-7*86400000);
-    })().finally(()=>{this.ticking=undefined;});
-    this.ticking=work;return work;
+  /** 正被配置订阅或模板使用的资源。规则集、订阅源文档本身不算使用。 */
+  private liveResources():Set<string> {
+    const collect = (id:string) => {
+      try { return this.collect('profile',id); }
+      catch (error) {
+        if (!(error instanceof ResourceAccessError)) throw error;
+        return [];
+      }
+    };
+    return new Set([
+      ...this.store.list('profile').flatMap(p=>collect(p.id)),
+      ...this.store.listTemplates().flatMap(t=>Object.values(this.renderer.collectRuleEntries(t.rules).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
+    ].map(r=>this.snapshots.resourceId(r.kind,r.id,r.url,r.options)));
   }
+  /** 只清理、不拉取：无人使用且超过系统缓存时间的资源下次读取时重新拉取。 */
+  sweep():void {
+    if (this.stopping) return;
+    this.lastSweepAt=this.now();
+    this.store.pruneResourceBindings();
+    this.store.pruneStaleBindings(this.liveResources(),this.now()-this.store.resourceCacheTtlSec*1000);
+    this.store.db.prepare('DELETE FROM refresh_jobs WHERE at < ?').run(this.now()-7*86400000);
+  }
+  /** 清理周期跟随系统缓存时间，修改设置后无需重启。 */
   start() {
     if(this.timer || this.stopping)return;
-    const run=()=>void this.tick().catch(error=>console.error('资源调度失败',error));
+    const run=()=>{
+      if(this.lastSweepAt!==undefined && this.now()-this.lastSweepAt<this.store.resourceCacheTtlSec*1000)return;
+      try { this.sweep(); } catch (error) { console.error('资源清理失败',error); }
+    };
     run();this.timer=setInterval(run,60_000);this.timer.unref();
   }
-  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all([...this.running.values(),this.ticking]);this.store.documentDeleteHooks.delete(this.dropDocumentJobs);}
+  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all(this.running.values());this.store.documentDeleteHooks.delete(this.dropDocumentJobs);}
 }

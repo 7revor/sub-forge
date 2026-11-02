@@ -31,6 +31,8 @@ it('不同用户同规则同处理共用产物和原文，平台变体独立，�
   const a = await h.main(h.tokenA, 'a'), b = await h.main(h.tokenB, 'b');
   expect(ruleUrl(a).replace(h.tokenA, '')).toBe(ruleUrl(b).replace(h.tokenB, ''));
   expect(Object.keys(a['rule-providers'])).toEqual(['规则增强']);
+  expect(h.fetcher).not.toHaveBeenCalled();
+  for (const url of [ruleUrl(a), ruleUrl(b)]) expect((await h.app.request(url)).status).toBe(200);
   expect(h.fetcher).toHaveBeenCalledTimes(1);
   const stash = await h.main(h.tokenB, 'b', '?target=stash&platform=ios');
   expect(ruleUrl(stash)).not.toBe(ruleUrl(b));
@@ -71,7 +73,7 @@ it('旧转换 token 入口不可用，修改下载参数不能把规则资源变
   const url = ruleUrl(await h.main(h.tokenA, 'a'));
   expect((await h.app.request(`/api/rules/convert?token=${h.tokenA}&url=https://foreign.test/x`)).status).toBe(401);
   expect((await h.app.request(`${url}&url=https://foreign.test/x&target=stash`)).status).toBe(400);
-  expect(h.fetcher).toHaveBeenCalledTimes(1);
+  expect(h.fetcher).not.toHaveBeenCalled();
 });
 
 it('通用链接遇到目标客户端不支持的 MRS 来源时返回明确错误，不抓取上游', async () => {
@@ -99,6 +101,7 @@ it('规则增强公共读取，普通用户不能修改他人定义；引用关�
 
 it('上游失败使用成功原文并标记告警，改写不可用返回 409，修复后恢复', async () => {
   const h = setup(); h.profile('a', h.a.id); const url = ruleUrl(await h.main(h.tokenA, 'a'));
+  expect((await h.app.request(url)).status).toBe(200);
   h.fail();
   const stale = await h.app.request(url); expect(await stale.text()).toBe('DOMAIN,one.test\n'); expect(stale.headers.get('x-sub-forge-warning')).toBe('last-good-rule');
   const rs = h.store.get('ruleset', 'r')!;

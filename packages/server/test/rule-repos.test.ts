@@ -139,20 +139,24 @@ describe('规则仓库索引', () => {
     expect(indexedEntries(h.store, 'Legacy', undefined, undefined).total).toBe(0);
     await restart.stop();
   });
-  it('启动自动索引，每日检查，停止后不再运行定时任务', async () => {
+  it('没有定时同步：到期后读取目录才更新，停止后不再更新', async () => {
     vi.useFakeTimers();
     const h = setup();
     const service = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
     try {
       service.start(); await service.refresh('blackmatrix7'); await service.refresh('zydou');
       const calls = h.fetcher.mock.calls.length;
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(h.fetcher.mock.calls.length).toBe(calls);
+      service.refreshIfDue();
       await vi.advanceTimersByTimeAsync(86_400_000);
+      expect(h.fetcher.mock.calls.length).toBe(calls);
+      service.refreshIfDue();
+      await vi.advanceTimersByTimeAsync(0);
       expect(h.fetcher.mock.calls.length).toBeGreaterThan(calls);
       await service.stop();
       const stoppedCalls = h.fetcher.mock.calls.length;
       await vi.advanceTimersByTimeAsync(86_400_000);
+      service.refreshIfDue();
+      await vi.advanceTimersByTimeAsync(0);
       expect(h.fetcher.mock.calls.length).toBe(stoppedCalls);
     } finally { await service.stop(); vi.useRealTimers(); }
   });
@@ -286,9 +290,9 @@ describe('规则仓库接口', () => {
     const h = setup(); await addUser(h.store, 'root', 'admin'); const c = client(h.app); await c.login('root');
     expect((await c.post('/api/rule-repos/blackmatrix7/refresh')).status).toBe(202);
     await h.service.refresh('blackmatrix7');
-    expect((await c.get('/api/rule-options/search?q=openai&scope=repository')).json.total).toBeGreaterThan(0);
+    expect((await c.get('/api/rule-options/search?q=openai&scope=repository&repository=blackmatrix7')).json.total).toBeGreaterThan(0);
     expect((await c.patch('/api/rule-repos/blackmatrix7', { enabled: false })).status).toBe(200);
-    expect((await c.get('/api/rule-options/search?q=openai&scope=repository')).json.total).toBe(0);
+    expect((await c.get('/api/rule-options/search?q=openai&scope=repository&repository=blackmatrix7')).json.total).toBe(0);
     expect((await c.patch('/api/rule-repos/blackmatrix7', { enabled: true })).status).toBe(200);
   });
   it('关联推荐组合保存后归属当前用户并可渲染', async () => {

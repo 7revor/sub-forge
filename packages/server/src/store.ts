@@ -6,7 +6,7 @@ import { Report, resolveProfileRouting, stableStringify } from '@sub-forge/core'
 import type { ClientAddress } from './net/client-ip.ts';
 import { migrateProfile, profileTemplate } from './profile-routing.ts';
 // SQLite 存储。保存文档、快照与最近一次成功的渲染结果。
-// 文档正文、快照 URL/正文/错误、订阅 token 均加密落盘（SYS-04）。
+// 文档、快照和令牌原文明文存储（2026-11-02 修订 SYS-04）；数据库文件权限为 0600，备份凭据和备份文件仍加密。
 
 import Database from 'better-sqlite3';
 import { pageMeta, type PageOptions, type PageResult } from './pagination.ts';
@@ -78,9 +78,13 @@ export class Store {
   readonly cipher: Cipher;
   private readonly now: () => number;
 
+  /** 只在数据库升级期间为 true：此时旧数据可能仍是密文，升级结束后全部是明文。 */
+  legacyEncoded = false;
+  private readText(value: string): string { return this.legacyEncoded ? this.cipher.decrypt(value) : value; }
+
   constructor(path: string, opts: StoreOptions = {}) {
     this.now = opts.now ?? Date.now;
-    if (!opts.cipher && path !== ':memory:') throw new Error('持久化数据库必须提供加密密钥');
+    if (!opts.cipher && path !== ':memory:') throw new Error('持久化数据库必须提供主密钥');
     this.cipher = opts.cipher ?? new Cipher(randomBytes(32));
     this.db = new Database(path);
     this.db.function('search_fold', { deterministic: true }, (value: unknown) => normalizeNameSearch(typeof value === 'string' ? value : ''));
@@ -148,6 +152,17 @@ export class Store {
       this.db.prepare('DELETE FROM snapshots WHERE owner_id = ?').run(resource);
     }
   }
+  /** 删除不在 live 中、最近一次拉取早于 before 的绑定；仍有其他绑定的资源保留快照。 */
+  pruneStaleBindings(live: Set<string>, before: number): void {
+    for (const row of this.db.prepare('SELECT kind, id, url_hash, resource FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
+      if (live.has(row.resource)) continue;
+      const { newest } = this.db.prepare('SELECT MAX(fetched_at) AS newest FROM snapshots WHERE owner_id = ?').get(row.resource) as { newest: number | null };
+      // 没有快照说明首次拉取还在进行，留给下一轮判断。
+      if (newest === null || newest >= before) continue;
+      this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(row.kind, row.id, row.url_hash);
+      this.pruneUnusedResource(row.resource);
+    }
+  }
   private dropResourceBindings(kind: SnapshotOwner, id: string, urls: string[] = []): void {
     const keep = new Set(urls.map(url => this.cipher.hmac(url)));
     for (const row of this.db.prepare('SELECT DISTINCT url_hash FROM snapshots WHERE owner_kind = ? AND owner_id = ?').all(kind, id) as { url_hash: string }[]) {
@@ -177,9 +192,9 @@ export class Store {
       }
       Object.values(v).forEach(item => walk(item, context));
     };
-    // 只有这三类文档持有资源地址；本地节点组可能很大，不必解密。
+    // 只有这三类文档持有资源地址；本地节点组可能很大，不必解析。
     for (const row of this.db.prepare("SELECT kind,id,data FROM docs WHERE kind IN ('source','ruleset','profile')").all() as {kind:string;id:string;data:string}[]) {
-      const doc = JSON.parse(this.cipher.decrypt(row.data));
+      const doc = JSON.parse(this.readText(row.data));
       if (row.kind === 'source' && doc.url) add('source', row.id, [doc.url]);
       if (row.kind === 'ruleset' && usableRuleSet(doc, this)) add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
       if (row.kind === 'profile') {
@@ -215,7 +230,7 @@ export class Store {
 
   getProfileMigrationBackup(id: string): ProfileDoc | undefined {
     const row = this.db.prepare('SELECT data FROM profile_migration_backups WHERE profile_id = ?').get(id) as { data: string } | undefined;
-    return row ? JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc : undefined;
+    return row ? JSON.parse(this.readText(row.data)) as ProfileDoc : undefined;
   }
 
   // ---------- 文档 ----------
@@ -228,9 +243,9 @@ export class Store {
     if (kind === 'source') doc = normalizeSourceFetch(doc as SourceDoc) as DocTypes[K];
     this.db.transaction(() => {
       if (kind === 'profile' && !(input as ProfileDoc).routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
-        .run(input.id, this.cipher.encrypt(JSON.stringify(input)), this.now());
+        .run(input.id, JSON.stringify(input), this.now());
       this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
-        .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
+        .run(kind, doc.id, owner, JSON.stringify(doc), this.now());
 
     })();
     this.configurationRevision++;
@@ -246,7 +261,7 @@ export class Store {
 
   getWithOwner<K extends DocKind>(kind: K, id: string): { doc: DocTypes[K]; owner: string | null; updatedAt: number } | undefined {
     const row = this.db.prepare('SELECT owner, data, updated_at FROM docs WHERE kind = ? AND id = ?').get(kind, id) as { owner: string | null; data: string; updated_at: number } | undefined;
-    return row ? { doc: JSON.parse(this.cipher.decrypt(row.data)) as DocTypes[K], owner: row.owner, updatedAt: row.updated_at } : undefined;
+    return row ? { doc: JSON.parse(this.readText(row.data)) as DocTypes[K], owner: row.owner, updatedAt: row.updated_at } : undefined;
   }
 
   /** owner 缺省时列出全部 */
@@ -254,10 +269,10 @@ export class Store {
     const rows = (owner === undefined
       ? this.db.prepare('SELECT data FROM docs WHERE kind = ? ORDER BY id').all(kind)
       : this.db.prepare('SELECT data FROM docs WHERE kind = ? AND owner = ? ORDER BY id').all(kind, owner)) as { data: string }[];
-    return rows.map((r) => JSON.parse(this.cipher.decrypt(r.data)) as DocTypes[K]);
+    return rows.map((r) => JSON.parse(this.readText(r.data)) as DocTypes[K]);
   }
 
-  /** 无搜索时在数据库分页；名称在加密正文内，搜索必须先解密再筛选。 */
+  /** 无搜索时在数据库分页；名称在 JSON 正文内，搜索时先解析再筛选。 */
   private readPage<T extends { id: string; name?: string }>(sql: string, params: string[], options: PageOptions, decode: (data: string) => T): PageResult<T> {
     if (options.q) {
       const matches = (this.db.prepare(sql).all(...params) as { data: string }[])
@@ -273,7 +288,7 @@ export class Store {
 
   listPage<K extends DocKind>(kind: K, options: PageOptions, owner?: string): PageResult<DocTypes[K]> {
     return this.readPage(`SELECT data FROM docs WHERE kind = ?${owner === undefined ? '' : ' AND owner = ?'} ORDER BY id`,
-      owner === undefined ? [kind] : [kind, owner], options, data => JSON.parse(this.cipher.decrypt(data)) as DocTypes[K]);
+      owner === undefined ? [kind] : [kind, owner], options, data => JSON.parse(this.readText(data)) as DocTypes[K]);
   }
 
   delete(kind: DocKind, id: string): boolean {
@@ -334,14 +349,14 @@ export class Store {
     this.db.transaction(() => {
       const existing = this.getToken(t.token);
       if (existing && existing.userId !== t.userId) throw new Error('令牌已被其他用户使用');
-      this.db.prepare('INSERT INTO user_tokens (user_id, token_hash, token_enc, created_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET token_hash = excluded.token_hash, token_enc = excluded.token_enc, created_at = excluded.created_at')
-        .run(t.userId, this.cipher.hmac(t.token), this.cipher.encrypt(t.token), this.now());
+      this.db.prepare('INSERT INTO user_tokens (user_id, token_hash, token, created_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET token_hash = excluded.token_hash, token = excluded.token, created_at = excluded.created_at')
+        .run(t.userId, this.cipher.hmac(t.token), t.token, this.now());
     })();
   }
 
   userToken(userId: string): (TokenDoc & { createdAt: number }) | undefined {
-    const row = this.db.prepare('SELECT token_enc, created_at FROM user_tokens WHERE user_id = ?').get(userId) as { token_enc: string; created_at: number } | undefined;
-    return row ? { token: this.cipher.decrypt(row.token_enc), userId, createdAt: row.created_at } : undefined;
+    const row = this.db.prepare('SELECT token, created_at FROM user_tokens WHERE user_id = ?').get(userId) as { token: string; created_at: number } | undefined;
+    return row ? { token: this.readText(row.token), userId, createdAt: row.created_at } : undefined;
   }
 
   resetToken(token: string): (TokenDoc & { createdAt: number }) | undefined {
@@ -383,7 +398,7 @@ export class Store {
     const urlHash = this.cipher.hmac(s.url);
     const tx = this.db.transaction(() => {
       const inserted = this.db.prepare('INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(s.ownerKind, s.ownerId, this.cipher.encrypt(s.url), urlHash, s.fetchedAt, s.ok ? 1 : 0, s.status ?? null, s.body === undefined ? null : this.cipher.encrypt(s.body), s.hash ?? null, s.userinfo ? JSON.stringify(s.userinfo) : null, s.error === undefined ? null : this.cipher.encrypt(s.error));
+        .run(s.ownerKind, s.ownerId, s.url, urlHash, s.fetchedAt, s.ok ? 1 : 0, s.status ?? null, s.body === undefined ? null : s.body, s.hash ?? null, s.userinfo ? JSON.stringify(s.userinfo) : null, s.error === undefined ? null : s.error);
       const row = { ...s, id: Number(inserted.lastInsertRowid) };
       if (s.ownerKind === 'source') {
         // 一个订阅源只留最新成功内容和最新失败状态，换地址也不累积历史。
@@ -411,18 +426,26 @@ export class Store {
   }
 
   private toSnapshot(r: RawSnapshot): SnapshotRow {
-    const s: SnapshotRow = { id: r.id, ownerKind: r.owner_kind, ownerId: r.owner_id, url: this.cipher.decrypt(r.url), fetchedAt: r.fetched_at, ok: r.ok === 1 };
+    const s: SnapshotRow = { id: r.id, ownerKind: r.owner_kind, ownerId: r.owner_id, url: this.readText(r.url), fetchedAt: r.fetched_at, ok: r.ok === 1 };
     if (r.status !== null) s.status = r.status;
-    if (r.body !== null) s.body = this.cipher.decrypt(r.body);
+    if (r.body !== null) s.body = this.readText(r.body);
     if (r.hash !== null) s.hash = r.hash;
     if (r.userinfo !== null) s.userinfo = JSON.parse(r.userinfo) as TrafficInfo;
-    if (r.error !== null) s.error = this.cipher.decrypt(r.error);
+    if (r.error !== null) s.error = this.readText(r.error);
     return s;
   }
 
   latestSnapshot(ownerKind: SnapshotOwner, ownerId: string, url: string, okOnly = true): SnapshotRow | undefined {
     ownerId = this.snapshotOwner(ownerKind, ownerId, url);
     const row = this.db.prepare(`SELECT * FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
+      .get(ownerKind, ownerId, this.cipher.hmac(url)) as RawSnapshot | undefined;
+    return row ? this.toSnapshot(row) : undefined;
+  }
+
+  /** 只判断新旧和状态时使用：不读取、不解码正文。 */
+  latestSnapshotMeta(ownerKind: SnapshotOwner, ownerId: string, url: string, okOnly = true): Omit<SnapshotRow, 'body'> | undefined {
+    ownerId = this.snapshotOwner(ownerKind, ownerId, url);
+    const row = this.db.prepare(`SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
       .get(ownerKind, ownerId, this.cipher.hmac(url)) as RawSnapshot | undefined;
     return row ? this.toSnapshot(row) : undefined;
   }

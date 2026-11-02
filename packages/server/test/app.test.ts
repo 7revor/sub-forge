@@ -139,7 +139,7 @@ describe('订阅接口', () => {
     const { app, store, calls } = setup();
     await get(app, '/subs/profile?token=tk-mac&id=p1');
     await get(app, '/subs/profile?token=tk-mac&id=p1');
-    expect(calls).toHaveLength(2); // 订阅源 + 规则集各拉一次
+    expect(calls).toHaveLength(1); // 只拉订阅源一次；规则由规则文件请求按需拉取
     expect(store.recentAccess('p1').map((r) => r.source)).toEqual(['fresh', 'fresh']);
   });
 });

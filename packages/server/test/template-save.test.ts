@@ -73,7 +73,7 @@ it('v18 升级先展开旧锁定订阅，再清理历史；绑定、归属、链
       store.db.prepare('INSERT INTO template_versions VALUES (?, ?, ?, ?)').run(t.id, version, JSON.stringify(t), 1234);
     }
     const base: ProfileDoc = { id: 'pinned', name: '锁定订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, template: { id: 't', follow: { pinned: 1 } } };
-    store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,1234)").run(base.id, 'owner', cipher.encrypt(JSON.stringify(base)));
+    store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,1234)").run(base.id, 'owner', JSON.stringify(base));
     const { template: _old, ...rest } = base;
     store.put('profile', { ...rest, id: 'bound', routing: { mode: 'bound', templateId: 't', groupAdditions: {} } }, 'owner');
     issueProfileToken(store, { token: 'unchanged', profileId: 'pinned' });
@@ -124,7 +124,7 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
     store.db.exec('CREATE TABLE template_versions (template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (template_id, version))');
     store.db.prepare('INSERT INTO template_versions VALUES (?, ?, ?, ?)').run('t', 7, JSON.stringify(oldTemplate), 1234);
     const oldProfile = { id: 'p', name: '绑定订阅', revision: 4, templateVersion: 7, nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: { mode: 'bound', templateId: 't', groupAdditions: {} } };
-    const encrypted = cipher.encrypt(JSON.stringify(oldProfile));
+    const encrypted = JSON.stringify(oldProfile);
     store.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?)').run('profile', 'p', 'owner', encrypted, 1234);
     store.db.prepare('INSERT INTO profile_migration_backups VALUES (?, ?, ?)').run('p', encrypted, 1234);
     issueProfileToken(store, { token: 'same-token', profileId: 'p' });

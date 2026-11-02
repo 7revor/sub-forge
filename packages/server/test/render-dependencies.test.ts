@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { ruleBodies } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -20,6 +21,13 @@ function setup(overlay: Overlay, tpl?: Template) {
   h.store.put('profile', { id: 'p', name: '测试', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay, ...(tpl ? { template: { id: tpl.id, follow: 'latest' as const } } : {}) });
   issueProfileToken(h.store, { token: 'token', profileId: 'p' });
   return { ...h, calls };
+}
+
+/** 主配置不拉规则：取出规则地址后请求规则文件。 */
+async function ruleFileStatus(h: { app: { request(url: string): Response | Promise<Response> } }) {
+  const main = await h.app.request('/subs/profile?token=token&id=p');
+  expect(main.status).toBe(200);
+  return (await h.app.request(Object.values<{ url: string }>(parse(await main.text())['rule-providers'])[0]!.url)).status;
 }
 
 describe('仅拉取实际启用的规则依赖', () => {
@@ -50,7 +58,7 @@ describe('仅拉取实际启用的规则依赖', () => {
 
   it('覆盖层重新启用模板规则后恢复拉取，失败时不会伪装成功', async () => {
     const h = setup({ rulePatches: { r: { enabled: true } } }, { ...template, rules: [{ ...rule, enabled: false }] });
-    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(503);
+    expect(await ruleFileStatus(h)).toBe(503);
     expect(h.calls).toEqual(['https://rules.example.test/bad']);
   });
 
@@ -59,7 +67,7 @@ describe('仅拉取实际启用的规则依赖', () => {
       { anchor: 'top', rule: { ...rule, enabled: false } },
       { anchor: 'bottom', rule: { ...rule, id: 'active' } },
     ] });
-    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(503);
+    expect(await ruleFileStatus(h)).toBe(503);
     expect(h.calls).toHaveLength(1);
   });
 });

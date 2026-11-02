@@ -119,16 +119,12 @@ describe('资源刷新任务',()=>{
     for(const p of Object.values(cfg['rule-providers']) as any[])expect(p.url).toContain('https://sub.test/resources/ruleset?');
     for(const p of Object.values(cfg['proxy-providers']) as any[])expect(p.interval).toBe(86400);
   });
-  it('后台调度不依赖请求，设置改变后按新周期刷新，任务及状态隔离',async()=>{
-    const h=await setup();let now=1700000000000;const service=new ResourceService(h.store,h.snapshots,h.renderer,()=>now);
-    await service.tick();expect(h.calls).toHaveLength(2);await service.tick();expect(h.calls).toHaveLength(2);
-    now+=3601000;h.advance(3601000);await service.tick();expect(h.calls).toHaveLength(2);
-    h.store.setResourceCacheTtlSec(3600);await service.tick();expect(h.calls).toHaveLength(4);
+  it('刷新任务及状态按用户隔离',async()=>{
+    const h=await setup();
     const other=await addUser(h.store,'other');const api=client(h.app);await api.login('other');
     expect((await api.post('/api/profiles/p/refresh-cache')).status).toBe(404);
     const start=await h.api.post('/api/profiles/p/refresh-cache');await done(h.api,start.json.job.id);
     expect((await api.get(`/api/refresh-jobs?id=${start.json.job.id}`)).status).toBe(404);
-    await service.stop();
   });
 });
 
