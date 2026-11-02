@@ -93,6 +93,19 @@ Stash 使用 YAML；配置、节点集和规则集的形状与 Clash 家族相�
 
 ## 2. 本项目使用方式
 
+### 主配置自动更新（2026-11-02 核对）
+
+| 客户端 | 官方机制 | 本项目输出 |
+| --- | --- | --- |
+| Surge | 顶部 `#!MANAGED-CONFIG <url> interval=<秒> strict=<布尔>`；更新后的配置必须继续包含声明 | 正式订阅和已保存订阅的预览均显示声明，间隔取系统资源缓存时间，默认 86400 秒；保留 `strict=false`，更新失败允许继续使用旧配置 |
+| Stash | 首行 `#SUBSCRIBED <url>`；官方说明默认每 12 小时检查，用户可在客户端配置页面修改 | 正式订阅和已保存订阅的预览补齐首行；不向声明追加官方未定义的 interval / strict 参数 |
+| Mihomo 系客户端 | 主配置更新由客户端管理；Clash Verge Rev 官方支持 HTTP `profile-update-interval` 响应头，单位小时 | 延续既有响应头，取系统资源缓存时间；不向 Mihomo YAML 添加未经确认的主配置更新字段 |
+| Loon | 当前官方通用设置和 URL Scheme 文档未找到与前两者等价的主配置更新声明 | 不添加猜测字段；主配置更新地址和周期由客户端管理。HTTP 更新提示头继续输出，但未确认 Loon 会读取 |
+
+更新 URL 固定指向本订阅，包含配置 ID、内核、平台、应用和当前请求 token；即使再次请求时 UA 不同，也保持原输出目标。预览里的 token 仅显示 `{token}`；未保存草稿没有可用的主订阅地址，不生成托管声明。Surge/Stash 独立文件导出不携带托管声明或占位更新 URL。失败回退也补齐更新声明，Surge 使用当前系统间隔。
+
+依据：[Surge Managed Profile](https://manual.nssurge.com/profile/managed-profile.html)、[Stash 服务提供商订阅](https://stash.wiki/features/service-provider-subscription)、[Clash Verge Rev 订阅响应头](https://www.clashverge.dev/guide/url_schemes.html)、[Mihomo 配置总览](https://wiki.metacubex.one/config/)、[Loon General](https://nsloon.app/en/docs/General/)、[Loon URL Scheme](https://github.com/Loon0x00/LoonManual/blob/master/docs/cn/scheme.md)。节点 provider、rule-provider 或远程规则自己的 interval / update-interval 只更新对应资源，与整份主配置更新分别处理。以上为文档和实现核对，不等于真实客户端定时更新验收。
+
 ### Stash 主订阅
 
 保留现有订阅 token，显式使用：
@@ -136,5 +149,6 @@ GET /api/rules/convert?url=<完整编码的上游URL>&target=stash&platform=ios
 | 2026-10-29 | Stash | 完整订阅、独立文件导出、规则转换及 iOS/macOS 预览接入；节点按快照内联 | 自动化及内置浏览器结果见[验收记录](../research/verification/stash-support-20261029/验收记录.md)；未进行 Stash 真机导入/转发验收 |
 | 2026-10-30 | Surge | 完整主订阅、独立导出、基础配置、节点与策略组接通 | 全量回归、内置浏览器、官方 surge-cli 离线检查；未真机转发 |
 | 2026-10-30 | Loon | 独立 INI 适配、规则集内嵌、平台规则与失败回退接通 | 全量回归和内置浏览器；未运行官方校验器或真机转发 |
+| 2026-11-02 | 四客户端 | 核对主配置更新机制，补齐 Stash `#SUBSCRIBED`，已保存的 Surge/Stash 预览展示托管更新声明；独立导出和未保存草稿保持无托管声明 | 全量回归、类型检查和构建通过；内置浏览器结果见[验收记录](../research/verification/client-profile-update-20261102/验收记录.md)；未进行真实客户端定时更新验收 |
 
 2026-10-30 后续修正：Loon 全部分流规则改为托管，含规则的草稿禁用独立导出，正式订阅沿用新 query API；旧内联 last-good 不再下发。见[源预览与托管验收](../research/verification/raw-source-preview-20261030/README.md)。上表内嵌记录属于初次实现基线。

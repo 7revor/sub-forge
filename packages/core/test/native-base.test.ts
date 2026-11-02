@@ -63,6 +63,8 @@ describe('原文追加的保存与生成边界', () => {
     expect(() => validateNativeText('rules: []', 'mihomo')).toThrow('由订阅生成');
     expect(() => validateNativeText('[Proxy]\na = direct', 'surge')).toThrow('由订阅生成');
     expect(() => validateNativeText('#!MANAGED-CONFIG https://example.test/config', 'surge')).toThrow('托管更新地址');
+    expect(() => validateNativeText('#SUBSCRIBED https://example.test/config\nmode: rule', 'stash')).toThrow('托管更新地址');
+    expect(() => resolveNativeBase('stash', 'stash-ios', { kernels: { mihomo: '#SUBSCRIBED https://example.test/config\nmode: rule' } })).toThrow('托管更新地址');
     expect(() => validateNativeText('listeners: []', 'mihomo')).not.toThrow();
   });
   it('无效 YAML、重复键、循环引用和原型键明确失败', () => {

@@ -43,7 +43,14 @@ describe('Stash 主订阅与资源隔离', () => {
     const h = await scenario();
     const res = await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}`, { headers: { 'user-agent': 'Stash/3.6.0' } });
     expect(res.status).toBe(200);
-    const yaml = parse(await res.text());
+    const text = await res.text();
+    const updateUrl = text.split('\n')[0]!.slice('#SUBSCRIBED '.length);
+    expect(updateUrl).toBe(`https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token=${h.token}`);
+    expect(res.headers.get('profile-update-interval')).toBe('24');
+    const updated = await h.app.request(updateUrl, { headers: { 'user-agent': 'curl' } });
+    expect(updated.status).toBe(200);
+    expect((await updated.text()).split('\n')[0]).toBe(`#SUBSCRIBED ${updateUrl}`);
+    const yaml = parse(text);
     expect(yaml['mixed-port']).toBe(7890); expect(yaml['allow-lan']).toBe(true);
     expect(yaml['log-level']).toBe('warning');
     expect(yaml.dns).toEqual({ enable: true, nameserver: ['https://dns.example.test/dns-query'] });
@@ -56,7 +63,9 @@ describe('Stash 主订阅与资源隔离', () => {
     const file = await h.app.request(provider.url);
     expect(file.status).toBe(200); expect(await file.text()).toContain('\nUSER-AGENT,PayPal*\n');
     expect((await h.app.request(`${provider.url}&target=mihomo`)).status).toBe(400);
-    const mac = parse(await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=macos`)).text());
+    const macText = await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=macos`)).text();
+    expect(macText.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=macos&app=stash-macos&token=${h.token}`);
+    const mac = parse(macText);
     expect(mac.rules).toContain('PROCESS-NAME,Example,代理');
     const mihomo = parse(await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=mihomo&platform=ios`)).text());
     expect(mihomo['mixed-port']).toBe(7890); expect(mihomo.proxies).toEqual([]);
@@ -83,7 +92,9 @@ describe('Stash 主订阅与资源隔离', () => {
     for (const path of ['/api/profiles/preview', `/api/profiles/${h.profile.id}/preview`]) {
       const preview = await h.alice.post(path, { profile: h.profile, client: 'stash', platform: 'ios' });
       expect(preview.status).toBe(200); expect(preview.json.ok, preview.text).toBe(true);
-      expect(preview.json.exportYaml).not.toMatch(/\{token\}|__SF_TOKEN__/);
+      if (path === '/api/profiles/preview') expect(preview.json.yaml).not.toContain('#SUBSCRIBED');
+      else expect(preview.json.yaml.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token={token}`);
+      expect(preview.json.exportYaml).not.toMatch(/\{token\}|__SF_TOKEN__|#SUBSCRIBED/);
       const yaml = parse(preview.json.exportYaml);
       expect(yaml['mixed-port']).toBe(7890);
       expect(yaml.dns).toEqual({ enable: true, nameserver: ['https://dns.example.test/dns-query'] });
@@ -114,7 +125,11 @@ describe('Stash 主订阅与资源隔离', () => {
     const h = await scenario();
     const verify = vi.fn(async () => ({ ok: true, output: '' }));
     const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify });
-    expect((await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' })).ok).toBe(true);
+    const original = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
+    expect(original.ok).toBe(true);
+    if (!original.ok) throw new Error(original.message);
+    // 模拟升级前缺少 Stash 更新声明的历史成功结果。
+    h.store.putLastGood(h.profile.id, 'stash:ios:stash-ios', { ...original.render, yaml: original.render.yaml.replace(/^#SUBSCRIBED[^\n]*\n/, '') });
     expect(verify).not.toHaveBeenCalled();
     expect((await renderer.render(h.profile.id, { client: 'mihomo' })).ok).toBe(true);
     expect(verify).toHaveBeenCalledTimes(1);
@@ -122,6 +137,8 @@ describe('Stash 主订阅与资源隔离', () => {
     const fallback = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
     expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
     if (!fallback.ok) throw new Error(fallback.message);
+    expect(fallback.render.yaml.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token=__SF_TOKEN__`);
+    expect(fallback.render.yaml.match(/^#SUBSCRIBED /gm)).toHaveLength(1);
     expect(parse(fallback.render.yaml).proxies[0].auth).toBe('example-password');
     expect((await renderer.render(h.profile.id, { client: 'stash', platform: 'macos' })).ok).toBe(false);
   });

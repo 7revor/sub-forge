@@ -318,7 +318,7 @@
 
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
-| OUT-01 | **主配置** `GET /subs/profile?id=P&token=T`：mihomo 输出 YAML；Surge 输出 conf，**首行**为 `#!MANAGED-CONFIG <本订阅地址> interval=<秒> strict=false`，每次下发都必须带这一行（否则 Surge 会把它退化为普通配置）。`interval` 取系统资源缓存时间，默认 86400 | P0 |
+| OUT-01 | **主配置** `GET /subs/profile?id=P&token=T`：mihomo 输出 YAML；Surge 输出 conf，**首行**为 `#!MANAGED-CONFIG <本订阅地址> interval=<秒> strict=false`，每次下发都必须带这一行（否则 Surge 会把它退化为普通配置）。`interval` 取系统资源缓存时间，默认 86400。Stash YAML 首行写入 `#SUBSCRIBED <本订阅地址>`，不追加未定义的间隔参数。两者地址保留 ID、输出目标和当前 token，已保存订阅的预览显示脱敏声明；未保存草稿与独立导出不带托管声明。Loon/Mihomo 不添加未经官方确认的主配置更新正文参数（2026-11-02 补充，见 [官方核对](17-official-client-configuration-guides.md#主配置自动更新2026-11-02-核对)） | P0 |
 | OUT-02 | **响应头**：<br>· `subscription-userinfo: upload=<B>; download=<B>; total=<B>; expire=<unix 秒>`，内容按 SRC-05 的设置（汇总勾选的节点订阅，同一上游地址只计一次）；没有流量信息时不输出<br>· `profile-update-interval: <小时>`，与 OUT-01 的间隔一致<br>· `content-disposition: inline; filename*=UTF-8''<Profile 名>`，保留客户端中的订阅显示名，浏览器以纯文本直接显示 YAML<br>各客户端是否读取这些头待采集（07 C4），不影响输出 | P0 |
 | OUT-03 | **外部节点集** `GET /subs/nodes?kind=provider&profile=P&id=K&token=T`：mihomo 输出 `proxies:` YAML；Surge 输出逐行 `[Proxy]` 格式（不带段标题）。URL 保持稳定，节点内容按当前配置生成（REF-11） | P0 |
 | OUT-04 | **规则集** `GET /resources/ruleset?key=K&token=T`：按 `behavior`、`format` 输出（RS-05）；托管的仓库规则保留来源注释与许可证声明（R2） | P0 |

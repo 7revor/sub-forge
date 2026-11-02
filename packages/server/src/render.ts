@@ -100,6 +100,17 @@ export class RenderService {
     private readonly opts: RenderServiceOptions,
   ) { this.sharedRules = new SharedRuleService(store, snapshots); }
 
+  /** 更新声明只属于已保存的主订阅；草稿和独立导出不绑定更新地址。 */
+  private managedProfileYaml(yaml: string, profileId: string, target: Target): string {
+    if (!profileId || (target.client !== 'surge' && target.client !== 'stash')) return yaml;
+    const url = queryUrl('/subs/profile', { id: profileId, target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER }, this.opts.publicUrl.replace(/\/$/, ''));
+    const header = target.client === 'surge'
+      ? `#!MANAGED-CONFIG ${url} interval=${this.store.resourceCacheTtlSec} strict=false`
+      : `#SUBSCRIBED ${url}`;
+    // 回退结果可能已有声明，旧结果也要补齐并使用当前更新间隔。
+    return header + '\n' + yaml.replace(/^(?:#!MANAGED-CONFIG|#SUBSCRIBED)\b[^\r\n]*(?:\r?\n|$)/, '');
+  }
+
   async render(profileId: string, target: Target): Promise<RenderOutcome> {
     target = normalizeTarget(target);
     const pre: ReportItem[] = [];
@@ -118,7 +129,7 @@ export class RenderService {
     const last = target.client === 'loon' && saved?.data.loonRuleDelivery !== 'remote' ? undefined : saved;
     if (last && this.store.getWithOwner('profile', profileId)?.owner && !this.canReadNodes(last.data, this.store.getWithOwner('profile', profileId)!.owner!)) return { ok: false, accessDenied: true, message: '节点资源权限已变化', report: attempt.report };
     if (last && !this.canReadRules(profileId, last.data)) return { ok: false, accessDenied: true, message: '规则资源已移除或失效', report: attempt.report };
-    if (last) return { ok: true, source: 'last-good', render: last.data, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
+    if (last) return { ok: true, source: 'last-good', render: { ...last.data, yaml: this.managedProfileYaml(last.data.yaml, profileId, target) }, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
     return { ok: false, message: attempt.failure ?? '渲染失败', report: attempt.report };
   }
 
@@ -163,7 +174,7 @@ export class RenderService {
     try {
       const a = await this.attempt(profileId, target, pre, { dry: true, ...overrides });
       return a.result
-        ? { ok: !a.failure, yaml: a.result.yaml, format: isIniClient(target.client) ? 'ini' : 'yaml', ...(target.client === 'loon' && Object.keys(a.result.rulesets).length ? { exportUnavailableReason: 'Loon 规则需要通过托管链接加载。请保存配置后，通过页面顶部的订阅链接在 Loon 中获取；草稿预览不能导出为可用配置。' } : {}), ...(target.client === 'surge' && !a.failure ? { exportYaml: stringifySurge(a.result, true) } : {}), ...(target.client === 'stash' && !a.failure && !Object.values(a.result.rulesets).some(r => r.text.startsWith('#subforge-binary-mrs\n')) ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
+        ? { ok: !a.failure, yaml: this.managedProfileYaml(a.result.yaml, profileId, target), format: isIniClient(target.client) ? 'ini' : 'yaml', ...(target.client === 'loon' && Object.keys(a.result.rulesets).length ? { exportUnavailableReason: 'Loon 规则需要通过托管链接加载。请保存配置后，通过页面顶部的订阅链接在 Loon 中获取；草稿预览不能导出为可用配置。' } : {}), ...(target.client === 'surge' && !a.failure ? { exportYaml: stringifySurge(a.result, true) } : {}), ...(target.client === 'stash' && !a.failure && !Object.values(a.result.rulesets).some(r => r.text.startsWith('#subforge-binary-mrs\n')) ? { exportYaml: exportStashConfig(a.result) } : {}), dependencies: a.result.dependencies, chainResolutions: a.result.chainResolutions, report: a.report, ...(a.failure ? { failure: a.failure } : {}) }
         : { ok: false, report: a.report, failure: a.failure ?? '渲染失败' };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
@@ -271,9 +282,7 @@ export class RenderService {
     checkCurrent();
     const render: StoredRender = {
       ...(target.client === 'loon' ? { loonRuleDelivery: 'remote' as const } : {}),
-      yaml: target.client === 'surge'
-        ? '#!MANAGED-CONFIG ' + queryUrl('/subs/profile', { id: profile.id, ...output }, publicUrl) + ' interval=' + this.store.resourceCacheTtlSec + ' strict=false\n' + result.yaml
-        : result.yaml,
+      yaml: this.managedProfileYaml(result.yaml, profile.id, target),
       nodeDependencies: [
         ...Object.keys(nodeSets.sources).map(id => ({ type: 'source' as const, id })),
         ...Object.keys(nodeSets.collections).map(id => ({ type: 'collection' as const, id })),

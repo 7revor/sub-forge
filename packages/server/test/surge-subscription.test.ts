@@ -36,7 +36,10 @@ describe('Surge 主订阅和 API', () => {
     const res = await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}`, { headers: { 'user-agent': 'Surge iOS/3412' } });
     expect(res.status).toBe(200); expect(res.headers.get('content-type')).toContain('text/plain');
     const text = await res.text();
-    expect(text).toContain('#!MANAGED-CONFIG https://sub.test/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token=' + h.token + ' interval=86400 strict=false');
+    expect(text.split('\n').slice(0, 2)).toEqual([
+      '#!MANAGED-CONFIG https://sub.test/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token=' + h.token + ' interval=86400 strict=false',
+      '#!FORBIDDEN-AUTO-UPGRADE smart-group',
+    ]);
     expect(text).toContain('[General]\nipv6 = false\nloglevel = notify\ntest-timeout = 5');
     expect(text).not.toMatch(/mixed-port|allow-lan/);
     expect(text).toContain('节点 = trojan, example.test, 443, password="example"');
@@ -56,7 +59,9 @@ describe('Surge 主订阅和 API', () => {
     for (const path of ['/api/profiles/preview', '/api/profiles/' + h.profile.id + '/preview']) {
       const res = await h.alice.post(path, { profile: h.profile, client: 'surge', platform: 'ios' });
       expect(res.json.ok, res.text).toBe(true); expect(res.json.format).toBe('ini');
-      expect(res.json.exportYaml).not.toMatch(/__SF_|RULE-SET/);
+      if (path === '/api/profiles/preview') expect(res.json.yaml).not.toContain('#!MANAGED-CONFIG');
+      else expect(res.json.yaml.split('\n')[0]).toBe('#!MANAGED-CONFIG https://sub.test/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token={token} interval=86400 strict=false');
+      expect(res.json.exportYaml).not.toMatch(/__SF_|RULE-SET|#!MANAGED-CONFIG/);
       expect(res.json.exportYaml).toContain('DOMAIN,example.test,代理,extended-matching\nIP-CIDR,192.0.2.0/24,代理,no-resolve\nUSER-AGENT,Example*,代理');
     }
     expect(h.store.getLastGood(h.profile.id, 'surge:ios:surge-ios')).toBeUndefined();
@@ -82,5 +87,25 @@ describe('Surge 主订阅和 API', () => {
     expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
     if (original.ok && fallback.ok) expect(fallback.render.yaml).toBe(original.render.yaml);
     expect((await renderer.render(h.profile.id, { client: 'surge', platform: 'macos' })).ok).toBe(false);
+  });
+  it('更新地址可再次拉取，缓存间隔变化同步到正文、响应头和失败回退', async () => {
+    const h = await scenario();
+    const path = `/subs/profile?token=${h.token}&id=${h.profile.id}&target=surge&platform=macos`;
+    const initial = await h.app.request(path);
+    const firstLine = (await initial.text()).split('\n')[0]!;
+    const url = firstLine.split(' ')[1]!;
+    h.store.setResourceCacheTtlSec(7200);
+    const updated = await h.app.request(url, { headers: { 'user-agent': 'curl' } });
+    expect(updated.status).toBe(200);
+    expect(updated.headers.get('profile-update-interval')).toBe('2');
+    expect((await updated.text()).split('\n')[0]).toBe(`#!MANAGED-CONFIG ${url} interval=7200 strict=false`);
+    h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'vless', server: 'example.test', port: 443, uuid: 'example' }] }, h.user.id);
+    h.store.setResourceCacheTtlSec(3600);
+    const fallback = await h.app.request(url);
+    const text = await fallback.text();
+    expect(fallback.status).toBe(200);
+    expect(fallback.headers.get('profile-update-interval')).toBe('1');
+    expect(text.split('\n')[0]).toBe(`#!MANAGED-CONFIG ${url} interval=3600 strict=false`);
+    expect(text.match(/^#!MANAGED-CONFIG /gm)).toHaveLength(1);
   });
 });

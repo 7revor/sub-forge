@@ -40,7 +40,7 @@ Stash 的顺序为 **Mihomo 公共原文 → 历史 Stash 公共原文（若存�
 - INI：只识别段落和必要的键。General、Host、MITM 同名键由后层替换，其余段落按顺序追加；不转换 DNS/Hosts 的值，保留原生指令及条件注释。重复键的合并不等于客户端语义校验。
 - DNS 分流、加密 DNS、Hosts、IPv6、GeoData、系统代理跳过、TUN 排除和 fake-ip-range 全由对应原生配置决定。服务端不推测跨内核等价项，也不验证每项在客户端版本中的支持程度。
 - `listeners` 在订阅追加中处理。
-- 节点、节点集、策略组和规则由已有模块生成。追加中含 `proxies`、`proxy-providers`、`proxy-groups`、`rules`、`rule-providers` 或相应 INI 段时明确报错，不静默删段或覆盖生成结果。Surge 托管更新地址由服务生成，追加中不能再次声明 `#!MANAGED-CONFIG`。
+- 节点、节点集、策略组和规则由已有模块生成。追加中含 `proxies`、`proxy-providers`、`proxy-groups`、`rules`、`rule-providers` 或相应 INI 段时明确报错，不静默删段或覆盖生成结果。Surge `#!MANAGED-CONFIG` 与 Stash `#SUBSCRIBED` 托管更新地址由服务生成，追加中不能再次声明；Stash 继承的 Mihomo 原文也遵守这一约束。
 - INI 测速 URL/超时只为已有节点、组输出读取必要的原生值；Loon 组间及全局超时冲突继续报错。
 
 格式错误允许保存，但预览生成失败；正式订阅仅能回退到同一目标的最近成功产物。基础配置原文不是整份成品配置导入入口，不再提供独立的 Loon 完整导入。模板仅提取策略组、规则及规则集引用；节点与规则由各自模块解析，基础配置不解析成业务对象。

@@ -123,6 +123,7 @@ export function validateNativeText(text: unknown, kernel: Client): asserts text 
     if (/^\s*#!MANAGED-CONFIG\b/m.test(text)) throw new Error('托管更新地址由订阅生成，请移除 #!MANAGED-CONFIG 行');
     for (const section of iniSections(text)) if (GENERATED_INI.has(section.name.toLowerCase())) throw new Error(`[${section.name}] 由订阅生成，请在节点、策略组或规则设置中编辑`);
   } else {
+    if (kernel === 'stash' && /^\s*#SUBSCRIBED\b/m.test(text)) throw new Error('托管更新地址由订阅生成，请移除 #SUBSCRIBED 行');
     for (const key of Object.keys(parseNativeYaml(text))) {
       if (GENERATED_YAML.has(key)) throw new Error(`${key} 由订阅生成，请在节点、策略组或规则设置中编辑`);
     }
