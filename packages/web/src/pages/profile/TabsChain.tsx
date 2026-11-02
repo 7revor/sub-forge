@@ -7,7 +7,6 @@ import { RoutingCard, RoutingCardActions, RoutingCardIcon } from '../../componen
 import { SortableList } from '../../components/SortableList.tsx';
 import type { ReactNode } from 'react';
 import { putChain } from './memberModel.ts';
-import { persistedProfile } from './routing.ts';
 import { CodePreview, type CodeRange } from '../../components/CodePreview.tsx';
 import { PreviewReport } from './PreviewReport.tsx';
 import { indexPreview, locatePreviewIssue } from './previewReport.ts';
@@ -24,7 +23,7 @@ import { useProfile } from './context.ts';
 
 function usePreview() {
   const { draft } = useProfile();
-  return useMutation({ mutationFn: ({ app, client = 'mihomo', profile = draft }: { app?: ClientApp; client?: Client; profile?: ProfileDoc } = {}) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: persistedProfile(profile), client, ...(app ? { app } : {}) }) });
+  return useMutation({ mutationFn: ({ app, client = 'mihomo', profile = draft }: { app?: ClientApp; client?: Client; profile?: ProfileDoc } = {}) => api<ProfilePreview>('POST', draft.id ? `/profiles/${draft.id}/preview` : '/profiles/preview', { profile: profile, client, ...(app ? { app } : {}) }) });
 }
 
 export function TabChains() {
@@ -71,7 +70,7 @@ export function TabPreview() {
   const [level, setLevel] = useState<'all' | 'error' | 'warn' | 'info'>('all');
   const [client, setClient] = useState<Client>('mihomo');
   const apps = CLIENT_APPS.filter(a => a.kernel === client);
-  const target = { client, profile: persistedProfile(draft), ...(app ? { app } : {}) };
+  const target = { client, profile: draft, ...(app ? { app } : {}) };
   const current = preview.data && !preview.isPending && !preview.error && JSON.stringify(preview.variables) === JSON.stringify(target);
   const report = preview.data?.report ?? [];
   const filtered = report.map((item, index) => ({ item, index })).filter(({ item }) => level === 'all' || item.level === level);

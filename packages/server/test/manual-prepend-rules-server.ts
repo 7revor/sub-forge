@@ -10,7 +10,7 @@ import { RenderService } from '../src/render.ts';
 const store = new Store(':memory:');
 const user = store.createUser({ username: 'prepend-admin', passwordHash: await hashPassword('prepend-test-2026'), role: 'admin' });
 store.put('source', { id: 'remote', name: '远端 provider', url: 'https://nodes.example.test/sub', pipeline: [] }, user.id);
-store.putTemplateVersion({ id: 'template', name: '前置规则验收模板', version: 1, groups: [
+store.putTemplate({ id: 'template', name: '前置规则验收模板', version: 1, groups: [
   { id: 'default', name: '默认策略组', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] },
   { id: 'auto', name: '自动选择', type: 'url-test', members: [{ kind: 'group', groupId: 'default' }], test: { interval: 300 } },
 ], rules: [{ id: 'template-rule', matcher: { kind: 'rule', rule: { type: 'DOMAIN-SUFFIX', value: 'example.test' } }, target: { kind: 'group', groupId: 'default' } }], final: { kind: 'group', groupId: 'auto' } });

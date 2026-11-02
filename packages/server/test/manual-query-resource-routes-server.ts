@@ -20,7 +20,7 @@ const config = { groups: [], rules: [
   { id: 'public-rule', matcher: { kind: 'ruleset' as const, id: 'public' }, target: direct },
   { id: 'private-rule', matcher: remoteRuleMatcher('https://fixture.test/Private.list'), target: direct },
 ], final: direct };
-store.putTemplateVersion({ id: 'template', name: '内部模板', ...config });
+store.putTemplate({ id: 'template', name: '内部模板', ...config });
 store.put('profile', { id: 'profile', name: '入口迁移验收订阅', nodeSets: [{ ref: { type: 'source', id: 'source' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'bound', templateId: 'template', groupAdditions: {} } }, user.id);
 const fetcher = async (url: string) => url.endsWith('/nodes') ? { status: 200, body: 'proxies: [{name: 验收节点, type: socks5, server: node.example.test, port: 1080}]', userinfo: { upload: 0, download: 100, total: 1000 } } : { status: 200, body: '# 私有规则来源原文\nDOMAIN,private.example.test\n' };
 const snapshots = new SnapshotService(store, fetcher);

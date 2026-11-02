@@ -118,7 +118,7 @@ export class SharedRuleService {
       return record.body;
     }
     const result = (record.target.client === 'loon' ? renderLoon : record.target.client === 'surge' ? renderSurge : record.target.client === 'stash' ? renderStash : renderMihomo)({
-      profile: { id: '$shared-rule', name: rs.name, nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: {
+      profile: { id: '$shared-rule', name: rs.name, nodeSets: [], chains: [], routing: { mode: 'independent', config: {
         groups: [], rules: [{ id: 'rule', matcher: record.reference.matcher, options: record.reference.options, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' },
       } } },
       nodeSets: { sources: {}, locals: {}, collections: {}, snapshots: {} }, rules,

@@ -1,5 +1,5 @@
 import { queryUrl } from '@sub-forge/core';
-import { editableProfileGroups, persistedProfile } from './routing.ts';
+import { editableProfileGroups } from './routing.ts';
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
 
 import type { GroupSpec, NodeSetID } from '@sub-forge/core';
@@ -46,7 +46,7 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
     if (!draft) return undefined;
     const groups = editableProfileGroups(draft, template.data);
     return {
-      draft, setDraft: (next) => setDraft(persistedProfile(next)),
+      draft, setDraft,
       template: template.data,
       groups,
       groupOptions: groups.map((g) => ({ id: g.id, name: g.name })),

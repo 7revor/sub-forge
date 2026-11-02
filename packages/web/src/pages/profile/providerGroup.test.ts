@@ -3,7 +3,7 @@ import type { ProfileDoc } from '../../hooks.ts';
 import { appendProviderGroup, removeIndependentGroup } from './providerGroup.ts';
 import { associationRequirements } from './associationModel.ts';
 const ref = { type: 'local' as const, id: 's' };
-const base: Omit<ProfileDoc, 'routing'> = { id: 'p', name: '订阅', nodeSets: [{ ref, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' } };
+const base: Omit<ProfileDoc, 'routing'> = { id: 'p', name: '订阅', nodeSets: [{ ref, output: 'provider' }], chains: [] };
 describe('Provider 快捷独立组', () => {
   it.each(['bound', 'independent'] as const)('%s 模式保存动态节点集成员，重名递增且原草稿不变', mode => {
     const profile: ProfileDoc = { ...base, routing: mode === 'bound' ? { mode, templateId: 't', groupAdditions: {} } : { mode, config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } };
@@ -12,7 +12,7 @@ describe('Provider 快捷独立组', () => {
     const groups = next.routing.mode === 'independent' ? next.routing.config.groups : next.routing.extraGroups!;
     expect(groups).toHaveLength(1);
     expect(groups[0]!).toMatchObject({ name: '机场 3', type: 'select', members: [{ kind: 'nodeset', ref }] });
-    expect(next.overlay).toEqual({});
+    expect(next).not.toHaveProperty('overlay');
     expect(profile).toEqual(snapshot);
     expect(appendProviderGroup({ ...profile, nodeSets: [{ ref, output: 'inline' }] }, ref, '机场', [])).toEqual({ ...profile, nodeSets: [{ ref, output: 'inline' }] });
   });

@@ -4,9 +4,6 @@ import type { ProfileDoc, TemplateDoc } from '../../hooks.ts';
 export function boundTemplateId(p: ProfileDoc): string | undefined {
   return p.routing.mode === 'bound' ? p.routing.templateId : undefined;
 }
-export function persistedProfile(p: ProfileDoc): ProfileDoc {
-  return { ...p, refPolicy: { default: 'wrap' }, overlay: {} };
-}
 
 /** 编辑器的原始组：模板成员与追加成员分开，弹窗分别展示继承项和可编辑项。 */
 export function editableProfileGroups(profile: ProfileDoc, template: TemplateDoc | undefined): (GroupSpec & { origin: 'template' | 'profile' })[] {

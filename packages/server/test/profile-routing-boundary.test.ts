@@ -17,11 +17,11 @@ describe('订阅 routing 边界', () => {
   it('底层写入先迁移；详情、列表及分页只返回 routing，原始备份不会被后续保存覆盖', () => {
     const store = new Store(':memory:');
     try {
-      store.putTemplateVersion(template);
+      store.putTemplate(template);
       const old = legacy('p');
       store.put('profile', old, 'owner');
       const current = store.get('profile', 'p')!;
-      expect(current).toMatchObject({ overlay: {}, routing: { mode: 'bound', templateId: 't', groupAdditions: { g: [{ kind: 'builtin', name: 'REJECT' }] } } });
+      expect(current).toMatchObject({ routing: { mode: 'bound', templateId: 't', groupAdditions: { g: [{ kind: 'builtin', name: 'REJECT' }] } } });
       expect(current).not.toHaveProperty('template');
       expect(store.list('profile', 'owner')).toEqual([current]);
       expect(store.listPage('profile', { page: 1, pageSize: 20, q: '' }, 'owner').items).toEqual([current]);
@@ -44,19 +44,19 @@ describe('订阅 routing 边界', () => {
     let store = new Store(file, { cipher });
     const old = legacy('p');
     try {
-      store.putTemplateVersion(template);
+      store.putTemplate(template);
       const user = store.createUser({ username: 'fixture', passwordHash: 'fixture-only', role: 'user' });
       store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(old.id, user.id, cipher.encrypt(JSON.stringify(old)), 1234);
       store.putToken({ token: 'fixture-routing-token', userId: user.id });
       store.putLastGood('p', 'mihomo:any', { yaml: '保留成功结果' });
       store.db.pragma('user_version = 28');
       const plan = await profileMigrationPlan(file, cipher);
-      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 29, profiles: [{ id: 'p', mode: 'bound' }] });
+      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 31, profiles: [{ id: 'p', mode: 'bound' }] });
       expect(store.get('profile', 'p')!.routing).toBeUndefined();
       expect(store.getProfileMigrationBackup('p')).toBeUndefined();
       store.close(); store = new Store(file, { cipher });
       const migrated = store.getWithOwner('profile', 'p');
-      expect(migrated).toMatchObject({ owner: user.id, updatedAt: 1234, doc: { routing: { mode: 'bound' }, overlay: {} } });
+      expect(migrated).toMatchObject({ owner: user.id, updatedAt: 1234, doc: { routing: { mode: 'bound' } } });
       expect(store.getProfileMigrationBackup('p')).toEqual(old);
       expect(store.userToken(user.id)?.token).toBe('fixture-routing-token');
       expect(store.getLastGood('p', 'mihomo:any')?.data).toEqual({ yaml: '保留成功结果' });
@@ -71,7 +71,7 @@ describe('订阅 routing 边界', () => {
     try {
       const alice = await addUser(env.store, 'alice');
       const bob = await addUser(env.store, 'bob');
-      env.store.putTemplateVersion(template);
+      env.store.putTemplate(template);
       env.store.put('local', { id: 'foreign', name: '别人的节点', proxies: [] }, bob.id);
       const api = client(env.app); await api.login('alice');
       const old = { ...legacy(''), overlay: { groupPatches: { g: { addMembers: [{ kind: 'nodeset', ref: { type: 'local', id: 'foreign' } }] } } } };
@@ -89,7 +89,7 @@ describe('订阅 routing 边界', () => {
       expect(env.store.list('profile')).toEqual([]);
       const saved = await api.post('/api/profiles', legacy(''));
       expect(saved.status).toBe(201);
-      expect(saved.json.item).toMatchObject({ routing: { mode: 'bound' }, overlay: {} });
+      expect(saved.json.item).toMatchObject({ routing: { mode: 'bound' } });
       expect(saved.json.item).not.toHaveProperty('template');
       const currentPreview = await api.post('/api/profiles/preview', { profile: saved.json.item });
       expect(currentPreview.json.yaml).toBe(preview.json.yaml);

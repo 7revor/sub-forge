@@ -38,7 +38,7 @@ export type ProfileDoc = Profile & {
 };
 
 /** 读取及业务处理只接收迁移后的分流结构；ProfileDoc 保留历史导入类型。 */
-export type RoutedProfileDoc = ProfileDoc & { routing: import('@sub-forge/core').ProfileRouting };
+export type RoutedProfileDoc = Omit<ProfileDoc, 'routing' | 'overlay' | 'refPolicy' | 'template' | 'updateIntervalSec'> & { routing: import('@sub-forge/core').ProfileRouting };
 
 export type TokenDoc = { token: string; userId: string; createdAt?: number };
 /** 旧种子仅用于导入时关联所有者，不继续发行旧订阅凭证。 */

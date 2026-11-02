@@ -11,7 +11,7 @@ it('保存规范化旧策略，草稿诊断返回实际前置、缺失与环且�
   const body = { name: '自动引用', nodeSets: [{ ref, output: 'provider' }], overlay: {}, refPolicy: { default: 'copy', perRef: { fake: 'inline' } }, chains: [{ id: 'c', landing: { nodeSet: ref, filter: '^落地$' }, via }], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } };
   const saved = await user.post('/api/profiles', body); expect(saved.status).toBe(201);
   const profile = saved.json.item;
-  expect(profile.refPolicy).toEqual({ default: 'wrap' });
+  expect(profile).not.toHaveProperty('refPolicy');
   const preview = await user.post(`/api/profiles/${profile.id}/preview`, { profile, client: 'mihomo' });
   expect(preview.json.chainResolutions).toEqual([{ chainId: 'c', viaName: '前置', landingCount: 1, appliedCount: 1, issues: [] }]);
   expect(preview.json.dependencies[0].strategy).toBe('wrap');

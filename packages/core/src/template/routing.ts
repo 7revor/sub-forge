@@ -12,7 +12,7 @@ export function routingConfig(effective: RoutingConfig): RoutingConfig {
 }
 
 export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overlay'>, template: Template | undefined, report: Report): Effective {
-  if (!profile.routing) return mergeTemplate(template, profile.overlay, report);
+  if (!profile.routing) return mergeTemplate(template, profile.overlay ?? {}, report);
   if (profile.routing.mode === 'independent') return {
     groups: profile.routing.config.groups.map(g => ({ ...g, origin: 'profile' })),
     rules: profile.routing.config.rules.map(r => ({ ...r, origin: 'profile' })), final: profile.routing.config.final,

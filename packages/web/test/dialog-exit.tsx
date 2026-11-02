@@ -25,7 +25,7 @@ import '../src/index.css';
 
 const nodeFixture = { nodeSet: { type: 'local' as const, id: 'self' }, name: '自建落地' };
 const profileFixture: ProfileModalData = {
-  profile: { id: 'exit-check', name: '代理链退场验收', nodeSets: [{ ref: nodeFixture.nodeSet, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
+  profile: { id: 'exit-check', name: '代理链退场验收', nodeSets: [{ ref: nodeFixture.nodeSet, output: 'inline' }, { ref: { type: 'local', id: 'relay' }, output: 'provider' }], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
   nodeSets: [{ ref: nodeFixture.nodeSet, name: nodeFixture.name }, { ref: { type: 'local', id: 'relay' }, name: '中转机场' }],
 };
 

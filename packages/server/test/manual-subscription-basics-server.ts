@@ -26,7 +26,7 @@ store.importSeed({ templates: [{ id: 'dialog-template', name: '弹窗隔离验�
   ],
 }, user.id);
 const snapshots = new SnapshotService(store, async () => { throw new Error('隔离验收不访问上游'); });
-store.putTemplateVersion({ id: 'alternate', name: '备用模板', groups: [{ id: 'new-select', name: '节点选择', type: 'select', members: [direct] }], rules: [], final: { kind: 'group', groupId: 'new-select' } });
+store.putTemplate({ id: 'alternate', name: '备用模板', groups: [{ id: 'new-select', name: '节点选择', type: 'select', members: [direct] }], rules: [], final: { kind: 'group', groupId: 'new-select' } });
 const bound = store.get('profile', 'bound')!;
 store.put('profile', { ...bound, routing: { mode: 'bound', templateId: 'dialog-template', groupAdditions: { select: [{ kind: 'nodeset', ref: { type: 'local', id: 'dialog-nodes' } }] } } }, user.id);
 const publicUrl = 'http://127.0.0.1:18649';

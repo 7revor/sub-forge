@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Report, resolveProfileRouting, routingConfig, type RoutingConfig } from '@sub-forge/core';
 import type { ProfileDoc, TemplateDoc } from '../../hooks.ts';
-import { acceptProfileSave, editableProfileGroups, persistedProfile, syncProfileDraft, withRoutingGroups, withRoutingRules } from './routing.ts';
+import { acceptProfileSave, editableProfileGroups, syncProfileDraft, withRoutingGroups, withRoutingRules } from './routing.ts';
 import { removeIndependentGroup } from './providerGroup.ts';
 const config: RoutingConfig = {
   groups: [{ id: 'a', name: '甲', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }], test: { interval: 300 } }, { id: 'b', name: '乙', type: 'fallback', members: [{ kind: 'group', groupId: 'a' }] }],
   rules: [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'test.local' } }, target: { kind: 'group', groupId: 'a' }, options: { src: true } }], final: { kind: 'group', groupId: 'b' },
 };
-const profile: ProfileDoc = { id: 'p', name: '配置', nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config } };
+const profile: ProfileDoc = { id: 'p', name: '配置', nodeSets: [], chains: [], routing: { mode: 'independent', config } };
 const template: TemplateDoc = { id: 't', groups: [{ id: 'tpl', name: '模板组', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [{ ...config.rules[0]!, id: 'tpl-rule', target: { kind: 'group', groupId: 'tpl' } }], final: { kind: 'group', groupId: 'tpl' } };
 const bound: ProfileDoc = { ...profile, routing: { mode: 'bound', templateId: 't', groupAdditions: { tpl: [{ kind: 'group', groupId: 'a' }] }, groupHidden: { tpl: false }, extraGroups: config.groups, prependGroupIds: ['a'], prependRules: config.rules, appendRules: [{ ...config.rules[0]!, id: 'last' }] } };
 const effective = (p: ProfileDoc) => routingConfig(resolveProfileRouting(p, template, new Report()));
@@ -23,7 +23,6 @@ describe('直接编辑 routing', () => {
     expect(next.routing.config.groups.map(group => group.name)).toEqual(['甲改', '乙改']);
     expect(next.routing.config.groups[1]!.members).toEqual([{ kind: 'group', groupId: 'a' }]);
     expect(profile).toEqual(before);
-    expect(persistedProfile({ ...next, overlay: { final: { kind: 'builtin', name: 'REJECT' } } }).overlay).toEqual({});
   });
 
   it('弹窗继承成员与追加成员分开展示，反复派生不叠加', () => {

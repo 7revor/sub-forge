@@ -115,12 +115,12 @@ describe('Loon 订阅与管理接口', () => {
     const profile = h.store.get('profile', h.profile.id)!;
     if (profile.routing?.mode !== 'independent') throw new Error('测试需要独立分流');
     const config = profile.routing.config;
-    h.store.putTemplateVersion({ id: 'loon-template', name: 'Loon 模板', version: 1, ...config });
+    h.store.putTemplate({ id: 'loon-template', name: 'Loon 模板', version: 1, ...config });
     h.store.put('profile', { ...profile, routing: { mode: 'bound', templateId: 'loon-template', groupAdditions: {} } }, h.user.id);
     const text = await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=loon&platform=ios`)).text();
     const link = text.split('[Remote Rule]\n')[1]!.split(',policy=')[0]!;
     expect(await (await h.app.request(link)).text()).toBe('DOMAIN,before.test\n');
-    h.store.putTemplateVersion({ id: 'loon-template', name: 'Loon 模板', version: 2, ...config, rules: config.rules.slice(1) });
+    h.store.putTemplate({ id: 'loon-template', name: 'Loon 模板', version: 2, ...config, rules: config.rules.slice(1) });
     expect((await h.app.request(link)).status).toBe(404);
   });
   it('旧内联 last-good 不得在失败时重新下发', async () => {

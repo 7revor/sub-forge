@@ -20,7 +20,7 @@ const template = { id: 'inline-hint', name: '规则布局验收', version: 1, gr
   { id: 'openai', matcher: remoteRuleMatcher('https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/OpenAI/OpenAI.list'), target: { kind: 'group' as const, groupId: 'proxy' } },
   { id: 'static', matcher: { kind: 'rule' as const, rule: { type: 'DOMAIN-SUFFIX' as const, value: 'example.test' } }, target: direct },
 ], final: direct };
-env.store.putTemplateVersion(template);
+env.store.putTemplate(template);
 env.store.put('profile', { id: 'inline-profile', name: '独立规则验收', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: template } }, env.user.id);
 const publicUrl = 'http://127.0.0.1:5223';
 const app = createApp({ ...env, ruleRepos: env.repos, publicUrl, webDir: resolve('../web/dist') });

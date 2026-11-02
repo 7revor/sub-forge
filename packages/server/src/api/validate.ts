@@ -1,7 +1,7 @@
 import { validateNativeBase } from '@sub-forge/core';
 import { localRulesError } from '@sub-forge/core';
 import { normalizeRulePresence } from '../rule-presence.ts';
-import { migrateProfile, profileTemplate, stripProfileRevisions } from '../profile-routing.ts';
+import { migrateProfile, profileTemplate } from '../profile-routing.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
 import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/adapters.ts';
@@ -281,8 +281,6 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
     }
     case 'preset': throw bad('基础设置预设已移除');
     case 'profile': {
-      delete doc.revision;
-      delete doc.templateVersion;
       if (!Array.isArray(doc.nodeSets)) throw bad('nodeSets 必须是数组');
       (doc.nodeSets as unknown[]).forEach((n, i) => {
         if (!isObj(n) || (n.output !== 'provider' && n.output !== 'inline')) throw bad(`节点集 ${i + 1} 的输出方式只能是 provider 或 inline`);
@@ -305,7 +303,6 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (doc.base !== undefined) try { validateNativeBase(doc.base); } catch (error) { throw bad((error as Error).message); }
       doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];
-      doc.refPolicy = { default: 'wrap' }; // 兼容旧字段，引用方式由客户端自动决定
       const extraRules = (doc.overlay as { extraRules?: unknown }).extraRules;
       if (extraRules !== undefined) {
         if (!Array.isArray(extraRules)) throw bad('extraRules 必须是数组');
@@ -314,7 +311,9 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
           if (!m) throw bad(`私有规则 ${i + 1} 格式错误`);
           checkRawRules(m, `私有规则 ${i + 1}`);
           if (m.kind === 'ruleset') {
-            const prior = store.get('profile', id)?.overlay.extraRules?.find(r => r.rule.id === (er as { rule: { id: string } }).rule.id)?.rule.matcher;
+            const previous = store.get('profile', id);
+            const previousRules = previous?.routing.mode === 'independent' ? previous.routing.config.rules : [...(previous?.routing.prependRules ?? []), ...(previous?.routing.appendRules ?? [])];
+            const prior = previousRules.find(r => r.id === (er as { rule: { id: string } }).rule.id)?.matcher;
             checkRuleSetReference(m as RuleSetMatcher, store, prior?.kind === 'ruleset' ? prior : undefined);
             if (!isStr(m.id) || (!m.repository && !m.remote && !refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
           }
@@ -335,7 +334,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       }
       validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);
       checkRawRules((doc.routing as { config?: { rules?: unknown } }).config?.rules, '分流规则');
-      doc = stripProfileRevisions(doc as unknown as import('../docs.ts').ProfileDoc) as unknown as Record<string, unknown>;
+      doc = migrateProfile(doc as unknown as import('../docs.ts').ProfileDoc, undefined) as unknown as Record<string, unknown>;
       break;
     }
   }
@@ -359,16 +358,16 @@ export function findReferrers(store: Store, ownerId: string, kind: DocKind, id: 
   if (kind === 'source' || kind === 'collection' || kind === 'local') {
     for (const c of store.list('collection', ownerId)) if (c.members.some((m) => isRef(m.ref))) hits.push(`组合「${c.name}」`);
     for (const p of store.list('profile', ownerId)) {
-      if (p.nodeSets.some((n) => isRef(n.ref)) || contains([p.overlay, p.routing, p.chains], 'type') || (kind === 'source' && (p.userinfo?.mode === 'sources' ? p.userinfo.sourceIds.includes(id) : p.userinfo?.mode === 'source' && p.userinfo.sourceId === id))) hits.push(`配置订阅「${p.name}」`);
+      if (p.nodeSets.some((n) => isRef(n.ref)) || contains([p.routing, p.chains], 'type') || (kind === 'source' && (p.userinfo?.mode === 'sources' ? p.userinfo.sourceIds.includes(id) : p.userinfo?.mode === 'source' && p.userinfo.sourceId === id))) hits.push(`配置订阅「${p.name}」`);
     }
     for (const l of store.list('local', ownerId)) if (contains(l.proxies, 'type')) hits.push(`本地节点组「${l.name}」`);
   }
   if (kind === 'ruleset') {
-    for (const p of store.list('profile')) if (contains([p.overlay, p.routing], 'kind')) {
+    for (const p of store.list('profile')) if (contains([p.routing], 'kind')) {
       hits.push(store.getWithOwner('profile', p.id)?.owner === ownerId ? `配置订阅「${p.name}」` : '其他用户的配置订阅');
     }
     // 模板由管理员维护，可能引用管理员名下的公共规则集
-    for (const t of store.listLatestTemplates()) {
+    for (const t of store.listTemplates()) {
       if (t.rules.some((r) => r.matcher.kind === 'ruleset' && r.matcher.id === id)) hits.push(`模板「${t.name ?? t.id}」`);
     }
   }

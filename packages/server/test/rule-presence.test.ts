@@ -25,8 +25,8 @@ describe('规则存在即生效', () => {
     let store = new Store(file, { cipher, now: () => 1234 });
     try {
       const withSources: TemplateVersionDoc = { ...template, rules: [...template.rules, { id: 'set', matcher: { kind: 'ruleset', id: 'rs' }, target: direct }] };
-      store.putTemplateVersion(withSources);
-      store.putTemplateVersion({ ...withSources, version: 2 });
+      store.putTemplate(withSources);
+      store.putTemplate({ ...withSources, version: 2 });
       store.put('profile', base, 'owner');
       store.put('profile', { ...base, id: 'independent', routing: { mode: 'independent', config: { groups: [], rules: [rule('own-on', true), rule('own-off', false)], final: direct } } }, 'owner');
       store.put('ruleset', { id: 'rs', name: '规则集', sources: [
@@ -39,19 +39,19 @@ describe('规则存在即生效', () => {
         rules: { rulesets: { rs: store.get('ruleset', 'rs')! }, snapshots: {} }, urls: { provider: key => key, ruleset: key => key } }).yaml;
       const before = ['p', 'independent'].map(output);
       store.db.pragma('user_version = 16'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(29);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(31);
       expect(['p', 'independent'].map(output)).toEqual(before);
       expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
       expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'p')?.owner);
-      expect(store.listLatestTemplates()).toHaveLength(1);
+      expect(store.listTemplates()).toHaveLength(1);
       expect(store.getTemplate('t')).not.toHaveProperty('version');
       expect(store.getTemplate('t')!.rules).toEqual([rule('on'), { id: 'set', matcher: { kind: 'ruleset', id: 'rs' }, target: direct }]);
       expect(store.get('profile', 'p')!.routing).toMatchObject({ prependRules: [rule('pre-on')] });
       expect(store.get('ruleset', 'rs')!.sources).toEqual([{ id: 'on', kind: 'local', format: 'auto', content: 'DOMAIN,source-on.test' }]);
       expect(store.get('source', 'nodes')!.pipeline[0]!.enabled).toBe(false);
-      const snapshot = [store.list('profile'), store.list('ruleset'), store.listLatestTemplates()];
+      const snapshot = [store.list('profile'), store.list('ruleset'), store.listTemplates()];
       store.close(); store = new Store(file, { cipher });
-      expect([store.list('profile'), store.list('ruleset'), store.listLatestTemplates()]).toEqual(snapshot);
+      expect([store.list('profile'), store.list('ruleset'), store.listTemplates()]).toEqual(snapshot);
     } finally { store.close(); rmSync(dir, { recursive: true }); }
   });
 

@@ -16,7 +16,7 @@ const template = { id: 'cards-template', name: '统一规则卡片验收', versi
   { id: 'remote', matcher: remoteRuleMatcher(url), target: direct },
   { id: 'local', matcher: { kind: 'local' as const, content: '# 本地示例\nDOMAIN,a.example.test\nIP-CIDR,198.51.100.0/24,no-resolve' }, target: direct },
 ], final: direct };
-env.store.putTemplateVersion(template);
+env.store.putTemplate(template);
 env.store.put('ruleset', { id: 'cards-rules', name: '统一来源卡片验收', sources: [
   { ...linked, id: 'linked' }, { id: 'remote', kind: 'remote', format: 'auto', url },
   { id: 'local', kind: 'local', format: 'auto', content: 'DOMAIN,a.example.test\nDOMAIN,b.example.test' },

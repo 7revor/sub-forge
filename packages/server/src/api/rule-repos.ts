@@ -60,7 +60,7 @@ export function ruleRepoRoutes(store: Store, repos: RuleRepoService, resources?:
   });
   app.delete('/rule-repos/:id', requireAdmin, async c => {
     const id = c.req.param('id');
-    const referrers = store.listLatestTemplates().filter(t => t.rules.some(r => r.matcher.kind === 'ruleset' && r.matcher.repository?.repo === id)).map(t => `模板「${t.name}」`);
+    const referrers = store.listTemplates().filter(t => t.rules.some(r => r.matcher.kind === 'ruleset' && r.matcher.repository?.repo === id)).map(t => `模板「${t.name}」`);
     for (const p of store.list('profile')) {
       const rules = p.routing.mode === 'independent' ? p.routing.config.rules : [...(p.routing.prependRules ?? []), ...(p.routing.appendRules ?? [])];
       if (rules.some(rule => rule.matcher.kind === 'ruleset' && rule.matcher.repository?.repo === id)) referrers.push(`配置订阅「${p.name}」`);

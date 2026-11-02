@@ -18,5 +18,7 @@ export function sourceUrl(data: Record<string, unknown>): string {
 /** 兼容旧请求和种子：移除订阅源已停用的独立拉取选项。 */
 export function normalizeSourceFetch<T extends { fetch?: { ttlSec?: number } }>(source: T): T {
   const { fetch, ...rest } = source;
+  // 旧本地来源仍交给历史迁移器转换；远程来源已不需要 kind 判别字段。
+  if ('kind' in rest && rest.kind === 'remote') delete rest.kind;
   return rest as T;
 }

@@ -125,7 +125,7 @@ it('发布时检查模板与追加成员合并后的环，并在异常版本进�
   expect(blocked.status).toBe(409);
   expect(blocked.json.details.impact[0].issues.some((i: any) => i.code === 'binding.group-cycle')).toBe(true);
   const good = await renderer.render(profile.id, { client: 'mihomo' });
-  store.putTemplateVersion({ id: t.id, version: 3, ...next } as any);
+  store.putTemplate({ id: t.id, version: 3, ...next } as any);
   const fallback = await renderer.render(profile.id, { client: 'mihomo' });
   expect(fallback.ok && fallback.source).toBe('last-good');
   expect(fallback.ok && fallback.render.yaml).toBe(good.ok && good.render.yaml);

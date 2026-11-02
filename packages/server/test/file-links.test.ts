@@ -15,7 +15,7 @@ function setup() {
   const headers = { cookie: `sf_session=${h.store.createSession(owner.id, 3600000)}` };
   const matcher = remoteRuleMatcher('https://rules.example.test/File.list');
   const config = { groups: [], rules: [{ id: 'remote', matcher, target: { kind: 'builtin' as const, name: 'DIRECT' as const } }], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
-  h.store.putTemplateVersion({ id: 'template', name: '模板', version: 1, ...config });
+  h.store.putTemplate({ id: 'template', name: '模板', version: 1, ...config });
   h.store.put('profile', { id: 'profile', name: '私有订阅', nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config } }, owner.id);
   h.store.put('profile', { id: 'bound', name: '绑定订阅', nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'bound', templateId: 'template', groupAdditions: {}, extraGroups: [] } }, owner.id);
   const link = (profile = 'profile', credential = token, rule = 'remote', value: Matcher = matcher) => queryUrl('/subs/ruleset', { profile, token: credential, rule, view: 'source', revision: stableHash(stableStringify(value)) });
@@ -82,7 +82,7 @@ it.each(['reset', 'disable', 'delete-profile', 'replace-profile', 'remove-templa
     const doc = h.store.get('profile', 'profile')!; h.store.delete('profile', 'profile');
     if (action === 'replace-profile') h.store.put('profile', doc, h.owner.id);
   }
-  if (action === 'remove-template-rule') h.store.putTemplateVersion({ id: 'template', name: '模板', version: 1, ...h.config, rules: [] });
+  if (action === 'remove-template-rule') h.store.putTemplate({ id: 'template', name: '模板', version: 1, ...h.config, rules: [] });
   if (action === 'delete-ruleset') h.store.delete('ruleset', 'enhance');
   finish(); const response = await request;
   expect(response.status).toBe(404); expect(await response.text()).not.toContain('file.example.test');

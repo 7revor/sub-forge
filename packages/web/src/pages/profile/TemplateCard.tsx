@@ -7,7 +7,7 @@ import { Button, Field, Select } from '../../components/ui.tsx';
 import { useTemplates, type ProfileDoc, type TemplateDoc } from '../../hooks.ts';
 import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalDescription, ModalFooter } from '../../modals/index.tsx';
 import { useProfile } from './context.ts';
-import { boundTemplateId, persistedProfile } from './routing.ts';
+import { boundTemplateId } from './routing.ts';
 import { associationRequirements, inferAssociationMapping } from './associationModel.ts';
 import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group.tsx';
 import { Label } from '../../components/ui/label.tsx';
@@ -32,7 +32,7 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
   const required = associationRequirements(draft, data.groups, effectiveMapping);
   const unresolved = required.some(g => !effectiveMapping[g.id] || (!g.canDrop && effectiveMapping[g.id] === '__drop'));
   const apply = () => modal.submit(async () => {
-    const profile = persistedProfile({ ...draft, name: draft.name.trim() || '未命名订阅' });
+    const profile = { ...draft, name: draft.name.trim() || '未命名订阅' };
     let converted: Conversion;
     if (mode === 'detach') converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'independent' });
     else {

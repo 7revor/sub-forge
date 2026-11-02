@@ -16,7 +16,7 @@ function setup(overlay: Overlay, tpl?: Template) {
   const h = setupApp({ fetcher: async url => { calls.push(url); throw new Error('模拟远程规则不可用'); } });
   envs.push(h);
   h.store.put('ruleset', { id: 'bad', name: '不可用规则', sources: [{ id: 's1', kind: 'remote', format: 'classical', url: 'https://rules.example.test/bad' }] });
-  if (tpl) h.store.putTemplateVersion(tpl);
+  if (tpl) h.store.putTemplate(tpl);
   h.store.put('profile', { id: 'p', name: '测试', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay, ...(tpl ? { template: { id: tpl.id, follow: 'latest' as const } } : {}) });
   issueProfileToken(h.store, { token: 'token', profileId: 'p' });
   return { ...h, calls };

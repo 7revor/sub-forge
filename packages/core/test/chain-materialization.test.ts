@@ -79,7 +79,7 @@ describe('订阅专属 Provider 服务端覆写', () => {
     expect(renderMihomo(f).report.byCode('ref.unresolved')[0]!.message).toContain('落地以外');
   });
   it('旧复制策略不生成多余节点，整集覆写仍写入 Provider', () => {
-    const f = fixture(); f.profile.refPolicy.default = 'copy';
+    const f = fixture(); f.profile.refPolicy!.default = 'copy';
     if (f.profile.routing?.mode !== 'independent') throw new Error('测试配置错误');
     f.profile.routing.config.groups[0]!.members.push({ kind: 'node', ref: { nodeSet: ref, match: { exact: '落地' } } });
     const result = renderMihomo(f);

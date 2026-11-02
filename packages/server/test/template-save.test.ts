@@ -34,7 +34,7 @@ it('直接保存当前模板，不保留历史；旧草稿和无版本请求按�
     expect((await admin.put(`/api/templates/${first.id}`, template)).status).toBe(200);
     expect(env.store.getTemplate(first.id)?.name).toBe('模板');
     expect(env.store.getTemplate(first.id)).not.toHaveProperty('version');
-    expect(env.store.db.prepare('SELECT COUNT(*) n FROM template_versions').get()).toEqual({ n: 1 });
+    expect(env.store.db.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({ n: 1 });
     expect((await admin.get(`/api/templates?id=${first.id}`)).json).not.toHaveProperty('versions');
     expect((await admin.get(`/api/templates/${first.id}/versions/1`)).status).toBe(404);
   } finally { env.store.close(); }
@@ -66,17 +66,18 @@ it('v18 升级先展开旧锁定订阅，再清理历史；绑定、归属、链
   const cipher = new Cipher(randomBytes(32));
   let store = new Store(file, { cipher, now: () => 1234 });
   try {
+    store.db.exec('CREATE TABLE template_versions (template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (template_id, version))');
     for (const version of [1, 2]) {
       const t = { ...template, id: 't', version, groups: [{ ...template.groups[0], name: `组${version}` }], changelog: '旧记录' };
       store.db.prepare('INSERT INTO template_versions VALUES (?, ?, ?, ?)').run(t.id, version, JSON.stringify(t), 1234);
     }
     const base: ProfileDoc = { id: 'pinned', name: '锁定订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, template: { id: 't', follow: { pinned: 1 } } };
-    store.put('profile', base, 'owner');
+    store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,1234)").run(base.id, 'owner', cipher.encrypt(JSON.stringify(base)));
     const { template: _old, ...rest } = base;
     store.put('profile', { ...rest, id: 'bound', routing: { mode: 'bound', templateId: 't', groupAdditions: {} } }, 'owner');
     issueProfileToken(store, { token: 'unchanged', profileId: 'pinned' });
     store.db.pragma('user_version = 18'); store.close(); store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(29);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(31);
     expect(store.getWithOwner('profile', 'pinned')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { routing: { mode: 'independent', config: { groups: [{ name: '组1' }] } } } });
     expect(store.get('profile', 'bound')?.routing).toMatchObject({ mode: 'bound', templateId: 't' });
     expect(store.getTemplate('t')).toMatchObject({ groups: [{ name: '组2' }] });
@@ -85,7 +86,7 @@ it('v18 升级先展开旧锁定订阅，再清理历史；绑定、归属、链
     expect(store.getTemplate('t', 1)).toBeUndefined();
     expect(store.getProfileMigrationBackup('pinned')).toEqual(base);
     expect(store.getToken('unchanged')?.userId).toBe(store.getWithOwner('profile', 'pinned')?.owner);
-    expect(store.db.prepare('SELECT COUNT(*) n FROM template_versions').get()).toEqual({ n: 1 });
+    expect(store.db.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({ n: 1 });
     store.close(); store = new Store(file, { cipher });
     expect(store.get('profile', 'pinned')?.routing?.mode).toBe('independent');
   } finally { store.close(); rmSync(dir, { recursive: true }); }
@@ -119,6 +120,7 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
   let store = new Store(file, { cipher, now: () => 1234 });
   try {
     const oldTemplate = { ...template, id: 't', version: 7 };
+    store.db.exec('CREATE TABLE template_versions (template_id TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (template_id, version))');
     store.db.prepare('INSERT INTO template_versions VALUES (?, ?, ?, ?)').run('t', 7, JSON.stringify(oldTemplate), 1234);
     const oldProfile = { id: 'p', name: '绑定订阅', revision: 4, templateVersion: 7, nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: { mode: 'bound', templateId: 't', groupAdditions: {} } };
     const encrypted = cipher.encrypt(JSON.stringify(oldProfile));
@@ -127,7 +129,7 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
     issueProfileToken(store, { token: 'same-token', profileId: 'p' });
     store.putLastGood('p', 'mihomo', { yaml: '原成功内容' });
     store.db.pragma('user_version = 19'); store.close(); store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(29);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(31);
     expect(store.getTemplate('t')).toEqual({ ...template, id: 't' });
     const profile = store.getWithOwner('profile', 'p');
     expect(profile).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { routing: oldProfile.routing } });

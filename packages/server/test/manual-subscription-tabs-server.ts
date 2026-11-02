@@ -27,7 +27,7 @@ store.importSeed({ templates: [{ id: 'dialog-template', name: '日常分流模�
   ],
 }, user.id);
 const snapshots = new SnapshotService(store, async () => ({ status: 200, body: 'DOMAIN,fixture.example.test' }));
-store.putTemplateVersion({ id: 'alternate', name: '备用模板', groups: [{ id: 'new-select', name: '节点选择', type: 'select', members: [direct] }], rules: [], final: { kind: 'group', groupId: 'new-select' } });
+store.putTemplate({ id: 'alternate', name: '备用模板', groups: [{ id: 'new-select', name: '节点选择', type: 'select', members: [direct] }], rules: [], final: { kind: 'group', groupId: 'new-select' } });
 const bound = store.get('profile', 'bound')!;
 store.put('profile', { ...bound, routing: { mode: 'bound', templateId: 'dialog-template', groupAdditions: { select: [{ kind: 'nodeset', ref: { type: 'local', id: 'dialog-nodes' } }] } } }, user.id);
 store.put('profile', { ...store.get('profile', 'independent')!, routing: { mode: 'independent', config: { groups: [], rules: [{ id: 'public', matcher: remoteRuleMatcher('https://fixture.test/Apple.list'), target: direct }], final: direct } } }, user.id);

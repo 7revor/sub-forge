@@ -1,0 +1,25 @@
+{
+  "sourceVersion": 29,
+  "beforeVersion": 29,
+  "afterVersion": 31,
+  "unchangedTables": [
+    "users",
+    "sessions",
+    "user_tokens",
+    "snapshots",
+    "last_good"
+  ],
+  "profiles": 1,
+  "sources": 2,
+  "retiredProfileFields": 0,
+  "legacySourceKinds": 0,
+  "retiredTables": [],
+  "templateColumns": [
+    "id",
+    "data",
+    "updated_at"
+  ],
+  "templatesIdentical": true,
+  "documentBusinessDataIdentical": true,
+  "ownersAndTimestampsIdentical": true
+}
