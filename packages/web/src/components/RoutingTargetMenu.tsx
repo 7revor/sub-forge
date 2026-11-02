@@ -2,13 +2,14 @@ import { Fragment, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { SearchInput } from './SearchInput.tsx';
 import { cx } from './ui.tsx';
+import { Button } from './ui/button.tsx';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu.tsx';
 
 type TargetOption = { value: string; label: string; group?: string };
 
-/** 卡片出口：文字区固定 84px（约「🚀 节点选择」宽度），箭头紧随其后并逐行对齐；使用菜单选择，不绘制表单输入框。 */
-export function RoutingTargetMenu({ value, options, onChange, label, placeholder, restoreFocus = true }: {
-  value: string; options: TargetOption[]; onChange: (value: string) => void; label: string; placeholder: string; restoreFocus?: boolean;
+/** 卡片出口：文字区固定 84px（约「🚀 节点选择」宽度），箭头紧随其后并逐行对齐；使用菜单选择，不绘制表单输入框。表单内用 field 显示为与 AsyncSelect 一致的整行下拉。 */
+export function RoutingTargetMenu({ value, options, onChange, label, placeholder, restoreFocus = true, field = false, id }: {
+  value: string; options: TargetOption[]; onChange: (value: string) => void; label: string; placeholder: string; restoreFocus?: boolean; field?: boolean; id?: string;
 }) {
   const [search, setSearch] = useState('');
   const focusAfterClose = useRef(restoreFocus);
@@ -24,11 +25,14 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
     return sections;
   }, []);
   return <DropdownMenu onOpenChange={open => { if (!open) setSearch(''); }}>
-    <DropdownMenuTrigger asChild><button type="button" aria-label={label} title={selected?.label ?? placeholder}
+    <DropdownMenuTrigger asChild>{field ? <Button type="button" id={id} variant="outline" aria-label={label} title={selected?.label ?? placeholder} className={cx('h-9 w-full justify-between text-sm font-normal', !selected && 'text-muted-foreground')}>
+      <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
+      <ChevronDown className="opacity-50" aria-hidden />
+    </Button> : <button type="button" aria-label={label} title={selected?.label ?? placeholder}
       className="flex h-8 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-transparent pr-1.5 pl-3 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
       <span className={cx('w-[84px] min-w-0 flex-none truncate', !selected && 'text-muted-foreground')}>{selected?.label ?? placeholder}</span>
       <ChevronDown size={14} className="shrink-0 text-muted-foreground" aria-hidden />
-    </button></DropdownMenuTrigger>
+    </button>}</DropdownMenuTrigger>
     <DropdownMenuContent onCloseAutoFocus={event => {
       if (openNodeAfterClose.current) {
         openNodeAfterClose.current = false;
@@ -36,7 +40,7 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
         onChange('node');
       } else if (!focusAfterClose.current) event.preventDefault();
     }} align="end" className="w-[260px] min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[min(360px,calc(100vw-2rem))]" aria-label={label}>
-      <div className="p-1" onKeyDown={event => { if (event.key !== 'Escape' && event.key !== 'Tab') event.stopPropagation(); }}><SearchInput className="h-8" aria-label="搜索出口策略组" placeholder="搜索策略组" value={search} onChange={event => setSearch(event.target.value)} /></div>
+      <div className="p-1" onKeyDown={event => { if (event.key !== 'Escape' && event.key !== 'Tab') event.stopPropagation(); }}><SearchInput className={cx('h-8', field && 'max-w-none')} aria-label="搜索出口策略组" placeholder="搜索策略组" value={search} onChange={event => setSearch(event.target.value)} /></div>
       <DropdownMenuRadioGroup value={value} onValueChange={next => { if (next === 'node') openNodeAfterClose.current = true; else if (next !== value) onChange(next); }}>
         {sections.map((section, i) => <Fragment key={i}>
           {i > 0 && <DropdownMenuSeparator />}
