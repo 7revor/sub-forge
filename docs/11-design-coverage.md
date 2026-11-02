@@ -333,3 +333,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-01 改为以 shadcn/ui 默认样式为标准：用 CLI 补装 input、textarea、badge、switch、checkbox、radio-group、tabs、card、table、toggle-group、label、separator、alert，并把 button、select、dialog、dropdown-menu、command、sonner 重置为官方实现；`:root` 只保留品牌色、状态色与字体，删除全局 `[data-slot]` 覆盖与自定义圆角；页面类名改用 foreground / border / card 等 shadcn 语义和 Tailwind 默认字号（控件文字 14px）；原生勾选控件统一为 Checkbox / RadioGroup，分段控件为 ToggleGroup，图标按钮用 icon / icon-sm 尺寸。设计画布 v2 的字号 13px、圆角 8px 等自定义规格以此为准替换。仅前端样式，领域模型与服务端无变化。
 
 2026-11-02 代理链来源与节点点选分离：画板 `V2ProfileDialogs` 的两个代理链弹窗已同步（来源 + 查找框 + 可点选节点 + 弱提示），对应 `ChainRuleEditor`。渲染在 `packages/core` 实现，无新增后端待实现项。旧画板 `ProfileChain` 属于已废弃的依赖节点版式，本次未修改。
+
+2026-11-02 表格统一迁移到 shadcn `Table`：修复表格末行底线与分页栏顶线叠成双线的问题（原全局规则在 `base` 层，优先级低于 `border-b`，实际未生效）。行分隔线改由 `TableRow` 绘制，`TableBody` 清除末行，删除 `th` / `td` 常量与全局规则；单元格字号随 shadcn 默认由 16px 改为 14px，普通数据行获得默认悬停态。画板 `V2Lists`、`V2Overview`、`V2RuleRepo`、`V2Settings` 同步为末行无底线、分页栏提供顶线。仅前端样式，领域模型与服务端无变化，无后端待实现项。
