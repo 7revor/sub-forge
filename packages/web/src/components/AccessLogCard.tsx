@@ -17,6 +17,7 @@ export function AccessLogCard() {
   const query = useQuery({
     queryKey: ['user-access-log', { kind, page, pageSize }],
     queryFn: () => api<PageResult<UserAccessLogRow>>('GET', `/access-log?${new URLSearchParams({ page: String(page), pageSize: String(pageSize), ...(kind === 'all' ? {} : { kind }) })}`),
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] as { kind?: string } | undefined)?.kind === kind ? previous : undefined,
     refetchInterval: 30_000,
   });
   const data = query.data;

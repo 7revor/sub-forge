@@ -3,7 +3,7 @@ import { RepositoryModal } from '../components/RepositoryModal.tsx';
 import { Plus, Check, Copy } from 'lucide-react';
 import { useClipboard } from '../hooks/useClipboard.ts';
 import { nameSearchRanges } from '@sub-forge/core';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type MouseEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ListTable, ListTableLoading } from '../components/ListTable.tsx';
@@ -64,6 +64,8 @@ function RepositoryFileTable({ query, repository, repos }: { query: string; repo
       if (repository) params.set('repository', repository);
       return api<RuleOptions>('GET', `/rule-options/search?${params}`);
     },
+    // 搜索或筛选变化会按 key 重新挂载；翻页、改条数时保留上一页结果，总数不闪动。
+    placeholderData: keepPreviousData,
   });
   return <>
     <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain" aria-busy={result.isFetching}>
