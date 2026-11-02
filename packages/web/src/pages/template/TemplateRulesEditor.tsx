@@ -2,7 +2,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { SearchInput } from '../../components/SearchInput.tsx';
 import { rulePreviewLinks } from '../../domain/rulePreview.ts';
 import { type Matcher, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
-import { ChevronDown, FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
+import { ChevronDown, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { TemplateBoundList } from '../../components/TemplateBoundList.tsx';
 import { targetLabel } from '../../components/pickers.tsx';
@@ -10,12 +10,14 @@ import { ruleToLine } from '../../components/rule.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, FieldError } from '../../components/ui.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
-import { RuleCard, RuleFinalCard } from '../../components/RuleCard.tsx';
+import { RuleCard, RuleFinalCard, type RuleKind } from '../../components/RuleCard.tsx';
 import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { RuleEditDialog } from './RuleEditDialog.tsx';
 import { applyRuleDraft, applyRuleDialogResult, linkRepositoryRules } from './ruleDraft.ts';
+
+const ruleMatcherKind = (matcher: Matcher): RuleKind => matcher.kind !== 'ruleset' ? 'local' : matcher.remote ? 'remote' : matcher.repository ? 'repository' : 'collection';
 
 export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
   if (matcher.kind === 'local') return localRuleLines(matcher.content).map(line => line.text).join(',') || '尚未填写';
@@ -45,8 +47,8 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   const linkableCount = remoteUrls.filter(url => repositoryMatches.matches[url]?.length === 1).length;
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
-  const edit = async (rule: RuleEntry, adding = false, scope?: 'repository' | 'local') => {
-    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions, scope, bound: !!templateRuleIds, groups: value.groups });
+  const edit = async (rule: RuleEntry, adding = false) => {
+    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions, bound: !!templateRuleIds, groups: value.groups });
     if (result.status !== 'confirmed') return;
     const draft = result.data.rule;
     const old = currentValue.current.rules.find(r => r.id === draft.id)?.matcher;
@@ -57,7 +59,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
     if (adding && url) void repositoryMatches.detect([url]);
     onRuleValidationReady(draft.id, true);
   };
-  const add = (matcher: Matcher, scope?: 'repository' | 'local') => void edit({ id: newId('r'), matcher, target: value.final }, true, scope);
+  const add = (matcher: Matcher) => void edit({ id: newId('r'), matcher, target: value.final }, true);
   const linkRepository = async (ruleId: string, url: string, match: RepositoryUrlMatch) => {
     if (readOnly) return;
     setLinkingRule(ruleId); setLinkError(undefined);
@@ -81,8 +83,8 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
       {!staticOnly && remoteUrls.length > 0 && <Button variant="ghost" disabled={repositoryMatches.isPending || repositoryMatches.isLinkingAll} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
       {!staticOnly && linkableCount > 0 && <Button disabled={repositoryMatches.isLinkingAll || !!linkingRule} onClick={() => void linkAllRepositories()}><Link2 size={15} />{repositoryMatches.isLinkingAll ? '关联中…' : `一键关联 ${linkableCount} 项`}</Button>}
       <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={16} />添加规则<ChevronDown size={14} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72">
+        {!staticOnly && <><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' })}><span><span className="block">系统规则集</span><span className="text-xs text-muted-foreground">搜索规则仓库文件或规则集合</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><span><span className="block">远程地址</span><span className="text-xs text-muted-foreground">填写 HTTP(S) 规则文件 URL</span></span></DropdownMenuItem></>}
         <DropdownMenuItem onSelect={() => add({ kind: 'local', content: '' })}><span><span className="block">本地规则</span><span className="text-xs text-muted-foreground">每行一条，如 DOMAIN-SUFFIX,openai.com</span></span></DropdownMenuItem>
-        {!staticOnly && <><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'repository')}><span><span className="block">从规则仓库选择</span><span className="text-xs text-muted-foreground">选择已索引的仓库文件</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'local')}><span><span className="block">引用规则集合</span><span className="text-xs text-muted-foreground">复用已合并的多来源集合</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><span><span className="block">远程规则地址</span><span className="text-xs text-muted-foreground">填写 HTTP(S) 规则文件 URL</span></span></DropdownMenuItem></>}
       </DropdownMenuContent></DropdownMenu>
 
     </>}</>}>
@@ -96,14 +98,14 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
         const label = ruleMatcherLabel(matcher, ctx);
         return <RuleCard id={`template-rule-${r.id}`} label={`第 ${i + 1} 项规则`} handle={handle} readOnly={readOnly}
           invalid={report.some(item => item.level === 'error' && item.where === `rule:${r.id}`)}
-          icon={local ? <FileText size={16} /> : matcher.remote ? <Globe size={16} /> : <Link2 size={16} />}
+          kind={ruleMatcherKind(matcher)}
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
           hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule || repositoryMatches.isLinkingAll} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
           target={readOnly ? <span className="block truncate pr-1.5 pl-3 text-sm" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
           externalPreview={!local} previewLinks={rulePreviewLinks(matcher)} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);
-          }}><span title={label} className={local || matcher.kind === 'ruleset' && matcher.remote ? "font-mono text-xs font-normal" : undefined}>{label}</span></RuleCard>;
+          }}><span title={label}>{label}</span></RuleCard>;
       }} />
       {!hideFinal && <>
         <RuleFinalCard readOnly={readOnly || !!templateRuleIds} targetId="template-rule-final" target={readOnly || templateRuleIds ? <span className="block truncate pr-1.5 pl-3" title={targetLabel(value.final, groupName, ref => ref.id)}>{targetLabel(value.final, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(value.final, final => onChange({ ...value, final }), 'MATCH 出口') : <TemplateTargetSelect label="MATCH 出口" value={value.final} groups={value.groups} onChange={final => onChange({ ...value, final })} />} />

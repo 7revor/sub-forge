@@ -10,7 +10,7 @@ import { RuleEditShell } from '../../components/RuleEditShell.tsx';
 import type { ConvertCtx } from '../../convert/templateYaml.ts';
 
 /** 编辑只修改弹窗草稿；URL 检测由列表在新增或导入时显式触发。 */
-export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx: ConvertCtx; staticOnly: boolean; adding: boolean; extendedOptions?: boolean; groups?: GroupSpec[]; scope?: 'repository' | 'local'; bound?: boolean }, { rule: RuleEntry; position: 'before' | 'after' }>(function RuleEdit({ data: { rule, index, ctx, staticOnly, adding, extendedOptions, groups = [], scope, bound }, modal }) {
+export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx: ConvertCtx; staticOnly: boolean; adding: boolean; extendedOptions?: boolean; groups?: GroupSpec[]; bound?: boolean }, { rule: RuleEntry; position: 'before' | 'after' }>(function RuleEdit({ data: { rule, index, ctx, staticOnly, adding, extendedOptions, groups = [], bound }, modal }) {
   const onSave = modal.confirm, onClose = modal.cancel;
   const [draft, setDraft] = useModalDraft(rule);
   const [position, setPosition] = useModalDraft<'before' | 'after'>('before');
@@ -24,9 +24,9 @@ export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx:
     try { normalized = { ...matcher, ...remoteRuleMatcher(matcher.remote.url) }; }
     catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
   } else if (!matcher.id) error = '请选择规则集';
-  return <RuleEditShell description={adding && bound ? '插入本订阅的前置规则' : undefined} confirmLabel={adding ? '添加' : '保存'} title={adding ? `添加规则 · ${matcher.kind !== 'ruleset' ? '本地规则' : matcher.remote ? '远程地址' : '引用规则'}` : `编辑第 ${index + 1} 项规则`}
+  return <RuleEditShell description={adding && bound ? '插入本订阅的前置规则' : undefined} confirmLabel={adding ? '添加' : '保存'} title={adding ? '添加规则' : `编辑第 ${index + 1} 项规则`}
     error={attempted ? error : undefined} onClose={onClose} onApply={() => { setAttempted(true); if (!error) onSave({ rule: { ...draft, matcher: normalized }, position }); }}>
-    <MatcherEditor directRemote fixedKind={adding || staticOnly} scope={scope} value={matcher} rulesets={ctx.rulesets}
+    <MatcherEditor directRemote fixedKind={staticOnly} value={matcher} rulesets={ctx.rulesets}
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}
       onRuleChange={rule => { if (matcher.kind === 'rule') setDraft({ ...draft, matcher: { ...matcher, rule } }); }}
       onChange={matcher => setDraft({ ...draft, matcher })} />

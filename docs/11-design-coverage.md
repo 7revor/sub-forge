@@ -361,3 +361,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 一键关联：`V2RuleSet`（补画「检测仓库关联」）、`V2Template`、`V2ProfileRouting` 工具栏增加「一键关联 N 项」；画布已同步，前端已实现，后端复用现有接口，无新增待实现项。卡片带操作时标题不换行，避免工具栏变宽后竖排。
 
 2026-11-02 规则弹窗统一：`V2ProfileDialogs`、`V2MoreDialogs` 的规则来源与规则编辑弹窗改为 640×620，编辑规则的匹配类型改为分段控件，两块画板高度调整为 2100px、2800px；v2 页「手写」统一改为「本地规则」。前端对应 `RuleEditShell`、`LocalRulesInput`、`MatcherEditor`、`RulesetSourceDialog`、`RuleEditDialog`。仅界面变化，无后端待实现项。
+
+2026-11-02 规则类型命名与添加入口统一：`V2Template`、`V2ProfileRouting`、`V2RuleSet`、`V2Components` 的规则行增加 48px 类型列，名称统一 14px 中等字重；规则仓库、规则集合换用独立图标。`V2ProfileRouting` 的添加菜单收敛为三项，`V2ProfileDialogs`、`V2MoreDialogs` 的添加弹窗标题统一为「添加规则」并带类型分段控件，`V2Pickers` 候选改为「规则集合 · 名称」。前端对应 `RuleCard`、`TemplateRulesEditor`、`RuleEditDialog`、`MatcherEditor`、`Rulesets`；后端对应 `rule-repos/options.ts`、`api/rule-options.ts` 的候选文案。无后端待实现项。

@@ -65,7 +65,7 @@ export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query:
     FROM named
     UNION ALL
     SELECT json_object('source', 'local', 'id', json_extract(value, '$.id')),
-      '本地 · ' || json_extract(value, '$.name'), json_extract(value, '$.hint'), json_extract(value, '$.name'),
+      '规则集合 · ' || json_extract(value, '$.name'), json_extract(value, '$.hint'), json_extract(value, '$.name'),
       json_extract(value, '$.name') || ' ' || json_extract(value, '$.hint'), 0, NULL, NULL, NULL, NULL
     FROM json_each(@locals)
   ), matches AS (

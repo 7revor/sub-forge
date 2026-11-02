@@ -18,7 +18,7 @@ function RuleOptionPicker({ scope = 'all', label, onSelect, ...props }: {
   return <AsyncSelect {...props} label={label} loadOptions={scope === 'all' ? loadAll : loadRepository} onChange={value => onSelect(JSON.parse(value) as RuleSelection)} />;
 }
 
-/** 模板、订阅和本地规则集共用两行分页列表；解析成功前不改动原草稿。 */
+/** 模板、订阅和规则集合共用两行分页列表；解析成功前不改动原草稿。 */
 export function RuleSetPicker({ onSelect, scope = 'all', label = '引用规则集', ariaLabel = label, id, triggerClassName, triggerIcon, valueLabel, placeholder, modal }: {
   onSelect: (matcher: RuleSetMatcher) => void; scope?: 'all' | 'repository'; label?: string; id?: string;
   ariaLabel?: string; triggerClassName?: string; triggerIcon?: ReactNode;

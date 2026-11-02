@@ -228,6 +228,7 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 ### 模板规则集统一引用（2026-10-29）
 
 - `GET /api/rule-options/search?q=&offset=0&limit=30&scope=all`：统一搜索可见本地与已启用仓库条目，返回 items/total/notices；scope=repository 用于本地规则集维护。
+- 规则集合候选的 `label` 为「规则集合 · 名称」，`hint` 为备注或来源数。
 - `GET /api/rule-options/locals`：返回可引用本地规则集的 ID/名称（本人及管理员公共规则），不改变仅本人可维护的文档列表。
 - `POST /api/rule-options/resolve`：请求 `{ source: 'local', id }` 或 `{ source: 'repository', repo, entry }`，返回 matcher，不创建本地规则集。
 - 仓库 matcher 保存所选文件映射及稳定身份；新引用检查索引，已发布映射在索引移除或仓库停用后保持可用。删除被模板/配置订阅直接引用的仓库返回 409 和引用方。本地规则集自身被引用时仍禁止删除。

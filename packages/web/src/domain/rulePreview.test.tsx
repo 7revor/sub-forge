@@ -29,7 +29,7 @@ it('增强引用打开合并结果；本地正文不创建外部链接', () => {
 });
 
 it('源文件使用新标签页原生链接，本地规则保留预览按钮', () => {
-  const props = { label: '规则', handle: null, icon: null, onPreview() {}, onEdit() {}, onDelete() {} };
+  const props = { label: '规则', handle: null, kind: 'local' as const, onPreview() {}, onEdit() {}, onDelete() {} };
   const external = renderToStaticMarkup(<RuleCard {...props} externalPreview previewLinks={[{ href: 'https://example.test/a.list' }]}>文件</RuleCard>);
   expect(external).toContain('href="https://example.test/a.list"');
   expect(external).toContain('target="_blank"');
