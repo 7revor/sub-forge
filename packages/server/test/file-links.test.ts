@@ -19,11 +19,11 @@ function setup() {
   h.store.put('profile', { id: 'profile', name: '私有订阅', nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config } }, owner.id);
   h.store.put('profile', { id: 'bound', name: '绑定订阅', nodeSets: [], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, routing: { mode: 'bound', templateId: 'template', groupAdditions: {}, extraGroups: [] } }, owner.id);
   const link = (profile = 'profile', credential = token, rule = 'remote', value: Matcher = matcher) => queryUrl('/subs/ruleset', { profile, token: credential, rule, view: 'source', revision: stableHash(stableStringify(value)) });
-  const templateLink = queryUrl('/api/templates/rule-file', { id: 'template', rule: 'remote', revision: stableHash(stableStringify(matcher)) });
-  return { ...h, raw, fetcher, owner, reader, token, readerToken, matcher, config, link, headers, templateLink };
+  const sessionLink = queryUrl('/api/rules/convert', { url: 'https://rules.example.test/File.list' });
+  return { ...h, raw, fetcher, owner, reader, token, readerToken, matcher, config, link, headers, sessionLink };
 }
 
-it('订阅专属原文用所有者 token，绑定模板后也只通过订阅暴露；模板原文仅接受登录会话', async () => {
+it('订阅专属原文用所有者 token，绑定模板后也只通过订阅暴露；管理接口仅接受登录会话', async () => {
   const h = setup();
   for (const url of [h.link(), h.link('bound')]) {
     const response = await h.app.request(url);
@@ -35,14 +35,13 @@ it('订阅专属原文用所有者 token，绑定模板后也只通过订阅暴�
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   }
   expect((await h.app.request(h.link('profile', h.readerToken), { headers: h.headers })).status).toBe(404);
-  expect((await h.app.request(h.templateLink)).status).toBe(401);
-  expect((await h.app.request(h.templateLink + '&token=' + h.token)).status).toBe(401);
-  expect((await h.app.request(h.templateLink + '&token=' + h.token, { headers: h.headers })).status).toBe(400);
-  expect(await (await h.app.request(h.templateLink, { headers: h.headers })).text()).toBe(h.raw);
+  expect((await h.app.request(h.sessionLink)).status).toBe(401);
+  expect((await h.app.request(h.sessionLink + '&token=' + h.token)).status).toBe(401);
+  expect((await h.app.request(h.sessionLink + '&token=' + h.token, { headers: h.headers })).status).toBe(400);
   const head = await h.app.request(h.link(), { method: 'HEAD' });
   expect(head.status).toBe(200); expect(await head.text()).toBe('');
   expect(h.store.listSharedRules()).toHaveLength(0);
-  expect(h.fetcher).toHaveBeenCalledTimes(3); // 两份私有订阅及内部模板各有绑定，权限范围不混用。
+  expect(h.fetcher).toHaveBeenCalledTimes(2); // 两份私有订阅各有绑定，权限范围不混用。
 });
 
 it('无效凭证不回退登录态，拒绝未保存引用、过期 revision、未知和重复查询参数', async () => {
@@ -97,18 +96,18 @@ it('无关配置更新不打断文件原文读取；二进制原文拒绝文本�
 });
 
 
-it.each(['logout', 'disable'])('模板原文在途 %s 后拒绝正文，资源 token 不能替代失效会话', async action => {
+it.each(['logout', 'disable'])('管理接口在途 %s 后拒绝正文，资源 token 不能替代失效会话', async action => {
   const h = setup();
   let started!: () => void, release!: () => void;
   const began = new Promise<void>(resolve => { started = resolve; });
   const gate = new Promise<void>(resolve => { release = resolve; });
   h.fetcher.mockImplementation(async () => { started(); await gate; return { status: 200, body: h.raw }; });
-  const request = h.app.request(h.templateLink, { headers: h.headers }); await began;
+  const request = h.app.request(h.sessionLink, { headers: h.headers }); await began;
   if (action === 'logout') h.store.deleteSession(h.headers.cookie.slice('sf_session='.length));
   else h.store.updateUser(h.owner.id, { disabled: true });
   release(); const response = await request;
   expect(response.status).toBe(401); expect(await response.text()).not.toContain('file.example.test');
-  expect((await h.app.request(h.templateLink + '&token=' + h.token, { headers: h.headers })).status).toBe(401);
+  expect((await h.app.request(h.sessionLink + '&token=' + h.token, { headers: h.headers })).status).toBe(401);
 });
 
 it('排队原文请求在删除后才开始拉取，也不能遗留私有绑定和快照', async () => {

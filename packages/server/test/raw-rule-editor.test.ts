@@ -1,3 +1,4 @@
+import { previewRuleset } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { addUser, client, setupApp } from './helpers.ts';
@@ -15,7 +16,7 @@ describe('三个入口的 RAW 保存及输出', () => {
     try {
       await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
       const text = 'AND,((DOMAIN,example.test),(NETWORK,tcp))';
-      const published = await c.post('/api/templates/new/publish', template(text));
+      const published = await c.post('/api/templates', template(text));
       expect(published.status).toBe(201);
       expect(published.json.item.rules[0].matcher.rule).toEqual(raw(text));
       const created = await c.post('/api/profiles', { ...profile([{ anchor: 'top', rule: entry('private-raw', 'IP-SUFFIX,8.8.8.8/24,no-resolve,src') }]), template: { id: published.json.item.id, follow: 'latest' } });
@@ -42,14 +43,14 @@ describe('三个入口的 RAW 保存及输出', () => {
     try {
       await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
       const draft = ruleset('PROCESS-PATH-WILDCARD,/apps/*');
-      const preview = await c.post('/api/rulesets/preview', { ruleset: draft, client: 'mihomo' });
+      const preview = await previewRuleset(c, { ruleset: draft, client: 'mihomo' });
       expect(preview.status).toBe(200);
       expect(preview.json.lines.filter((line: string) => line && !line.startsWith('#'))).toEqual(['PROCESS-PATH-WILDCARD,/Apps/*']);
       const created = await c.post('/api/rulesets', draft);
       expect(created.status).toBe(201);
       expect((await c.get(`/api/rulesets?id=${created.json.item.id}`)).json.item.overrides).toEqual(draft.overrides);
       const custom = ruleset('FUTURE,a,b,c');
-      const customPreview = await c.post('/api/rulesets/preview', { ruleset: custom, client: 'mihomo' });
+      const customPreview = await previewRuleset(c, { ruleset: custom, client: 'mihomo' });
       expect(customPreview.status).toBe(200);
       expect(customPreview.json.lines).toContain('FUTURE,a,b,c');
     } finally { await h.snapshots.settled(); h.store.close(); }
@@ -58,7 +59,7 @@ describe('三个入口的 RAW 保存及输出', () => {
     const h = setupApp();
     try {
       await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
-      expect((await c.post('/api/templates/new/publish', template(text))).status).toBe(400);
+      expect((await c.post('/api/templates', template(text))).status).toBe(400);
       expect((await c.post('/api/profiles', profile([{ anchor: 'top', rule: entry('bad', text) }]))).status).toBe(400);
       expect((await c.post('/api/profiles', { name: 'RAW 独立', nodeSets: [], chains: [], overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [entry('bad', text)], final: direct } } })).status).toBe(400);
       expect((await c.post('/api/rulesets', ruleset(text))).status).toBe(400);

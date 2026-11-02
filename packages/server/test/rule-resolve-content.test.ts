@@ -1,3 +1,4 @@
+import { previewRuleset } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -62,7 +63,7 @@ describe('no-resolve 以内容为准', () => {
       const rs = await api.post('/api/rulesets', { name: '规则增强', noResolve: true, sources: [source] });
       expect(rs.status, rs.text).toBe(201); expect(rs.json.item.noResolve).toBeUndefined();
       expect(rs.json.item.sources[0].content).toBe(content);
-      const t = await api.post('/api/templates/new/publish', { name: '模板', ...config });
+      const t = await api.post('/api/templates', { name: '模板', ...config });
       expect(t.status, t.text).toBe(201); expect(t.json.item.rules).toEqual(cleaned);
       for (const mode of ['independent', 'bound'] as const) {
         const profile = { name: mode, nodeSets: [], overlay: {}, ...(mode === 'bound' ? { templateVersion: 1 } : {}), routing: mode === 'independent'
@@ -91,7 +92,7 @@ describe('no-resolve 以内容为准', () => {
       await addUser(h.store, 'alice'); const api = client(h.app); await api.login('alice');
       const converted = await api.post('/api/rules/convert', { inputs: [{ source, content }], client: 'mihomo', noResolve });
       expect(converted.status).toBe(200); expect(converted.json.lines).toEqual(content.split('\n'));
-      const preview = await api.post('/api/rulesets/preview', { ruleset: { name: '预览', noResolve, sources: [source] }, client: 'mihomo' });
+      const preview = await previewRuleset(api, { ruleset: { name: '预览', noResolve, sources: [source] }, client: 'mihomo' });
       expect(preview.status).toBe(200); expect(preview.json.lines).toEqual(converted.json.lines);
       const get = await api.get('/api/rules/convert?url=https%3A%2F%2Fexample.test%2Frules.list');
       expect(get.status).toBe(200); expect(get.text).toBe(content + '\n');

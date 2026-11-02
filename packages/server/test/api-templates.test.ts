@@ -24,7 +24,7 @@ async function scenario() {
   await alice.login('alice');
   await bob.login('bob');
   const rs = (await admin.post('/api/rulesets', { name: 'AI', kind: 'local', format: 'auto', content: '.openai.com\n' })).json.item.id as string;
-  const published = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), changelog: '初版' });
+  const published = await admin.post('/api/templates', { ...TEMPLATE(rs), changelog: '初版' });
   const tplId = published.json.item.id as string;
   const src = (await alice.post('/api/sources', { name: '机场', url: 'https://air.example.com/sub', pipeline: [] })).json.item.id as string;
   const profile = (await alice.post('/api/profiles', {
@@ -47,14 +47,14 @@ describe('模板', () => {
         { name: 'google', url: 'https://example.test/unused-google.list' },
         { name: 'lan', url: 'https://example.test/unused-lan.list' },
       ];
-      const saved = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders });
+      const saved = await admin.post('/api/templates', { ...TEMPLATE(rs), ruleProviders });
       expect(saved.status).toBe(201);
       const id = saved.json.item.id;
       expect(saved.json.item.ruleProviders).toEqual(ruleProviders);
       expect((await admin.get(`/api/templates?id=${id}`)).json.item.ruleProviders).toEqual(ruleProviders);
       expect((await admin.get(`/api/templates/${id}/versions/1`)).status).toBe(404);
       for (const invalid of [[{ name: 'file', url: 'file:///tmp/rules' }], [ruleProviders[0], ruleProviders[0]], {}]) {
-        const result = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders: invalid });
+        const result = await admin.post('/api/templates', { ...TEMPLATE(rs), ruleProviders: invalid });
         expect(result.status).toBe(400);
         expect(result.json.details.report[0].code).toBe('template.invalid-provider');
       }
@@ -66,13 +66,13 @@ describe('模板', () => {
     expect(published.status).toBe(201);
     expect(published.json.item).not.toHaveProperty('version');
     expect((await alice.get('/api/templates')).json.items.map((t: { id: string }) => t.id)).toEqual([tplId]);
-    expect((await alice.post(`/api/templates/${tplId}/publish`, TEMPLATE(rs))).status).toBe(403);
+    expect((await alice.put(`/api/templates/${tplId}`, TEMPLATE(rs))).status).toBe(403);
   });
 
   it('自身校验不通过时禁止发布；编辑器可即时校验', async () => {
     const { admin, tplId, rs } = await scenario();
     const bad = { ...TEMPLATE(rs), rules: [{ id: 'x', matcher: { kind: 'ruleset', id: 'nope' }, target: { kind: 'group', groupId: 'gone' } }] };
-    const res = await admin.post(`/api/templates/${tplId}/publish`, bad);
+    const res = await admin.put(`/api/templates/${tplId}`, bad);
     expect(res.status).toBe(400);
     expect(res.json.details.report.map((i: { code: string }) => i.code).sort()).toEqual(['template.dangling-group', 'template.dangling-ruleset']);
     expect((await admin.post('/api/templates/validate', bad)).json.report).toHaveLength(2);
@@ -83,7 +83,7 @@ describe('模板', () => {
     expect((await alice.get(`/api/profiles?id=${profile}`)).json.item.routing.mode).toBe('independent');
     const withoutHk = { ...TEMPLATE(rs), groups: [{ id: 'sel', name: '🚀 节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], changelog: '删除香港组' };
     expect((await admin.post(`/api/templates/${tplId}/impact`, withoutHk)).json.impact).toEqual([]);
-    expect((await admin.post(`/api/templates/${tplId}/publish`, withoutHk)).status).toBe(200);
+    expect((await admin.put(`/api/templates/${tplId}`, withoutHk)).status).toBe(200);
     expect((await alice.post(`/api/profiles/${profile}/preview`)).json.ok).toBe(true);
     expect((await admin.get(`/api/templates?id=${tplId}`)).json.item.groups).toEqual(withoutHk.groups);
   });

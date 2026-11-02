@@ -1,3 +1,4 @@
+import { previewRuleset } from './helpers.ts';
 import { ruleBodies } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
@@ -11,7 +12,7 @@ describe('远程 YAML 转换为托管 LIST', () => {
       const user = await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
       const source = { id: 'yaml', kind: 'remote', format, url: 'https://example.com/input.yaml' };
       const doc = { name: 'YAML 转 LIST', sources: [source] };
-      const preview = await c.post('/api/rulesets/preview', { ruleset: doc, source: 'yaml', client: 'mihomo' });
+      const preview = await previewRuleset(c, { ruleset: doc, source: 'yaml', client: 'mihomo' });
       expect(preview.status).toBe(200);
       expect(preview.json).toMatchObject({ binary: false, sources: [{ conversion: 'yaml-to-list', rules: 3, rejected: 1 }] });
       expect(preview.json.lines).toContain('DOMAIN,example.com');
@@ -40,7 +41,7 @@ describe('远程 YAML 转换为托管 LIST', () => {
       for (const format of ['mrs','srs']) {
         const ruleset={name:'禁止伪装二进制',sources:[{id:'s',kind:'remote',url:'https://example.com/input.YML?download=1',format,behavior:'domain'}]};
         expect((await c.post('/api/rulesets',ruleset)).status).toBe(400);
-        expect((await c.post('/api/rulesets/preview',{ruleset,client:'mihomo'})).status).toBe(400);
+        expect((await previewRuleset(c, {ruleset,client:'mihomo'})).status).toBe(400);
       }
     } finally { h.store.close(); }
   });

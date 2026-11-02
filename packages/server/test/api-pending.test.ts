@@ -7,7 +7,7 @@ describe('尚未实现的接口', () => {
     await addUser(store, 'root', 'admin');
     const c = client(app);
     await c.login('root');
-    const repos = await c.get('/api/rule-repos/search?q=telegram');
+    const repos = await c.get('/api/rule-options/search?q=telegram&scope=repository');
     expect(repos.status).toBe(200);
     expect(repos.json).toMatchObject({ items: [], total: 0 });
     expect(repos.json.pending).toBeUndefined();

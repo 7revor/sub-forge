@@ -1,3 +1,4 @@
+import { previewRuleset } from './helpers.ts';
 import { ruleBodies } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import type { UpstreamFetcher } from '../src/net/upstream.ts';
@@ -110,14 +111,14 @@ describe('规则集预览（CR-05）', () => {
   it('单个来源按内核输出，同族两端一致，列出降级、丢弃与无法解析的行；草稿不必保存', async () => {
     const { alice } = await scenario();
     const ruleset = { name: '', sources: [local('a', RULES)] };
-    const mihomo = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'mihomo' });
+    const mihomo = await previewRuleset(alice, { ruleset, source: 'a', client: 'mihomo' });
     expect(activeLines(mihomo.json.lines)).toEqual(['DOMAIN-SUFFIX,notion.so', 'PROCESS-NAME-REGEX,^steam.*', 'PROCESS-PATH-WILDCARD,/Applications/*/Slack.app/*', 'IP-CIDR,1.1.1.0/24,no-resolve']);
     expect(mihomo.json.rejected.map((r: { reason: string }) => r.reason)).toEqual(['不支持的规则类型 UNKNOWN']);
     expect(mihomo.json.sources).toEqual([{ id: 'a', ok: true, stale: false, format: 'classical', behavior: 'classical', rules: 4, rejected: 1, rejectedDetails: [{ line: 5, text: 'UNKNOWN,x*', reason: '不支持的规则类型 UNKNOWN' }] }]);
-    const mac = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'macos' });
+    const mac = await previewRuleset(alice, { ruleset, source: 'a', client: 'surge', platform: 'macos' });
     expect(mac.json.lines).toContain('PROCESS-NAME,steam*');
     expect(mac.json.notes).toHaveLength(1);
-    const ios = await alice.post('/api/rulesets/preview', { ruleset, source: 'a', client: 'surge', platform: 'ios' });
+    const ios = await previewRuleset(alice, { ruleset, source: 'a', client: 'surge', platform: 'ios' });
     expect(ios.json.lines).toEqual(mac.json.lines);
     expect(ios.json.dropped).toHaveLength(0);
   });
@@ -130,13 +131,13 @@ describe('规则集预览（CR-05）', () => {
       { ...local('off', 'DOMAIN,off.test'), enabled: false },
     ] };
     for (const source of ['a', 'b', 'off']) {
-      const res = await alice.post('/api/rulesets/preview', { ruleset, source, client: 'mihomo' });
+      const res = await previewRuleset(alice, { ruleset, source, client: 'mihomo' });
       expect(res.status).toBe(200);
       expect(activeLines(res.json.lines)).toEqual([`DOMAIN,${source}.test`]);
       expect(res.json.stats).toBeUndefined();
       expect(res.json.rejected).toHaveLength(source === 'off' ? 0 : 1);
     }
-    const merged = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
+    const merged = await previewRuleset(alice, { ruleset, client: 'mihomo' });
     expect(activeLines(merged.json.lines)).toEqual(['DOMAIN,a.test', 'DOMAIN,b.test']);
     expect(merged.json.sources[0].rejectedDetails).toEqual([{ line: 3, text: 'UNKNOWN,a*', reason: '不支持的规则类型 UNKNOWN' }]);
     expect(merged.json.sources[1].rejectedDetails).toEqual([{ line: 2, text: 'UNKNOWN,b*', reason: '不支持的规则类型 UNKNOWN' }]);
@@ -145,7 +146,7 @@ describe('规则集预览（CR-05）', () => {
   it('来源诊断保留完整计数，详情最多返回 100 行', async () => {
     const { alice } = await scenario();
     const ruleset = { name: '大量不支持行', sources: [local('a', Array.from({ length: 105 }, (_, i) => `UNKNOWN,x${i}`).join('\n'))] };
-    const res = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
+    const res = await previewRuleset(alice, { ruleset, client: 'mihomo' });
     expect(res.status).toBe(200);
     expect(res.json.sources[0].rejected).toBe(105);
     expect(res.json.sources[0].rejectedDetails).toHaveLength(100);
@@ -159,7 +160,7 @@ describe('规则集预览（CR-05）', () => {
       local('b', 'DOMAIN,a.test\nDOMAIN-SUFFIX,b.test'),
       { ...local('off', 'DOMAIN,off.test'), enabled: false },
     ] };
-    const res = await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' });
+    const res = await previewRuleset(alice, { ruleset, client: 'mihomo' });
     expect(activeLines(res.json.lines)).toEqual(['IP-CIDR,10.0.0.0/8', 'DOMAIN-KEYWORD,x', 'DOMAIN,a.test', 'DOMAIN-SUFFIX,b.test']);
     expect(res.json.stats).toEqual({ domain: 2, classical: 1, ipcidr: 1, total: 5, duplicates: 1 });
   });
@@ -172,7 +173,7 @@ describe('规则集预览（CR-05）', () => {
       return { status: 200, body: 'DOMAIN,remote.test' };
     });
     const sources = [{ id: 'r', kind: 'remote', format: 'classical', url: 'https://rules.example.test/ok' }, { id: 'x', kind: 'remote', format: 'classical', url: 'https://rules.example.test/bad' }, local('l', 'DOMAIN,local.test')];
-    const draft = await alice.post('/api/rulesets/preview', { ruleset: { name: 'N', sources }, client: 'mihomo' });
+    const draft = await previewRuleset(alice, { ruleset: { name: 'N', sources }, client: 'mihomo' });
     expect(activeLines(draft.json.lines)).toEqual(['DOMAIN,remote.test', 'DOMAIN,local.test']);
     expect(draft.json.sources).toEqual([
       { id: 'r', ok: true, stale: false, format: 'classical', behavior: 'classical', rules: 1, rejected: 0 },
@@ -181,21 +182,21 @@ describe('规则集预览（CR-05）', () => {
     ]);
     expect(store.snapshotHistory('ruleset', 'draft')).toEqual([]);
     // 草稿不保留已完成缓存，下一次请求重新拉取
-    await alice.post('/api/rulesets/preview', { ruleset: { name: 'N', sources }, source: 'r', client: 'mihomo' });
+    await previewRuleset(alice, { ruleset: { name: 'N', sources }, source: 'r', client: 'mihomo' });
     expect(fetched.filter((u) => u.endsWith('/ok'))).toHaveLength(2);
 
     const id = (await alice.post('/api/rulesets', { name: 'N', sources: sources.slice(0, 1) })).json.item.id;
     // 已保存规则集里新填、尚未保存的地址同样不落快照
-    await alice.post('/api/rulesets/preview', { id, ruleset: { name: 'N', sources }, client: 'mihomo' });
+    await previewRuleset(alice, { id, ruleset: { name: 'N', sources }, client: 'mihomo' });
     expect(store.snapshotHistory('ruleset', id)).toHaveLength(1);
-    const saved = await alice.post('/api/rulesets/preview', { id, ruleset: { name: 'N', sources: sources.slice(0, 1) }, source: 'r', client: 'mihomo' });
+    const saved = await previewRuleset(alice, { id, ruleset: { name: 'N', sources: sources.slice(0, 1) }, source: 'r', client: 'mihomo' });
     expect(activeLines(saved.json.lines)).toEqual(['DOMAIN,remote.test']);
   });
 
   it('任意登录用户可以预览公共规则增强', async () => {
     const { alice, bob } = await scenario();
     const id = (await alice.post('/api/rulesets', { name: 'A', sources: [local('a', 'DOMAIN,a.test')] })).json.item.id;
-    expect((await bob.post('/api/rulesets/preview', { id, ruleset: { name: 'A', sources: [] }, client: 'mihomo' })).status).toBe(200);
+    expect((await previewRuleset(bob, { id, ruleset: { name: 'A', sources: [] }, client: 'mihomo' })).status).toBe(200);
   });
 });
 
@@ -314,12 +315,12 @@ describe('规则集组级改写保存与预览', () => {
     expect(rs.overrides).toEqual(overrides);
     expect(rs.sources.every((s: object) => !('overrides' in s))).toBe(true);
     for (const source of ['a', 'b', undefined]) {
-      const preview = await alice.post('/api/rulesets/preview', { id: rs.id, ruleset: rs, source, client: 'mihomo' });
+      const preview = await previewRuleset(alice, { id: rs.id, ruleset: rs, source, client: 'mihomo' });
       expect(preview.status).toBe(200);
       expect(preview.json.lines).toContain('DOMAIN,changed.test');
       expect(preview.json.lines).not.toContain('DOMAIN,same.test');
     }
-    const surge = await alice.post('/api/rulesets/preview', { ruleset: rs, client: 'surge' });
+    const surge = await previewRuleset(alice, { ruleset: rs, client: 'surge' });
     expect(surge.json.lines).toContain('DOMAIN,same.test');
     const profile = await alice.post('/api/profiles', { name: '改写输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
@@ -327,7 +328,7 @@ describe('规则集组级改写保存与预览', () => {
     expect(rendered.ok && Object.values(ruleBodies(store, rendered.render)).join('')).toContain('changed.test');
     expect(rendered.ok && activeLines(Object.values(ruleBodies(store, rendered.render)).join('\n').split('\n')).join('\n')).not.toContain('same.test');
     const removed = await alice.put(`/api/rulesets/${rs.id}`, { ...rs, overrides: [] });
-    const restored = await alice.post('/api/rulesets/preview', { ruleset: removed.json.item, client: 'mihomo' });
+    const restored = await previewRuleset(alice, { ruleset: removed.json.item, client: 'mihomo' });
     expect(restored.json.lines).toContain('DOMAIN,same.test');
     const rerendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rerendered.ok && Object.values(ruleBodies(store, rerendered.render)).join('')).toContain('same.test');
@@ -343,10 +344,10 @@ describe('规则集组级改写保存与预览', () => {
     expect(created.status).toBe(201);
     const rs = (await alice.get(`/api/rulesets?id=${created.json.item.id}`)).json.item;
     expect(rs.overrides).toEqual(overrides);
-    const preview = await alice.post('/api/rulesets/preview', { id: rs.id, ruleset: rs, client: 'mihomo' });
+    const preview = await previewRuleset(alice, { id: rs.id, ruleset: rs, client: 'mihomo' });
     expect(preview.status).toBe(200);
     expect(activeLines(preview.json.lines)).toEqual(['DOMAIN,keep.test', 'DOMAIN,added.test']);
-    const surge = await alice.post('/api/rulesets/preview', { ruleset: rs, client: 'surge' });
+    const surge = await previewRuleset(alice, { ruleset: rs, client: 'surge' });
     expect(activeLines(surge.json.lines)).toEqual(['DOMAIN,keep.test']);
     const profile = await alice.post('/api/profiles', { name: '追加输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
@@ -368,7 +369,7 @@ describe('规则集组级改写保存与预览', () => {
     ]) {
       const ruleset = { name: '非法', sources: [{ id: 'a', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }], overrides: [item] };
       expect((await alice.post('/api/rulesets', ruleset)).status).toBe(400);
-      expect((await alice.post('/api/rulesets/preview', { ruleset, client: 'mihomo' })).status).toBe(400);
+      expect((await previewRuleset(alice, { ruleset, client: 'mihomo' })).status).toBe(400);
     }
   });
 });

@@ -1,4 +1,3 @@
-import { requiredQuery } from '../query.ts';
 // 来源获取与无 I/O 转换分别提供接口，客户端切换不会读取上游。
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -40,11 +39,12 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
   const app = new Hono<ApiEnv>();
   const converter = new RuleConverter();
   const getter = new RuleSourceService(snapshots, converter);
-  for (const path of ['/rulesets/preview', '/rulesets/source', '/rules/convert', '/rules/matcher-source', '/rulesets/sources/content']) {
+  for (const path of ['/rulesets/source', '/rules/convert', '/rules/matcher-source']) {
     app.use(path, requireUser);
     app.use(path, bodyLimit({ maxSize: 16 * 1024 * 1024 }));
   }
-  const own = (id: unknown, userId: string): RuleSetDoc | undefined => {
+  // 规则集公共可读，这里只确认已保存来源存在，写权限由保存接口校验。
+  const savedRuleset = (id: unknown): RuleSetDoc | undefined => {
     if (id === undefined) return undefined;
     if (typeof id !== 'string') throw bad('规则集 id 不合法');
     const row = store.getWithOwner('ruleset', id);
@@ -70,45 +70,14 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
     }));
     return c.json({ name: ruleset.name, content: loaded.join('\n'), sources: sources.length });
   });
-  app.get('/rulesets/sources/content', async c => {
-    const saved = own(requiredQuery(c, 'id'), c.get('user').id)!;
-    const src = saved.sources.find(s => s.id === requiredQuery(c, 'source'));
-    if (!src) throw notFound('来源');
-    return c.json(await getter.get(c.get('user').id, src, saved));
-  });
-  // 草稿包含未保存的正文和参数，因此使用 POST；与 GET 共用 getter。
+  // 草稿包含未保存的正文和参数，因此使用 POST。
   app.post('/rulesets/source', async c => {
     const body = await jsonBody<{ id?: unknown; source?: unknown; refresh?: unknown }>(c);
-    const saved = own(body.id, c.get('user').id);
+    const saved = savedRuleset(body.id);
     if (body.refresh !== undefined && typeof body.refresh !== 'boolean') throw bad('refresh 必须是布尔值');
     const src = source(body.source);
     checkRepositorySource(src, saved?.sources.find(s => s.id === src.id), store, '来源');
     return c.json(await getter.get(c.get('user').id, src, saved, body.refresh === true));
-  });
-  // 兼容旧调用方：仅编排 getter 与 converter，不再维护第二套解析/转换实现。
-  app.post('/rulesets/preview', async c => {
-    const body = await jsonBody<{ id?: unknown; ruleset?: RuleSetDoc; source?: string; client?: string }>(c);
-    const saved = own(body.id, c.get('user').id);
-    if (body.client !== undefined && !['mihomo', 'surge', 'stash', 'loon'].includes(body.client)) throw bad('客户端不合法');
-    if (!body.ruleset || !Array.isArray(body.ruleset.sources)) throw bad('ruleset.sources 必须是数组');
-    checkRuleSetOverrides(body.ruleset.overrides);
-    const sources = body.ruleset.sources.map(source);
-    const loaded: Awaited<ReturnType<RuleSourceService['get']>>[] = [];
-    for (const src of sources) {
-      checkRepositorySource(src, saved?.sources.find(s => s.id === src.id), store, '来源');
-      loaded.push(await getter.get(c.get('user').id, src, saved));
-    }
-    if (body.source !== undefined && !sources.some(s => s.id === body.source)) throw bad('来源不存在');
-    const result = converter.convert(sources.map((src, i) => ({ source: src, content: loaded[i]!.content })),
-      { overrides: body.ruleset.overrides },
-      { client: body.client === 'surge' || body.client === 'stash' || body.client === 'loon' ? body.client : 'mihomo' } as ClientCtx, body.source);
-    const stats = result.stats;
-    return c.json({ ...result, sources: loaded.map(x => x.status), total: result.lines.length,
-      stats: body.source ? undefined : { domain: stats.domain, classical: stats.classical, ipcidr: stats.ipcidr, total: stats.output + stats.duplicates + stats.unsupported, duplicates: stats.duplicates },
-      rejected: result.diagnostics.filter(d => d.kind === 'invalid' || d.kind === 'unimplemented'),
-      dropped: result.diagnostics.filter(d => d.kind === 'client').map(d => ({ rule: d.text, reason: d.reason })),
-      notes: result.diagnostics.filter(d => d.kind === 'degraded').map(d => d.reason),
-    });
   });
   // GET 仅供登录用户预览外部 URL；正式下载统一走公共托管资源入口。
   app.get('/rules/convert', async c => {
@@ -135,10 +104,9 @@ export function ruleConversionRoutes(store: Store, snapshots: SnapshotService) {
     return send(converted.lines.join('\n') + '\n');
   });
   app.post('/rules/convert', async c => {
-    const body = await jsonBody<{ inputs?: unknown; overrides?: RuleSetDoc['overrides']; noResolve?: boolean; client?: string; sourceId?: string }>(c);
+    const body = await jsonBody<{ inputs?: unknown; overrides?: RuleSetDoc['overrides']; client?: string; sourceId?: string }>(c);
     if (!Array.isArray(body.inputs) || body.inputs.length > 256) throw bad('inputs 必须是数组且不超过 256 个来源');
     if (!['mihomo', 'surge', 'stash', 'loon'].includes(body.client ?? '')) throw bad('内核不合法');
-    if (body.noResolve !== undefined && typeof body.noResolve !== 'boolean') throw bad('noResolve 必须是布尔值');
     checkRuleSetOverrides(body.overrides);
     const ids = new Set<string>();
     const inputs: ConversionInput[] = body.inputs.map(i => {

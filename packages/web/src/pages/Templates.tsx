@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stableStringify, type ReportItem } from '@sub-forge/core';
 import { Pencil, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useParams, useSearchParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { api, ApiError, type ImpactEntry } from '../api.ts';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
 import { Notice } from '../components/Notice.tsx';
@@ -37,12 +37,8 @@ function useTemplateUsage() {
 
 export function TemplateList() {
   const list = usePagedList('templates');
-  const [params] = useSearchParams();
   const usage = useTemplateUsage();
-  const selectedId = params.get('id');
   const inUse = (id: string) => usage.data?.get(id) ?? 0;
-  // 兼容发布完成和旧书签中的模板定位链接。
-  if (selectedId) return <Navigate to={`/templates/${encodeURIComponent(selectedId)}`} replace />;
   return (
     <>
       <PageHeader title="模板"
@@ -95,11 +91,9 @@ function emptyTemplate(): TemplateDraft {
   return { name: '', body: { groups: [{ id, name: '节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [], final: { kind: 'group', groupId: id } } };
 }
 
-/** 旧详情、编辑和发布书签统一落到同一个页面。 */
 export function TemplateEdit() {
-  const { id = 'new', tab } = useParams();
-  const tpl = useQuery({ queryKey: ['template', id], enabled: id !== 'new' && !tab, queryFn: () => api<TemplateResponse>('GET', queryUrl('/templates', { id })) });
-  if (tab) return <Navigate to={`/templates/${encodeURIComponent(id)}`} replace />;
+  const { id = 'new' } = useParams();
+  const tpl = useQuery({ queryKey: ['template', id], enabled: id !== 'new', queryFn: () => api<TemplateResponse>('GET', queryUrl('/templates', { id })) });
   if (id !== 'new' && !tpl.data) return tpl.error ? <ErrorAlert error={tpl.error} /> : <div className="text-muted-foreground">加载中…</div>;
   return <TemplatePage key={id} id={id} initial={tpl.data?.item} />;
 }
