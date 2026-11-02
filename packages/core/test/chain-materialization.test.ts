@@ -97,8 +97,7 @@ describe('订阅专属 Provider 服务端覆写', () => {
     f.profile.chains = [{ id: 'regex', landing: { nodeSet: ref, ...(output === 'inline' ? { filter: '^落地$' } : {}) }, via: { kind: 'node', ref: { nodeSet: via, match: { regex: '香港' }, fallback: 'error' } } }];
     const m = renderMihomo(f), stash = renderStash(f);
     expect(m.report.hasErrors).toBe(false);
-    expect(stash.report.hasErrors).toBe(output === 'provider');
-    if (output === 'provider') expect(stash.report.byCode('stash.provider-chain')[0]?.level).toBe('error');
+    expect(stash.report.hasErrors).toBe(false);
     const wrapper = (m.config['proxy-groups'] as { name: string; hidden?: boolean }[]).find(g => g.hidden);
     expect(wrapper).toMatchObject({ type: 'select', use: ['中转'], filter: '^香港 \\[01\\]$', 'empty-fallback': 'REJECT' });
     const landings = output === 'provider' ? parse(m.providers['source:s']!.yaml).proxies : m.config.proxies;

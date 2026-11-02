@@ -18,12 +18,6 @@ describe('代理链全部来源', () => {
     it(`${client} ${output}：汇总多个来源、采用首个匹配、自动包含后续来源`, () => {
       const f = fixture(output), before = JSON.stringify(f);
       const initial = render(f);
-      if (client === 'Stash' && output === 'provider') {
-        expect(initial.report.byCode('stash.provider-chain')[0]?.level).toBe('error');
-        expect(initial.config.proxies).toEqual([]);
-        expect(JSON.stringify(f)).toBe(before);
-        return;
-      }
       expect(initial.report.hasErrors).toBe(false);
       expect(initial.chainResolutions).toEqual([{ chainId: 'c', viaName: '前置-a', landingCount: 2, appliedCount: 2, issues: [] }]);
       const nodes = (output === 'provider'

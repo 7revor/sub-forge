@@ -1,65 +1,46 @@
 // Stash 官方依据：docs/17-official-client-configuration-guides.md。
-// 共用节点、依赖和代理链解析，但不把 Mihomo 专用字段当作 Stash 配置输出。
+// 基于公共 Clash 产物应用少量已确认的字段差异；不另建解析器或代理链实现。
 import { stringify } from 'yaml';
 import { composeRule } from '../rules/client.ts';
 import { rawRuleParts } from '../rules/raw.ts';
 import type { MihomoRenderResult } from './mihomo.ts';
 import type { Report } from '../report.ts';
-import type { GroupSpec, ProxyIR } from '../types.ts';
+import type { GroupSpec } from '../types.ts';
+import { bandwidthMbps } from './node-semantics.ts';
 
-const TYPES = new Set(['ss', 'ssr', 'socks5', 'http', 'vmess', 'vless', 'trojan', 'snell', 'hysteria', 'hysteria2', 'tuic', 'wireguard', 'ssh', 'anytls', 'trusttunnel', 'juicity', 'mieru', 'masque', 'tailscale', 'direct']);
-
-export function stashProxy(node: ProxyIR, report: Report): ProxyIR {
-  const out = { ...node };
-  const where = `proxy:${node.name}`;
-  if (!TYPES.has(node.type)) report.error('stash.proxy-type', `Stash 尚未适配代理类型 ${node.type}`, where);
-  if (node.network && !['tcp', 'ws', 'h2', 'http', 'grpc', ...(node.type === 'vless' ? ['xhttp'] : [])].includes(String(node.network))) {
-    report.error('stash.transport', `Stash 尚未适配传输方式 ${String(node.network)}`, where);
-  }
-  if (node.type === 'hysteria2') {
-    if (out.password !== undefined) {
-      if (out.auth !== undefined && out.auth !== out.password) report.error('stash.auth-conflict', 'Hysteria2 的 auth 与 password 不一致', where);
-      else out.auth = out.password;
-      delete out.password;
-    }
+/** 仅处理官方字段别名与单位，不维护节点、传输、扩展字段白名单。 */
+function adaptProxy(node: Record<string, unknown>, report: Report): void {
+  if (node.type === 'hysteria2' && node.password !== undefined) {
+    node.auth = node.password;
+    delete node.password;
   }
   if (node.type === 'hysteria' || node.type === 'hysteria2') {
-    for (const direction of ['up', 'down'] as const) {
-      if (out[direction] === undefined) continue;
-      const match = /^(\d+(?:\.\d+)?)\s*(?:(k|m|g)bps)?$/i.exec(String(out[direction]).trim());
-      if (!match) { report.error('stash.bandwidth', `Stash 无法转换 ${direction} 带宽，请填写 Mbps 数值`, where); continue; }
-      const speed = Number(match[1]) * (match[2]?.toLowerCase() === 'g' ? 1000 : match[2]?.toLowerCase() === 'k' ? 0.001 : 1);
-      const key = `${direction}-speed`;
-      if (out[key] !== undefined && out[key] !== speed) report.error('stash.bandwidth-conflict', `${direction} 与 ${key} 带宽不一致`, where);
-      else out[key] = speed;
-      delete out[direction];
+    for (const direction of ['up', 'down']) {
+      if (node[direction] === undefined) continue;
+      const speed = bandwidthMbps(node[direction]);
+      if (speed === undefined) {
+        report.error('stash.bandwidth', `Stash 无法转换 ${direction} 带宽，请填写 Mbps 数值`, `proxy:${String(node.name)}`);
+        continue;
+      }
+      node[`${direction}-speed`] = speed;
+      delete node[direction];
     }
   }
-  // smux 等功能不能在未适配时静默关闭，避免输出表面成功但行为变化的配置。
-  for (const key of ['smux', 'reality-opts-extra', 'routing-mark', 'ip-version', 'dialer-proxy-group']) {
-    if (out[key] !== undefined) report.error('stash.proxy-option', `Stash 尚未适配节点参数 ${key}`, where);
-  }
-  return out;
 }
 
-export function stashGroup(out: Record<string, unknown>, group: GroupSpec, report: Report): Record<string, unknown> {
-  const result = { ...out, proxies: [...new Set(out.proxies as string[] | undefined)] };
-  for (const key of ['url', 'timeout', 'max-failed-times', 'expected-status']) delete (result as Record<string, unknown>)[key];
-  if (group.test?.maxFailedTimes !== undefined || group.test?.expectedStatus !== undefined) {
-    report.error('stash.group-test', `Stash 尚未适配组「${group.name}」的最大失败次数或预期状态码`, `group:${group.id}`);
+/** 公共 Clash 产物的最小差异：节点别名、测速单位、空组策略。代理链完全沿用公共生成和校验。 */
+export function applyStashCompatibility(groups: Record<string, unknown>[], nodes: Record<string, unknown>[], specs: GroupSpec[], report: Report, providers: Map<string, Record<string, unknown>[]>, remoteMembers: Map<string, string[]>): void {
+  for (const node of [...nodes, ...[...providers.values()].flat()]) adaptProxy(node, report);
+  stashBenchmarks(groups, nodes, specs, report, providers, remoteMembers);
+  for (const group of groups) {
+    delete group.url;
+    delete group.timeout;
+    delete group['empty-fallback'];
   }
-  if (group.strategy === 'sticky-sessions') report.error('stash.group-strategy', 'Stash 不支持 sticky-sessions 负载均衡', `group:${group.id}`);
-  // 高级原文只允许已确认的 Stash 组参数；不能覆盖解析后的成员或生成动态空组。
-  const allowed = new Set(['interval', 'lazy', 'tolerance', 'hidden', 'icon', 'ssid-policy']);
-  for (const [key, value] of Object.entries(group.extra ?? {})) {
-    if (allowed.has(key)) (result as Record<string, unknown>)[key] = value;
-    else report.error('stash.group-option', `Stash 尚未适配策略组参数 ${key}，请移除或使用已支持的配置`, `group:${group.id}`);
-  }
-  return result;
 }
 
 /** Stash 的测试参数属于节点；共享节点要求测试参数一致，不能照搬组级 url/timeout。 */
-export function stashBenchmarks(groups: Record<string, unknown>[], nodes: Record<string, unknown>[], specs: GroupSpec[], report: Report, providers = new Map<string, Record<string, unknown>[]>(), remoteMembers = new Map<string, string[]>()): void {
+function stashBenchmarks(groups: Record<string, unknown>[], nodes: Record<string, unknown>[], specs: GroupSpec[], report: Report, providers = new Map<string, Record<string, unknown>[]>(), remoteMembers = new Map<string, string[]>()): void {
   const groupMap = new Map(groups.map(g => [g.name as string, g]));
   const nodeMap = new Map([...nodes, ...[...providers.values()].flat()].map(n => [n.name as string, n]));
   const visit = (name: string, patch: Record<string, unknown>, seen: Set<string>, where: string) => {
@@ -79,8 +60,14 @@ export function stashBenchmarks(groups: Record<string, unknown>[], nodes: Record
   };
   for (const group of specs) {
     const patch: Record<string, unknown> = {};
-    if (group.test?.url) patch['benchmark-url'] = group.test.url;
-    if (group.test?.timeout !== undefined) patch['benchmark-timeout'] = group.test.timeout / 1000;
+    const output = groupMap.get(group.name);
+    const url = output?.url ?? group.test?.url;
+    const timeout = output?.timeout ?? group.test?.timeout;
+    if (url !== undefined) patch['benchmark-url'] = url;
+    if (timeout !== undefined) {
+      if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout < 0) report.error('stash.benchmark-timeout', '测速超时必须为非负毫秒数', `group:${group.id}`);
+      else patch['benchmark-timeout'] = timeout / 1000;
+    }
     if (Object.keys(patch).length) visit(group.name, patch, new Set(), `group:${group.id}`);
   }
 }

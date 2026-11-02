@@ -117,3 +117,33 @@ for (const target of ['surge', 'loon', 'stash'] as const) describe(target + ' �
     expect((await h.renderer.render('p', client)).ok).toBe(false);
   });
 });
+
+it('Stash 正式订阅使用公共策略组前置，并返回带相同 dialer-proxy 的节点资源', async () => {
+  const h = await setup(), profile = h.store.get('profile', 'p')!;
+  profile.nodeSets[1]!.output = 'provider';
+  profile.chains = [{ id: 'chain', landing: { nodeSet: { type: 'local', id: 'inline' } }, via: { kind: 'group', groupId: 'g' } }];
+  h.store.put('profile', profile, h.user.id);
+  const generated = await h.renderer.render('p', { client: 'stash', platform: 'ios' });
+  expect(generated.ok).toBe(true);
+  expect(generated.report.some(item => item.code.startsWith('stash.provider-chain'))).toBe(false);
+  const main = await h.app.request(`/subs/profile?id=p&token=${h.token}&target=stash&platform=ios`);
+  expect(main.status).toBe(200);
+  const url = parse(await main.text())['proxy-providers']['展开来源'].url;
+  const resource = await h.app.request(url);
+  expect(resource.status).toBe(200);
+  expect(parse(await resource.text()).proxies).toMatchObject([{ name: '本地', 'dialer-proxy': '代理' }]);
+});
+
+it('Stash 失败不回退旧专用生成器的成功缓存', async () => {
+  const h = await setup(), target = { client: 'stash' as const, platform: 'ios' as const };
+  expect((await h.renderer.render('p', target)).ok).toBe(true);
+  const key = 'stash:ios:stash-ios', saved = h.store.getLastGood<StoredRender>('p', key)!;
+  const { clashDelivery: _version, ...legacy } = saved.data;
+  h.store.putLastGood('p', key, legacy);
+  const profile = h.store.get('profile', 'p')!;
+  profile.base = { kernels: { stash: 'proxies: []' } };
+  h.store.put('profile', profile, h.user.id);
+  expect((await h.renderer.render('p', target)).ok).toBe(false);
+  h.store.putLastGood('p', key, saved.data);
+  expect(await h.renderer.render('p', target)).toMatchObject({ ok: true, source: 'last-good' });
+});

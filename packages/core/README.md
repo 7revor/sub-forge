@@ -84,7 +84,7 @@ MIHOMO=/path/to/mihomo pnpm --filter @sub-forge/core test
 
 `USER-AGENT` 解析为独立 IR，保留大小写与通配值；Surge 正常输出，mihomo 按客户端不支持处理。来源解析诊断、客户端输出诊断分别计数。
 
-Stash：renderStash 共用依赖与环路检测，按官方规则和节点字段生成 YAML。节点集按快照内联以保留筛选、代理链及空组 REJECT；Hysteria2 和延迟测试字段独立转换。exportStashConfig 将托管规则内嵌成可独立导入文件。官方依据见 docs/17-official-client-configuration-guides.md。
+Mihomo / Stash：统一使用 `renderClash(input, client)`；`renderMihomo` / `renderStash` 为兼容入口。节点、策略组、provider 与代理链共用生成；Stash 仅保留字段别名、测速单位、空集合保护及规则方言差异。普通策略组和隐藏组前置不做 Stash 专用改写或限制。`exportStashConfig` 将托管规则内嵌成独立文件，含远程节点的草稿使用正式订阅链接。详见 [公共生成验收](../../docs/verification/stash-common-20261102/README.md)。
 
 ### 2026-10-29：统一名称搜索工具
 
@@ -105,9 +105,9 @@ Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整�
 
 2026-10-30 订阅弹窗整合不改变渲染、Provider 前置、循环保护或客户端转换语义；空值提示仅存在于前端，false 与 0 保持真实值。领域模型与示例种子无需迁移。
 
-2026-10-30 代理链流量交互沿用现有模型：Provider 正则前置取节点顺序中的首个命中，默认隐藏组精确引用此节点；整集落地服务端逐节点写入、Stash 内联翻译保持一致（2026-11-02 起单节点规则优先于整集规则，正则前置跳过本条链落地）。`chain-materialization.test.ts` 新增 Provider 正则连接 Inline / Provider 两种落地的跨客户端断言。模型和示例种子无需迁移。
+2026-10-30 代理链流量交互沿用现有模型：Provider 正则前置取节点顺序中的首个命中，默认隐藏组精确引用此节点；整集落地服务端逐节点写入、Mihomo/Stash 共用生成（2026-11-02 起单节点规则优先于整集规则，正则前置跳过本条链落地）。`chain-materialization.test.ts` 新增 Provider 正则连接 Inline / Provider 两种落地的跨客户端断言。模型和示例种子无需迁移。
 
-2026-10-30 自动引用：Mihomo Provider 自动生成精确隐藏组，Inline 直接引用；Stash 沿用节点集内联转换。旧 refPolicy 不参与渲染。结果包含 chainResolutions（实际前置、落地命中/应用数量、关联问题），ReportItem.chainIds 将循环及依赖循环的入口关联到对应代理链。完整诊断和只读 dependencies 继续返回。回归覆盖旧策略、输入不变、缺失、整集覆盖及环路关联。
+2026-10-30 自动引用：Mihomo Provider 自动生成精确隐藏组，Inline 直接引用；Stash 共用精确隐藏组引用。旧 refPolicy 不参与渲染。结果包含 chainResolutions（实际前置、落地命中/应用数量、关联问题），ReportItem.chainIds 将循环及依赖循环的入口关联到对应代理链。完整诊断和只读 dependencies 继续返回。回归覆盖旧策略、输入不变、缺失、整集覆盖及环路关联。
 
 2026-10-30 代理链由流量卡片改为紧凑文本列表，仅调整前端展示；代理链、自动引用、接口与存储格式不变，示例种子已核对，无需迁移。
 

@@ -37,6 +37,7 @@ export function lowerRemoteProviders(input: {
     }
     aliases.set(name, alias);
   }
+  const commonProvider = Object.values(proxyProviders)[0] ?? {};
   for (const name of Object.keys(proxyProviders)) delete proxyProviders[name];
 
   const publish = (key: string, name: string, selected: Fields[], sourceKeys: string[]) => {
@@ -46,7 +47,7 @@ export function lowerRemoteProviders(input: {
     }).join('\n') + '\n';
     providers[key] = { name, yaml: body, sourceKeys, nodeCount: selected.length };
     // 空远程集合在部分客户端会变为 DIRECT：主配置改用 REJECT，资源接口拒绝下发空正文。
-    if (selected.length) proxyProviders[name] = { url: urls.provider(key), interval };
+    if (selected.length) proxyProviders[name] = client === 'stash' ? { ...commonProvider, url: urls.provider(key), interval } : { url: urls.provider(key), interval };
     return name;
   };
   for (const [name, source] of originals) {
@@ -77,12 +78,6 @@ export function lowerRemoteProviders(input: {
         if (!providers[key]) {
           while (occupied.has(name)) name += '_';
           occupied.add(name);
-          if (client === 'stash') for (const node of selected) {
-            const via = node['dialer-proxy'];
-            if (typeof via === 'string' && sources.some(s => s.nodes.some(n => n.name === via)) && !selected.some(n => n.name === via)) {
-              report.error('stash.provider-chain-filter', '远程集合筛选排除了代理链前置，请保留前置节点或将前置来源设为展开', 'group:' + group.name);
-            }
-          }
           publish(key, name, selected, sourceKeys);
         }
         remote = [name];

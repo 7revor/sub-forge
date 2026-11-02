@@ -30,7 +30,7 @@ describe('主配置与规则集诊断的边界', () => {
   it('手写规则的丢弃与适配提示仍可见，规则集的相同适配不重复报告', () => {
     const input = fixture({ id: 'rs', name: '规则集', sources: [{ id: 's', kind: 'local', format: 'classical', content: 'SRC-IP-CIDR,192.0.2.0/24' }] });
     routing(input).rules.push(
-      { id: 'manual-drop', matcher: { kind: 'rule', rule: { type: 'URL-REGEX', value: '^https://example.test' } }, target: direct },
+      { id: 'manual-drop', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'path', mode: 'regex', value: '^/Applications/.*' } }, target: direct },
       { id: 'manual-adapt', matcher: { kind: 'rule', rule: { type: 'SRC-IP-CIDR', value: '192.0.2.0/24' } }, target: direct },
     );
     const out = renderStash(input);

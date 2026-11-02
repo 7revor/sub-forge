@@ -121,7 +121,7 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(verify).not.toHaveBeenCalled();
     expect((await renderer.render(h.profile.id, { client: 'mihomo' })).ok).toBe(true);
     expect(verify).toHaveBeenCalledTimes(1);
-    h.store.put('local', { id: 'nodes', name: '不支持的协议', proxies: [{ name: '测试节点', type: 'sudoku', server: 'example.test', port: 443 }] }, h.user.id);
+    h.store.put('local', { id: 'nodes', name: '认证冲突', proxies: [{ name: '测试节点', type: 'hysteria2', server: 'example.test', port: 443, password: 'one', auth: 'two' }] }, h.user.id);
     const fallback = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
     expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
     if (!fallback.ok) throw new Error(fallback.message);

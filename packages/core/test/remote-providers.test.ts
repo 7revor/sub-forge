@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readdirSync, unlinkSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderSurge, renderLoon, renderStash, parseContent, type RenderInput } from '../src/index.ts';
+import { renderSurge, renderLoon, renderStash, renderMihomo, parseContent, type RenderInput } from '../src/index.ts';
 
 const ref = (id: string) => ({ type: 'local' as const, id });
 const node = (name: string, type = 'socks5') => ({ name, type, server: 'node.example.test', port: 1080, ...(type === 'http' ? { tls: false } : {}) });
@@ -38,7 +38,7 @@ for (const [client, render] of Object.entries(renders)) describe(client + ' 原�
       expect(out.yaml).toContain('代理 = select, 机场 A');
       expect(out.yaml).not.toContain('香港 =');
     } else {
-      expect(out.config['proxy-providers']).toEqual({ '机场 A': { url: 'https://sub.test/nodes?id=local%3Aa', interval: 7200 } });
+      expect(out.config['proxy-providers']).toEqual({ '机场 A': { type: 'http', url: 'https://sub.test/nodes?id=local%3Aa', interval: 7200, proxy: 'DIRECT' } });
       expect(out.config['proxy-groups']).toMatchObject([{ name: '代理', use: ['机场 A'] }]);
     }
     expect(JSON.stringify(f)).toBe(before);
@@ -125,20 +125,23 @@ it('Loon 订阅名与策略组重名时分配独立引用名', () => {
   expect(out.yaml).toContain(`代理 = select, ${alias}`);
   expect(out.yaml).toContain(`${alias} = https://sub.test/nodes`);
 });
-it('Surge 远程正文保留 underlying-proxy，Stash 同集前置直接引用集内节点', () => {
+it('Surge 远程正文保留 underlying-proxy，Stash 同集前置沿用 Mihomo 隐藏策略组', () => {
   const f = fixture(); f.profile.chains = [{ id: 'c', landing: { nodeSet: ref('a'), filter: '^日本$' }, via: { kind: 'node', ref: { nodeSet: ref('a'), match: { exact: '香港' } } } }];
   const surge = renderSurge(f), stash = renderStash(f), loon = renderLoon(f);
   expect(surge.report.hasErrors).toBe(false);
   expect(surge.providers['local:a']!.yaml).toContain('underlying-proxy=__ref_');
   expect(stash.report.hasErrors).toBe(false);
-  expect(parse(stash.providers['local:a']!.yaml).proxies[1]['dialer-proxy']).toBe('香港');
+  expect(parse(stash.providers['local:a']!.yaml).proxies[1]['dialer-proxy']).toBe(parse(renderMihomo(f).providers['local:a']!.yaml).proxies[1]['dialer-proxy']);
   expect(loon.report.byCode('loon.provider-chain')[0]?.level).toBe('error');
   expect(loon.config.proxies).toHaveLength(1);
 });
-it('Stash 不把跨远程来源的前置伪装成有效代理链', () => {
+it('Stash 跨来源前置复用 Mihomo 引用，不增加专用诊断', () => {
   const f = fixture(); f.profile.nodeSets[1]!.output = 'provider';
   f.profile.chains = [{ id: 'c', landing: { nodeSet: ref('b') }, via: { kind: 'node', ref: { nodeSet: ref('a'), match: { exact: '香港' } } } }];
-  expect(renderStash(f).report.byCode('stash.provider-chain')[0]?.level).toBe('error');
+  const stash = renderStash(f), mihomo = renderMihomo(f);
+  expect(stash.report.items).toEqual(mihomo.report.items);
+  expect(stash.providers['local:b']!.yaml).toBe(mihomo.providers['local:b']!.yaml);
+  expect(stash.dependencies).toEqual(mihomo.dependencies);
 });
 it.each([renderSurge, renderStash])('远程测速参数按实际筛选成员写入资源，互不重叠的组允许不同超时', render => {
   const f = fixture();

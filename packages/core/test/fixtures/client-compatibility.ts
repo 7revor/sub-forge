@@ -1,3 +1,4 @@
+// 这里只验证生成器的保留、转换与诊断，不代表真实客户端已支持全部透传字段。
 import { stringify as testYaml } from 'yaml';
 // 以 Mihomo 字段为输入，逐项测试目标输出；ok 仅表示生成器完整接受，不代表真机连接通过。
 import type { Client, GroupSpec, LocalProxy, RenderInput } from '../../src/index.ts';
@@ -58,21 +59,21 @@ export const compatibilityCases: CompatibilityCase[] = [
   node('snell', 'Snell v3', { type: 'snell', psk: 'example', version: 3 }, { loon: 'error' }),
   node('ssr', 'ShadowsocksR', { type: 'ssr', password: 'example', cipher: 'aes-128-cfb', protocol: 'auth_aes128_md5', obfs: 'tls1.2_ticket_auth' }, { surge: 'error' }),
   node('fingerprint', 'client-fingerprint=chrome', { ...trojan, 'client-fingerprint': 'chrome' }, { surge: 'warning' }, 'Loon 映射有说明；不承诺握手字节一致'),
-  node('ip-version', '节点 ip-version=ipv4', { ...trojan, 'ip-version': 'ipv4' }, { stash: 'error' }),
-  node('smux', '节点 smux', { ...trojan, smux: { enabled: true } }, { surge: 'error', loon: 'error', stash: 'error' }),
+  node('ip-version', '节点 ip-version=ipv4', { ...trojan, 'ip-version': 'ipv4' }, undefined),
+  node('smux', '节点 smux', { ...trojan, smux: { enabled: true } }, { surge: 'error', loon: 'error' }),
   group('select', 'select 与节点成员', { type: 'select' }),
   group('nested', '嵌套策略组', { type: 'select' }),
   group('url-test', 'url-test + url/interval/timeout/tolerance', { type: 'url-test', test: { url: 'http://example.test/204', interval: 300, timeout: 5000, tolerance: 50 } }, undefined, '多组共享节点需统一测速参数，Loon 超时全局统一；选择结果可能不同'),
   group('fallback', 'fallback + url/interval/timeout', { type: 'fallback', test: { url: 'http://example.test/204', interval: 300, timeout: 5000 } }, undefined, '跨端测速和可用性判定存在差异'),
   group('balance-hash', 'load-balance consistent-hashing', { type: 'load-balance', strategy: 'consistent-hashing' }, undefined, '只保留按目标主机稳定选节点的意图，哈希算法不保证相同'),
   group('balance-round', 'load-balance round-robin', { type: 'load-balance', strategy: 'round-robin' }, { surge: 'error' }),
-  group('balance-sticky', 'load-balance sticky-sessions', { type: 'load-balance', strategy: 'sticky-sessions' }, { surge: 'error', loon: 'error', stash: 'error' }),
+  group('balance-sticky', 'load-balance sticky-sessions', { type: 'load-balance', strategy: 'sticky-sessions' }, { surge: 'error', loon: 'error' }),
   group('lazy', 'url-test lazy=true', { type: 'url-test', test: { lazy: true } }, { surge: 'warning', loon: 'warning' }),
-  group('expected-status', 'expected-status=204', { type: 'url-test', test: { expectedStatus: '204' } }, { surge: 'warning', loon: 'error', stash: 'error' }),
-  group('max-failures', 'max-failed-times=3', { type: 'fallback', test: { maxFailedTimes: 3 } }, { surge: 'warning', loon: 'error', stash: 'error' }),
+  group('expected-status', 'expected-status=204', { type: 'url-test', test: { expectedStatus: '204' } }, { surge: 'warning', loon: 'error' }),
+  group('max-failures', 'max-failed-times=3', { type: 'fallback', test: { maxFailedTimes: 3 } }, { surge: 'warning', loon: 'error' }),
   group('hidden', 'hidden=true', { display: { hidden: true } }, { loon: 'warning' }),
   group('icon', 'icon URL', { display: { icon: 'https://example.test/icon.png' } }),
-  group('extra', '扩展字段 disable-udp', { extra: { 'disable-udp': true } }, { surge: 'error', loon: 'error', stash: 'error' }),
+  group('extra', '扩展字段 disable-udp', { extra: { 'disable-udp': true } }, { surge: 'error', loon: 'error' }),
   group('pass', 'PASS 成员', { members: [{ kind: 'builtin', name: 'PASS' }] }, { loon: 'error' }),
   ...[
     ['domain', 'DOMAIN,example.test'], ['suffix', 'DOMAIN-SUFFIX,example.test'], ['keyword', 'DOMAIN-KEYWORD,example'],
@@ -90,7 +91,7 @@ export const compatibilityCases: CompatibilityCase[] = [
   rule('rule-process', 'PROCESS-NAME（由客户端处理平台能力）', 'PROCESS-NAME,Example'),
   rule('rule-proc-regex', '复杂进程正则（macOS）', 'PROCESS-NAME-REGEX,^(Foo|Bar)[0-9]+$', { surge: 'omitted', loon: 'omitted', stash: 'omitted' }),
   rule('rule-ua', 'USER-AGENT（非 Mihomo 通用项）', 'USER-AGENT,Example*', { mihomo: 'omitted' }),
-  rule('rule-urlregex', 'URL-REGEX（非 Mihomo 通用项）', 'URL-REGEX,^https://example[.]test', { mihomo: 'omitted', stash: 'omitted' }),
+  rule('rule-urlregex', 'URL-REGEX（非 Mihomo 通用项）', 'URL-REGEX,^https://example[.]test', { mihomo: 'omitted' }),
   rule('rule-extended', 'extended-matching（Surge 专用）', 'DOMAIN,example.test,extended-matching', { mihomo: 'omitted', loon: 'omitted', stash: 'omitted' }),
 ];
 // 让嵌套样例确实包含引用，避免仅测试 select 的重复配置。

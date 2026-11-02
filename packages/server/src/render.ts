@@ -11,7 +11,7 @@ import { profileTemplate } from './profile-routing.ts';
 import { createHash } from 'node:crypto';
 import { stringify } from 'yaml';
 import {
-  resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, renderLoon, isIniClient, stringifySurge, surgeProxyLine, loonProxyLine, exportStashConfig, sourceKey, sourceLabel, stableStringify,
+  resolveProfileRouting, Report, renderClash, renderSurge, renderLoon, isIniClient, stringifySurge, surgeProxyLine, loonProxyLine, exportStashConfig, sourceKey, sourceLabel, stableStringify,
   type Client, type HostedRuleReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs, type RuleEntry,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
@@ -30,12 +30,19 @@ function normalizeTarget(target: Target): Target {
   return { client: target.client, ...(target.platform ? { platform: target.platform } : {}), ...(app ? { app: app.id, ...('platform' in app ? { platform: app.platform } : {}) } : {}) };
 }
 
+/** Stash 和 Mihomo 均进入公共 YAML 生成流程。 */
+function renderForClient(input: Parameters<typeof renderClash>[0], client: Client): MihomoRenderResult {
+  return client === 'surge' ? renderSurge(input) : client === 'loon' ? renderLoon(input) : renderClash(input, client);
+}
+
 /** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
 export type StoredRender = {
   /** Loon 全部分流规则已托管；旧内联产物不可作为回退。 */
   loonRuleDelivery?: 'remote';
   /** 原生远程节点输出版本；禁止回退到旧版强制内联产物。 */
   nodeProviderDelivery?: 1;
+  /** Stash 已切换到公共 Clash 生成，不回退到旧专用改写。 */
+  clashDelivery?: 1;
   nodeOutputSignature?: string;
   providerNodeCounts?: Record<string, number>;
   yaml: string;
@@ -121,7 +128,7 @@ export class RenderService {
     const saved = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
     const requiresRemote = target.client !== 'mihomo' && this.store.get('profile', profileId)?.nodeSets.some(s => s.output === 'provider');
     const changedOutput = saved?.data.nodeOutputSignature !== undefined && saved.data.nodeOutputSignature !== stableStringify(this.store.get('profile', profileId)?.nodeSets);
-    const last = changedOutput || target.client === 'loon' && saved?.data.loonRuleDelivery !== 'remote' || requiresRemote && saved?.data.nodeProviderDelivery !== 1 ? undefined : saved;
+    const last = target.client === 'stash' && saved?.data.clashDelivery !== 1 || changedOutput || target.client === 'loon' && saved?.data.loonRuleDelivery !== 'remote' || requiresRemote && saved?.data.nodeProviderDelivery !== 1 ? undefined : saved;
     if (last && this.store.getWithOwner('profile', profileId)?.owner && !this.canReadNodes(last.data, this.store.getWithOwner('profile', profileId)!.owner!)) return { ok: false, accessDenied: true, message: '节点资源权限已变化', report: attempt.report };
     if (last && !this.canReadRules(profileId, last.data)) return { ok: false, accessDenied: true, message: '规则资源已移除或失效', report: attempt.report };
     if (last) return { ok: true, source: 'last-good', render: last.data, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
@@ -253,7 +260,7 @@ export class RenderService {
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const output = { target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER };
     const ruleReferences = new Map<string, HostedRuleReference>();
-    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = renderForClient({
       profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
@@ -269,7 +276,7 @@ export class RenderService {
             : queryUrl(reference.matcher.repository ? '/resources/repo' : '/resources/ruleset', { key, token: TOKEN_PLACEHOLDER }, publicUrl);
         },
       },
-    });
+    }, target.client);
     const report = [...pre, ...result.report.items];
     const errors = report.filter((i) => i.level === 'error');
     if (errors.length) return { report, result, failure: errors.map((e) => e.message).join('；') };
@@ -286,6 +293,7 @@ export class RenderService {
     checkCurrent();
     const render: StoredRender = {
       nodeProviderDelivery: 1,
+      ...(!isIniClient(target.client) ? { clashDelivery: 1 as const } : {}),
       nodeOutputSignature: stableStringify(profile.nodeSets),
       providerNodeCounts: Object.fromEntries(Object.entries(result.providers).flatMap(([key, provider]) => provider.nodeCount === undefined ? [] : [[key, provider.nodeCount]])),
       ...(target.client === 'loon' ? { loonRuleDelivery: 'remote' as const } : {}),
@@ -359,11 +367,11 @@ export class RenderService {
     const loaded = await this.loadNodeSets([ref], owner);
     if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
     if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
-    const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
+    const result = renderForClient({
       profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
       platform: target.platform,
       nodeSets: loaded.inputs, rules: { rulesets: {}, snapshots: {} }, urls: { provider: key => key, ruleset: key => key },
-    });
+    }, target.client);
     const yaml = isIniClient(target.client) ? (result.config.proxies as Record<string, unknown>[]).flatMap(node => {
       const line = (target.client === 'loon' ? loonProxyLine : surgeProxyLine)(node, result.report);
       return line ? [line] : [];

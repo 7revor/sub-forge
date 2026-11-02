@@ -24,7 +24,7 @@ import { stringifySurge, surgeBenchmarks } from './surge-config.ts';
 import { isIniClient } from '../types.ts';
 import { stringifyLoon, loonBenchmarks } from './loon-config.ts';
 import { iniName } from './ini-format.ts';
-import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
+import { applyStashCompatibility } from './stash-config.ts';
 import { lowerRemoteProviders } from './remote-providers.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
@@ -109,12 +109,18 @@ type NS = {
 
 type MihomoGroup = Record<string, unknown> & { name: string; proxies?: string[]; use?: string[] };
 
-export function renderMihomo(input: RenderInput): MihomoRenderResult {
-  return renderClient(input, 'mihomo');
+/** Clash YAML 共用节点、策略组、规则、provider 和代理链生成；客户端差异只在输出阶段处理。 */
+export function renderClash(input: RenderInput, client: 'mihomo' | 'stash' = 'mihomo'): MihomoRenderResult {
+  return renderClient(input, client);
 }
 
+export function renderMihomo(input: RenderInput): MihomoRenderResult {
+  return renderClash(input);
+}
+
+/** 保留现有调用兼容；没有独立的 Stash 生成器。 */
 export function renderStash(input: RenderInput): MihomoRenderResult {
-  return renderClient(input, 'stash');
+  return renderClash(input, 'stash');
 }
 
 export function renderSurge(input: RenderInput): MihomoRenderResult {
@@ -151,7 +157,8 @@ function stripNode(n: ProxyIR): Record<string, unknown> {
 
 function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const { profile } = input;
-  const nativeRemote = client !== 'mihomo';
+  // INI 远程格式及 Stash 空集合保护需要本服务管理成员；节点与代理链仍使用同一流程。
+  const managedMembers = isIniClient(client) || client === 'stash';
   const report = new Report();
   const ctx: ClientCtx = { client };
   let base: Record<string, unknown> = {};
@@ -175,34 +182,34 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     sets.set(key, {
       key, ref: ps.ref, providerName,
       output: ps.output,
-      nodes: resolver.resolve(ps.ref).map(n => nodeSemantics(n, client, report)).map(n => client === 'stash' ? stashProxy(n, report) : n),
+      nodes: resolver.resolve(ps.ref).map(n => nodeSemantics(n, client, report)),
     });
   }
 
   // ---------- 顶层名称表 ----------
   const topNames = new Set<string>();
   for (const s of sets.values()) {
-    if (s.output !== 'inline' && !nativeRemote) continue;
+    if (s.output !== 'inline' && !managedMembers) continue;
     for (const n of s.nodes) {
       if (topNames.has(n.name)) {
         const orig = n.name;
         let i = 2;
         while (topNames.has(`${orig} ${i}`)) i++;
-        if (nativeRemote) n[inlineOriginalName] = orig;
+        if (managedMembers) n[inlineOriginalName] = orig;
         n.name = `${orig} ${i}`;
         report.warn('inline.name-conflict', `节点「${orig}」与其他节点来源重名，已改为「${n.name}」`, s.key);
       }
       topNames.add(n.name);
     }
   }
-  if (nativeRemote) {
+  if (managedMembers) {
     topNames.clear();
     for (const s of sets.values()) if (s.output === 'inline') for (const n of s.nodes) topNames.add(n.name);
   }
   const groupName = new Map(eff.groups.map((g) => [g.id, g.name]));
   const groupNames = new Set(groupName.values());
   for (const g of eff.groups) {
-    if (topNames.has(g.name) || nativeRemote && [...sets.values()].some(s => s.nodes.some(n => n.name === g.name)) || BUILTINS.has(g.name)) report.error('name.conflict', `组名「${g.name}」与节点或内置策略重名`, `group:${g.id}`);
+    if (topNames.has(g.name) || managedMembers && [...sets.values()].some(s => s.nodes.some(n => n.name === g.name)) || BUILTINS.has(g.name)) report.error('name.conflict', `组名「${g.name}」与节点或内置策略重名`, `group:${g.id}`);
   }
 
   // ---------- 引用解析 ----------
@@ -211,7 +218,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const deps = new Map<string, DependencyEntry>();
   const wrapperNode = new Map<string, { set: NS; node: ProxyIR }>();
 
-  const refName = (n: RenderNode) => nativeRemote ? n[inlineOriginalName] ?? n.name : n.name;
+  const refName = (n: RenderNode) => managedMembers ? n[inlineOriginalName] ?? n.name : n.name;
   /** 正则取首个命中时跳过 skip（本条链的落地节点）；精确点选是明确选择，不跳过，成环由环检测报告。 */
   const findNode = (ref: ChainNodeRef, where: string, skip?: Set<string>): { set: NS; node: ProxyIR } | undefined => {
     const candidates = chainSources(ref.nodeSet, profile.nodeSets).map(source => sets.get(nodeSetKey(source.ref))!).filter(Boolean);
@@ -284,17 +291,10 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         if (s.output === 'provider') use.push(s.providerName);
         else proxies.push(...filterNodes(s.nodes, filterSpec).map((n) => n.name)); // 内联节点不受 filter 约束，服务端预过滤
       } else {
-        if (nativeRemote) {
-          for (const s of sets.values()) if (m.scope === 'all' || (m.scope === 'providers' ? s.output === 'provider' : s.output === 'inline')) {
-            if (s.output === 'provider') use.push(s.providerName);
-            else proxies.push(...filterNodes(s.nodes, filterSpec).map(n => n.name));
-          }
-          continue;
-        }
         out[m.scope === 'all' ? 'include-all' : m.scope === 'proxies' ? 'include-all-proxies' : 'include-all-providers'] = true;
       }
     }
-    const hasInclude = ['include-all', 'include-all-proxies', 'include-all-providers'].some((k) => out[k]);
+    const hasInclude = ['include-all', 'include-all-proxies', 'include-all-providers'].some(k => (g.extra?.[k] ?? out[k]) === true);
     if (!proxies.length && !use.length && !hasInclude) {
       // 静态空组必须补一个合法成员；忽略历史 whenEmpty，统一拒绝。
       proxies.push('REJECT');
@@ -337,7 +337,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       return { ...out, ...Object.fromEntries(Object.entries(g.extra ?? {}).filter(([key]) => allowed.has(key))) };
     }
     // 运行时筛空同样拒绝；放在扩展字段之后，防止历史配置覆盖固定策略。
-    return client === 'stash' ? stashGroup(out, g, report) as MihomoGroup : { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
+    return { ...out, ...(g.extra ?? {}), 'empty-fallback': 'REJECT' } as MihomoGroup;
   };
   if (isIniClient(client) && !report.items.some(r => r.code === client + '.base')) {
     const url = iniGeneralValue(input.base ?? '', 'proxy-test-url');
@@ -347,6 +347,23 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     if (client === 'loon' && timeout !== undefined && Number.isFinite(timeout)) base.general = { 'test-timeout': timeout / 1000 };
   }
   const groups = eff.groups.map(lowerGroup);
+  // 先生成公共 Clash 成员表达，再为需要托管筛选/空集合保护的输出展开动态范围。
+  if (managedMembers) for (const group of groups) {
+    const includeProviders = group['include-all'] === true || group['include-all-providers'] === true;
+    const includeProxies = group['include-all'] === true || group['include-all-proxies'] === true;
+    if (!includeProviders && !includeProxies) continue;
+    const spec = { filter: group.filter as string | undefined, excludeFilter: group['exclude-filter'] as string | undefined, excludeType: group['exclude-type'] as string | undefined };
+    for (const set of sets.values()) {
+      if (includeProviders && set.output === 'provider') group.use = [...new Set([...(group.use ?? []), set.providerName])];
+      if (includeProxies && set.output === 'inline') group.proxies = [...new Set([...(group.proxies ?? []), ...filterNodes(set.nodes, spec).map(n => n.name)])];
+    }
+    for (const key of ['include-all', 'include-all-proxies', 'include-all-providers']) delete group[key];
+    if (!group.proxies?.length && !group.use?.length) {
+      group.proxies = ['REJECT'];
+      report.warn('group.empty', `组「${group.name}」没有成员，按拒绝输出`, 'group:' + eff.groups.find(g => g.name === group.name)!.id);
+    }
+  }
+
 
   // ---------- 代理链：先确定有效前置，再写入订阅专属节点副本 ----------
   // 逐节点写入，不使用 Mihomo provider 的 override：整集规则是默认值，命中单节点规则的节点按单节点规则。
@@ -468,7 +485,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       }
       const key = `${base}_binary`, file = `${key}.mrs`;
       rulesets[file] = { behavior: src.behavior as Behavior, text: body, providerName };
-      ruleProviders[providerName] = { type:'http',behavior:src.behavior,format:'mrs',url:input.urls.ruleset(file, reference),interval:input.resourceIntervalSec ?? RULESET_INTERVAL,...(client === 'mihomo' ? {proxy:FETCH_VIA} : {}) };
+      ruleProviders[providerName] = { type:'http',behavior:src.behavior,format:'mrs',url:input.urls.ruleset(file, reference),interval:input.resourceIntervalSec ?? RULESET_INTERVAL,...(!isIniClient(client) ? {proxy:FETCH_VIA} : {}) };
       ruleLines.push(`RULE-SET,${providerName},${target}`);
       continue;
     }
@@ -506,7 +523,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       }
       if (!converted.lines.length) continue;
       rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', providerName };
-      ruleProviders[providerName] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, reference), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(client === 'mihomo' ? { proxy: FETCH_VIA } : {}) };
+      ruleProviders[providerName] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, reference), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(!isIniClient(client) ? { proxy: FETCH_VIA } : {}) };
     }
     ruleLines.push(`RULE-SET,${providerName},${target}`);
   }
@@ -526,32 +543,15 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     const set = [...sets.values()].find(s => s.providerName === name);
     return set ? filterNodes(set.nodes, { filter: g.filter as string | undefined, excludeFilter: g['exclude-filter'] as string | undefined, excludeType: g['exclude-type'] as string | undefined }).map(n => n.name) : [];
   })]));
-  if (client === 'stash') {
-    stashBenchmarks(allGroups, inlineProxies, eff.groups, report, providerNodes, benchmarkMembers);
-    for (const node of [...inlineProxies, ...[...providerNodes.values()].flat()]) if (node['dialer-proxy'] && node['interface-name']) report.error('stash.dialer-interface', 'Stash 的 dialer-proxy 与 interface-name 不能同时配置', `proxy:${String(node.name)}`);
-    // Stash 远程节点只允许指向同一集合中的节点，或不包含远程集合的主配置策略。
-    const hasRemote = (name: string, seen = new Set<string>()): boolean => {
-      if (seen.has(name)) return false;
-      seen.add(name);
-      const group = allGroups.find(g => g.name === name);
-      return !!group && (!!group.use?.length || (group.proxies ?? []).some(p => hasRemote(p, seen)));
-    };
-    for (const nodes of providerNodes.values()) for (const node of nodes) {
-      const via = node['dialer-proxy'];
-      if (typeof via !== 'string') continue;
-      const ref = wrapperNode.get(via);
-      if (ref && nodes.some(n => n.name === ref.node.name)) node['dialer-proxy'] = ref.node.name;
-      else if (hasRemote(via)) report.error('stash.provider-chain', 'Stash 远程节点的前置不能指向包含远程集合的策略组；请将前置来源设为展开', `proxy:${String(node.name)}`);
-    }
-  }
+  if (client === 'stash') applyStashCompatibility(allGroups, inlineProxies, eff.groups, report, providerNodes, benchmarkMembers);
   if (client === 'surge') surgeBenchmarks(allGroups, inlineProxies, eff.groups, report, providerNodes, benchmarkMembers);
   for (const s of sets.values()) {
     if (s.output !== 'provider') continue;
     providers[s.key] = { name: s.providerName, yaml: stringify({ proxies: providerNodes.get(s.providerName) }, { lineWidth: 0 }) };
     proxyProviders[s.providerName] = { type: 'http', url: input.urls.provider(s.key), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
   }
-  validateReferences(allGroups, inlineProxies, providers, proxyProviders, report, client === 'stash');
-  if (nativeRemote) {
+  validateReferences(allGroups, inlineProxies, providers, proxyProviders, report);
+  if (managedMembers) {
     const originalNames = new Map([...sets.values()].flatMap(s => s.nodes.map(n => [n.name, refName(n)] as const)));
     lowerRemoteProviders({ client, groups: allGroups, providers, proxyProviders, nodes: providerNodes, urls: input.urls, report, nodeReferences: new Map([...wrapperNode].map(([name, ref]) => [name, ref.node.name])),
       filter: (nodes, spec) => filterNodes(nodes.map(n => ({ ...n, [inlineOriginalName]: originalNames.get(String(n.name)) } as RenderNode)), spec),
@@ -564,7 +564,6 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   if (Object.keys(ruleProviders).length) config['rule-providers'] = ruleProviders;
   config.rules = ruleLines;
   if (client === 'loon') loonBenchmarks(config, eff.groups, report);
-  if (client === 'stash') for (const provider of Object.values(ruleProviders)) delete provider.type;
 
   const relatedGroups = (target: ChainTarget, seen = new Set<string>()): Set<string> => {
     if (target.kind === 'group' && !seen.has(target.groupId)) {
@@ -603,7 +602,6 @@ function validateReferences(
   providers: Record<string, ProviderOutput>,
   proxyProviders: Record<string, unknown>,
   report: Report,
-  allowSameProvider = false,
 ): void {
   const names = new Set<string>([...BUILTINS, ...inlineProxies.map((p) => String(p.name)), ...groups.map((g) => g.name)]);
   for (const g of groups) {
@@ -616,10 +614,7 @@ function validateReferences(
   for (const p of inlineProxies) checkDialer(p['dialer-proxy'], `proxy:${String(p.name)}`);
   for (const [key, prov] of Object.entries(providers)) {
     const payload = parse(prov.yaml) as { proxies: Record<string, unknown>[] };
-    for (const node of payload.proxies) {
-      if (allowSameProvider && payload.proxies.some(n => n.name === node['dialer-proxy'])) continue;
-      checkDialer(node['dialer-proxy'], `provider:${key}`);
-    }
+    for (const node of payload.proxies) checkDialer(node['dialer-proxy'], `provider:${key}`);
   }
 }
 

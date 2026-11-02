@@ -287,7 +287,7 @@ SUBFORGE_DB=/绝对路径/sub-forge.db pnpm --filter @sub-forge/server exec tsx 
 
 规则转换支持 `USER-AGENT`：来源读取计为已解析，POST 预览与 GET 下载对 Surge 输出有效规则，mihomo 保留客户端不支持注释；全部没有有效输出时 GET 仍返回 400。
 
-Stash：/subs/profile?id=PROFILE&token=TOKEN&target=stash&platform=ios 或 macos 输出完整订阅；UA 可自动识别。预览接口接受 client: stash，并返回可独立导入的 exportYaml。资源和历史版本按客户端/平台隔离；Mihomo 校验器不用于 Stash。预设 stash 与 base.stashPatch 独立保存，节点按快照内联。详见 docs/17-official-client-configuration-guides.md。
+Stash：`/subs/profile?id=PROFILE&token=TOKEN&target=stash&platform=ios`（或 macos）输出完整订阅；UA 可自动识别。主订阅、预览与节点资源均使用公共 `renderClash` 入口，保留少量 Stash 输出差异。节点遵循引用 / 展开设置，含远程节点时草稿不提供独立导出。追加配置继承 Mihomo；产物缓存和规则方言仍按输出目标隔离，Mihomo 校验器不用于 Stash。详见 [公共生成验收](../../docs/verification/stash-common-20261102/README.md)。
 
 ### 2026-10-29：目录级联索引
 
