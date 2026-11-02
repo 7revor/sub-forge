@@ -1,7 +1,7 @@
 import { TESTABLE_PROXY_TYPES, validateLocalProxy, type LocalProxy } from '@sub-forge/core';
 import { LineCounter } from 'yaml';
 import { parseYamlDocument } from './yamlDocument.ts';
-import type { RawResult } from '../components/DualEditor.tsx';
+import type { RawResult } from './result.ts';
 
 export function inspectLocalNodeYaml(text: string): RawResult<LocalProxy> {
   const lines = new LineCounter();

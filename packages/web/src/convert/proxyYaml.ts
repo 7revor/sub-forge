@@ -1,6 +1,6 @@
 import { parseClientProxyObject, parseContent, tryDecodeBase64, type LocalProxy } from '@sub-forge/core';
 import { isNode, LineCounter, parseDocument, stringify } from 'yaml';
-import type { RawResult } from '../components/DualEditor.tsx';
+import type { RawResult } from './result.ts';
 import { isRecord } from '../components/schema.ts';
 import { schemaFor } from '../schemas/proxy.ts';
 import { recoverFields, recoverYaml } from './recoverYaml.ts';

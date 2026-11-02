@@ -7,7 +7,7 @@ import { Badge, Button } from './ui.tsx';
 import { YamlTextarea } from './YamlTextarea.tsx';
 import { CopyButton } from './CopyButton.tsx';
 
-import type { RawResult } from './DualEditor.tsx';
+import type { RawResult } from '../convert/result.ts';
 
 export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled = false }: { disabled?: boolean; text: string; onChange: (text: string) => void; result: RawResult<LocalProxy>; checking: boolean }) {
   const undo = useRef<{ before: string; after: string; notification: number } | undefined>(undefined);

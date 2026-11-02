@@ -60,7 +60,7 @@ Profile 基础设置直接保存原文，未完成语法也可保存；生成时
 
 全局 blank 使用 `Empty.tsx` 的公共 `Empty`（由 `ui.tsx` 导出），包括列表、详情、预览、功能占位和下拉无结果。说明与空框间距由 `Card description` 或 `gap-4` 保证 16 px，不依赖默认段落 margin。尺寸、适用范围与设计稿待同步项见 [空状态规范](../../docs/14-empty-state-guidelines.md)。
 
-公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` （内部调用 `Frame.modal.confirm`））、`dialogs`（节点集选择的静态入口）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
+公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` （内部调用 `Frame.modal.confirm`））、`dialogs`（节点集选择的静态入口）、`LocalNodeYamlEditor`（单节点 YAML 编辑与导入）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
 
 公共展示与业务表单的复用边界：
 
