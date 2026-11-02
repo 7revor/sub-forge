@@ -69,7 +69,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
               <span className="shrink-0 text-foreground" title="策略组类型">{GROUP_TYPE_LABEL[g.type]}</span>
               <span className={cx("min-w-0 flex-1 truncate max-md:basis-20", !g.members.length ? memberSummary ? "text-warn" : "text-muted-foreground" : "text-muted-foreground")} title={members}>{members}</span>
               <span className="flex flex-wrap gap-1 max-md:empty:hidden">{!g.members.length && memberSummary && <Badge tone="warn">空组</Badge>}{inherited !== undefined && inherited !== hidden && <Badge tone="warn">{inherited ? '模板为隐藏' : '模板为显示'}</Badge>}</span>
-              <label className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">隐藏<Switch label={`隐藏策略组「${g.name || '未命名组'}」`} disabled={readOnly} checked={hidden} onChange={next => setHidden(g, next)} /></label>
+              <label className="ml-auto flex w-[62px] shrink-0 items-center gap-1.5 text-xs text-muted-foreground"><Switch label={`显示策略组「${g.name || '未命名组'}」`} disabled={readOnly} checked={!hidden} onChange={shown => setHidden(g, !shown)} />{hidden && '隐藏'}</label>
             </div>
             <div className="col-start-4 row-start-1 md:col-start-8">
               <RoutingCardActions label={`策略组「${g.name}」`} onEdit={() => void edit(g)} onDelete={isGroupReadOnly(g) ? undefined : () => void remove(g)} />
