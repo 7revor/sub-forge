@@ -18,8 +18,7 @@
 }
 
 .native-base-row { display: flex; align-items: center; position: relative; border-radius: 6px; }
-.native-base-row:has(.native-base-target-active) { background: color-mix(in oklab, var(--primary) 10%, transparent); }
-.native-base-row-child { border-left: 1px solid var(--border); margin-left: 14px; padding-left: 0; }
+.native-base-row-child { margin-left: 14px; padding-left: 0; }
 .native-base-target { flex: 1; min-width: 0; }
 .native-base-expand { width: 18px; flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: var(--muted-foreground); }
 .native-base-editor-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--input); border-radius: 8px; }
