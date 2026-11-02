@@ -1,6 +1,6 @@
 /* 目标目录与原文编辑区共享一层面板，分别滚动。 */
 .native-base-workspace { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-width: 0; min-height: 516px; border-top: 1px solid var(--border); }
-.native-base-targets { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; background: var(--card); border-right: 1px solid var(--border); overflow: auto; }
+.native-base-targets { --native-base-arrow-width: 18px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; background: var(--card); border-right: 1px solid var(--border); overflow: auto; }
 .native-base-target { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 0 8px; border-radius: 6px; font-size: var(--text-sm); text-align: left; cursor: pointer; }
 .native-base-target:hover { background: var(--accent); }
 .native-base-child { padding-left: 18px; color: var(--muted-foreground); }
@@ -19,7 +19,7 @@
 }
 
 .native-base-row { display: flex; align-items: center; position: relative; border-radius: 6px; }
-.native-base-row-child { margin-left: 14px; padding-left: 0; }
+.native-base-row-child { margin-left: var(--native-base-arrow-width); padding-left: 0; }
 .native-base-target { flex: 1; min-width: 0; }
-.native-base-expand { width: 18px; flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: var(--muted-foreground); }
+.native-base-expand { width: var(--native-base-arrow-width); flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: var(--muted-foreground); }
 .native-base-editor-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--input); border-radius: 8px; }
