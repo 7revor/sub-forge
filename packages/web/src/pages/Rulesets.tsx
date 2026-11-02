@@ -16,7 +16,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 规则集（RS-01–04、CR-05）：一个规则集由多个来源（远程地址 / 本地规则）合并而成，只配一个出口。
 // 来源正文打开只读预览，编辑使用统一弹窗；下方始终显示合并结果。
 
-import { TriangleAlert, FileText, Globe, Link2, Plus, ScanSearch } from 'lucide-react';
+import { TriangleAlert, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
@@ -147,12 +147,12 @@ export function RulesetEdit() {
     </>}>
       <ErrorAlert error={matches.error} /><FieldError error={linkError} />
       <SortableList items={d.sources} getKey={s => s.id} onReorder={sources => set({ sources })} renderItem={(s, i, handle) => <RuleCard label={`第 ${i + 1} 项来源`} handle={handle}
-        icon={s.repository ? <Link2 size={16} /> : s.kind === 'remote' ? <Globe size={16} /> : <FileText size={16} />}
+        kind={s.repository ? 'repository' : s.kind === 'remote' ? 'remote' : 'local'}
         count={<SourceStatus src={s} status={status.get(s.id)} loading={sources.loading.has(s.id)} />}
         hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking || matches.isLinkingAll} onLink={match => link(s.id, s.url!, match)} />}
         externalPreview={s.kind === 'remote'} previewLinks={sourcePreviewHref(s) ? [{ href: sourcePreviewHref(s)! }] : []}
         onPreview={() => void RuleSourcePreview.show({ source: { rulesetId: e.isNew ? undefined : e.id, source: s } })} onEdit={() => void edit({ source: s, adding: false })} onDelete={() => { set({ sources: d.sources.filter(x => x.id !== s.id) }); if (s.url) matches.clear([s.url]); }}>
-        <span className="block min-w-0" title={sourceLabel(s)}><span className="block truncate">{sourceLabel(s)}</span><span className="block truncate font-mono text-xs font-normal text-muted-foreground">{s.repository?.path ?? (s.kind === 'remote' ? s.url : s.content?.split('\n').filter(Boolean).join(' · '))}</span></span>
+        <span className="block min-w-0" title={sourceLabel(s)}><span className="block truncate">{sourceLabel(s)}</span><span className="block truncate text-xs font-normal text-muted-foreground">{s.repository?.path ?? (s.kind === 'remote' ? s.url : s.content?.split('\n').filter(Boolean).join(' · '))}</span></span>
       </RuleCard>} />
     </Card>
     </> : <Card title="来源（只读）"><div className="flex flex-col gap-2">{d.sources.map((source, i) => source.kind === 'remote' ? <a key={source.id} href={sourcePreviewHref(source)} target="_blank" rel="noreferrer noopener" className={buttonClass('default', 'sm')}>查看来源 {i + 1} · {sourceLabel(source)}</a> : <Button key={source.id} onClick={() => void RuleSourcePreview.show({ source: { rulesetId: e.id, source } })}>查看来源 {i + 1} · {sourceLabel(source)}</Button>)}</div></Card>}

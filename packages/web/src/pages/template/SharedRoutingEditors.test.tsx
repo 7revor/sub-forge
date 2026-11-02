@@ -78,7 +78,7 @@ describe('模板与订阅共享编辑器的权限边界', () => {
     expect(select(true)).not.toContain('w-[84px]');
     expect(select(false)).toContain('w-[84px]');
   });
-  it('编辑规则可切换匹配类型，添加时类型由入口固定', () => {
+  it('规则弹窗可切换匹配类型，仅静态规则入口固定类型', () => {
     const editor = (fixedKind: boolean) => renderToStaticMarkup(<MemoryRouter><QueryClientProvider client={new QueryClient()}><MatcherEditor fixedKind={fixedKind} value={{ kind: 'local', content: '' }} rulesets={[]} onChange={() => {}} /></QueryClientProvider></MemoryRouter>);
     expect(editor(false)).toContain('匹配类型');
     expect(editor(true)).not.toContain('匹配类型');

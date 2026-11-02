@@ -118,7 +118,7 @@ Profile 基础设置直接保存原文，未完成语法也可保存；生成时
 
 ### 模板规则编辑（2026-10-29）
 
-「添加单条规则」直接编辑模板规则；「引用规则集」通过公共 RuleSetPicker 搜索本地和 GitHub 候选。本地名称加「本地 ·」前缀，仓库显示名称与来源。RuleSets 维护使用同一选择器的仓库作用域。AsyncSelect 支持防抖、分页、键盘选择、索引状态、失败重试；解析失败不覆盖已有引用。
+「添加单条规则」直接编辑模板规则；「引用规则集」通过公共 RuleSetPicker 搜索本地和 GitHub 候选。规则集合名称加「规则集合 ·」前缀，仓库显示名称与来源。RuleSets 维护使用同一选择器的仓库作用域。AsyncSelect 支持防抖、分页、键盘选择、索引状态、失败重试；解析失败不覆盖已有引用。
 
 2026-10-29：模板移除「编辑 YAML」与反向导出入口，仅支持从 YAML 单向导入；内部稳定 ID 与规则集关联通过结构化表单维护。导入解析仍兼容既有 `x-sub-forge-rulesets` 引用映射。更换引用保持规则 ID、出口、启停、选项和顺序。最终订阅 YAML 仍由服务端渲染，不含编辑器元数据。
 
@@ -250,7 +250,7 @@ Input、Textarea、DraftInput、DraftTextarea、YamlTextarea、Select、MultiSel
 
 ### 2026-10-30：三处共用规则编辑
 
-RuleCard、RuleEditShell、LocalRulesInput 统一规则增强、模板和订阅；点击正文预览、铅笔弹窗编辑，移除复制地址。增强下方始终显示合并结果。本地多条共用出口，弹窗取消不改草稿，空内容不能应用；绑定继承规则只读。 `RuleEditShell` 固定 640×620（不超过视口 85%），类型切换用分段控件，切换时弹窗尺寸不变。
+RuleCard、RuleEditShell、LocalRulesInput 统一规则增强、模板和订阅；点击正文预览、铅笔弹窗编辑，移除复制地址。增强下方始终显示合并结果。本地多条共用出口，弹窗取消不改草稿，空内容不能应用；绑定继承规则只读。 `RuleEditShell` 固定 640×620（不超过视口 85%），类型切换用分段控件，切换时弹窗尺寸不变。 `RuleCard` 通过 `kind` 决定图标和定宽类型列，名称不按类型切换字体；添加与编辑规则共用 `RuleEditDialog`，同一搜索范围。
 
 useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；只响应新增远程项、应用 YAML 导入和列表手动检测。标记离开页面清空，旧请求不能恢复；关联仍由用户明确点击，并重新校验当前索引。保存状态比较使用稳定键顺序，避免接口回写字段顺序变化导致虚假未保存提示。截图和全部验证见 `research/verification/unified-rule-cards-20261030/README.md`。
 

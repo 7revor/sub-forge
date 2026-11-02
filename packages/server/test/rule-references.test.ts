@@ -19,7 +19,7 @@ describe('模板统一规则引用', () => {
     const first = await h.admin.get('/api/rule-options/search?q=google&limit=30');
     const second = await h.admin.get('/api/rule-options/search?q=google&limit=30&offset=30');
     expect(first.json.total).toBe(38);
-    expect(first.json.items.slice(0, 2).map((x: { label: string }) => x.label).sort()).toEqual(['Google.list', '本地 · Google']);
+    expect(first.json.items.slice(0, 2).map((x: { label: string }) => x.label).sort()).toEqual(['Google.list', '规则集合 · Google']);
     const all = [...first.json.items, ...second.json.items];
     expect(new Set(all.map(x => x.value)).size).toBe(38);
     expect(all.some(x => x.label.includes('私有'))).toBe(true);
