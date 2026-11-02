@@ -59,9 +59,9 @@ export function stashGroup(out: Record<string, unknown>, group: GroupSpec, repor
 }
 
 /** Stash 的测试参数属于节点；共享节点要求测试参数一致，不能照搬组级 url/timeout。 */
-export function stashBenchmarks(groups: Record<string, unknown>[], nodes: Record<string, unknown>[], specs: GroupSpec[], report: Report): void {
+export function stashBenchmarks(groups: Record<string, unknown>[], nodes: Record<string, unknown>[], specs: GroupSpec[], report: Report, providers = new Map<string, Record<string, unknown>[]>(), remoteMembers = new Map<string, string[]>()): void {
   const groupMap = new Map(groups.map(g => [g.name as string, g]));
-  const nodeMap = new Map(nodes.map(n => [n.name as string, n]));
+  const nodeMap = new Map([...nodes, ...[...providers.values()].flat()].map(n => [n.name as string, n]));
   const visit = (name: string, patch: Record<string, unknown>, seen: Set<string>, where: string) => {
     if (seen.has(name)) return;
     seen.add(name);
@@ -71,7 +71,11 @@ export function stashBenchmarks(groups: Record<string, unknown>[], nodes: Record
         if (node[key] !== undefined && node[key] !== value) report.error('stash.benchmark-conflict', `节点「${name}」在多个位置设置了不同的 ${key}，请统一 Stash 延迟测试参数`, where);
         else node[key] = value;
       }
-    } else for (const member of groupMap.get(name)?.proxies as string[] ?? []) visit(member, patch, seen, where);
+    } else {
+      const group = groupMap.get(name);
+      for (const member of group?.proxies as string[] ?? []) visit(member, patch, seen, where);
+      for (const member of remoteMembers.get(name) ?? []) visit(member, patch, seen, where);
+    }
   };
   for (const group of specs) {
     const patch: Record<string, unknown> = {};

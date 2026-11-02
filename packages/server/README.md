@@ -451,3 +451,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-02 存储边界：`store.ts` 只保留当前读写；跨版本升级、旧种子转换和历史模板读取位于 `store-migrations.ts`，当前结构位于 `schema.ts`。`getTemplate` 与模板查询只读 `templates`；升级和种子事务通过显式的 `TemplateReader` 读取 `template_versions`。v32 把 `refresh_jobs` 纳入当前结构，文档删除时由 `ResourceService` 在同一事务内清理对应任务。`SnapshotService.status` 与状态接口只读，调度和刷新任务在拉取前建立绑定。`pruneResourceBindings` 只解密来源、规则集和订阅文档。
 
 2026-11-02 一键关联：前端批量复用 `/api/rule-options/match-urls` 与 `/api/rule-options/resolve`，服务端、数据库和示例种子无变更。
+
+2026-11-02：配置节点 provider 现按内核返回 Mihomo/Stash YAML 或 Surge/Loon 节点行，四端遵循来源的引用 / 展开设置。派生筛选资源沿用用户鉴权、流量头和当前配置校验；空资源不成功下发，旧强制内联缓存不作为回退。含远程节点的草稿禁用独立下载，使用正式订阅链接；边界见 [转换说明](../../docs/19-client-conversion.md#2026-11-02遵循节点来源输出设置)。

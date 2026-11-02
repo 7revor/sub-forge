@@ -3,7 +3,7 @@ import type { RenderInput, RoutingConfig } from '../../src/index.ts';
 export const direct = { kind: 'builtin' as const, name: 'DIRECT' as const };
 export function iniFixture(): RenderInput {
   return {
-    profile: { id: 'p', name: '多客户端', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: {
+    profile: { id: 'p', name: '多客户端', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'inline' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: {
       groups: [{ id: 'all', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }],
       rules: [{ id: 'ua', matcher: { kind: 'rule', rule: { type: 'USER-AGENT', value: 'Example*' } }, target: { kind: 'group', groupId: 'all' } }], final: direct,
     } } },

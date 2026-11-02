@@ -103,14 +103,14 @@ export function TabPreview() {
       </div>
       <ErrorAlert error={preview.error} />
       {preview.data && !current && !preview.isPending && <p role="status" className="text-sm text-muted-foreground">配置已更改，请重新生成预览。</p>}
-      {client !== 'mihomo' && client !== 'loon' && <p className="text-sm text-muted-foreground">节点随主订阅刷新更新；节点来源内联输出，空策略组保持拒绝连接。下载配置文件会内嵌已转换的规则，可直接导入。</p>}
-      {client === 'loon' && <p className="text-sm text-muted-foreground">本地规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
+      <p className="text-sm text-muted-foreground">引用来源通过远程订阅更新；展开来源随主订阅更新。空策略组保持拒绝连接。</p>
+      {client === 'loon' && <p className="text-sm text-muted-foreground">本地规则和规则集按列表顺序托管，最终兜底保留在主配置。</p>}
       {current && preview.data.exportUnavailableReason && <p role="status" className="text-sm text-muted-foreground">{preview.data.exportUnavailableReason}</p>}
       {current && (
         <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[minmax(0,1fr)]">
           <CodePreview fill lineNumbers label="最终配置" className="rounded-xl" title={<>{`config.${preview.data.format === 'ini' ? 'conf' : 'yaml'} · ${preview.data.yaml?.split('\n').length ?? 0} 行`}{selection && <span role="status" className="ml-3 text-[#b8ccff]">已定位第 {selection.range.startLine} 行</span>}</>} text={preview.data.yaml ?? preview.data.failure ?? ''} highlight={selection?.range} bodyClassName="overscroll-contain p-4 text-sm leading-[22px]" />
           <section aria-label="渲染报告" tabIndex={0} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border bg-card shadow-sm [overflow-wrap:anywhere]">
-            <div className="flex items-center justify-between px-5 pt-4"><h2 className="m-0 text-base font-semibold">检查结果</h2><Badge tone={preview.data.ok ? 'ok' : 'err'}>{preview.data.ok ? '可以导入' : '渲染失败'}</Badge></div>
+            <div className="flex items-center justify-between px-5 pt-4"><h2 className="m-0 text-base font-semibold">检查结果</h2><Badge tone={preview.data.ok ? 'ok' : 'err'}>{preview.data.ok ? (preview.data.exportUnavailableReason ? '生成成功' : '可以导入') : '渲染失败'}</Badge></div>
             <div className="px-5"><Segmented fullWidth label="筛选检查结果" value={level} onChange={setLevel} options={[{ value: 'all', label: `全部 ${report.length}` }, { value: 'error', label: `错误 ${count('error')}` }, { value: 'warn', label: `告警 ${count('warn')}` }, { value: 'info', label: `提示 ${count('info')}` }]} /></div>
             <div className="min-h-0 flex-1 overflow-auto border-t border-border">
               <PreviewReport items={filtered.map(item => item.item)} locations={filtered.map(item => locations[item.index])} selected={filtered.findIndex(item => item.index === selection?.index)} onLocate={index => { const original = filtered[index]!.index; const range = locations[original]; if (range) setLocated({ result: preview.data, index: original, range: { ...range } }); }} />

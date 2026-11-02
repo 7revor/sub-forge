@@ -42,7 +42,11 @@ describe('Loon 订阅与管理接口', () => {
     expect(res.status).toBe(200); expect(res.headers.get('content-type')).toContain('text/plain');
     const text = await res.text();
     expect(text).toContain('[General]\nip-mode = v4-only\nallow-wifi-access = false\ntest-timeout = 5');
-    expect(text).toContain('节点 = trojan, example.test, 443, "example", transport=tcp');
+    const nodesUrl = text.split('[Remote Proxy]\n')[1]!.split(' = ')[1]!.split(',parser-enabled=')[0]!;
+    const nodes = await h.app.request(nodesUrl);
+    expect(nodes.status).toBe(200);
+    expect(await nodes.text()).toContain('节点 = trojan, example.test, 443, "example", transport=tcp');
+    expect(text).not.toContain('节点 = trojan');
     expect(text).toContain('[Rule]\nFINAL,DIRECT\n\n[Remote Rule]');
     expect(text).toContain(',policy=代理,tag=loon,enabled=true');
     const links = text.split('[Remote Rule]\n')[1]!.trim().split('\n').map(line => line.split(',policy=')[0]!);

@@ -39,7 +39,11 @@ describe('Surge 主订阅和 API', () => {
     expect(text).toContain('#!MANAGED-CONFIG https://sub.test/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token=' + h.token + ' interval=86400 strict=false');
     expect(text).toContain('[General]\nipv6 = false\nloglevel = notify\ntest-timeout = 5');
     expect(text).not.toMatch(/mixed-port|allow-lan/);
-    expect(text).toContain('节点 = trojan, example.test, 443, password="example"');
+    const nodesUrl = /policy-path=([^,\n]+)/.exec(text)![1]!;
+    const nodes = await h.app.request(nodesUrl);
+    expect(nodes.status).toBe(200);
+    expect(await nodes.text()).toContain('节点 = trojan, example.test, 443, password="example"');
+    expect(text).not.toContain('节点 = trojan');
     expect(text).toContain('FINAL,DIRECT');
     const url = resourceUrl(text), file = await h.app.request(url);
     expect(new URL(url).pathname).toBe('/subs/ruleset'); expect(new URL(url).searchParams.get('token')).toBe(h.token); expect(file.status).toBe(200);
@@ -54,7 +58,7 @@ describe('Surge 主订阅和 API', () => {
   it('预览和独立导出不留占位 token，预览不写 last-good，用户隔离有效', async () => {
     const h = await scenario();
     for (const path of ['/api/profiles/preview', '/api/profiles/' + h.profile.id + '/preview']) {
-      const res = await h.alice.post(path, { profile: h.profile, client: 'surge', platform: 'ios' });
+      const res = await h.alice.post(path, { profile: { ...h.profile, nodeSets: h.profile.nodeSets.map((s: any) => ({ ...s, output: 'inline' })) }, client: 'surge', platform: 'ios' });
       expect(res.json.ok, res.text).toBe(true); expect(res.json.format).toBe('ini');
       expect(res.json.exportYaml).not.toMatch(/__SF_|RULE-SET/);
       expect(res.json.exportYaml).toContain('DOMAIN,example.test,代理,extended-matching\nIP-CIDR,192.0.2.0/24,代理,no-resolve\nUSER-AGENT,Example*,代理');

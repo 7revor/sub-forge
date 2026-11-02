@@ -47,9 +47,12 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(yaml['mixed-port']).toBe(7890); expect(yaml['allow-lan']).toBe(true);
     expect(yaml['log-level']).toBe('warning');
     expect(yaml.dns).toEqual({ enable: true, nameserver: ['https://dns.example.test/dns-query'] });
-    expect(yaml.proxies[0]).toMatchObject({ name: '测试节点', auth: 'example-password' });
-    expect(yaml.proxies[0].password).toBeUndefined();
-    expect(yaml['proxy-providers']).toBeUndefined();
+    expect(yaml.proxies).toEqual([]);
+    const nodesResponse = await h.app.request(yaml['proxy-providers']['节点'].url);
+    expect(nodesResponse.status).toBe(200);
+    const nodes = parse(await nodesResponse.text()).proxies;
+    expect(nodes[0]).toMatchObject({ name: '测试节点', auth: 'example-password' });
+    expect(nodes[0].password).toBeUndefined();
     expect(yaml.rules).toContain('PROCESS-NAME,Example,代理');
     const provider = Object.values(yaml['rule-providers'])[0] as { url: string };
     expect(new URL(provider.url).pathname).toBe('/subs/ruleset');
@@ -81,7 +84,7 @@ describe('Stash 主订阅与资源隔离', () => {
   it('草稿预览和独立文件导出可用，不写缓存，导出没有占位 token', async () => {
     const h = await scenario();
     for (const path of ['/api/profiles/preview', `/api/profiles/${h.profile.id}/preview`]) {
-      const preview = await h.alice.post(path, { profile: h.profile, client: 'stash', platform: 'ios' });
+      const preview = await h.alice.post(path, { profile: { ...h.profile, nodeSets: h.profile.nodeSets.map((s: any) => ({ ...s, output: 'inline' })) }, client: 'stash', platform: 'ios' });
       expect(preview.status).toBe(200); expect(preview.json.ok, preview.text).toBe(true);
       expect(preview.json.exportYaml).not.toMatch(/\{token\}|__SF_TOKEN__/);
       const yaml = parse(preview.json.exportYaml);
@@ -122,7 +125,7 @@ describe('Stash 主订阅与资源隔离', () => {
     const fallback = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
     expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
     if (!fallback.ok) throw new Error(fallback.message);
-    expect(parse(fallback.render.yaml).proxies[0].auth).toBe('example-password');
+    expect(parse(fallback.render.providers['local:nodes']!).proxies[0].auth).toBe('example-password');
     expect((await renderer.render(h.profile.id, { client: 'stash', platform: 'macos' })).ok).toBe(false);
   });
 });

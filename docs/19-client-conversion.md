@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | 完整主订阅 | YAML | INI | INI | YAML |
 | 订阅追加原文 | `base.kernels.mihomo` | `base.kernels.surge` | `base.kernels.loon` | `base.kernels.stash` |
-| 节点集 | provider / inline | 快照内联 | 快照内联 | 快照内联 |
+| 节点集 | provider / inline | policy-path / inline | Remote Proxy / inline | proxy-providers / inline |
 | 规则集 | 托管 provider | 托管 LIST | 托管 `[Remote Rule]` | 托管 provider |
 | 独立文件 | 现有 YAML 导出 | 规则内嵌 `.conf` | 含规则时通过正式订阅获取 `.conf` | 规则内嵌 YAML |
 | 平台 | 现有平台 | iOS / macOS | iOS / macOS | iOS / macOS |
@@ -94,3 +94,16 @@ Loon 没有在本机执行官方配置校验器；Surge/Loon 的真实客户端�
 
 
 2026-10-30 后续重构：当前基础配置与规则维度以 [20](20-native-client-append.md) 为准。早期公共映射验收仅描述历史实现。
+
+## 2026-11-02：遵循节点来源输出设置
+
+四个内核都保留每个来源的 `provider` / `inline` 选择。引用来源由本服务生成专属远程资源，展开来源写入主配置，支持两者混用。Surge 策略组使用 `policy-path` 和秒单位的 `update-interval`；Loon 声明 `[Remote Proxy]` 并在策略组引用订阅名，禁用额外解析器；Stash 声明 `proxy-providers` 并用 `use` 引用，不携带 Mihomo 专用 `type` / `proxy`。
+
+- 远程资源仍走 `/subs/nodes?kind=provider&profile=…&id=…&target=…`，正文分别是 Surge 节点行、Loon 节点行、Stash YAML。来源处理链、组合成员及前后缀先执行；上游私有地址不会直接下发。
+- 三端组级包含 / 排除正则、排除类型和精确节点引用由服务端生成稳定的派生资源；每次刷新重新计算。Surge 多个引用来源合成一个远程资源，保持来源顺序。派生资源继承原来源的权限和去重流量统计。节点重名时同步改名与引用，Loon 订阅名与策略名冲突时分配独立名称。
+- 筛空的组输出 REJECT，不引用空集合；旧派生地址失效，空原始资源返回 503，避免客户端把空 provider 转成 DIRECT。后续新增节点后需刷新主订阅恢复空组的远程引用。网络失败时是否保留客户端本地缓存取决于客户端本身。
+- Surge 远程正文保留 `underlying-proxy`；Stash 同一远程集合内的前置直接引用集内节点，支持指向主配置的节点或不含远程集合的策略组。Stash 跨远程集合前置、筛选删除所需集内前置，以及 Loon 远程落地携带代理链均明确报错，不能静默去掉前置或改为内联；可显式将对应前置 / 落地来源设为展开。三端均支持内联落地引用精确远程前置。Stash provider 代理链要求 iOS/tvOS 3.6+、macOS 4.3+。
+- 草稿远程链接含占位令牌，含远程节点时禁用独立文件下载，使用保存后的正式订阅链接。选择展开后恢复原有独立导出；Loon 含远程规则时仍需正式订阅。
+- 失败回退不会使用旧版强制内联的成功结果，也不会回退到与当前节点输出设置不同的产物。
+
+依据（2026-11-02 核对）：[Surge 外部策略](https://manual.nssurge.com/policy-groups/policy-including.html)、[Loon 订阅节点](https://nsloon.app/docs/Node/subscription/)、[Loon 官方示例](https://github.com/Loon0x00/LoonExampleConfig/blob/master/example.conf)、[Stash 远程代理集](https://stash.wiki/proxy-protocols/proxy-providers)、[Stash 代理链](https://stash.wiki/proxy-protocols/dialer-proxy)。

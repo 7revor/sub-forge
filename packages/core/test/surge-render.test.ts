@@ -49,7 +49,7 @@ describe('Surge 完整订阅', () => {
   it('内联重名仍按原快照名称筛选并解析引用', () => {
     const f = iniFixture();
     f.nodeSets.locals.other = { id: 'other', name: '另一个节点集', proxies: [{ name: '香港', type: 'trojan', server: 'other.example.test', port: 443, password: 'other' }] };
-    f.profile.nodeSets.push({ ref: { type: 'local', id: 'other' }, output: 'provider' });
+    f.profile.nodeSets.push({ ref: { type: 'local', id: 'other' }, output: 'inline' });
     routing(f).groups[0]!.members = [{ kind: 'node', ref: { nodeSet: { type: 'local', id: 'other' }, match: { exact: '香港' } } }];
     expect(renderSurge(f).yaml).toContain('代理 = select, 香港 2');
   });

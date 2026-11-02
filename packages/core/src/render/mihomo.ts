@@ -25,6 +25,7 @@ import { isIniClient } from '../types.ts';
 import { stringifyLoon, loonBenchmarks } from './loon-config.ts';
 import { iniName } from './ini-format.ts';
 import { stashProxy, stashGroup, stashBenchmarks } from './stash-config.ts';
+import { lowerRemoteProviders } from './remote-providers.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
@@ -68,7 +69,7 @@ export type ChainResolution = {
   issues: ReportItem[];
 };
 
-export type ProviderOutput = { name: string; yaml: string };
+export type ProviderOutput = { name: string; yaml: string; sourceKeys?: string[]; nodeCount?: number };
 export type RulesetOutput = { behavior: Behavior; text: string; providerName?: string };
 
 export type MihomoRenderResult = {
@@ -101,7 +102,6 @@ type NS = {
   key: string;
   ref: NodeSetID;
   output: 'provider' | 'inline';
-  requestedOutput: 'provider' | 'inline';
   providerName: string;
   /** 本次渲染的节点副本，可以写入 dialer-proxy */
   nodes: RenderNode[];
@@ -151,20 +151,14 @@ function stripNode(n: ProxyIR): Record<string, unknown> {
 
 function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const { profile } = input;
-  const inlineNodes = client !== 'mihomo';
+  const nativeRemote = client !== 'mihomo';
   const report = new Report();
   const ctx: ClientCtx = { client };
   let base: Record<string, unknown> = {};
   try { validateNativeText(input.base ?? '', client); if (!isIniClient(client)) base = parseNativeYaml(input.base ?? ''); }
   catch (error) { report.error(client + '.base', (error as Error).message); }
   if (client === 'stash' && input.platform && input.platform !== 'ios' && input.platform !== 'macos') report.error('stash.platform', 'Stash 输出仅支持 iOS 或 macOS 平台');
-  if (client === 'stash' && profile.nodeSets.some(s => s.output === 'provider')) {
-    report.info('stash.nodes-inline', 'Stash 节点来源按快照内联输出，随主订阅刷新更新，以保留筛选、代理链及空组拒绝语义');
-  }
-  if (isIniClient(client)) {
-    if (input.platform && !['ios', 'macos'].includes(input.platform)) report.error(client + '.platform', client + ' 仅支持 iOS 或 macOS');
-    if (profile.nodeSets.some(s => s.output === 'provider')) report.info(client + '.nodes-inline', client + ' 节点按快照内联，随主订阅刷新，以保留筛选和空组拒绝语义');
-  }
+  if (isIniClient(client) && input.platform && !['ios', 'macos'].includes(input.platform)) report.error(client + '.platform', client + ' 仅支持 iOS 或 macOS');
   if (client === 'loon') report.info('loon.rule-priority', 'Loon 全部分流规则按列表顺序托管；客户端仍按域名、IP 等阶段匹配，请在 Loon 中核对跨类型规则优先级');
   const eff = resolveProfileRouting(profile, input.template, report);
   const resolver = new NodeSetResolver(input.nodeSets, report);
@@ -180,8 +174,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     providerNames.add(providerName);
     sets.set(key, {
       key, ref: ps.ref, providerName,
-      output: inlineNodes ? 'inline' : ps.output,
-      requestedOutput: ps.output,
+      output: ps.output,
       nodes: resolver.resolve(ps.ref).map(n => nodeSemantics(n, client, report)).map(n => client === 'stash' ? stashProxy(n, report) : n),
     });
   }
@@ -189,23 +182,27 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   // ---------- 顶层名称表 ----------
   const topNames = new Set<string>();
   for (const s of sets.values()) {
-    if (s.output !== 'inline') continue;
+    if (s.output !== 'inline' && !nativeRemote) continue;
     for (const n of s.nodes) {
       if (topNames.has(n.name)) {
         const orig = n.name;
         let i = 2;
         while (topNames.has(`${orig} ${i}`)) i++;
-        if (inlineNodes) n[inlineOriginalName] = orig;
+        if (nativeRemote) n[inlineOriginalName] = orig;
         n.name = `${orig} ${i}`;
-        report.warn('inline.name-conflict', `内联节点「${orig}」与其他节点来源重名，已改为「${n.name}」`, s.key);
+        report.warn('inline.name-conflict', `节点「${orig}」与其他节点来源重名，已改为「${n.name}」`, s.key);
       }
       topNames.add(n.name);
     }
   }
+  if (nativeRemote) {
+    topNames.clear();
+    for (const s of sets.values()) if (s.output === 'inline') for (const n of s.nodes) topNames.add(n.name);
+  }
   const groupName = new Map(eff.groups.map((g) => [g.id, g.name]));
   const groupNames = new Set(groupName.values());
   for (const g of eff.groups) {
-    if (topNames.has(g.name) || BUILTINS.has(g.name)) report.error('name.conflict', `组名「${g.name}」与节点或内置策略重名`, `group:${g.id}`);
+    if (topNames.has(g.name) || nativeRemote && [...sets.values()].some(s => s.nodes.some(n => n.name === g.name)) || BUILTINS.has(g.name)) report.error('name.conflict', `组名「${g.name}」与节点或内置策略重名`, `group:${g.id}`);
   }
 
   // ---------- 引用解析 ----------
@@ -214,7 +211,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const deps = new Map<string, DependencyEntry>();
   const wrapperNode = new Map<string, { set: NS; node: ProxyIR }>();
 
-  const refName = (n: RenderNode) => inlineNodes ? n[inlineOriginalName] ?? n.name : n.name;
+  const refName = (n: RenderNode) => nativeRemote ? n[inlineOriginalName] ?? n.name : n.name;
   /** 正则取首个命中时跳过 skip（本条链的落地节点）；精确点选是明确选择，不跳过，成环由环检测报告。 */
   const findNode = (ref: ChainNodeRef, where: string, skip?: Set<string>): { set: NS; node: ProxyIR } | undefined => {
     const candidates = chainSources(ref.nodeSet, profile.nodeSets).map(source => sets.get(nodeSetKey(source.ref))!).filter(Boolean);
@@ -236,7 +233,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     const refKey = `${set.key}|${node._key}`;
     const hit = deps.get(refKey);
     if (hit) { if (!hit.usedBy.includes(where)) hit.usedBy.push(where); return hit.output; }
-    // Mihomo 的 Provider 前置自动提升为精确隐藏组；Stash 已在节点集阶段内联。
+    // Provider 单节点引用保留为精确成员组，各客户端在输出阶段转换远程引用。
     const output = `__ref_${safeId(set.ref.id)}_${shortHash(refKey, 8)}`;
     wrappers.push({ name: output, type: 'select', use: [set.providerName], filter: exactNameRegex(node.name), hidden: true, 'empty-fallback': 'REJECT' });
     wrapperNode.set(output, { set, node });
@@ -287,9 +284,10 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         if (s.output === 'provider') use.push(s.providerName);
         else proxies.push(...filterNodes(s.nodes, filterSpec).map((n) => n.name)); // 内联节点不受 filter 约束，服务端预过滤
       } else {
-        if (inlineNodes) {
-          for (const s of sets.values()) if (m.scope === 'all' || (m.scope === 'providers' ? s.requestedOutput === 'provider' : s.requestedOutput === 'inline')) {
-            proxies.push(...filterNodes(s.nodes, filterSpec).map(n => n.name));
+        if (nativeRemote) {
+          for (const s of sets.values()) if (m.scope === 'all' || (m.scope === 'providers' ? s.output === 'provider' : s.output === 'inline')) {
+            if (s.output === 'provider') use.push(s.providerName);
+            else proxies.push(...filterNodes(s.nodes, filterSpec).map(n => n.name));
           }
           continue;
         }
@@ -522,21 +520,43 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const inlineProxies = [...sets.values()].filter(s => s.output === 'inline').flatMap(s => s.nodes).map(stripNode);
   const providers: Record<string, ProviderOutput> = {};
   const proxyProviders: Record<string, Record<string, unknown>> = Object.create(null);
+  const providerNodes = new Map([...sets.values()].filter(s => s.output === 'provider').map(s => [s.providerName, s.nodes.map(stripNode)]));
+  const allGroups = [...groups, ...wrappers];
+  const benchmarkMembers = new Map(allGroups.map(g => [g.name, wrapperNode.has(g.name) ? [wrapperNode.get(g.name)!.node.name] : (g.use ?? []).flatMap(name => {
+    const set = [...sets.values()].find(s => s.providerName === name);
+    return set ? filterNodes(set.nodes, { filter: g.filter as string | undefined, excludeFilter: g['exclude-filter'] as string | undefined, excludeType: g['exclude-type'] as string | undefined }).map(n => n.name) : [];
+  })]));
+  if (client === 'stash') {
+    stashBenchmarks(allGroups, inlineProxies, eff.groups, report, providerNodes, benchmarkMembers);
+    for (const node of [...inlineProxies, ...[...providerNodes.values()].flat()]) if (node['dialer-proxy'] && node['interface-name']) report.error('stash.dialer-interface', 'Stash 的 dialer-proxy 与 interface-name 不能同时配置', `proxy:${String(node.name)}`);
+    // Stash 远程节点只允许指向同一集合中的节点，或不包含远程集合的主配置策略。
+    const hasRemote = (name: string, seen = new Set<string>()): boolean => {
+      if (seen.has(name)) return false;
+      seen.add(name);
+      const group = allGroups.find(g => g.name === name);
+      return !!group && (!!group.use?.length || (group.proxies ?? []).some(p => hasRemote(p, seen)));
+    };
+    for (const nodes of providerNodes.values()) for (const node of nodes) {
+      const via = node['dialer-proxy'];
+      if (typeof via !== 'string') continue;
+      const ref = wrapperNode.get(via);
+      if (ref && nodes.some(n => n.name === ref.node.name)) node['dialer-proxy'] = ref.node.name;
+      else if (hasRemote(via)) report.error('stash.provider-chain', 'Stash 远程节点的前置不能指向包含远程集合的策略组；请将前置来源设为展开', `proxy:${String(node.name)}`);
+    }
+  }
+  if (client === 'surge') surgeBenchmarks(allGroups, inlineProxies, eff.groups, report, providerNodes, benchmarkMembers);
   for (const s of sets.values()) {
     if (s.output !== 'provider') continue;
-    const yaml = stringify({ proxies: s.nodes.map(stripNode) }, { lineWidth: 0 });
-    providers[s.key] = { name: s.providerName, yaml };
-    const entry: Record<string, unknown> = { type: 'http', url: input.urls.provider(s.key), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
-    proxyProviders[s.providerName] = entry;
+    providers[s.key] = { name: s.providerName, yaml: stringify({ proxies: providerNodes.get(s.providerName) }, { lineWidth: 0 }) };
+    proxyProviders[s.providerName] = { type: 'http', url: input.urls.provider(s.key), interval: input.resourceIntervalSec ?? PROVIDER_INTERVAL, proxy: FETCH_VIA };
   }
-
-  const allGroups = [...groups, ...wrappers];
-  if (client === 'stash') {
-    stashBenchmarks(allGroups, inlineProxies, eff.groups, report);
-    for (const node of inlineProxies) if (node['dialer-proxy'] && node['interface-name']) report.error('stash.dialer-interface', 'Stash 的 dialer-proxy 与 interface-name 不能同时配置', `proxy:${String(node.name)}`);
+  validateReferences(allGroups, inlineProxies, providers, proxyProviders, report, client === 'stash');
+  if (nativeRemote) {
+    const originalNames = new Map([...sets.values()].flatMap(s => s.nodes.map(n => [n.name, refName(n)] as const)));
+    lowerRemoteProviders({ client, groups: allGroups, providers, proxyProviders, nodes: providerNodes, urls: input.urls, report, nodeReferences: new Map([...wrapperNode].map(([name, ref]) => [name, ref.node.name])),
+      filter: (nodes, spec) => filterNodes(nodes.map(n => ({ ...n, [inlineOriginalName]: originalNames.get(String(n.name)) } as RenderNode)), spec),
+    });
   }
-  if (client === 'surge') surgeBenchmarks(allGroups, inlineProxies, eff.groups, report);
-  validateReferences(allGroups, inlineProxies, providers, proxyProviders, report);
 
   const config: Record<string, unknown> = { ...base, proxies: inlineProxies };
   if (Object.keys(proxyProviders).length) config['proxy-providers'] = proxyProviders;
@@ -583,6 +603,7 @@ function validateReferences(
   providers: Record<string, ProviderOutput>,
   proxyProviders: Record<string, unknown>,
   report: Report,
+  allowSameProvider = false,
 ): void {
   const names = new Set<string>([...BUILTINS, ...inlineProxies.map((p) => String(p.name)), ...groups.map((g) => g.name)]);
   for (const g of groups) {
@@ -595,7 +616,10 @@ function validateReferences(
   for (const p of inlineProxies) checkDialer(p['dialer-proxy'], `proxy:${String(p.name)}`);
   for (const [key, prov] of Object.entries(providers)) {
     const payload = parse(prov.yaml) as { proxies: Record<string, unknown>[] };
-    for (const node of payload.proxies) checkDialer(node['dialer-proxy'], `provider:${key}`);
+    for (const node of payload.proxies) {
+      if (allowSameProvider && payload.proxies.some(n => n.name === node['dialer-proxy'])) continue;
+      checkDialer(node['dialer-proxy'], `provider:${key}`);
+    }
   }
 }
 

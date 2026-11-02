@@ -19,7 +19,7 @@ export function loonBenchmarks(config: Fields, specs: GroupSpec[], report: Repor
 
 function loonGroup(group: Fields, report: Report): string {
   const name = iniName(group.name), type = String(group.type);
-  const fields = [type, ...[...new Set(group.proxies as string[] ?? [])].map(iniName)];
+  const fields = [type, ...[...new Set([...(group.proxies as string[] ?? []), ...(group.use as string[] ?? [])])].map(iniName)];
   const add = (key: string, value: unknown) => { if (value !== undefined) fields.push(key + '=' + iniValue(value)); };
   add('url', group.url);
   if (type !== 'select') {
@@ -57,6 +57,7 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       const line = loonProxyLine(copy, report); return line ? [line] : [];
     });
     const groups = (config['proxy-groups'] as Fields[]).map(group => loonGroup(group, report));
+    const remoteProxies = Object.entries(config['proxy-providers'] as Record<string, Fields> ?? {}).map(([name, provider]) => iniName(name) + ' = ' + iniValue(provider.url) + ',parser-enabled=false,enabled=true');
     const remoteRules: string[] = [];
     const providers = (config['rule-providers'] ?? {}) as Record<string, Fields>;
     const rules = (config.rules as string[]).flatMap(line => {
@@ -69,6 +70,6 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       remoteRules.push(iniValue(url) + ',policy=' + iniName(match[2]) + ',tag=' + iniValue(match[1]) + ',enabled=true');
       return [];
     });
-    return [base.trim(), '[Proxy]', ...proxies, ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ...(remoteRules.length ? ['', '[Remote Rule]', ...remoteRules] : []), ''].filter((s, i) => i !== 0 || s).join('\n');
+    return [base.trim(), '[Proxy]', ...proxies, ...(remoteProxies.length ? ['', '[Remote Proxy]', ...remoteProxies] : []), ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ...(remoteRules.length ? ['', '[Remote Rule]', ...remoteRules] : []), ''].filter((s, i) => i !== 0 || s).join('\n');
   } catch (cause) { report.error('loon.format', cause instanceof Error ? cause.message : 'Loon 配置格式不合法'); return ''; }
 }

@@ -87,9 +87,9 @@ Stash 使用 YAML；配置、节点集和规则集的形状与 Clash 家族相�
 
 - `USER-AGENT`、`DOMAIN-REGEX`、`GEOSITE`、`NETWORK` 等规则按 Stash 能力输出。进程匹配能力依赖平台；本项目按内核保留进程规则，不再按平台删除。路径通配 / 路径正则未建立等价映射，保留客户端诊断。源地址 `SRC-IP`、源端口 `SRC-PORT` 页面标为 Beta iOS/tvOS 3.7+ / macOS 4.4+，转换结果带版本提示。[规则类型](https://stash.wiki/rules/rule-types)
 - Hysteria2 将 IR 中的 `password` 转成 `auth`，`up/down` 转成 Mbps 数值的 `up-speed/down-speed`。未适配的协议和传输明确阻止成功导出。[协议类型](https://stash.wiki/proxy-protocols/proxy-types)
-- Stash 空组可能直连。本项目为保持现有筛选与空组拒绝语义，将节点集在导出时按快照内联，展开动态成员；筛空补 REJECT。当前不生成 Stash 节点 provider，节点更新随主订阅刷新。[策略组](https://stash.wiki/proxy-protocols/proxy-groups)、[远程代理集](https://stash.wiki/proxy-protocols/proxy-providers)
+- Stash 空组可能直连。本项目遵循引用 / 展开设置；引用来源生成远程 provider，组级筛选由本服务托管的派生资源执行。筛空组补 REJECT 并移除远程引用，资源接口不下发空 provider；恢复节点后需刷新主订阅。[策略组](https://stash.wiki/proxy-protocols/proxy-groups)、[远程代理集](https://stash.wiki/proxy-protocols/proxy-providers)
 - 延迟测试 URL / 超时下放到节点的 `benchmark-*` 字段，并将毫秒转换为秒。共享节点要求测试设置一致，冲突时报错。[延迟测试](https://stash.wiki/proxy-protocols/proxy-benchmark)
-- 代理链使用 `dialer-proxy`，按官方要求检查与 `interface-name` 互斥。官方最低版本为 iOS/tvOS 3.2.5+ / macOS 4.1+；provider 内代理链另有更高版本要求，本次内联导出不依赖它。[代理链](https://stash.wiki/proxy-protocols/dialer-proxy)
+- 代理链使用 `dialer-proxy`，按官方要求检查与 `interface-name` 互斥。官方最低版本为 iOS/tvOS 3.2.5+ / macOS 4.1+；provider 内代理链要求 iOS/tvOS 3.6+ / macOS 4.3+，且不能指向包含远程集合的策略组；本项目对此显式校验。[代理链](https://stash.wiki/proxy-protocols/dialer-proxy)
 
 ## 2. 本项目使用方式
 
@@ -138,3 +138,5 @@ GET /api/rules/convert?url=<完整编码的上游URL>&target=stash&platform=ios
 | 2026-10-30 | Loon | 独立 INI 适配、规则集内嵌、平台规则与失败回退接通 | 全量回归和内置浏览器；未运行官方校验器或真机转发 |
 
 2026-10-30 后续修正：Loon 全部分流规则改为托管，含规则的草稿禁用独立导出，正式订阅沿用新 query API；旧内联 last-good 不再下发。见[源预览与托管验收](../research/verification/raw-source-preview-20261030/README.md)。上表内嵌记录属于初次实现基线。
+
+2026-11-02：四端节点来源均遵循引用 / 展开设置，Surge / Loon / Stash 原生远程入口、稳定筛选资源、鉴权及失败回退边界见 [转换说明](19-client-conversion.md#2026-11-02遵循节点来源输出设置)。早期记录中的强制快照内联已移除。
