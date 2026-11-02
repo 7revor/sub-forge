@@ -362,8 +362,6 @@ body {
 }
 @layer base {
   * { @apply border-border outline-ring/50; }
-  /* 与 shadcn TableBody 一致：末行不画底线。 */
-  tbody > tr:last-child > * { border-bottom-width: 0; }
 }
 
 /* Sidebar 沿用品牌深色导航，主题只作用于侧栏。 */

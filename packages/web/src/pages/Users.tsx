@@ -9,9 +9,10 @@ import { Plus } from 'lucide-react';
 import { notifySuccess } from '../feedback.ts';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
 import { MultiSelect } from '../components/listbox.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Segmented, Switch, listMono, listTd, listTh, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Segmented, Switch, listMono } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
 import { ListActions } from '../components/ListActions.tsx';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table.tsx';
 
 /** 用户（设计稿「管理员 · 用户」）：用户表与共享的订阅源 / 组合 */
 export function Users() {
@@ -34,37 +35,37 @@ export function Users() {
         actions={<Button variant="primary" onClick={async () => { const result = await CreateUserModal.show({}); if (result.status === 'confirmed') { notifySuccess('用户已创建'); void refresh(); } }}><Plus size={16} />创建用户</Button>} />
       <ErrorAlert error={users.error ?? patch.error} />
       <PageScroll>
-        <Card className="overflow-hidden" bodyClass="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse">
-            <thead><tr><th className={listTh}>用户</th><th className={listTh}>角色</th><th className={listTh}>脚本处理器</th><th className={listTh}>配置订阅</th><th className={listTh}>最近订阅请求</th><th className={listTh}>状态</th><th className={cx(listTh, 'w-px')}><span className="sr-only">操作</span></th></tr></thead>
-            <tbody>
+        <Card className="overflow-hidden" bodyClass="">
+          <Table className="min-w-[760px]">
+            <TableHeader><TableRow><TableHead>用户</TableHead><TableHead>角色</TableHead><TableHead>脚本处理器</TableHead><TableHead>配置订阅</TableHead><TableHead>最近订阅请求</TableHead><TableHead>状态</TableHead><TableHead className="w-px"><span className="sr-only">操作</span></TableHead></TableRow></TableHeader>
+            <TableBody>
               {list.map((u) => {
                 const self = u.id === me?.id;
                 const s = st(u.id);
                 return (
-                  <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
-                    <td className={cx(listTd, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-xs font-normal text-muted-foreground">（我）</span>}</td>
-                    <td className={listTd}>
+                  <TableRow key={u.id} className={u.disabled ? 'opacity-60' : ''}>
+                    <TableCell className="font-medium whitespace-nowrap">{u.username}{self && <span className="ml-2 text-xs font-normal text-muted-foreground">（我）</span>}</TableCell>
+                    <TableCell>
                       {self ? <span>管理员</span> : <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} className="h-8 w-28 data-[size=default]:h-8" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
                         <option value="user">用户</option><option value="admin">管理员</option>
                       </Select>}
-                    </td>
-                    <td className={listTd}>{u.role === 'admin' ? <span className="text-sm text-muted-foreground">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
-                    <td className={cx(listTd, listMono)}>{s?.profiles ?? '—'}</td>
-                    <td className={cx(listTd, 'whitespace-nowrap text-foreground')}>{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</td>
+                    </TableCell>
+                    <TableCell>{u.role === 'admin' ? <span className="text-sm text-muted-foreground">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</TableCell>
+                    <TableCell className={listMono}>{s?.profiles ?? '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-foreground">{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</TableCell>
 
-                    <td className={listTd}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
-                    <td className={listTd}>
+                    <TableCell><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></TableCell>
+                    <TableCell>
                       <ListActions><ActionMenu label={`${u.username}更多操作`}>
                         <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `重置 ${u.username} 的密码`, label: '新密码', description: '至少 8 位；该用户的所有登录会失效', placeholder: '设置至少 8 位的新密码', type: 'password', minLength: 8, confirmLabel: '重置' }, { submit: async password => { await api('PATCH', `/users/${u.id}`, { password }); } }); if (result.status === 'confirmed') { notifySuccess('密码已重置'); void refresh(); } }}>重置密码</Button>
                         {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
                       </ActionMenu></ListActions>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </Card>
 
         <Card title={`共享的订阅源与组合`} subtitle={`被共享的用户只能引用，看不到原始 URL。`}

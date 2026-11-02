@@ -12,8 +12,9 @@ import { useQueries } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from '../components/DocTableRow.tsx';
-import { Badge, buttonClass, Card, Empty, PageHeader, PageScroll, formatBytes, formatTime, td, th, cx } from '../components/ui.tsx';
+import { Badge, buttonClass, Card, Empty, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
 import { useList, useTemplates } from '../hooks.ts';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table.tsx';
 
 const DAY = 86_400_000;
 
@@ -98,32 +99,32 @@ export function Overview() {
         <div className="grid items-stretch gap-5 xl:grid-cols-2">
         <Card title="配置订阅" actions={<Link to="/profiles" className="text-sm text-primary">全部</Link>} className="min-w-0" bodyClass="">
 
-          <div className="overflow-x-auto">
+          <div>
             {profiles.data?.length === 0 ? <div className="px-4 pb-4"><Empty title="还没有配置订阅" action={<Link to="/profiles/new" className="text-primary">新建一个</Link>} /></div> : (
-              <table className="w-full min-w-[540px] table-fixed border-collapse"><colgroup><col /><col /><col style={{ width: 80 }} /><col style={{ width: 80 }} /><col style={{ width: 120 }} /></colgroup>
-                <thead><tr><th className={th}>名称</th><th className={th}>分流</th><th className={th}>状态</th><th className={th}>最近访问</th><th className={cx(th, 'w-px')}>{actionHeader}</th></tr></thead>
-                <tbody>
+              <Table className="min-w-[540px] table-fixed"><colgroup><col /><col /><col style={{ width: 80 }} /><col style={{ width: 80 }} /><col style={{ width: 120 }} /></colgroup>
+                <TableHeader><TableRow><TableHead>名称</TableHead><TableHead>分流</TableHead><TableHead>状态</TableHead><TableHead>最近访问</TableHead><TableHead className="w-px">{actionHeader}</TableHead></TableRow></TableHeader>
+                <TableBody>
                   {rows.map(({ p, last }) => (
                     <DocTableRow key={p.id} to={`/profiles/${p.id}`}>
-                      <td className={cx(td, 'whitespace-nowrap')}><Link to={`/profiles/${p.id}`} className={cx(docNameLinkClass, 'block truncate')} title={p.name}>{p.name}</Link></td>
-                      <td className={cx(td, 'whitespace-nowrap')}><span className="block truncate" title={modeLabel(p, tpl(boundTemplateId(p))?.name)}>{modeLabel(p, tpl(boundTemplateId(p))?.name)}</span></td>
-                      <td className={td}>{!last ? <Badge>未访问</Badge> : last.status !== 200 ? <Badge tone="err">渲染失败</Badge> : last.warnings ? <Badge tone="warn">{last.warnings} 条告警</Badge> : <Badge tone="ok">正常</Badge>}</td>
-                      <td className={td}>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-xs text-muted-foreground">{last.client}</span></div> : <span className="whitespace-nowrap text-muted-foreground">从未访问</span>}</td>
-                      <td className={cx(td, 'text-right')}><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="profiles" id={p.id} name={p.name} size="sm" /></div></td>
+                      <TableCell className="whitespace-nowrap"><Link to={`/profiles/${p.id}`} className={cx(docNameLinkClass, 'block truncate')} title={p.name}>{p.name}</Link></TableCell>
+                      <TableCell className="whitespace-nowrap"><span className="block truncate" title={modeLabel(p, tpl(boundTemplateId(p))?.name)}>{modeLabel(p, tpl(boundTemplateId(p))?.name)}</span></TableCell>
+                      <TableCell>{!last ? <Badge>未访问</Badge> : last.status !== 200 ? <Badge tone="err">渲染失败</Badge> : last.warnings ? <Badge tone="warn">{last.warnings} 条告警</Badge> : <Badge tone="ok">正常</Badge>}</TableCell>
+                      <TableCell>{last ? <div className="flex flex-col gap-0.5"><span className="whitespace-nowrap">{formatRelativeTime(last.at)}</span><span className="text-xs text-muted-foreground">{last.client}</span></div> : <span className="whitespace-nowrap text-muted-foreground">从未访问</span>}</TableCell>
+                      <TableCell className="text-right"><div className="flex items-center justify-end gap-2 whitespace-nowrap"><ResourceLinkButton kind="profiles" id={p.id} name={p.name} size="sm" /></div></TableCell>
                     </DocTableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             )}
           </div>
         </Card>
 
         <Card title="节点订阅" actions={<Link to="/sources" className="text-sm text-primary">全部</Link>} className="min-w-0" bodyClass="">
-          <div className="overflow-x-auto">
+          <div>
             {!sources.data?.length ? <div className="px-4 pb-4"><Empty title="还没有节点订阅" /></div> : (
-              <table className="w-full border-collapse">
-                <thead><tr><th className={th}>名称</th><th className={th}>节点</th><th className={th}>流量</th><th className={th}>到期</th><th className={th}>状态</th></tr></thead>
-                <tbody>
+              <Table>
+                <TableHeader><TableRow><TableHead>名称</TableHead><TableHead>节点</TableHead><TableHead>流量</TableHead><TableHead>到期</TableHead><TableHead>状态</TableHead></TableRow></TableHeader>
+                <TableBody>
                   {(sources.data ?? []).map((source) => {
                     const st = status.find((x) => x.source.id === source.id);
                     const u = st?.lastOk?.userinfo;
@@ -131,20 +132,20 @@ export function Overview() {
                     const pct = u?.total && used !== undefined ? Math.min(100, Math.round((used / u.total) * 100)) : 0;
                     return (
                       <DocTableRow key={source.id} to={`/sources/${source.id}`}>
-                        <td className={cx(td, 'whitespace-nowrap')}><Link to={`/sources/${source.id}`} className={docNameLinkClass}>{source.name}</Link></td>
-                        <td className={cx(td, 'font-mono')}><NodeSetCount nodeSet={{ type: 'source', id: source.id }} /></td>
-                        <td className={td}>{u?.total ? (
+                        <TableCell className="whitespace-nowrap"><Link to={`/sources/${source.id}`} className={docNameLinkClass}>{source.name}</Link></TableCell>
+                        <TableCell className="font-mono"><NodeSetCount nodeSet={{ type: 'source', id: source.id }} /></TableCell>
+                        <TableCell>{u?.total ? (
                           <div className="flex items-center gap-2.5">
                             <span className="text-sm whitespace-nowrap text-muted-foreground">{formatBytes(used)} / {formatBytes(u.total)}</span>
                           </div>
-                        ) : <span className="text-sm text-muted-foreground">—</span>}</td>
-                        <td className={cx(td, 'whitespace-nowrap text-muted-foreground')}>{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</td>
-                        <td className={td}><SourceFetchStatus state={st ?? { failing: false, lastOk: undefined }} /></td>
+                        ) : <span className="text-sm text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">{u?.expire ? formatTime(u.expire * 1000).slice(0, 10) : '—'}</TableCell>
+                        <TableCell><SourceFetchStatus state={st ?? { failing: false, lastOk: undefined }} /></TableCell>
                       </DocTableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             )}
           </div>
         </Card>
