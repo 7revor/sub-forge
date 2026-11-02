@@ -113,6 +113,13 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     return c.json(options ? store.listTemplatesPage(options) : { items: store.listTemplates() });
   });
 
+  /** 跟随数覆盖全部用户，与保存时的影响检查范围一致。 */
+  app.get('/templates/usage', requireAdmin, c => {
+    const counts = new Map<string, number>();
+    for (const { routing } of store.list('profile')) if (routing.mode === 'bound') counts.set(routing.templateId, (counts.get(routing.templateId) ?? 0) + 1);
+    return c.json({ items: [...counts].map(([id, followers]) => ({ id, followers })) });
+  });
+
   /** 编辑器即时校验（TPL-11）：只做模板自身检查 */
   app.post('/templates/validate', requireAdmin, async (c) => {
     const body = await jsonBody(c);

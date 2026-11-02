@@ -16,23 +16,31 @@ import { SearchInput } from '../components/SearchInput.tsx';
 import { Pagination } from '../components/Pagination.tsx';
 import { YamlTextarea } from '../components/YamlTextarea.tsx';
 import { Badge, Button, buttonClass, Card, Empty, ErrorAlert, Field, FieldError, Input, PageHeader, PageScroll } from '../components/ui.tsx';
-import { useList, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
+import { useMe, useRuleSetRefs, type TemplateDoc } from '../hooks.ts';
 import { useLeaveGuard } from '../hooks/useLeaveGuard.ts';
 import { usePagedList } from '../hooks/usePagedList.ts';
 import { newId, templateFromYaml, type ConvertCtx, type TemplateBody } from '../convert/templateYaml.ts';
-import { boundTemplateId } from './profile/routing.ts';
 import { TemplateGroupsEditor } from './template/TemplateGroupsEditor.tsx';
 import { TemplateRulesEditor } from './template/TemplateRulesEditor.tsx';
 import { TemplateReport } from './template/TemplateFields.tsx';
 import { draftIssues } from './template/model.ts';
 import { TableCell } from '../components/ui/table.tsx';
 
+/** 全部用户中跟随各模板的订阅数。 */
+function useTemplateUsage() {
+  return useQuery({
+    queryKey: ['template-usage'],
+    queryFn: () => api<{ items: { id: string; followers: number }[] }>('GET', '/templates/usage'),
+    select: result => new Map(result.items.map(item => [item.id, item.followers])),
+  });
+}
+
 export function TemplateList() {
   const list = usePagedList('templates');
   const [params] = useSearchParams();
-  const profiles = useList('profiles');
+  const usage = useTemplateUsage();
   const selectedId = params.get('id');
-  const inUse = (id: string) => (profiles.data ?? []).filter((p) => boundTemplateId(p) === id).length;
+  const inUse = (id: string) => usage.data?.get(id) ?? 0;
   // 兼容发布完成和旧书签中的模板定位链接。
   if (selectedId) return <Navigate to={`/templates/${encodeURIComponent(selectedId)}`} replace />;
   return (
@@ -56,7 +64,7 @@ export function TemplateList() {
                 <TableCell><Link to={path} className={docNameLinkClass}>{t.name ?? t.id}</Link></TableCell>
                 <TableCell>{t.groups.length} 个</TableCell>
                 <TableCell>{t.rules.length} 条</TableCell>
-                <TableCell className="whitespace-nowrap text-foreground">{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</TableCell>
+                <TableCell className="whitespace-nowrap text-foreground">{!usage.data ? usage.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</TableCell>
                 <TableCell className="whitespace-nowrap text-right"><ListActions>
                   <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
                   <DocActionLink to={path} name={t.name ?? t.id} />
@@ -100,7 +108,8 @@ export function TemplateEdit() {
 function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const isNew = id === 'new';
   const qc = useQueryClient();
-  const profiles = useList('profiles');
+  const usage = useTemplateUsage();
+  const me = useMe().data;
   const rulesets = useRuleSetRefs();
   const ctx: ConvertCtx = { rulesets: rulesets.data ?? [] };
   const [base, setBase] = useState(() => initial ? draftFromTemplate(initial) : emptyTemplate());
@@ -124,7 +133,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   const visibleReport = report.filter(r => !r.where?.startsWith('rule:') || !pendingRules.has(r.where.slice(5)));
   const visibleErrors = visibleReport.filter(r => r.level === 'error');
   const firstLocation = visibleErrors.find(r => r.where && /^(group:|rule:|final$)/.test(r.where))?.where;
-  const inUse = (profiles.data ?? []).filter(p => boundTemplateId(p) === id).length;
+  const inUse = usage.data?.get(id) ?? 0;
   const updateBody = (body: TemplateBody) => setDraft(current => ({ ...current, body }));
   const locate = (where: string) => {
     if (where.startsWith('group:')) document.getElementById(`template-group-${where.slice(6)}`)?.querySelector<HTMLButtonElement>('button[aria-label^="编辑"]')?.click();
@@ -166,6 +175,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       qc.setQueryData(['template', result.item.id], { item: result.item });
       void qc.invalidateQueries({ queryKey: ['templates'] });
       void qc.invalidateQueries({ queryKey: ['profiles'] });
+      void qc.invalidateQueries({ queryKey: ['template-usage'] });
       if (isNew && blocker.state !== 'blocked') leave(`/templates/${encodeURIComponent(result.item.id)}`, { replace: true });
     },
   });
@@ -223,7 +233,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
       {failure?.report?.length ? <Card title="保存检查"><TemplateReport items={failure.report} onLocate={locate} /></Card> : null}
       {!!failure?.impact?.length && <Card title="请先修复绑定订阅冲突">
         <ul className="m-0 flex list-none flex-col gap-3 p-0">{failure.impact.map(item => <li key={item.profileId} className="text-sm">
-          <Link to={`/profiles/${item.profileId}/groups`} className="font-medium text-primary">{item.profileName}</Link>
+          {item.owner === me?.id ? <Link to={`/profiles/${item.profileId}/groups`} className="font-medium text-primary">{item.profileName}</Link> : <span className="font-medium">{item.profileName}<span className="ml-2 font-normal text-muted-foreground">其他用户的订阅，需由其修复</span></span>}
           <ul className="mt-1 pl-5 text-foreground">{item.issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul>
         </li>)}</ul>
       </Card>}
