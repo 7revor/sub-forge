@@ -22,3 +22,10 @@ export function normalizeSourceFetch<T extends { fetch?: { ttlSec?: number } }>(
   if ('kind' in rest && rest.kind === 'remote') delete rest.kind;
   return rest as T;
 }
+
+/** 资源缓存时间由系统统一设置：移除文档及其来源上的独立时效字段。 */
+export function stripResourceTiming(doc: Record<string, any>): void {
+  delete doc.updateIntervalSec;
+  if (doc.fetch) { delete doc.fetch.ttlSec; if (!Object.keys(doc.fetch).length) delete doc.fetch; }
+  for (const source of doc.sources ?? []) stripResourceTiming(source);
+}
