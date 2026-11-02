@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button, cx } from './ui.tsx';
 
+/** 节点来源、策略组、规则的控件列共用此宽度：控件靠左，列内右侧留白，不贴着操作按钮。 */
+export const routingControlClass = 'w-[168px] min-w-0 shrink-0 sm:w-[240px]';
+
 /** 策略组、规则和增强来源共用尺寸，保留各自的信息排列。 */
 export function RoutingCard({ children, className, invalid, id }: { children: ReactNode; className?: string; invalid?: boolean; id?: string }) {
   return <div id={id} data-routing-card className={cx('my-2 min-h-[52px] items-center gap-x-3 gap-y-2 rounded-lg border bg-card px-4 py-2 text-sm leading-5', invalid ? 'border-destructive' : 'border-border', className)}>{children}</div>;
