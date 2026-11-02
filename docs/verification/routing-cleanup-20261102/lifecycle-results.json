@@ -1,0 +1,42 @@
+[
+  {
+    "title": "编辑策略组",
+    "mode": "动画",
+    "passed": true,
+    "frames": 123,
+    "height": 688,
+    "error": null
+  },
+  {
+    "title": "保存失败后重试",
+    "mode": "动画",
+    "passed": true,
+    "frames": 122,
+    "height": 230,
+    "error": null
+  },
+  {
+    "title": "子弹窗",
+    "mode": "动画",
+    "passed": true,
+    "frames": 123,
+    "height": 194,
+    "error": null
+  },
+  {
+    "title": "嵌套草稿与路由验收",
+    "mode": "动画",
+    "passed": true,
+    "frames": 122,
+    "height": 368,
+    "error": null
+  },
+  {
+    "title": "编辑策略组",
+    "mode": "无动画",
+    "passed": true,
+    "frames": 0,
+    "height": 688,
+    "error": null
+  }
+]
