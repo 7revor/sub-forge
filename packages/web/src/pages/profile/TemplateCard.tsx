@@ -25,19 +25,19 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
   const currentId = boundTemplateId(draft);
   const [selected, setSelected] = useModalDraft(currentId ?? '');
   const [mode, setMode] = useModalDraft<AssociationMode>('bound');
-  const [mapping, setMapping] = useModalDraft<Record<string, string>>({});
+  const [mapping, setMapping] = useModalDraft<Record<string, string | null>>({});
   const target = templates.data?.find(t => t.id === selected);
   const automaticMapping = inferAssociationMapping(data.groups, target?.groups ?? []);
   const effectiveMapping = { ...automaticMapping, ...mapping };
   const required = associationRequirements(draft, data.groups, effectiveMapping);
-  const unresolved = required.some(g => !Object.hasOwn(effectiveMapping, g.id) || !effectiveMapping[g.id] || (!g.canDrop && effectiveMapping[g.id] === '__drop'));
+  const unresolved = required.some(g => !Object.hasOwn(effectiveMapping, g.id) || effectiveMapping[g.id] === '' || (!g.canDrop && effectiveMapping[g.id] === null));
   const apply = () => modal.submit(async () => {
     const profile = { ...draft, name: draft.name.trim() || '未命名订阅' };
     let converted: Conversion;
     if (mode === 'detach') converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'independent' });
     else {
       if (!target) throw new Error('请先选择模板');
-      converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'bound', templateId: target.id, mapping: Object.fromEntries(Object.entries(effectiveMapping).map(([id, value]) => [id, value === '__drop' ? null : value])) });
+      converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile, mode: 'bound', templateId: target.id, mapping: effectiveMapping });
       if (modal.signal.aborted) return draft;
       if (mode === 'copy') converted = await api<Conversion>('POST', '/profiles/routing/convert', { profile: converted.item, mode: 'independent' });
     }
@@ -56,9 +56,13 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
       {target && mode !== 'detach' && <section className="border-t border-border pt-4"><h3 className="m-0 mb-3 text-base font-semibold">变更检查</h3>
         <div className="mb-4 flex gap-6 text-sm text-muted-foreground"><span>策略组 {data.groups.length} → {target.groups.length}</span><span>规则 {data.template?.rules.length ?? (draft.routing?.mode === 'independent' ? draft.routing.config.rules.length : 0)} → {target.rules.length}</span></div>
         <p className="mb-3 text-xs text-muted-foreground">同名或同 ID 的组已自动对应，只列出需要你决定的组。</p>
-        <div className="flex flex-col gap-4">{required.filter(g => !Object.hasOwn(automaticMapping, g.id)).map(g => <Field key={g.id} label={g.name} hint={g.reasons.join('、')}>{id => <Select id={id} clearable value={Object.hasOwn(effectiveMapping, g.id) ? effectiveMapping[g.id] : ''} placeholder="选择迁移到的策略组" onChange={event => setMapping({ ...mapping, [g.id]: event.target.value })}>
-          {g.canDrop && <option value="__drop">移除此组的节点填充</option>}{target.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </Select>}</Field>)}</div>
+        <div className="flex flex-col gap-4">{required.filter(g => !Object.hasOwn(automaticMapping, g.id)).map(g => {
+          const mapped = Object.hasOwn(effectiveMapping, g.id) ? effectiveMapping[g.id] : undefined;
+          // 选项值加前缀，避免合法组 ID 与“移除”选项冲突。
+          return <Field key={g.id} label={g.name} hint={g.reasons.join('、')}>{id => <Select id={id} clearable value={mapped === null ? '__drop' : mapped ? `group:${mapped}` : ''} placeholder="选择迁移到的策略组" onChange={event => setMapping({ ...mapping, [g.id]: event.target.value === '__drop' ? null : event.target.value.slice(6) })}>
+            {g.canDrop && <option value="__drop">移除此组的节点填充</option>}{target.groups.map(g => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}
+          </Select>}</Field>;
+        })}</div>
       </section>}
       {templates.error && <p role="alert" className="text-sm text-destructive">{templates.error.message}<Button size="sm" onClick={() => void templates.refetch()}>重试</Button></p>}
     </div>
