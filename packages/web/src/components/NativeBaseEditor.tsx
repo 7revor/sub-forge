@@ -25,7 +25,6 @@ export function NativeBaseEditor({ value, onChange }: { value: NativeBase; onCha
   const inherited = nativeBaseParents(kernel, app).map(parent => ({ kernel: parent, label: scopeLabel(parent), text: value.kernels?.[parent] ?? '' })).filter(parent => parent.text.trim());
   const visible = TARGETS.flatMap((scope, i) => scope.parents.every(parent => expanded.includes(parent)) ? [i] : []);
   const format = isIniClient(kernel) ? 'INI' : 'YAML';
-  const mergeHint = format === 'YAML' ? 'YAML 映射递归合并；数组、标量和 null 由下层整体替换。例如 dns.nameserver 会替换整个列表，不会追加。' : 'INI 的 General、Host、MITM 中同名键由下层替换，其余段落按顺序追加。';
   const text = (app ? value.clients?.[app] : value.kernels?.[kernel]) ?? '';
   const update = (text: string) => { setError(undefined); onChange(app ? { ...value, clients: { ...value.clients, [app]: text } } : { ...value, kernels: { ...value.kernels, [kernel]: text } }); };
   return <div className="native-base-workspace">
@@ -42,17 +41,17 @@ export function NativeBaseEditor({ value, onChange }: { value: NativeBase; onCha
       </button></div>)}
     </div>
     <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${selected}-tab`} className="native-base-content">
-      <div className="native-base-toolbar"><div><h3 className="m-0 text-sm font-medium">{label}</h3><p className="m-0 text-xs text-muted-foreground">{app ? '仅用于此客户端，优先于继承的公共配置' : `所有 ${label} 客户端共用${kernel === 'mihomo' ? '（含 Stash）' : ''}，客户端专属内容优先`}</p></div>
-        <div className="flex gap-2">{format === 'YAML' && <Button size="sm" variant="ghost" disabled={!text.trim()} onClick={() => { try { update(stringify(parse(text))); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } }}>格式化</Button>}<Button size="sm" variant="ghost" disabled={!text} onClick={() => update('')}>清空</Button></div>
-      </div>
       {inherited.length > 0 && <div className="mb-3 flex shrink-0 flex-col gap-2" aria-label="继承配置">
         {inherited.map(parent => <CodePreview key={`${kernel}:${app ?? 'common'}:${parent.kernel}`} label={`继承的 ${parent.label}原文`} text={parent.text} lineNumbers bodyClassName="max-h-48"
-          footer={<><p className="m-0">继承自 {parent.label} · 只读。展示当前公共配置草稿，不写入本层配置。</p><p className="m-0">{mergeHint}</p></>} />)}
+          footer={`继承自 ${parent.label} · 只读`} />)}
       </div>}
       <div className="native-base-editor-frame"><YamlTextarea key={`${kernel}:${app ?? 'kernel'}`} aria-label={app ? `${label} 追加配置` : kernel === 'stash' ? 'Stash 公共追加配置' : `${label} 内核公共配置`} value={text} rows={15} lineNumbers
         className="native-base-source" placeholder={`粘贴 ${label} 的原始 ${format} 配置`} onChange={event => update(event.target.value)} />
       <FieldError error={error} />
-      <div className="border-t border-border bg-muted px-3 py-1.5 text-xs text-muted-foreground">{format} · proxies、proxy-groups、rules 由系统生成，这里写了也会被忽略</div></div>
+      <div className="native-base-editor-footer">
+        <span className="text-xs text-muted-foreground">{format}</span>
+        <div className="flex gap-1">{format === 'YAML' && <Button size="sm" variant="ghost" disabled={!text.trim()} onClick={() => { try { update(stringify(parse(text))); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } }}>格式化</Button>}<Button size="sm" variant="ghost" disabled={!text} onClick={() => update('')}>清空</Button></div>
+      </div></div>
     </div>
   </div>;
 }

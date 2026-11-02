@@ -43,7 +43,7 @@
 
 常规合并顺序为：**订阅内核公共原文 → 订阅客户端原文（可选）**。产品内核分组为 Mihomo、Surge、Loon；FlClash、Clash Verge Rev、Stash 归入 Mihomo，Apple 两端按应用选择。保存只检查目标及字符串类型，未写完的原文也能保存。生成时解析必要的结构：YAML 映射递归合并、数组/标量/null 后层替换；INI General/Host/MITM 同名键后层替换，其余段落按顺序追加。原文不回写，错误会在预览报告，不会静默丢字段。
 
-Stash iOS/macOS 直接列在 Mihomo 下，无中间 Stash 菜单；FlClash、Clash Verge Rev 不再单列。Stash 的继承顺序为 **Mihomo 公共 → 历史 Stash 公共（若存在） → Stash 应用追加**。Stash 输出目标与序列化保留，其他应用仍按两层合并。客户端页直接展示非空的上层只读原文，不套卡片、不折叠，来源与合并提示位于代码区内部底部；空公共配置不显示。规则集合预览仅保留三个顶层选项。完整约定见 [20](20-native-client-append.md)。
+Stash iOS/macOS 直接列在 Mihomo 下，无中间 Stash 菜单；FlClash、Clash Verge Rev 不再单列。Stash 的继承顺序为 **Mihomo 公共 → 历史 Stash 公共（若存在） → Stash 应用追加**。Stash 输出目标与序列化保留，其他应用仍按两层合并。客户端页直接展示非空的上层只读原文，不套卡片、不折叠，代码区底部只保留来源与只读标识；空公共配置不显示。当前目标由左侧导航表达，格式化与清空位于编辑器底栏。规则集合预览仅保留三个顶层选项。完整约定见 [20](20-native-client-append.md)。
 
 节点、策略组、规则仍由原有模块管理；原文包含这些受管理的段时生成报错。listeners 仅允许放在订阅追加。基础预设已移除；旧引用迁移为订阅原文。升级前的对象及公共映射只在 v28 一次迁移中使用，保留加密备份与迁移提示。
 
