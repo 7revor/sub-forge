@@ -16,7 +16,7 @@ import { NodeSetCount } from '../../components/NodeSetCount.tsx';
 
 import { Plus, Trash2, Boxes, ListPlus, Server, Monitor, Layers } from 'lucide-react';
 import { NodeSetPickerDialog } from '../../components/dialogs.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Segmented, Switch, Textarea } from '../../components/ui.tsx';
+import { Badge, BooleanSegmented, Button, Card, Empty, Field, Input, Segmented, Switch, Textarea } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 
 /** 名称、备注和流量信息放在同一行，配置原文使用独立编辑区。 */
@@ -80,12 +80,12 @@ export function TabNodeSets() {
     <>
       <Card title="节点来源" count={draft.nodeSets.length}
         actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={16} />添加节点来源</Button>}>
-        {!draft.nodeSets.length ? <Empty title="还没有节点来源" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_132px_128px_64px]">
+        {!draft.nodeSets.length ? <Empty title="还没有节点来源" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_132px_148px_64px]">
           {handle}<RoutingCardIcon>{n.ref.type === 'source' ? <Server size={16} /> : n.ref.type === 'local' ? <Monitor size={16} /> : <Layers size={16} />}</RoutingCardIcon>
           <div className="flex min-w-0 flex-col"><ResourceFileLink kind={n.ref.type === 'source' ? 'sources' : n.ref.type === 'collection' ? 'collections' : 'locals'} id={n.ref.id} name={nodeSetName(n.ref)} className="block truncate text-sm leading-5 font-medium text-foreground no-underline hover:text-primary" />
           <span className="text-xs text-muted-foreground">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span></div>
           <div className="col-start-3 row-start-2 lg:col-auto lg:row-auto"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: '引用' }, { value: 'inline', label: '展开' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>
-          <div className="col-start-3 row-start-3 lg:col-auto lg:row-auto">{n.ref.type === 'source' ? <label className="inline-flex items-center gap-2 text-sm"><Switch label={`${nodeSetName(n.ref)}提供流量信息`} checked={traffic.includes(n.ref.id)} onChange={checked => setDraft({ ...draft, userinfo: { mode: 'sources', sourceIds: checked ? [...traffic, n.ref.id] : traffic.filter(id => id !== n.ref.id) } })} />流量信息</label> : <span className="text-muted-foreground">—</span>}</div>
+          <div className="col-start-3 row-start-3 lg:col-auto lg:row-auto">{n.ref.type === 'source' ? <span className="inline-flex items-center gap-2 text-sm">流量信息<BooleanSegmented label={`${nodeSetName(n.ref)}是否提供流量信息`} on="开" off="关" value={traffic.includes(n.ref.id)} onChange={checked => setDraft({ ...draft, userinfo: { mode: 'sources', sourceIds: checked ? [...traffic, n.ref.id] : traffic.filter(id => id !== n.ref.id) } })} /></span> : <span className="text-muted-foreground">—</span>}</div>
           <div className="col-start-4 row-start-1 flex justify-end lg:col-auto lg:row-auto"><ActionMenu label={`${nodeSetName(n.ref)}更多操作`} items={[
             ...(n.output === 'provider' ? [{ label: '追加独立策略组', onSelect: () => setDraft(appendProviderGroup(draft, n.ref, nodeSetName(n.ref), groups)) }] : []),
             { label: '移除节点来源', danger: true, onSelect: () => void remove(n.ref) },

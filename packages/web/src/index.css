@@ -357,6 +357,12 @@ body {
 }
 @layer base {
   * { @apply border-border outline-ring/50; }
+  /* Tailwind v4 不再给按钮默认手型；工具类（如 cursor-grab）仍可覆盖。 */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  label:has(input[type='checkbox'], input[type='radio'], [role='checkbox'], [role='radio']) { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
 }
 
 /* Sidebar 沿用品牌深色导航，主题只作用于侧栏。 */

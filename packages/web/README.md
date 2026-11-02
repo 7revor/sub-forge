@@ -326,3 +326,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-02 策略组隐藏与分段控件：`TemplateGroupsEditor` 每行显示「隐藏」开关，弹窗高级设置不再提供该入口；绑定订阅的模板组写入 `routing.groupHidden`，与模板不同时显示标记。`components/ui/toggle.tsx` 的选中态改为品牌色（默认 `--accent` 与页面灰底几乎相同），全部 `Segmented` 随之更新。
 
 2026-11-02 策略组列表开关改为开启 = 显示：显示时不带文案，隐藏时在开关右侧显示「隐藏」，列宽固定以保持开关对齐。
+
+2026-11-02 新增 `BooleanSegmented`，列表行内布尔项（策略组显示状态、节点来源流量信息、用户脚本权限）统一使用，其余位置保留 `Switch`。Tailwind v4 按钮默认没有手型，`index.css` 补充按钮、`summary` 与勾选类 `label` 的光标；`components/ui` 的菜单、下拉和命令项从 `cursor-default` 改为 `cursor-pointer`；`toggle.tsx` 禁用态改为禁止光标，悬停样式只作用于可用的未选中项。

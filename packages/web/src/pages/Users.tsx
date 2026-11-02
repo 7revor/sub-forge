@@ -9,7 +9,7 @@ import { Plus } from 'lucide-react';
 import { notifySuccess } from '../feedback.ts';
 import { api, type Pending, type Share, type User, type UserStats } from '../api.ts';
 import { MultiSelect } from '../components/listbox.tsx';
-import { Badge, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Segmented, Switch, listMono } from '../components/ui.tsx';
+import { Badge, BooleanSegmented, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Segmented, Switch, listMono } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
 import { ListActions } from '../components/ListActions.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table.tsx';
@@ -50,7 +50,7 @@ export function Users() {
                         <option value="user">用户</option><option value="admin">管理员</option>
                       </Select>}
                     </TableCell>
-                    <TableCell>{u.role === 'admin' ? <span className="text-sm text-muted-foreground">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</TableCell>
+                    <TableCell>{u.role === 'admin' ? <span className="text-sm text-muted-foreground">管理员默认可写</span> : <BooleanSegmented label={`${u.username} 的脚本编写权限`} on="允许" off="禁止" value={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</TableCell>
                     <TableCell className={listMono}>{s?.profiles ?? '—'}</TableCell>
                     <TableCell className="whitespace-nowrap text-foreground">{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</TableCell>
 

@@ -347,3 +347,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 策略组隐藏与分段控件：`V2Template`、`V2ProfileRouting`、`V2Components` 的策略组行增加「隐藏」开关列，移除「已隐藏」徽标；`V2GroupDialog` 移除隐藏开关；v2 页全部 `.seg` 改为新选中态。前端对应 `TemplateGroupsEditor`、`ProfileRoutingEditors` 与 `components/ui/toggle.tsx`，后端对应 `routing.groupHidden`。旧版 `LegacyGroups`（无 `routing` 的旧文档）保持只读显示。
 
 2026-11-02 策略组列表开关语义修订：`V2Template`、`V2ProfileRouting`、`V2Components` 改为开启 = 显示（无文案）、关闭 = 隐藏（右侧显示「隐藏」）。前端对应 `TemplateGroupsEditor`；仅界面变化，领域模型与服务端不变，无后端待实现项。
+
+2026-11-02 列表行内布尔项：`V2Template`、`V2ProfileRouting`、`V2Components`、`V2ProfileNodes`、`V2Settings` 的列表开关改为分段控件；`V2ProfileClient`、`V2Source`、`V2MoreDialogs` 的非列表开关不变。前端对应 `BooleanSegmented`（`components/ui.tsx`）；可点击光标对应 `index.css` 与 `components/ui/*` 的菜单项。仅界面变化，无后端待实现项。

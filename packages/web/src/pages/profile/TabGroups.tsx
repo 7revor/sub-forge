@@ -12,7 +12,7 @@ import { NodeSetSelect, memberLabel } from '../../components/pickers.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
 import { MatchPreview } from '../../components/MatchPreview.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Segmented, Select, Switch, cx } from '../../components/ui.tsx';
+import { Badge, BooleanSegmented, Button, Card, Empty, Field, Input, Segmented, Select, cx } from '../../components/ui.tsx';
 import { useProfile } from './context.ts';
 import { reorderExtraGroups } from './groupOrder.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
@@ -121,10 +121,9 @@ function LegacyGroups() {
                     </span>
                     {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-xs text-foreground">{n} 成员</span>}
                   </button>
-                  <div className="flex shrink-0 flex-col items-center gap-1 px-2 py-2">
-                    <span className="text-xs text-muted-foreground">隐藏</span>
-                    {x.origin === 'template' || bound ? <span className="text-xs text-muted-foreground" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
-                      onChange={hidden => patchOverlay(o => ({ ...o, extraGroups: (o.extraGroups ?? []).map(item => item.group.id === x.id ? { ...item, group: { ...item.group, display: { ...item.group.display, hidden } } } : item) }))} />}
+                  <div className="shrink-0 px-2 py-2">
+                    {x.origin === 'template' || bound ? <span className="text-xs text-muted-foreground" title="模板设定，只读">{current.display?.hidden ? '隐藏' : '显示'}</span> : <BooleanSegmented label={`策略组「${x.name || '未命名组'}」的显示状态`} on="显示" off="隐藏" value={!current.display?.hidden}
+                      onChange={shown => { const hidden = !shown; patchOverlay(o => ({ ...o, extraGroups: (o.extraGroups ?? []).map(item => item.group.id === x.id ? { ...item, group: { ...item.group, display: { ...item.group.display, hidden } } } : item) })); }} />}
                   </div>
                 </div>
               );
