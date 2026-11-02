@@ -331,3 +331,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-01 v2 复核补齐：对照画布「重设计 v2」修正前端落地偏差。输入类控件聚焦态统一为品牌色边框 + 3px 浅色光圈，全局键盘描边排除文本输入，shadcn Select 与 outline 触发按钮改用表单控件边框、圆角与展开态；表格紧接分页栏时隐藏末行底线，消除双线；规则出口文字区定宽 84px、箭头逐行对齐；侧栏「仓库管理」改为「规则仓库」；代理链按来源区分：展开来源直接点选（前置单选含「自动」，落地多选含「全部节点」），引用来源只按名称正则筛选、列表只读；选中态与侧栏颜色收进 `selected` / `selected-line` / `subtle` / `nav-*` token；Notice 统一带图标，订阅源拉取失败提供「重试」；代理链空态改为虚线卡片，迁移记录改为中性一行，用户页共享未开放只显示一个空态。仅前端样式与交互，领域模型与服务端无变化。
 
 2026-11-01 改为以 shadcn/ui 默认样式为标准：用 CLI 补装 input、textarea、badge、switch、checkbox、radio-group、tabs、card、table、toggle-group、label、separator、alert，并把 button、select、dialog、dropdown-menu、command、sonner 重置为官方实现；`:root` 只保留品牌色、状态色与字体，删除全局 `[data-slot]` 覆盖与自定义圆角；页面类名改用 foreground / border / card 等 shadcn 语义和 Tailwind 默认字号（控件文字 14px）；原生勾选控件统一为 Checkbox / RadioGroup，分段控件为 ToggleGroup，图标按钮用 icon / icon-sm 尺寸。设计画布 v2 的字号 13px、圆角 8px 等自定义规格以此为准替换。仅前端样式，领域模型与服务端无变化。
+
+2026-11-02 代理链来源与节点点选分离：画板 `V2ProfileDialogs` 的两个代理链弹窗已同步（来源 + 查找框 + 可点选节点 + 弱提示），对应 `ChainRuleEditor`。渲染在 `packages/core` 实现，无新增后端待实现项。旧画板 `ProfileChain` 属于已废弃的依赖节点版式，本次未修改。
