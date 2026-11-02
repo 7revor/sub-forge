@@ -109,6 +109,14 @@ export class Store {
     this.db.prepare("INSERT OR REPLACE INTO system_settings VALUES ('resourceCacheTtlSec', ?)").run(String(value));
     this.changed();
   }
+  /** 含凭据的系统设置加密保存；只有持有主密钥才能读取。 */
+  getSecureSetting<T>(name: string): T | undefined {
+    const row = this.db.prepare('SELECT value FROM system_settings WHERE name = ?').get(name) as { value: string } | undefined;
+    return row ? JSON.parse(this.cipher.decrypt(row.value)) as T : undefined;
+  }
+  setSecureSetting(name: string, value: unknown): void {
+    this.db.prepare('INSERT OR REPLACE INTO system_settings VALUES (?, ?)').run(name, this.cipher.encrypt(JSON.stringify(value)));
+  }
   /** 相同权限、地址与读取参数共享一份成功原文。绑定不改变文档归属。 */
   resourceKey(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string): string {
     const owner = scope ?? this.getWithOwner(kind, id)?.owner ?? `reference:${id}`;

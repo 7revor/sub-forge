@@ -1,4 +1,5 @@
 import { accessLogger, type DownloadEnv } from './access-log.ts';
+import { randomId } from './crypto.ts';
 import type { BlockList } from 'node:net';
 // /subs 为用户私有订阅，/resources 为公共规则；动态值只使用查询参数。
 // 资源凭证与登录会话互不替代，失效或越权不暴露资源存在性。
@@ -73,7 +74,9 @@ export function createApp(deps: AppDeps) {
   const app = new Hono<DownloadEnv>();
   app.use('*', accessLogger(store, now, deps.trustedProxies));
 
-  app.get('/healthz', (c) => c.text('ok'));
+  // 启动 ID 让前端区分“已重启”和“旧进程还没关闭”；进程内恢复重启可能短到观察不到下线。
+  const bootId = randomId(9);
+  app.get('/healthz', (c) => { c.header('x-boot-id', bootId); return c.text('ok'); });
   const ruleRepos = deps.ruleRepos ?? new RuleRepoService(store, createUpstreamFetcher({ allow: parseAllowList([]) }), now, undefined, deps.snapshots);
   // TLS 在反向代理终止时，应用看到的是 http 地址；配置的对外地址是可信来源，否则浏览器的写请求都会被 CSRF 防护拒绝。
   const publicOrigin = deps.publicUrl ? [new URL(deps.publicUrl).origin] : [];

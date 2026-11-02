@@ -2,6 +2,7 @@ import { Frame } from '../modals/Frame.tsx';
 import { useMutation,useQuery,useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api.ts';
+import { BackupSettings } from '../components/BackupSettings.tsx';
 import { Pagination } from '../components/Pagination.tsx';
 import type { PageResult } from '../hooks/usePagedList.ts';
 import { RefreshCacheButton, type ResourceState } from '../components/ResourceCache.tsx';
@@ -42,5 +43,6 @@ export function System(){
         </li>)}</ul>}
         {!!rules.data?.total && <Pagination className="!px-0 !pb-0" page={rules.data.page} pageSize={rules.data.pageSize} total={rules.data.total} totalPages={rules.data.totalPages} busy={rules.isFetching} onPage={setRulePage} onPageSize={value=>{setRulePageSize(value);setRulePage(1);}} />}
       </div></div>
+      <BackupSettings />
     </section></PageScroll></>;
 }

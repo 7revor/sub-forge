@@ -23,14 +23,16 @@ import { RuleRepoService } from './rule-repos/service.ts';
 import { Store } from './store.ts';
 import { createNodeProbe } from './node-probe.ts';
 import { mihomoVerifier } from './verify.ts';
+import { applyStagedRestore } from './backup/restore.ts';
+import { BackupService } from './backup/service.ts';
 
 const env = process.env;
 const dbPath = env.SUBFORGE_DB ?? './data/sub-forge.db';
 const DAY_MS = 86400_000;
 
-function openStore(): Store {
+function openStore(masterKey?: Buffer): Store {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
-  return new Store(dbPath, { cipher: new Cipher(loadMasterKey(dbPath, env.SUBFORGE_SECRET)) });
+  return new Store(dbPath, { cipher: new Cipher(masterKey ?? loadMasterKey(dbPath, env.SUBFORGE_SECRET)) });
 }
 
 async function createAdmin(store: Store, username: string, password: string | undefined): Promise<void> {
@@ -78,7 +80,11 @@ async function start(): Promise<void> {
   const port = Number(env.PORT ?? 8080);
   const publicUrl = env.PUBLIC_URL ?? `http://${host}:${port}`;
   if (!env.PUBLIC_URL) console.warn(`未设置 PUBLIC_URL，订阅链接将使用 ${publicUrl}，客户端可能无法访问`);
-  const store = openStore();
+  // 上次恢复已暂存（含重启中途崩溃）时，先替换数据库和密钥再打开。
+  if (dbPath !== ':memory:' && applyStagedRestore(dbPath)) console.log(`已从备份恢复数据库，原文件保存为 ${dbPath}.before-restore`);
+  if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
+  const masterKey = loadMasterKey(dbPath, env.SUBFORGE_SECRET);
+  const store = openStore(masterKey);
 
   // 首次启动且没有任何用户时，可用环境变量创建管理员（便于容器部署）
   if (store.countUsers() === 0) {
@@ -95,14 +101,19 @@ async function start(): Promise<void> {
   const ruleRepos = new RuleRepoService(store, fetcher, Date.now, new GitRepoCache(env.SUBFORGE_REPO_CACHE ?? join(dirname(dbPath), 'rule-repo-cache')), snapshots);
   const nodeProbe = env.MIHOMO_BIN ? createNodeProbe(env.MIHOMO_BIN, { allow: parseAllowList((env.SSRF_ALLOW ?? '').split(',')) }) : undefined;
   const resources = new ResourceService(store,snapshots,renderer);
+  const backups = new BackupService(store, {
+    dbPath, masterKey, keyFromEnv: !!env.SUBFORGE_SECRET,
+    onRestoreStaged: () => { setTimeout(restart, 200).unref(); },
+  });
   const app = createApp({
-    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe, resources, trustedProxies,
+    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe, resources, backups, trustedProxies,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   });
   ruleRepos.start();
   resources.start();
+  backups.start();
   store.pruneAccessLog();
   const prune = setInterval(() => store.pruneAccessLog(), DAY_MS);
   prune.unref();
@@ -111,9 +122,9 @@ async function start(): Promise<void> {
     console.log(`Sub Forge 已启动：http://${info.address}:${info.port}（对外地址 ${publicUrl}，数据库 ${dbPath}）`);
   });
   let shuttingDown = false;
-  const shutdown = async () => {
-    if (shuttingDown) return;
-    shuttingDown = true;
+  const stop = async () => {
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
     clearInterval(prune);
     store.closeEvents();
     // 立即停止接收请求并取消探测；同时等待所有清理，避免先前未等待的 close 拒绝。
@@ -122,17 +133,29 @@ async function start(): Promise<void> {
     const drainDeadline = setTimeout(() => {
       if ('closeAllConnections' in server) server.closeAllConnections();
     }, 10_000);
-    const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop(), resources.stop()]);
+    const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop(), resources.stop(), backups.stop()]);
     clearTimeout(drainDeadline);
     await snapshots.settled();
     store.close();
     const errors = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     if (errors.length) throw new AggregateError(errors.map(result => result.reason), '关闭服务时清理失败');
+  };
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    await stop();
     process.exit(0);
   };
   const onSignal = () => {
     void shutdown().catch(error => { console.error('关闭服务失败', error); process.exit(1); });
   };
+  // 恢复在进程内重启，不依赖容器重启策略；任何一步失败都退出，由暂存目录在下次启动继续。
+  function restart() {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log('备份已校验，正在重启服务以完成恢复');
+    void stop().then(start).catch(error => { console.error('恢复重启失败', error); process.exit(1); });
+  }
   process.once('SIGINT', onSignal);
   process.once('SIGTERM', onSignal);
 }

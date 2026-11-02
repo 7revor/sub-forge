@@ -6,6 +6,8 @@ import { getCookie } from 'hono/cookie';
 import { ResourceService } from '../resources.ts';
 import { resourceRoutes } from './resources.ts';
 import { systemRoutes } from './system.ts';
+import { backupRoutes } from './backup.ts';
+import type { BackupService } from '../backup/service.ts';
 import { ruleConversionRoutes } from './rule-conversion.ts';
 // 管理接口 /api/* 统一使用登录会话；资源 token 不能调用管理接口。
 
@@ -32,6 +34,7 @@ export type ApiDeps = {
   store: Store;
   resources?: ResourceService;
   nodeProbe?: NodeProbe;
+  backups?: BackupService;
   ruleRepos?: RuleRepoService;
   renderer: RenderService;
   snapshots: SnapshotService;
@@ -74,6 +77,7 @@ export function createApi(deps: ApiDeps) {
   api.route('/', resourceRoutes(deps.store,resources,repos));
   api.route('/', resourceLinkRoutes(deps.store, deps.renderer, deps.publicUrl));
   api.route('/', systemRoutes(deps.store));
+  if (deps.backups) api.route('/', backupRoutes(deps.backups));
   api.route('/', pendingRoutes());
   api.route('/', nodeProbeRoutes(deps.nodeProbe));
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
