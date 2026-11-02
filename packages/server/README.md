@@ -41,7 +41,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | --- | --- | --- |
 | `SUBFORGE_DB` | `./data/sub-forge.db`（镜像中为 `/data/sub-forge.db`） | SQLite 文件路径 |
 | `SUBFORGE_REPO_CACHE` | 数据库同目录的 `rule-repo-cache` | 公开规则仓库的 Git 缓存，需可写且建议持久化；本地运行需安装 Git，生产镜像已包含 |
-| `SUBFORGE_SECRET` | 数据库旁的 `secret.key` | 32 字节 Base64 主密钥，用于加密敏感数据（SYS-04）；不设置时首次启动自动生成 |
+| `SUBFORGE_SECRET` | 数据库旁的 `secret.key` | 32 字节 Base64 主密钥，用于加密备份凭据和计算令牌、URL 的 HMAC 索引（SYS-04）；不设置时首次启动自动生成 |
 | `SUBFORGE_ADMIN_USERNAME` / `SUBFORGE_ADMIN_PASSWORD` | 空 | 首次启动时创建管理员；`create-admin` 命令也从 `SUBFORGE_ADMIN_PASSWORD` 取密码 |
 | `HOST` / `PORT` | `127.0.0.1` / `8080`（镜像中 HOST 为 `0.0.0.0`） | 监听地址 |
 | `PUBLIC_URL` | `http://HOST:PORT` | 对外地址，用于生成订阅、provider 与规则集链接；未设置时启动会告警 |
@@ -131,7 +131,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 
 ## 敏感数据
 
-文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、最近一次成功的渲染结果、订阅 token 均以 AES-256-GCM 加密落盘；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
+文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、订阅 token 自 v35 起明文存储，数据库文件权限为 0600；系统设置中的备份凭据用 AES-256-GCM 加密；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
 
 ## 测试
 
@@ -156,7 +156,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 
 ## 内置与自定义规则仓库
 
-服务初始化自动建立 blackmatrix7 / zydou 元数据，`serve` 启动后台索引；每日检查各分支 commit，更新失败保留旧索引并在 15 分钟后重试，退出前停止定时器并等待当前任务。SQLite v10 新增公共索引表，用户规则文档仍加密存储。
+服务初始化自动建立 blackmatrix7 / zydou 元数据，没有定时同步：读取仓库目录、搜索或读取仓库规则时，到期的仓库在后台更新，失败保留旧索引并在 15 分钟后重试，退出前等待当前任务。
 
 - `GET /api/rule-repos`：状态与数量（需要登录）。
 - 2026-11-02：仓库搜索、关联解析统一走 `GET /api/rule-options/search` 与 `POST /api/rule-options/resolve`；原 `rule-repos` 的 search、entry、files、file-preview、file-refresh、resolve、import 已删除。
@@ -228,7 +228,7 @@ SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两
 
 `GET /api/{sources,profiles,collections,locals,rulesets,templates}` 支持 `page`、`pageSize`、`q`。传任一参数即启用分页，默认第 1 页、每页 20 条，`pageSize` 范围 1–100；非法页码或条数返回 400。返回 `{ items, total, page, pageSize, totalPages }`，计数仅包含当前用户可见且名称匹配的结果（模板沿用共享读取权限）。模板仅计最新版本；名称搜索忽略首尾空白和大小写，无名称的历史模板按 ID 搜索。顺序保持 ID 升序，越界页回退至最后一页，空结果为第 1 / 1 页。
 
-不传参数仍返回全量 `{ items }`，兼容关联选择器及旧客户端。无搜索时通过 SQLite `LIMIT/OFFSET` 分页；文档正文保持加密，名称搜索在服务端解密后筛选，不新增明文名称索引。
+不传参数仍返回全量 `{ items }`，兼容关联选择器及旧客户端。无搜索时通过 SQLite `LIMIT/OFFSET` 分页；名称搜索在服务端解析文档后筛选，不新增单独的名称索引。
 
 ### 模板规则集统一引用（2026-10-29）
 
@@ -264,7 +264,7 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 2026-11-02：预览、模式转换和保存统一在校验入口迁移旧草稿，再校验当前 routing 及资源归属；底层 Store 写入也先迁移，详情、列表和分页只返回 RoutedProfileDoc。SQLite v29 补齐历史底层写入留下的旧订阅，保留加密原始备份、归属、更新时间、令牌及 last-good；缺少模板或合并失败时整批回滚。历史导入与迁移合并器继续保留，当前渲染不再经由编辑用覆盖层。
 
 - `POST /api/profiles/routing/convert`：`{ profile, mode, templateId?, mapping? }`。只返回 `{ item, changes }` 草稿；mapping 以旧组 ID 映射目标 ID，null 表示明确不迁移。应用后通过原 PUT 保存，后保存的内容覆盖当前内容。
-- `GET /api/profiles/migration-backup?id=ID`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；备份在库内加密，删除订阅时一并删除。
+- `GET /api/profiles/migration-backup?id=ID`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；删除订阅时一并删除。
 - 模板影响检查和保存仅影响绑定订阅，覆盖全部用户。组改名保留成员；删组和合并环等冲突不能强制发布。保存不因模板或订阅在检查期间更新而中断。
 
 升级前先停止写入并保留完整数据库一致性备份及原密钥（运行中的 SQLite 使用 backup API，不能只复制主文件遗漏 WAL）。可在现有库上执行只读预检：
@@ -304,7 +304,7 @@ SQLite v18 新增平面目录缓存 `rule_repo_catalog`，与条目、配置和�
 
 ### 2026-10-29：全量名称筛选
 
-仓库目录接口支持 `q`，使用规范化后的 SQL LIKE 与转义参数筛选；匹配路径由前端恢复父级目录。加密文档仍在授权读取解密后执行等价的包含筛选，再分页。`GET /api/nodesets/nodes?type=类型&id=ID&q=...` 在完整已处理节点集筛选后截取响应上限，`total` 为筛选后的数量。`%`、`_` 和反斜线按字面匹配，不当作用户通配符。
+仓库目录接口支持 `q`，使用规范化后的 SQL LIKE 与转义参数筛选；匹配路径由前端恢复父级目录。文档在授权读取后执行等价的包含筛选，再分页。`GET /api/nodesets/nodes?type=类型&id=ID&q=...` 在完整已处理节点集筛选后截取响应上限，`total` 为筛选后的数量。`%`、`_` 和反斜线按字面匹配，不当作用户通配符。
 
 ### 2026-10-29：仓库单文件正文预览
 
@@ -460,3 +460,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-02：配置节点 provider 现按内核返回 Mihomo/Stash YAML 或 Surge/Loon 节点行，四端遵循来源的引用 / 展开设置。派生筛选资源沿用用户鉴权、流量头和当前配置校验；空资源不成功下发，旧强制内联缓存不作为回退。含远程节点的草稿禁用独立下载，使用正式订阅链接；边界见 [转换说明](../../docs/19-client-conversion.md#2026-11-02遵循节点来源输出设置)。
 
 2026-11-02：SQLite v33 删除 `last_good` 和 `shared_rule_resources` 并回收空间，移除 `/api/system/rule-resources`。主配置只写规则地址；公共规则改为 `/resources/ruleset?id=…&target=…&format=…` 和 `/resources/repo?id=…&files=…&target=…&format=…`，按需转换，格式契约不符返回 409，旧 `?key=` 返回 404。渲染失败返回 503，不再回退；手动刷新配置时只校验 Mihomo 输出。
+
+2026-11-02：上游内容改为懒加载，主配置只拉节点来源，到期内容最多等待 3 秒，超时先返回旧内容。定时任务只做清理，周期等于系统缓存时间。SQLite v35 把文档、快照、令牌原文和刷新任务改为明文，`token_enc` 列改名为 `token`；升级时需要原主密钥，之后主密钥仍用于备份凭据和 HMAC 索引。

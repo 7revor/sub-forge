@@ -151,7 +151,7 @@ type Profile = {
   chains: ChainRule[];
   // 2026-10-30 起仅兼容旧数据；渲染忽略，保存规范化为 { default: 'wrap' }。
   refPolicy: { default: 'wrap' | 'copy' | 'inline'; perRef?: Record<RefKey, 'wrap' | 'copy' | 'inline'> };
-  token: string; // 保存时自动生成的唯一订阅令牌，独立加密存储；普通保存保持不变
+  token: string; // 保存时自动生成的唯一订阅令牌，明文存储并以 HMAC 为查找索引；普通保存保持不变
 };
 
 type Overlay = {
@@ -461,7 +461,7 @@ SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`�
 
 ## 2026-10-29：名称搜索谓词
 
-`normalizeNameSearch`/`matchesNameSearch` 统一大小写、全半角与首尾空白处理。公开仓库缓存使用 SQLite `search_fold(value) LIKE ? ESCAPE` 与转义参数；本地加密文档先按权限读取、解密后包含筛选，再分页。节点接口支持 `q`，先解析完整节点集、按名称筛选，再执行 5000 条响应上限。此处只改变搜索候选，不改变 NodeRef 精确匹配或规则正则语义。
+`normalizeNameSearch`/`matchesNameSearch` 统一大小写、全半角与首尾空白处理。公开仓库缓存使用 SQLite `search_fold(value) LIKE ? ESCAPE` 与转义参数；本地文档先按权限读取、解析后包含筛选，再分页。节点接口支持 `q`，先解析完整节点集、按名称筛选，再执行 5000 条响应上限。此处只改变搜索候选，不改变 NodeRef 精确匹配或规则正则语义。
 
 ## 2026-10-29：按物理文件读取正文
 
@@ -609,3 +609,5 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 恢复时这两条保留当前实例的值，其余数据全部以备份为准。见 [22](22-database-backup.md)。
 
 2026-11-02 缓存模型：持久缓存只有上游内容，即 `snapshots`、`resource_bindings`、`data/rule-repo-cache` 裸仓库和仓库索引表；`last_good`、`shared_rule_resources` 在 v33 删除。`RenderInput.deferRuleBody` 让主配置跳过规则正文解析，规则文件请求和预览才转换。全部规则都不适用于目标内核时，主配置仍声明 provider，规则文件返回只含注释的内容。
+
+2026-11-02 懒加载与明文存储（v35）：`SnapshotService.get` 对过期且有旧内容的资源最多等待 3 秒（`STALE_WAIT_MS`），超时返回旧快照并标记 `stale`，刷新在后台完成；从未成功时等到上游结束。主配置不拉规则来源，节点来源并行拉取。`ResourceService.sweep` 只清理不拉取，周期等于系统缓存时间。`docs`、迁移备份、`snapshots`、`refresh_jobs` 和令牌原文（列 `token`）明文存储，`system_settings` 中的备份配置仍加密。

@@ -390,3 +390,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 系统页公共规则资源分页与数据库备份：`/api/system/rule-resources` 改为分页（默认 20 条，页面默认 10 条，复用公共 `Pagination`，无查询参数时不再返回全量）。新增「数据库备份」行、`BackupSettingsModal`、`RestoreBackupModal`，契约见 [22](22-database-backup.md)。已同步画布：`V2Settings`（公共规则资源示例与分页、数据库备份行、两个备份弹窗）。无后端待实现项。部署增加 `docker/compose.yaml` 与 `docker/nginx.conf.example`，不涉及画板。
 
 2026-11-02 缓存收敛：v2「系统 / 用户 / 账户」画板移除「公共规则资源」区块，前端 `System.tsx` 与 `GET`、`DELETE /api/system/rule-resources` 同步删除。v1「系统」「模板发布前校验」画板的失败文案改为“订阅返回错误，客户端保留本地配置”。访问日志的 `last-good` 来源标签保留，用于展示 30 天内的历史记录和快照告警。
+
+2026-11-02 懒加载：v2「系统 / 用户 / 账户」画板和前端系统页、订阅源页的缓存说明同步为“到期后下次使用时重新拉取，无人使用的资源到期后自动清理”，资源异常说明改为“下次可重新拉取的时间”。

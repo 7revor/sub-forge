@@ -344,3 +344,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-02：系统页公共规则资源改为服务端分页；新增数据库备份（`components/BackupSettings.tsx`）：WebDAV 配置、立即备份、备份列表与恢复，恢复后按 `/healthz` 的 `x-boot-id` 判断重启完成。见 [22](../../docs/22-database-backup.md)。
 
 2026-11-02：系统页移除「公共规则资源」区块，规则产物不再保存，无须手动管理。
+
+2026-11-02：缓存说明改为“到期后下次使用时重新拉取，无人使用的资源到期后自动清理”，与服务端懒加载一致。
