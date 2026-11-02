@@ -1036,10 +1036,10 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
 
   // ---------- 用户与会话 ----------
 
-  createUser(u: { username: string; passwordHash: string; role: Role }): User {
+  createUser(u: { username: string; passwordHash: string; role: Role; scriptAllowed?: boolean }): User {
     const id = randomId(9);
     this.db.transaction(() => {
-      this.db.prepare('INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)').run(id, u.username, u.passwordHash, u.role, this.now());
+      this.db.prepare('INSERT INTO users (id, username, password_hash, role, script_allowed, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, u.username, u.passwordHash, u.role, u.scriptAllowed ? 1 : 0, this.now());
       this.createToken(id);
     })();
     return this.getUser(id)!;

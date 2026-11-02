@@ -88,12 +88,13 @@ export function authRoutes(store: Store, opts: { secureCookies: boolean; now: ()
   app.get('/users', requireAdmin, (c) => c.json({ users: store.listUsers() }));
 
   app.post('/users', requireAdmin, async (c) => {
-    const { username, password, role } = await jsonBody<{ username?: unknown; password?: unknown; role?: unknown }>(c);
+    const { username, password, role, scriptAllowed } = await jsonBody<{ username?: unknown; password?: unknown; role?: unknown; scriptAllowed?: unknown }>(c);
     if (!isStr(username) || !/^[A-Za-z0-9_.-]{2,32}$/.test(username)) throw bad('用户名为 2–32 位字母、数字或 _ . -');
     if (store.getUserAuth(username)) throw new HttpError(409, '用户名已存在');
     const r = (role ?? 'user') as Role;
     if (!ROLES.includes(r)) throw bad('角色只能是 admin 或 user');
-    const user = store.createUser({ username, passwordHash: await hashPassword(checkPassword(password)), role: r });
+    if (scriptAllowed !== undefined && typeof scriptAllowed !== 'boolean') throw bad('scriptAllowed 必须是布尔值');
+    const user = store.createUser({ username, passwordHash: await hashPassword(checkPassword(password)), role: r, scriptAllowed: scriptAllowed === true });
     return c.json({ user }, 201);
   });
 
