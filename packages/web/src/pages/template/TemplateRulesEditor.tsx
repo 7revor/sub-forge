@@ -15,7 +15,7 @@ import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
 import { newId, type ConvertCtx, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { RuleEditDialog } from './RuleEditDialog.tsx';
-import { applyRuleDraft, applyRuleDialogResult } from './ruleDraft.ts';
+import { applyRuleDraft, applyRuleDialogResult, linkRepositoryRules } from './ruleDraft.ts';
 
 export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
   if (matcher.kind === 'local') return localRuleLines(matcher.content).map(line => line.text).join(',') || '尚未填写';
@@ -42,6 +42,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   const remoteUrls = readOnly ? [] : value.rules.filter(r => !ruleReadOnly(r)).flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
   const repositoryMatches = useRepositoryUrlMatches();
   useEffect(() => { if (importedUrls && !readOnly) void repositoryMatches.detect(importedUrls); }, [importedUrls, readOnly, repositoryMatches.detect]);
+  const linkableCount = remoteUrls.filter(url => repositoryMatches.matches[url]?.length === 1).length;
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
   const edit = async (rule: RuleEntry, adding = false, scope?: 'repository' | 'local') => {
@@ -70,9 +71,15 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
     } catch (error) { setLinkError(error instanceof Error ? error.message : String(error)); }
     finally { setLinkingRule(undefined); }
   };
+  const linkAllRepositories = () => repositoryMatches.linkAll(remoteUrls, resolved => {
+    const next = linkRepositoryRules(currentValue.current, resolved, rule => !ruleReadOnly(rule));
+    if (next.linked) onChange(next.body);
+    return next.linked;
+  });
   return <>
     <Card title={title} count={value.rules.length} actions={<><SearchInput className="w-[220px] shrink-0" aria-label="搜索规则" placeholder="搜索规则内容或出口" value={search} onChange={event => setSearch(event.target.value)} />{!readOnly && <>
-      {!staticOnly && remoteUrls.length > 0 && <Button variant="ghost" disabled={repositoryMatches.isPending} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
+      {!staticOnly && remoteUrls.length > 0 && <Button variant="ghost" disabled={repositoryMatches.isPending || repositoryMatches.isLinkingAll} onClick={() => void repositoryMatches.detect(remoteUrls)}><ScanSearch size={15} />{repositoryMatches.isPending ? '检测中…' : '检测仓库关联'}</Button>}
+      {!staticOnly && linkableCount > 0 && <Button disabled={repositoryMatches.isLinkingAll || !!linkingRule} onClick={() => void linkAllRepositories()}><Link2 size={15} />{repositoryMatches.isLinkingAll ? '关联中…' : `一键关联 ${linkableCount} 项`}</Button>}
       <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={16} />添加规则<ChevronDown size={14} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72">
         <DropdownMenuItem onSelect={() => add({ kind: 'local', content: '' })}><span><span className="block">手写规则</span><span className="text-xs text-muted-foreground">每行一条，如 DOMAIN-SUFFIX,openai.com</span></span></DropdownMenuItem>
         {!staticOnly && <><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'repository')}><span><span className="block">从规则仓库选择</span><span className="text-xs text-muted-foreground">选择已索引的仓库文件</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '' }, 'local')}><span><span className="block">引用规则集合</span><span className="text-xs text-muted-foreground">复用已合并的多来源集合</span></span></DropdownMenuItem><DropdownMenuItem onSelect={() => add({ kind: 'ruleset', id: '', remote: { url: '' } })}><span><span className="block">远程规则地址</span><span className="text-xs text-muted-foreground">填写 HTTP(S) 规则文件 URL</span></span></DropdownMenuItem></>}
@@ -91,7 +98,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           invalid={report.some(item => item.level === 'error' && item.where === `rule:${r.id}`)}
           icon={local ? <FileText size={16} /> : matcher.remote ? <Globe size={16} /> : <Link2 size={16} />}
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
-          hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
+          hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule || repositoryMatches.isLinkingAll} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
           target={readOnly ? <span className="block truncate pr-1.5 pl-3 text-sm" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
           externalPreview={!local} previewLinks={rulePreviewLinks(matcher)} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });

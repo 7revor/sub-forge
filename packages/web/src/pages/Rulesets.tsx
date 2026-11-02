@@ -84,6 +84,7 @@ export function RulesetEdit() {
   const status = sources.statuses;
   const error = rulesetError(d);
   const urls = d.sources.flatMap(s => s.kind === 'remote' && !s.repository && s.url ? [s.url] : []);
+  const linkableCount = urls.filter(url => matches.matches[url]?.length === 1).length;
   const edit = async (editing: { source: RuleSetSourceDoc; adding: boolean; repository?: boolean }) => {
     const result = await RulesetSourceDialog.show(editing);
     if (result.status !== 'confirmed') return;
@@ -105,6 +106,19 @@ export function RulesetEdit() {
     } catch (cause) { setLinkError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setLinking(undefined); }
   };
+  const linkAll = () => matches.linkAll(urls, resolved => {
+    const current = latest.current;
+    if (!current) return 0;
+    let linked = 0;
+    const next = current.sources.map(s => {
+      const source = s.kind === 'remote' && !s.repository && s.url ? resolved.get(s.url)?.repository?.sources[0] : undefined;
+      if (!source) return s;
+      linked++;
+      return { ...s, ...source, id: newId('src') };
+    });
+    if (linked) e.setDraft({ ...current, sources: next });
+    return linked;
+  });
   return <DetailShell canEdit={canEdit} listPath="/rulesets" listLabel="规则集合" isNew={e.isNew} name={d.name} dirty={e.dirty} saving={e.save.isPending}
     extraActions={!e.isNew && <ResourceLinkButton kind="rulesets" id={d.id} name={d.name} disabled={e.dirty} />}
     onSave={() => {
@@ -123,7 +137,8 @@ export function RulesetEdit() {
     <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_440px]"><div className="flex min-w-0 flex-col gap-5">
     {canEdit ? <>
     <Card title="来源" count={d.sources.length} actions={<>
-      <Button variant="ghost" disabled={!urls.length || matches.isPending} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>
+      <Button variant="ghost" disabled={!urls.length || matches.isPending || matches.isLinkingAll} onClick={() => void matches.detect(urls)}><ScanSearch size={15} />{matches.isPending ? '检测中…' : '检测仓库关联'}</Button>
+      {linkableCount > 0 && <Button disabled={matches.isLinkingAll || !!linking} onClick={() => void linkAll()}><Link2 size={15} />{matches.isLinkingAll ? '关联中…' : `一键关联 ${linkableCount} 项`}</Button>}
       <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={15} />添加来源</Button></DropdownMenuTrigger><DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true, repository: true })}>规则仓库</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true })}>远程地址</DropdownMenuItem>
@@ -134,7 +149,7 @@ export function RulesetEdit() {
       <SortableList items={d.sources} getKey={s => s.id} onReorder={sources => set({ sources })} renderItem={(s, i, handle) => <RuleCard label={`第 ${i + 1} 项来源`} handle={handle}
         icon={s.repository ? <Link2 size={16} /> : s.kind === 'remote' ? <Globe size={16} /> : <FileText size={16} />}
         count={<SourceStatus src={s} status={status.get(s.id)} loading={sources.loading.has(s.id)} />}
-        hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking} onLink={match => link(s.id, s.url!, match)} />}
+        hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking || matches.isLinkingAll} onLink={match => link(s.id, s.url!, match)} />}
         externalPreview={s.kind === 'remote'} previewLinks={sourcePreviewHref(s) ? [{ href: sourcePreviewHref(s)! }] : []}
         onPreview={() => void RuleSourcePreview.show({ source: { rulesetId: e.isNew ? undefined : e.id, source: s } })} onEdit={() => void edit({ source: s, adding: false })} onDelete={() => { set({ sources: d.sources.filter(x => x.id !== s.id) }); if (s.url) matches.clear([s.url]); }}>
         <span className="block min-w-0" title={sourceLabel(s)}><span className="block truncate">{sourceLabel(s)}</span><span className="block truncate font-mono text-xs font-normal text-muted-foreground">{s.repository?.path ?? (s.kind === 'remote' ? s.url : s.content?.split('\n').filter(Boolean).join(' · '))}</span></span>

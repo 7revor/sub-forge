@@ -1,7 +1,7 @@
-import { remoteRuleMatcher, type RuleEntry } from '@sub-forge/core';
+import { remoteRuleMatcher, type Matcher, type RuleEntry } from '@sub-forge/core';
 import { describe, expect, it } from 'vitest';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
-import { applyRuleDraft, applyRuleDialogResult } from './ruleDraft.ts';
+import { applyRuleDraft, applyRuleDialogResult, linkRepositoryRules } from './ruleDraft.ts';
 
 const url = 'https://example.test/rules.list';
 const direct = { kind: 'builtin', name: 'DIRECT' } as const;
@@ -50,5 +50,25 @@ describe('规则弹窗草稿提交', () => {
     const emptyTemplate = applyRuleDialogResult(body, draft, true, 'before', [], 0);
     expect(emptyTemplate.body.rules.map(r => r.id)).toEqual(['new', 'r']);
     expect(emptyTemplate.templateStart).toBe(1);
+  });
+});
+
+describe('一键关联规则', () => {
+  const linked: Matcher = { kind: 'ruleset', id: '', repository: { repo: 'repo', entry: 'entry', name: '仓库文件', sources: [] } };
+  const locked = { ...rule, id: 'locked' };
+  const other = { ...rule, id: 'other', matcher: remoteRuleMatcher('https://example.test/other.list') };
+  it('替换同地址的可编辑规则，保留顺序和出口，跳过只读与未解析项', () => {
+    const result = linkRepositoryRules({ ...body, rules: [rule, locked, other] }, new Map([[url, linked]]), item => item.id !== 'locked');
+    expect(result.linked).toBe(1);
+    expect(result.body.rules.map(item => item.id)).toEqual(['r', 'locked', 'other']);
+    expect(result.body.rules[0]).toMatchObject({ matcher: linked, target: direct });
+    expect(result.body.rules[1]).toBe(locked);
+    expect(result.body.rules[2]).toBe(other);
+    expect(result.body.ruleProviders).toEqual(body.ruleProviders);
+  });
+  it('全部替换后清理失去引用的远程来源', () => {
+    const result = linkRepositoryRules({ ...body, rules: [rule, { ...rule, id: 'same' }] }, new Map([[url, linked]]), () => true);
+    expect(result.linked).toBe(2);
+    expect(result.body.ruleProviders).toEqual([]);
   });
 });

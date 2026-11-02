@@ -591,3 +591,7 @@ URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应�
 ## 2026-11-02：SQLite v32 与存储边界
 
 v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变。当前读取路径只访问 `templates`；`template_versions` 仅在升级事务和旧种子导入的临时表中存在，由 `store-migrations.ts` 显式读取，用于展开锁定版本。资源绑定只在调度、刷新和实际读取资源时建立，查询状态不产生写入。
+
+### 2026-11-02：一键关联
+
+一键关联复用 `POST /api/rule-options/match-urls` 的页面临时结果，对唯一候选按地址去重后逐个调用 `POST /api/rule-options/resolve` 复核，并发上限 4（解析会读取文件正文）。领域模型与接口不变：规则替换沿用 `applyRuleDraft`，来源替换生成新来源 ID。
