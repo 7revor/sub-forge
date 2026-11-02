@@ -30,7 +30,9 @@ function RepositoryFileLoading({ failed }: { failed: boolean }) {
     <div className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
       <ListTable label="规则文件" columns={FILE_COLUMNS}>{!failed && <ListTableLoading columns={FILE_COLUMNS.length} rowHeight={45} />}</ListTable>
     </div>
-    <div role="status" className="shrink-0 border-t px-3 py-2 text-center text-xs text-muted-foreground">{failed ? '仓库加载失败，无法读取文件列表。' : '正在加载…'}</div>
+    {failed
+      ? <div role="alert" className="shrink-0 border-t px-3 py-2 text-center text-xs text-muted-foreground">仓库加载失败，无法读取文件列表。</div>
+      : <Pagination page={1} pageSize={20} total={0} totalPages={1} unknownTotal busy onPage={() => {}} onPageSize={() => {}} />}
   </>;
 }
 
@@ -105,7 +107,6 @@ export function RuleRepoPage() {
     <section aria-label="规则文件列表" className="mb-5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-5 py-4">
         <h2 className="m-0 text-base font-semibold">规则文件</h2>
-        <span role="status" className="text-xs text-muted-foreground">{pending ? '搜索中…' : !repos.data ? '正在加载…' : ''}</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Select clearable aria-label="筛选规则仓库" placeholder="全部仓库" className="w-[200px]" value={repository} onChange={event => setRepository(event.target.value)}>{(repos.data?.repos ?? []).filter(repo => repo.enabled).map(repo => <option key={repo.id} value={repo.id}>{repo.name}</option>)}</Select>
           <SearchInput size="md" className="w-[280px]" aria-label="搜索规则名称或路径" placeholder="按文件名或路径搜索，例如 115.list" value={q} onChange={event => setQ(event.target.value)} />
