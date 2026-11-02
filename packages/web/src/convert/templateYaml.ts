@@ -52,7 +52,7 @@ export function templateToYaml(t: TemplateBody, ctx: ConvertCtx): string {
     const out: Record<string, unknown> = {
       name: g.name, type: g.type,
       proxies: g.members.map((m) => {
-        if (m.kind !== 'builtin' && m.kind !== 'group') throw new Error(`模板组「${g.name}」不能包含节点或节点集`);
+        if (m.kind !== 'builtin' && m.kind !== 'group') throw new Error(`模板组「${g.name}」不能包含节点或节点来源`);
         return targetName(m, t.groups);
       }),
     };

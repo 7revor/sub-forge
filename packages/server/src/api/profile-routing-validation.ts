@@ -96,7 +96,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
   }
   const nodeSet = (value: unknown, where: string) => {
     const ref = refs.nodeSet(value, where);
-    if (!doc.nodeSets.some(n => n.ref.type === ref.type && n.ref.id === ref.id)) throw bad(`${where}：节点集未加入本订阅`);
+    if (!doc.nodeSets.some(n => n.ref.type === ref.type && n.ref.id === ref.id)) throw bad(`${where}：节点来源未加入本订阅`);
   };
   const target = (value: unknown, where: string, depth = 0, allowAll = false): void => {
     if (depth > 20 || !obj(value)) throw bad(`${where}：引用格式错误`);

@@ -42,7 +42,7 @@ export function TabChains() {
         actions={<>{draft.chains.length > 0 && <Button variant="ghost" onClick={check.refresh} disabled={check.checking}>重新检查</Button>}<Button onClick={add} disabled={!profileNodeSets.length}><Plus size={14} />添加代理链</Button></>}>
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
         {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-sm text-destructive">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
-        {!draft.chains.length ? <Empty variant="card" title={profileNodeSets.length ? '还没有代理链' : '还没有节点来源'} description={profileNodeSets.length ? undefined : '先添加节点来源，再配置代理链。'} /> : (
+        {!draft.chains.length ? <Empty variant="card" title={profileNodeSets.length ? '还没有代理链' : '先添加节点来源，再配置代理链'} /> : (
           <div aria-label="代理链列表"><SortableList items={draft.chains} getKey={chain => chain.id} onReorder={chains => setDraft({ ...draft, chains })} renderItem={(chain, i, handle) => <ChainCard chain={chain} index={i} handle={handle} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === chain.id)} onEdit={() => void edit(chain)} onDelete={() => setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== chain.id) })} /> } /></div>
         )}
       </Card>
@@ -102,7 +102,7 @@ export function TabPreview() {
       </div>
       <ErrorAlert error={preview.error} />
       {preview.data && !current && !preview.isPending && <p role="status" className="text-sm text-muted-foreground">配置已更改，请重新生成预览。</p>}
-      {client !== 'mihomo' && client !== 'loon' && <p className="text-sm text-muted-foreground">节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。下载配置文件会内嵌已转换的规则，可直接导入。</p>}
+      {client !== 'mihomo' && client !== 'loon' && <p className="text-sm text-muted-foreground">节点随主订阅刷新更新；节点来源内联输出，空策略组保持拒绝连接。下载配置文件会内嵌已转换的规则，可直接导入。</p>}
       {client === 'loon' && <p className="text-sm text-muted-foreground">本地规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
       {current && preview.data.exportUnavailableReason && <p role="status" className="text-sm text-muted-foreground">{preview.data.exportUnavailableReason}</p>}
       {current && (

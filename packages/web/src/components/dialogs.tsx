@@ -17,7 +17,7 @@ export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref:
   const shown = options.filter((o) => matchesNameSearch(o.name, q));
   return (
     <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{title}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-3">
-      <SearchInput className="max-w-none" aria-label="搜索节点集" placeholder="搜索订阅源、组合、本地节点组" value={q} onChange={(e) => setQ(e.target.value)} />
+      <SearchInput className="max-w-none" aria-label="搜索节点来源" placeholder="搜索订阅源、组合、本地节点组" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex max-h-[360px] flex-col overflow-y-auto rounded-lg border border-border">
         {(['source', 'collection', 'local'] as const).map(type => <div key={type}>{shown.some(o => o.ref.type === type) && <div className="bg-muted px-3 py-1.5 text-xs text-muted-foreground">{NODE_SET_LABEL[type]}</div>}{shown.filter(o => o.ref.type === type).map((o) => {
           const isAdded = added.some((a) => same(a, o.ref));
@@ -30,7 +30,7 @@ export const NodeSetPickerDialog = createModal<{ title?: string; options: { ref:
             </label>
           );
         })}</div>)}
-        {!shown.length && <div className="p-3"><Empty title={options.length ? '没有匹配的节点集' : '还没有可加入的节点集'} /></div>}
+        {!shown.length && <div className="p-3"><Empty title={options.length ? '没有匹配的节点来源' : '还没有可添加的节点来源'} /></div>}
       </div>
       {hint && <span className="text-xs leading-relaxed text-muted-foreground">{hint}</span>}
     </div><ModalFooter>{<><span className="mr-auto text-xs text-muted-foreground">已选 {picked.length}</span><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!picked.length} onClick={() => { onAdd(picked); }}>添加</Button></>}</ModalFooter></ModalContent>

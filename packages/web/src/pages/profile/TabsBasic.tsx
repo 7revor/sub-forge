@@ -72,7 +72,7 @@ export function TabNodeSets() {
     const affected = draft.chains.filter(c => chainUsesNodeSet(c, ref));
     if (affected.length) {
       const chains = affected.map(c => `${c.via.kind === 'group' ? groupName(c.via.groupId) : c.via.kind === 'builtin' ? c.via.name : 'exact' in c.via.ref.match ? c.via.ref.match.exact : '筛选节点'} → ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? '筛选节点' : '全部节点')}`).join('\n');
-      const result = await Frame.modal.confirm({ title: `移出节点集「${nodeSetName(ref)}」？`, description: `以下 ${affected.length} 条代理链引用了此节点集，将一起移除。保存订阅后生效。\n\n${chains}`, confirmLabel: '移出并移除代理链', danger: true });
+      const result = await Frame.modal.confirm({ title: `移出节点来源「${nodeSetName(ref)}」？`, description: `以下 ${affected.length} 条代理链引用了此节点来源，将一起移除。保存订阅后生效。\n\n${chains}`, confirmLabel: '移出并移除代理链', danger: true });
       if (result.status !== 'confirmed') return;
     }
     setDraft(removeProfileNodeSet(draft, ref));

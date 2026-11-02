@@ -24,7 +24,7 @@ export function useNodeSetNames() {
 }
 
 
-export function NodeSetSelect({ value, onChange, options, label, placeholder = '选择节点集' }: {
+export function NodeSetSelect({ value, onChange, options, label, placeholder = '选择节点来源' }: {
   value: NodeSetID | undefined; onChange: (r: NodeSetID) => void; options: { ref: NodeSetID; name: string }[]; label: string; placeholder?: string;
 }) {
   return (
@@ -81,7 +81,7 @@ export function memberLabel(m: GroupMember, groupName: (id: string) => string, n
   switch (m.kind) {
     case 'builtin': return { kind: '内置', text: m.name };
     case 'group': return { kind: '组', text: groupName(m.groupId) };
-    case 'nodeset': return { kind: '节点集', text: nodeSetName(m.ref) };
+    case 'nodeset': return { kind: '节点来源', text: nodeSetName(m.ref) };
     case 'node': return { kind: '节点', text: targetLabel({ kind: 'node', ref: m.ref }, groupName, nodeSetName) };
     case 'all': return { kind: '全部', text: m.scope === 'all' ? '全部节点' : m.scope === 'proxies' ? '全部 Inline 节点' : '全部 Provider' };
   }

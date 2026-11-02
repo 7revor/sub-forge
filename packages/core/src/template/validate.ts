@@ -40,7 +40,7 @@ export function validateTemplate(t: Template, rules?: Pick<RuleSetInputs, 'rules
       if (!groupIds.has(m.groupId)) report.error('template.dangling-group', `引用的组 ${m.groupId} 不存在`, where);
       return;
     }
-    report.error('template.node-in-template', '模板组的成员只能是模板组或内置策略，不能包含节点或节点集', where);
+    report.error('template.node-in-template', '模板组的成员只能是模板组或内置策略，不能包含节点或节点来源', where);
   };
   const checkTarget = (target: Target, where: string) => {
     if (target.kind === 'node') report.error('template.node-in-template', '模板中的出口只能是模板组或内置策略', where);
