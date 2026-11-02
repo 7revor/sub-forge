@@ -1,3 +1,4 @@
+import { previewRuleset } from './helpers.ts';
 import { stringify as testYaml } from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
@@ -99,8 +100,6 @@ describe('Stash 主订阅与资源隔离', () => {
     const converted = await h.alice.post('/api/rules/convert', { inputs, overrides, client: 'stash', platform: 'ios' });
     expect(converted.status, converted.text).toBe(200);
     expect(converted.json.lines).toEqual(['USER-AGENT,PayPal*', 'URL-REGEX,^https://example.test/']);
-    const legacy = await h.alice.post('/api/rulesets/preview', { ruleset: { sources: inputs.map(i => ({ ...i.source, content: i.content })) }, client: 'stash', platform: 'ios' });
-    expect(legacy.json.lines).toEqual(['USER-AGENT,PayPal*']);
     const file = await h.alice.get(`/api/rules/convert?url=${encodeURIComponent(rulesUrl)}&target=stash&platform=ios`);
     expect(file.status).toBe(200); expect(file.text).toContain('USER-AGENT,PayPal*');
     expect((await h.alice.post('/api/rules/convert', { inputs, client: 'stash', platform: 'linux' })).status).toBe(200);

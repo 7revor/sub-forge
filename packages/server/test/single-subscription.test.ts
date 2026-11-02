@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { stringify as testYaml } from 'yaml';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -16,8 +17,8 @@ describe('每个用户一个资源令牌', () => {
     try {
       const a = await addUser(h.store, 'alice'), b = await addUser(h.store, 'bob');
       const alice = client(h.app), bob = client(h.app); await alice.login('alice'); await bob.login('bob');
-      const one = (await alice.post('/api/profiles', { name: '订阅一', nodeSets: [] })).json.item;
-      const two = (await alice.post('/api/profiles', { name: '订阅二', nodeSets: [] })).json.item;
+      const one = (await alice.post('/api/profiles', { routing: independentRouting(), name: '订阅一', nodeSets: [] })).json.item;
+      const two = (await alice.post('/api/profiles', { routing: independentRouting(), name: '订阅二', nodeSets: [] })).json.item;
       const first = (await alice.get(`/api/profiles/link?id=${one.id}`)).json.item;
       const second = (await alice.get(`/api/profiles/link?id=${two.id}`)).json.item;
       expect(first.token).toBe(second.token); expect(first.url).not.toBe(second.url);

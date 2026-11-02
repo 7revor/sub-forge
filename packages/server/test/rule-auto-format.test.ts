@@ -1,3 +1,4 @@
+import { previewRuleset } from './helpers.ts';
 import { ruleBodies } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
@@ -18,11 +19,11 @@ describe('自动格式贯通预览、保存与下载', () => {
     try {
       const user = await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
       const draft = { name: 'wildcard 去重', sources: [{ id: 's', kind: 'remote', url: 'https://example.test/wildcard' }] };
-      const preview = await c.post('/api/rulesets/preview', { ruleset: draft, client: 'mihomo' });
+      const preview = await previewRuleset(c, { ruleset: draft, client: 'mihomo' });
       expect(preview.status).toBe(200);
       expect(preview.json.delivery.mode).toBe('managed');
       expect(preview.json.lines.filter((line: string) => line && !line.startsWith('#'))).toEqual([rows[0], rows[2], rows[4]]);
-      const surge = await c.post('/api/rulesets/preview', { ruleset: draft, client: 'surge', platform: 'macos' });
+      const surge = await previewRuleset(c, { ruleset: draft, client: 'surge', platform: 'macos' });
       expect(surge.json.lines.filter((line: string) => line && !line.startsWith('#'))).toHaveLength(6);
       const saved = await c.post('/api/rulesets', draft);
       expect(saved.status).toBe(201);
@@ -46,7 +47,7 @@ describe('自动格式贯通预览、保存与下载', () => {
     try {
       const user = await addUser(h.store, 'alice'); const c = client(h.app); await c.login('alice');
       const draft = { name: '自动识别', sources: [{ id: 's', kind: 'remote', url: 'https://example.test/rules.txt' }] };
-      const pre = await c.post('/api/rulesets/preview', { ruleset: draft, source: 's' });
+      const pre = await previewRuleset(c, { ruleset: draft, source: 's' });
       expect(pre.status).toBe(200);
       expect(pre.json).toMatchObject({ delivery: { mode: 'managed', format: 'text', behavior: 'classical' }, sources: [{ format: 'yaml', behavior: 'classical', rules: 2 }], lines: ['DOMAIN,example.test', 'IP-CIDR,192.0.2.0/24,no-resolve'] });
       const saved = await c.post('/api/rulesets', draft);
@@ -60,7 +61,7 @@ describe('自动格式贯通预览、保存与下载', () => {
       // 增加本地来源后切换到一个 LIST；已有来源格式不需要手动改动。
       const merged = { ...saved.json.item, sources: [...saved.json.item.sources, { id: 'local', kind: 'local', content: 'DOMAIN,local.test' }] };
       expect((await c.put(`/api/rulesets/${id}`, merged)).status).toBe(200);
-      const mergedPre = await c.post('/api/rulesets/preview', { id, ruleset: merged });
+      const mergedPre = await previewRuleset(c, { id, ruleset: merged });
       expect(mergedPre.json.delivery.mode).toBe('managed');
       const config = parse(await (await h.app.request('/subs/profile?token=test&id=p')).text());
       const providers = Object.values(config['rule-providers']) as { url: string; behavior: string; format: string }[];
@@ -104,11 +105,11 @@ describe('自动格式贯通预览、保存与下载', () => {
         { id: 'bad', kind: 'local', content: 'payload: [' },
         { id: 'good', kind: 'local', content: 'DOMAIN,good.test' },
       ] };
-      const merged = await c.post('/api/rulesets/preview', { ruleset });
+      const merged = await previewRuleset(c, { ruleset });
       expect(merged.status).toBe(200);
       expect(merged.json.lines).toEqual([expect.stringContaining('# [输入格式有误'), 'DOMAIN,good.test']);
       expect(merged.json.sources[0]).toMatchObject({ ok: true, rejected: 1, rejectedDetails: [expect.objectContaining({ reason: expect.stringContaining('输入格式有误') })] });
-      const selected = await c.post('/api/rulesets/preview', { ruleset, source: 'bad' });
+      const selected = await previewRuleset(c, { ruleset, source: 'bad' });
       expect(selected.status).toBe(200);
       expect(selected.json).toMatchObject({ lines: [expect.stringContaining('# [输入格式有误')] });
     } finally { await h.snapshots.settled(); h.store.close(); }

@@ -1,7 +1,7 @@
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from 'react-router';
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router';
 import { ModalRoot } from './modals/index.tsx';
 import { FeedbackHost } from './components/FeedbackHost.tsx';
 import { alertError, notifySuccess } from './feedback.ts';
@@ -58,8 +58,7 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="rulesets" element={<RulesetList />} />
       <Route path="rulesets/:id" element={<RulesetEdit />} />
       <Route path="templates" element={<RequireAdmin><TemplateList /></RequireAdmin>} />
-      <Route path="templates/manage" element={<RequireAdmin><Navigate to="/templates" replace /></RequireAdmin>} />
-      <Route path="templates/:id/:tab?" element={<RequireAdmin><TemplateEdit /></RequireAdmin>} />
+      <Route path="templates/:id" element={<RequireAdmin><TemplateEdit /></RequireAdmin>} />
       <Route path="rule-repo" element={<RuleRepoPage />} />
       <Route path="rule-repo/new" element={<RequireAdmin><RuleRepoEditorPage /></RequireAdmin>} />
       <Route path="rule-repo/:id/edit" element={<RequireAdmin><RuleRepoEditorPage /></RequireAdmin>} />

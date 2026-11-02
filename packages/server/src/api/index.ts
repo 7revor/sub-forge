@@ -1,7 +1,6 @@
 import { accessLogRoutes } from './access-log.ts';
 import { ResourceAccessError } from '../resource-access.ts';
 import { resourceLinkRoutes } from './resource-links.ts';
-import { templateFileRoutes } from './template-file.ts';
 import { uniqueQuery } from '../query.ts';
 import { getCookie } from 'hono/cookie';
 import { ResourceService } from '../resources.ts';
@@ -69,8 +68,7 @@ export function createApi(deps: ApiDeps) {
   const repos = deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now,undefined,deps.snapshots);
   const resources=deps.resources ?? new ResourceService(deps.store,deps.snapshots,deps.renderer,deps.now);
   resources.setAdditionalResources(() => repos.cachedResources());
-  api.route('/', templateFileRoutes(deps.store, deps.snapshots));
-  api.route('/', ruleRepoRoutes(deps.store, repos, resources));
+  api.route('/', ruleRepoRoutes(deps.store, repos));
   api.route('/', ruleOptionRoutes(deps.store, repos));
 
   api.route('/', resourceRoutes(deps.store,resources,repos));

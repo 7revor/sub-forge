@@ -1,3 +1,4 @@
+import { previewRuleset } from './helpers.ts';
 import { stringify as testYaml } from 'yaml';
 import { stringifyIniBase as testIni } from '@sub-forge/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -87,8 +88,6 @@ describe('Loon 订阅与管理接口', () => {
     const rules = await h.alice.post('/api/rules/convert', { inputs, overrides, client: 'loon' });
     expect(rules.status, rules.text).toBe(200);
     expect(rules.json.lines).toEqual(['DEST-PORT,443', 'DOMAIN-SUFFIX,cn']);
-    const legacy = await h.alice.post('/api/rulesets/preview', { ruleset: { sources: inputs.map(i => ({ ...i.source, content: i.content })), overrides }, client: 'loon' });
-    expect(legacy.json.lines).toEqual(rules.json.lines);
     expect((await h.alice.post('/api/profiles', { ...h.draft, base: { kernels: {loon: [] } } })).status).toBe(400);
   });
   it('手写规则只能由所属订阅读取，移除或改写后撤销历史正文', async () => {

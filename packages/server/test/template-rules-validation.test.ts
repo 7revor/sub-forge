@@ -39,7 +39,7 @@ describe('模板自身的规则可用性检查', () => {
     const h = await setup();
     const validation = await h.admin.post('/api/templates/validate', h.template);
     expect(validation.json.report).toContainEqual(expect.objectContaining({ level: 'error', code: 'template.ruleset-unavailable', where: 'ruleset:r' }));
-    const publish = await h.admin.post('/api/templates/new/publish', { ...h.template, force: true });
+    const publish = await h.admin.post('/api/templates', { ...h.template, force: true });
     expect(publish.status).toBe(400);
     expect(h.calls.length).toBeGreaterThan(0);
     expect(h.store.listTemplates()).toEqual([]);
@@ -48,14 +48,14 @@ describe('模板自身的规则可用性检查', () => {
 
   it.each(['<html>错误页面</html>', 'UNKNOWN,value'])('远程返回不可解析内容 %s 时禁止发布', async body => {
     const h = await setup(); h.respond(body);
-    expect((await h.admin.post('/api/templates/new/publish', h.template)).status).toBe(400);
+    expect((await h.admin.post('/api/templates', h.template)).status).toBe(400);
     expect(h.store.listTemplates()).toEqual([]);
   });
 
   it('本地来源同样检查，输出具体规则集与来源', async () => {
     const h = await setup();
     h.store.put('ruleset', { id: 'r', name: '坏规则', sources: [{ id: 'ok', kind: 'local', format: 'classical', content: 'DOMAIN,a.test' }, { id: 'bad', name: '坏来源', kind: 'local', format: 'yaml', content: 'payload: [' }] });
-    const res = await h.admin.post('/api/templates/new/publish', h.template);
+    const res = await h.admin.post('/api/templates', h.template);
     expect(res.status).toBe(400);
     expect(res.json.details.report).toContainEqual(expect.objectContaining({ code: 'template.ruleset-invalid', where: 'ruleset:r', message: expect.stringContaining('来源「坏来源」') }));
     expect(h.calls).toEqual([]);
@@ -63,13 +63,13 @@ describe('模板自身的规则可用性检查', () => {
 
   it('有效规则可保存；自检失败时当前模板保持不变', async () => {
     const h = await setup(); h.respond('DOMAIN,valid.example.test');
-    const first = await h.admin.post('/api/templates/new/publish', h.template);
+    const first = await h.admin.post('/api/templates', h.template);
     expect(first.status).toBe(201);
     const id = first.json.item.id;
     h.store.put('ruleset', { id: 'r', name: '坏规则', sources: [{ id: 's1', kind: 'local', format: 'classical', content: 'UNKNOWN,invalid' }] });
     const impact = await h.admin.post(`/api/templates/${id}/impact`, h.template);
     expect(impact.json.report).toContainEqual(expect.objectContaining({ level: 'error' }));
-    expect((await h.admin.post(`/api/templates/${id}/publish`, { ...h.template, force: true })).status).toBe(400);
+    expect((await h.admin.put(`/api/templates/${id}`, { ...h.template, force: true })).status).toBe(400);
     expect(h.store.listTemplates().filter(t => t.id === id)).toEqual([first.json.item]);
   });
 
@@ -78,7 +78,7 @@ describe('模板自身的规则可用性检查', () => {
     await h.snapshots.refresh('ruleset', 'r', 'https://rules.example.test/list');
     h.respond(new Error('暂时不可用'));
     await h.snapshots.refresh('ruleset', 'r', 'https://rules.example.test/list');
-    const res = await h.admin.post('/api/templates/new/publish', h.template);
+    const res = await h.admin.post('/api/templates', h.template);
     expect(res.status).toBe(201);
     expect(res.json.report).toContainEqual(expect.objectContaining({ level: 'warn', code: 'template.ruleset-snapshot' }));
   });
@@ -89,7 +89,7 @@ describe('模板自身的规则可用性检查', () => {
       { id: 'off', kind: 'remote', format: 'classical', url: 'https://rules.example.test/list', enabled: false },
       { id: 'on', kind: 'local', format: 'classical', content: 'DOMAIN,a.test' },
     ] });
-    const res = await h.admin.post('/api/templates/new/publish', { ...h.template, rules: [
+    const res = await h.admin.post('/api/templates', { ...h.template, rules: [
       { ...h.template.rules[0], enabled: false },
       { ...h.template.rules[0], id: 'multi', matcher: { kind: 'ruleset', id: 'b' } },
     ] });
@@ -102,7 +102,7 @@ describe('模板自身的规则可用性检查', () => {
     h.respond('DOMAIN,not-binary.test');
     const rs = h.store.get('ruleset', 'r')!;
     h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, format: 'mrs', behavior: 'domain' }] });
-    const res = await h.admin.post('/api/templates/new/publish', h.template);
+    const res = await h.admin.post('/api/templates', h.template);
     expect(res.status).toBe(400);
     expect(res.text).toContain('MRS');
     expect(h.calls).toHaveLength(1);
@@ -112,7 +112,7 @@ describe('模板自身的规则可用性检查', () => {
     h.store.put('ruleset', { id: 'r', name: '旧二进制', overrides: [{ match: 'DOMAIN,unused.fixture.test', override: { when: { client: 'mihomo' as const }, action: { drop: true as const } } }], sources: [{ id: 's', kind: 'remote', format: 'mrs', behavior: 'ipcidr', url: 'https://example.test/ip.mrs' }] });
     const validation = await h.admin.post('/api/templates/validate', h.template);
     expect(validation.json.report).toContainEqual(expect.objectContaining({ level: 'error', code: 'template.ruleset-invalid', message: expect.stringContaining('无法合并或改写') }));
-    expect((await h.admin.post('/api/templates/new/publish', { ...h.template, force: true })).status).toBe(400);
+    expect((await h.admin.post('/api/templates', { ...h.template, force: true })).status).toBe(400);
   });
 
 });

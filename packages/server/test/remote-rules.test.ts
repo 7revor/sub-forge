@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { remoteRuleMatcher } from '@sub-forge/core';
@@ -12,13 +13,13 @@ describe('外部 URL 与系统 ID 分开引用', () => {
     const h = setupApp({ fetcher: async value => { calls.push(value); return { status: 200, body: 'payload:\n  - DOMAIN,example.test\n  - IP-CIDR,10.0.0.0/8\n  - IP-CIDR,192.0.2.0/24,no-resolve' }; } });
     try {
       const user = await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
-      const published = await c.post('/api/templates/new/publish', draft());
+      const published = await c.post('/api/templates', draft());
       expect(published.status, published.text).toBe(201);
-      const routing = mode === 'bound'
-        ? { routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} }, templateVersion: 1 }
-        : { template: { id: published.json.item.id, follow: 'latest' } };
-      const p = await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], overlay: {}, ...routing });
-      expect(p.status, p.text).toBe(201);
+      // 旧结构只经存储层迁移进入系统。
+      const p = mode === 'bound'
+        ? await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} } })
+        : { json: { item: { id: 'legacy-profile' } } };
+      if (mode === 'legacy') h.store.put('profile', { id: 'legacy-profile', name: '外部规则订阅', nodeSets: [], chains: [], template: { id: published.json.item.id, follow: 'latest' } }, user.id);
       const token = h.store.createToken(user.id).token;
       const main = await h.app.request(`/subs/profile?token=${token}&id=${p.json.item.id}`);
       expect(main.status).toBe(200);
@@ -47,7 +48,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       const other = h.store.userToken(otherUser.id)!.token;
       expect((await h.app.request(provider.url.replace(token, other))).status).toBe(404);
       expect((await h.app.request(`/api/rules/convert?token=${token}&url=${encodeURIComponent(url)}`)).status).toBe(401);
-      const changed = await c.post(`/api/templates/${published.json.item.id}/publish`, draft(remoteRuleMatcher('https://example.test/new.list')));
+      const changed = await c.put(`/api/templates/${published.json.item.id}`, draft(remoteRuleMatcher('https://example.test/new.list')));
       expect(changed.status, changed.text).toBe(200);
       expect((await h.app.request(provider.url)).status).toBe(404);
       expect(h.store.list('ruleset')).toEqual([]);
@@ -67,7 +68,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
         const rule = { ...draft().rules[0], matcher };
         return c.post('/api/profiles', { name: '私有规则引用', nodeSets: [], ...(mode === 'independent'
           ? { overlay: {}, routing: { mode, config: { groups: [], rules: [rule], final: draft().final } } }
-          : { overlay: { extraRules: [{ anchor: 'top', rule }] } }) });
+          : { routing: independentRouting([rule]) }) });
       };
       const external = await create(remoteRuleMatcher(url)); expect(external.status).toBe(201);
       const internal = await create({ kind: 'ruleset', id: 'system' }); expect(internal.status).toBe(201);
@@ -90,7 +91,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
     const h = setupApp({ fetcher: async () => ({ status: 200, body: 'DOMAIN,example.test' }) });
     try {
       const user = await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
-      const published = await c.post('/api/templates/new/publish', draft());
+      const published = await c.post('/api/templates', draft());
       const profile = await c.post('/api/profiles', { name: '转为独立配置', nodeSets: [], overlay: {}, routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} }, templateVersion: 1 });
       expect(profile.status, profile.text).toBe(201);
       const converted = await c.post('/api/profiles/routing/convert', { profile: profile.json.item, mode: 'independent', currentTemplateVersion: 1 });
@@ -98,7 +99,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(converted.json.item.routing.config.rules[0].matcher).toEqual(remoteRuleMatcher(url));
       const saved = await c.put(`/api/profiles/${profile.json.item.id}`, converted.json.item);
       expect(saved.status, saved.text).toBe(200);
-      expect((await c.post(`/api/templates/${published.json.item.id}/publish`, draft(remoteRuleMatcher('https://example.test/changed.list')))).status).toBe(200);
+      expect((await c.put(`/api/templates/${published.json.item.id}`, draft(remoteRuleMatcher('https://example.test/changed.list')))).status).toBe(200);
       const token = h.store.createToken(user.id).token;
       const config = parse(await (await h.app.request(`/subs/profile?token=${token}&id=${profile.json.item.id}`)).text());
       const provider = Object.values(config['rule-providers'])[0] as { url: string };

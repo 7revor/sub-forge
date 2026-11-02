@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { addUser, client, serve, setupApp } from './helpers.ts';
@@ -15,7 +16,7 @@ const TEMPLATE = (rulesetId: string) => ({
 async function scenario() {
   const env = setupApp({ fetcher: serve({ 'https://air.example.com/sub': 'trojan://pw@hk.example.com:443#HK-01\ntrojan://pw@jp.example.com:443#JP-01' }) });
   await addUser(env.store, 'root', 'admin');
-  await addUser(env.store, 'alice');
+  const aliceId = (await addUser(env.store, 'alice')).id;
   await addUser(env.store, 'bob');
   const admin = client(env.app);
   const alice = client(env.app);
@@ -23,19 +24,23 @@ async function scenario() {
   await admin.login('root');
   await alice.login('alice');
   await bob.login('bob');
-  const rs = (await admin.post('/api/rulesets', { name: 'AI', kind: 'local', format: 'auto', content: '.openai.com\n' })).json.item.id as string;
-  const published = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), changelog: '初版' });
+  const rs = (await admin.post('/api/rulesets', { name: 'AI', sources: [{ id: 's', kind: 'local', format: 'auto', content: '.openai.com\n' }] })).json.item.id as string;
+  const published = await admin.post('/api/templates', { ...TEMPLATE(rs), changelog: '初版' });
   const tplId = published.json.item.id as string;
   const src = (await alice.post('/api/sources', { name: '机场', url: 'https://air.example.com/sub', pipeline: [] })).json.item.id as string;
-  const profile = (await alice.post('/api/profiles', {
+  // 历史覆盖配置只经存储层迁移进入系统。
+  const profile = 'legacy-overlay';
+  env.store.put('profile', {
+    id: profile,
     name: '我的订阅',
+    chains: [],
     template: { id: tplId, follow: 'latest' },
     nodeSets: [{ ref: { type: 'source', id: src }, output: 'provider' }],
     overlay: {
       groupPatches: { hk: { addMembers: [{ kind: 'nodeset', ref: { type: 'source', id: src } }], set: { filter: 'HK' } } },
       extraGroups: [{ group: { id: 'mine', name: '我的组', type: 'select', members: [{ kind: 'group', groupId: 'hk' }] } }],
     },
-  })).json.item.id as string;
+  }, aliceId);
   return { ...env, admin, alice, bob, rs, tplId, src, profile, published };
 }
 
@@ -47,14 +52,14 @@ describe('模板', () => {
         { name: 'google', url: 'https://example.test/unused-google.list' },
         { name: 'lan', url: 'https://example.test/unused-lan.list' },
       ];
-      const saved = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders });
+      const saved = await admin.post('/api/templates', { ...TEMPLATE(rs), ruleProviders });
       expect(saved.status).toBe(201);
       const id = saved.json.item.id;
       expect(saved.json.item.ruleProviders).toEqual(ruleProviders);
       expect((await admin.get(`/api/templates?id=${id}`)).json.item.ruleProviders).toEqual(ruleProviders);
       expect((await admin.get(`/api/templates/${id}/versions/1`)).status).toBe(404);
       for (const invalid of [[{ name: 'file', url: 'file:///tmp/rules' }], [ruleProviders[0], ruleProviders[0]], {}]) {
-        const result = await admin.post('/api/templates/new/publish', { ...TEMPLATE(rs), ruleProviders: invalid });
+        const result = await admin.post('/api/templates', { ...TEMPLATE(rs), ruleProviders: invalid });
         expect(result.status).toBe(400);
         expect(result.json.details.report[0].code).toBe('template.invalid-provider');
       }
@@ -66,13 +71,13 @@ describe('模板', () => {
     expect(published.status).toBe(201);
     expect(published.json.item).not.toHaveProperty('version');
     expect((await alice.get('/api/templates')).json.items.map((t: { id: string }) => t.id)).toEqual([tplId]);
-    expect((await alice.post(`/api/templates/${tplId}/publish`, TEMPLATE(rs))).status).toBe(403);
+    expect((await alice.put(`/api/templates/${tplId}`, TEMPLATE(rs))).status).toBe(403);
   });
 
   it('自身校验不通过时禁止发布；编辑器可即时校验', async () => {
     const { admin, tplId, rs } = await scenario();
     const bad = { ...TEMPLATE(rs), rules: [{ id: 'x', matcher: { kind: 'ruleset', id: 'nope' }, target: { kind: 'group', groupId: 'gone' } }] };
-    const res = await admin.post(`/api/templates/${tplId}/publish`, bad);
+    const res = await admin.put(`/api/templates/${tplId}`, bad);
     expect(res.status).toBe(400);
     expect(res.json.details.report.map((i: { code: string }) => i.code).sort()).toEqual(['template.dangling-group', 'template.dangling-ruleset']);
     expect((await admin.post('/api/templates/validate', bad)).json.report).toHaveLength(2);
@@ -83,7 +88,7 @@ describe('模板', () => {
     expect((await alice.get(`/api/profiles?id=${profile}`)).json.item.routing.mode).toBe('independent');
     const withoutHk = { ...TEMPLATE(rs), groups: [{ id: 'sel', name: '🚀 节点选择', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], changelog: '删除香港组' };
     expect((await admin.post(`/api/templates/${tplId}/impact`, withoutHk)).json.impact).toEqual([]);
-    expect((await admin.post(`/api/templates/${tplId}/publish`, withoutHk)).status).toBe(200);
+    expect((await admin.put(`/api/templates/${tplId}`, withoutHk)).status).toBe(200);
     expect((await alice.post(`/api/profiles/${profile}/preview`)).json.ok).toBe(true);
     expect((await admin.get(`/api/templates?id=${tplId}`)).json.item.groups).toEqual(withoutHk.groups);
   });
@@ -108,7 +113,7 @@ describe('订阅链接与预览', () => {
     expect(cfg['proxy-groups'].map((g: { name: string }) => g.name)).toEqual(['🚀 节点选择', '🇭🇰 香港', '我的组']);
     expect(res.json.report).toEqual([]);
 
-    const draft = { name: '我的订阅', template: { id: tplId, follow: 'latest' }, nodeSets: [{ ref: { type: 'source', id: src }, output: 'inline' }], overlay: {} };
+    const draft = { name: '我的订阅', routing: { mode: 'bound', templateId: tplId, groupAdditions: {} }, nodeSets: [{ ref: { type: 'source', id: src }, output: 'inline' }], overlay: {} };
     const d = await alice.post(`/api/profiles/${profile}/preview`, { profile: draft });
     expect((parse(d.json.yaml) as Record<string, any>).proxies.map((p: { name: string }) => p.name)).toEqual(['HK-01', 'JP-01']);
     expect(d.json.report.map((i: { code: string }) => i.code)).toEqual(['group.empty']);
@@ -118,18 +123,18 @@ describe('订阅链接与预览', () => {
     const { bob, profile, src } = await scenario();
     expect((await bob.get(`/api/profiles/${profile}/tokens`)).status).toBe(404);
     expect((await bob.post(`/api/profiles/${profile}/preview`, {})).status).toBe(404);
-    const mine = (await bob.post('/api/profiles', { name: 'B', nodeSets: [] })).json.item.id;
-    const steal = await bob.post(`/api/profiles/${mine}/preview`, { profile: { name: 'B', nodeSets: [{ ref: { type: 'source', id: src }, output: 'inline' }] } });
+    const mine = (await bob.post('/api/profiles', { routing: independentRouting(), name: 'B', nodeSets: [] })).json.item.id;
+    const steal = await bob.post(`/api/profiles/${mine}/preview`, { profile: { name: 'B', routing: independentRouting(), nodeSets: [{ ref: { type: 'source', id: src }, output: 'inline' }] } });
     expect(steal.status).toBe(400);
   });
 
   it('配置订阅可引用任意公共规则增强', async () => {
     const { alice, bob, rs } = await scenario();
-    const own = (await alice.post('/api/rulesets', { name: '我的', kind: 'local', format: 'auto', content: 'DOMAIN,a.com' })).json.item.id;
+    const own = (await alice.post('/api/rulesets', { name: '我的', sources: [{ id: 's', kind: 'local', format: 'auto', content: 'DOMAIN,a.com' }] })).json.item.id;
     const rule = (id: string) => ({ anchor: 'top', rule: { id: 'p1', matcher: { kind: 'ruleset', id }, target: { kind: 'builtin', name: 'DIRECT' } } });
-    expect((await alice.post('/api/profiles', { name: 'A', nodeSets: [], overlay: { extraRules: [rule(own)] } })).status).toBe(201);
-    expect((await alice.post('/api/profiles', { name: 'A', nodeSets: [], overlay: { extraRules: [rule(rs)] } })).status).toBe(201);
-    expect((await bob.post('/api/profiles', { name: 'B', nodeSets: [], overlay: { extraRules: [rule(own)] } })).status).toBe(201);
+    expect((await alice.post('/api/profiles', { name: 'A', nodeSets: [], routing: independentRouting([rule(own).rule]) })).status).toBe(201);
+    expect((await alice.post('/api/profiles', { name: 'A', nodeSets: [], routing: independentRouting([rule(rs).rule]) })).status).toBe(201);
+    expect((await bob.post('/api/profiles', { name: 'B', nodeSets: [], routing: independentRouting([rule(own).rule]) })).status).toBe(201);
   });
 
   it('访问日志只返回自己 Profile 的', async () => {

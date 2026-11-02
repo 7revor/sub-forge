@@ -1,6 +1,6 @@
 import type { SnapshotService } from '../snapshots.ts';
 // 索引按仓库原子替换；网络故障不清空旧索引。进程退出前等待任务结束。
-import { matchesNameSearch, nameLikePattern, normalizeNameSearch, parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
+import { parseRuleSourceContent, ruleKey, type RuleSetSource } from '@sub-forge/core';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { GitRepoCache, type RepoCache } from './git-cache.ts';
@@ -93,10 +93,10 @@ export class RuleRepoService {
       if (changed) this.store.put('ruleset', doc, this.store.getWithOwner('ruleset', doc.id)!.owner);
     }
   }
-  async linkedSources(repo: string, path: string, variantId?: string) {
+  async linkedSources(repo: string, path: string) {
     const version = this.snapshotVersion(repo);
     const entry = await this.resolvedEntry(repo, path);
-    const variant = this.importVariant(entry, variantId);
+    const variant = this.importVariant(entry);
     if (!entry.variants.some(v => v.readme)) {
       const detail = await this.detail(repo, path);
       if (detail.previewError) throw new HttpError(400, `规则文件尚不可导入：${detail.previewError}`);
@@ -276,41 +276,6 @@ export class RuleRepoService {
     if (!this.rows().find(r => r.id === id)?.enabled) throw notFound('已启用的规则仓库');
     return repo;
   }
-  search(q: string, repo: string | undefined, client: string | undefined, offset: number, limit: number) {
-    if (repo) this.assertEnabled(repo);
-    const query = normalizeNameSearch(q);
-    const rows = this.store.db.prepare(`SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo
-      WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?) AND (search_fold(json_extract(e.data, '$.name')) LIKE ? ESCAPE '\\' OR search_fold(json_extract(e.data, '$.path')) LIKE ? ESCAPE '\\')
-      ORDER BY CASE WHEN search_fold(json_extract(e.data, '$.name')) = ? THEN 0 WHEN instr(search_fold(json_extract(e.data, '$.name')), ?) = 1 THEN 1 ELSE 2 END, e.search_name, e.repo, e.key`)
-      .all(repo ?? null, repo ?? null, nameLikePattern(q), nameLikePattern(q), query, query) as { data: string }[];
-    const entries = rows.map(r => JSON.parse(r.data) as IndexedEntry).filter(e => !client || e.variants.some(v => (v.client === client || v.client === 'any')));
-    return { items: entries.slice(offset, offset + limit).map(({ variants, ...e }) => ({ ...e, clients: [...new Set(variants.map(v => v.client))] })), total: entries.length, offset, limit };
-  }
-  /** 文件视图独立于历史分组键，每个路径和分支均可直接选择。 */
-  searchFiles(q: string, repo: string | undefined, client: string | undefined, offset: number, limit: number) {
-    if (repo) this.assertEnabled(repo);
-    const query = normalizeNameSearch(q);
-    const rows = this.store.db.prepare(`SELECT e.data FROM rule_repo_entries e JOIN rule_repos r ON r.id = e.repo
-      WHERE r.enabled = 1 AND (? IS NULL OR e.repo = ?)`).all(repo ?? null, repo ?? null) as { data: string }[];
-    const files = new Map<string, { repo: string; path: string; name: string; filePath: string; ref: string; url: string }>();
-    const definitions = new Map<string, RepoDefinition>();
-    for (const row of rows) {
-      const entry = JSON.parse(row.data) as IndexedEntry;
-      const definition = definitions.get(entry.repo) ?? this.definition(entry.repo, true);
-      definitions.set(entry.repo, definition);
-      for (const variant of entry.variants) {
-        if (client && variant.client !== client && variant.client !== 'any') continue;
-        for (const file of variant.files) {
-          if (!isIndexedRuleFile(file.path) || !matchesNameSearch(file.path, query)) continue;
-          const key = JSON.stringify([entry.repo, entry.path, file.ref, file.path]);
-          if (!files.has(key)) files.set(key, { repo: entry.repo, path: entry.path, name: file.path.split('/').at(-1)!, filePath: file.path, ref: file.ref, url: rawUrl(definition, file) });
-        }
-      }
-    }
-    const rank = (name: string) => normalizeNameSearch(name.replace(/\.[^.]+$/, '')) === query ? 0 : normalizeNameSearch(name).startsWith(query) ? 1 : 2;
-    const items = [...files.values()].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.repo.localeCompare(b.repo) || a.filePath.localeCompare(b.filePath) || a.ref.localeCompare(b.ref));
-    return { items: items.slice(offset, offset + limit), total: items.length, offset, limit };
-  }
   private entry(repo: string, path: string): IndexedEntry {
     this.assertEnabled(repo);
     const row = this.store.db.prepare('SELECT data FROM rule_repo_entries WHERE repo = ? AND key = ?').get(repo, path) as { data: string } | undefined;
@@ -469,9 +434,9 @@ export class RuleRepoService {
     void job.then(finished, finished);
     return job;
   }
-  importVariant(entry: IndexedEntry, variantId?: string) {
+  importVariant(entry: IndexedEntry) {
     const text = entry.variants.filter(v => v.files.length && v.files.every(f => isIndexedRuleFile(f.path) && !['yaml', 'mrs', 'srs'].includes(f.format)));
-    const variant = variantId ? text.find(v => v.id === variantId) : text.find(v => v.client === 'mihomo' && v.recommended) ?? text.find(v => v.recommended) ?? text[0];
+    const variant = text.find(v => v.client === 'mihomo' && v.recommended) ?? text.find(v => v.recommended) ?? text[0];
     if (!variant) throw bad('请选择 .list 或 .txt 文本变体');
     return variant;
   }

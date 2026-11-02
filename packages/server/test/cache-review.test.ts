@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { ruleBinding } from '../src/rule-binding.ts';
 import { ruleBodies } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
@@ -10,12 +11,13 @@ afterEach(async () => { for (const h of active.splice(0)) { await h.snapshots.se
 function setup(options: Parameters<typeof setupApp>[0] = {}) { const h = setupApp(options); active.push(h); return h; }
 function gate() { let release!: () => void; const promise = new Promise<void>(r => { release = r; }); return { promise, release }; }
 const profile = (id = 'p') => ({ id, name: '订阅', nodeSets: [], chains: [], refPolicy: { default: 'wrap' as const }, overlay: { extraRules: [{ anchor: 'top' as const, rule: { id: 'r', matcher: remoteRuleMatcher('https://rules.test/a'), target: { kind: 'builtin' as const, name: 'DIRECT' as const } } }] } });
+const draftProfile = () => ({ id: 'p', name: '订阅', nodeSets: [], chains: [], routing: independentRouting([profile().overlay.extraRules[0]!.rule]) });
 it('未保存的私有远程规则草稿不跨用户共享，预览完成即清理缓存', async () => {
   let calls = 0; const h = setup({ fetcher: async () => ({ status: 200, body: `DOMAIN,user${++calls}.test` }) });
   await addUser(h.store, 'a'); await addUser(h.store, 'b'); const a = client(h.app), b = client(h.app); await a.login('a'); await b.login('b');
-  expect((await a.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true);
-  expect((await b.post('/api/profiles/preview', { profile: profile() })).json.ok).toBe(true); expect(calls).toBe(2);
-  await a.post('/api/profiles/preview', { profile: profile() }); expect(calls).toBe(3);
+  expect((await a.post('/api/profiles/preview', { profile: draftProfile() })).json.ok).toBe(true);
+  expect((await b.post('/api/profiles/preview', { profile: draftProfile() })).json.ok).toBe(true); expect(calls).toBe(2);
+  await a.post('/api/profiles/preview', { profile: draftProfile() }); expect(calls).toBe(3);
 });
 it('隐式 MRS 格式采用相同拉取参数，文本不能伪装成 MRS', async () => {
   const { readFile } = await import('node:fs/promises'); const { createUpstreamFetcher } = await import('../src/net/upstream.ts'); const { parseAllowList } = await import('../src/net/ssrf.ts');

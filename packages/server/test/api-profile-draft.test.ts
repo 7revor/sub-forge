@@ -1,8 +1,9 @@
+import { independentRouting } from './helpers.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
 import { addUser, client, setupApp } from './helpers.ts';
 
-const draft = { name: '草稿', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' } };
+const draft = { name: '草稿', nodeSets: [], routing: independentRouting(), chains: [] };
 
 async function scenario() {
   const env = setupApp();

@@ -61,7 +61,6 @@ export function docRoutes(store: Store) {
       const current = load(id, user.id);
       if (kind === 'ruleset' && current.owner !== user.id && user.role !== 'admin') throw new HttpError(403, '只有创建者或管理员可以修改公共规则增强');
       if (body.id !== undefined && body.id !== id) throw new HttpError(400, 'id 与路径不一致');
-      if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.routing === undefined) throw new HttpError(400, '不能移除分流模式，请使用模式转换');
       let doc = validateDoc(kind, body, id, user, store);
       if (kind === 'profile') doc = { ...doc, migration: (current.doc as ProfileDoc).migration };
       store.put(kind, doc, kind === 'ruleset' ? current.owner : user.id);

@@ -12,7 +12,7 @@ env.setFileBody('root.list', '# 根目录文件\nDOMAIN,root.example.test\n');
 await env.repos.refresh('blackmatrix7');
 const custom = await env.repos.addCustom({ url: 'https://github.com/example/catalog-fixture', name: '根目录示例', ref: 'master' });
 await env.repos.refresh(custom);
-const published = await env.admin.post('/api/templates/new/publish', { name: '平铺模板', groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } });
+const published = await env.admin.post('/api/templates', { name: '平铺模板', groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } });
 if (published.status !== 201) throw new Error(published.text);
 const profile = await env.admin.post('/api/profiles', { name: '平铺订阅', nodeSets: [], overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
 if (profile.status !== 201) throw new Error(profile.text);

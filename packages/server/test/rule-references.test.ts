@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { ruleBodies } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { remoteRuleMatcher, type Matcher } from '@sub-forge/core';
@@ -23,7 +24,7 @@ describe('模板统一规则引用', () => {
     expect(new Set(all.map(x => x.value)).size).toBe(38);
     expect(all.some(x => x.label.includes('私有'))).toBe(true);
     expect((await h.admin.post('/api/rule-options/resolve', { source: 'local', id: 'private-google' })).status).toBe(200);
-    expect((await h.admin.post('/api/templates/new/publish', template({ kind: 'ruleset', id: 'private-google' }))).status).toBe(201);
+    expect((await h.admin.post('/api/templates', template({ kind: 'ruleset', id: 'private-google' }))).status).toBe(201);
     expect((await client(h.app).get('/api/rule-options/search')).status).toBe(401);
     expect((await h.admin.get('/api/rule-options/search?offset=-1')).status).toBe(400);
   });
@@ -43,7 +44,7 @@ describe('模板统一规则引用', () => {
     expect(await h.resolve()).toEqual(matcher);
     expect(h.store.list('ruleset')).toHaveLength(2);
     const draft = template(matcher);
-    const published = await h.admin.post('/api/templates/new/publish', { ...draft, rules: draft.rules.map(r => ({ ...r, options: { src: true } })) });
+    const published = await h.admin.post('/api/templates', { ...draft, rules: draft.rules.map(r => ({ ...r, options: { src: true } })) });
     expect(published.status).toBe(201);
     h.store.put('profile', { id: 'p', name: '引用配置', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, template: { id: published.json.item.id, follow: 'latest' } }, h.user.id);
     const rendered = await h.renderer.render('p', { client: 'mihomo' });
@@ -59,11 +60,11 @@ describe('模板统一规则引用', () => {
 
   it('停用或移除仓库资源后保留编辑定义，但发布、渲染与新选择均拒绝失效引用', async () => {
     const h = await setup(); const matcher = await h.resolve();
-    const first = await h.admin.post('/api/templates/new/publish', template(matcher));
+    const first = await h.admin.post('/api/templates', template(matcher));
     h.repos.setEnabled('blackmatrix7', false);
     h.store.db.prepare('DELETE FROM rule_repo_entries WHERE repo = ?').run('blackmatrix7');
     expect((await h.admin.post('/api/templates/validate', { ...template(matcher), id: first.json.item.id })).json.report).toContainEqual(expect.objectContaining({ level: 'error', code: 'template.dangling-ruleset' }));
-    expect((await h.admin.post(`/api/templates/${first.json.item.id}/publish`, template(matcher))).status).toBe(400);
+    expect((await h.admin.put(`/api/templates/${first.json.item.id}`, template(matcher))).status).toBe(400);
     expect((await h.admin.post('/api/rule-options/resolve', { source: 'repository', repo: 'blackmatrix7', entry: 'Google' })).status).toBe(404);
     const preview = await h.renderer.previewDraft({ id: '', name: '草稿', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, template: { id: first.json.item.id, follow: 'latest' } }, { client: 'mihomo' });
     expect(preview.ok).toBe(false);
@@ -77,7 +78,7 @@ describe('模板统一规则引用', () => {
       if (change === 'format') forged.repository.sources[0].format = 'classical';
       if (change === 'extra') forged.repository.sources[0].repository.unknown = '无效';
       const input = change === 'identity' ? { ...forged, id: 'local-google' } : repositoryMatcher(forged.repository);
-      const res = await h.admin.post('/api/templates/new/publish', template(input));
+      const res = await h.admin.post('/api/templates', template(input));
       expect(res.status).toBe(400);
       expect(res.json.details.report).toContainEqual(expect.objectContaining({ where: 'rule:r', code: 'template.ruleset-reference' }));
     }
@@ -86,21 +87,21 @@ describe('模板统一规则引用', () => {
 
   it('上游不可解析时禁止发布并定位，禁用规则不触发上游请求', async () => {
     const h = await setup(); const matcher = await h.resolve(); h.setBody('<html>错误页面</html>');
-    const invalid = await h.admin.post('/api/templates/new/publish', template(matcher));
+    const invalid = await h.admin.post('/api/templates', template(matcher));
     expect(invalid.status).toBe(400);
     expect(invalid.json.details.report).toContainEqual(expect.objectContaining({ where: 'rule:r', code: 'template.ruleset-unavailable' }));
     h.calls.length = 0;
     const disabled = template(matcher);
-    const result = await h.admin.post('/api/templates/new/publish', { ...disabled, rules: disabled.rules.map(r => ({ ...r, enabled: false })) });
+    const result = await h.admin.post('/api/templates', { ...disabled, rules: disabled.rules.map(r => ({ ...r, enabled: false })) });
     expect(result.status).toBe(201);
     expect(h.calls).toEqual([]);
   });
 
   it('旧本地引用继续发布，内容定制留在本地规则集；私有规则也能引用仓库', async () => {
     const h = await setup();
-    expect((await h.admin.post('/api/templates/new/publish', template({ kind: 'ruleset', id: 'local-google' }))).status).toBe(201);
+    expect((await h.admin.post('/api/templates', template({ kind: 'ruleset', id: 'local-google' }))).status).toBe(201);
     const matcher = await h.resolve();
-    const profile = await h.admin.post('/api/profiles', { name: '私有引用', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: template(matcher).rules[0] }] } });
+    const profile = await h.admin.post('/api/profiles', { name: '私有引用', nodeSets: [], routing: independentRouting([template(matcher).rules[0]]) });
     expect(profile.status).toBe(201);
     const preview = await h.renderer.preview(profile.json.item.id, { client: 'mihomo' });
     expect(preview.ok).toBe(true);
@@ -112,7 +113,7 @@ describe('关联模板的自定义规则引用', () => {
   it('前后规则支持远程、仓库和增强集合，保存、实际订阅及转换保持顺序', async () => {
     const h = await setup();
     const repository = await h.resolve();
-    const published = await h.admin.post('/api/templates/new/publish', template({ kind: 'local', content: 'DOMAIN,template.example.test' }));
+    const published = await h.admin.post('/api/templates', template({ kind: 'local', content: 'DOMAIN,template.example.test' }));
     expect(published.status).toBe(201);
     const entry = (id: string, matcher: Matcher) => ({ id, matcher, target: { kind: 'builtin', name: 'DIRECT' } });
     const routing = { mode: 'bound', templateId: published.json.item.id, groupAdditions: {},
@@ -151,7 +152,7 @@ describe('关联模板的自定义规则引用', () => {
   it('前后引用均校验来源身份，不允许伪造远程或仓库映射', async () => {
     const h = await setup();
     const repository = await h.resolve();
-    const published = await h.admin.post('/api/templates/new/publish', { name: '空模板', groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } });
+    const published = await h.admin.post('/api/templates', { name: '空模板', groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } });
     const forged = structuredClone(repository);
     forged.repository.sources[0].url = 'https://forged.example.test/list';
     for (const key of ['prependRules', 'appendRules']) for (const matcher of [

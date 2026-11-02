@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildCatalog } from '../src/rule-repos/catalog.ts';
 import { buildEntries, BUILTIN_REPOS } from '../src/rule-repos/adapters.ts';
@@ -80,7 +81,6 @@ describe('物理文件平铺搜索与分页', () => {
     const h = await setup();
     h.setPaths(['Clash', 'Surge'].flatMap(directory => Array.from({ length: 35 }, (_, i) => `rule/${directory}/China/file-${String(i).padStart(2, '0')}.list`)));
     await h.repos.refresh('blackmatrix7');
-    const full = vi.spyOn(h.repos, 'searchFiles').mockImplementation(() => { throw new Error('不得读取全量文件'); });
     const items = [];
     for (const offset of [0, 30, 60]) {
       const page = (await h.admin.get(`/api/rule-options/search?scope=repository&offset=${offset}`)).json;
@@ -95,9 +95,7 @@ describe('物理文件平铺搜索与分页', () => {
     expect(searched.items.map((item: { value: string }) => JSON.parse(item.value).file.path)).toEqual(['rule/Clash/China/file-34.list', 'rule/Surge/China/file-34.list']);
     expect(searched.items[0]).toMatchObject({ label: 'file-34.list', hint: 'blackmatrix7/ios_rule_script · rule/Clash/China/' });
     expect((await h.admin.get('/api/rule-options/search?offset=999')).json).toMatchObject({ items: [], total: 72 });
-    expect(full).not.toHaveBeenCalled();
     expect(h.reads).toEqual([]);
-    full.mockRestore();
     h.repos.setEnabled('blackmatrix7', false);
     expect((await h.admin.get('/api/rule-options/search?scope=repository')).json.items).toEqual([]);
   });
@@ -227,7 +225,7 @@ describe('物理文件平铺搜索与分页', () => {
     expect(page.items).toHaveLength(3);
     expect(new Set(page.items.map((item: { value: string }) => item.value)).size).toBe(3);
     expect(page.items.find((item: { label: string }) => item.label === 'unlinked.txt').disabled).toBe(true);
-    expect((await h.admin.get('/api/rule-repos/file-preview?repo=blackmatrix7&ref=master&path=rule/unlinked.txt')).status).toBe(200);
+    await expect(h.repos.filePreview('blackmatrix7', 'master', 'rule/unlinked.txt')).resolves.toBeDefined();
   });
 
   it('旧缓存缺失仍在数据库分页，补建失败保留已有索引', async () => {
@@ -267,9 +265,9 @@ describe('物理文件平铺搜索与分页', () => {
     expect((await resolve('rule/Clash/China/fake.list')).status).toBe(400);
     expect((await h.admin.post('/api/rule-options/resolve', { source: 'repository', repo: 'blackmatrix7', entry: 'China', file: null })).status).toBe(400);
     const rules = [{ id: 'r', matcher, target: { kind: 'builtin', name: 'REJECT' } }];
-    const published = await h.admin.post('/api/templates/new/publish', { name: '列表文件模板', groups: [], rules, final: { kind: 'builtin', name: 'DIRECT' } });
+    const published = await h.admin.post('/api/templates', { name: '列表文件模板', groups: [], rules, final: { kind: 'builtin', name: 'DIRECT' } });
     expect(published.status).toBe(201);
-    const saved = await h.admin.post('/api/profiles', { name: '列表文件订阅', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: rules[0] }] } });
+    const saved = await h.admin.post('/api/profiles', { name: '列表文件订阅', nodeSets: [], routing: independentRouting([rules[0]]) });
     expect(saved.status).toBe(201);
     expect((await h.renderer.preview(saved.json.item.id, { client: 'mihomo' })).ok).toBe(true);
     expect(h.store.list('ruleset')).toHaveLength(2);

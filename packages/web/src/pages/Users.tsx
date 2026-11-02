@@ -97,7 +97,7 @@ const CreateUserModal = createModal<Record<string, never>>(function CreateUser({
         </div>
         {form.role !== 'admin' && <label className="flex items-center gap-2 text-sm"><Switch label="允许编写脚本处理器" checked={form.scriptAllowed} onChange={scriptAllowed => setForm({ ...form, scriptAllowed })} />允许编写脚本处理器</label>}
 
-      </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={modal.pending} onClick={() => modal.submit(async () => { const { user } = await api<{ user: User }>('POST', '/users', form); if (form.scriptAllowed && form.role !== 'admin') await api('PATCH', `/users/${user.id}`, { scriptAllowed: true }); })}>{modal.pending ? '创建中…' : '创建'}</Button></>}</ModalFooter></ModalContent>;
+      </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={modal.pending} onClick={() => modal.submit(async () => { await api('POST', '/users', { ...form, scriptAllowed: form.role !== 'admin' && form.scriptAllowed }); })}>{modal.pending ? '创建中…' : '创建'}</Button></>}</ModalFooter></ModalContent>;
 });
 
 const ShareModal = createModal<{ sources: { id: string; name: string }[]; collections: { id: string; name: string }[]; users: User[] }>(function ShareForm({ data: { sources, collections, users }, modal }) {

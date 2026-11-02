@@ -13,7 +13,7 @@ async function setup() {
   await addUser(env.store, 'admin', 'admin'); await addUser(env.store, 'alice'); await addUser(env.store, 'bob');
   const admin = client(env.app), alice = client(env.app), bob = client(env.app);
   await admin.login('admin'); await alice.login('alice'); await bob.login('bob');
-  const t = (await admin.post('/api/templates/new/publish', template)).json.item;
+  const t = (await admin.post('/api/templates', template)).json.item;
   const source = (await alice.post('/api/sources', { name: '远端 provider', url: 'https://nodes.example.test/sub', pipeline: [] })).json.item;
   const draft = { name: '绑定订阅', nodeSets: [{ ref: { type: 'source', id: source.id }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, templateVersion: 1,
     routing: { mode: 'bound', templateId: t.id, groupAdditions: {}, prependRules: [rule(), rule('pre-node', { kind: 'node', ref: { nodeSet: { type: 'source', id: source.id }, match: { exact: '远端节点' }, fallback: { kind: 'builtin', name: 'REJECT' } } })] } };
@@ -36,13 +36,13 @@ describe('绑定模板订阅的隐藏覆盖接口', () => {
     const independent = await alice.post('/api/profiles/routing/convert', { profile, mode: 'independent' });
     expect(independent.json.item.routing.config.groups[0].display.hidden).toBe(true);
 
-    const second = (await admin.post('/api/templates/new/publish', { ...template, name: '第二模板', groups: [{ ...template.groups[0], id: 'new-g' }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } })).json.item;
+    const second = (await admin.post('/api/templates', { ...template, name: '第二模板', groups: [{ ...template.groups[0], id: 'new-g' }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } })).json.item;
     const rebound = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', templateId: second.id, mapping: { g: 'new-g' } });
     expect(rebound.status).toBe(200);
     expect(rebound.json.item.routing.groupHidden).toEqual({ 'new-g': true });
     expect(rebound.json.changes).toContain('保留「默认组」的隐藏设置');
 
-    const third = (await admin.post('/api/templates/new/publish', { ...template, name: '第三模板', groups: [{ ...template.groups[0], id: 'hid', display: { hidden: true } }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } })).json.item;
+    const third = (await admin.post('/api/templates', { ...template, name: '第三模板', groups: [{ ...template.groups[0], id: 'hid', display: { hidden: true } }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } })).json.item;
     const same = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', templateId: third.id, mapping: { g: 'hid' } });
     expect(same.json.item.routing.groupHidden).toBeUndefined();
     const dropped = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', templateId: second.id, mapping: { g: null } });
@@ -73,14 +73,14 @@ describe('绑定模板订阅的前置规则接口', () => {
     const { alice, admin, draft, t } = await setup();
     draft.routing.prependRules[0]!.target = { kind: 'group', groupId: 'g' };
     let profile = (await alice.post('/api/profiles', draft)).json.item;
-    expect((await admin.post(`/api/templates/${t.id}/publish`, { ...template, rules: [rule('new-template'), ...template.rules] })).status).toBe(200);
+    expect((await admin.put(`/api/templates/${t.id}`, { ...template, rules: [rule('new-template'), ...template.rules] })).status).toBe(200);
     profile = (await alice.get(`/api/profiles?id=${profile.id}`)).json.item;
     const preview = await alice.post('/api/profiles/preview', { profile });
     expect(parse(preview.json.yaml).rules.slice(0, 3)).toEqual(['DOMAIN,pre-first.example.test,默认组', expect.stringMatching(/^DOMAIN,pre-node/), 'DOMAIN,new-template.example.test,DIRECT']);
     const converted = await alice.post('/api/profiles/routing/convert', { profile, mode: 'independent', currentTemplateVersion: 2 });
     expect(converted.status).toBe(200);
     expect(converted.json.item.routing.config.rules.slice(0, 2)).toEqual(profile.routing.prependRules);
-    const second = (await admin.post('/api/templates/new/publish', { ...template, groups: [{ ...template.groups[0], id: 'new-g', name: '新组' }], rules: [], final: { kind: 'group', groupId: 'new-g' } })).json.item;
+    const second = (await admin.post('/api/templates', { ...template, groups: [{ ...template.groups[0], id: 'new-g', name: '新组' }], rules: [], final: { kind: 'group', groupId: 'new-g' } })).json.item;
     const rebound = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', currentTemplateVersion: 2, templateId: second.id, templateVersion: 1, mapping: { g: 'new-g' } });
     expect(rebound.status).toBe(200);
     expect(rebound.json.item.routing.prependRules[0].target).toEqual({ kind: 'group', groupId: 'new-g' });
@@ -95,9 +95,8 @@ describe('绑定模板订阅的前置规则接口', () => {
       { ...template, groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } },
       { ...template, rules: [rule(), ...template.rules] },
     ]) {
-      const response = await admin.post(`/api/templates/${t.id}/publish`, { ...next, force: true });
+      const response = await admin.put(`/api/templates/${t.id}`, { ...next, force: true });
       expect(response.status).toBe(409);
-      expect(response.json.details.impact[0].forceable).toBe(false);
     }
     expect((await admin.get(`/api/templates?id=${t.id}`)).json.item).toEqual(t);
   });
@@ -153,17 +152,17 @@ it('前后自定义规则及策略组保存、实际输出、模板更新与转�
   const output = parse(await (await app.request(`/subs/profile?token=${token}&id=${profile.id}`)).text());
   expect(output.rules).toEqual(['DOMAIN,before.example.test,DIRECT', 'DOMAIN-SUFFIX,example.test,默认组', 'DOMAIN,after.example.test,默认组', 'MATCH,默认组']);
   expect(output['proxy-groups'].map((g: { name: string }) => g.name)).toEqual(['first', '默认组', 'last']);
-  expect((await admin.post(`/api/templates/${t.id}/publish`, { ...template, rules: [rule('new'), ...template.rules] })).status).toBe(200);
+  expect((await admin.put(`/api/templates/${t.id}`, { ...template, rules: [rule('new'), ...template.rules] })).status).toBe(200);
   const converted = await alice.post('/api/profiles/routing/convert', { profile, mode: 'independent' });
   expect(converted.status).toBe(200);
   expect(converted.json.item.routing.config.rules.map((r: { id: string }) => r.id)).toEqual(['before', 'new', 'template-rule', 'after']);
   expect(converted.json.item.routing.config.groups.map((g: { id: string }) => g.id)).toEqual(['first', 'g', 'last']);
-  const second = (await admin.post('/api/templates/new/publish', { ...template, groups: [{ ...template.groups[0], id: 'g2' }], rules: [], final: { kind: 'group', groupId: 'g2' } })).json.item;
+  const second = (await admin.post('/api/templates', { ...template, groups: [{ ...template.groups[0], id: 'g2' }], rules: [], final: { kind: 'group', groupId: 'g2' } })).json.item;
   const rebound = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', templateId: second.id, mapping: { g: 'g2' } });
   expect(rebound.status).toBe(200);
   expect(rebound.json.item.routing).toMatchObject({ prependGroupIds: ['first'], appendRules: [{ id: 'after', target: { kind: 'group', groupId: 'g2' } }] });
   // 后置出口与前置出口具有相同的模板发布保护。
-  const blocked = await admin.post(`/api/templates/${t.id}/publish`, { ...template, groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' }, force: true });
+  const blocked = await admin.put(`/api/templates/${t.id}`, { ...template, groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' }, force: true });
   expect(blocked.status).toBe(409);
 });
 

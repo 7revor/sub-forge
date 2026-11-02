@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { addUser, client, setupApp } from './helpers.ts';
 
@@ -6,7 +7,7 @@ const docs = [
   ['collections', { members: [], pipeline: [] }],
   ['locals', { proxies: [] }],
   ['rulesets', { sources: [] }],
-  ['profiles', { nodeSets: [] }],
+  ['profiles', { nodeSets: [], routing: independentRouting() }],
 ] as const;
 
 async function setup() {

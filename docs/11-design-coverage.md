@@ -57,7 +57,7 @@
 | 功能 | 前端 | 服务端现状 |
 |---|---|---|
 | 规则仓库后续（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | 内置索引/搜索/预览/文本导入已实现；自定义公开 GitHub 仓库增删及逐文件索引已实现，动态 repo 引用及 mrs 导入待实现 |
-| 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制；保存、备份、恢复 501 |
+| 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制。2026-11-02 移除无界面调用的备份、恢复占位接口；`V2Settings` 不含该入口，需要时再按需求新增 |
 | 共享订阅源 / 组合（SYS-06） | 用户页「共享的订阅源与组合」 | `GET /api/shares` 返回空，写 501 |
 | 用户统计列 | 用户页「配置订阅 / 订阅源 / 最近订阅请求」 | `GET /api/users/stats` 返回空，显示「—」 |
 | 组合成员「拉取失败时」（COL-05） | 组合成员表 | 字段 `onFail` 随文档保存，渲染尚未读取，目前一律使用快照 |
@@ -355,3 +355,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 控件列宽度修订：`V2Template`、`V2ProfileRouting`、`V2Components`、`V2ProfileNodes` 的控件列由 240px 改为 168px；`V2ProfileNodes` 的流量信息按钮移到「引用 / 展开」左侧。前端对应 `routingControlClass` 与 `TabsBasic`。仅界面变化，无后端待实现项。
 
 2026-11-02 规则弹窗修订：`V2ProfileDialogs` 新增「编辑第 N 项规则」弹窗（匹配类型 + 系统规则集 + 出口），画板高度由 1560px 调整为 1960px。前端对应 `RuleEditDialog`、`MatcherEditor`；`RoutingTargetMenu` 与 `TemplateTargetSelect` 增加 `field` 形态，用于表单内的整行出口下拉。仅界面变化，无后端待实现项。
+
+2026-11-02 代码审查清理：`V2Template` 增加「请先修复绑定订阅冲突」状态，区分本人订阅（可跳转）与其他用户的订阅（只显示说明），跟随数改由 `GET /api/templates/usage` 提供并覆盖全部用户，`/templates` 与 `/templates/:id` 为仅有的模板路由，旧 `/templates/manage`、`?id=` 和 `/templates/:id/:tab` 跳转已删除。未改动 v1 现状画板。无新增后端待实现项。

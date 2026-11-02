@@ -19,7 +19,7 @@ import { bad, HttpError, isStr, jsonBody, notFound, requireAdmin, requireUser, t
 import { checkRuleSetReference, resolveRuleSetReference } from '../ruleset-reference.ts';
 import { RefChecker } from './validate.ts';
 
-export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; forceable?: boolean; issues: ReportItem[] };
+export type ImpactEntry = { profileId: string; profileName: string; owner: string | null; level: 'error' | 'warn'; issues: ReportItem[] };
 
 /** 只关心新版本带来的问题：渲染错误、孤儿覆盖项、空组 */
 const IMPACT_CODES = new Set(['overlay.orphan', 'overlay.orphan-anchor', 'group.empty']);
@@ -113,6 +113,13 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     return c.json(options ? store.listTemplatesPage(options) : { items: store.listTemplates() });
   });
 
+  /** 跟随数覆盖全部用户，与保存时的影响检查范围一致。 */
+  app.get('/templates/usage', requireAdmin, c => {
+    const counts = new Map<string, number>();
+    for (const { routing } of store.list('profile')) if (routing.mode === 'bound') counts.set(routing.templateId, (counts.get(routing.templateId) ?? 0) + 1);
+    return c.json({ items: [...counts].map(([id, followers]) => ({ id, followers })) });
+  });
+
   /** 编辑器即时校验（TPL-11）：只做模板自身检查 */
   app.post('/templates/validate', requireAdmin, async (c) => {
     const body = await jsonBody(c);
@@ -131,18 +138,14 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
     if (own.some((i) => i.level === 'error')) throw new HttpError(400, '模板自身校验未通过，不能保存', { report: own });
 
     const impact = isNew ? [] : await analyzeImpact(store, renderer, draft);
-    const blocking = impact.filter((i) => i.level === 'error');
-    if (blocking.some(i => store.get('profile', i.profileId)?.routing?.mode === 'bound')) throw new HttpError(409, '绑定订阅存在冲突，必须先修复成员或引用，不能强制保存', { report: own, impact });
-    if (blocking.length) throw new HttpError(409, `${blocking.length} 个配置订阅存在冲突，请修复后再保存`, { report: own, impact });
+    if (impact.some((i) => i.level === 'error')) throw new HttpError(409, '绑定订阅存在冲突，必须先修复成员或引用，不能强制保存', { report: own, impact });
     store.putTemplate(draft);
     return c.json({ item: draft, report: own, impact }, isNew ? 201 : 200);
   };
   app.post('/templates', requireAdmin, c => save(c, true));
   app.put('/templates/:id', requireAdmin, c => save(c, false));
-  // 兼容旧客户端入口：执行相同的直接保存，不再创建历史版本。
-  app.post('/templates/:id/publish', requireAdmin, c => save(c, c.req.param('id') === 'new'));
 
-  /** 兼容旧客户端的只读影响检查。新页面直接保存，由服务端完成检查。 */
+  /** 模板页「检查影响」：只读试渲染绑定订阅，实际保存时服务端会再次检查。 */
   app.post('/templates/:id/impact', requireAdmin, async (c) => {
     const id = c.req.param('id');
     const current = store.getTemplate(id);
@@ -155,7 +158,7 @@ export function templateRoutes(store: Store, renderer: RenderService, snapshots:
   return app;
 }
 
-/** 对所有跟随最新版本的 Profile 用新版本试渲染 */
+/** 对所有绑定此模板的订阅用草稿试渲染 */
 export async function analyzeImpact(store: Store, renderer: RenderService, draft: TemplateVersionDoc): Promise<ImpactEntry[]> {
   const out: ImpactEntry[] = [];
   const profiles = store.list('profile').filter((p) => p.routing.mode === 'bound' && p.routing.templateId === draft.id);
@@ -167,7 +170,7 @@ export async function analyzeImpact(store: Store, renderer: RenderService, draft
     const owner = store.getWithOwner('profile', p.id)?.owner ?? null;
     const issues = errors.length ? errors : warns;
     if (!res.ok && !errors.length) issues.push({ level: 'error', code: 'render.failed', message: res.failure ?? '渲染失败' });
-    out.push({ profileId: p.id, profileName: p.name, owner, level: res.ok ? 'warn' : 'error', forceable: p.routing?.mode !== 'bound', issues });
+    out.push({ profileId: p.id, profileName: p.name, owner, level: res.ok ? 'warn' : 'error', issues });
   }
   return out;
 }

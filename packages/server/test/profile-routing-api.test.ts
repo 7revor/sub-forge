@@ -11,7 +11,7 @@ async function scenario() {
   const user = await addUser(env.store, 'alice'); await addUser(env.store, 'bob');
   const admin = client(env.app), alice = client(env.app), bob = client(env.app);
   await admin.login('root'); await alice.login('alice'); await bob.login('bob');
-  const t = (await admin.post('/api/templates/new/publish', template)).json.item;
+  const t = (await admin.post('/api/templates', template)).json.item;
   const local = (await alice.post('/api/locals', { name: '本地节点', proxies: [{ name: '节点 A', type: 'socks5', server: 'test.local', port: 1080 }] })).json.item;
   const member = { kind: 'nodeset', ref: { type: 'local', id: local.id } };
   const result = await alice.post('/api/profiles', { name: '绑定订阅', nodeSets: [{ ref: member.ref, output: 'provider' }], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: { mode: 'bound', templateId: t.id, groupAdditions: { g: [member] } } });
@@ -45,7 +45,7 @@ describe('模板绑定与独立模式', () => {
     const token = (await alice.get(`/api/profiles/link?id=${profile.id}`)).json.item.token;
     const before = parse(await (await app.request(`/subs/profile?token=${token}&id=${profile.id}`)).text());
     const oldResource = new URL((Object.values(before['proxy-providers'])[0] as { url: string }).url);
-    expect((await admin.post(`/api/templates/${t.id}/publish`, { ...template, groups: template.groups.map(g => g.id === 'g' ? { ...g, name: '香港新版' } : g), rules: [{ ...template.rules[0], target: { kind: 'builtin', name: 'REJECT' } }] })).status).toBe(200);
+    expect((await admin.put(`/api/templates/${t.id}`, { ...template, groups: template.groups.map(g => g.id === 'g' ? { ...g, name: '香港新版' } : g), rules: [{ ...template.rules[0], target: { kind: 'builtin', name: 'REJECT' } }] })).status).toBe(200);
     const updated = parse(await (await app.request(`/subs/profile?token=${token}&id=${profile.id}`)).text());
     expect(updated['proxy-groups'][0]).toMatchObject({ name: '香港新版', use: ['本地节点'] });
     expect(updated.rules[0]).toBe('DOMAIN,example.com,REJECT');
@@ -54,7 +54,7 @@ describe('模板绑定与独立模式', () => {
     const converted = await alice.post('/api/profiles/routing/convert', { profile: current, mode: 'independent' });
     expect(converted.status).toBe(200); expect(converted.json.item.routing.config.groups[0].members).toHaveLength(2);
     expect((await alice.put(`/api/profiles/${profile.id}`, converted.json.item)).status).toBe(200);
-    expect((await admin.post(`/api/templates/${t.id}/publish`, template)).status).toBe(200);
+    expect((await admin.put(`/api/templates/${t.id}`, template)).status).toBe(200);
     const final = parse(await (await app.request(`/subs/profile?token=${token}&id=${profile.id}`)).text());
     expect(final['proxy-groups']).toEqual(updated['proxy-groups']); expect(final.rules).toEqual(updated.rules);
     expect((await alice.get(`/api/profiles/link?id=${profile.id}`)).json.item.token).toBe(token);
@@ -62,7 +62,7 @@ describe('模板绑定与独立模式', () => {
   it('绑定订阅的删组冲突禁止强制发布；组引用环在保存前拒绝', async () => {
     const { admin, alice, t, profile } = await scenario();
     const deletion = { ...template, groups: [{ ...template.groups[1], members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [], force: true };
-    const blocked = await admin.post(`/api/templates/${t.id}/publish`, deletion);
+    const blocked = await admin.put(`/api/templates/${t.id}`, deletion);
     expect(blocked.status).toBe(409); expect(blocked.json.details.impact[0].issues.some((i: any) => i.code === 'binding.orphan')).toBe(true);
     const cycle = { ...profile, routing: { ...profile.routing, groupAdditions: { g: [{ kind: 'group', groupId: 'auto' }] } } };
     expect((await alice.post('/api/profiles/preview', { profile: cycle })).status).toBe(400);
@@ -74,7 +74,7 @@ describe('模板绑定与独立模式', () => {
     expect((await alice.put(`/api/profiles/${profile.id}`, { ...profile, name: '新名称' })).status).toBe(200);
     expect((await alice.put(`/api/profiles/${profile.id}`, { ...profile, revision: -1, templateVersion: -1 })).status).toBe(200);
     const fresh = (await alice.get(`/api/profiles?id=${profile.id}`)).json.item;
-    expect((await admin.post(`/api/templates/${t.id}/publish`, template)).status).toBe(200);
+    expect((await admin.put(`/api/templates/${t.id}`, template)).status).toBe(200);
     expect((await alice.put(`/api/profiles/${profile.id}`, fresh)).status).toBe(200);
     const converted = await alice.post('/api/profiles/routing/convert', { profile: fresh, mode: 'independent', currentTemplateVersion: -1 });
     expect(converted.status).toBe(200);
@@ -87,7 +87,7 @@ describe('模板绑定与独立模式', () => {
     const { alice, bob, admin, profile } = await scenario();
     const detached = (await alice.post('/api/profiles/routing/convert', { profile, mode: 'independent' })).json.item;
     const independent = (await alice.put(`/api/profiles/${profile.id}`, detached)).json.item;
-    const target = (await admin.post('/api/templates/new/publish', { ...template, groups: [{ ...template.groups[0], id: 'new' }], rules: [], final: { kind: 'group', groupId: 'new' } })).json.item;
+    const target = (await admin.post('/api/templates', { ...template, groups: [{ ...template.groups[0], id: 'new' }], rules: [], final: { kind: 'group', groupId: 'new' } })).json.item;
     const request = { profile: independent, mode: 'bound', templateId: target.id, mapping: {} };
     expect((await alice.post('/api/profiles/routing/convert', request)).status).toBe(400);
     expect((await admin.put(`/api/templates/${target.id}`, { ...target, name: '修改后的目标模板' })).status).toBe(200);
@@ -116,12 +116,12 @@ describe('模板绑定与独立模式', () => {
 it('发布时检查模板与追加成员合并后的环，并在异常版本进入存储后沿用上次成功输出', async () => {
   const { admin, alice, t, profile, store, renderer } = await scenario();
   const first = { ...template, groups: template.groups.map(g => ({ ...g, members: [{ kind: 'builtin', name: 'DIRECT' }] })) };
-  expect((await admin.post(`/api/templates/${t.id}/publish`, first)).status).toBe(200);
+  expect((await admin.put(`/api/templates/${t.id}`, first)).status).toBe(200);
   const current = (await alice.get(`/api/profiles?id=${profile.id}`)).json.item;
   current.routing.groupAdditions.auto = [{ kind: 'group', groupId: 'g' }];
   expect((await alice.put(`/api/profiles/${profile.id}`, current)).status).toBe(200);
   const next = { ...first, groups: first.groups.map(g => g.id === 'g' ? { ...g, members: [{ kind: 'group', groupId: 'auto' }] } : g) };
-  const blocked = await admin.post(`/api/templates/${t.id}/publish`, { ...next, force: true });
+  const blocked = await admin.put(`/api/templates/${t.id}`, { ...next, force: true });
   expect(blocked.status).toBe(409);
   expect(blocked.json.details.impact[0].issues.some((i: any) => i.code === 'binding.group-cycle')).toBe(true);
   const good = await renderer.render(profile.id, { client: 'mihomo' });
@@ -140,7 +140,7 @@ it('模板影响检查期间有订阅保存时，模板仍可正常保存', asyn
     if (!changed) { changed = true; expect((await alice.put(`/api/profiles/${profile.id}`, { ...profile, name: '并发修改' })).status).toBe(200); }
     return result;
   };
-  const published = await admin.post(`/api/templates/${t.id}/publish`, template);
+  const published = await admin.put(`/api/templates/${t.id}`, template);
   expect(published.status).toBe(200);
   expect((await admin.get(`/api/templates?id=${t.id}`)).json.item.groups).toEqual(template.groups);
 });
@@ -171,7 +171,7 @@ it('绑定订阅的独立策略组可保存、导出、随模板更新保留并�
   profile.routing.extraGroups = [group];
   profile.routing.prependRules = [{ id: 'private-rule', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'private.test' } }, target: { kind: 'group', groupId: group.id } }];
   expect((await alice.put(`/api/profiles/${profile.id}`, profile)).status).toBe(200);
-  expect((await admin.post(`/api/templates/${t.id}/publish`, { ...template, groups: template.groups.map(g => ({ ...g, name: `${g.name}新版` })) })).status).toBe(200);
+  expect((await admin.put(`/api/templates/${t.id}`, { ...template, groups: template.groups.map(g => ({ ...g, name: `${g.name}新版` })) })).status).toBe(200);
   const saved = (await alice.get(`/api/profiles?id=${profile.id}`)).json.item;
   expect(saved.routing.extraGroups).toEqual([group]);
   for (const client of ['mihomo', 'stash'] as const) {
@@ -182,7 +182,7 @@ it('绑定订阅的独立策略组可保存、导出、随模板更新保留并�
     expect(config['proxy-groups']).toContainEqual(expect.objectContaining({ name: group.name }));
     expect(config.rules).toContain('DOMAIN,private.test,独立机场');
   }
-  const target = (await admin.post('/api/templates/new/publish', { ...template, groups: [{ ...template.groups[0], id: 'new' }], rules: [], final: { kind: 'group', groupId: 'new' } })).json.item;
+  const target = (await admin.post('/api/templates', { ...template, groups: [{ ...template.groups[0], id: 'new' }], rules: [], final: { kind: 'group', groupId: 'new' } })).json.item;
   const rebound = await alice.post('/api/profiles/routing/convert', { profile: saved, mode: 'bound', templateId: target.id, mapping: { g: 'new' } });
   expect(rebound.status).toBe(200);
   expect(rebound.json.item.routing.extraGroups[0].members).toEqual([member, { kind: 'group', groupId: 'new' }]);
@@ -200,6 +200,6 @@ it('独立组拒绝重名、ID 覆盖、非法成员和循环；模板发布也�
     expect(response.status, JSON.stringify(response.json)).toBe(400);
   }
   expect((await alice.put(`/api/profiles/${profile.id}`, { ...profile, routing: { ...profile.routing, extraGroups: [group] } })).status).toBe(200);
-  const collision = await admin.post(`/api/templates/${t.id}/publish`, { ...template, groups: [...template.groups, { ...group, members: [] }], force: true });
+  const collision = await admin.put(`/api/templates/${t.id}`, { ...template, groups: [...template.groups, { ...group, members: [] }], force: true });
   expect(collision.status).toBe(409);
 });

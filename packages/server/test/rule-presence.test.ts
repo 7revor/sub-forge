@@ -66,7 +66,7 @@ describe('规则存在即生效', () => {
       ] });
       expect(ruleset.status).toBe(201);
       expect(ruleset.json.item.sources).toEqual([{ id: 'on', kind: 'local', content: 'DOMAIN,on.test', format: 'auto' }]);
-      const published = await user.post('/api/templates/new/publish', template);
+      const published = await user.post('/api/templates', template);
       expect(published.status).toBe(201);
       expect(published.json.item.rules).toEqual([rule('on')]);
       const profile = { ...base, id: undefined, routing: { ...base.routing, templateId: published.json.item.id } };

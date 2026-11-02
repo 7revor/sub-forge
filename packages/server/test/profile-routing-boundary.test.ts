@@ -74,6 +74,7 @@ describe('订阅 routing 边界', () => {
       env.store.putTemplate(template);
       env.store.put('local', { id: 'foreign', name: '别人的节点', proxies: [] }, bob.id);
       const api = client(env.app); await api.login('alice');
+      // 旧结构只由存储迁移和种子导入处理，接口一律拒绝，避免绕开现用引用校验。
       const old = { ...legacy(''), overlay: { groupPatches: { g: { addMembers: [{ kind: 'nodeset', ref: { type: 'local', id: 'foreign' } }] } } } };
       for (const [url, body] of [
         ['/api/profiles/preview', { profile: old }],
@@ -81,18 +82,11 @@ describe('订阅 routing 边界', () => {
         ['/api/profiles/routing/convert', { profile: old, mode: 'independent' }],
       ] as const) {
         const result = await api.post(url, body);
-        expect(result.status).toBe(400); expect(result.json.error).toContain('节点集');
+        expect(result.status).toBe(400); expect(result.json.error).toContain('分流方式');
       }
+      const foreign = { name: '越权', nodeSets: [], routing: { mode: 'bound', templateId: template.id, groupAdditions: { g: [{ kind: 'nodeset', ref: { type: 'local', id: 'foreign' } }] } } };
+      expect((await api.post('/api/profiles/preview', { profile: foreign })).status).toBe(400);
       expect(env.store.list('profile', alice.id)).toEqual([]);
-      const preview = await api.post('/api/profiles/preview', { profile: legacy('') });
-      expect(preview.status).toBe(200); expect(preview.json.ok).toBe(true);
-      expect(env.store.list('profile')).toEqual([]);
-      const saved = await api.post('/api/profiles', legacy(''));
-      expect(saved.status).toBe(201);
-      expect(saved.json.item).toMatchObject({ routing: { mode: 'bound' } });
-      expect(saved.json.item).not.toHaveProperty('template');
-      const currentPreview = await api.post('/api/profiles/preview', { profile: saved.json.item });
-      expect(currentPreview.json.yaml).toBe(preview.json.yaml);
     } finally { await env.snapshots.settled(); env.store.close(); }
   });
 });

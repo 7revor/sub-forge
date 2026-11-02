@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { addUser, client, setupApp } from './helpers.ts';
 
@@ -57,7 +58,7 @@ describe('文档增删改查', () => {
 
   it('旧锁定引用转为独立配置后仍阻止删除所需规则，模板只保留当前内容', async () => {
     const { store, renderer, admin, alice } = await twoUsers();
-    const rs = (await admin.post('/api/rulesets', { name: '旧规则', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' })).json.item.id;
+    const rs = (await admin.post('/api/rulesets', { name: '旧规则', sources: [{ id: 's', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' }] })).json.item.id;
     const t = { id: 'legacy', version: 1, name: '历史模板', groups: [], rules: [{ id: 'r', matcher: { kind: 'ruleset' as const, id: rs }, target: { kind: 'builtin' as const, name: 'DIRECT' as const } }], final: { kind: 'builtin' as const, name: 'DIRECT' as const } };
     const owner = (await alice.get('/api/me')).json.user.id;
     const p = 'legacy-pinned';
@@ -72,8 +73,8 @@ describe('文档增删改查', () => {
 
   it('不同属性顺序的引用与跨用户共享规则也阻止删除，不暴露他人配置名称', async () => {
     const { admin, alice } = await twoUsers();
-    const rs = (await admin.post('/api/rulesets', { name: '公共规则', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' })).json.item.id;
-    await alice.post('/api/profiles', { name: '不对管理员暴露的名称', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { id: rs, kind: 'ruleset' }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
+    const rs = (await admin.post('/api/rulesets', { name: '公共规则', sources: [{ id: 's', kind: 'local', format: 'classical', content: 'DOMAIN,example.test' }] })).json.item.id;
+    await alice.post('/api/profiles', { name: '不对管理员暴露的名称', nodeSets: [], routing: independentRouting([{ id: 'r', matcher: { id: rs, kind: 'ruleset' }, target: { kind: 'builtin', name: 'DIRECT' } }]) });
     const res = await admin.del(`/api/rulesets/${rs}`);
     expect(res.status).toBe(409);
     expect(res.json.details.referrers).toEqual(['其他用户的配置订阅']);
@@ -121,11 +122,11 @@ describe('文档增删改查', () => {
     expect(badRegex.status).toBe(400);
     expect(badRegex.json.error).toMatch(/第 1 步.*非法正则/);
     expect((await alice.post('/api/sources', { ...remoteSource(), pipeline: [{ op: 'script', code: 'x' }] })).json.error).toMatch(/脚本/);
-    expect((await alice.post('/api/rulesets', { name: 'M', kind: 'remote', format: 'mrs', url: 'https://a.example.com/x.mrs' })).json.error).toMatch(/behavior/);
+    expect((await alice.post('/api/rulesets', { name: 'M', sources: [{ id: 's', kind: 'remote', format: 'mrs', url: 'https://a.example.com/x.mrs' }] })).json.error).toMatch(/behavior/);
     expect((await alice.post('/api/rulesets', { name: 'D', sources: [{ id: 'a', kind: 'local', format: 'auto', content: '' }, { id: 'a', kind: 'local', format: 'auto', content: '' }] })).json.error).toMatch(/重复/);
     expect((await alice.post('/api/rulesets', { name: 'U', sources: [{ id: 'a', kind: 'remote', format: 'auto', url: 'ftp://x' }] })).json.error).toMatch(/来源 1.*http/);
-    // 旧客户端的单一来源写法转成一个来源
-    expect((await alice.post('/api/rulesets', { name: 'L', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' })).json.item).toEqual(expect.objectContaining({ sources: [{ id: 's1', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' }] }));
+    // 旧的单一来源写法不再接受
+    expect((await alice.post('/api/rulesets', { name: 'L', kind: 'local', format: 'auto', content: 'DOMAIN,a.test' })).json.error).toMatch(/sources/);
     expect((await alice.get('/api/bundles')).status).toBe(404);
   });
 
@@ -168,7 +169,7 @@ describe('文档增删改查', () => {
     const { alice } = await twoUsers();
     const s = (await alice.post('/api/sources', remoteSource())).json.item.id;
     await alice.post('/api/collections', { name: '全部', members: [{ ref: { type: 'source', id: s } }] });
-    await alice.post('/api/profiles', { name: '订阅', nodeSets: [{ ref: { type: 'source', id: s }, output: 'provider' }] });
+    await alice.post('/api/profiles', { routing: independentRouting(), name: '订阅', nodeSets: [{ ref: { type: 'source', id: s }, output: 'provider' }] });
     const res = await alice.del(`/api/sources/${s}`);
     expect(res.status).toBe(409);
     expect(res.json.details.referrers).toEqual(['组合「全部」', '配置订阅「订阅」']);
@@ -176,12 +177,12 @@ describe('文档增删改查', () => {
 
   it('Profile 补全默认字段，模板必须存在且禁止旧预设引用', async () => {
     const { alice } = await twoUsers();
-    const res = await alice.post('/api/profiles', { name: 'P', nodeSets: [] });
+    const res = await alice.post('/api/profiles', { routing: independentRouting(), name: 'P', nodeSets: [] });
     expect(res.json.item).toMatchObject({ chains: [] });
     expect(res.json.item).not.toHaveProperty('overlay');
     expect(res.json.item).not.toHaveProperty('refPolicy');
-    expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], template: { id: 'nope', follow: 'latest' } })).json.error).toMatch(/模板不存在/);
-    expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], base: { presetId: 'nope' } })).json.error).toMatch(/不支持的基础配置字段：presetId/);
+    expect((await alice.post('/api/profiles', { name: 'P', nodeSets: [], routing: { mode: 'bound', templateId: 'nope', groupAdditions: {} } })).json.error).toMatch(/模板不存在/);
+    expect((await alice.post('/api/profiles', { routing: independentRouting(), name: 'P', nodeSets: [], base: { presetId: 'nope' } })).json.error).toMatch(/不支持的基础配置字段：presetId/);
   });
 
   it('移除预设的列表、读取和写入接口，管理员与普通用户均不可访问', async () => {
@@ -200,7 +201,7 @@ describe('订阅原文配置', () => {
   it('保存和更新后逐字读回，空文本不自动补默认值', async () => {
     const { alice } = await twoUsers();
     const surge = '# 保留注释\n[General]\nipv6 = false\n[Host]\n*.example.test = server:1.1.1.1\n';
-    const created = await alice.post('/api/profiles', { name: '原文', nodeSets: [], base: { kernels: { surge } } });
+    const created = await alice.post('/api/profiles', { routing: independentRouting(), name: '原文', nodeSets: [], base: { kernels: { surge } } });
     expect(created.status).toBe(201);
     const path = `/api/profiles/${created.json.item.id}`;
     expect((await alice.get(`/api/profiles?id=${created.json.item.id}`)).json.item.base.kernels.surge).toBe(surge);
@@ -209,7 +210,7 @@ describe('订阅原文配置', () => {
   });
   it.each([1, null, [], {}, { general: {} }])('只接受原文，拒绝结构对象 %j', async surge => {
     const { alice } = await twoUsers();
-    const res = await alice.post('/api/profiles', { name: '错误类型', nodeSets: [], base: { kernels: { surge } } });
+    const res = await alice.post('/api/profiles', { routing: independentRouting(), name: '错误类型', nodeSets: [], base: { kernels: { surge } } });
     expect(res.status).toBe(400); expect(res.json.error).toContain('原始文本');
   });
 });
@@ -222,7 +223,7 @@ describe('拉取参数校验', () => {
     expect(short.status).toBe(201);
     expect(short.json.item.fetch).toBeUndefined();
     expect((await alice.post('/api/sources', { ...src, fetch: { ttlSec: 300 } })).status).toBe(201);
-    const rs = await alice.post('/api/rulesets', { name: '远程规则', kind: 'remote', format: 'classical', url: 'https://example.com/r.list', fetch: { ttlSec: 0 } });
+    const rs = await alice.post('/api/rulesets', { name: '远程规则', sources: [{ id: 's', kind: 'remote', format: 'classical', url: 'https://example.com/r.list', fetch: { ttlSec: 0 } }] });
     expect(rs.status).toBe(201);
     expect(rs.json.item.sources[0].fetch?.ttlSec).toBeUndefined();
   });

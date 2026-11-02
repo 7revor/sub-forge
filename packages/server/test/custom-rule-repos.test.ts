@@ -1,3 +1,4 @@
+import { importRepoFile, indexedEntries } from './helpers.ts';
 import { fixtureCache } from './repo-cache-fixture.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RuleRepoService } from '../src/rule-repos/service.ts';
@@ -45,7 +46,7 @@ describe('自定义仓库配置与文件发现', () => {
     const h = setup(); const id = await h.service.addCustom({ url, include: ['**/*'] });
     h.paths(['a.list','a.txt','a.yaml','a.yml','a.mrs','a.srs','a.json']);
     await h.service.refresh(id);
-    expect(h.service.search('',id,undefined,0,50).items.map(e=>e.path)).toEqual(['a.list','a.txt']);
+    expect(indexedEntries(h.store, '', id, undefined).items.map(e=>e.path)).toEqual(['a.list','a.txt']);
     const current = h.service.definition(id); const def = { ...current, scans: undefined, adapter: 'generic', options: { ...current.scans[0], format: 'yaml' } };
     h.store.db.prepare('UPDATE rule_repos SET definition=? WHERE id=?').run(JSON.stringify(def),id);
     const restart = new RuleRepoService(h.store,h.fetcher, Date.now, fixtureCache(h.fetcher));
@@ -57,10 +58,10 @@ describe('自定义仓库配置与文件发现', () => {
     const id = await h.service.addCustom({ url: url + '.git/' });
     await h.service.refresh(id);
     expect(h.service.list().find(r => r.id === id)).toMatchObject({ refs: ['main'], entries: 2 });
-    expect(h.service.search('ai', id, 'surge', 0, 50).total).toBe(2);
+    expect(indexedEntries(h.store, 'ai', id, 'surge').total).toBe(2);
     const restarted = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
     expect(restarted.definition(id).scans[0]?.format).toBe('auto');
-    expect(restarted.search('', id, 'mihomo', 0, 50).total).toBe(2);
+    expect(indexedEntries(h.store, '', id, 'mihomo').total).toBe(2);
     await restarted.stop();
     await expect(h.service.addCustom({ url: 'https://github.com/7REVOR/PROXY-RULES' })).rejects.toMatchObject({ status: 409 });
   });
@@ -92,20 +93,19 @@ describe('自定义仓库配置与文件发现', () => {
     expect(h.service.list().find(r => r.id === id)).toEqual(before);
     expect(h.fetcher).not.toHaveBeenCalled();
   });
-  it('索引进行时不能删除，停用后无法搜索或导入', async () => {
+  it('索引进行时不能删除，停用后无法关联', async () => {
     const h = setup(); const id = await h.service.addCustom({ url });
     const pending = h.service.refresh(id);
     await expect(h.service.removeCustom(id)).rejects.toThrow('索引正在更新');
     await pending;
     h.service.setEnabled(id, false);
-    expect(() => h.service.search('', id, undefined, 0, 50)).toThrow();
     await addUser(h.store, 'alice'); const user = client(h.app); await user.login('alice');
-    expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(404);
+    expect((await importRepoFile(user, { repo: id, path: 'ai.list' })).status).toBe(404);
   });
   it('失败保留索引，空匹配成功清空索引', async () => {
     const h = setup(); const id = await h.service.addCustom({ url });
     await h.service.refresh(id); h.fail(); await h.service.refresh(id);
-    expect(h.service.search('', id, undefined, 0, 50).total).toBe(2);
+    expect(indexedEntries(h.store, '', id, undefined).total).toBe(2);
     expect(h.service.list().find(r => r.id === id)?.error).toContain('测试网络故障');
     const other = setup(); const next = await other.service.addCustom({ url });
     await other.service.refresh(next); other.paths([]); await other.service.refresh(next);
@@ -123,7 +123,7 @@ describe('自定义仓库管理及导入 API', () => {
     const linked = await h.service.linkedFileSource(id, 'ai.list', { ref: 'main', path: 'ai.list' });
     expect(linked.sources[0]).toMatchObject({ url: 'https://raw.githubusercontent.com/7revor/proxy-rules/main/ai.list', repository: { repo: id, path: 'ai.list' } });
   });
-  it('管理员添加、预览诊断、用户导入、追加去重，删除保留已导入来源', async () => {
+  it('管理员添加、预览诊断、用户关联，删除保留已保存来源', async () => {
     const h = setup();
     await addUser(h.store, 'admin', 'admin'); await addUser(h.store, 'alice');
     const admin = client(h.app); await admin.login('admin');
@@ -134,32 +134,31 @@ describe('自定义仓库管理及导入 API', () => {
     await h.service.refresh(id);
     const detail = await h.service.detail(id, 'ai.list');
     expect(detail).toMatchObject({ count: 2, rejected: 1, rejectedDetails: [expect.objectContaining({ line: 3 })] });
-    const imported = await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' });
+    const imported = await importRepoFile(user, { repo: id, path: 'ai.list' });
     expect(imported.status).toBe(201);
     expect(imported.json.item.sources[0]).toMatchObject({ kind: 'remote', format: 'auto', url: 'https://raw.githubusercontent.com/7revor/proxy-rules/main/ai.list' });
     expect(imported.json.item.sources[0].repository).toMatchObject({ repo: id, entry: 'ai.list', ref: 'main', path: 'ai.list' });
-    const resolved = await user.post('/api/rule-repos/resolve', { repo: id, path: 'ai.list' });
+    const resolved = await user.post('/api/rule-options/resolve', { source: 'repository', repo: id, entry: 'ai.list' });
     expect(resolved.status).toBe(200);
-    expect((await user.post('/api/rulesets', { name: '自定义仓库关联', sources: resolved.json.sources })).status).toBe(201);
-    expect((await user.post('/api/rulesets', { name: '伪造关联', sources: [{ ...resolved.json.sources[0], url: 'https://example.com/fake' }] })).status).toBe(400);
+    const linked = resolved.json.matcher.repository.sources;
+    expect((await user.post('/api/rulesets', { name: '自定义仓库关联', sources: linked })).status).toBe(201);
+    expect((await user.post('/api/rulesets', { name: '伪造关联', sources: [{ ...linked[0], url: 'https://example.com/fake' }] })).status).toBe(400);
     const target = imported.json.item.id;
-    expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list', ruleset: target })).json.item.sources).toHaveLength(1);
-    expect((await admin.post('/api/rule-repos/import', { repo: id, path: 'ai.list', ruleset: target })).status).toBe(404);
     expect((await admin.del('/api/rule-repos/blackmatrix7')).status).toBe(200);
     expect((await user.del(`/api/rule-repos/${id}`)).status).toBe(403);
     expect((await admin.del(`/api/rule-repos/${id}`)).status).toBe(200);
     expect(h.store.get('ruleset', target)?.sources).toHaveLength(1);
     expect((await user.put(`/api/rulesets/${target}`, { ...imported.json.item, note: '仓库删除后仍可编辑' })).status).toBe(200);
-    expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(404);
+    expect((await importRepoFile(user, { repo: id, path: 'ai.list' })).status).toBe(404);
   });
   it.each(['', '<html>错误页面</html>', 'payload: invalid', 'NOT,((DOMAIN,a),(DOMAIN,b))'])('无可解析内容不能导入：%s', async body => {
     const h = setup(); h.body(body);
     const id = await h.service.addCustom({ url }); await h.service.refresh(id);
     await addUser(h.store, 'alice'); const user = client(h.app); await user.login('alice');
-    expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(400);
-    expect((await user.post('/api/rule-repos/resolve', { repo: id, path: 'ai.list' })).status).toBe(400);
+    expect((await importRepoFile(user, { repo: id, path: 'ai.list' })).status).toBe(400);
+    expect((await user.post('/api/rule-options/resolve', { source: 'repository', repo: id, entry: 'ai.list' })).status).toBe(400);
     h.body('DOMAIN,example.com');
-    expect((await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' })).status).toBe(201);
+    expect((await importRepoFile(user, { repo: id, path: 'ai.list' })).status).toBe(201);
   });
 });
 
@@ -195,7 +194,7 @@ describe('动态仓库编辑与一致性', () => {
     });
     await h.service.refresh(id);
     expect(h.service.list().find(r => r.id === id)?.pending).toBe(false);
-    expect(h.service.search('', id, undefined, 0, 50).items.map(e => e.path)).toEqual(['nested/new.list']);
+    expect(indexedEntries(h.store, '', id, undefined).items.map(e => e.path)).toEqual(['nested/new.list']);
     expect(h.service.fileList(id, 'nested/new.list').files[0]?.url).toContain('/example/new-rules/');
   });
   it('仅修改扫描配置也会重建索引，旧编辑版本及重复仓库被拒绝', async () => {
@@ -203,7 +202,7 @@ describe('动态仓库编辑与一致性', () => {
     const before = h.service.list().find(r => r.id === id)!;
     await h.service.update(id, { ...before, scans: [{ ...before.scans[0]!, directory: 'nested' }] });
     await h.service.refresh(id);
-    expect(h.service.search('', id, undefined, 0, 50).items.map(e => e.path)).toEqual(['nested/ai.list']);
+    expect(indexedEntries(h.store, '', id, undefined).items.map(e => e.path)).toEqual(['nested/ai.list']);
     await expect(h.service.update(id, before)).rejects.toMatchObject({ status: 409 });
     const current = h.service.list().find(r => r.id === id)!;
     await expect(h.service.update(id, { ...current, url: 'https://github.com/blackmatrix7/ios_rule_script', scans: [{ ...current.scans[0]!, ref: 'master' }] })).rejects.toMatchObject({ status: 409 });
@@ -215,7 +214,7 @@ describe('动态仓库编辑与一致性', () => {
     const admin = client(h.app); await admin.login('admin'); const user = client(h.app); await user.login('user');
     const before = h.service.list().find(r => r.id === id)!;
     expect((await user.put(`/api/rule-repos/${id}`, before)).status).toBe(403);
-    const imported = await user.post('/api/rule-repos/import', { repo: id, path: 'ai.list' });
+    const imported = await importRepoFile(user, { repo: id, path: 'ai.list' });
     for (const scans of [[], [{ ...before.scans[0], ref: '--upload-pack=evil' }], [{ ...before.scans[0], directory: '../bad' }]]) {
       expect((await admin.put(`/api/rule-repos/${id}`, { ...before, scans })).status).toBe(400);
     }
@@ -229,12 +228,12 @@ describe('动态仓库编辑与一致性', () => {
 
 it('数据库写入失败回滚整个快照，恢复后可重新同步', async () => {
   const h = setup(); const id = await h.service.addCustom({ url }); await h.service.refresh(id);
-  const before = h.service.search('', id, undefined, 0, 50);
+  const before = indexedEntries(h.store, '', id, undefined);
   const revisions = h.service.list().find(r => r.id === id)!.revisions;
   h.store.db.exec("CREATE TRIGGER reject_new_entry BEFORE INSERT ON rule_repo_entries WHEN NEW.key = 'replacement.list' BEGIN SELECT RAISE(ABORT, '模拟事务写入失败'); END");
   h.paths(['replacement.list']); await h.service.refresh(id);
-  expect(h.service.search('', id, undefined, 0, 50)).toEqual(before);
+  expect(indexedEntries(h.store, '', id, undefined)).toEqual(before);
   expect(h.service.list().find(r => r.id === id)).toMatchObject({ revisions, error: expect.stringContaining('模拟事务写入失败') });
   h.store.db.exec('DROP TRIGGER reject_new_entry'); await h.service.refresh(id);
-  expect(h.service.search('', id, undefined, 0, 50).items.map(e => e.path)).toEqual(['replacement.list']);
+  expect(indexedEntries(h.store, '', id, undefined).items.map(e => e.path)).toEqual(['replacement.list']);
 });

@@ -12,13 +12,7 @@
 
 ## 接口
 
-### 已保存来源读取
-
-`GET /api/rulesets/sources/content?id=ID&source=来源ID`
-
-必须登录且拥有规则集。返回 `{ content?, status }`。二进制来源不伪造文本正文。
-
-### 草稿来源读取
+### 来源读取
 
 `POST /api/rulesets/source`
 
@@ -50,7 +44,7 @@
 - `stats` 分开记录解析成功、未解析、改写移除/替换/追加、重复、客户端无法输出、降级、有效输出，以及有效输出的 domain/classical/ipcidr 数量。
 - 转换不读取传入 URL；当前预览范围内的文本来源缺少正文时返回 400，不输出空或部分成功结果。禁用来源（未单选）与二进制透传不受此限制。
 - 请求体上限 16 MiB，最多 256 个来源。超过限制拒绝请求，不截断计算输入。
-- 旧 `POST /api/rulesets/preview` 保留为组合接口，内部只编排 getter 和 converter；新页面不使用它。
+- 2026-11-02 删除 `POST /api/rulesets/preview` 和 `GET /api/rulesets/sources/content`，前端统一用 `POST /api/rulesets/source` 读取来源后调用转换接口。
 
 ## 行号与注释
 
