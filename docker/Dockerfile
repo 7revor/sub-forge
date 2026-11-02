@@ -7,7 +7,7 @@
 # 或直接运行：
 #   docker build -f docker/Dockerfile -t sub-forge .
 #   docker run -d --name sub-forge --restart unless-stopped -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
-#     -e PUBLIC_URL=https://sub.example.com \
+#     -e PUBLIC_URL=https://sub.example.com -e ALLOWED_ORIGINS=https://sub.example.com \
 #     -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD=请改成强密码 \
 #     sub-forge
 #

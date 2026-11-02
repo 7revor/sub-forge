@@ -26,7 +26,7 @@ pnpm --filter @sub-forge/server start
 ```bash
 docker build -f docker/Dockerfile -t sub-forge .
 docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
-  -e PUBLIC_URL=https://sub.example.com \
+  -e PUBLIC_URL=https://sub.example.com -e ALLOWED_ORIGINS=https://sub.example.com \
   -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD='请改成强密码' \
   sub-forge
 ```
@@ -46,7 +46,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 | `HOST` / `PORT` | `127.0.0.1` / `8080`（镜像中 HOST 为 `0.0.0.0`） | 监听地址 |
 | `PUBLIC_URL` | `http://HOST:PORT` | 对外地址，用于生成订阅、provider 与规则集链接；未设置时启动会告警 |
 | `SUBFORGE_TRUSTED_PROXIES` | 空（不信任转发头） | 逗号分隔的可信代理 IP / CIDR；仅解析可信链上的 X-Forwarded-For，详见部署说明 |
-| `ALLOWED_ORIGINS` | 空 | 逗号分隔，允许跨源调用管理接口的 Origin（如前端开发服务器） |
+| `ALLOWED_ORIGINS` | 空 | 逗号分隔，允许调用管理接口写操作的 Origin。经 HTTPS 反向代理部署时**必填**，通常等于 `PUBLIC_URL`：应用只看到 http，不会判为同源，也不自动信任 `PUBLIC_URL`；缺失时启动告警，Compose 直接拒绝启动。开发时也用于前端开发服务器 |
 | `SSRF_ALLOW` | 空 | 逗号分隔的字面 IP / CIDR 白名单；兼容接受主机名，域名本身已默认放行 |
 | `MIHOMO_BIN` | 空 | 设置后每次渲染都执行 `mihomo -t` 校验，失败时返回上一份成功结果 |
 | `MIHOMO_DIR` | 临时目录 | `-t` 的工作目录；GEOIP 规则需要其中有 `Country.mmdb`，否则 mihomo 会尝试下载 |

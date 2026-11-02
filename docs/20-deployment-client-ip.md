@@ -8,19 +8,24 @@
 cp docker/.env.example docker/.env
 ```
 
-填写 `docker/.env` 的 `PUBLIC_URL`、管理员账号密码后启动：
+填写 `docker/.env` 的 `PUBLIC_URL`、`ALLOWED_ORIGINS`、管理员账号密码后启动：
 
 ```bash
 docker compose -f docker/compose.yaml up -d --build
 ```
 
-再把 [docker/nginx.conf.example](../docker/nginx.conf.example) 放入 Nginx 配置，替换域名和证书路径。该示例已处理：
+不需要新增 Nginx 容器，使用服务器上现有的 Nginx 即可，Compose 只启动应用一个容器，并只绑定 `127.0.0.1:8080`（端口由 `SUBFORGE_PORT` 决定）：
+
+- **Nginx 装在宿主机：** 参考 [docker/nginx.conf.example](../docker/nginx.conf.example)，为域名新增 `server`，或把其中的 `upstream` 和两个 `location` 合入已有配置。
+- **Nginx 也在容器里：** 它访问不到宿主机回环地址，改为加入同一 Docker 网络并代理到 `sub-forge:8080`，见下文“推荐拓扑”。
+
+该示例已处理：
 
 - 覆盖 `X-Forwarded-For`，配合下文的可信代理获得真实 IP。
 - `/api/events`（SSE）关闭缓冲、放宽读取超时；否则页面收不到实时刷新。
 - 把一般请求的读取超时放宽到 600 秒，覆盖手动备份和恢复。
 
-`PUBLIC_URL` 必须是浏览器实际访问的地址：TLS 在 Nginx 终止，应用只看到 http，它的来源（origin）会被当作可信来源；填错时所有写请求都会返回“跨站请求被拒绝”。必须部署在域名根路径，不支持子路径。数据都在 `sub-forge-data` 卷中，定时备份见 [22](22-database-backup.md)。恢复备份在进程内完成，不需要重启容器。
+`ALLOWED_ORIGINS` 必须配置为浏览器实际访问的来源（协议 + 域名 + 非默认端口，不带路径），通常与 `PUBLIC_URL` 相同。TLS 在 Nginx 终止，应用只看到 http，不会判为同源，也不会自动信任 `PUBLIC_URL`；未配置或填错时，登录和所有写操作都会返回“跨站请求被拒绝”，服务启动时会告警，Compose 则直接拒绝启动。必须部署在域名根路径，不支持子路径。数据都在 `sub-forge-data` 卷中，定时备份见 [22](22-database-backup.md)。恢复备份在进程内完成，不需要重启容器。
 
 ## 日志含义与配置
 
@@ -54,6 +59,7 @@ services:
     image: sub-forge
     environment:
       PUBLIC_URL: https://sub.example.com
+      ALLOWED_ORIGINS: https://sub.example.com
       SUBFORGE_TRUSTED_PROXIES: 172.30.80.2
       # 首次创建管理员时提供 SUBFORGE_ADMIN_USERNAME / SUBFORGE_ADMIN_PASSWORD
     volumes:
@@ -96,6 +102,7 @@ location / {
 docker run -d --name sub-forge -p 127.0.0.1:8080:8080 \
   -v sub-forge-data:/data \
   -e PUBLIC_URL=https://sub.example.com \
+  -e ALLOWED_ORIGINS=https://sub.example.com \
   -e SUBFORGE_TRUSTED_PROXIES='<应用观察到的宿主机代理 IP>' \
   sub-forge
 ```

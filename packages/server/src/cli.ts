@@ -85,6 +85,9 @@ async function start(): Promise<void> {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
   const masterKey = loadMasterKey(dbPath, env.SUBFORGE_SECRET);
   const store = openStore(masterKey);
+  const allowedOrigins = (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  // TLS 在反向代理终止时应用只看到 http，来源不会被判为同源，必须显式配置，这里不自动信任 PUBLIC_URL。
+  if (publicUrl.startsWith('https://') && !allowedOrigins.includes(new URL(publicUrl).origin)) console.warn(`ALLOWED_ORIGINS 未包含 ${new URL(publicUrl).origin}，经 HTTPS 反向代理访问时登录和所有写操作都会被拒绝`);
 
   // 首次启动且没有任何用户时，可用环境变量创建管理员（便于容器部署）
   if (store.countUsers() === 0) {
@@ -109,7 +112,7 @@ async function start(): Promise<void> {
     store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe, resources, backups, trustedProxies,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
-    allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    allowedOrigins,
   });
   ruleRepos.start();
   resources.start();

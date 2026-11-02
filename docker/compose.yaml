@@ -10,6 +10,7 @@ services:
     restart: unless-stopped
     environment:
       PUBLIC_URL: ${PUBLIC_URL:?请在 docker/.env 中设置对外 HTTPS 地址}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?请在 docker/.env 中设置浏览器访问的来源，通常与 PUBLIC_URL 相同}
       SUBFORGE_TRUSTED_PROXIES: ${SUBFORGE_TRUSTED_PROXIES:-}
       SUBFORGE_ADMIN_USERNAME: ${SUBFORGE_ADMIN_USERNAME:-}
       SUBFORGE_ADMIN_PASSWORD: ${SUBFORGE_ADMIN_PASSWORD:-}
