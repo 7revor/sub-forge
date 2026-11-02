@@ -6,9 +6,9 @@ import { NativeBaseEditor } from '../../components/NativeBaseEditor.tsx';
 import { RoutingCard, RoutingCardIcon } from '../../components/RoutingCard.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { appendProviderGroup } from './providerGroup.ts';
-import type { NodeSetID } from '@sub-forge/core';
-import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
-import { Frame } from '../../modals/Frame.tsx';
+import type { NodeSetID, ProfileNodeSet } from '@sub-forge/core';
+import { planProfileChange, removeProfileNodeSet } from './chainModel.ts';
+import { useCascadeConfirm } from './useCascadeConfirm.ts';
 import { NODE_SET_LABEL } from '../../domain/nodeSet.ts';
 import { ResourceFileLink } from '../../components/ResourceLinkButton.tsx';
 import { NodeSetCount } from '../../components/NodeSetCount.tsx';
@@ -65,17 +65,17 @@ export function TabBase() {
 
 /** 节点集（设计稿「Profile · 节点集」）：表格 + 添加对话框，下方说明两种输出方式 */
 export function TabNodeSets() {
-  const { draft, setDraft, allNodeSets, nodeSetName, groupName, groups } = useProfile();
+  const { draft, setDraft, allNodeSets, nodeSetName, groups } = useProfile();
   const collections = useList('collections');
   const traffic = trafficSourceIds(draft, collections.data ?? []);
+  const confirmCascade = useCascadeConfirm();
   const remove = async (ref: NodeSetID) => {
-    const affected = draft.chains.filter(c => chainUsesNodeSet(c, ref));
-    if (affected.length) {
-      const chains = affected.map(c => `${c.via.kind === 'group' ? groupName(c.via.groupId) : c.via.kind === 'builtin' ? c.via.name : 'exact' in c.via.ref.match ? c.via.ref.match.exact : '筛选节点'} → ${landingNodeName(c.landing) ?? (c.landing.filter || c.landing.excludeFilter ? '筛选节点' : '全部节点')}`).join('\n');
-      const result = await Frame.modal.confirm({ title: `移出节点来源「${nodeSetName(ref)}」？`, description: `以下 ${affected.length} 条代理链引用了此节点来源，将一起移除。保存订阅后生效。\n\n${chains}`, confirmLabel: '移出并移除代理链', danger: true });
-      if (result.status !== 'confirmed') return;
-    }
-    setDraft(removeProfileNodeSet(draft, ref));
+    const cascade = removeProfileNodeSet(draft, ref);
+    if (await confirmCascade(cascade, { title: `移出节点来源「${nodeSetName(ref)}」？`, lead: '以下内容引用了此节点来源，将一起清除。', confirmLabel: '移出并清除' })) setDraft(cascade.next);
+  };
+  const setOutput = async (index: number, output: ProfileNodeSet['output']) => {
+    const cascade = planProfileChange(draft, { nodeSets: draft.nodeSets.map((n, i) => i === index ? { ...n, output } : n) });
+    if (await confirmCascade(cascade, { title: `将「${nodeSetName(draft.nodeSets[index]!.ref)}」改为${output === 'provider' ? '引用' : '展开'}？`, lead: '切换后以下内容不再成立，将一起清除。', confirmLabel: '切换并清除' })) setDraft(cascade.next);
   };
   return (
     <>
@@ -86,7 +86,7 @@ export function TabNodeSets() {
           <div className="flex min-w-0 flex-col"><ResourceFileLink kind={n.ref.type === 'source' ? 'sources' : n.ref.type === 'collection' ? 'collections' : 'locals'} id={n.ref.id} name={nodeSetName(n.ref)} className="block truncate text-sm leading-5 font-medium text-foreground no-underline hover:text-primary" />
           <span className="text-xs text-muted-foreground">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span></div>
           {n.ref.type === 'source' && <div className="col-start-3 row-start-3 lg:col-start-4 lg:row-start-1"><Toggle variant="outline" size="sm" className="px-3" aria-label={`${nodeSetName(n.ref)}提供流量信息`} title="开启后，此来源的流量与到期时间计入订阅" pressed={traffic.includes(n.ref.id)} onPressedChange={checked => setDraft({ ...draft, userinfo: { mode: 'sources', sourceIds: checked ? [...traffic, n.ref.id] : traffic.filter(id => id !== n.ref.id) } })}><Gauge />流量信息</Toggle></div>}
-          <div className="col-start-3 row-start-2 lg:col-start-5 lg:row-start-1"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: '引用' }, { value: 'inline', label: '展开' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>
+          <div className="col-start-3 row-start-2 lg:col-start-5 lg:row-start-1"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: '引用' }, { value: 'inline', label: '展开' }]} onChange={output => void setOutput(i, output)} /></div>
           <div className="col-start-4 row-start-1 flex justify-end lg:col-start-6"><ActionMenu label={`${nodeSetName(n.ref)}更多操作`} items={[
             ...(n.output === 'provider' ? [{ label: '追加独立策略组', onSelect: () => setDraft(appendProviderGroup(draft, n.ref, nodeSetName(n.ref), groups)) }] : []),
             { label: '移除节点来源', danger: true, onSelect: () => void remove(n.ref) },

@@ -12,6 +12,7 @@ import { draftIssues } from '../template/model.ts';
 import { useProfile } from './context.ts';
 import { Frame } from '../../modals/Frame.tsx';
 import { removeIndependentGroup } from './providerGroup.ts';
+import { planProfileChange } from './chainModel.ts';
 import { ProfileGroupDialog } from './ProfileGroupDialog.tsx';
 import { withRoutingGroups, withRoutingRules } from './routing.ts';
 
@@ -35,8 +36,11 @@ export function ProfileGroupsEditor() {
         set: (group, hidden) => { if (draft.routing?.mode === 'bound') setDraft({ ...draft, routing: withGroupHidden(draft.routing, template, group.id, hidden) }); },
       } : undefined}
       onRemoveGroup={async group => {
-        const result = await Frame.modal.confirm({ title: `删除策略组「${group.name}」？`, description: '同时移除组内成员引用及引用它的代理链，相关规则出口改为 REJECT。保存订阅后生效。', confirmLabel: '删除', danger: true });
-        if (result.status === 'confirmed') setDraft(removeIndependentGroup(draft, group.id));
+        const removed = removeIndependentGroup(draft, group.id);
+        // 随组移除的代理链继续向后影响其他组的成员。
+        const cascade = planProfileChange({ ...removed, chains: draft.chains }, { chains: removed.chains });
+        const result = await Frame.modal.confirm({ title: `删除策略组「${group.name}」？`, description: `同时移除组内成员引用及引用它的代理链，相关规则出口改为 REJECT。保存订阅后生效。${cascade.members.length ? `\n\n以下成员不再经过代理链，将一起清除：\n${cascade.members.map(({ groupId, member }) => `${groupName(groupId)}：${memberLabel(member, groupName, nodeSetName).text}`).join('\n')}` : ''}`, confirmLabel: '删除', danger: true });
+        if (result.status === 'confirmed') setDraft(cascade.next);
       }}
       memberSummary={group => {
         return group.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '没有成员，流量会被拒绝';

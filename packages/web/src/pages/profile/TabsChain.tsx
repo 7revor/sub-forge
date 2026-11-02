@@ -7,6 +7,8 @@ import { RoutingCard, RoutingCardActions, RoutingCardIcon } from '../../componen
 import { SortableList } from '../../components/SortableList.tsx';
 import type { ReactNode } from 'react';
 import { putChain } from './memberModel.ts';
+import { chainLabel, planProfileChange } from './chainModel.ts';
+import { useCascadeConfirm } from './useCascadeConfirm.ts';
 import { CodePreview, type CodeRange } from '../../components/CodePreview.tsx';
 import { PreviewReport } from './PreviewReport.tsx';
 import { indexPreview, locatePreviewIssue } from './previewReport.ts';
@@ -28,11 +30,18 @@ function usePreview() {
 
 export function TabChains() {
   const profile = useProfile();
-  const { draft, setDraft, profileNodeSets } = profile;
+  const { draft, setDraft, profileNodeSets, groupName } = profile;
+  const confirmCascade = useCascadeConfirm();
   const check = useChainCheck();
   const edit = async (chain: ChainRule, adding = false) => {
     const result = await ChainRuleModal.show({ ...profileModalData(profile), chain, title: adding ? '添加代理链' : '编辑代理链' });
-    if (result.status === 'confirmed' && result.data) setDraft({ ...draft, chains: putChain(draft.chains, result.data) });
+    if (result.status !== 'confirmed' || !result.data) return;
+    const cascade = planProfileChange(draft, { chains: putChain(draft.chains, result.data) });
+    if (await confirmCascade(cascade, { title: '应用代理链修改？', lead: '修改后以下策略组成员不再经过代理链，将一起清除。', confirmLabel: '应用并清除' })) setDraft(cascade.next);
+  };
+  const remove = async (chain: ChainRule) => {
+    const cascade = planProfileChange(draft, { chains: draft.chains.filter(c => c.id !== chain.id) });
+    if (await confirmCascade(cascade, { title: `删除代理链「${chainLabel(chain, groupName)}」？`, lead: '删除后以下策略组成员不再经过代理链，将一起清除。', confirmLabel: '删除并清除' })) setDraft(cascade.next);
   };
   const add = () => void edit(chainForLanding([], { nodeSet: { type: 'source', id: '' } }), true);
 
@@ -43,7 +52,7 @@ export function TabChains() {
         {check.error && <div className="px-4"><ErrorAlert error={check.error} /></div>}
         {check.result && !check.result.ok && <p role="alert" className="m-0 mb-3 px-4 text-sm text-destructive">Mihomo 检查未通过。请在「预览」中选择实际客户端查看报告；各条代理链的问题显示在下方。</p>}
         {!draft.chains.length ? <Empty variant="card" title={profileNodeSets.length ? '还没有代理链' : '先添加节点来源，再配置代理链'} /> : (
-          <div aria-label="代理链列表"><SortableList items={draft.chains} getKey={chain => chain.id} onReorder={chains => setDraft({ ...draft, chains })} renderItem={(chain, i, handle) => <ChainCard chain={chain} index={i} handle={handle} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === chain.id)} onEdit={() => void edit(chain)} onDelete={() => setDraft({ ...draft, chains: draft.chains.filter(c => c.id !== chain.id) })} /> } /></div>
+          <div aria-label="代理链列表"><SortableList items={draft.chains} getKey={chain => chain.id} onReorder={chains => setDraft({ ...draft, chains })} renderItem={(chain, i, handle) => <ChainCard chain={chain} index={i} handle={handle} checking={check.checking} result={check.result?.chainResolutions?.find(r => r.chainId === chain.id)} onEdit={() => void edit(chain)} onDelete={() => void remove(chain)} /> } /></div>
         )}
       </Card>
 

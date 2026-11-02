@@ -1,4 +1,4 @@
-import type { ChainRule, NodeRef, NodeSetID, Profile, ChainTarget } from '@sub-forge/core';
+import { chainSources, compileUserRegex, type ChainNodeSet, type ChainRule, type GroupMember, type GroupSpec, type NodeRef, type NodeSetID, type Profile, type ChainTarget, type RuleEntry, type Target } from '@sub-forge/core';
 import { exactNodeFilter, NO_NODE_FILTER, nodeSetKey } from './memberModel.ts';
 
 /** 只还原本编辑器生成的精确筛选；历史正则不能被误当成单个节点。 */
@@ -36,15 +36,99 @@ export function landingConstraintHint(scope: string, landing: ChainRule['landing
   return `范围：${scope} · 沿用已有${rules}，点选节点可替换`;
 }
 
+const targetUsesKey = (target: ChainTarget, key: string): boolean => target.kind === 'node' && (
+  nodeSetKey(target.ref.nodeSet) === key || !!(target.ref.fallback && target.ref.fallback !== 'error' && targetUsesKey(target.ref.fallback, key))
+);
+
 /** 同时检查落地、前置与嵌套回退，移出来源后不能留下悬空链引用。 */
 export function chainUsesNodeSet(chain: ChainRule, ref: NodeSetID): boolean {
   const key = nodeSetKey(ref);
-  const targetUses = (target: ChainTarget): boolean => target.kind === 'node' && (
-    nodeSetKey(target.ref.nodeSet) === key || !!(target.ref.fallback && target.ref.fallback !== 'error' && targetUses(target.ref.fallback))
-  );
-  return nodeSetKey(chain.landing.nodeSet) === key || targetUses(chain.via);
+  return nodeSetKey(chain.landing.nodeSet) === key || targetUsesKey(chain.via, key);
 }
 
-export function removeProfileNodeSet<T extends Profile>(profile: T, ref: NodeSetID): T {
-  return { ...profile, nodeSets: profile.nodeSets.filter(s => nodeSetKey(s.ref) !== nodeSetKey(ref)), chains: profile.chains.filter(c => !chainUsesNodeSet(c, ref)) };
+export function chainLabel(chain: ChainRule, groupName: (id: string) => string): string {
+  const via = chain.via.kind === 'group' ? groupName(chain.via.groupId) : chain.via.kind === 'builtin' ? chain.via.name : 'exact' in chain.via.ref.match ? chain.via.ref.match.exact : '筛选节点';
+  return `${via} → ${landingNodeName(chain.landing) ?? (chain.landing.filter || chain.landing.excludeFilter ? '筛选节点' : '全部节点')}`;
+}
+
+const chainScopes = (chain: ChainRule): ChainNodeSet[] => {
+  const via = (target: ChainTarget): ChainNodeSet[] => target.kind !== 'node' ? [] : [target.ref.nodeSet, ...(target.ref.fallback && target.ref.fallback !== 'error' ? via(target.ref.fallback) : [])];
+  return [chain.landing.nodeSet, ...via(chain.via)];
+};
+
+function landingIncludes(landing: ChainRule['landing'], name: string): boolean {
+  try {
+    return (!landing.filter || compileUserRegex(landing.filter).test(name)) && !(landing.excludeFilter && compileUserRegex(landing.excludeFilter).test(name));
+  } catch {
+    // 历史非法正则无法判断范围：按仍覆盖保留成员，错误由代理链检查展示。
+    return true;
+  }
+}
+
+/** 成员的节点是否走这条代理链；动态的「全部」成员不算填入的具体内容。 */
+function chainCoversMember(chain: ChainRule, member: GroupMember, nodeSets: Profile['nodeSets']): boolean {
+  if (member.kind !== 'nodeset' && member.kind !== 'node') return false;
+  const key = nodeSetKey(member.kind === 'nodeset' ? member.ref : member.ref.nodeSet);
+  if (!chainSources(chain.landing.nodeSet, nodeSets).some(source => nodeSetKey(source.ref) === key)) return false;
+  return member.kind === 'nodeset' || !('exact' in member.ref.match) || landingIncludes(chain.landing, member.ref.match.exact);
+}
+
+export type ClearedMember = { groupId: string; member: GroupMember };
+export type ProfileCascade<T> = { next: T; chains: ChainRule[]; members: ClearedMember[]; rules: number };
+
+/**
+ * 节点来源 → 代理链 → 策略组逐级引用：前一级改动后，清除后一级已填入且不再成立的内容。
+ * 模板组自身的成员只读，这里只处理订阅可编辑的成员。
+ */
+export function planProfileChange<T extends Profile>(profile: T, change: { nodeSets?: Profile['nodeSets']; chains?: ChainRule[] }): ProfileCascade<T> {
+  const nodeSets = change.nodeSets ?? profile.nodeSets;
+  const requested = change.chains ?? profile.chains;
+  const removedKeys = profile.nodeSets.map(source => nodeSetKey(source.ref)).filter(key => !nodeSets.some(source => nodeSetKey(source.ref) === key));
+  const emptied = (chain: ChainRule) => chainScopes(chain).some(scope => chainSources(scope, profile.nodeSets).length > 0 && !chainSources(scope, nodeSets).length);
+  const chains = requested.filter(chain => !emptied(chain));
+  const usesRemoved = (target: Target) => removedKeys.some(key => targetUsesKey(target, key));
+  const stale = (member: GroupMember) => (member.kind === 'nodeset' ? removedKeys.includes(nodeSetKey(member.ref)) : member.kind === 'node' && usesRemoved(member))
+    || (profile.chains.some(chain => chainCoversMember(chain, member, profile.nodeSets)) && !chains.some(chain => chainCoversMember(chain, member, nodeSets)));
+  const members: ClearedMember[] = [];
+  let rules = 0;
+  const cleanMembers = (groupId: string, list: GroupMember[]) => list.filter(member => {
+    if (!stale(member)) return true;
+    members.push({ groupId, member });
+    return false;
+  });
+  const cleanGroups = (groups: GroupSpec[]) => groups.map(group => ({ ...group, members: cleanMembers(group.id, group.members) }));
+  const cleanTarget = (target: Target): Target => {
+    if (!usesRemoved(target)) return target;
+    rules++;
+    return { kind: 'builtin', name: 'REJECT' };
+  };
+  const cleanRules = (list: RuleEntry[]) => list.map(rule => ({ ...rule, target: cleanTarget(rule.target) }));
+  const routing = profile.routing;
+  const nextRouting = !routing ? routing : routing.mode === 'independent'
+    ? { ...routing, config: { ...routing.config, groups: cleanGroups(routing.config.groups), rules: cleanRules(routing.config.rules), final: cleanTarget(routing.config.final) } }
+    : { ...routing,
+      groupAdditions: Object.fromEntries(Object.entries(routing.groupAdditions).map(([id, list]) => [id, cleanMembers(id, list)] as const).filter(([, list]) => list.length)),
+      ...(routing.extraGroups ? { extraGroups: cleanGroups(routing.extraGroups) } : {}),
+      ...(routing.prependRules ? { prependRules: cleanRules(routing.prependRules) } : {}),
+      ...(routing.appendRules ? { appendRules: cleanRules(routing.appendRules) } : {}),
+    };
+  return { next: { ...profile, nodeSets, chains, ...(nextRouting ? { routing: nextRouting } : {}) }, chains: requested.filter(emptied), members, rules };
+}
+
+export const hasCascade = (cascade: ProfileCascade<unknown>) => cascade.chains.length > 0 || cascade.members.length > 0 || cascade.rules > 0;
+
+/** 提示正文逐项列出将被清除的内容，取消后草稿不变。 */
+export function cascadeDescription(cascade: ProfileCascade<unknown>, lead: string, names: { chain: (chain: ChainRule) => string; member: (item: ClearedMember) => string }): string {
+  return [
+    lead,
+    ...(cascade.chains.length ? ['', `代理链（${cascade.chains.length} 条）`, ...cascade.chains.map(names.chain)] : []),
+    ...(cascade.members.length ? ['', `策略组成员（${cascade.members.length} 项）`, ...cascade.members.map(names.member)] : []),
+    ...(cascade.rules ? ['', `${cascade.rules} 条规则出口改为 REJECT`] : []),
+    '',
+    '保存订阅后生效。',
+  ].join('\n');
+}
+
+export function removeProfileNodeSet<T extends Profile>(profile: T, ref: NodeSetID): ProfileCascade<T> {
+  return planProfileChange(profile, { nodeSets: profile.nodeSets.filter(s => nodeSetKey(s.ref) !== nodeSetKey(ref)) });
 }

@@ -13,6 +13,8 @@ import { Badge, Button, Empty, Segmented, Select, cx } from '../../components/ui
 import { GROUP_TYPE_LABEL } from '../../components/GroupSettingsFields.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, memberKey, nodeSetKey, toggleMember } from './memberModel.ts';
+import { planProfileChange } from './chainModel.ts';
+import { useCascadeConfirm } from './useCascadeConfirm.ts';
 import { useChainNames } from './useChainNames.ts';
 import { Checkbox } from '../../components/ui/checkbox.tsx';
 
@@ -21,6 +23,7 @@ type Props = { group: GroupSpec; members: GroupMember[]; inherited: GroupMember[
 /** 成员编辑集中于会话副本；候选浮层与右侧预览不创建另一套弹窗。 */
 export function GroupMemberPicker({ group, members, inherited, onChange, advanced }: Props) {
   const { draft, setDraft, groups, groupName, nodeSetName, profileNodeSets } = useProfile();
+  const confirmCascade = useCascadeConfirm();
   const [category, setCategory] = useState<'source' | 'node' | 'group' | 'builtin'>('source');
   const [source, setSource] = useState('');
   const output = (ref: NodeSetID) => draft.nodeSets.find(s => nodeSetKey(s.ref) === nodeSetKey(ref))?.output;
@@ -35,6 +38,10 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
   const allProviders = effective.some(m => m.kind === 'all' && m.scope !== 'proxies');
   const allInline = effective.some(m => m.kind === 'all' && m.scope !== 'providers');
   const previewSets = profileNodeSets.filter(s => effective.some(m => m.kind === 'nodeset' && nodeSetKey(m.ref) === nodeSetKey(s.ref)) || (output(s.ref) === 'provider' ? allProviders : allInline));
+  const expandProviders = async () => {
+    const cascade = planProfileChange(draft, { nodeSets: draft.nodeSets.map(n => n.output === 'provider' ? { ...n, output: 'inline' } : n) });
+    if (await confirmCascade(cascade, { title: '将引用来源改为展开？', lead: '切换后以下内容不再成立，将一起清除。', confirmLabel: '切换并清除' })) setDraft(cascade.next);
+  };
   const choose = (member: GroupMember, checked: boolean) => onChange(toggleMember(members, member, checked, inherited));
   const candidate = (member: GroupMember, title: string, subtitle?: string, disabled = false) => {
     const key = memberKey(member), locked = inheritedKeys.has(key), checked = locked || selectedKeys.has(key);
@@ -65,7 +72,7 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
                   {category === 'group' && effectiveGroups.filter(g => g.id !== group.id).map(g => candidate({ kind: 'group', groupId: g.id }, g.name, canReferenceGroup(effectiveGroups, group.id, g.id) ? GROUP_TYPE_LABEL[g.type] : '不可添加：会循环引用', !canReferenceGroup(effectiveGroups, group.id, g.id)))}
                   {category === 'builtin' && BUILTINS.map(name => candidate({ kind: 'builtin', name }, name, { DIRECT: '直连', REJECT: '拒绝', 'REJECT-DROP': '静默丢弃', PASS: '继续匹配规则' }[name]))}
                 </div>
-                {category === 'node' && providers.length > 0 && <div className="border-t border-border pt-3 text-xs text-muted-foreground">{providers.map(p => p.name).join('、')}为引用来源 <Button size="sm" variant="ghost" onClick={() => setDraft({ ...draft, nodeSets: draft.nodeSets.map(n => n.output === 'provider' ? { ...n, output: 'inline' } : n) })}>改为展开</Button></div>}
+                {category === 'node' && providers.length > 0 && <div className="border-t border-border pt-3 text-xs text-muted-foreground">{providers.map(p => p.name).join('、')}为引用来源 <Button size="sm" variant="ghost" onClick={expandProviders}>改为展开</Button></div>}
               </div>
             </PopoverContent>
           </Popover>
