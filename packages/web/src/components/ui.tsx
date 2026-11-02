@@ -118,6 +118,14 @@ export function Switch({ checked, onChange, label, disabled = false }: { checked
   return <ShadcnSwitch checked={checked} onCheckedChange={onChange} aria-label={label} disabled={disabled} />;
 }
 
+/** 列表行内的布尔项用分段控件，两种状态都有明确文案；value 为 true 时选中 on。 */
+export function BooleanSegmented({ value, onChange, label, on, off, disabled = false, size = 'sm' }: {
+  value: boolean; onChange: (v: boolean) => void; label: string; on: string; off: string; disabled?: boolean; size?: 'sm' | 'md';
+}) {
+  return <Segmented label={label} size={size} value={value ? 'on' : 'off'} onChange={next => onChange(next === 'on')}
+    options={[{ value: 'on', label: on, disabled }, { value: 'off', label: off, disabled }]} />;
+}
+
 export function PageHeader({ title, subtitle, crumbs, actions, children }: { title: ReactNode; subtitle?: ReactNode; crumbs?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
   return (
     <div className="shrink-0 flex flex-col gap-2 break-words">

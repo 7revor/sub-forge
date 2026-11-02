@@ -9,14 +9,14 @@ import { memberLabel } from '../../components/pickers.tsx';
 import { TemplateBoundList } from '../../components/TemplateBoundList.tsx';
 import { SortableList } from '../../components/SortableList.tsx';
 import { RoutingCard, RoutingCardActions, RoutingCardIcon } from '../../components/RoutingCard.tsx';
-import { Badge, Button, Card, Empty, Field, Input, Switch, cx } from '../../components/ui.tsx';
+import { Badge, BooleanSegmented, Button, Card, Empty, Field, Input, cx } from '../../components/ui.tsx';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { newId, type TemplateBody } from '../../convert/templateYaml.ts';
 import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup, setGroupHidden } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
-const columns = 'grid grid-cols-[20px_32px_minmax(0,1fr)_64px] md:grid-cols-[20px_32px_minmax(160px,1fr)_88px_minmax(0,1.6fr)_124px_64px_64px]';
+const columns = 'grid grid-cols-[20px_32px_minmax(0,1fr)_64px] md:grid-cols-[20px_32px_minmax(160px,1fr)_88px_minmax(0,1.6fr)_124px_108px_64px]';
 
 export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, isGroupReadOnly = () => readOnly, onRemoveGroup, onEditGroup, memberSummary, nodeSetName = ref => ref.id, templateGroupIds, templateStart, hiddenOverride }: {
   value: TemplateBody; onChange: (body: TemplateBody, templateStart?: number) => void; report: ReportItem[];
@@ -69,7 +69,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
               <span className="shrink-0 text-foreground" title="策略组类型">{GROUP_TYPE_LABEL[g.type]}</span>
               <span className={cx("min-w-0 flex-1 truncate max-md:basis-20", !g.members.length ? memberSummary ? "text-warn" : "text-muted-foreground" : "text-muted-foreground")} title={members}>{members}</span>
               <span className="flex flex-wrap gap-1 max-md:empty:hidden">{!g.members.length && memberSummary && <Badge tone="warn">空组</Badge>}{inherited !== undefined && inherited !== hidden && <Badge tone="warn">{inherited ? '模板为隐藏' : '模板为显示'}</Badge>}</span>
-              <label className="ml-auto flex w-[62px] shrink-0 items-center gap-1.5 text-xs text-muted-foreground"><Switch label={`显示策略组「${g.name || '未命名组'}」`} disabled={readOnly} checked={!hidden} onChange={shown => setHidden(g, !shown)} />{hidden && '隐藏'}</label>
+              <span className="ml-auto shrink-0"><BooleanSegmented label={`策略组「${g.name || '未命名组'}」的显示状态`} on="显示" off="隐藏" disabled={readOnly} value={!hidden} onChange={shown => setHidden(g, !shown)} /></span>
             </div>
             <div className="col-start-4 row-start-1 md:col-start-8">
               <RoutingCardActions label={`策略组「${g.name}」`} onEdit={() => void edit(g)} onDelete={isGroupReadOnly(g) ? undefined : () => void remove(g)} />
