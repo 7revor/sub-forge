@@ -20,6 +20,36 @@ async function setup() {
   return { ...env, admin, alice, bob, t, draft };
 }
 
+describe('绑定模板订阅的隐藏覆盖接口', () => {
+  it('保存后写入订阅输出，转独立与改绑时迁移，并拒绝非法值', async () => {
+    const { admin, alice, draft, app } = await setup();
+    const routing = { ...draft.routing, prependRules: [], groupHidden: { g: true } };
+    expect((await alice.post('/api/profiles', { ...draft, routing: { ...routing, groupHidden: { g: 'yes' } } })).status).toBe(400);
+    const created = await alice.post('/api/profiles', { ...draft, routing });
+    expect(created.status).toBe(201);
+    const profile = created.json.item;
+    expect(profile.routing.groupHidden).toEqual({ g: true });
+    const token = (await alice.get(`/api/profiles/link?id=${profile.id}`)).json.item.token;
+    const yaml = parse(await (await app.request(`/subs/profile?token=${token}&id=${profile.id}`)).text());
+    expect(yaml['proxy-groups']).toContainEqual(expect.objectContaining({ name: '默认组', hidden: true }));
+
+    const independent = await alice.post('/api/profiles/routing/convert', { profile, mode: 'independent' });
+    expect(independent.json.item.routing.config.groups[0].display.hidden).toBe(true);
+
+    const second = (await admin.post('/api/templates/new/publish', { ...template, name: '第二模板', groups: [{ ...template.groups[0], id: 'new-g' }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } })).json.item;
+    const rebound = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', templateId: second.id, mapping: { g: 'new-g' } });
+    expect(rebound.status).toBe(200);
+    expect(rebound.json.item.routing.groupHidden).toEqual({ 'new-g': true });
+    expect(rebound.json.changes).toContain('保留「默认组」的隐藏设置');
+
+    const third = (await admin.post('/api/templates/new/publish', { ...template, name: '第三模板', groups: [{ ...template.groups[0], id: 'hid', display: { hidden: true } }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } })).json.item;
+    const same = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', templateId: third.id, mapping: { g: 'hid' } });
+    expect(same.json.item.routing.groupHidden).toBeUndefined();
+    const dropped = await alice.post('/api/profiles/routing/convert', { profile, mode: 'bound', templateId: second.id, mapping: { g: null } });
+    expect(dropped.json.item.routing.groupHidden).toBeUndefined();
+  });
+});
+
 describe('绑定模板订阅的前置规则接口', () => {
   it('保存、重读、草稿预览与实际订阅共享顺序和远端节点依赖', async () => {
     const { alice, draft, app, renderer } = await setup();

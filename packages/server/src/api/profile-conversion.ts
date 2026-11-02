@@ -1,6 +1,6 @@
 import { requiredQuery } from '../query.ts';
 import { Hono } from 'hono';
-import { Report, resolveProfileRouting, type GroupMember, type Target } from '@sub-forge/core';
+import { Report, resolveProfileRouting, type GroupMember, type Target, type Template } from '@sub-forge/core';
 import { independentProfile, profileTemplate } from '../profile-routing.ts';
 import type { ProfileDoc } from '../docs.ts';
 import type { Store } from '../store.ts';
@@ -62,8 +62,9 @@ export function profileConversionRoutes(store: Store) {
       additions[target] = [...(additions[target] ?? []), ...remapped];
       changes.push(`「${group.name}」的 ${members.length} 个成员迁移到「${template.groups.find(g => g.id === target)!.name}」`);
     }
+    const groupHidden = migratedGroupHidden(profile, template, map, changes);
     const { template: _old, ...rest } = profile;
-    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, extraGroups: extraGroups.map(group => ({ ...group, members: group.members.map(member => member.kind === 'group' || member.kind === 'node' ? remapTarget(member) : member) })), ...(profile.routing?.mode === 'bound' ? { prependGroupIds: profile.routing.prependGroupIds, appendRules: profile.routing.appendRules?.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}), ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
+    const next: ProfileDoc = { ...rest, overlay: {}, routing: { mode: 'bound', templateId: template.id, groupAdditions: additions, ...(Object.keys(groupHidden).length ? { groupHidden } : {}), extraGroups: extraGroups.map(group => ({ ...group, members: group.members.map(member => member.kind === 'group' || member.kind === 'node' ? remapTarget(member) : member) })), ...(profile.routing?.mode === 'bound' ? { prependGroupIds: profile.routing.prependGroupIds, appendRules: profile.routing.appendRules?.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}), ...(profile.routing?.mode === 'bound' && profile.routing.prependRules ? { prependRules: profile.routing.prependRules.map(rule => ({ ...rule, target: remapTarget(rule.target) })) } : {}) },
       chains: profile.chains.map(chain => ({ ...chain, via: chain.via.kind === 'node' ? { ...chain.via, ref: { ...chain.via.ref, ...(chain.via.ref.fallback && chain.via.ref.fallback !== 'error' ? { fallback: remapTarget(chain.via.ref.fallback) } : {}) } } : remapTarget(chain.via) })),
     };
     if (profile.routing?.mode === 'bound' && profile.routing.prependRules?.length) changes.push(`保留 ${profile.routing.prependRules.length} 条前置规则，并按策略组映射更新出口`);
@@ -81,4 +82,21 @@ export function profileConversionRoutes(store: Store) {
     return c.json({ item: backup });
   });
   return app;
+}
+
+/** 绑定订阅的隐藏覆盖随成员映射迁移；与新模板相同或目标冲突的不再保留。独立订阅没有覆盖，改绑后跟随新模板。 */
+function migratedGroupHidden(profile: ProfileDoc, template: Template, map: Record<string, unknown>, changes: string[]): Record<string, boolean> {
+  if (profile.routing?.mode !== 'bound') return {};
+  const targets = new Map<string, boolean[]>();
+  for (const [id, hidden] of Object.entries(profile.routing.groupHidden ?? {})) {
+    const target = id in map ? map[id] : id;
+    if (isStr(target) && template.groups.some(g => g.id === target)) targets.set(target, [...(targets.get(target) ?? []), hidden]);
+  }
+  const result: Record<string, boolean> = {};
+  for (const [id, values] of targets) {
+    const name = template.groups.find(g => g.id === id)!.name;
+    if (new Set(values).size > 1) { changes.push(`「${name}」的隐藏设置来源冲突，改为跟随模板`); continue; }
+    if (values[0] !== !!template.groups.find(g => g.id === id)!.display?.hidden) { result[id] = values[0]!; changes.push(`保留「${name}」的隐藏设置`); }
+  }
+  return result;
 }
