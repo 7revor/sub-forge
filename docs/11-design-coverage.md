@@ -59,7 +59,7 @@
 | 功能 | 前端 | 服务端现状 |
 |---|---|---|
 | 规则仓库后续（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | 内置索引/搜索/预览/文本导入已实现；自定义公开 GitHub 仓库增删及逐文件索引已实现，动态 repo 引用及 mrs 导入待实现 |
-| 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制。2026-11-02 移除无界面调用的备份、恢复占位接口；`V2Settings` 不含该入口，需要时再按需求新增 |
+| 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制。2026-11-02 备份与恢复已按 [22](22-database-backup.md) 实现（此前移除的是无界面调用的占位接口）；早先 `V2Settings` 不含该入口，需要时再按需求新增 |
 | 共享订阅源 / 组合（SYS-06） | 用户页「共享的订阅源与组合」 | `GET /api/shares` 返回空，写 501 |
 | 用户统计列 | 用户页「配置订阅 / 订阅源 / 最近订阅请求」 | `GET /api/users/stats` 返回空，显示「—」 |
 | 组合成员「拉取失败时」（COL-05） | 组合成员表 | 字段 `onFail` 随文档保存，渲染尚未读取，目前一律使用快照 |
@@ -386,3 +386,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 必要说明修正：编辑器底栏恢复精简的用途/覆盖规则及系统管理字段说明，每类只出现一次；继承区仍只标来源和只读，不恢复重复标题、草稿实现解释和长示例。界面、当前约定与本地验收截图已同步；外部画布待同步。
 
 2026-11-02 已同步画布：`V2ProfileClient`（配置追加工作区重绘，同时去掉旧的 FlClash / Clash Verge / Stash 菜单）、`V2GroupDialog`（添加成员浮层去掉搜索框）、`V2ProfileDialogs`（新增移出来源、删除代理链两个级联确认）。前端在 `packages/web`；服务端接口与 `packages/core` 模型无需改动，校验沿用现有逻辑，无新增后端待实现项，示例种子不变。
+
+2026-11-02 系统页公共规则资源分页与数据库备份：`/api/system/rule-resources` 改为分页（默认 20 条，页面默认 10 条，复用公共 `Pagination`，无查询参数时不再返回全量）。新增「数据库备份」行、`BackupSettingsModal`、`RestoreBackupModal`，契约见 [22](22-database-backup.md)。已同步画布：`V2Settings`（公共规则资源示例与分页、数据库备份行、两个备份弹窗）。无后端待实现项。部署增加 `docker/compose.yaml` 与 `docker/nginx.conf.example`，不涉及画板。

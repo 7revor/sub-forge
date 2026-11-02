@@ -598,3 +598,12 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 2026-11-02 用语：本文的「节点集」是领域模型 `NodeSet` 的说法；界面、接口提示与渲染报告统一称「节点来源」。字段、类型与错误码不变。
 
 2026-11-02 引用级联：节点来源 → 代理链 → 策略组逐级引用。前一级改动使后一级已填入的内容不再成立时，先弹确认框逐项列出，确认后一并清除，取消则草稿不变；没有受影响内容时不提示。规则见 [PRD](02-PRD.md)，纯函数 `planProfileChange` 位于 `packages/web/src/pages/profile/chainModel.ts`。代理链「覆盖」成员指成员来源在落地范围内，且单节点成员的名称命中落地筛选；领域模型、接口与存储格式不变，服务端继续以「节点来源未加入本订阅」拒绝悬空引用，示例种子无需修改。
+
+## 系统设置中的备份（2026-11-02）
+
+`system_settings` 新增两条用主密钥加密的记录，不改变表结构（结构版本不变），也不进入种子文件：
+
+- `backup`：`{ enabled, url, username, password, passphrase, intervalHours, retain }`
+- `backupState`：`{ lastAttemptAt, lastSuccessAt, lastFile, lastSize, lastError, lastWarning, lastRestoreAt, lastRestoreFile }`
+
+恢复时这两条保留当前实例的值，其余数据全部以备份为准。见 [22](22-database-backup.md)。

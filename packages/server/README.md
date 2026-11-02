@@ -21,6 +21,8 @@ pnpm --filter @sub-forge/server start
 
 ### Docker（生产，SYS-08）
 
+推荐用 `docker/compose.yaml` 和 `docker/nginx.conf.example`，步骤见 [部署文档](../../docs/20-deployment-client-ip.md)。下面是直接运行的方式。
+
 ```bash
 docker build -f docker/Dockerfile -t sub-forge .
 docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
@@ -123,6 +125,10 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 - 旧库中已保存的无效远程规则快照也不能生成成功配置：使用最近成功配置回退，没有可回退配置时返回 503。有效规则经客户端覆盖主动全部丢弃不受此限制。
 - 订阅只拉取模板与个人覆盖合并后实际启用的规则依赖；禁用规则、失效锚点规则及规则集中停用的来源不会触发上游请求。
 - 地址限制：仅禁止 URL 中直接填写的内网 / 保留 IP，重定向逐跳检查协议与字面 IP；域名按系统 DNS 解析，解析结果即使是 Fake-IP 或内网地址也允许连接。此策略不提供 DNS rebinding 防护。
+
+## 数据库备份
+
+系统页可把数据库定时加密备份到 WebDAV 并恢复，接口与格式见 [22 · 数据库备份](../../docs/22-database-backup.md)。备份口令丢失后无法解密；设置了 `SUBFORGE_SECRET` 时只能恢复使用相同主密钥的备份。恢复前的文件保存为 `<数据库>.before-restore` 和 `secret.key.before-restore`。
 
 ## 敏感数据
 

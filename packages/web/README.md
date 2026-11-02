@@ -340,3 +340,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-02 一键关联：`useRepositoryUrlMatches` 增加 `linkAll`，只处理唯一候选，并发上限 4，单项失败不影响其余项；调用方基于最新草稿替换。`Card` 带操作时标题不换行。
 
 2026-11-02 复制链接统一：配置订阅详情删除链接预览行，改用页头右侧 `ResourceLinkButton`（未保存时禁用），备注显示在标题后；本地节点分组的复制入口移出「更多」菜单；删除 `CopyField` 与 `tokenOptions`。
+
+2026-11-02：系统页公共规则资源改为服务端分页；新增数据库备份（`components/BackupSettings.tsx`）：WebDAV 配置、立即备份、备份列表与恢复，恢复后按 `/healthz` 的 `x-boot-id` 判断重启完成。见 [22](../../docs/22-database-backup.md)。

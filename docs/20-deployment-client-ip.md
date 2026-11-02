@@ -1,5 +1,27 @@
 # 部署与访问日志 IP 透传
 
+## 快速部署：Compose + 宿主机 Nginx
+
+镜像只含应用（单容器，前端、管理接口、订阅接口同源），对外由 Nginx 负责 HTTPS。
+
+```bash
+cp docker/.env.example docker/.env
+```
+
+填写 `docker/.env` 的 `PUBLIC_URL`、管理员账号密码后启动：
+
+```bash
+docker compose -f docker/compose.yaml up -d --build
+```
+
+再把 [docker/nginx.conf.example](../docker/nginx.conf.example) 放入 Nginx 配置，替换域名和证书路径。该示例已处理：
+
+- 覆盖 `X-Forwarded-For`，配合下文的可信代理获得真实 IP。
+- `/api/events`（SSE）关闭缓冲、放宽读取超时；否则页面收不到实时刷新。
+- 把一般请求的读取超时放宽到 600 秒，覆盖手动备份和恢复。
+
+`PUBLIC_URL` 必须是浏览器实际访问的地址：TLS 在 Nginx 终止，应用只看到 http，它的来源（origin）会被当作可信来源；填错时所有写请求都会返回“跨站请求被拒绝”。必须部署在域名根路径，不支持子路径。数据都在 `sub-forge-data` 卷中，定时备份见 [22](22-database-backup.md)。恢复备份在进程内完成，不需要重启容器。
+
 ## 日志含义与配置
 
 首页访问日志、`GET /api/access-log` 和配置的访问历史返回：
@@ -52,7 +74,7 @@ volumes:
   sub-forge-data:
 ```
 
-Nginx 直接面对客户端时，在已有 HTTPS `server` 内配置：
+Nginx 直接面对客户端时，在已有 HTTPS `server` 内配置（SSE 与超时设置见 [完整示例](../docker/nginx.conf.example)）：
 
 ```nginx
 location / {
