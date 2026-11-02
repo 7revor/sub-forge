@@ -158,3 +158,5 @@ Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整�
 2026-10-30：新增 `renderSurge` / `renderLoon`、节点输入解析、INI 基础编解码与独立导出，规则补齐逻辑表达式、URL-REGEX、extended-matching 和语义去重。架构、能力矩阵、版本要求及测试边界见 [四客户端转换](../../docs/19-client-conversion.md)。可设置 `SURGE_BIN=/path/to/surge-cli` 运行官方离线配置检查；不能用 Mihomo 校验器代替其他客户端。
 
 2026-11-02 `ProfileRouting` 绑定模式新增 `groupHidden`：`resolveProfileRouting` 在合并后应用，`withGroupHidden` 只保存与模板不同的值并清理已删除组。旧 `overlay.groupPatches.set` 仍禁止隐藏模板组。
+
+2026-11-02 当前订阅使用精简的 `RoutedProfile`，不携带 `overlay` 或 `refPolicy`。`Profile` 作为历史兼容输入接受可选旧字段，迁移后只保留 routing；历史合并与当前解析继续共享输出一致性验证。
