@@ -5,8 +5,8 @@ import { cx } from './cx.ts';
 /** 只负责只读文本展示；请求、错误与空结果语义由使用方决定。 */
 export type CodeRange = { startLine: number; endLine: number };
 
-export function CodePreview({ text, title, label, copyable = false, loading = false, lineNumbers = false, fill = false, highlight, className, bodyClassName }: {
-  lineNumbers?: boolean; fill?: boolean; text: string; title?: ReactNode; label?: string; copyable?: boolean; loading?: boolean; className?: string; bodyClassName?: string;
+export function CodePreview({ text, title, footer, label, copyable = false, loading = false, lineNumbers = false, fill = false, highlight, className, bodyClassName }: {
+  lineNumbers?: boolean; fill?: boolean; text: string; title?: ReactNode; footer?: ReactNode; label?: string; copyable?: boolean; loading?: boolean; className?: string; bodyClassName?: string;
   highlight?: CodeRange;
 }) {
   const body = useRef<HTMLPreElement>(null);
@@ -27,5 +27,6 @@ export function CodePreview({ text, title, label, copyable = false, loading = fa
       {copyable && <CopyButton text={text} size="sm" variant="ghost" className="text-nav-text hover:bg-nav-hover" />}
     </div>}
     <pre ref={body} tabIndex={0} className={cx('m-0 overflow-auto p-3 font-mono text-xs leading-[1.7] text-[#dde1e7] transition-opacity', fill ? 'min-h-0 flex-1' : '', loading && 'opacity-70', bodyClassName)}>{lineNumbers ? <span className="flex min-w-max"><span aria-hidden="true" className="sticky left-0 mr-3 select-none bg-nav text-right text-[#8b95a5]">{lines.map((_, i) => i + 1).join('\n')}</span><code>{content}</code></span> : content}</pre>
+    {footer && <div className="shrink-0 border-t border-[#262b33] px-3 py-2 text-xs leading-relaxed text-[#8b95a5]">{footer}</div>}
   </section>;
 }

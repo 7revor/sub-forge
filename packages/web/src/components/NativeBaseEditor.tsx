@@ -22,9 +22,10 @@ export function NativeBaseEditor({ value, onChange }: { value: NativeBase; onCha
   const [error, setError] = useState<string>();
   const target = TARGETS[selected]!;
   const { kernel, app, label } = target;
-  const inherited = nativeBaseParents(kernel, app).filter(parent => parent !== 'stash' || value.kernels?.stash?.trim()).map(parent => ({ kernel: parent, label: scopeLabel(parent), text: value.kernels?.[parent] ?? '' }));
+  const inherited = nativeBaseParents(kernel, app).map(parent => ({ kernel: parent, label: scopeLabel(parent), text: value.kernels?.[parent] ?? '' })).filter(parent => parent.text.trim());
   const visible = TARGETS.flatMap((scope, i) => scope.parents.every(parent => expanded.includes(parent)) ? [i] : []);
   const format = isIniClient(kernel) ? 'INI' : 'YAML';
+  const mergeHint = format === 'YAML' ? 'YAML 映射递归合并；数组、标量和 null 由下层整体替换。例如 dns.nameserver 会替换整个列表，不会追加。' : 'INI 的 General、Host、MITM 中同名键由下层替换，其余段落按顺序追加。';
   const text = (app ? value.clients?.[app] : value.kernels?.[kernel]) ?? '';
   const update = (text: string) => { setError(undefined); onChange(app ? { ...value, clients: { ...value.clients, [app]: text } } : { ...value, kernels: { ...value.kernels, [kernel]: text } }); };
   return <div className="native-base-workspace">
@@ -45,11 +46,8 @@ export function NativeBaseEditor({ value, onChange }: { value: NativeBase; onCha
         <div className="flex gap-2">{format === 'YAML' && <Button size="sm" variant="ghost" disabled={!text.trim()} onClick={() => { try { update(stringify(parse(text))); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } }}>格式化</Button>}<Button size="sm" variant="ghost" disabled={!text} onClick={() => update('')}>清空</Button></div>
       </div>
       {inherited.length > 0 && <div className="mb-3 flex shrink-0 flex-col gap-2" aria-label="继承配置">
-        {inherited.map(parent => <details key={`${kernel}:${app ?? 'common'}:${parent.kernel}`} className="min-w-0 rounded-lg border border-border bg-muted/40">
-          <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground">继承自 {parent.label} <span className="ml-1">· 只读</span></summary>
-          {parent.text.trim() ? <CodePreview label={`继承的 ${parent.label}原文`} text={parent.text} lineNumbers className="mx-3 mb-3" bodyClassName="max-h-48" /> : <p className="m-0 px-3 pb-3 text-xs text-muted-foreground">{parent.label}{parent.kernel === 'stash' ? '为空' : '暂无公共配置'}</p>}
-        </details>)}
-        <p className="m-0 text-xs leading-relaxed text-muted-foreground">{format === 'YAML' ? 'YAML 映射递归合并；数组、标量和 null 由下层整体替换。例如 dns.nameserver 会替换整个列表，不会追加。' : 'INI 的 General、Host、MITM 中同名键由下层替换，其余段落按顺序追加。'}继承区仅展示当前草稿，不写入本层配置。</p>
+        {inherited.map(parent => <CodePreview key={`${kernel}:${app ?? 'common'}:${parent.kernel}`} label={`继承的 ${parent.label}原文`} text={parent.text} lineNumbers bodyClassName="max-h-48"
+          footer={<><p className="m-0">继承自 {parent.label} · 只读。展示当前公共配置草稿，不写入本层配置。</p><p className="m-0">{mergeHint}</p></>} />)}
       </div>}
       <div className="native-base-editor-frame"><YamlTextarea key={`${kernel}:${app ?? 'kernel'}`} aria-label={app ? `${label} 追加配置` : kernel === 'stash' ? 'Stash 公共追加配置' : `${label} 内核公共配置`} value={text} rows={15} lineNumbers
         className="native-base-source" placeholder={`粘贴 ${label} 的原始 ${format} 配置`} onChange={event => update(event.target.value)} />
