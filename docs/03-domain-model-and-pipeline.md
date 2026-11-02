@@ -1,6 +1,6 @@
 # 03 · 领域模型与渲染流水线
 
-本篇描述"怎么做"层面的关键设计，是 PRD 中 G1–G5 的落地方式。类型以 TypeScript 伪代码表示，与最终实现语言无关。
+本篇保留领域模型的设计脉络，带历史标记的伪代码不作为当前 API。2026-11-02 已同步规则转换与原文配置边界：现用类型见 [core/types](../packages/core/src/types.ts)、[base/native](../packages/core/src/base/native.ts)，输出矩阵见 [04](04-client-matrix.md)，原文继承见 [20](20-native-client-append.md)。
 
 ## 1. 设计原则
 
@@ -75,15 +75,15 @@ type RuleIR =
   | { type: 'IP-CIDR' | 'IP-CIDR6' | 'IP-ASN' | 'SRC-IP-CIDR'; value: string; noResolve?: boolean }
   | { type: 'GEOSITE' | 'GEOIP'; value: string; noResolve?: boolean }
   | { type: 'DST-PORT' | 'SRC-PORT'; value: string }
-  | { type: 'USER-AGENT'; value: string }       // Surge 专用；mihomo 输出为客户端不支持注释
+  | { type: 'USER-AGENT'; value: string }       // Surge／Loon／Stash 输出；Mihomo 生成不支持诊断
   | { type: 'NETWORK'; value: 'tcp' | 'udp' }
   | { type: 'PROCESS'; kind: 'name' | 'path'; mode: 'exact' | 'wildcard' | 'regex'; value: string } // 语义化
   | { type: 'AND' | 'OR' | 'NOT'; children: RuleIR[] }
   | { type: 'RAW'; client?: Client; text: string };  // 单条原文；未指定客户端时按目标客户端原样输出，旧 client 限制继续生效
 
 type ClientOverride = {
-  when: { client: Client; platform?: Platform };
-  action: { replace: RuleIR[] } | { drop: true };
+  when: { client: Client }; // 平台条件仅旧迁移读取，新配置拒绝
+  action: { replace: RuleIR[] } | { drop: true } | { append: RuleIR[] };
 };
 
 // 规则集由多个来源合并（2026-10-29 起；原 RuleBundle 并入规则集，旧数据迁移为同 id 的规则集）
@@ -101,7 +101,7 @@ type RuleSetSource = {
 type RuleSet = {
   id: ID; name: string;
   sources: RuleSetSource[];      // 按序合并、去重
-  overrides?: { match: string; override: ClientOverride }[]; // 整组按规则原文精确匹配，第一条客户端/平台匹配项生效
+  overrides?: { match: string; override: ClientOverride }[]; // 整组按规则原文精确匹配，第一条内核匹配项生效
   noResolve?: boolean;           // 仅兼容旧输入，忽略；以来源原文为准
   script?: string;               // (rule, ctx) => rule | rule[] | null（P1）
 };
@@ -144,7 +144,7 @@ type Template = {
 // ---------- 订阅（历史模型；2026-10-29 起采用文末 routing 两种模式） ----------
 type Profile = {
   id: ID; owner: UserID; name: string;
-  base?: { presetId?: ID; patch?: BasePatch };
+  base?: ProfileBase; // kernels／clients 原文槽位，类型见 base/native.ts；旧预设／patch 仅在迁移边界读取
   nodeSets: { ref: NodeSetID; output: 'provider' | 'inline'; providerName?: string }[];
   template?: { id: ID; follow: 'latest' | { pinned: number } };
   overlay: Overlay;
@@ -172,7 +172,7 @@ type ChainRule = {
 };
 ```
 
-代理链来源选择为空时，界面显示 placeholder「全部」，保存为 `{ type: 'all', id: 'provider' | 'inline' }`。渲染时按订阅中的来源顺序展开当前对应输出类型，包含后续加入的来源与节点；移出单个来源不会删除这类动态规则。前置采用范围内首个匹配节点，落地应用到全部匹配节点，循环检查继续生效。Stash 按用户设置的输出类型确定范围，再转换为内联输出。普通策略组、分流目标和嵌套回退仍使用具体 `NodeSetID`。
+代理链来源选择为空时，界面显示 placeholder「全部」，保存为 `{ type: 'all', id: 'provider' | 'inline' }`。渲染时按订阅中的来源顺序展开当前对应输出类型，包含后续加入的来源与节点；移出单个来源不会删除这类动态规则。前置采用范围内首个匹配节点，落地应用到全部匹配节点，循环检查继续生效。Stash 按用户设置保留 provider／inline，与 Mihomo 共用范围解析和代理链生成。普通策略组、分流目标和嵌套回退仍使用具体 `NodeSetID`。
 
 独立节点预览弹窗只展示节点列表。代理链的引用与展开来源（2026-11-02 起）使用同一表单：直接点选节点列表，不展示正则配置项，搜索框只用于查找；点选后列表保留并标记当前节点，可恢复全部。策略组前置直接展开组列表点选，不再套下拉选择器。
 
@@ -207,7 +207,7 @@ type ChainRule = {
 | 地址 | 用途 |
 | --- | --- |
 | `GET /subs/profile?id=P&token=T` | Profile 主配置（UA 识别客户端） |
-| `GET /subs/nodes?kind=provider&profile=P&id=K&token=T` | **Profile 专属** provider 内容：NodeSet 处理结果 + 本 Profile 链规则注入的 `dialer-proxy`（REF-06，仅 mihomo）；Surge/Loon/Stash 使用主配置内联节点，不生成此 provider |
+| `GET /subs/nodes?kind=provider&profile=P&id=K&token=T` | **Profile 专属** provider：处理链结果及本订阅链设置；Mihomo／Stash 返回 YAML，Surge／Loon 返回节点行。四端按来源 provider／inline 设置决定是否引用 |
 | `GET /resources/ruleset?key=K&token=T`、`GET /resources/repo?key=K&token=T` | 公共规则产物，与订阅无关 |
 | `GET /subs/ruleset?profile=P&key=K&token=T` | 订阅专属远程规则；模板不提供 token 入口 |
 
@@ -235,12 +235,12 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 2. 对每个引用 r 解析出具体节点 n（按 NodeRef.match 在 NodeSet 处理结果中查找）：
    - 找不到 → 走 fallback；无 fallback → report.error
 3. 若 n 所在 NodeSet 输出方式为 inline → 直接用 n.name，结束
-4. 否则（Mihomo 的 n 在 Provider P 中）自动处理：
+4. 否则（n 在 Provider P 中）自动处理：
             生成/复用组 G = { name: "__ref_<P>_<hash(n._key)>", type: select,
                             use: [P], filter: "^" + regexEscape(n.name) + "$",
                             hidden: true, empty-fallback: REJECT }   // 防止静默直连
            r 指向 G.name
-   Stash 在节点集阶段已转换为内联，由步骤 3 直接引用。
+   Stash 共用同一隐藏组身份；Surge／Loon／Stash 在远程资源层筛选精确成员。
 5. ChainRule 的落地侧：
    - 落地 NodeSet 为 inline → 直接给匹配节点写 dialer-proxy
    - 落地 NodeSet 为 provider →
@@ -250,7 +250,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
    - 在其他地方找不到 → report.warn，并按 fallback 处理（默认移除该字段）
 7. 环检测：在“节点→前置”图上做 DFS（包装组、provider 节点都计入），成环则报错
 8. 引用校验：所有 dialer-proxy / 规则目标 / 组成员必须在顶层表中（mihomo 不校验 provider 内的 dialer-proxy）
-9. Profile 专属 provider 的 URL 追加 ?v=<该 provider 注入内容的哈希>；proxy-providers 不输出 path（否则改 URL 不会触发重新下载，06 §3）
+9. Profile 专属 provider 的 URL 稳定，不追加内容版本或哈希；proxy-providers 不输出 path，按客户端刷新请求重新生成。
 ```
 
 要点：
@@ -261,13 +261,13 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 
 ### 4.3 Surge 与 Loon 的对应处理
 
-2026-10-30 实现采用节点快照内联，取代旧的 policy-path 包装组草案。共用节点筛选、引用解析、重名处理、模板合并及环检测；客户端差异集中在最后的序列化层。
+2026-11-02 起四端均遵守 provider／inline 设置；共用节点筛选、引用解析、重名处理、模板合并及环检测，在资源交付与序列化阶段处理差异。
 
 - Surge 将节点级 `dialer-proxy` 转成 `underlying-proxy`；QUIC 端口跳跃与代理链不能同时使用，冲突时报错。
-- Loon 尚未适配代理链。链配置或上游前置引用会阻止发布，不删除前置后输出直连节点。
-- 四类组均以筛选后的成员名称输出，无成员补 REJECT。节点更新随主订阅刷新生效。
-- Surge 规则集采用版本化托管 LIST，独立文件导出时展开；Loon 将手写规则与规则集按列表顺序统一输出为 `[Remote Rule]` 托管链接，`[Rule]` 仅保留 `FINAL`，避免本地/远程来源跨段重排。手写规则属于订阅私有产物。
-- `Client` 增加 `loon`；`BaseSettings.loon`、`Profile.base.loonPatch` 与其他客户端配置隔离。完整范围、限制和测试证据见 [19](19-client-conversion.md)。
+- Loon 内联落地生成节点副本与 Proxy Chain；远程落地不能携带链段，要求显式设为 inline，前置来源可保留 provider。
+- Surge 远程成员用 policy-path，Loon 用 Remote Proxy 订阅名；筛选在服务端执行，无成员补 REJECT，空远程资源不成功下发。
+- Surge 规则集采用稳定地址的托管 LIST，独立文件导出时展开；Loon 将手写规则与规则集按列表顺序统一输出为 `[Remote Rule]` 托管链接，`[Rule]` 仅保留 `FINAL`，避免本地/远程来源跨段重排。手写规则属于订阅私有产物。
+- Loon 基础配置使用 kernels.loon 与 clients 对应应用原文；旧 loonPatch 仅迁移读取。范围、限制和验证边界见 [19](19-client-conversion.md)。
 
 ## 5. 模板 ⊕ 覆盖层 合并
 
@@ -291,29 +291,28 @@ effective.final = overlay.final ?? template.final
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
 - 模板组不能在 Profile 中删除、改名（Q6）；旧覆盖层 `groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。绑定模式通过 `routing.groupHidden` 覆盖隐藏状态（2026-11-02 修订）。Profile 私有组（`extraGroups`）不受此限制。
-- 空组处理（TPL-10，2026-10-29 修订）：模板和私有组统一拒绝。静态无成员或内联节点筛空时补 `proxies: [REJECT]`，记录 `group.empty` 告警；所有组固定输出 `empty-fallback: REJECT`，由 Mihomo v1.19.27+ 处理运行时 provider 未加载、更新或筛选后无成员的情况。覆盖层、旧 `whenEmpty: direct` 和 `extra.empty-fallback` 都不能改变此行为。节点测速失败仍按组类型处理，不等于空组。UI 不提供空组设置；Surge/Loon 快照内联后的空组固定补 REJECT。
+- 空组处理：模板和私有组统一拒绝。静态无成员补 REJECT；Mihomo 动态组固定 empty-fallback: REJECT；Surge／Loon／Stash 服务端筛选、生成子集并保护空资源。旧 whenEmpty 不改变策略，节点测速失败不等于空组。
 
-## 6. 规则集展开与输出
+## 6. 规则集转换与输出
 
-```
-expand(ruleset):
-  rules = concat(sources.filter(enabled).map(s => applyOverrides(parse(s.kind == 'local' ? s.content : snapshot(ruleset.id, s.url)), ruleset.overrides)))
-  所有可解析文本来源：转换并合并为一个托管 classical LIST
-  单一合法 MRS 来源：校验后二进制托管；不能合并、改写或添加 src
-  SRS 或目标无法表示的内容：明确失败，并按既有成功产物回退
-  去重（按 type+value）
-  内部按 behavior 分类，仅用于排序与统计：
-    domain   : DOMAIN / DOMAIN-SUFFIX（可转为 mihomo domain behavior: +.suffix）
-    ipcidr   : IP-CIDR / IP-CIDR6
-    classical: 其余（KEYWORD、REGEX、PROCESS、GEOIP、AND/OR…）
-  输出顺序：domain → classical(非 IP 类) → ipcidr（IP 类逐行保留原文 no-resolve）
+```text
+对每个启用来源：读取本地正文或远程快照，校验输入与交付格式
+prepareRuleDocument：解析并保留来源行位、注释及诊断
+convertRuleDocuments：
+  按来源及原行顺序应用首条内核改写，兼容旧来源级改写
+  使用目标内核的去重键跨来源去重，再执行规则方言转换
+  按原位置输出规则或诊断注释，整组追加在末尾执行一次
+  domain／classical／ipcidr 只做统计，不分桶重排
+文本统一生成本服务托管的 classical LIST
+单一合法 MRS 来源校验后原字节托管；不能合并、改写或添加 src
+SRS／不支持的交付组合明确失败；规则行不能转换则保留诊断
 ```
 
 改写对各来源解析后的规则原文精确匹配（不含出口），在合并去重之前应用；单来源预览与合并、订阅输出共用同一逻辑。v8 迁移将启用来源的旧原文匹配直接提升，旧行号按本地内容或已有成功快照转成内容匹配；停用来源及无法定位的旧项保留，并在独立改写区块提示，补充内容并保存时重试转换。组级匹配优先于兼容旧项。
 
 预览接口的 `source` 选择单个来源（包括停用来源的诊断）；省略时只合并启用来源。来源状态中的 `rejected` 保留完整计数，新增可选 `rejectedDetails: { line, text, reason }[]`，最多返回前 100 条，供来源徽标直接展示诊断。该字段只存在于预览响应，规则集持久化结构与种子格式不变。
 
-同一出口的规则在规则集内部的相对顺序不影响命中结果，唯一需要关心的是 IP 类规则会触发 DNS 解析，因此放在最后。
+保留规则原顺序，不主动将 IP 类规则移到最后；类别统计不承担排序职责。旧 expandSource／expandRuleSet 分桶实现已删除，生产、预览与回归测试使用正式转换入口。
 
 ## 7. 缓存与刷新
 
@@ -359,7 +358,7 @@ SQLite v11 的 `rule_repos.definition` 为可空 JSON：`id/name/owner/repo/refs
 
 仓库候选扩展名固定为 list/txt，自定义路径通配符不能扩大范围。zydou 仅读取 surge-rule-set 与 surge-domain-set；blackmatrix7 不再索引 YAML。服务初始化过滤旧缓存中的不支持变体（多文件变体整体过滤），删除空条目，清空受影响仓库的 revisions 与 checked_at，从而在 commit 不变时也重新构建；既有 RuleSetSource 文档不改动。旧自定义仓库 `format: yaml` 改为 auto，保留用户路径筛选。
 
-RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML 解析结果增加可选 `conversion: yaml-to-list`，预览来源状态透出同名字段，前端展示转换托管标记。输入先解析为 IR，应用改写，再分桶输出 LIST 文本；不是把 YAML URL 直接下发。保存/预览拒绝把 YAML 地址或同 URL 的既有 yaml 输入标记为 mrs/srs；内核也阻止把已知 YAML 地址标成二进制。MRS 原字节托管不承担文本转换功能。
+RuleSetSource.format 继续表示输入格式（yaml 与 auto 保留）。YAML 解析结果增加可选 `conversion: yaml-to-list`，预览来源状态透出同名字段，前端展示转换托管标记。输入先解析为 IR，应用改写，按原顺序输出 LIST 文本；不是把 YAML URL 直接下发。保存/预览拒绝把 YAML 地址或同 URL 的既有 yaml 输入标记为 mrs/srs；内核也阻止把已知 YAML 地址标成二进制。MRS 原字节托管不承担文本转换功能。
 
 ## 2026-10-29 追加：索引凭据
 
@@ -433,7 +432,7 @@ type ProfileRouting =
 
 `ProfileRouting` 的 `bound` 分支增加可选 `prependRules: RuleEntry[]`，按显示顺序保存，只允许 `matcher.kind: rule`，不携带锚点，不修改模板。缺省等同空数组，已有绑定订阅无需数据库迁移。有效规则为 `prependRules + template.rules`；禁用项保留顺序但不输出，最终出口仍为 `template.final`。编辑器通过倒序 top 锚点兼容旧覆盖层视图，保存仅写 routing。
 
-前置节点出口共用 `resolveTarget / nameForNode`：按客户端自动处理，Mihomo Provider 生成精确过滤的隐藏组，Inline 直接引用，Stash 内联后直接引用；与代理链重复引用时复用依赖。保存及草稿预览检查出口归属、节点集已加入订阅、匹配项和规则 ID；规则 ID 不得与模板或其他前置规则冲突。模板发布检查全部前置出口（含禁用项、节点兜底组），删除所引用组或引入冲突 ID 时不可强制发布。绑定转独立会将前置规则完整固化，绑定间转换映射前置出口及兜底组。
+前置节点出口共用 `resolveTarget / nameForNode`：按客户端自动处理，Mihomo／Stash Provider 共用精确隐藏组，Inline 直接引用；Surge／Loon 在远程资源层转换引用；与代理链重复引用时复用依赖。保存及草稿预览检查出口归属、节点集已加入订阅、匹配项和规则 ID；规则 ID 不得与模板或其他前置规则冲突。模板发布检查全部前置出口（含禁用项、节点兜底组），删除所引用组或引入冲突 ID 时不可强制发布。绑定转独立会将前置规则完整固化，绑定间转换映射前置出口及兜底组。
 
 规则出口也会生成隐藏引用组，因此代理链的成环与跳数检查在全部规则出口解析完成后执行，并展开 `include-all-proxies` 等动态成员。
 
@@ -458,7 +457,7 @@ SQLite v18 新增 `rule_repo_catalog(repo, data)` 缓存：节点保存 `kind`�
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
 
-2026-10-29：Client 新增 stash；服务端 Target 支持 mihomo/stash，并用客户端和平台隔离缓存、last-good 与资源地址。Preset.stash 和 Profile.base.stashPatch 保存 Stash 原生基础设置。renderStash 共用依赖/环路/规则流水线，独立转换节点和组；节点按快照内联。Stash 预览另返回 exportYaml，将已转换的托管规则内嵌，支持草稿独立文件导出。详见 [17](17-official-client-configuration-guides.md)。
+2026-11-02 当前 Stash：主配置使用公共 renderClash，遵守来源 provider／inline 设置；节点／组只保留少量字段、测速及空组差异。基础设置保存 kernels／clients 原文，旧 Preset.stash／stashPatch 仅迁移读取。主缓存区分 client／platform／app，公共规则仅按 client 区分目标；文本规则可独立内嵌，含远程节点的草稿禁止独立导出，MRS 不内嵌。详见 [19](19-client-conversion.md)、[20](20-native-client-append.md)。
 
 ## 2026-10-29：名称搜索谓词
 
@@ -490,7 +489,7 @@ SQLite 文件索引、本地授权候选在同一查询中筛选、排序和 LIM
 2026-10-29 hint 格式调整：先在 matches 中按 repo 统计 `COUNT(DISTINCT ref)`，再执行当前页 LIMIT/OFFSET；分支数大于 1 才展示 ref。父目录为空时直接省略，不再填充 `/`。分支显示由当前查询全部匹配项决定，跨页稳定；hint 高亮区间按实际前缀长度生成。value、鉴权、文件身份、核心 IR 与示例种子保持不变。
 
 
-2026-10-30 表单空值契约：placeholder 仅为前端元数据，不进入基础预设、覆盖补丁、IR 或生成配置。可选配置未填写时省略相应键；清空仍经现有 setPath 删除字段及空父对象，覆盖保留继承语义。false 与 0 是明确值，不做空值转换。API、数据库、领域结构及示例种子不变，无迁移。
+2026-10-30 表单空值契约：placeholder 仅为前端元数据，不进入持久化配置、IR 或生成结果。可选配置未填写时省略相应键；清空仍经现有 setPath 删除字段及空父对象，覆盖保留继承语义。false 与 0 是明确值，不做空值转换。API、数据库、领域结构及示例种子不变，无迁移。
 
 ### 2026-10-30：缓存并发与授权补充
 
@@ -515,7 +514,7 @@ URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应�
 
 ### 2026-10-30：代理链编辑与来源移出约束
 
-领域格式不变：Provider 前置写 `via.ref.match.regex`，Inline 前置写 `exact`，策略组写 `groupId`；Inline 落地用转义并首尾锚定的 `landing.filter`，Provider 整集落地省略筛选字段。`NodeRef` 正则沿用解析首个匹配节点的合同，界面显示命中数及当前采用节点；默认 wrap 仍生成针对该节点的精确隐藏组，避免动态扩大前置范围。整集落地沿用服务端 Provider 内容覆写，Stash 沿用整体内联翻译。
+领域格式不变：Provider 前置写 `via.ref.match.regex`，Inline 前置写 `exact`，策略组写 `groupId`；Inline 落地用转义并首尾锚定的 `landing.filter`，Provider 整集落地省略筛选字段。`NodeRef` 正则沿用解析首个匹配节点的合同，界面显示命中数及当前采用节点；默认 wrap 仍生成针对该节点的精确隐藏组，避免动态扩大前置范围。整集落地沿用服务端 Provider 内容覆写，Stash 共用相同流程并保留来源输出方式。
 
 旧 `landing.filter/excludeFilter` 不迁移、不静默转整集；只有规范的精确筛选才回显为 Inline 单节点。移出来源的前端事务同时过滤节点集与直接引用它的链（含嵌套前置回退）；服务端保存/草稿预览增加落地节点集已加入本订阅的校验。策略组与规则成员继续使用原有引用校验，不在该事务中静默修改。
 

@@ -1,6 +1,6 @@
-# 多平台差异处理器复审与缓存修复总结
+# 多平台差异处理器复审与遗留清理总结
 
-审查日期：2026-11-02。源码基线：`331d003`；公共规则缓存修复：`4711cba`。本文合并首次 30 组处理器审查与 Stash 精简后的复审结论，以当前实现为准。历史审查中的 Stash 白名单、强制内联、链路专用阻断、URL-REGEX 丢弃及 provider.type 删除描述已不适用。
+审查日期：2026-11-02。清理基线：`6d161f8`（已包含公共规则缓存修复 `4711cba`）；代码清理提交：`0a11862`。本文合并首次 30 组处理器审查、Stash 精简复审与 R01–R06 清理结果，以当前实现为准。历史审查中的 Stash 白名单、强制内联、链路专用阻断、URL-REGEX 丢弃及 provider.type 删除描述已不适用。
 
 本文核对代码和自动测试，不重新声明各客户端的最新能力；字段透传不等于真机验证通过。
 
@@ -9,7 +9,7 @@
 1. **通用基础配置跨端映射已退出正常生成。** 正常路径按内核／应用保存原文，执行结构合并、目标校验和受管理段冲突检查。旧映射只供数据库 v28 升级和旧种子导入使用。
 2. **节点、策略组、代理链与规则的差异处理仍是有效功能。** Stash 与 Mihomo 已共用 Clash 生成入口，Stash 差异收敛为字段／单位、测速、托管成员与空组保护、规则方言、历史继承与交付等职责。
 3. **公共规则缓存缺陷已修复。** 内容版本由 2 升为 3；旧链接和资源身份保持不变，下次服务端读取重建正文。
-4. **初审的 R01–R06 尚未清理。** 其中一项是旧规则管线，其余是提示、注释、文档或测试残留。本文没有顺带删除它们，也没有取消历史数据支持。
+4. **初审的 R01–R06 已处理。** 旧规则分桶实现及专用导出删除；有效断言迁到现用转换入口；提示、注释、文档及重复测试已纠正。历史升级、旧种子导入、来源级改写与原文继承兼容继续保留。
 5. **三组产品菜单、四个输出目标仍并存。** Stash 在产品菜单归入 Mihomo，但规则改写和产物身份继续区分 Stash；这不是误留的枚举。
 
 ## 2. 本次缓存修复
@@ -45,7 +45,7 @@
 
 ## 4. 30 组处理器更新清单
 
-编号沿用初审，按职责归类，不代表代码中存在 30 个独立类或注册器。普通重命名、排序等无目标客户端参数的处理链不计入。
+编号沿用初审，按职责归类，不代表代码中存在 30 个独立类或注册器；A24 的旧分桶部分已退役，编号保留用于追踪。普通重命名、排序等无目标客户端参数的处理链不计入。
 
 | 编号 | 处理器／位置 | 当前各端差异与处理 |
 | --- | --- | --- |
@@ -72,7 +72,7 @@
 | A21 | [rules/client](../packages/core/src/rules/client.ts)：规则降级 | 四端具体差异见下表；不支持时诊断跳过；任一逻辑子条件失败，整条跳过 |
 | A22 | [rules/parse](../packages/core/src/rules/parse.ts)：去重键 | 仅 Mihomo wildcard 键忽略大小写，保留首条原文；Stash 仍不做该键归一 |
 | A23 | [rules/delivery](../packages/core/src/rules/delivery.ts)：规则交付 | 文本统一 classical LIST；合法单源 MRS 仅 Mihomo／Stash 托管；SRS 拒绝；Loon 手写规则也转远程 |
-| A24 | [rules/expand](../packages/core/src/rules/expand.ts)：旧展开／分桶 | expandSource／expandRuleSet 仅仓库内测试调用，待清理；sourceKey、RuleSetInputs、formatRuleLine 等仍有现用调用，不能整文件删除 |
+| A24 | [rules/expand](../packages/core/src/rules/expand.ts)：来源工具／历史文本格式化 | 旧 expandSource／expandRuleSet 与三项专用类型已删除；仅保留 sourceKey、sourceLabel、RuleSetInputs、formatRuleLine，并显式导出；转换统一走 convertRuleDocuments |
 | A25 | [rule-repos/adapters](../packages/server/src/rule-repos/adapters.ts)：仓库变体 | 区分 Clash／Surge 路径、纯域名格式；选择推荐变体，属于输入源适配 |
 | A26 | [surge-config](../packages/core/src/render/surge-config.ts)／[loon-config](../packages/core/src/render/loon-config.ts)：序列化 | YAML 输出 Mihomo／Stash；INI 引用转义、MATCH→FINAL；Surge RULE-SET、Loon Remote Rule／Remote Proxy／Proxy Chain |
 | A27 | [server/render](../packages/server/src/render.ts)：独立导出 | Surge／Stash 可内嵌文本规则；Stash MRS 不可内嵌；Loon 含托管规则不可草稿导出；含远程节点时使用保存后的正式链接 |
@@ -102,20 +102,31 @@
 | RAW／本地原文 | 校验单行及可选 client 限定后透传，不自动翻译正文 | 同左 | 同左，最终远程托管 | 同左 |
 | MRS／SRS | 合法单源 MRS 托管；SRS 拒绝 | 均拒绝 | 均拒绝 | 合法单源 MRS 托管；SRS 拒绝 |
 
-规则不再按 iOS／macOS 主动筛除 PROCESS；旧 `when.platform` 只走迁移，正常保存拒绝。部分说明仍引用旧行为，见 R04／R05。
+规则不再按 iOS／macOS 主动筛除 PROCESS；旧 `when.platform` 只走迁移，正常保存拒绝。R04／R05 已同步现行矩阵、需求与模型说明，历史设计明确标注适用范围。
 
-## 6. 尚未解决的遗留项
+## 6. R01–R06 清理结果与兼容保留
 
-| 编号 | 当前发现 | 后续建议 |
+| 编号 | 处理结果 | 复审依据 |
 | --- | --- | --- |
-| R01 | [expand.ts](../packages/core/src/rules/expand.ts) 的 expandSource／expandRuleSet 和专用分桶类型没有仓库内生产调用，仍公开导出 | 删除前收紧导出，将有价值断言迁到 convertRuleDocuments；保留现用类型／工具，仓库外消费者未调查 |
-| R02 | [RulesetOverrides](../packages/web/src/components/RulesetOverrides.tsx) 仍提示“所有内核输出相同规则” | 改为“暂无自定义改写，按目标内核自动转换。” |
-| R03 | [legacy-common-base](../packages/server/src/legacy-common-base.ts) 注释仍写仅用于 v25 | 改为 v28 升级与旧种子导入；不能据注释判断成死代码 |
-| R04 | [04-client-matrix](04-client-matrix.md) 仍写 Surge iOS 丢弃进程规则、platform 改写和旧公共字段映射 | 重写现行矩阵或标注历史版本 |
-| R05 | [server README](../packages/server/README.md)、[PRD](02-PRD.md) 等仍留 base.raw 不输出、preset.stash／stashPatch 和旧验收 | 当前说明改为原文槽位和按内核转换；历史记录明确适用版本 |
-| R06 | [rules.test](../packages/core/test/rules.test.ts) 的 mac 变量仅传 client:surge，存在同目标重复断言 | 与 R01 一起迁移；不能将旧命名当作平台覆盖证据 |
+| R01 | 删除 expandSource／expandRuleSet 及 ExpandedSource／BinaryRuleSource／RuleSetBuckets；index.ts 改为显式导出现用工具 | packages 中已无这些旧符号的定义、调用或导出；生产渲染仍用 convertRuleDocuments；所有包类型检查通过 |
+| R02 | 空态提示改为“暂无自定义改写，按目标内核自动转换。” | [RulesetOverrides](../packages/web/src/components/RulesetOverrides.tsx)，仅改提示，不改保存和转换行为 |
+| R03 | 注释修正为 v28 历史升级及旧种子导入 | [legacy-common-base](../packages/server/src/legacy-common-base.ts) 逻辑未改；迁移调用和回归继续保留 |
+| R04 | 能力矩阵按四端当前实现重写 | [04](04-client-matrix.md) 不再承诺平台改写、iOS 丢进程规则、分桶重排、基础字段映射或强制内联 |
+| R05 | README／PRD／领域模型／画布记录改为原文槽位与当前转换；旧表单方案明确归档 | [server README](../packages/server/README.md)、[02](02-PRD.md)、[03](03-domain-model-and-pipeline.md)、[09 历史方案](09-frontend-forms-plan.md)、[11](11-design-coverage.md)；旧字段只作为迁移说明或已标注的历史记录出现 |
+| R06 | 删除伪平台循环、mac 变量和重复 Surge 断言；现用转换测试目标由重复三个内核改为四个唯一目标，补齐 Loon | [rules.test](../packages/core/test/rules.test.ts)、[rule-convert.test](../packages/core/test/rule-convert.test.ts)；不再将重复内核测试当作 OS 覆盖 |
 
-本次另修正了 [19-client-conversion](19-client-conversion.md) 中仍将 Stash 与 Mihomo 一并拦截 block-quic 的过时描述，并明确主配置与公共规则的不同失败策略。
+旧管线的有效测试迁移到正式入口，覆盖来源顺序、禁用来源、本地／远程正文、来源级行号／内容改写的作用范围、组级首条改写优先、替换后跨来源去重、追加只执行一次及原文 no-resolve。原先混合文本和 MRS 后分桶的断言属于退役行为，不继续保留；现有 [rule-delivery.test](../packages/core/test/rule-delivery.test.ts) 验证真实交付限制，[render-report.test](../packages/core/test/render-report.test.ts) 保留缺少快照和无有效输出阻断覆盖。wildcard 去重与来源行位由现用转换测试验证。
+
+明确保留：
+
+| 兼容代码／数据 | 现用职责及验证 |
+| --- | --- |
+| CommonBase／validateCommonBase／lowerCommonBase／mergeBase | 仅供 native-migration 使用；v28 升级和旧种子导入仍调用；[native-migration.test](../packages/server/test/native-migration.test.ts) 覆盖旧库升级、备份、原文继承及重启幂等 |
+| 旧 common／patch／raw／presetId 与平台条件 | store-migrations 先保存加密备份，再展开原文或停用旧平台改写；本轮未改迁移逻辑或数据库版本 |
+| formatRuleLine | legacy-rules 将旧规则包单条内容写回文本；Web 展示不能自动提升的旧来源改写；保留原有格式化断言 |
+| sourceKey／sourceLabel／RuleSetInputs | 正式渲染、服务端快照和公共规则仍使用；显式导出保持调用可用 |
+| source.overrides | convertRuleDocuments 仍读取旧来源级改写；新增测试覆盖行号／内容匹配和组级优先关系 |
+| kernels.stash、隐藏应用原文、stringifyIniBase | 当前继承和 INI 序列化仍有用途，均未删除或改变 |
 
 仍需产品审查的边界：
 
@@ -125,20 +136,22 @@
 - INI `proxy-test-url / test-timeout` 仍会影响组／节点；原文并非完全不解释。
 - Loon fallback／load-balance 的 `max-timeout` 缺省取 `group.timeout`，两个字段语义是否继续联动需单独决定。
 
-仍有用途的历史代码：`CommonBase / lowerCommonBase / mergeBase` 供迁移；平台改写停用前有加密备份；`source.overrides` 仍被正式转换读取；`stringifyIniBase` 仍供当前 INI 序列化和 Loon 测速使用。不能把这些与 R01 一并删除。
-
 ## 7. 本轮验证与交付状态
 
-- 新增升级回归 3 项：未修复时全部因返回旧注释正文而失败，修复后全部通过，随后纳入服务端全量测试。
-- 服务端全量：77 个文件通过、2 个文件按环境跳过；665 项通过、5 项跳过。
-- Core 定向：6 个文件通过；83 项通过、1 项跳过。
-- 合计 **748 项通过、6 项跳过**，新增用例不重复计数；服务端类型检查通过。
-- 服务端跳过项需要 `MIHOMO` 及部分场景的 `MIHOMO_RUNTIME=1`；Core 跳过项需要 `SURGE_BIN`。本轮未执行客户端真机导入、实际代理转发、浏览器验收或前端构建。
-- 在独立工作树复用本机已安装依赖执行，没有安装依赖或浏览器，没有运行项目开发服务。测试进程结束后清理临时依赖链接。
-- 修改本地提交，未合并主分支、未推送、未部署；保留工作树供审查。
+| 检查 | 结果 |
+| --- | --- |
+| Core 全量测试 | 37 个文件通过、4 个文件跳过；753 项通过、41 项跳过 |
+| Server 全量测试 | 77 个文件通过、2 个文件跳过；665 项通过、5 项跳过 |
+| Web 非浏览器测试 | 46 个文件通过；351 项通过、2 项跳过 |
+| 合计 | **1,769 项通过、48 项跳过**；前置定向 53 项不重复计数 |
+| 类型检查 | core／server／web 全部通过 |
+| 调用与改动范围复核 | 旧分桶符号从 packages 移除；迁移实现、正式渲染和规则转换代码未修改；旧迁移回归及上轮缓存升级回归均通过 |
+
+Core／Server 的跳过项需要 MIHOMO、MIHOMO_RUNTIME、MMDB 或 SURGE_BIN 等客户端校验环境；Web 两项因为现有协议样例没有对应内容而跳过。未执行真机导入、实际转发、浏览器验收或前端构建；界面只修改一处提示文字，不涉及弹窗或流程。
+
+本轮在独立工作树复用本机已安装依赖运行，没有安装新依赖或浏览器，没有启动项目开发服务。测试已结束，临时依赖链接清理后保留工作树。代码与报告本地提交，未合并主分支、未推送或部署。清理分支基于上轮修复分支，包含公共规则缓存修复。
 
 ```sh
-pnpm --filter @sub-forge/server test
-pnpm --filter @sub-forge/server typecheck
-pnpm --filter @sub-forge/core test test/clash-common.test.ts test/stash-render.test.ts test/remote-providers.test.ts test/node-semantics.test.ts test/native-base.test.ts test/rule-convert.test.ts
+pnpm test
+pnpm typecheck
 ```

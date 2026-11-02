@@ -1,6 +1,6 @@
 # 02 · 产品需求文档（PRD）
 
-> 2026-10-30 实现修订：当前完整输出为 Mihomo、Surge、Loon、Stash。Surge/Loon 采用节点快照内联，Surge 节点级 underlying-proxy、Loon 链暂不支持；不使用本文件早期 policy-path/组级代理链草案，也未实现按 UA 版本自动降级。四客户端字段、协议和验证边界以 [19](19-client-conversion.md) 为准；下文历史版本要求保留作设计记录。
+> 2026-11-02 实现修订：完整输出支持 Mihomo、Surge、Loon、Stash，四端遵守节点来源 provider／inline 设置；Stash 共用 Clash 生成，Surge 使用节点 underlying-proxy，Loon 支持内联落地的 Proxy Chain。基础预设与公共字段映射已退出正常使用，规则改写只按内核，不按平台筛除进程规则。当前矩阵见 [04](04-client-matrix.md)，转换与原文契约见 [19](19-client-conversion.md)、[20](20-native-client-append.md)。历史版本要求和注明日期的设计记录不作为当前实现承诺。
 
 
 2026-10-30 统一弹窗修订：所有编辑、确认、提示、只读预览迁移到静态 `show()` + Promise；简单交互采用 `Frame.modal.*`，页面不维护开关或挂载弹窗。禁止其他弹窗封装，独立草稿与实际退场清理由唯一运行时保证。此条取代此前页面直接组合 Dialog / AlertDialog 的入口规范，保留官方动画、最新成员编辑和预览布局。后端协议与领域模型不变；外部画布本轮未修改，待同步项目规范中的入口和高级设置约定。详见 [18](18-unified-modals.md)。
@@ -45,7 +45,7 @@
 
 | 角色 | 能力 |
 | --- | --- |
-| 管理员 | 管理用户；维护**模板**、**基础设置预设**、**公共规则集**；可维护订阅源并**共享**给指定用户（用户不可见原始 URL） |
+| 管理员 | 管理用户；维护**模板**、**公共规则集**；可维护订阅源并**共享**给指定用户（用户不可见原始 URL） |
 | 普通用户 | 管理自己的订阅源、组合、本地节点、规则集；基于模板创建**配置订阅**；获取订阅链接 |
 
 ---
@@ -75,7 +75,7 @@
 | **规则集 RuleSet** | 一组匹配条件（不含出口），由一个或多个**来源**（远程 URL / 本地规则）按序合并去重；可解析 Surge/Clash classical、domain、ipcidr、YAML payload、纯文本等。原「规则包 RuleBundle」于 2026-10-29 并入规则集 |
 | **规则条目 Rule** | 配置中的一行分流：`匹配项（单条规则 / RuleSet） → 出口` |
 | **策略组 ProxyGroup** | select / url-test / fallback / load-balance 等，成员可以是节点、节点集、其他组、内置策略 |
-| **基础设置 BaseSettings** | 通用设置、DNS、TUN、嗅探等，按客户端分别描述，可做成预设 |
+| **基础配置 ProfileBase** | 每份订阅按内核／应用保存 YAML／INI 原文，生成时继承合并；无预设引用 |
 | **模板 Template** | **只包含分流**：ProxyGroup 骨架（不含节点）+ Rule 列表 + Rule→Group 的关联 |
 | **配置订阅 Profile** | 最终交付给客户端的"整体订阅"：选择基础设置、节点集、模板，并在模板之上叠加覆盖层 |
 | **覆盖层 Overlay** | Profile 相对模板的差异：给组填充成员、修改组参数、增删规则、改规则出口为节点等。以**稳定 ID** 指向模板元素 |
@@ -125,7 +125,7 @@
 | --- | --- | --- |
 | GRP-01 | 组类型：`select`、`url-test`、`fallback`、`load-balance`（Surge 映射见 [04](04-client-matrix.md)） | P0 |
 | GRP-02 | 成员类型：<br>① 内置策略（DIRECT / REJECT / REJECT-DROP / PASS）<br>② 其他策略组（mihomo `proxies` 写组名；Surge 写组名或 `include-other-group`）<br>③ 节点集整体（mihomo `use: [provider]`；Surge `policy-path` / `include-other-group`）<br>④ 单个节点引用（见 4.6 节点引用）<br>⑤ "全部节点"（mihomo `include-all` / `include-all-proxies` / `include-all-providers`；Surge `include-all-proxies`） | P0 |
-| GRP-03 | 组内过滤：`filter`、`exclude-filter`、`exclude-type`（mihomo）/ `policy-regex-filter`（Surge），`exclude-type` 使用可清空的多选下拉；预览、内联筛选和 provider 输出统一协议别名（如 ss → Shadowsocks），UI 中实时显示命中的节点 | P0 |
+| GRP-03 | 组内过滤：`filter`、`exclude-filter`、`exclude-type`（Mihomo 保留动态表达，Surge／Loon／Stash 在服务端筛选），`exclude-type` 使用可清空的多选下拉；预览、内联筛选和 provider 输出统一协议别名（如 ss → Shadowsocks），UI 中实时显示命中的节点 | P0 |
 | GRP-04 | 测速参数：`url`、`interval`、`timeout`、`tolerance`、`lazy`、`max-failed-times`、`expected-status`；负载均衡 `strategy`。Surge 的 `url`、`timeout` 语义与 mihomo 不同，按 [04 §2](04-client-matrix.md#2-策略组) 转换，无法表达的参数写入渲染报告 | P0 |
 | GRP-05 | 展示参数：`hidden`、`icon`（Surge 为 `icon-url`）；Surge `no-alert` | P1 |
 | GRP-06 | 其他：`disable-udp`、`interface-name`、`routing-mark`、`default-selected` 等以"高级参数"KV 形式支持（空组固定 REJECT，不提供 empty-fallback 设置），并标注客户端适用范围 | P1 |
@@ -149,7 +149,7 @@
 
 #### 4.5.2 规则包 RuleBundle（需求"多合一"）
 
-> 2026-10-29：规则包不再单独成页，**并入规则集**。规则集本身可以引用多个远程 URL 与本地规则，合并后只配一个出口，下列需求由规则集承担：RB-01 → RS-01（多来源；原「单条规则」子项写进本地来源）；RB-02/03/05 → 规则集输出（只占一行、按 behavior 拆分、IP 类统一 no-resolve）；RB-04 → 规则集合并结果预览。旧数据中的规则包自动迁移为同 id 的规则集，模板与 Profile 中的引用随之改写。原条目保留如下备查。
+> 2026-10-29：规则包不再单独成页，**并入规则集**。规则集本身可以引用多个远程 URL 与本地规则，合并后只配一个出口，下列需求由规则集承担：RB-01 → RS-01（多来源；原「单条规则」子项写进本地来源）；RB-02/03 → 规则集文本按原顺序合并为 classical LIST；旧 RB-05 独立 no-resolve 开关已退役，按每行原文保留；RB-04 → 规则集合并结果预览。旧数据中的规则包自动迁移为同 id 的规则集，模板与 Profile 中的引用随之改写。原条目保留如下备查。
 
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
@@ -175,7 +175,7 @@
 
 | 语义 | mihomo | Surge |
 | --- | --- | --- |
-| 进程名精确 | `PROCESS-NAME` | `PROCESS-NAME`（Surge 的 PROCESS-NAME 同时接受名称或完整路径，区分大小写，仅 macOS） |
+| 进程名精确 | `PROCESS-NAME` | `PROCESS-NAME`（本服务按 Surge 内核统一输出，不按 iOS／macOS 删除） |
 | 进程路径精确 | `PROCESS-PATH` | `PROCESS-NAME,<完整路径>` |
 | 名称/路径通配（`*` `?`） | `PROCESS-NAME-WILDCARD` / `PROCESS-PATH-WILDCARD` | `PROCESS-NAME` 中直接写通配符（名称模式与路径模式都支持） |
 | 名称/路径正则 | `PROCESS-NAME-REGEX` / `PROCESS-PATH-REGEX` | 不支持 ⇒ 尝试转通配，否则丢弃并告警 |
@@ -184,10 +184,10 @@
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
 | CR-01 | 规则 IR 中引入**语义化进程规则** `process(kind=name|path, mode=exact|wildcard|regex, value)`，渲染时按客户端降级（见 [04 §3](04-client-matrix.md#3-规则映射)）；不可表达时丢弃并在渲染报告中告警 | P0 |
-| CR-02 | 声明式客户端覆盖：任一规则可设置；规则集在独立区块中按规则内容精确匹配所有启用来源，不再提供行号定位或来源绑定（2026-10-29）。可设置 `{client: mihomo|surge, platform?: android|macos|windows|ios|linux} → 替换为 / 丢弃` | P0 |
-| CR-03 | 规则改写脚本：对 RuleSet（或其中某个来源）挂 JS 脚本 `(rule, ctx) => rule | rule[] | null`，`ctx.client`、`ctx.platform` 可用；沙箱执行；编写权限同 SRC-08 | P1 |
-| CR-04 | 客户端识别：优先 URL 参数 `?target=mihomo|surge&platform=...`，其次 User-Agent 自动识别（mihomo 内核 / Clash Verge / FlClash / ClashMetaForAndroid / Surge iOS/macOS）；识别结果在访问日志中可见 | P0 |
-| CR-05 | 规则预览：选择客户端 + 平台，实时查看规则集最终输出 | P0 |
+| CR-02 | 声明式客户端覆盖：任一规则可设置；规则集按内容精确匹配全部启用来源，支持 `{client: mihomo/surge/loon/stash} → 替换 / 删除 / 追加`，首条匹配优先。新配置不接受 platform 条件；旧来源级改写保留兼容，旧平台条件迁移时停用并备份 | P0 |
+| CR-03 | 历史待实现草案：规则级 JS 改写脚本未接入当前生成；原 ctx.platform 设想已退役。当前规则转换上下文只含 client，不将此条视作现行 API | P1 |
+| CR-04 | 客户端识别：URL 的 target／platform／app 参数优先于 UA，支持 Mihomo／Surge／Loon／Stash；应用与系统用于原文选择、合法性与主配置缓存，规则正文只按内核转换 | P0 |
+| CR-05 | 规则预览只选内核，不选平台；当前规则集页面提供 Mihomo／Surge／Loon 三项，Stash 改写仍可保存并通过完整订阅预览。三项预览与四项改写的入口差异见复审报告 | P0 |
 
 ### 4.6 节点引用、代理链与依赖解析（对应需求 3，**核心差异点**）
 
@@ -209,26 +209,28 @@
 | REF-02 | 引用解析失败（上游已无该节点）时的兜底：可配置 `fallback = 某个组 / DIRECT / REJECT / 报错`，并在 Profile 状态页告警 | P0 |
 | REF-03 | **代理链配置**：在 Profile 中配置"链规则"：`落地 = 某 NodeSet 中匹配 filter 的节点` → `前置 = NodeRef 或 策略组`。可配置多条。**代理链只在这里设置**（2026-10-29 起本地节点不再设置前置，见 LOC-02），在选好节点集、策略组与规则之后配置；订阅源自带的前置由 REF-04 自动识别，不是设置项 | P0 |
 | REF-04 | **上游自带的 dialer-proxy**：订阅中节点本身带 `dialer-proxy`/`underlying-proxy` 时，自动识别其前置并纳入依赖解析 | P0 |
-| REF-05 | **自动依赖解析**：2026-10-30 移除旧版「包装组 / 复制到本地 / 整体内联」三级策略选择及逐项覆写。Mihomo 中的 Provider 前置自动生成精确隐藏组，Inline 直接引用；Stash 按现有节点集内联方案转换。旧 `refPolicy` 不再影响输出，保存时规范化为自动兼容值 | P0 |
-| REF-06 | **落地节点在 provider 中**：provider 节点可以引用主配置中的组和节点，所以系统按 Profile 生成**专属 provider 地址**，在下发的 provider 内容中给命中的落地节点注入 `dialer-proxy`；整源都需要同一前置时，在服务端逐节点写入专属内容，不使用客户端 `override`；2026-11-02 起整集规则只是默认值，单节点规则优先（替代此前的整集覆盖局部）。Surge 不注入外部内容，改为生成带组级 `underlying-proxy` 的隐藏组 | P0 |
+| REF-05 | 自动解析前置依赖：Mihomo／Stash 共用精确远程节点隐藏组，Inline 直接引用；Surge 转节点 underlying-proxy；Loon 内联落地拆 Proxy Chain，远程落地需显式展开。旧 refPolicy 不再影响输出，保存时规范化为兼容值 | P0 |
+| REF-06 | **落地节点在 provider 中**：provider 节点可以引用主配置中的组和节点，所以系统按 Profile 生成**专属 provider 地址**，在下发的 provider 内容中给命中的落地节点注入 `dialer-proxy`；整源都需要同一前置时，在服务端逐节点写入专属内容，不使用客户端 `override`；2026-11-02 起整集规则只是默认值，单节点规则优先（替代此前的整集覆盖局部）。Surge 在专属节点行中写 underlying-proxy；Loon 远程落地需显式设为 inline，不能把 Proxy Chain 写进远程节点订阅 | P0 |
 | REF-07 | **代理链就地诊断**：2026-10-30 移除独立「依赖节点」面板。每条链显示实际前置、落地命中数与生效数，缺失、冲突、循环等问题定位到对应卡片；修改草稿立即撤下旧结果并自动重新检查。配置预览保留默认折叠、只读的「自动生成的引用详情」 | P0 |
 | REF-08 | **服务端引用校验**（P0）：渲染时校验所有 `dialer-proxy`、规则目标、组成员都能在顶层表中找到。provider 内节点的 `dialer-proxy` 在 mihomo 加载时不校验，写错只会在运行时连接失败，必须由服务端兜住。另外可选用内置 mihomo 内核执行 `-t`（P1），校验失败时返回上一份成功版本并告警 | P0 |
 | REF-09 | 链长度与环检测：前置链不得成环（mihomo 自带的环检测只覆盖本地节点，跨 provider 的环由服务端检测）；超过 3 跳给出提示 | P0 |
-| REF-10 | **防静默直连**：包装组一律输出 `empty-fallback: REJECT`。provider 未加载完成或节点消失时，mihomo 默认回退到 `COMPATIBLE`（即直连），会让落地绕过前置（已实测复现）。Surge 组无可用成员时同样回退 DIRECT，且没有对应参数：暂用 `fallback, <筛选组>, REJECT` 结构（D2），运行时验证前在 UI 与渲染报告中标注"Surge 防泄漏未验证" | P0 |
+| REF-10 | 防静默直连：Mihomo 动态组固定 empty-fallback: REJECT；Surge／Loon／Stash 服务端筛选成员，筛空组用 REJECT，空远程资源不成功下发。旧双层 fallback 草案不再采用；真实客户端转发须独立验证 | P0 |
 | REF-11 | **节点资源直接更新**：包装组名用稳定哈希（不随显示名变化）；Profile 专属 provider URL 不带 `version` 或 `hash`，按当前配置生成内容。客户端按 `interval` 定时或手动刷新节点；`proxy-providers` 不输出 `path` | P0 |
 | REF-12 | 前置可以是策略组：链规则的前置选一个组（如"🌠 中转"），用户在面板中切换中转后，所有落地随之切换。mihomo 与 Surge 都支持（D1） | P0 |
 
 > 历史说明：原 REF-05 支持复制节点和整体内联的人工选择。2026-10-30 根据简化主流程的决定废止该入口，底层引用解析、安全校验及节点集输出方式继续保留。
 
-### 4.7 基础设置（BaseSettings）
+### 4.7 基础设置（原文追加）
+
+2026-11-02 现行需求取代旧公共表单、预设与字段映射方案，详见 [20](20-native-client-append.md)。
 
 | ID | 需求 | 优先级 |
 | --- | --- | --- |
-| BS-01 | mihomo：通用（`mixed-port`、`allow-lan`、`bind-address`、`mode`、`log-level`、`ipv6`、`unified-delay`、`tcp-concurrent`、`find-process-mode`、`global-client-fingerprint`、`profile`、`external-controller`/`external-ui`/`secret`）、**DNS**（`enable`、`enhanced-mode`、`fake-ip-range`、`fake-ip-filter`、`default-nameserver`、`nameserver`、`fallback`/`fallback-filter`、`nameserver-policy`、`proxy-server-nameserver`、`direct-nameserver`、`respect-rules`）、`sniffer`、`tun`、`geox-url`/`geodata-mode` | P0 |
-| BS-02 | Surge：`[General]`（`dns-server`、`encrypted-dns-server`、`skip-proxy`、`tun-excluded-routes`、`ipv6`、`loglevel`、`internet-test-url`、`proxy-test-url`、`test-timeout`、`always-real-ip`、`hijack-dns` 等）、`[Host]` | P0 |
-| BS-03 | 管理员可发布基础设置预设（如 "fake-ip 推荐" / "redir-host 推荐"），Profile 可引用预设并做少量覆盖；预设更新同步到引用方（同模板机制） | P0 |
-| BS-04 | 原样片段：每个客户端可追加一段原始 YAML / INI（如 Surge `[MITM]`、`[Script]`），作为逃生通道 | P1 |
-| BS-05 | `find-process-mode` 与进程规则联动提示：Profile 中存在进程规则而 `find-process-mode: off` 时告警 | P1 |
+| BS-01 | Mihomo 内核公共原文与对应应用追加使用 YAML；不提取成公共字段或自动做客户端兼容过滤 | P0 |
+| BS-02 | Surge／Loon 内核及应用追加使用原生 INI；生成时合并结构并检查受管理段冲突 | P0 |
+| BS-03 | 基础预设已移除；各订阅独立保存 kernels／clients 原文。旧预设引用在 v28 升级或旧种子导入时备份后展开 | P0 |
+| BS-04 | 原文是基础配置的主要编辑入口。允许保存未写完的原文；生成时报告解析错误。Stash 继承 Mihomo→历史 Stash→应用追加 | P0 |
+| BS-05 | 原 find-process-mode 表单联动告警属于退役草案；当前不解析公共表单字段，规则不按操作系统主动删除 | 历史 |
 
 ### 4.8 模板（Template）
 
@@ -241,7 +243,7 @@
 | TPL-01 | 模板中的组：可设置类型、测速参数、展示参数；空组固定拒绝（TPL-10）；成员**只能是**其他模板组或内置策略，组之间的嵌套关系属于模板、随模板同步（Q5）。**不能包含任何节点/节点集**；可预设 `filter`/`exclude-filter`/`exclude-type`，在 Profile 填入节点集后生效，并可在 Profile 中覆盖。模板和订阅策略组支持一次添加香港、美国、日本、新加坡四个隐藏的 select 地区组 | P0 |
 | TPL-02 | 模板中的规则：匹配项可为单条规则 / RuleSet（RuleBundle 已并入 RuleSet，2026-10-29）；**出口只能是模板组或内置策略** | P0 |
 | TPL-03 | 每个模板组可标注"填充提示"（如"建议放香港节点"、"建议放所有节点"），在 Profile 填充时展示（仅文字提示，不参与渲染） | P1 |
-| TPL-10 | **空组固定拒绝（2026-10-29 修订）**：移除原「拒绝 / 直连」配置项，模板组和私有组统一 REJECT，历史 `whenEmpty: direct` 不再生效。生成时无成员则自动写入 `proxies: [REJECT]` 并告警；所有组自动输出 `empty-fallback: REJECT`，客户端加载或筛选 provider 后为空时直接拒绝。扩展字段不能覆盖这一固定策略。Mihomo v1.19.27+ 原生支持，用户无需设置；节点仍存在但测速失败不视为空组。Surge/Loon 使用快照内联，筛空后补 REJECT，真实客户端转发尚未验收 | P0 |
+| TPL-10 | 空组固定拒绝：静态无成员补 REJECT；Mihomo 动态集合固定 empty-fallback: REJECT；Surge／Loon／Stash 服务端筛选并保护空远程集合。旧 whenEmpty 不影响输出，节点测速失败不等于空组。真实客户端转发与生成测试分别验收 | P0 |
 | TPL-04 | 模板元素（组、规则）具有**稳定 ID**；改名不影响已有 Profile 的覆盖层 | P0 |
 | TPL-05 | 模板版本：每次发布生成新版本号与变更说明；可查看版本间 diff | P0 |
 | TPL-06 | 订阅跟随策略：**跟随最新**（默认）/ 锁定某版本。跟随最新时模板发布即对所有订阅生效（订阅在渲染时合并模板，不复制） | P0 |
@@ -255,7 +257,7 @@
 
 新建 Profile 的向导：
 
-1. **基础设置**（可选）：选预设 / 自定义 / 不输出（使用客户端默认）。
+1. **基础配置**（可选）：填写内核／应用原文，可整体停用追加；不选择预设。
 2. **节点**：选择若干 NodeSet（Source / Collection / 本地节点组），每个指定输出方式：
    - `provider`（默认，mihomo 输出为 `proxy-providers`，指向本服务的 provider 地址；Surge 输出为 `policy-path`，见 [04](04-client-matrix.md)）
    - `inline`（展开到 `proxies` / `[Proxy]`）
@@ -270,7 +272,7 @@
 | --- | --- | --- |
 | PRF-01 | 上述向导 + 之后可在单页中修改各部分 | P0 |
 | PRF-02 | 订阅链接：保存后提供 `/subs/profile?id=<配置ID>&token=<用户token>`，所有设备共用；根据 UA 自动输出 Mihomo、Stash、Surge 或 Loon，支持显式 target/platform 参数；普通保存保持链接，复制配置共享用户 token，配置 ID 使链接不同；浏览器直接显示 Mihomo YAML | P0 |
-| PRF-03 | Profile 是"模板引用 + 覆盖层"，**不保存渲染结果**（只做缓存）；模板/基础预设/节点集任何一方变化，下次请求即反映 | P0 |
+| PRF-03 | Profile 是"模板引用 + 覆盖层"，**不保存渲染结果**（只做缓存）；模板、订阅原文、节点集任一方变化，下次请求即反映 | P0 |
 | PRF-04 | 覆盖层孤儿处理：模板删除了某组/规则后，对应的覆盖项标为"孤儿"，不输出，在 Profile 页提示用户清理 | P0 |
 | PRF-05 | 规则出口改为单节点时，可选范围仅限本 Profile 已加入的 NodeSet 中的节点 | P0 |
 | PRF-06 | 2026-10-30 替代原渲染缓存方案：每次按当前配置与资源快照重新渲染；删除完成结果的内存缓存，保留上一份成功配置用于失败兜底，资源按当前配置生成 | P1 |
@@ -295,7 +297,9 @@
 
 ## 5. 客户端兼容与订阅输出约定
 
-### 5.1 最低支持版本
+### 5.1 最低支持版本（历史设计记录）
+
+以下保留早期版本选型与自动降级设想，未接入现行运行时；当前不按 UA 版本切换规则或代理链，也不承诺下表的版本告警／字段省略。现用节点级代理链已替代旧组级方案，当前字段边界与已执行验证见 [19](19-client-conversion.md)。
 
 | 客户端 | 最低版本 | 依据 |
 | --- | --- | --- |
@@ -370,7 +374,7 @@
 | --- | --- | --- |
 | 模板 | 模板列表 / 编辑器 | 2026-10-29 合并原「模板管理」入口；仅管理员可见、可编辑与发布。组骨架、规则、填充提示；空组固定拒绝且无配置项；草稿实时校验（TPL-11）；版本 diff（TPL-05） |
 |  | 发布 | 发布前校验与影响分析结果，按错误 / 警告分级，可跳转到具体 Profile（TPL-07、TPL-12） |
-| 预设 | 基础设置预设列表 / 详情 | 列表搜索、新建、删除和编辑；详情 mihomo / Surge 分段编辑、发布与引用方列表（BS-03） |
+| 基础配置 | 配置订阅内核／应用原文编辑区 | 原文编辑、格式化、清空与上层只读展示；旧预设列表／详情已移除（BS-03） |
 | 规则仓库 | 仓库管理 | 启用 / 停用内置仓库、自定义仓库与适配器、索引状态与报告（REPO-01–06、REPO-08、R4） |
 | 用户 | 用户管理 | 创建、禁用、重置密码；脚本授权（Q8）；共享的订阅源与组合（SYS-06） |
 | 系统 | 系统设置 | SSRF 白名单（SYS-02）、备份与恢复（SYS-07）、内置 mihomo 版本与校验开关 |
@@ -389,10 +393,10 @@
 
 1. **多源不打平**：用户 A 有 8 个机场。创建 Profile，8 个源均以 provider 输出；Clash Verge 中可按 provider 查看与单独更新。✅ 生成的 YAML `proxies` 为空或只含本地节点。
 2. **改名确定性**：源 X 处理链把 `香港 01 | 0.5x` 改名为 `🇭🇰 HK-01`。上游新增 `香港 02`、删除 `香港 01` 后重新拉取：结果为 `🇭🇰 HK-02`，不存在重复或残留名称。
-3. **落地走中转（provider 内节点）**：用户 B 的落地节点在源 L（provider），中转节点在源 T（provider）的 `🇭🇰 IPLC-01`。配置链规则 "L 全部 → T:`🇭🇰 IPLC-01`"。✅ mihomo：输出中生成隐藏组 `__ref_T_xxx`（`use: [T]`, `filter: ^🇭🇰 IPLC-01$`, `empty-fallback: REJECT`），L 的专属 provider 内容中每个节点带 `dialer-proxy: __ref_T_xxx`；`mihomo -t` 通过。✅ Surge（Mac 6.9.0+）：生成包装组 `__ref_T_xxx` 与 `__chain_L_xxx = select, policy-path=<L>, underlying-proxy=__ref_T_xxx, hidden=true`，L 的节点在面板中显示为 `Name (via __ref_T_xxx)`；`surge-cli --check` 通过。
-4. **规则出口为 provider 节点**：规则 `RuleSet(金融服务，多来源) → 源 S 中的 "🇺🇸 Home-Broadband"`。✅ mihomo 输出包装组并在规则中引用；Surge 输出 `select` + `fallback, …, REJECT` 两层包装组并在规则中引用。
+3. **落地走中转（provider 内节点）**：落地来源 L，经来源 T 中的精确节点作为前置。Mihomo／Stash 共用精确隐藏组与 dialer-proxy；Surge 使用相同依赖解析，节点行写 underlying-proxy，不采用旧组级链方案；Loon 需将落地来源显式设为 inline 后输出 Proxy Chain。客户端语法和转发测试分别记录，不将生成通过视作真实连接通过。
+4. **规则出口为 provider 节点**：引用精确节点时生成稳定隐藏组，保持引用关系；Surge／Loon／Stash 由服务端筛选对应远程成员，空集合拒绝。原 Surge 双层 fallback 包装草案不作为验收断言。
 5. **模板更新同步**：管理员在模板中新增 "🤖 AI 服务" 组和对应规则并发布。✅ 所有"跟随最新"的 Profile 下次拉取即包含该组；该组尚未填充成员时，按空组输出（TPL-10），默认拒绝：mihomo 中显示为仅含 `REJECT` 的组，相关流量被拒绝而不是直连，配置校验通过。
-6. **进程规则分客户端**：规则 `process(path, wildcard, "/Applications/*/WeChat.app/*")`。✅ mihomo 输出 `PROCESS-PATH-WILDCARD,...`；Surge macOS 输出 `PROCESS-NAME,...`；Surge iOS 丢弃并在报告中注明。
+6. **进程规则分客户端**：结构化规则 `PROCESS(path, wildcard, "/Applications/*/WeChat.app/*")`：Mihomo 输出 PROCESS-PATH-WILDCARD，Surge 统一输出 PROCESS-NAME，不按 iOS／macOS 筛除；Loon 按名称／路径方言输出；Stash 对路径通配给诊断并跳过。实际匹配能力由客户端决定。
 
 ## 2026-10-29：自定义公开 GitHub 规则仓库
 
@@ -424,7 +428,7 @@ RS-07 扩展：管理员添加、启停、更新、删除公开 GitHub 仓库；
 
 ## 列表分页（2026-10-29）
 
-订阅源、配置订阅、组合、本地节点、规则集、模板列表默认启用服务端分页。每页默认 20 条，可选 10 / 20 / 50 / 100；展示匹配总数、当前范围、当前页与总页数，并提供上一页、下一页（2026-11-02 起分页栏不再展示当前范围，只展示总数与「当前页 / 总页数」，上一页、下一页改为图标按钮）。基础设置预设复用同一列表能力。搜索覆盖全部可见记录，修改名称搜索或每页条数回到第一页；删除导致页码越界时回到最后有效页。空结果仍保留搜索及分页控件。 总数统一在底部分页器显示，移除列表右上角的重复总数（2026-10-29 调整）。
+订阅源、配置订阅、组合、本地节点、规则集、模板列表默认启用服务端分页。每页默认 20 条，可选 10 / 20 / 50 / 100；展示匹配总数、当前范围、当前页与总页数，并提供上一页、下一页（2026-11-02 起分页栏不再展示当前范围，只展示总数与「当前页 / 总页数」，上一页、下一页改为图标按钮）。旧基础预设列表已退役，不再列入分页入口。搜索覆盖全部可见记录，修改名称搜索或每页条数回到第一页；删除导致页码越界时回到最后有效页。空结果仍保留搜索及分页控件。 总数统一在底部分页器显示，移除列表右上角的重复总数（2026-10-29 调整）。
 
 页面标题、搜索栏与分页器固定，内容以 flex 适配剩余高度并独立滚动。模板宽屏左右分栏，窄屏上下分栏，列表和详情各自滚动。分页、条数及搜索保存在 URL，支持刷新与浏览器前进后退。
 
@@ -483,7 +487,7 @@ RS-07 扩展：管理员添加、启停、更新、删除公开 GitHub 仓库；
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
 
-2026-10-29 Stash 接入：规则预览/转换/下载、完整主订阅与独立 YAML 文件导出支持 Stash iOS/macOS。专属基础设置使用 preset.stash 与 base.stashPatch；节点集按快照内联，保持代理链、筛选及空组拒绝语义。官方指引与后续同步依据见 [17](17-official-client-configuration-guides.md)。
+2026-10-29 Stash 接入的历史 preset.stash／base.stashPatch 和强制内联方案已退役。当前继承 Mihomo 公共→历史 Stash 公共→应用原文，四端均遵守 provider／inline 选择；Stash 共用 Clash 生成，字段、测速、规则及交付差异见 [04](04-client-matrix.md)、[19](19-client-conversion.md)。旧格式仍由迁移入口兼容。
 
 ## 2026-10-29：全部名称筛选统一
 
