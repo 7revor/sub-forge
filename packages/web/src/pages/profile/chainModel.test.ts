@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChainRule, Profile, Target } from '@sub-forge/core';
-import { chainUsesNodeSet, landingNodeName, removeProfileNodeSet } from './chainModel.ts';
-import { chainInputError, exactNodeFilter } from './memberModel.ts';
+import { chainUsesNodeSet, landingConstraintHint, landingNodeName, landingNodeNames, removeProfileNodeSet, viaConstraintHint } from './chainModel.ts';
+import { chainInputError, exactNodeFilter, selectedNodeFilter } from './memberModel.ts';
 const landing = { type: 'local' as const, id: 'landing' };
 const relay = { type: 'local' as const, id: 'relay' };
 const chain = { id: 'c', landing: { nodeSet: landing }, via: { kind: 'node', ref: { nodeSet: relay, match: { regex: '香港|HK' }, fallback: 'error' } } } satisfies ChainRule;
@@ -15,6 +15,21 @@ describe('流量顺序代理链', () => {
   it('排除条件和整集范围保留为历史范围', () => {
     expect(landingNodeName({ nodeSet: landing })).toBeUndefined();
     expect(landingNodeName({ nodeSet: landing, filter: '^节点$', excludeFilter: '过期' })).toBeUndefined();
+  });
+  it('勾选生成的多节点筛选可还原，转义的竖线不被拆开', () => {
+    expect(landingNodeNames({ nodeSet: landing, filter: selectedNodeFilter(['甲|乙', '🇺🇸 GCP [01]']) })).toEqual(['甲|乙', '🇺🇸 GCP [01]']);
+    expect(landingNodeNames({ nodeSet: landing, filter: '^甲$|香港' })).toBeUndefined();
+    expect(landingNodeNames({ nodeSet: landing, filter: selectedNodeFilter(['甲']), excludeFilter: '过期' })).toBeUndefined();
+    expect(landingNodeNames({ nodeSet: landing })).toBeUndefined();
+  });
+  it('弱提示区分自动、精确与已有正则，全部范围不暴露勾选生成的正则', () => {
+    expect(viaConstraintHint('全部引用来源', { regex: '' })).toContain('跳过落地');
+    expect(viaConstraintHint('全部引用来源', { exact: 'GCP' })).toContain('精确匹配');
+    expect(viaConstraintHint('全部引用来源', { regex: '香港' })).toContain('已有正则 香港');
+    expect(landingConstraintHint('全部引用来源', { nodeSet: landing })).toContain('新增节点');
+    expect(landingConstraintHint('全部引用来源', { nodeSet: landing, filter: selectedNodeFilter(['甲', '乙']) })).not.toContain('^');
+    expect(landingConstraintHint('全部引用来源', { nodeSet: landing, filter: selectedNodeFilter([]) })).toContain('尚未选择');
+    expect(landingConstraintHint('全部引用来源', { nodeSet: landing, filter: '香港', excludeFilter: '过期' })).toContain('排除 过期');
   });
   it('Provider 前置正则合法且整集同源必须阻止', () => {
     expect(chainInputError(chain)).toBeUndefined();

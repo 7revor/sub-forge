@@ -27,9 +27,10 @@ export function canReferenceGroup(groups: GroupSpec[], owner: string, target: st
   };
   return !reachesOwner(target);
 }
+export const NO_NODE_FILTER = 'a^';
 /** 将勾选节点转成已有落地筛选格式；空集合不能误变为全部。 */
 export function selectedNodeFilter(names: string[]): string {
-  return [...new Set(names)].map(exactNodeFilter).join('|') || 'a^';
+  return [...new Set(names)].map(exactNodeFilter).join('|') || NO_NODE_FILTER;
 }
 export function exactNodeFilter(name: string): string {
   const escaped = Array.from(name, char => '.*+?^${}()|[]'.includes(char) || char.charCodeAt(0) === 92 ? String.fromCharCode(92) + char : char).join('');
