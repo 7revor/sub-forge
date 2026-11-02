@@ -234,7 +234,7 @@ export function PipelineEditor({ compactOverview = false, steps, onChange, previ
           <span className="w-full text-sm text-muted-foreground">{inputLabel ?? `输入 ${preview?.input ?? '—'} 个节点`}</span>
         </div>
         <div className="pipeline-step-scroll">
-        {!steps.length && <div className="px-4 pb-2"><Empty title="暂无处理器" /></div>}
+        {!steps.length && <div className="px-4 pb-2"><Empty variant="card" title="暂无处理器" /></div>}
         <SortableList items={steps.map((s, i) => ({ step: s, id: keys[i]! }))} getKey={(item) => item.id}
           onReorder={(items, { to }) => {
             setIds(items.map((item) => item.id));

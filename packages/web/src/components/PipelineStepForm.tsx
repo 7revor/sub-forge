@@ -70,7 +70,7 @@ function PatternRows({ label, patterns, hits, onChange, addLabel = '添加正则
         {error && <span role="status" className={cx('col-span-full text-xs', pattern ? 'text-destructive' : 'text-muted-foreground')}>{error}</span>}
       </RoutingCard>;
     })}
-    {!patterns.length && <div className="mt-3"><Empty title="尚未添加正则" /></div>}
+    {!patterns.length && <div className="mt-3"><Empty variant="card" title="尚未添加正则" /></div>}
   </div>;
 }
 
@@ -183,7 +183,7 @@ export function PipelineStepForm({ step, names, onChange }: { step: OperatorStep
             {error && <span role="status" className={cx('col-span-full text-xs', pattern ? 'text-destructive' : 'text-muted-foreground')}>{error}</span>}
           </RoutingCard>;
         }} />
-        {!step.patterns.length && <div className="mt-3"><Empty title="尚未添加优先级" /></div>}
+        {!step.patterns.length && <div className="mt-3"><Empty variant="card" title="尚未添加优先级" /></div>}
       </div>;
     case 'rename.regex': {
       const counts = names ? renameHits(step.rules, names) : undefined;

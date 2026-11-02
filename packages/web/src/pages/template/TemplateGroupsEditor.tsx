@@ -55,7 +55,7 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
         void edit({ id, name: '新策略组', type: 'select', members: [] }, true);
       }}><Plus size={16} />新建策略组</Button>
     </>}>
-      {!value.groups.length ? <Empty title="还没有策略组" /> : <>
+      {!value.groups.length ? <Empty variant="card" title="还没有策略组" /> : <>
         <TemplateBoundList label="策略组" items={value.groups} templateIds={templateGroupIds} templateStart={templateStart} isLocked={isGroupReadOnly} canDrop={(_from, to) => !isGroupReadOnly(value.groups[to]!)} onReorder={(groups, start) => onChange({ ...value, groups }, start)} renderItem={(g, _i, handle) => {
           const error = report.some(r => r.level === 'error' && r.where === `group:${g.id}`);
           const members = memberSummary?.(g) ?? (g.members.map(m => memberLabel(m, groupName, nodeSetName).text).join(' · ') || '留空');

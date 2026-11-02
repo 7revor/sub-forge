@@ -71,7 +71,7 @@ export function CollectionEdit() {
       <Card title="成员" count={d.members.length}
         actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ title: '添加成员', options, added: d.members.map(m => m.ref), hint: '组合不能循环引用。' }); if (result.status === 'confirmed') set({ members: [...d.members, ...result.data.map(ref => ({ ref }))] }); }}><Plus size={15} />添加成员</Button>}
         bodyClass="px-5 pb-5">
-        {!d.members.length ? <div className="px-4 pb-4"><Empty title="还没有成员" /></div> : (
+        {!d.members.length ? <div className="px-4 pb-4"><Empty variant="card" title="还没有成员" /></div> : (
           <div>
             <SortableList items={d.members} onReorder={(members) => set({ members })} renderItem={(m, i, handle) => (
               <div className={GRID}>
