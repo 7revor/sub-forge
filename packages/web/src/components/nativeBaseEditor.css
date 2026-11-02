@@ -1,26 +1,41 @@
-/* 目标目录与原文编辑区共享一层面板，分别滚动。 */
-.native-base-workspace { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-width: 0; min-height: 516px; border-top: 1px solid var(--border); }
-.native-base-targets { --native-base-arrow-width: 18px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; background: var(--card); border-right: 1px solid var(--border); overflow: auto; }
-.native-base-target { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 0 8px; border-radius: 6px; font-size: var(--text-sm); text-align: left; cursor: pointer; }
+/* 目标目录与配置工作区共享一层面板；工作区内的继承层与当前层叠在同一边框里，读起来是一份配置。 */
+.native-base-workspace { display: grid; grid-template-columns: 208px minmax(0, 1fr); min-width: 0; min-height: 540px; border-top: 1px solid var(--border); }
+.native-base-targets { display: flex; flex-direction: column; gap: 16px; padding: 16px 12px; border-right: 1px solid var(--border); overflow: auto; }
+.native-base-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.native-base-group-title { padding: 0 8px 4px; color: var(--muted-foreground); font-size: var(--text-xs); font-weight: 500; }
+.native-base-target { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 32px; padding: 0 8px; border-radius: 6px; font-size: var(--text-sm); text-align: left; cursor: pointer; }
 .native-base-target:hover { background: var(--accent); }
-.native-base-child { padding-left: 18px; color: var(--muted-foreground); }
-.native-base-target-active { background: color-mix(in oklab, var(--primary) 10%, transparent); color: var(--primary); }
-.native-base-content { display: flex; flex-direction: column; min-width: 0; overflow: auto; padding: 20px; }
-.native-base-source.yaml-textarea { flex: 1; border: 0; border-radius: 0; background: var(--card); }
-.native-base-source.yaml-textarea:focus-within { box-shadow: none; }
-.native-base-source > textarea { min-height: 390px; }
-@media (max-width: 639px) {
-  .native-base-workspace { grid-template-columns: 140px minmax(0, 1fr); }
-  .native-base-targets { padding: 8px; }
-  .native-base-target { padding-inline: 8px; }
-  .native-base-child { padding-left: 16px; }
-}
+.native-base-child { padding-left: 20px; }
+.native-base-target-active, .native-base-target-active:hover { background: color-mix(in oklab, var(--primary) 10%, transparent); color: var(--primary); }
+.native-base-count { flex-shrink: 0; color: var(--muted-foreground); font-size: var(--text-xs); }
+.native-base-target-active .native-base-count { color: inherit; }
 
-.native-base-row { display: flex; align-items: center; position: relative; border-radius: 6px; }
-.native-base-row-child { margin-left: var(--native-base-arrow-width); padding-left: 0; }
-.native-base-target { flex: 1; min-width: 0; }
-.native-base-expand { width: var(--native-base-arrow-width); flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: var(--muted-foreground); }
-.native-base-editor-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--input); border-radius: 8px; }
-.native-base-editor-footer { display: flex; flex-wrap: wrap; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--muted); }
-.native-base-editor-hints { flex: 1 1 260px; min-width: 0; color: var(--muted-foreground); font-size: var(--text-xs); line-height: 1.6; }
-.native-base-editor-hints p { margin: 0; }
+.native-base-content { display: flex; flex-direction: column; min-width: 0; padding: 16px 20px 20px; }
+.native-base-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; }
+.native-base-toolbar { display: flex; flex-wrap: wrap; flex-shrink: 0; align-items: center; gap: 8px 12px; min-height: 44px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border); }
+.native-base-toolbar p { margin: 0; }
+.native-base-layer { display: flex; flex-direction: column; min-width: 0; }
+.native-base-layer-inherited { flex-shrink: 0; border-bottom: 1px solid var(--border); background: var(--muted); }
+.native-base-layer-own { flex: 1; }
+.native-base-layer-title { margin: 0; padding: 8px 12px 0; color: var(--muted-foreground); font-size: var(--text-xs); font-weight: 500; }
+.native-base-source.yaml-textarea { flex: 1; border: 0; border-radius: 0; background: transparent; }
+.native-base-source.yaml-textarea:focus-within { box-shadow: none; }
+.native-base-source .yaml-textarea-gutter { background: transparent; }
+.native-base-layer-own .native-base-source { display: grid; }
+.native-base-layer-own .native-base-source > textarea { align-self: stretch; resize: none; }
+.native-base-source-readonly > textarea { resize: none; caret-color: transparent; }
+.native-base-source-readonly .yaml-textarea-highlight { opacity: .8; }
+.native-base-footer { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: var(--text-xs); line-height: 1.6; }
+.native-base-footer p { margin: 0; }
+
+@media (max-width: 767px) {
+  .native-base-workspace { grid-template-columns: minmax(0, 1fr); }
+  .native-base-targets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .native-base-group-title { padding-inline: 6px; }
+  .native-base-target { padding-inline: 6px; font-size: var(--text-xs); }
+  .native-base-child { padding-left: 6px; }
+  .native-base-count { display: none; }
+  .native-base-content { padding: 12px; }
+  .native-base-toolbar p { flex-basis: 100%; order: 1; }
+  .native-base-toolbar > :last-child { margin-left: auto; }
+}
