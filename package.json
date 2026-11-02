@@ -11,6 +11,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "start": "pnpm --filter @sub-forge/server start",
+    "docker:build": "docker build -f docker/Dockerfile -t sub-forge .",
+    "docker:up": "docker compose -f docker/compose.yaml up -d --build",
     "test:docker": "docker build -f docker/test.Dockerfile -t sub-forge-test . && docker run --rm --network none sub-forge-test"
   },
   "pnpm": {

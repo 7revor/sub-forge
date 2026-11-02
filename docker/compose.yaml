@@ -1,0 +1,21 @@
+# 单容器部署。应用只绑定本机回环端口，由宿主机上的 Nginx 反向代理对外提供 HTTPS。
+#   cp docker/.env.example docker/.env
+#   docker compose -f docker/compose.yaml up -d --build
+services:
+  sub-forge:
+    image: sub-forge:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?请在 docker/.env 中设置对外 HTTPS 地址}
+      SUBFORGE_TRUSTED_PROXIES: ${SUBFORGE_TRUSTED_PROXIES:-}
+      SUBFORGE_ADMIN_USERNAME: ${SUBFORGE_ADMIN_USERNAME:-}
+      SUBFORGE_ADMIN_PASSWORD: ${SUBFORGE_ADMIN_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${SUBFORGE_PORT:-8080}:8080"
+    volumes:
+      - sub-forge-data:/data
+volumes:
+  sub-forge-data:

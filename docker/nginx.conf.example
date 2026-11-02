@@ -1,0 +1,47 @@
+# Sub Forge 反向代理示例：放入 Nginx 的 http 块（如 /etc/nginx/conf.d/sub-forge.conf），
+# 替换域名、证书路径和 upstream 端口。应用须部署在域名根路径，不支持子路径。
+upstream sub_forge {
+    server 127.0.0.1:8080;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name sub.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name sub.example.com;
+
+    ssl_certificate     /etc/nginx/certs/sub.example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/sub.example.com/privkey.pem;
+
+    # 模板、节点 YAML 等请求体的上限
+    client_max_body_size 16m;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    # 公网入口覆盖来访者自带的 XFF；前面还有 CDN 时见 docs/20-deployment-client-ip.md
+    proxy_set_header X-Forwarded-For $remote_addr;
+
+    # 页面实时刷新用 SSE：关闭缓冲，保活间隔 15 秒
+    location = /api/events {
+        proxy_pass http://sub_forge;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
+    location / {
+        proxy_pass http://sub_forge;
+        # 手动备份、恢复和规则仓库索引可能持续数分钟
+        proxy_read_timeout 600s;
+    }
+}

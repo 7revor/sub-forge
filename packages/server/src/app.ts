@@ -75,7 +75,9 @@ export function createApp(deps: AppDeps) {
 
   app.get('/healthz', (c) => c.text('ok'));
   const ruleRepos = deps.ruleRepos ?? new RuleRepoService(store, createUpstreamFetcher({ allow: parseAllowList([]) }), now, undefined, deps.snapshots);
-  const apiDeps = { ...deps, ruleRepos, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' };
+  // TLS 在反向代理终止时，应用看到的是 http 地址；配置的对外地址是可信来源，否则浏览器的写请求都会被 CSRF 防护拒绝。
+  const publicOrigin = deps.publicUrl ? [new URL(deps.publicUrl).origin] : [];
+  const apiDeps = { ...deps, ruleRepos, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: [...publicOrigin, ...(deps.allowedOrigins ?? [])], publicUrl: deps.publicUrl ?? '' };
   app.route('/api', createApi(apiDeps));
   const auth = new Hono<ApiEnv>();
   auth.use('*', async (c, next) => { c.header('cache-control', 'no-store'); await next(); });
