@@ -144,7 +144,7 @@ describe('规则仓库索引', () => {
     const h = setup();
     const service = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
     try {
-      await service.refresh('blackmatrix7'); await service.refresh('zydou');
+      service.start(); await service.refresh('blackmatrix7'); await service.refresh('zydou');
       const calls = h.fetcher.mock.calls.length;
       service.refreshIfDue();
       await vi.advanceTimersByTimeAsync(86_400_000);
