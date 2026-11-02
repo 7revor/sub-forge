@@ -28,4 +28,14 @@ describe('模板关联迁移', () => {
     expect(inferAssociationMapping(groups, [{ ...groups[0]!, name: '改名' }, { ...groups[1]!, id: 'new' }])).toEqual({ main: 'main', relay: 'new' });
     expect(inferAssociationMapping(groups, [{ ...groups[1]!, id: 'a' }, { ...groups[1]!, id: 'b' }])).toEqual({});
   });
+  it.each(['constructor', 'toString', '__proto__'])('特殊组 ID %s 只为实际追加成员生成映射要求', id => {
+    const special = [{ ...groups[0]!, id }];
+    const routing = { mode: 'bound' as const, templateId: 't', groupAdditions: {} };
+    expect(associationRequirements({ ...profile, routing }, special)).toEqual([]);
+    const withMembers = { ...routing, groupAdditions: { [id]: special[0]!.members } };
+    expect(associationRequirements({ ...profile, routing: withMembers }, special)).toEqual([{ id, name: special[0]!.name, reasons: ['1 项节点填充'], canDrop: true }]);
+    const mapping = inferAssociationMapping(special, special);
+    expect(Object.hasOwn(mapping, id)).toBe(true);
+    expect(mapping[id]).toBe(id);
+  });
 });

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { nodeListOptions } from '../../hooks.ts';
 import { filterNodes } from '../../components/nodeMatch.ts';
-import { chainSources, type GroupMember, type GroupSpec, type NodeSetID } from '@sub-forge/core';
+import { addedGroupMembers, chainSources, type GroupMember, type GroupSpec, type NodeSetID } from '@sub-forge/core';
 import { Plus, X, LockKeyhole, Link2, Layers, Server, Crosshair } from 'lucide-react';
 import { useNodeList } from '../../hooks.ts';
 import { useModalPresentation } from '../../modals/index.tsx';
@@ -34,7 +34,7 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
   const inheritedKeys = new Set(inherited.map(memberKey));
   const selectedKeys = new Set(members.map(memberKey));
   const effective = [...inherited, ...members];
-  const effectiveGroups = groups.map(g => ({ ...g, members: [...g.members, ...(draft.routing?.mode === 'bound' ? draft.routing.groupAdditions[g.id] ?? [] : [])] }));
+  const effectiveGroups = groups.map(g => ({ ...g, members: [...g.members, ...(draft.routing.mode === 'bound' ? addedGroupMembers(draft.routing, g.id) : [])] }));
   const allProviders = effective.some(m => m.kind === 'all' && m.scope !== 'proxies');
   const allInline = effective.some(m => m.kind === 'all' && m.scope !== 'providers');
   const previewSets = profileNodeSets.filter(s => effective.some(m => m.kind === 'nodeset' && nodeSetKey(m.ref) === nodeSetKey(s.ref)) || (output(s.ref) === 'provider' ? allProviders : allInline));

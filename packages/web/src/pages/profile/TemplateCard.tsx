@@ -30,7 +30,7 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
   const automaticMapping = inferAssociationMapping(data.groups, target?.groups ?? []);
   const effectiveMapping = { ...automaticMapping, ...mapping };
   const required = associationRequirements(draft, data.groups, effectiveMapping);
-  const unresolved = required.some(g => !effectiveMapping[g.id] || (!g.canDrop && effectiveMapping[g.id] === '__drop'));
+  const unresolved = required.some(g => !Object.hasOwn(effectiveMapping, g.id) || !effectiveMapping[g.id] || (!g.canDrop && effectiveMapping[g.id] === '__drop'));
   const apply = () => modal.submit(async () => {
     const profile = { ...draft, name: draft.name.trim() || '未命名订阅' };
     let converted: Conversion;
@@ -56,7 +56,7 @@ const TemplateAssociationModal = createModal<{ profile: ProfileDoc; groups: Grou
       {target && mode !== 'detach' && <section className="border-t border-border pt-4"><h3 className="m-0 mb-3 text-base font-semibold">变更检查</h3>
         <div className="mb-4 flex gap-6 text-sm text-muted-foreground"><span>策略组 {data.groups.length} → {target.groups.length}</span><span>规则 {data.template?.rules.length ?? (draft.routing?.mode === 'independent' ? draft.routing.config.rules.length : 0)} → {target.rules.length}</span></div>
         <p className="mb-3 text-xs text-muted-foreground">同名或同 ID 的组已自动对应，只列出需要你决定的组。</p>
-        <div className="flex flex-col gap-4">{required.filter(g => !automaticMapping[g.id]).map(g => <Field key={g.id} label={g.name} hint={g.reasons.join('、')}>{id => <Select id={id} clearable value={effectiveMapping[g.id] ?? ''} placeholder="选择迁移到的策略组" onChange={event => setMapping({ ...mapping, [g.id]: event.target.value })}>
+        <div className="flex flex-col gap-4">{required.filter(g => !Object.hasOwn(automaticMapping, g.id)).map(g => <Field key={g.id} label={g.name} hint={g.reasons.join('、')}>{id => <Select id={id} clearable value={Object.hasOwn(effectiveMapping, g.id) ? effectiveMapping[g.id] : ''} placeholder="选择迁移到的策略组" onChange={event => setMapping({ ...mapping, [g.id]: event.target.value })}>
           {g.canDrop && <option value="__drop">移除此组的节点填充</option>}{target.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </Select>}</Field>)}</div>
       </section>}

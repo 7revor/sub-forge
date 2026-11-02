@@ -1,4 +1,4 @@
-import type { GroupSpec, Profile, ChainTarget } from '@sub-forge/core';
+import { addedGroupMembers, type GroupSpec, type Profile, type ChainTarget } from '@sub-forge/core';
 
 /** 只要求映射仍需保留的填充及引用，避免为无关策略组制造空表单。 */
 export function associationRequirements(profile: Profile, groups: GroupSpec[], mapping: Record<string, string> = {}) {
@@ -17,7 +17,7 @@ export function associationRequirements(profile: Profile, groups: GroupSpec[], m
     else if (target.kind === 'node' && target.ref.fallback && target.ref.fallback !== 'error') visit(target.ref.fallback, reason);
   };
   for (const group of groups) {
-    const members = profile.routing?.mode === 'bound' ? profile.routing.groupAdditions[group.id] ?? [] : group.members.filter(m => ['node', 'nodeset', 'all'].includes(m.kind));
+    const members = profile.routing?.mode === 'bound' ? addedGroupMembers(profile.routing, group.id) : group.members.filter(m => ['node', 'nodeset', 'all'].includes(m.kind));
     if (!members.length) continue;
     add(group.id, `${members.length} 项节点填充`);
     if (mapping[group.id] !== '__drop') for (const member of members) if (member.kind === 'node' || member.kind === 'group') visit(member, '成员引用');

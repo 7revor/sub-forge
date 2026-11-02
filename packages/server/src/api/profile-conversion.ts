@@ -1,6 +1,6 @@
 import { requiredQuery } from '../query.ts';
 import { Hono } from 'hono';
-import { Report, resolveProfileRouting, type GroupMember, type Target, type Template } from '@sub-forge/core';
+import { addedGroupMembers, Report, resolveProfileRouting, type GroupMember, type Target, type Template } from '@sub-forge/core';
 import { independentProfile, profileTemplate } from '../profile-routing.ts';
 import type { ProfileDoc } from '../docs.ts';
 import type { Store } from '../store.ts';
@@ -39,7 +39,7 @@ export function profileConversionRoutes(store: Store) {
     const changes: string[] = [];
     const destination = (old: string): string | null => {
       if (privateIds.has(old)) return old;
-      const mapped = map[old];
+      const mapped = Object.hasOwn(map, old) ? map[old] : undefined;
       if (mapped === null) return null;
       if (!isStr(mapped) || !ids.has(mapped)) throw bad(`请为策略组 ${old} 选择目标或明确选择不迁移`);
       return mapped;
@@ -54,7 +54,7 @@ export function profileConversionRoutes(store: Store) {
       return target;
     };
     for (const group of effective.groups) {
-      const members = profile.routing?.mode === 'bound' ? profile.routing.groupAdditions[group.id] ?? [] : group.members.filter(m => ['node', 'nodeset', 'all'].includes(m.kind));
+      const members = profile.routing?.mode === 'bound' ? addedGroupMembers(profile.routing, group.id) : group.members.filter(m => ['node', 'nodeset', 'all'].includes(m.kind));
       if (!members.length) continue;
       const target = destination(group.id);
       if (!target) { changes.push(`移除「${group.name}」的 ${members.length} 个追加成员`); continue; }
@@ -88,10 +88,10 @@ function migratedGroupHidden(profile: ProfileDoc, template: Template, map: Recor
   if (profile.routing?.mode !== 'bound') return {};
   const targets = new Map<string, boolean[]>();
   for (const [id, hidden] of Object.entries(profile.routing.groupHidden ?? {})) {
-    const target = id in map ? map[id] : id;
+    const target = Object.hasOwn(map, id) ? map[id] : id;
     if (isStr(target) && template.groups.some(g => g.id === target)) targets.set(target, [...(targets.get(target) ?? []), hidden]);
   }
-  const result: Record<string, boolean> = {};
+  const result: Record<string, boolean> = Object.create(null);
   for (const [id, values] of targets) {
     const name = template.groups.find(g => g.id === id)!.name;
     if (new Set(values).size > 1) { changes.push(`「${name}」的隐藏设置来源冲突，改为跟随模板`); continue; }
