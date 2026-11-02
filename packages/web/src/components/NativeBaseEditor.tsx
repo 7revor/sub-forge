@@ -25,6 +25,7 @@ export function NativeBaseEditor({ value, onChange }: { value: NativeBase; onCha
   const inherited = nativeBaseParents(kernel, app).map(parent => ({ kernel: parent, label: scopeLabel(parent), text: value.kernels?.[parent] ?? '' })).filter(parent => parent.text.trim());
   const visible = TARGETS.flatMap((scope, i) => scope.parents.every(parent => expanded.includes(parent)) ? [i] : []);
   const format = isIniClient(kernel) ? 'INI' : 'YAML';
+  const scopeHint = !app ? '本内核客户端共用，客户端配置优先。' : !inherited.length ? '当前客户端专用。' : format === 'YAML' ? '合并字段，客户端优先；列表整体替换。' : 'General、Host、MITM 同名键覆盖，其他段落追加。';
   const text = (app ? value.clients?.[app] : value.kernels?.[kernel]) ?? '';
   const update = (text: string) => { setError(undefined); onChange(app ? { ...value, clients: { ...value.clients, [app]: text } } : { ...value, kernels: { ...value.kernels, [kernel]: text } }); };
   return <div className="native-base-workspace">
@@ -49,8 +50,8 @@ export function NativeBaseEditor({ value, onChange }: { value: NativeBase; onCha
         className="native-base-source" placeholder={`粘贴 ${label} 的原始 ${format} 配置`} onChange={event => update(event.target.value)} />
       <FieldError error={error} />
       <div className="native-base-editor-footer">
-        <span className="text-xs text-muted-foreground">{format}</span>
-        <div className="flex gap-1">{format === 'YAML' && <Button size="sm" variant="ghost" disabled={!text.trim()} onClick={() => { try { update(stringify(parse(text))); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } }}>格式化</Button>}<Button size="sm" variant="ghost" disabled={!text} onClick={() => update('')}>清空</Button></div>
+        <div className="native-base-editor-hints"><p>{format} · {scopeHint}</p><p>节点、策略组和规则由系统生成，请勿在此填写。</p></div>
+        <div className="ml-auto flex shrink-0 gap-1">{format === 'YAML' && <Button size="sm" variant="ghost" disabled={!text.trim()} onClick={() => { try { update(stringify(parse(text))); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } }}>格式化</Button>}<Button size="sm" variant="ghost" disabled={!text} onClick={() => update('')}>清空</Button></div>
       </div></div>
     </div>
   </div>;

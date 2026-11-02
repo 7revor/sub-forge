@@ -21,4 +21,6 @@
 .native-base-target { flex: 1; min-width: 0; }
 .native-base-expand { width: var(--native-base-arrow-width); flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: var(--muted-foreground); }
 .native-base-editor-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--input); border-radius: 8px; }
-.native-base-editor-footer { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px 4px 12px; border-top: 1px solid var(--border); background: var(--muted); }
+.native-base-editor-footer { display: flex; flex-wrap: wrap; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--muted); }
+.native-base-editor-hints { flex: 1 1 260px; min-width: 0; color: var(--muted-foreground); font-size: var(--text-xs); line-height: 1.6; }
+.native-base-editor-hints p { margin: 0; }
