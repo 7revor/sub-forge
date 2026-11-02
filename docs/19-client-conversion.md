@@ -55,7 +55,7 @@ Stash iOS/macOS 直接列在 Mihomo 下，无中间 Stash 菜单；FlClash、Cla
 - 节点与规则内容由各自模块解析，继续用于订阅生成和内核格式转换。
 - 基础配置按内核／客户端原文保存，不提取为表单、不转换为公共字段；生成时只做必要的结构合并和受管理段冲突检查。
 
-节点转换统一规范 VLESS/VMess 的 `sni` 为 `servername`；冲突报错。Loon block-quic 布尔值对应 Surge on/off，Surge auto/adaptive 保留原值并在 Loon 报不兼容。Mihomo/Stash 当前没有适配等价的节点级阻断：true/on/auto/adaptive 报错，false/off 可省略；绝不擅自替换成全局拒绝 UDP 443。
+节点转换统一规范 VLESS/VMess 的 `sni` 为 `servername`；冲突报错。Loon block-quic 布尔值对应 Surge on/off，Surge auto/adaptive 保留原值并在 Loon 报不兼容。Mihomo 当前没有适配等价的节点级阻断：true/on/auto/adaptive 报错，false/off 可省略；绝不擅自替换成全局拒绝 UDP 443。Stash 按公共生成保留 `block-quic` 原值，不再套用 Mihomo 的阻断检查；字段保留不等于已完成真机执行验证。
 
 新增依据：[Mihomo 域名语法](https://wiki.metacubex.one/handbook/syntax/)、[Mihomo TUN](https://wiki.metacubex.one/config/inbound/tun/)、[Loon General](https://nsloon.app/en/docs/General/)、[Surge General](https://manual.nssurge.com/profile/general.html)、[Surge 节点选项](https://manual.nssurge.com/policies/parameters.html)、[Stash DNS](https://stash.wiki/en/features/dns-server)。此前的公共配置映射及完整导入验收仅作历史记录；当前基础配置遵循[原文追加约定](20-native-client-append.md)。
 
@@ -118,5 +118,7 @@ Loon 没有在本机执行官方配置校验器；Surge/Loon 的真实客户端�
 - 动态成员先使用公共 Clash 表达；需要托管筛选和空集合保护时再展开。原生扩展中的 `include-all*` 也经过同一保护。Stash 的派生远程子集仍保持稳定地址和 REJECT 语义，这一差异不修改代理链前置名称。
 - `dialer-proxy: upstream-select` 在两端保持一致；精确远程节点前置在两端使用相同隐藏组名称、依赖记录及落地引用。本服务不为 Stash 额外改写、禁止或提示这些代理链组合；引用缺失、循环等公共校验继续生效。
 - Stash 缓存记录公共生成版本，失败不会回退到旧专用改写产物。基础配置继续遵循 Mihomo 公共 → 历史 Stash 公共 → Stash 应用追加的继承顺序。
+
+公共规则使用独立的内容版本。2026-11-02 将版本从 2 提升为 3，避免规则来源未变化时继续命中旧版省略 `URL-REGEX` 的正文。该版本只参与内容哈希，不改变资源身份和已发布链接；旧产物下次读取时按需重建，成功后继续缓存。主配置与公共规则的失败策略分别保留：主配置禁止回退旧 Stash 专用生成结果；公共规则重建失败仍带告警返回最后成功正文，并保留旧内容版本以便后续重试。
 
 验证与运行边界见[公共生成验收](verification/stash-common-20261102/README.md)。
