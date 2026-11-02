@@ -17,13 +17,13 @@ function rules(props: Partial<Parameters<typeof TemplateRulesEditor>[0]> = {}) {
 }
 
 describe('模板与订阅共享编辑器的权限边界', () => {
-  it('绑定组不能新增、删除、排序或改变隐藏状态，但可打开节点填充入口', () => {
+  it('只读列表不能新增、删除、排序或改变隐藏状态，但可打开节点填充入口', () => {
     const html = renderToStaticMarkup(<TemplateGroupsEditor {...common} readOnly memberSummary={() => '本订阅的节点集'} />);
     expect(html).toContain('编辑策略组「节点选择」');
     expect(html).toContain('本订阅的节点集');
     expect(html).not.toContain('新建策略组');
     expect(html).not.toContain('删除策略组');
-    expect(html).not.toContain('role="switch"');
+    expect(html).toMatch(/<button[^>]*role="switch"[^>]*\sdisabled=""/);
     expect(html).not.toContain('更多操作');
     expect(html).not.toContain('aria-label="拖动');
   });
@@ -31,8 +31,16 @@ describe('模板与订阅共享编辑器的权限边界', () => {
     const html = renderToStaticMarkup(<TemplateGroupsEditor {...common} />);
     expect(html).toContain('新建策略组');
     expect(html).toContain('删除策略组「节点选择」');
-    expect(html).not.toContain('role="switch"');
+    expect(html).toContain('aria-label="隐藏策略组「节点选择」"');
     expect(html).toContain('aria-label="拖动');
+  });
+  it('绑定订阅的模板组可切换隐藏，只有与模板不同时才标记', () => {
+    const group = common.value.groups[0]!;
+    const list = (hidden: boolean, inherited: boolean) => renderToStaticMarkup(<TemplateGroupsEditor {...common} value={{ ...common.value, groups: [{ ...group, display: { hidden } }] }} isGroupReadOnly={() => true} hiddenOverride={{ inherited: () => inherited, set: () => {} }} />);
+    expect(list(true, false)).toContain('模板为显示');
+    expect(list(false, true)).toContain('模板为隐藏');
+    expect(list(true, true)).not.toContain('模板为');
+    expect(list(true, false)).not.toMatch(/<button[^>]*role="switch"[^>]*\sdisabled=""/);
   });
   it('绑定规则仍可查看内容，但不能编辑、删除、排序或修改 MATCH', () => {
     const html = rules({ readOnly: true });

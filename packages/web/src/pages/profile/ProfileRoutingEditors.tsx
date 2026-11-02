@@ -1,5 +1,5 @@
 // 订阅与模板使用同一套列表和弹窗；订阅补充节点成员与独立规则出口。
-import { Report, resolveProfileRouting, routingConfig } from '@sub-forge/core';
+import { Report, resolveProfileRouting, routingConfig, withGroupHidden } from '@sub-forge/core';
 import { profileModalData } from './modalProfile.ts';
 import { memberLabel } from '../../components/pickers.tsx';
 import { RuleTargetSelect } from '../../components/RuleTargetSelect.tsx';
@@ -37,6 +37,10 @@ export function ProfileGroupsEditor() {
   const { body, update, bound } = useRoutingBody();
   return <>
     <TemplateGroupsEditor value={body} onChange={update} report={draftIssues(body)} templateGroupIds={bound ? template?.groups.map(g => g.id) ?? [] : undefined} templateStart={draft.routing?.mode === 'bound' ? draft.routing.prependGroupIds?.length ?? 0 : undefined} isGroupReadOnly={group => bound && !!template?.groups.some(g => g.id === group.id)} nodeSetName={nodeSetName}
+      hiddenOverride={draft.routing?.mode === 'bound' && template ? {
+        inherited: group => { const origin = template.groups.find(g => g.id === group.id); return origin && !!origin.display?.hidden; },
+        set: (group, hidden) => { if (draft.routing?.mode === 'bound') setDraft({ ...draft, routing: withGroupHidden(draft.routing, template, group.id, hidden) }); },
+      } : undefined}
       onRemoveGroup={async group => {
         const result = await Frame.modal.confirm({ title: `删除策略组「${group.name}」？`, description: '同时移除组内成员引用及引用它的代理链，相关规则出口改为 REJECT。保存订阅后生效。', confirmLabel: '删除', danger: true });
         if (result.status === 'confirmed') setDraft(removeIndependentGroup(draft, group.id));

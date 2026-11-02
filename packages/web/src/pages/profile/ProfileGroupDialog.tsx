@@ -7,7 +7,7 @@ import { compileUserRegex, type GroupSpec } from '@sub-forge/core';
 import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
 import { GROUP_TYPE_LABEL, GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
-import { Button, Field, Input, Select, Switch } from '../../components/ui.tsx';
+import { Button, Field, Input, Select } from '../../components/ui.tsx';
 import { draftIssues } from '../template/model.ts';
 import { ProfileContext } from './context.ts';
 import { GroupMemberPicker } from './GroupMemberPicker.tsx';
@@ -48,7 +48,7 @@ export const ProfileGroupDialog = createModal<ProfileModalData & { groupId: stri
             <Field label="名称排除">{id => <Input id={id} placeholder="排除匹配正则的节点" value={group.excludeFilter ?? ''} onChange={event => patch({ excludeFilter: event.target.value || undefined })} />}</Field>
             <Field label="排除协议">{id => <ExcludeTypeSelect id={id} disabled={bound} value={group.excludeType} onChange={excludeType => patch({ excludeType })} />}</Field>
           </div>
-          <label className="flex items-center gap-2 text-sm"><Switch label="在客户端面板中隐藏" disabled={bound} checked={group.display?.hidden ?? false} onChange={hidden => patch({ display: { ...group.display, hidden } })} />在客户端面板中隐藏</label><div className="grid gap-4 sm:grid-cols-2"><GroupSettingsFields disabled={bound} section="advanced" value={group} onChange={(key, value) => patch({ [key]: value })} /><Field label="图标地址">{id => <Input placeholder={groupPlaceholders.icon} id={id} value={group.display?.icon ?? ''} onChange={e => patch({ display: { ...group.display, icon: e.target.value || undefined } })} />}</Field>
+          <div className="grid gap-4 sm:grid-cols-2"><GroupSettingsFields disabled={bound} section="advanced" value={group} onChange={(key, value) => patch({ [key]: value })} /><Field label="图标地址">{id => <Input placeholder={groupPlaceholders.icon} id={id} value={group.display?.icon ?? ''} onChange={e => patch({ display: { ...group.display, icon: e.target.value || undefined } })} />}</Field>
 
           </div>
           <ExtraFields value={group.extra ?? {}} validateName={name => ['proxies', 'use', 'filter', 'exclude-filter', 'exclude-type', 'include-all', 'include-all-proxies', 'include-all-providers', 'dialer-proxy', 'empty-fallback'].includes(name) ? '请通过成员和前置设置编辑此字段；空组固定拒绝连接' : undefined} onChange={extra => patch({ extra })} />
