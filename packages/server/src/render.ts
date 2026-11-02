@@ -41,7 +41,8 @@ export type StoredRender = {
   providers: Record<string, string>;
   providerUserinfo?: Record<string, TrafficInfo>;
   nodeDependencies: NodeSetID[];
-  privateRules?: Record<string, { reference: HostedRuleReference; body: string }>;
+  /** 按 ruleKey 请求时才有：订阅专属规则正文。 */
+  ruleBody?: string;
   userinfo?: TrafficInfo;
   warnings: number;
 };
@@ -111,12 +112,12 @@ export class RenderService {
     return header + '\n' + yaml.replace(/^(?:#!MANAGED-CONFIG|#SUBSCRIBED)\b[^\r\n]*(?:\r?\n|$)/, '');
   }
 
-  async render(profileId: string, target: Target): Promise<RenderOutcome> {
+  async render(profileId: string, target: Target, ruleKey?: string): Promise<RenderOutcome> {
     target = normalizeTarget(target);
     const pre: ReportItem[] = [];
     let attempt: Attempt;
     try {
-      attempt = await this.attempt(profileId, target, pre);
+      attempt = await this.attempt(profileId, target, pre, ruleKey ? { ruleKey } : {});
     } catch (e) {
       if (e instanceof ResourceAccessError) return { ok: false, accessDenied: true, message: e.message, report: pre };
       // 内核抛出的异常（如依赖解析不收敛）也按渲染失败处理，走兜底
@@ -144,19 +145,6 @@ export class RenderService {
     if (!repository) return queryUrl('/resources/ruleset', { id: reference.matcher.id, ...common }, this.opts.publicUrl.replace(/\/$/, ''));
     const files = repository.sources.filter(source => source.enabled !== false).map(source => ({ ref: source.repository!.ref, path: source.repository!.path }));
     return queryUrl('/resources/repo', { id: repository.repo, files: JSON.stringify(files), ...common }, this.opts.publicUrl.replace(/\/$/, ''));
-  }
-
-  canReadRule(profileId: string, reference: HostedRuleReference): boolean {
-    const profile = this.store.get('profile', profileId);
-    if (!profile) return false;
-    const template = profileTemplate(profile, (id, version) => this.store.getTemplate(id, version));
-    const rules = resolveProfileRouting(profile, template, new Report()).rules;
-    return rules.some(rule => rule.enabled !== false && stableStringify(rule.matcher) === stableStringify(reference.matcher) && !!rule.options?.src === !!reference.options?.src)
-      && (reference.matcher.kind !== 'ruleset' || !!resolveRuleSetReference(reference.matcher, this.store));
-  }
-
-  canReadRules(profileId: string, render: StoredRender): boolean {
-    return Object.values(render.privateRules ?? {}).every(rule => this.canReadRule(profileId, rule.reference));
   }
 
   /**
@@ -190,7 +178,7 @@ export class RenderService {
     return this.preview('', target, { profile: { ...profile, id: '' }, owner });
   }
 
-  private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<Attempt> {
+  private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; ruleKey?: string; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<Attempt> {
     for (let retry = 0; ; retry++) {
       const start = pre.length;
       try { return await this.attemptOnce(profileId, target, pre, opts); }
@@ -201,7 +189,7 @@ export class RenderService {
     }
   }
 
-  private async attemptOnce(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string }): Promise<Attempt> {
+  private async attemptOnce(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; ruleKey?: string; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string }): Promise<Attempt> {
     const configurationRevision = this.store.configurationRevision;
     const usedSnapshots: {snapshot:SnapshotRow;revision?:string}[] = [];
     const checkCurrent = () => {
@@ -258,6 +246,8 @@ export class RenderService {
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
+      // 预览需要完整诊断和可导出的正文；主配置只写地址，正文由规则文件请求生成。
+      ...(opts.dry ? {} : { deferRuleBody: reference => this.ruleKey(reference, target) !== opts.ruleKey }),
       urls: {
         provider: k => queryUrl('/subs/nodes', { kind: 'provider', profile: profile.id, id: k, ...output }, publicUrl),
         ruleset: (k, reference) => {
@@ -282,6 +272,7 @@ export class RenderService {
     }
 
     checkCurrent();
+    const requestedRule = opts.ruleKey ? [...ruleReferences].find(([, reference]) => (reference.matcher.kind !== 'ruleset' || reference.matcher.remote) && this.ruleKey(reference, target) === opts.ruleKey) : undefined;
     const render: StoredRender = {
       providerNodeCounts: Object.fromEntries(Object.entries(result.providers).flatMap(([key, provider]) => provider.nodeCount === undefined ? [] : [[key, provider.nodeCount]])),
       yaml: this.managedProfileYaml(result.yaml, profile.id, target),
@@ -307,7 +298,7 @@ export class RenderService {
         const info = sumTraffic(infos.values());
         return info ? [[key, info]] : [];
       })),
-      privateRules: Object.fromEntries([...ruleReferences].filter(([, ref]) => ref.matcher.kind !== 'ruleset' || ref.matcher.remote).map(([file, reference]) => [this.ruleKey(reference, target), { reference, body: result.rulesets[file]!.text }])),
+      ...(requestedRule ? { ruleBody: result.rulesets[requestedRule[0]]?.text } : {}),
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };

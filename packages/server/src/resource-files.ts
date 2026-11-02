@@ -130,13 +130,12 @@ export function subscriptionRuleRoutes(store: Store, renderer: RenderService, sn
     }
     allowedQuery(c, ['profile', 'key', 'target', 'platform', 'app', 'token']);
     const key = requiredQuery(c, 'key'), output = target(c, true);
-    const result = await renderer.render(profileId, output);
+    const result = await renderer.render(profileId, output, key);
     if (!owned()) return c.body(null, 404);
     if (!result.ok) return result.accessDenied ? c.body(null, 404) : c.text(`规则暂时不可用：${result.message}`, 503);
-    const selected = result.render.privateRules?.[key];
-    if (!selected || !renderer.canReadRule(profileId, selected.reference)) return c.body(null, 404);
+    if (result.render.ruleBody === undefined) return c.body(null, 404);
     c.set('accessResource', { kind: 'rule-collection', resourceId: key, resourceName: store.get('profile', profileId)!.name + ' · 专属规则' });
-    return ruleBody(c, selected.body);
+    return ruleBody(c, result.render.ruleBody);
   });
   return app;
 }

@@ -48,6 +48,8 @@ export type RenderInput = {
   urls: UrlBuilder;
   /** 已按内核和客户端选取的原生追加文本，仅生成时合并 */
   base?: string;
+  /** 主配置只写规则地址时返回 true：跳过正文解析和转换，由规则文件请求按需生成。 */
+  deferRuleBody?(reference: HostedRuleReference): boolean;
 };
 
 /** 配置预览中的只读引用生成详情。 */
@@ -490,6 +492,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       continue;
     }
     // 只解析一次：校验、输出方式判断和正文转换共用容错文档。
+    const deferred = input.deferRuleBody?.(reference) ?? false;
     const documents = new Map<string, RuleDocument>();
     for (const src of rs.sources.filter(s => s.enabled !== false)) {
       const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
@@ -503,6 +506,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         report.error('ruleset.no-snapshot', `${label}没有可用快照`, where);
         continue;
       }
+      if (deferred) continue;
       const document = prepareRuleDocument(content ?? '', src);
       documents.set(src.id, document);
       // 保留远程错误页面保护，不能把失败响应当作空分流配置下发。
@@ -513,6 +517,12 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     // 所有需要处理的来源统一为一个 classical LIST，IP 选项保留在对应行内。
     const key = `${base}_classical`;
     const file = `${key}.list`;
+    const textProvider = () => ({ type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, reference), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(!isIniClient(client) ? { proxy: FETCH_VIA } : {}) });
+    if (deferred) {
+      ruleProviders[providerName] = textProvider();
+      ruleLines.push(`RULE-SET,${providerName},${target}`);
+      continue;
+    }
     if (!rulesets[file]) {
       const converted = convertRuleDocuments(rs, documents, ctx, { ipOptions: r.options });
       // 逐行解析、去重、客户端适配与改写详情由规则集预览和托管正文承载。
@@ -523,7 +533,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       }
       if (!converted.lines.length) continue;
       rulesets[file] = { behavior: 'classical', text: converted.lines.join('\n') + '\n', providerName };
-      ruleProviders[providerName] = { type: 'http', behavior: 'classical', format: 'text', url: input.urls.ruleset(file, reference), interval: input.resourceIntervalSec ?? RULESET_INTERVAL, ...(!isIniClient(client) ? { proxy: FETCH_VIA } : {}) };
+      ruleProviders[providerName] = textProvider();
     }
     ruleLines.push(`RULE-SET,${providerName},${target}`);
   }

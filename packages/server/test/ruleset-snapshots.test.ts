@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { ruleBodies } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -71,14 +72,14 @@ describe('远程规则快照有效性', () => {
     expect(after.ok && (await ruleBodies(h.renderer, 'p'))['rs_r_classical.list']).toBe('DOMAIN,recovered.example.test\n');
   });
 
-  it('历史库中已存在错误快照时保护主配置', async () => {
+  it('历史库中已存在错误快照时规则文件报错，不下发错误内容', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test');
     h.advance(1000);
     const body = '<html>旧版本错误保存的页面</html>';
     h.store.addSnapshot({ ownerKind: 'ruleset', ownerId: 'r', url: 'https://rules.example.test/list', fetchedAt: 1_700_000_001_000, ok: true, body, hash: stableHash(body) });
-    const after = await h.renderer.render('p', { client: 'mihomo' });
-    expect(after.report).toContainEqual(expect.objectContaining({ code: 'ruleset.invalid-content', level: 'error' }));
-    expect(after.ok).toBe(false);
+    expect((await h.renderer.render('p', { client: 'mihomo' })).ok).toBe(true);
+    await expect(h.renderer.sharedRules.read({ matcher: { kind: 'ruleset', id: 'r' } }, { client: 'mihomo' })).rejects.toThrow('没有可用规则');
+    expect((await h.renderer.preview('p', { client: 'mihomo' })).report).toContainEqual(expect.objectContaining({ code: 'ruleset.invalid-content', level: 'error' }));
   });
 
   it('有效规则被客户端覆盖全部丢弃时仍允许输出', async () => {
@@ -86,5 +87,15 @@ describe('远程规则快照有效性', () => {
     const rs = h.store.get('ruleset', 'r')!;
     h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, overrides: [{ line: 1, override: { when: { client: 'mihomo' }, action: { drop: true } } }] }] });
     expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(200);
+  });
+
+  it('规则全部不适用于目标内核时，主配置仍声明 provider，规则文件返回合法的空内容', async () => {
+    const h = setup('classical', 'DOMAIN,valid.example.test');
+    const rs = h.store.get('ruleset', 'r')!;
+    h.store.put('ruleset', { ...rs, sources: [{ ...rs.sources[0]!, overrides: [{ line: 1, override: { when: { client: 'mihomo' }, action: { drop: true } } }] }] });
+    const rendered = await h.renderer.render('p', { client: 'mihomo' });
+    expect(rendered.ok && parse(rendered.render.yaml).rules[0]).toContain('RULE-SET,');
+    const output = await h.renderer.sharedRules.read({ matcher: { kind: 'ruleset', id: 'r' } }, { client: 'mihomo' });
+    expect(output?.body.split('\n').filter(line => line && !line.startsWith('#'))).toEqual([]);
   });
 });

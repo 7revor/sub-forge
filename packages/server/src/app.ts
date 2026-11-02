@@ -151,7 +151,6 @@ export function createApp(deps: AppDeps) {
     const outcome = await renderer.render(profileId, { client: detected.client, ...(detected.platform ? { platform: detected.platform } : {}), ...(detected.app ? { app: detected.app } : {}) });
     if (store.getActiveToken(token)?.userId !== t.userId || store.getWithOwner('profile', profileId)?.owner !== t.userId) return notFound(c);
     if (outcome.ok && !renderer.canReadNodes(outcome.render, t.userId)) return notFound(c);
-    if (outcome.ok && !renderer.canReadRules(profileId, outcome.render)) return notFound(c);
     if (!outcome.ok) {
       setAccessResult(outcome);
       return c.text(`订阅暂时不可用：${outcome.message}`, 503);
