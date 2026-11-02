@@ -16,10 +16,11 @@ import { Plus } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useDeleteDoc, type DocMap, type Kind } from '../hooks.ts';
-import { Button, buttonClass, cx, Empty, ErrorAlert, PageHeader, listTd } from './ui.tsx';
+import { Button, buttonClass, cx, Empty, ErrorAlert, PageHeader } from './ui.tsx';
 import { DocActionLink, DocTableRow, actionHeader, docNameLinkClass } from './DocTableRow.tsx';
 import { Frame } from '../modals/Frame.tsx';
 import { ResourceLinkButton } from './ResourceLinkButton.tsx';
+import { TableCell } from './ui/table.tsx';
 
 export type Column<K extends Kind> = { header: string; cell: (d: DocMap[K]) => ReactNode; className?: string; width?: number };
 
@@ -66,13 +67,13 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
             {!list.data && !list.error ? <ListTableLoading columns={tableColumns.length} /> : rows.map((d) => (
               <DocTableRow key={d.id} to={`/${kind}/${d.id}`}>
                 {shownColumns.map((c, i) => (
-                  <td key={c.header} className={cx(listTd, c.className)}>
+                  <TableCell key={c.header} className={c.className}>
                     {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}><span className="block truncate">{c.cell(d)}</span><span className="block truncate text-xs font-normal text-muted-foreground" title={d.note}>{d.note || '无备注'}</span></Link> : c.cell(d)}
-                  </td>
+                  </TableCell>
                 ))}
-                {refreshable && <td className={listTd}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
-                {refreshable && <td className={listTd}>{kind === 'profiles' ? <LastProfileAccess id={d.id} /> : <ResourceLastRefreshTime kind={kind} id={d.id}/>}</td>}
-                <td className={cx(listTd, 'text-right whitespace-nowrap')}>
+                {refreshable && <TableCell><ResourceCacheStatus kind={kind} id={d.id}/></TableCell>}
+                {refreshable && <TableCell>{kind === 'profiles' ? <LastProfileAccess id={d.id} /> : <ResourceLastRefreshTime kind={kind} id={d.id}/>}</TableCell>}
+                <TableCell className="text-right whitespace-nowrap">
                   <ListActions>
                     <ResourceLinkButton kind={kind} id={d.id} name={d.name} size="sm" />
                     <ActionMenu label={`${d.name}更多操作`}>
@@ -82,7 +83,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                     {kind === 'profiles' && <Button size="sm" onClick={() => void copyProfile(d as DocMap['profiles'])}>复制为新订阅</Button>}
                     {canWrite(d.id) && <Button size="sm" variant="danger" aria-label={`删除 ${d.name}`} onClick={() => { del.reset(); void Frame.modal.confirm({ title: `删除${name}「${d.name}」？`, description: deleteBody ?? '删除后无法恢复。', confirmLabel: '删除', danger: true }, { submit: async () => { await del.mutateAsync(d.id); } }); }}>删除</Button>}
                   </ActionMenu></ListActions>
-                </td>
+                </TableCell>
               </DocTableRow>
             ))}
           </ListTable>

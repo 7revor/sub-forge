@@ -16,7 +16,8 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.ts';
 import { useMe } from '../hooks.ts';
 import { api, type RuleOptions, type RuleRepo } from '../api.ts';
 import { type RuleSelection } from '../domain/ruleOptions.ts';
-import { Button, cx, ErrorAlert, listMono, listTd, PageHeader } from '../components/ui.tsx';
+import { Button, cx, ErrorAlert, listMono, PageHeader } from '../components/ui.tsx';
+import { TableCell, TableRow } from '../components/ui/table.tsx';
 
 type RepositoryFile = Extract<RuleSelection, { source: 'repository' }>;
 
@@ -69,14 +70,14 @@ function RepositoryFileTable({ query, repository, repos }: { query: string; repo
           const selection = JSON.parse(option.value) as RepositoryFile;
           const repoName = repos.find(repo => repo.id === selection.repo)?.name ?? selection.repo;
           const href = option.url;
-          return <tr key={option.value} className="cursor-pointer hover:bg-accent focus-within:bg-muted" onClick={event => openFileRow(event, href)} onAuxClick={event => openFileRow(event, href)}>
-            <td className={cx(listTd, 'font-medium')}><a href={href} target="_blank" rel="noreferrer noopener" className="block truncate text-foreground no-underline hover:text-primary" title={option.label}><HighlightedText text={option.label} matches={option.matches?.label} /></a></td>
-            <td className={cx(listTd, 'text-muted-foreground')}><span className="block truncate" title={repoName}>{repoName}</span></td>
-            <td className={cx(listTd, 'text-muted-foreground')}>{selection.file.ref}</td>
-            <td className={cx(listTd, listMono, 'text-xs leading-[normal]') }><span className="group/name relative inline-flex max-w-full items-center pr-8"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="min-w-0 cursor-pointer break-all rounded-sm text-left no-underline hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" aria-label={`打开 ${selection.file.path}，${repoName}，${selection.file.ref}`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></a>{href && <CopyFileLink href={href} name={selection.file.path} />}</span></td>
-          </tr>;
+          return <TableRow key={option.value} className="cursor-pointer hover:bg-accent focus-within:bg-muted" onClick={event => openFileRow(event, href)} onAuxClick={event => openFileRow(event, href)}>
+            <TableCell className="font-medium"><a href={href} target="_blank" rel="noreferrer noopener" className="block truncate text-foreground no-underline hover:text-primary" title={option.label}><HighlightedText text={option.label} matches={option.matches?.label} /></a></TableCell>
+            <TableCell className="text-muted-foreground"><span className="block truncate" title={repoName}>{repoName}</span></TableCell>
+            <TableCell className="text-muted-foreground">{selection.file.ref}</TableCell>
+            <TableCell className={cx(listMono, 'text-xs leading-[normal]')}><span className="group/name relative inline-flex max-w-full items-center pr-8"><a href={href} target="_blank" rel="noreferrer noopener" aria-disabled={!href} className="min-w-0 cursor-pointer break-all rounded-sm text-left no-underline hover:text-primary focus-visible:outline-2 focus-visible:outline-primary" aria-label={`打开 ${selection.file.path}，${repoName}，${selection.file.ref}`}><HighlightedText text={selection.file.path} matches={nameSearchRanges(selection.file.path, query)} /></a>{href && <CopyFileLink href={href} name={selection.file.path} />}</span></TableCell>
+          </TableRow>;
         })}
-        {result.data?.items.length === 0 && <tr><td colSpan={FILE_COLUMNS.length} className="px-5 py-8 text-center text-muted-foreground">没有匹配的规则文件</td></tr>}
+        {result.data?.items.length === 0 && <TableRow className="hover:bg-transparent"><TableCell colSpan={FILE_COLUMNS.length} className="px-5 py-8 text-center text-muted-foreground">没有匹配的规则文件</TableCell></TableRow>}
       </ListTable>
     </div>
     {result.error && <div role="alert" className="px-5 py-2 text-destructive">文件列表加载失败。<Button size="sm" onClick={() => void result.refetch()}>重试</Button></div>}

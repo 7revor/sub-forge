@@ -335,3 +335,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 代理链来源与节点点选分离：画板 `V2ProfileDialogs` 的两个代理链弹窗已同步（来源 + 查找框 + 可点选节点 + 弱提示），对应 `ChainRuleEditor`。渲染在 `packages/core` 实现，无新增后端待实现项。旧画板 `ProfileChain` 属于已废弃的依赖节点版式，本次未修改。
 
 2026-11-02 代理链前置移除「自动」：`V2ProfileDialogs` 同步去掉该选项行，落地区块改为与前置相同的默认边框、无背景，对应 `ChainRuleEditor`。无新增后端待实现项。
+
+2026-11-02 表格统一迁移到 shadcn `Table`：修复表格末行底线与分页栏顶线叠成双线的问题（原全局规则在 `base` 层，优先级低于 `border-b`，实际未生效）。行分隔线改由 `TableRow` 绘制，`TableBody` 清除末行，删除 `th` / `td` 常量与全局规则；单元格字号随 shadcn 默认由 16px 改为 14px，普通数据行获得默认悬停态。画板 `V2Lists`、`V2Overview`、`V2RuleRepo`、`V2Settings` 同步为末行无底线、分页栏提供顶线。仅前端样式，领域模型与服务端无变化，无后端待实现项。

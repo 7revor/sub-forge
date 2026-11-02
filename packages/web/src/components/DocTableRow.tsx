@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { buttonClass } from './ui.tsx';
+import { TableRow } from './ui/table.tsx';
 
 // 与设计稿一致：名称为正文色，悬停变为强调色
 export const docNameLinkClass = 'text-sm leading-5 font-medium text-foreground no-underline hover:text-primary';
@@ -12,14 +13,14 @@ export const actionHeader = <span className="block text-right">操作</span>;
 export function DocTableRow({ to, children }: { to: string; children: ReactNode }) {
   const navigate = useNavigate();
   return (
-    <tr className="cursor-pointer hover:bg-accent focus-within:bg-muted" onClick={(event) => {
+    <TableRow className="cursor-pointer hover:bg-accent focus-within:bg-muted" onClick={(event) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       if (event.target instanceof Element && event.target.closest('a, button, input, select, textarea, [role="button"], [contenteditable]')) return;
       if (window.getSelection()?.toString()) return;
       void navigate(to);
     }}>
       {children}
-    </tr>
+    </TableRow>
   );
 }
 

@@ -12,6 +12,7 @@ import { PipelineStepForm } from './PipelineStepForm.tsx';
 import { SortableList } from './SortableList.tsx';
 import type { PipelinePreview, TraceStep } from '../api.ts';
 import { Badge, Button, Empty, ErrorAlert, Switch, cx } from './ui.tsx';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table.tsx';
 
 export const OP_LABEL: Record<OperatorStep['op'], string> = {
   'filter.useless': '无用节点过滤',
@@ -122,6 +123,8 @@ function resultText(t: TraceStep): string {
 const OVERVIEW = -1;
 
 type Side = { names: string[]; origins: (number | null)[] };
+/** 映射预览是紧凑表格，首尾列不需要卡片内边距。 */
+const mappingCell = 'px-3 py-2 first:pl-3 last:pr-3';
 /** 两侧独立排列与滚动，不按节点来源配对，也不补齐缺失行。 */
 function InputOutputView({ before, after, inLabel, outLabel, truncated }: {
   before: Side; after: Side; inLabel: string; outLabel: string; truncated?: boolean;
@@ -130,20 +133,20 @@ function InputOutputView({ before, after, inLabel, outLabel, truncated }: {
     <div className="pipeline-mapping-scroll mx-4 grid grid-cols-2 gap-4">
       {[{ side: before, label: inLabel }, { side: after, label: outLabel }].map(({ side, label }, column) => (
         <section key={column} aria-label={label} className="min-h-0 min-w-0 overflow-auto overscroll-contain">
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 z-[1] bg-card">
-              <tr>
-                <th className="w-10 border-b border-border px-3 py-2 text-right text-xs font-medium text-muted-foreground">#</th>
-                <th className="border-b border-border px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground">{label} <span className="font-normal text-muted-foreground">{side.names.length}</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {side.names.map((name, index) => <tr key={index}>
-                <td className="border-b border-border px-3 py-2 text-right font-mono text-xs text-muted-foreground">{index + 1}</td>
-                <td className="border-b border-border px-3 py-2 font-mono whitespace-nowrap text-foreground">{name}</td>
-              </tr>)}
-            </tbody>
-          </table>
+          <Table containerClassName="overflow-visible">
+            <TableHeader className="sticky top-0 z-[1] bg-card">
+              <TableRow>
+                <TableHead className={cx(mappingCell, 'h-auto w-10 text-right text-xs text-muted-foreground')}>#</TableHead>
+                <TableHead className={cx(mappingCell, 'h-auto text-xs text-muted-foreground')}>{label} <span className="font-normal text-muted-foreground">{side.names.length}</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {side.names.map((name, index) => <TableRow key={index}>
+                <TableCell className={cx(mappingCell, 'text-right font-mono text-xs text-muted-foreground')}>{index + 1}</TableCell>
+                <TableCell className={cx(mappingCell, 'font-mono whitespace-nowrap text-foreground')}>{name}</TableCell>
+              </TableRow>)}
+            </TableBody>
+          </Table>
           {!side.names.length && <div className="py-3"><Empty title="没有节点" /></div>}
         </section>
       ))}

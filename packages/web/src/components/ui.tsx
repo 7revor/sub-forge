@@ -186,11 +186,6 @@ export function ReportList({ items, onLocate, canLocate = () => true, showWhere 
 }
 
 export const mono = 'font-mono';
-/** 与 shadcn TableHead / TableCell 一致；首尾列补足卡片内边距，行分隔线由单元格底边提供（末行由 base 层去除）。 */
-export const th = 'h-10 border-b px-2 first:pl-6 last:pr-6 text-left align-middle font-medium whitespace-nowrap text-foreground';
-export const td = 'border-b p-2 first:pl-6 last:pr-6 align-middle';
-export const listTh = th;
-export const listTd = td;
 export const listMono = 'font-mono';
 
 export { formatTime, formatBytes } from '../utils/format.ts';
