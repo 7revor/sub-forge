@@ -24,7 +24,7 @@ export const RuleEditDialog = createModal<{ rule: RuleEntry; index: number; ctx:
     try { normalized = { ...matcher, ...remoteRuleMatcher(matcher.remote.url) }; }
     catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
   } else if (!matcher.id) error = '请选择规则集';
-  return <RuleEditShell description={adding && bound ? '插入本订阅的前置规则' : undefined} width={adding && matcher.kind === 'ruleset' ? 440 : 520} confirmLabel={adding ? '添加' : '保存'} title={adding ? `添加规则 · ${matcher.kind !== 'ruleset' ? '手写' : matcher.remote ? '远程地址' : '引用规则'}` : `编辑第 ${index + 1} 项规则`}
+  return <RuleEditShell description={adding && bound ? '插入本订阅的前置规则' : undefined} confirmLabel={adding ? '添加' : '保存'} title={adding ? `添加规则 · ${matcher.kind !== 'ruleset' ? '本地规则' : matcher.remote ? '远程地址' : '引用规则'}` : `编辑第 ${index + 1} 项规则`}
     error={attempted ? error : undefined} onClose={onClose} onApply={() => { setAttempted(true); if (!error) onSave({ rule: { ...draft, matcher: normalized }, position }); }}>
     <MatcherEditor directRemote fixedKind={adding || staticOnly} scope={scope} value={matcher} rulesets={ctx.rulesets}
       ruleValue={matcher.kind === 'rule' ? withIpOptions(matcher.rule, draft.options ?? {}) : undefined}
