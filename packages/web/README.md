@@ -60,7 +60,7 @@ Profile 基础设置直接保存原文，未完成语法也可保存；生成时
 
 全局 blank 使用 `Empty.tsx` 的公共 `Empty`（由 `ui.tsx` 导出），包括列表、详情、预览、功能占位和下拉无结果。说明与空框间距由 `Card description` 或 `gap-4` 保证 16 px，不依赖默认段落 margin。尺寸、适用范围与设计稿待同步项见 [空状态规范](../../docs/14-empty-state-guidelines.md)。
 
-公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` （内部调用 `Frame.modal.confirm`））、`dialogs`（节点集选择的静态入口）、`DualEditor`（双视图）、`SchemaForm`（字段描述驱动的表单，字段定义在 `src/schemas/`）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`、`MatchPreview`。格式转换在 `src/convert/`，都有单元测试。
+公共组件在 `src/components/`：`listbox`（`Select` 单选下拉与 `Combobox` 可输入下拉，所有下拉都用它们，不使用浏览器原生 `<select>` / `<datalist>`，弹层渲染到 body、层级高于对话框）、`DetailActions`（平铺操作按钮 `ActionButtons`、删除按钮 `DeleteAction` （内部调用 `Frame.modal.confirm`））、`dialogs`（节点集选择的静态入口）、`LocalNodeYamlEditor`（单节点 YAML 编辑与导入）、`OverrideField`（逐项覆盖）、`SortableList`（拖拽排序，支持锁定项）、`RuleEditor`、`ClientOverrides`、`NodePicker`。格式转换在 `src/convert/`，都有单元测试。
 
 公共展示与业务表单的复用边界：
 
@@ -142,7 +142,7 @@ Profile 基础设置直接保存原文，未完成语法也可保存；生成时
 
 新建向导与详情共用「模板与模式」。绑定订阅只编辑追加成员，模板组参数、模板成员、规则与最终出口只读；独立订阅完整维护分流。切换先选择成员与代理链引用映射，展示转换预览，应用到草稿并统一保存。解除绑定完整保留当前有效配置，节点源和规则集内容继续按原机制刷新。
 
-详情显示旧数据迁移原因和原文备份下载。模板发布页对绑定冲突禁用强制发布，版本/订阅并发冲突提示重新加载。内部沿用 overlay 视图适配既有编辑器，持久化只保存 routing，避免两份配置互相覆盖。
+详情显示旧数据迁移原因和原文备份下载。模板发布页对绑定冲突禁用强制发布，版本/订阅并发冲突提示重新加载。现用页面与弹窗直接读写 routing；旧组/规则编辑器与 overlay 双向适配已移除，兼容字段 overlay 只保留空对象。
 
 
 绑定订阅的规则页允许管理有序前置单条规则；模板规则和 MATCH 保持只读。前置添加与编辑通过公共 MatcherEditor/RuleEditor 和 TargetPicker/NodePicker 完成，支持内置策略、模板策略组及远端 provider 的单节点引用。

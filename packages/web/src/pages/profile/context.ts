@@ -1,9 +1,8 @@
 import { queryUrl } from '@sub-forge/core';
-import { profileEditorOverlay } from '@sub-forge/core';
-import { persistedProfile, updateEditorOverlay } from './routing.ts';
+import { editableProfileGroups, persistedProfile } from './routing.ts';
 // Profile 详情各标签页共享的状态：草稿、模板、有效组、名称查询。
 
-import type { GroupSpec, NodeSetID, Overlay } from '@sub-forge/core';
+import type { GroupSpec, NodeSetID } from '@sub-forge/core';
 import { createContext, useContext, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api.ts';
@@ -13,9 +12,8 @@ import type { ProfileDoc, TemplateDoc } from '../../hooks.ts';
 export type ProfileCtx = {
   draft: ProfileDoc;
   setDraft: (p: ProfileDoc) => void;
-  patchOverlay: (fn: (o: Overlay) => Overlay) => void;
   template: TemplateDoc | undefined;
-  /** 模板组 + 私有组（按输出顺序），用于各种选择器 */
+  /** 模板原始组与订阅独立组；追加成员由成员编辑器单独展示。 */
   groups: (GroupSpec & { origin: 'template' | 'profile' })[];
   groupOptions: GroupOption[];
   groupName: (id: string) => string;
@@ -33,20 +31,9 @@ export function useProfile(): ProfileCtx {
   return c;
 }
 
-/** 计算有效组顺序：模板组在前，私有组按 after 锚点插入（与内核 mergeTemplate 一致） */
-export function effectiveGroups(template: TemplateDoc | undefined, overlay: Overlay): ProfileCtx['groups'] {
-  const groups: ProfileCtx['groups'] = (template?.groups ?? []).map((g) => ({ ...g, origin: 'template' as const }));
-  for (const { after, group } of overlay.extraGroups ?? []) {
-    const at = after === undefined ? -1 : groups.findIndex((g) => g.id === after);
-    const eg = { ...group, origin: 'profile' as const };
-    if (at < 0) groups.push(eg); else groups.splice(at + 1, 0, eg);
-  }
-  return groups;
-}
-
-/** 详情页和新建向导共用模板查询与草稿派生状态。 */
+/** 详情页共用模板查询与草稿派生状态。 */
 export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: ProfileDoc) => void) {
-  const templateId = draft?.routing?.mode === 'bound' ? draft.routing.templateId : draft?.routing ? undefined : draft?.template?.id;
+  const templateId = draft?.routing.mode === 'bound' ? draft.routing.templateId : undefined;
   const template = useQuery({
     queryKey: ['template', templateId],
     enabled: !!templateId,
@@ -57,11 +44,9 @@ export function useProfileCtx(draft: ProfileDoc | undefined, setDraft: (p: Profi
 
   const ctx = useMemo<ProfileCtx | undefined>(() => {
     if (!draft) return undefined;
-    const overlay = profileEditorOverlay(draft);
-    const groups = effectiveGroups(template.data, overlay);
+    const groups = editableProfileGroups(draft, template.data);
     return {
-      draft: { ...draft, overlay }, setDraft: (next) => setDraft(persistedProfile(next)),
-      patchOverlay: (fn: (o: Overlay) => Overlay) => setDraft(updateEditorOverlay(draft, fn)),
+      draft, setDraft: (next) => setDraft(persistedProfile(next)),
       template: template.data,
       groups,
       groupOptions: groups.map((g) => ({ id: g.id, name: g.name })),

@@ -47,15 +47,6 @@ export type ImpactEntry = { profileId: string; profileName: string; owner: strin
 export type RejectedRuleDetail = { line: number; text: string; reason: string };
 /** 规则集预览中每个来源的拉取 / 解析状态；不支持的行最多返回前 100 条详情 */
 export type RulesetSourceStatus = { format?: string; behavior?: string; conversion?: 'yaml-to-list'; id: string; ok: boolean; error?: string; fetchedAt?: number; stale?: boolean; binary?: boolean; rules?: number; rejected?: number; rejectedDetails?: RejectedRuleDetail[] };
-export type RulesetPreview = {
-  delivery?: { mode: 'original'; format: string; behavior: string } | { mode: 'managed' } | { mode: 'unsupported'; reason: string };
-  sources: RulesetSourceStatus[];
-  binary: boolean; lines: string[]; total?: number;
-  dropped: { rule: string; reason: string }[]; notes?: string[]; rejected: { line: number; text: string; reason: string }[]; error?: string;
-  /** 只在合并结果中出现 */
-  stats?: { domain: number; classical: number; ipcidr: number; total: number; duplicates: number };
-  binarySources?: { sourceId: string; name: string; format: string }[];
-};
 
 // ---------- 仓库与系统接口；Pending 标注的功能仍为占位（见 docs/11） ----------
 export type Pending = { pending?: boolean };
@@ -63,15 +54,5 @@ export type UserStats = Pending & { items: Record<string, { profiles: number; so
 export type Share = { id: string; kind: 'source' | 'collection'; docId: string; name: string; to: string[] };
 export type RepoScan = { ref: string; directory: string; include: string[]; exclude: string[]; format: string; client: 'any' | 'mihomo' | 'surge'; groupBy: 'path' | 'directory' | 'stem'; readme: boolean; preferred: string[] };
 export type RuleRepo = { id: string; name: string; url: string; refs: string[]; scans: RepoScan[]; license: string; configRevision: string; pending: boolean; enabled: boolean; entries: number; builtAt?: number; checkedAt?: number; error?: string; indexing: boolean };
-export type RepoEntry = { repo: string; path: string; name: string; count?: number; clients?: string[] };
-export type RepoFileEntry = RepoEntry & { filePath: string; ref: string; url: string };
-export type RepoFilePreview = { cache?: { error?: string; lastSuccessAt?: number; nextFetchAt?: number }; repo: string; entry?: string; ref: string; path: string; name: string; content: string; url: string; upstream: string; license: string };
 export type RuleOption = { value: string; label: string; hint: string; url?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
 export type RuleOptions = { items: RuleOption[]; total: number; offset: number; limit: number; nextOffset?: number; notices: string[] };
-export type RepoFileList = RepoEntry & { license?: string; url: string; files: { ref: string; path: string; url: string; upstream: string; format: string }[] };
-export type RepoEntryDetail = RepoEntry & { rejected?: number; rejectedDetails?: RejectedRuleDetail[]; license?: string; url: string; previewError?: string; variants: { id: string; client: string; label: string; recommended?: boolean; file: string; how: string; files: { path: string; url: string; upstream: string; format: string }[] }[]; preview: string[] };
-export type SystemInfo = Pending & {
-  ssrfAllow: { value: string; note?: string }[];
-  verify: { enabled: boolean; version?: string; checks24h?: number; fails24h?: number } | null;
-  lastBackup: { at: number; size: number } | null;
-};

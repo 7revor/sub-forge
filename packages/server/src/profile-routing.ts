@@ -1,5 +1,5 @@
 import { additionsFromOverlay, mergeTemplate, Report, resolveProfileRouting, routingConfig, stableStringify, type Template } from '@sub-forge/core';
-import type { ProfileDoc, TemplateVersionDoc } from './docs.ts';
+import type { ProfileDoc, RoutedProfileDoc, TemplateVersionDoc } from './docs.ts';
 
 export function profileTemplate(profile: ProfileDoc, get: (id: string, version?: number) => TemplateVersionDoc | undefined): TemplateVersionDoc | undefined {
   if (profile.routing?.mode === 'independent') return undefined;
@@ -8,9 +8,12 @@ export function profileTemplate(profile: ProfileDoc, get: (id: string, version?:
 }
 
 /** 不访问上游；只展开已保存的领域配置，节点与规则集仍保留引用。 */
-export function migrateProfile(profile: ProfileDoc, template: TemplateVersionDoc | undefined): ProfileDoc {
+export function migrateProfile(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RoutedProfileDoc {
   profile = stripProfileRevisions(profile);
-  if (profile.routing) return profile;
+  if (profile.routing) {
+    const { template: _template, ...current } = profile;
+    return { ...current, overlay: {}, routing: profile.routing };
+  }
   if (profile.template && !template) throw new Error(`订阅「${profile.name}」引用的模板版本缺失，迁移已中止，原配置保持不变`);
   profile = { ...profile, overlay: profile.overlay ?? {}, nodeSets: profile.nodeSets ?? [], chains: profile.chains ?? [], refPolicy: profile.refPolicy ?? { default: 'wrap' } };
   const report = new Report();
@@ -24,7 +27,7 @@ export function migrateProfile(profile: ProfileDoc, template: TemplateVersionDoc
   const canBind = !!template && profile.template?.follow === 'latest' && onlyMembers && !report.items.length;
   const { template: _template, ...rest } = profile;
   const reason = canBind ? '仅有追加成员，继续跟随模板' : profile.template?.follow !== 'latest' && profile.template ? '锁定版本已展开为独立配置' : profile.template ? '保留原有组参数、规则或私有配置，转为独立维护' : '空白订阅转为独立配置';
-  const next: ProfileDoc = { ...rest, overlay: {},
+  const next: RoutedProfileDoc = { ...rest, overlay: {},
     routing: canBind ? { mode: 'bound', templateId: template.id, groupAdditions: additions } : {
       mode: 'independent', config: routingConfig(effective),
       ...(template ? { initializedFrom: { templateId: template.id, name: template.name } } : {}),
@@ -35,7 +38,7 @@ export function migrateProfile(profile: ProfileDoc, template: TemplateVersionDoc
   return next;
 }
 
-export function independentProfile(profile: ProfileDoc, template?: Template): ProfileDoc {
+export function independentProfile(profile: ProfileDoc, template?: Template): RoutedProfileDoc {
   const report = new Report();
   const config = routingConfig(resolveProfileRouting(profile, template, report));
   if (report.items.some(i => i.level === 'error')) throw new Error(report.items.map(i => i.message).join('；'));

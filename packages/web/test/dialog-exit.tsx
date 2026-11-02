@@ -1,6 +1,5 @@
 // 仅供 Codex 内置浏览器验收，不进入生产构建；节点数据使用隔离验收服务。
 import { observeDialogExits, type ExitRecord } from './observe-dialog-exit.ts';
-import { ExtraRuleModal } from '../src/pages/profile/TabRules.tsx';
 import { RemoteRuleDialog } from '../src/components/RemoteRulePicker.tsx';
 import { RuleEditDialog } from '../src/pages/template/RuleEditDialog.tsx';
 import { ProfileInfoModal } from '../src/pages/profile/ProfileInfoModal.tsx';
@@ -73,8 +72,6 @@ function App() {
     {slow && <style>{'[data-slot="dialog-content"][data-state="closed"], [data-slot="dialog-overlay"][data-state="closed"] { animation-duration: 2s !important; }'}</style>}
     {noAnimation && <style>{'[data-slot="dialog-content"], [data-slot="dialog-overlay"] { animation: none !important; }'}</style>}
     <div className="flex flex-wrap gap-3">
-      <Button onClick={() => void record(ExtraRuleModal.show({ ...profileFixture, profile: { ...profileFixture.profile, routing: undefined }, prepend: false }))}>兼容插入规则</Button>
-      <Button onClick={() => void record(ExtraRuleModal.show({ ...profileFixture, profile: { ...profileFixture.profile, routing: undefined }, prepend: true }))}>兼容前置规则</Button>
       <Button onClick={() => void record(RemoteRuleDialog.show({ value: 'http://127.0.0.1:4187/rules.list' }))}>兼容远程链接</Button>
       <Button onClick={() => void record(RuleEditDialog.show({ rule: { id: 'audit', matcher: { kind: 'local', content: 'DOMAIN-SUFFIX,example.test' }, target: { kind: 'builtin', name: 'DIRECT' } }, index: 0, ctx: { rulesets: [] }, adding: true, bound: true, staticOnly: false, extendedOptions: true }))}>手写规则退场</Button>
       <Button onClick={() => void record(ProfileInfoModal.show({ name: '保持到最后一帧', note: '备注内容也应该保留' }))}>名称备注退场</Button>

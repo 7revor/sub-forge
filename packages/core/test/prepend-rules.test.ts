@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { Report, profileEditorOverlay, resolveProfileRouting } from '../src/index.ts';
+import { Report, resolveProfileRouting } from '../src/index.ts';
 import type { Profile, RuleEntry, Target } from '../src/types.ts';
 import { render, TEMPLATE } from './fixtures/scenarios.ts';
 
@@ -15,7 +15,7 @@ describe('绑定订阅的前置单条规则', () => {
     const result = render({ routing: bound([first, { ...rule('off'), enabled: false }, second]) });
     expect((result.config.rules as string[]).slice(0, 3)).toEqual(['DOMAIN,first.test,DIRECT', 'DOMAIN,second.test,🚀 节点选择', 'RULE-SET,金融服务,🚀 节点选择']);
     expect((result.config.rules as string[]).at(-1)).toBe('MATCH,🚀 节点选择');
-    expect(profileEditorOverlay({ overlay: {}, routing: bound([first, second]) }).extraRules?.map(extra => extra.rule.id)).toEqual(['second', 'first']);
+    expect(resolveProfileRouting({ overlay: {}, routing: bound([first, second]) }, TEMPLATE, new Report()).rules.slice(0, 2).map(rule => rule.id)).toEqual(['first', 'second']);
   });
 
   it.each(['wrap', 'copy', 'inline'] as const)('旧策略 %s 自动处理，规则与代理链重复引用复用精确隐藏组', strategy => {

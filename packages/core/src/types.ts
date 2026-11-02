@@ -303,3 +303,6 @@ export type Profile = {
   /** @deprecated 兼容旧字段，渲染不再读取手动引用策略。 */
   refPolicy: { default: RefStrategy; perRef?: Record<string, RefStrategy> };
 };
+
+/** 当前订阅必须有分流模式；overlay 仅保留空对象以兼容历史文档结构。 */
+export type RoutedProfile = Profile & { routing: ProfileRouting };

@@ -37,6 +37,9 @@ export type ProfileDoc = Profile & {
   userinfo?: { mode: 'sources'; sourceIds: string[] } | { mode: 'sum' } | { mode: 'source'; sourceId: string } | { mode: 'none' };
 };
 
+/** 读取及业务处理只接收迁移后的分流结构；ProfileDoc 保留历史导入类型。 */
+export type RoutedProfileDoc = ProfileDoc & { routing: import('@sub-forge/core').ProfileRouting };
+
 export type TokenDoc = { token: string; userId: string; createdAt?: number };
 /** 旧种子仅用于导入时关联所有者，不继续发行旧订阅凭证。 */
 export type LegacyTokenDoc = { token: string; profileId: string; label?: string };
@@ -64,5 +67,8 @@ export type DocTypes = {
   local: LocalDoc;
   ruleset: RuleSetDoc;
   preset: PresetDoc;
-  profile: ProfileDoc;
+  profile: RoutedProfileDoc;
 };
+
+/** 存储入口仍接受历史订阅，写入时统一迁移。 */
+export type DocInputTypes = Omit<DocTypes, 'profile'> & { profile: ProfileDoc };

@@ -1,4 +1,4 @@
-// 模板 ⊕ 覆盖层合并（docs/03 §5）。Profile 只保存覆盖层，渲染时合并，模板更新自动生效。
+// 历史模板与覆盖层合并（docs/03 §5），保留给旧数据迁移及兼容渲染。当前订阅直接解析 routing。
 
 import type { Report } from '../report.ts';
 import type { GroupSpec, ID, Overlay, RuleEntry, Target, Template } from '../types.ts';

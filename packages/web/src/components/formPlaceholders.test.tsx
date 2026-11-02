@@ -1,9 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { PROXY_TYPES, schemaFor } from '../schemas/proxy.ts';
-import { FieldInput } from './SchemaForm.tsx';
+import { OptionalBoolean } from './OptionalBoolean.tsx';
 import { Select, type SelectProps } from './listbox.tsx';
-import { setPath, type FieldSpec } from './schema.ts';
+import { setPath } from './schema.ts';
 
 describe('表单占位与空值契约', () => {
   it('所有节点协议字段都提供中文解释', () => {
@@ -28,13 +28,13 @@ describe('表单占位与空值契约', () => {
   });
 
   it('显式 false 与未配置区分，清空时删除字段及空父对象', () => {
-    const field: FieldSpec = { key: 'dns.enable', label: 'DNS', type: 'bool', placeholder: '是否启用内置 DNS' };
+    const field = { key: 'dns.enable', label: 'DNS', placeholder: '是否启用内置 DNS' };
     let config: Record<string, unknown> = {};
-    const input = FieldInput({ field, id: 'dns', value: undefined, onChange: next => { config = setPath(config, field.key, next); } });
+    const input = OptionalBoolean({ label: field.label, placeholder: field.placeholder, value: undefined, onChange: next => { config = setPath(config, field.key, next); } });
     const onChange = (input.props as SelectProps).onChange!;
     onChange({ target: { value: 'false' } });
     expect(config).toEqual({ dns: { enable: false } });
-    const html = renderToStaticMarkup(<FieldInput field={field} id="dns" value={false} onChange={() => {}} />);
+    const html = renderToStaticMarkup(<OptionalBoolean label={field.label} placeholder={field.placeholder} value={false} onChange={() => {}} />);
     expect(html).toContain('>关闭<');
     expect(html).not.toContain('data-placeholder=');
     onChange({ target: { value: '' } });

@@ -43,7 +43,7 @@ describe('订阅流量与渲染缓存', () => {
     expect(last.data.userinfo).toEqual(h.traffic[a]);
     const provider = await h.app.request(parse(yaml)['proxy-providers']['源'].url);
     expect(provider.headers.get('subscription-userinfo')).toBe('download=80; total=1000; expire=2000000000');
-    h.store.put('profile', { ...h.store.get('profile', 'p')!, overlay: { final: { kind: 'group', groupId: 'missing' } } });
+    h.store.put('profile', { ...h.store.get('profile', 'p')!, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'group', groupId: 'missing' } } } });
     const fallback = await h.renderer.render('p', { client: 'mihomo' });
     expect(fallback.ok && fallback.source).toBe('last-good');
     expect(fallback.ok && fallback.render.userinfo).toEqual(h.traffic[a]);
@@ -82,7 +82,7 @@ describe('订阅流量与渲染缓存', () => {
   it('每次生成时更新拉取告警计数且保留内核告警', async () => {
     const h = setup();
     const p = h.store.get('profile', 'p')!;
-    h.store.put('profile', { ...p, overlay: { extraGroups: [{ group: { id: 'g', name: '空组', type: 'select', members: [] } }] } });
+    h.store.put('profile', { ...p, routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '空组', type: 'select', members: [] }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
     await h.app.request('/subs/profile?token=token&id=p');
     h.fail(); await h.refresh();
     const result = await h.renderer.render('p', { client: 'mihomo' });

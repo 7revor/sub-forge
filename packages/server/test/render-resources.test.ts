@@ -1,3 +1,4 @@
+import { independentProfile } from '../src/profile-routing.ts';
 import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -57,10 +58,11 @@ describe('订阅资源按当前配置独立刷新', () => {
     expect(await (await h.get(oldUrls.ruleset)).text()).toBe('IP-CIDR,203.0.113.0/24\n');
   });
 
-  it('锁定模板版本不会随模板发布改变', async () => {
+  it('展开为独立配置后不会随模板发布改变', async () => {
     const h = harness(); seed(h.store);
-    h.store.put('profile', { ...profile, template: { id: 't', follow: { pinned: 1 } } });
+    h.store.put('profile', independentProfile(h.store.get('profile', 'p')!, h.store.getTemplate('t')));
     const before = await h.main();
+    expect(before['proxy-groups'][0].name).toBe('旧前置');
     h.store.putTemplateVersion(template(2, '新前置'));
     expect(await h.main()).toEqual(before);
   });
@@ -204,7 +206,7 @@ it('v26 升级删除结构版本与旧渲染缓存，保留配置、令牌和上
     store.db.prepare('INSERT INTO render_generations VALUES (?, ?, ?, ?, ?)').run('p', 'mihomo:any', 'old', 1, cipher.encrypt(JSON.stringify(legacy)));
     store.db.pragma('user_version = 26'); store.close();
     store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(28);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(29);
     expect(store.db.prepare("SELECT name FROM sqlite_master WHERE name='render_generations'").get()).toBeUndefined();
     expect(store.getLastGood('p', 'mihomo:any')).toBeUndefined();
     expect(store.getWithOwner('profile', 'p')).toEqual(saved);

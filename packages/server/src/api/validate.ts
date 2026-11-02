@@ -1,6 +1,7 @@
 import { validateNativeBase } from '@sub-forge/core';
 import { localRulesError } from '@sub-forge/core';
 import { normalizeRulePresence } from '../rule-presence.ts';
+import { migrateProfile, profileTemplate, stripProfileRevisions } from '../profile-routing.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
 import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/adapters.ts';
@@ -197,7 +198,7 @@ export function checkRepositorySource(src: Record<string, unknown>, prior: { rep
 export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unknown>, id: string, user: User, store: Store): DocTypes[K] {
   if (!isStr(body.name)) throw bad('name 不能为空');
   if (['source', 'collection', 'local', 'ruleset', 'profile'].includes(kind) && body.note !== undefined && typeof body.note !== 'string') throw bad('备注必须是字符串');
-  const doc = normalizeRulePresence(kind, { ...body, id }) as Record<string, unknown>;
+  let doc = normalizeRulePresence(kind, { ...body, id }) as Record<string, unknown>;
   const refs = new RefChecker(store, user);
 
   switch (kind) {
@@ -326,10 +327,15 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (isObj(ch.via) && ch.via.kind === 'node' && isObj(ch.via.ref)) refs.chainSource(ch.via.ref.nodeSet, `链规则 ${i + 1} 的前置`);
         else refs.target(ch.via, `链规则 ${i + 1} 的前置`);
       });
-      if (doc.routing !== undefined) {
-        validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);
-        checkRawRules((doc.routing as { config?: { rules?: unknown } }).config?.rules, '分流规则');
+      // 旧草稿在边界迁移；预览、转换与保存使用同一份 routing，不能用旧字段绕过现用引用校验。
+      if (doc.routing === undefined) {
+        const legacy = doc as unknown as import('../docs.ts').ProfileDoc;
+        try { doc = normalizeRulePresence('profile', migrateProfile(legacy, profileTemplate(legacy, (id, version) => store.getTemplate(id, version)))) as unknown as Record<string, unknown>; }
+        catch (error) { throw bad((error as Error).message); }
       }
+      validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);
+      checkRawRules((doc.routing as { config?: { rules?: unknown } }).config?.rules, '分流规则');
+      doc = stripProfileRevisions(doc as unknown as import('../docs.ts').ProfileDoc) as unknown as Record<string, unknown>;
       break;
     }
   }

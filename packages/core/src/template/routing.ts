@@ -11,19 +11,6 @@ export function routingConfig(effective: RoutingConfig): RoutingConfig {
   });
 }
 
-/** 兼容编辑器的覆盖层视图；持久化只使用 routing，避免两个配置来源。 */
-export function profileEditorOverlay(profile: Pick<Profile, 'routing' | 'overlay'>): Overlay {
-  const routing = profile.routing;
-  if (!routing) return profile.overlay;
-  if (routing.mode === 'bound') return {
-    extraGroups: (routing.extraGroups ?? []).map(group => ({ group })),
-    groupPatches: Object.fromEntries(Object.entries(routing.groupAdditions).map(([id, addMembers]) => [id, { addMembers }])),
-    // 覆盖层逐条 unshift，倒序保存才能保持自定义规则的显示顺序。
-    extraRules: [...[...(routing.prependRules ?? [])].reverse().map(rule => ({ anchor: 'top' as const, rule })), ...(routing.appendRules ?? []).map(rule => ({ anchor: 'bottom' as const, rule }))],
-  };
-  return { extraGroups: routing.config.groups.map(group => ({ group })), extraRules: routing.config.rules.map(rule => ({ anchor: 'bottom' as const, rule })), final: routing.config.final };
-}
-
 export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overlay'>, template: Template | undefined, report: Report): Effective {
   if (!profile.routing) return mergeTemplate(template, profile.overlay, report);
   if (profile.routing.mode === 'independent') return {
@@ -55,7 +42,19 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
     ruleIds.add(rule.id);
     checkTarget(rule.target, `rule:${rule.id}`);
   }
-  const effective = mergeTemplate(template, profileEditorOverlay(profile), report);
+  const routing = profile.routing;
+  const effective: Effective = {
+    groups: [
+      ...template.groups.map(group => ({ ...group, members: [...group.members, ...(routing.groupAdditions[group.id] ?? [])], origin: 'template' as const })),
+      ...(profile.routing.extraGroups ?? []).map(group => ({ ...group, origin: 'profile' as const })),
+    ],
+    rules: [
+      ...(profile.routing.prependRules ?? []).map(rule => ({ ...rule, origin: 'profile' as const })),
+      ...template.rules.map(rule => ({ ...rule, origin: 'template' as const })),
+      ...(profile.routing.appendRules ?? []).map(rule => ({ ...rule, origin: 'profile' as const })),
+    ],
+    final: template.final,
+  };
   const groupHidden = profile.routing.groupHidden ?? {};
   for (const id of Object.keys(groupHidden)) {
     if (!template.groups.some(g => g.id === id)) report.warn('binding.orphan', `策略组 ${id} 已删除，它的隐藏设置不再生效`, `group:${id}`);

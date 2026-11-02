@@ -2,8 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { PageScroll, cx } from '../../components/ui.tsx';
 import { TabBase, TabNodeSets, TabProfileInfo } from './TabsBasic.tsx';
 import { TabChains, TabPreview } from './TabsChain.tsx';
-import { TabGroups } from './TabGroups.tsx';
-import { TabRules } from './TabRules.tsx';
+import { ProfileGroupsEditor, ProfileRulesEditor } from './ProfileRoutingEditors.tsx';
 import { Report, resolveProfileRouting, routingConfig } from '@sub-forge/core';
 import { useProfile } from './context.ts';
 import { TemplateCard } from './TemplateCard.tsx';
@@ -46,8 +45,8 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
         <div role="tabpanel" id={`${id}-routing-panel`} aria-labelledby={`${id}-routing-tab`} hidden={active !== 'routing'} className={active === 'routing' ? 'flex min-w-0 flex-col gap-5' : undefined}>
           <section ref={el => { sections.current.template = el; }} className="scroll-mt-1"><TemplateCard />{templateNotice}</section>
           {routingReady && <>
-            <section ref={el => { sections.current.groups = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabGroups /></section>
-            <section ref={el => { sections.current.rules = el; }} className="flex scroll-mt-1 flex-col gap-4"><TabRules /></section>
+            <section ref={el => { sections.current.groups = el; }} className="flex scroll-mt-1 flex-col gap-4"><ProfileGroupsEditor /></section>
+            <section ref={el => { sections.current.rules = el; }} className="flex scroll-mt-1 flex-col gap-4"><ProfileRulesEditor /></section>
           </>}
         </div>
         <div role="tabpanel" id={`${id}-client-panel`} aria-labelledby={`${id}-client-tab`} hidden={active !== 'client'} className={active === 'client' ? 'flex min-w-0 flex-col gap-5' : undefined}>

@@ -1,4 +1,4 @@
-import { applyOperator, compileUserRegex, DEFAULT_USELESS_PATTERNS, type OperatorStep } from '@sub-forge/core';
+import { applyOperator, compileUserRegex } from '@sub-forge/core';
 
 export function setFieldsError(fields: Record<string, unknown>): string | undefined {
   try { applyOperator({ op: 'set', fields }, []); }
@@ -54,29 +54,4 @@ export function renameHits(rules: RenameRule[], names: string[]): (number | unde
   const counts: (number | undefined)[] = rules.map((r) => (countable(r.pattern, (r.flags ?? '').replace('g', '')) ? 0 : undefined));
   for (const name of names) for (const i of renameChain(rules, name)) counts[i] = (counts[i] ?? 0) + 1;
   return counts;
-}
-
-/** 预览 diff 行的「命中」列：这一行是被哪条规则改动的 */
-export function rowHit(step: OperatorStep, from: string): string {
-  const first = (patterns: string[], label: (i: number) => string) => {
-    const i = patterns.findIndex((p) => countable(p)?.test(from));
-    return i < 0 ? '未命中' : label(i);
-  };
-  switch (step.op) {
-    case 'rename.regex': {
-      const hit = renameChain(step.rules, from);
-      return hit.length ? hit.map((i) => `#${i + 1}`).join('、') : '未命中';
-    }
-    case 'filter.regex':
-    case 'rename.delete':
-      return first(step.patterns, (i) => `#${i + 1}`);
-    case 'filter.useless': {
-      const patterns = step.patterns ?? DEFAULT_USELESS_PATTERNS;
-      return first(patterns, (i) => patterns[i]!);
-    }
-    case 'sort.regex':
-      return first(step.patterns, (i) => step.patterns[i]!);
-    default:
-      return '';
-  }
 }

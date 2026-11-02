@@ -1,5 +1,5 @@
-// 处理链预览的输入 → 输出对照：按服务端给出的来源序号（origins）把两侧节点逐个对齐，
-// 改名、移除、新增与顺序调整都落在同一行上。
+// 处理链总览统计：按服务端来源序号（origins）匹配输入与输出，
+// 计算改名、移除、新增与顺序调整；页面仍分别展示两侧列表。
 
 /** 对照表的一行；in 缺省为脚本新增，out 缺省为被移除 */
 export type MapRow = {
@@ -34,10 +34,6 @@ export function mapRows(before: Side, after: Side, order: 'out' | 'in' = 'out'):
   return [...[...kept, ...removed].sort((a, b) => a.in!.index - b.in!.index), ...added];
 }
 
-export function rowChanged(r: MapRow): boolean {
-  return !r.in || !r.out || r.in.name !== r.out.name || r.moved !== 0;
-}
-
 export function mapStats(rows: MapRow[]) {
   return {
     renamed: rows.filter((r) => r.in && r.out && r.in.name !== r.out.name).length,
@@ -45,33 +41,4 @@ export function mapStats(rows: MapRow[]) {
     added: rows.filter((r) => !r.in).length,
     moved: rows.filter((r) => r.moved !== 0).length,
   };
-}
-
-/** 每个原始节点在第几步被移除（步骤序号 0 起）；trace 每步带完整的来源序号 */
-export function removedAtStep(input: number, trace: { origins: (number | null)[] }[]): Map<number, number> {
-  const at = new Map<number, number>();
-  let alive = new Set(Array.from({ length: input }, (_, i) => i));
-  trace.forEach((t, k) => {
-    const next = new Set(t.origins.filter((o): o is number => o !== null));
-    for (const o of alive) if (!next.has(o)) at.set(o, k);
-    alive = next;
-  });
-  return at;
-}
-
-/** 每个原始节点在哪些步骤被改名（步骤序号 0 起） */
-export function renamedAtSteps(input: string[], trace: { names: string[]; origins: (number | null)[] }[]): Map<number, number[]> {
-  const at = new Map<number, number[]>();
-  let prev = new Map(input.map((name, i) => [i, name]));
-  trace.forEach((t, k) => {
-    const next = new Map<number, string>();
-    t.origins.forEach((o, j) => {
-      if (o === null) return;
-      const name = t.names[j] ?? '';
-      next.set(o, name);
-      if (prev.has(o) && prev.get(o) !== name) at.set(o, [...(at.get(o) ?? []), k]);
-    });
-    prev = next;
-  });
-  return at;
 }

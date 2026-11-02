@@ -14,7 +14,7 @@ import { pageMeta, type PageOptions, type PageResult } from './pagination.ts';
 import { matchesNameSearch, normalizeNameSearch, exactNameRegex, NodeSetResolver, type ChainRule, type LocalProxy, type Profile, type Target } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
-import type { DocKind, DocTypes, ProfileDoc, LocalDoc, RuleSetDoc, Seed, SourceDoc, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import type { DocKind, DocTypes, DocInputTypes, ProfileDoc, LocalDoc, RuleSetDoc, Seed, SourceDoc, TemplateVersionDoc, TokenDoc } from './docs.ts';
 import { normalizeSourceFetch, sourceUrl } from './source-url.ts';
 import { convertBundles, normalizeRuleSet, promoteRuleSetOverrides, retargetBundleRefs } from './legacy-rules.ts';
 
@@ -58,7 +58,7 @@ export type User = { id: string; username: string; role: Role; disabled: boolean
 
 /** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
 const KEEP_OK_SNAPSHOTS = 1;
-const SCHEMA_VERSION = 28;
+const SCHEMA_VERSION = 29;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS native_migration_backups (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
@@ -424,6 +424,7 @@ export class Store {
         this.db.exec('DROP TABLE IF EXISTS render_generations; DELETE FROM last_good');
       }
       if (version < 28) this.migrateNativeConfigs();
+      if (version < 29) this.normalizeProfileRouting();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -604,6 +605,20 @@ export class Store {
     }
   }
 
+  /** v29：补齐曾由底层写入的旧订阅，历史备份与外部身份保持不变。 */
+  private normalizeProfileRouting(): void {
+    for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
+      const original = this.cipher.decrypt(row.data);
+      const previous = JSON.parse(original) as ProfileDoc;
+      const next = migrateProfile(previous, profileTemplate(previous, (id, version) => this.getTemplate(id, version)));
+      const normalized = JSON.stringify(next);
+      if (normalized === original) continue;
+      this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
+        .run(previous.id, row.data, this.now());
+      this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?").run(this.cipher.encrypt(normalized), row.id);
+    }
+  }
+
   /** v19：先展开旧锁定引用，再移除历史；绑定订阅继续使用当前模板。 */
   private collapseTemplateHistory(): void {
     for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
@@ -672,17 +687,19 @@ export class Store {
   // ---------- 文档 ----------
 
   /** owner 为 null 表示历史系统级文档，只在新建时写入，更新时保持原归属 */
-  put<K extends DocKind>(kind: K, doc: DocTypes[K], owner: string | null = null): void {
-    this.configurationRevision++;
-    doc = structuredClone(doc);
+  put<K extends DocKind>(kind: K, input: DocInputTypes[K], owner: string | null = null): void {
+    let doc = structuredClone(input) as DocTypes[K];
     this.stripResourceTiming(doc as unknown as Record<string, any>);
-    if (kind === 'profile') doc = stripProfileRevisions(doc as ProfileDoc) as DocTypes[K];
+    if (kind === 'profile') doc = migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, version) => this.getTemplate(id, version))) as DocTypes[K];
     if (kind === 'source') doc = normalizeSourceFetch(doc as SourceDoc) as DocTypes[K];
     this.db.transaction(() => {
+      if (kind === 'profile' && !(input as ProfileDoc).routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
+        .run(input.id, this.cipher.encrypt(JSON.stringify(input)), this.now());
       this.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
         .run(kind, doc.id, owner, this.cipher.encrypt(JSON.stringify(doc)), this.now());
 
     })();
+    this.configurationRevision++;
     if (kind === 'profile') this.prunePrivateRules(doc.id);
     if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
     if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
