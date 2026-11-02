@@ -403,3 +403,6 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 - 显示 YAML 映射递归合并、数组整体替换，以及 INI General/Host/MITM 同名键替换、其他段落追加的说明。
 - 规则集合仅按三个内核预览；完整配置在 Mihomo 下选 Stash 应用。
 - 本轮不绘制合并结果或逐字段覆盖标识。参照 [本地设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)。
+
+
+2026-11-02 菜单层级更正（取代上方 Stash 中间菜单）：V2ProfileClient 采用三组各两个直接子项：Mihomo → Stash iOS / Stash macOS，Surge → Surge iOS / Surge macOS，Loon → Loon iOS / Loon macOS。去掉 FlClash、Clash Verge Rev 及独立 Stash 公共菜单；V2ProfilePreview 的应用候选同步。规则集合仍只选择三个内核。已有原文和服务端识别保持兼容；历史 Stash 公共内容仅在非空时只读展示。外部画布沿用本任务已核实的登录限制，本轮未编辑。

@@ -19,11 +19,11 @@
 }
 ```
 
-内核公共追加匹配同组客户端；客户端层可选，只匹配所选应用。2026-11-02 起，产品顶层分组统一为 Mihomo、Surge、Loon，Stash 位于 Mihomo 下并直接继承其公共 YAML，再应用 Stash 公共原文及 iOS/macOS 追加。[Stash 官方](https://stash.wiki/)仍称其为兼容 Clash 配置的自研内核，此处是项目的配置分组与继承约定；按用户要求不增加兼容过滤或字段转换。原有 `kernels.stash`、`clients.stash-ios`、`clients.stash-macos` 槽位保留，既有原文无需迁移。Surge 与 Loon 各自保存 INI。
+内核公共追加匹配同组客户端；客户端层可选，只匹配所选应用。2026-11-02 起，产品顶层分组统一为 Mihomo、Surge、Loon，Mihomo 下直接列出 Stash iOS、Stash macOS；Surge 下列出 Surge iOS、Surge macOS；Loon 下列出 Loon iOS、Loon macOS。不设置中间 Stash 菜单，也不再单列 FlClash、Clash Verge Rev 等标准 Mihomo 客户端。Stash 两端继承 Mihomo 公共 YAML，再应用各自追加。[Stash 官方](https://stash.wiki/)仍称其为兼容 Clash 配置的自研内核，此处是项目的配置分组与继承约定；按用户要求不增加兼容过滤或字段转换。原有 `kernels.stash`、`clients.stash-ios`、`clients.stash-macos` 槽位保留，既有原文无需迁移。Surge 与 Loon 各自保存 INI。
 
 编辑器只提供目标和文本框，不把原文解析为表单。原文的注释、空行、引号、未完成语法均直接保存；切换选项不改写或迁移文本。清空客户端选择只是切换编辑视图，已有内容仍保存并参与相应客户端生成；要移除某应用追加，应清空其文本框。
 
-选中客户端时，编辑框上方按继承顺序显示默认折叠的只读原文区；Stash 公共页展示 Mihomo，Stash iOS/macOS 展示 Mihomo 与 Stash 公共两层。直接读取当前 `value`，因此未保存的内核草稿也会立即回显；不解析、不复制到客户端、不写回持久层。空内核显示「Mihomo 内核暂无公共配置」等提示。旁边说明 YAML 映射递归合并、数组整体替换及 INI 的覆盖规则。本轮不增加合并结果视图或逐字段覆盖标注。
+选中客户端时，编辑框上方按继承顺序显示默认折叠的只读原文区；Stash iOS/macOS 直接展示 Mihomo 内核原文。已有 `kernels.stash` 非空时额外展示「历史 Stash 公共配置」，保留其已有继承作用；为空时不显示该区块。直接读取当前 `value`，因此未保存的内核草稿也会立即回显；不解析、不复制到客户端、不写回持久层。空内核显示「Mihomo 内核暂无公共配置」等提示。旁边说明 YAML 映射递归合并、数组整体替换及 INI 的覆盖规则。本轮不增加合并结果视图或逐字段覆盖标注。
 
 订阅可用 `enabled:false` 暂停基础输出，暂停后保留原文，重新启用不会丢失数据。不补虚默认端口或 DNS。基础设置预设及其页面、接口、引用已移除，模板管理入口归入管理员分组；普通用户仍可在订阅中选择模板。
 
@@ -34,7 +34,7 @@
 
 客户端层高于内核层。只处理命中目标的文本，其他内核或应用中未完成的文本不会影响当前输出。
 
-Stash 的顺序为 **Mihomo 公共原文 → Stash 公共原文 → Stash iOS/macOS 原文（可选）**。缺省或空的下层继续继承上层；Mihomo 错误会使 Stash 生成失败，Stash 错误不影响 Mihomo、Surge、Loon。客户端覆盖过的字段遵循下述规则，未覆盖字段随内核更新。原文始终独立保存。
+Stash 的顺序为 **Mihomo 公共原文 → 历史 Stash 公共原文（若存在） → Stash iOS/macOS 原文（可选）**。缺省或空的下层继续继承上层；Mihomo 错误会使 Stash 生成失败，Stash 错误不影响 Mihomo、Surge、Loon。客户端覆盖过的字段遵循下述规则，未覆盖字段随内核更新。原文始终独立保存。
 
 - YAML：映射递归合并，数组、标量及 `null` 整体替换；保留 `false`、`0`、空数组和含冒号/逗号的 DNS policy 键。输出会重新排版，保存的原文不变。重复键、循环别名、非映射顶层及非法键会报错。
 - INI：只识别段落和必要的键。General、Host、MITM 同名键由后层替换，其余段落按顺序追加；不转换 DNS/Hosts 的值，保留原生指令及条件注释。重复键的合并不等于客户端语义校验。
@@ -49,7 +49,7 @@ Stash 的顺序为 **Mihomo 公共原文 → Stash 公共原文 → Stash iOS/ma
 
 `target=mihomo|surge|stash|loon` 选择内核；`app` 选择可选客户端：`flclash`、`clash-verge`、`surge-ios`、`surge-macos`、`stash-ios`、`stash-macos`、`loon-ios`、`loon-macos`。不匹配的内核/应用组合返回错误。历史 `platform` 参数继续用于应用识别与日志，不参与规则转换。
 
-常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源、刷新链接和最近成功配置包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下可选 Stash iOS/macOS，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。
+常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源、刷新链接和最近成功配置包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下只提供 Stash iOS/macOS 两个应用选项，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。旧 FlClash、Clash Verge Rev 应用参数及已保存的追加继续兼容，本轮不迁移或删除已有配置。
 
 ## 规则只区分内核
 

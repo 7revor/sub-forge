@@ -13,7 +13,7 @@ import { indexPreview, locatePreviewIssue } from './previewReport.ts';
 // 代理链直接展示业务检查结果，引用生成细节仅在配置预览中按需展开。
 
 import { useMutation } from '@tanstack/react-query';
-import { BASE_KERNELS, baseKernel, CLIENT_APPS, type BaseKernel, type ClientApp, type ChainResolution, type ChainRule, type Client } from '@sub-forge/core';
+import { BASE_KERNELS, baseKernel, BASE_CLIENT_APPS, type BaseKernel, type ClientApp, type ChainResolution, type ChainRule, type Client } from '@sub-forge/core';
 import { ArrowRight, Link2, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type ProfilePreview } from '../../api.ts';
@@ -69,7 +69,7 @@ export function TabPreview() {
   const [app, setApp] = useState<ClientApp>();
   const [level, setLevel] = useState<'all' | 'error' | 'warn' | 'info'>('all');
   const [kernel, setKernel] = useState<BaseKernel>('mihomo');
-  const apps = CLIENT_APPS.filter(a => baseKernel(a.kernel) === kernel);
+  const apps = BASE_CLIENT_APPS.filter(a => baseKernel(a.kernel) === kernel);
   const client = apps.find(a => a.id === app)?.kernel ?? kernel;
   const target = { client, profile: draft, ...(app ? { app } : {}) };
   const current = preview.data && !preview.isPending && !preview.error && JSON.stringify(preview.variables) === JSON.stringify(target);

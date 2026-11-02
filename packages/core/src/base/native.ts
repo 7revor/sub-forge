@@ -28,6 +28,8 @@ export const CLIENT_APPS = [
   { id: 'loon-macos', kernel: 'loon', label: 'Loon macOS', platform: 'macos' },
 ] as const;
 export type ClientApp = typeof CLIENT_APPS[number]['id'];
+/** 编辑与预览只单列需要平台追加的应用，标准 Mihomo 客户端不再占用菜单。旧应用身份继续兼容已有配置与链接。 */
+export const BASE_CLIENT_APPS = CLIENT_APPS.filter(app => app.kernel !== 'mihomo');
 export type NativeBase = {
   kernels?: Partial<Record<Client, string>>;
   clients?: Partial<Record<ClientApp, string>>;

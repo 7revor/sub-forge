@@ -373,3 +373,6 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 
 2026-11-02 Stash 配置继承：V2ProfileClient 将 Stash 及 iOS/macOS 放入 Mihomo 下；编辑框上方增加默认折叠的继承原文只读区、空态和 YAML/INI 合并说明。V2RuleSet 只保留 Mihomo、Surge、Loon 预览；V2ProfilePreview 同步顶层分组，Stash 应用在 Mihomo 下选择。前端及核心继承已实现，数据模型/API 无需迁移。内置浏览器实查外部 Claude Design 画布仍要求登录，画布未同步；本地设计说明和验收截图见 [设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)。
+
+
+2026-11-02 菜单层级更正（取代上方 Stash 中间菜单）：V2ProfileClient 采用三组各两个直接子项：Mihomo → Stash iOS / Stash macOS，Surge → Surge iOS / Surge macOS，Loon → Loon iOS / Loon macOS。去掉 FlClash、Clash Verge Rev 及独立 Stash 公共菜单；V2ProfilePreview 的应用候选同步。规则集合仍只选择三个内核。已有原文和服务端识别保持兼容；历史 Stash 公共内容仅在非空时只读展示。外部画布沿用本任务已核实的登录限制，本轮未编辑。
