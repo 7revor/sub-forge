@@ -206,7 +206,7 @@ it('v26 升级删除结构版本与旧渲染缓存，保留配置、令牌和上
     store.db.prepare('INSERT INTO render_generations VALUES (?, ?, ?, ?, ?)').run('p', 'mihomo:any', 'old', 1, cipher.encrypt(JSON.stringify(legacy)));
     store.db.pragma('user_version = 26'); store.close();
     store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(31);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(32);
     expect(store.db.prepare("SELECT name FROM sqlite_master WHERE name='render_generations'").get()).toBeUndefined();
     expect(store.getLastGood('p', 'mihomo:any')).toBeUndefined();
     expect(store.getWithOwner('profile', 'p')).toEqual(saved);

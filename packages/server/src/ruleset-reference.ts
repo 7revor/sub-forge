@@ -54,7 +54,12 @@ export function resolveRuleSetReference(matcher: RuleSetMatcher, store: Store): 
   const rs = matcher.repository
     ? { id: matcher.id, name: matcher.repository.name, sources: matcher.repository.sources }
     : store.get('ruleset', matcher.id);
-  if (!rs || !Array.isArray(rs.sources)) return undefined;
+  return rs && usableRuleSet(rs, store);
+}
+
+/** 已解密的规则集可直接检查，避免批量遍历时重复读取。 */
+export function usableRuleSet(rs: RuleSetDoc, store: Store): RuleSetDoc | undefined {
+  if (!Array.isArray(rs.sources)) return undefined;
   for (const source of rs.sources.filter(source => source.enabled !== false && source.repository)) {
     try { checkRepositorySource(source, undefined, store, '仓库规则'); }
     catch (error) { if (error instanceof HttpError) return undefined; throw error; }

@@ -51,7 +51,7 @@ describe('订阅 routing 边界', () => {
       store.putLastGood('p', 'mihomo:any', { yaml: '保留成功结果' });
       store.db.pragma('user_version = 28');
       const plan = await profileMigrationPlan(file, cipher);
-      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 31, profiles: [{ id: 'p', mode: 'bound' }] });
+      expect(plan).toMatchObject({ sourceVersion: 28, targetVersion: 32, profiles: [{ id: 'p', mode: 'bound' }] });
       expect(store.get('profile', 'p')!.routing).toBeUndefined();
       expect(store.getProfileMigrationBackup('p')).toBeUndefined();
       store.close(); store = new Store(file, { cipher });

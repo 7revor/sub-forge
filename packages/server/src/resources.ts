@@ -23,12 +23,18 @@ export class ResourceService {
   setAdditionalResources(read: () => Resource[]) { this.additionalResources = read; }
   private ticking?: Promise<void>;
   constructor(private store:Store,private snapshots:SnapshotService,private renderer:RenderService,private now:()=>number=Date.now) {
-    store.db.exec('CREATE TABLE IF NOT EXISTS refresh_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, data TEXT NOT NULL, at INTEGER NOT NULL)');
+    store.documentDeleteHooks.add(this.dropDocumentJobs);
     for (const row of store.db.prepare('SELECT data FROM refresh_jobs').all() as {data:string}[]) {
       const job = JSON.parse(store.cipher.decrypt(row.data)) as RefreshJob;
       if (job.state === 'running') { job.state = 'interrupted';job.error = '服务重启，刷新任务已中断，请重新刷新';this.interruptPending(job);this.save(job); }
     }
   }
+  private readonly dropDocumentJobs = (kind:string,id:string) => {
+    for (const row of this.store.db.prepare('SELECT id,data FROM refresh_jobs').all() as {id:string;data:string}[]) {
+      const job = JSON.parse(this.store.cipher.decrypt(row.data)) as RefreshJob;
+      if (job.kind === kind && job.documentId === id) this.store.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
+    }
+  };
   private interruptPending(job:RefreshJob) {
     for (const result of job.results) {
       if (result.ok === undefined) result.state = 'interrupted';
@@ -62,9 +68,13 @@ export class ResourceService {
     return [...new Map(resources.map(r=>[this.snapshots.identity(r.kind,r.id,r.url,r.options),r])).values()];
   }
   statuses(resources:Resource[]) {
-    return this.unique(resources).map(r=>({name:r.name,...this.snapshots.status(r.kind,r.id,r.url,r.options)}));
+    return [...new Map(resources.map(r=>{ const status = this.snapshots.status(r.kind,r.id,r.url,r.options); return [status.resource,{name:r.name,...status}]; })).values()];
   }
+  /** 只读：状态页不应改变绑定；调度任务自行绑定后再拉取。 */
   all():Resource[] {
+    return [...new Map(this.dependencies().map(r=>[this.snapshots.resourceId(r.kind,r.id,r.url,r.options),r])).values()];
+  }
+  private dependencies():Resource[] {
     const collect = (kind:string,id:string) => {
       try { return this.collect(kind,id); }
       catch (error) {
@@ -73,14 +83,14 @@ export class ResourceService {
         return [];
       }
     };
-    return this.unique([
+    return [
       ...this.additionalResources(),
       ...this.store.listSharedRules<SharedRuleRecord>().flatMap(r => { const rs = resolveRuleSetReference(r.data.reference.matcher, this.store); return rs ? this.ruleResources(rs) : []; }),
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
       ...this.store.listTemplates().flatMap(t=>Object.values(this.renderer.collectRuleEntries(t.rules).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
-    ]);
+    ];
   }
   private async each(resources:Resource[],read:(r:Resource,index:number)=>Promise<void>) {
     let next = 0;
@@ -148,7 +158,7 @@ export class ResourceService {
     if (this.stopping) return Promise.resolve();
     if (this.ticking) return this.ticking;
     const work = (async()=>{
-      await this.each(this.all(),async r=>{
+      await this.each(this.unique(this.dependencies()),async r=>{
         if (!this.snapshots.isBound(r.kind, r.id, r.url, r.options)) return;
         const status=this.snapshots.status(r.kind,r.id,r.url,r.options);
         if(status.nextFetchAt===undefined || this.now()>=status.nextFetchAt) await this.snapshots.get(r.kind,r.id,r.url,r.options);
@@ -163,5 +173,5 @@ export class ResourceService {
     const run=()=>void this.tick().catch(error=>console.error('资源调度失败',error));
     run();this.timer=setInterval(run,60_000);this.timer.unref();
   }
-  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all([...this.running.values(),this.ticking]);}
+  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all([...this.running.values(),this.ticking]);this.store.documentDeleteHooks.delete(this.dropDocumentJobs);}
 }
