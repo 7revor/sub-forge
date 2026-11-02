@@ -351,3 +351,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 列表行内布尔项：`V2Template`、`V2ProfileRouting`、`V2Components`、`V2ProfileNodes`、`V2Settings` 的列表开关改为分段控件；`V2ProfileClient`、`V2Source`、`V2MoreDialogs` 的非列表开关不变。前端对应 `BooleanSegmented`（`components/ui.tsx`）；可点击光标对应 `index.css` 与 `components/ui/*` 的菜单项。仅界面变化，无后端待实现项。
 
 2026-11-02 节点来源与列表对齐修订：`V2ProfileNodes` 的流量信息改为带图标开关按钮，放在「引用 / 展开」右侧，本地节点行去掉「—」；`V2Template`、`V2ProfileRouting`、`V2Components` 的策略组与规则控件列统一为 240px，控件靠左、右侧留白。前端对应 `TabsBasic`、`TemplateGroupsEditor`、`RuleCard` 与 `RoutingCard` 的 `routingControlClass`。仅界面变化，无后端待实现项。
+
+2026-11-02 控件列宽度修订：`V2Template`、`V2ProfileRouting`、`V2Components`、`V2ProfileNodes` 的控件列由 240px 改为 168px；`V2ProfileNodes` 的流量信息按钮移到「引用 / 展开」左侧。前端对应 `routingControlClass` 与 `TabsBasic`。仅界面变化，无后端待实现项。

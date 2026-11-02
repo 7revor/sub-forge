@@ -3,7 +3,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { Button, cx } from './ui.tsx';
 
 /** 节点来源、策略组、规则的控件列共用此宽度：控件靠左，列内右侧留白，不贴着操作按钮。 */
-export const routingControlClass = 'w-[168px] min-w-0 shrink-0 sm:w-[240px]';
+export const routingControlClass = 'w-[168px] min-w-0 shrink-0';
 
 /** 策略组、规则和增强来源共用尺寸，保留各自的信息排列。 */
 export function RoutingCard({ children, className, invalid, id }: { children: ReactNode; className?: string; invalid?: boolean; id?: string }) {
