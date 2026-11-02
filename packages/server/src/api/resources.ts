@@ -1,6 +1,7 @@
 import { requiredQuery } from '../query.ts';
 import type { SharedRuleRecord } from '../shared-rules.ts';
 import { findReferrers } from './validate.ts';
+import { readPagination } from './pagination.ts';
 import { HttpError } from './common.ts';
 import { getCookie } from 'hono/cookie';
 import { Hono } from 'hono';
@@ -39,9 +40,12 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
     if (!resource) throw notFound();
     return c.json({ job: resources.startJob(c.get('user').id, 'system-resource', key, [resource]) }, 202);
   });
-  app.get('/system/rule-resources', requireAdmin, c => c.json({ items: store.listSharedRules<SharedRuleRecord>().map(r => ({
-    key: r.key, rulesetId: r.rulesetId, name: r.data.name, target: r.data.target, updatedAt: r.updatedAt, error: r.data.error, referenced: findReferrers(store, c.get('user').id, 'ruleset', r.rulesetId).length > 0,
-  })) }));
+  app.get('/system/rule-resources', requireAdmin, c => {
+    const result = store.sharedRulesPage<SharedRuleRecord>(readPagination(c.req.query()) ?? { page: 1, pageSize: 20, q: '' });
+    return c.json({ ...result, items: result.items.map(r => ({
+      key: r.key, rulesetId: r.rulesetId, name: r.data.name, target: r.data.target, updatedAt: r.updatedAt, error: r.data.error, referenced: findReferrers(store, c.get('user').id, 'ruleset', r.rulesetId).length > 0,
+    })) });
+  });
   app.delete('/system/rule-resources/:key', requireAdmin, c => {
     const key = c.req.param('key');
     const record = store.getSharedRule<SharedRuleRecord>(key);

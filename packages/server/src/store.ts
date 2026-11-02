@@ -406,6 +406,13 @@ export class Store {
     return (this.db.prepare('SELECT * FROM shared_rule_resources ORDER BY key').all() as { key: string; ruleset_id: string; data: string; updated_at: number }[])
       .map(r => ({ key: r.key, rulesetId: r.ruleset_id, data: JSON.parse(this.cipher.decrypt(r.data)), updatedAt: r.updated_at }));
   }
+  /** 系统页分页读取；只解密当前页，按 key 排序保持翻页稳定。 */
+  sharedRulesPage<T>(options: PageOptions): PageResult<{ key: string; rulesetId: string; data: T; updatedAt: number }> {
+    const total = (this.db.prepare('SELECT COUNT(*) AS n FROM shared_rule_resources').get() as { n: number }).n;
+    const meta = pageMeta(total, options);
+    const rows = this.db.prepare('SELECT * FROM shared_rule_resources ORDER BY key LIMIT ? OFFSET ?').all(meta.pageSize, (meta.page - 1) * meta.pageSize) as { key: string; ruleset_id: string; data: string; updated_at: number }[];
+    return { ...meta, items: rows.map(r => ({ key: r.key, rulesetId: r.ruleset_id, data: JSON.parse(this.cipher.decrypt(r.data)) as T, updatedAt: r.updated_at })) };
+  }
   deleteSharedRule(key: string): void {
     this.configurationRevision++;
     this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(key);

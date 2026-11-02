@@ -2,6 +2,8 @@ import { Frame } from '../modals/Frame.tsx';
 import { useMutation,useQuery,useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api.ts';
+import { Pagination } from '../components/Pagination.tsx';
+import type { PageResult } from '../hooks/usePagedList.ts';
 import { RefreshCacheButton, type ResourceState } from '../components/ResourceCache.tsx';
 import { Badge,Button,Card,ErrorAlert,Field,Input,PageHeader,PageScroll,formatTime } from '../components/ui.tsx';
 type RuleResource = { key: string; name: string; target: { client: string }; referenced: boolean; error?: string };
@@ -11,10 +13,10 @@ function RetryResource({resource:r}:{resource:ResourceState}) {
   return r.resource ? <RefreshCacheButton kind="system-resource" id={r.resource} name={r.name} label="立即重试" endpoint={`/system/resources/${encodeURIComponent(r.resource)}/refresh`} disabled={r.refreshing}/> : r.repositoryId ? <Button size="sm" disabled={retry.isPending||r.refreshing} onClick={()=>retry.mutate()}>{retry.isPending||r.refreshing?'重试中…':'立即重试'}</Button> : null;
 }
 export function System(){
-  const qc=useQueryClient();const [hours,setHours]=useState<string>();
+  const qc=useQueryClient();const [hours,setHours]=useState<string>();const [rulePage,setRulePage]=useState(1);const [rulePageSize,setRulePageSize]=useState(10);
   const info=useQuery({queryKey:['system'],queryFn:()=>api<{resourceCacheTtlSec:number}>('GET','/system')});
   const resources=useQuery({queryKey:['system-resources'],queryFn:()=>api<{items:ResourceState[]}>('GET','/system/resources')});
-  const rules=useQuery({queryKey:['shared-rule-resources'],queryFn:()=>api<{items:RuleResource[]}>('GET','/system/rule-resources')});
+  const rules=useQuery({queryKey:['shared-rule-resources',{page:rulePage,pageSize:rulePageSize}],placeholderData:previous=>previous,queryFn:()=>api<PageResult<RuleResource>>('GET',`/system/rule-resources?${new URLSearchParams({page:String(rulePage),pageSize:String(rulePageSize)})}`)});
   const remove = (resource: RuleResource) => Frame.modal.confirm({ title: `删除公共规则资源「${resource.name}」？`, description: '此资源的旧下载链接会失效；不删除规则增强定义或其他客户端变体。配置再次使用时会重新生成。', confirmLabel: '删除资源', danger: true }, { submit: async () => {
     await api('DELETE', `/system/rule-resources/${resource.key}`);
     await qc.invalidateQueries({ queryKey: ['shared-rule-resources'] });
@@ -34,10 +36,11 @@ export function System(){
       </div></div>
       <div className="settings-row"><div><h2>公共规则资源</h2><p>所有用户令牌可读；可清理无人引用的产物</p></div><div>
         <ErrorAlert error={rules.error} />
-        {!rules.data ? <p className="text-muted-foreground">正在读取公共资源…</p> : !rules.data.items.length ? <p className="text-muted-foreground">尚未生成公共规则资源。</p> : <ul className="flex list-none flex-col gap-3 p-0">{rules.data.items.map(resource => <li key={resource.key} className="flex items-center justify-between gap-4 border-b border-border py-3 last:border-0 text-sm">
+        {!rules.data ? <p className="text-muted-foreground">正在读取公共资源…</p> : !rules.data.total ? <p className="text-muted-foreground">尚未生成公共规则资源。</p> : <ul className="flex list-none flex-col p-0">{rules.data.items.map(resource => <li key={resource.key} className="flex items-center justify-between gap-4 border-b border-border py-3 last:border-0 text-sm">
           <div className="min-w-0"><div className="break-all font-medium">{resource.name}</div><div className="text-muted-foreground">{resource.target.client} · {resource.referenced ? '仍被引用' : '无配置引用'}</div>{resource.error && <p className="text-red-600">{resource.error} · 正在使用上次成功产物</p>}</div>
           <Button size="sm" variant="danger" disabled={resource.referenced} onClick={() => void remove(resource)}>删除资源</Button>
         </li>)}</ul>}
+        {!!rules.data?.total && <Pagination className="!px-0 !pb-0" page={rules.data.page} pageSize={rules.data.pageSize} total={rules.data.total} totalPages={rules.data.totalPages} busy={rules.isFetching} onPage={setRulePage} onPageSize={value=>{setRulePageSize(value);setRulePage(1);}} />}
       </div></div>
     </section></PageScroll></>;
 }
