@@ -159,7 +159,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   catch (error) { report.error(client + '.base', (error as Error).message); }
   if (client === 'stash' && input.platform && input.platform !== 'ios' && input.platform !== 'macos') report.error('stash.platform', 'Stash 输出仅支持 iOS 或 macOS 平台');
   if (client === 'stash' && profile.nodeSets.some(s => s.output === 'provider')) {
-    report.info('stash.nodes-inline', 'Stash 节点集按快照内联输出，随主订阅刷新更新，以保留筛选、代理链及空组拒绝语义');
+    report.info('stash.nodes-inline', 'Stash 节点来源按快照内联输出，随主订阅刷新更新，以保留筛选、代理链及空组拒绝语义');
   }
   if (isIniClient(client)) {
     if (input.platform && !['ios', 'macos'].includes(input.platform)) report.error(client + '.platform', client + ' 仅支持 iOS 或 macOS');
@@ -174,7 +174,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const providerNames = new Set<string>();
   for (const ps of profile.nodeSets) {
     const key = nodeSetKey(ps.ref);
-    if (sets.has(key)) { report.warn('nodeset.duplicate', '节点集重复加入，已忽略', key); continue; }
+    if (sets.has(key)) { report.warn('nodeset.duplicate', '节点来源重复加入，已忽略', key); continue; }
     let providerName = ps.providerName ?? displayName(ps.ref, input.nodeSets);
     for (let i = 2; providerNames.has(providerName); i++) providerName = `${ps.providerName ?? displayName(ps.ref, input.nodeSets)} (${i})`;
     providerNames.add(providerName);
@@ -197,7 +197,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         while (topNames.has(`${orig} ${i}`)) i++;
         if (inlineNodes) n[inlineOriginalName] = orig;
         n.name = `${orig} ${i}`;
-        report.warn('inline.name-conflict', `内联节点「${orig}」与其他节点集重名，已改为「${n.name}」`, s.key);
+        report.warn('inline.name-conflict', `内联节点「${orig}」与其他节点来源重名，已改为「${n.name}」`, s.key);
       }
       topNames.add(n.name);
     }
@@ -218,7 +218,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   /** 正则取首个命中时跳过 skip（本条链的落地节点）；精确点选是明确选择，不跳过，成环由环检测报告。 */
   const findNode = (ref: ChainNodeRef, where: string, skip?: Set<string>): { set: NS; node: ProxyIR } | undefined => {
     const candidates = chainSources(ref.nodeSet, profile.nodeSets).map(source => sets.get(nodeSetKey(source.ref))!).filter(Boolean);
-    if (!candidates.length) { report.error('ref.nodeset-not-in-profile', `前置范围 ${nodeSetKey(ref.nodeSet)} 中没有可用节点集`, where); return undefined; }
+    if (!candidates.length) { report.error('ref.nodeset-not-in-profile', `前置范围 ${nodeSetKey(ref.nodeSet)} 中没有可用节点来源`, where); return undefined; }
     const match = ref.match;
     const regex = 'regex' in match ? compileUserRegex(match.regex) : undefined;
     for (const set of candidates) {
@@ -283,7 +283,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       else if (m.kind === 'node') { const n = resolveTarget({ kind: 'node', ref: m.ref }, where); if (n) proxies.push(n); }
       else if (m.kind === 'nodeset') {
         const s = sets.get(nodeSetKey(m.ref));
-        if (!s) { report.error('ref.nodeset-not-in-profile', `组成员节点集 ${nodeSetKey(m.ref)} 未加入本 Profile`, where); continue; }
+        if (!s) { report.error('ref.nodeset-not-in-profile', `组成员节点来源 ${nodeSetKey(m.ref)} 未加入本 Profile`, where); continue; }
         if (s.output === 'provider') use.push(s.providerName);
         else proxies.push(...filterNodes(s.nodes, filterSpec).map((n) => n.name)); // 内联节点不受 filter 约束，服务端预过滤
       } else {
@@ -365,7 +365,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     const whole = rules.filter(c => !c.landing.filter && !c.landing.excludeFilter);
     const partial = rules.filter(c => c.landing.filter || c.landing.excludeFilter);
     if (whole.length > 1 && new Set(whole.map(c => JSON.stringify(c.via))).size > 1) {
-      report.error('chain.conflict', `节点集「${set.providerName}」有不同的整集前置，请保留一个`, set.key, whole.map(c => c.id));
+      report.error('chain.conflict', `节点来源「${set.providerName}」有不同的整集前置，请保留一个`, set.key, whole.map(c => c.id));
     }
     const matches = new Map(partial.map(c => [c, new Set(filterNodes(set.nodes, c.landing))]));
     const partialFor = (n: ProxyIR) => partial.filter(c => matches.get(c)!.has(n));
@@ -398,7 +398,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     if (rules.length && set.output === 'provider') report.info('chain.provider-materialized', `「${set.providerName}」的前置已写入本订阅专属 Provider 内容，节点更新后自动重新应用`, set.key);
   }
   for (const chain of profile.chains) if (!chainSources(chain.landing.nodeSet, profile.nodeSets).length) {
-    report.error('ref.nodeset-not-in-profile', `链规则的落地节点集 ${nodeSetKey(chain.landing.nodeSet)} 未加入本订阅`, `chain:${chain.id}`);
+    report.error('ref.nodeset-not-in-profile', `链规则的落地节点来源 ${nodeSetKey(chain.landing.nodeSet)} 未加入本订阅`, `chain:${chain.id}`);
   }
 
   for (const chain of profile.chains) if (!chainCounts.get(chain.id)?.landingCount) report.warn('chain.no-landing', '没有命中落地节点，请检查落地来源或筛选范围', `chain:${chain.id}`);

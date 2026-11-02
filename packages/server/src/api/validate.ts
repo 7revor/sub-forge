@@ -150,9 +150,9 @@ export class RefChecker {
   ruleVisible(id: string): boolean { return !!this.store.get('ruleset', id); }
 
   nodeSet(ref: unknown, where: string): NodeSetID {
-    if (!isObj(ref) || !NODESET_KINDS.has(ref.type as string) || !isStr(ref.id)) throw bad(`${where}：节点集引用格式错误`);
+    if (!isObj(ref) || !NODESET_KINDS.has(ref.type as string) || !isStr(ref.id)) throw bad(`${where}：节点来源引用格式错误`);
     const r = ref as NodeSetID;
-    if (!this.owned(r.type, r.id)) throw bad(`${where}：节点集 ${r.type}:${r.id} 不存在`);
+    if (!this.owned(r.type, r.id)) throw bad(`${where}：节点来源 ${r.type}:${r.id} 不存在`);
     return r;
   }
 
@@ -275,8 +275,8 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
     case 'profile': {
       if (!Array.isArray(doc.nodeSets)) throw bad('nodeSets 必须是数组');
       (doc.nodeSets as unknown[]).forEach((n, i) => {
-        if (!isObj(n) || (n.output !== 'provider' && n.output !== 'inline')) throw bad(`节点集 ${i + 1} 的输出方式只能是 provider 或 inline`);
-        refs.nodeSet(n.ref, `节点集 ${i + 1}`);
+        if (!isObj(n) || (n.output !== 'provider' && n.output !== 'inline')) throw bad(`节点来源 ${i + 1} 的输出方式只能是 provider 或 inline`);
+        refs.nodeSet(n.ref, `节点来源 ${i + 1}`);
       });
       if (doc.userinfo !== undefined) {
         const u = doc.userinfo;

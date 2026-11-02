@@ -117,7 +117,7 @@ export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupS
         </section>
         <fieldset disabled={readOnly} className="contents">        <details className="mt-4"><summary className="cursor-pointer text-sm font-medium">高级设置</summary><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <GroupSettingsFields section="advanced" disabled={readOnly} value={group} onChange={(key, next) => update({ [key]: next })} />
-          <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
+          <Field label="filter（保留）" hint="订阅填入节点来源后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
           <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>
           <Field label="exclude-type（排除协议）">{id => <ExcludeTypeSelect disabled={readOnly} id={id} value={group.excludeType} onChange={excludeType => update({ excludeType })} />}</Field>
         </div></details>

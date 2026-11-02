@@ -89,7 +89,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
 
     </>}</>}>
       <ErrorAlert error={repositoryMatches.error} />{linkError && <FieldError error={linkError} />}
-      {!value.rules.length && <Empty variant="card" title="没有规则" description={hideFinal ? '先于模板规则匹配，仅影响本订阅。' : '未匹配的流量走 MATCH。'} />}
+      {!value.rules.length && <Empty variant="card" title={hideFinal ? '没有规则，添加后先于模板规则匹配，仅影响本订阅' : '没有规则，未匹配的流量走 MATCH'} />}
       <TemplateBoundList label="规则" items={value.rules} templateIds={templateRuleIds} templateStart={templateStart} isLocked={rule => ruleReadOnly(rule) || !!search.trim()} onReorder={(rules, start) => onChange({ ...value, rules }, start)} renderItem={(r, i, handle) => {
         if (search.trim() && !`${ruleMatcherLabel(r.matcher, ctx)} ${targetLabel(r.target, groupName, ref => ref.id)}`.toLowerCase().includes(search.trim().toLowerCase())) return null;
         const readOnly = ruleReadOnly(r);

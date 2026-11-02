@@ -17,12 +17,12 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
   return (
     <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-2">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3">
-        <Field label="节点来源">{id => <div id={id}><NodeSetSelect label={`${label}所在节点集`} value={value.nodeSet} options={nodeSets} onChange={nodeSet => onChange({ ...value, nodeSet })} /></div>}</Field>
+        <Field label="节点来源">{id => <div id={id}><NodeSetSelect label={`${label}所在节点来源`} value={value.nodeSet} options={nodeSets} onChange={nodeSet => onChange({ ...value, nodeSet })} /></div>}</Field>
         <Field label="匹配方式">{id => <div id={id}><Segmented label={`${label}匹配方式`} value={exact ? 'exact' : 'regex'} options={[{ value: 'exact', label: '指定节点' }, { value: 'regex', label: '正则' }]} onChange={mode => onChange({ ...value, match: mode === 'exact' ? { exact: text } : { regex: text } })} /></div>}</Field>
         <Field label="节点" className="col-span-2">{id => exact
           ? <Combobox id={id} aria-label={`${label}节点名称`} placeholder="搜索或输入节点名称（处理链之后）" value={text}
               options={(data?.nodes ?? []).map(n => ({ value: n.name, hint: `${n.type.toUpperCase()} · ${n.server}:${n.port}` }))}
-              empty={isLoading ? '节点列表加载中…' : text ? '没有匹配的节点，可直接使用输入的名称' : '节点集中没有节点'}
+              empty={isLoading ? '节点列表加载中…' : text ? '没有匹配的节点，可直接使用输入的名称' : '节点来源中没有节点'}
               onChange={v => onChange({ ...value, match: { exact: v } })} />
           : <Input id={id} aria-label={`${label}节点正则`} className="font-mono" placeholder="节点名称正则，支持 (?i)" value={text} onChange={e => onChange({ ...value, match: { regex: e.target.value } })} />}</Field>
         <Field label="节点不存在时" className="col-span-2">{id => <Select id={id} placeholder="选择节点未匹配时采用的处理方式" aria-label={`${label}兜底`} value={value.fallback === 'error' || !value.fallback ? 'error' : value.fallback.kind === 'builtin' ? value.fallback.name : 'error'}
@@ -31,7 +31,7 @@ export function NodePicker({ nodeSets, value, onChange, label }: {
           </Select>}</Field>
       </div>
       <div className="flex min-w-0 flex-col gap-1 break-words text-xs" aria-live="polite">
-        {!value.nodeSet.id && <span className="text-muted-foreground">请选择节点集</span>}
+        {!value.nodeSet.id && <span className="text-muted-foreground">请选择节点来源</span>}
         {isLoading && <span className="text-muted-foreground">节点列表加载中…</span>}
         {error && <span className="text-destructive">节点列表加载失败：{error.message}</span>}
         {result.error && <span className="text-destructive">{result.error}</span>}
