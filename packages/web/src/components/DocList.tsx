@@ -55,10 +55,10 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
   return (
     <>
       <PageHeader title={title} subtitle={intro} actions={<>
-        <span role="status" className={cx('self-center text-[length:var(--text-control)] text-ink-muted', !list.isFetching && 'sr-only')}>{list.isFetching ? '加载中…' : ''}</span>
+        <span role="status" className={cx('self-center text-sm text-muted-foreground', !list.isFetching && 'sr-only')}>{list.isFetching ? '加载中…' : ''}</span>
         <SearchInput size="md" aria-label={`搜索${name}`} placeholder={`搜索${name}名称或备注`} value={q} onChange={(e) => setQ(e.target.value)} />
         {canCreate && createButton('md', 'primary')}
-      </>}><span className="text-[length:var(--text-control)] font-normal text-ink-muted">{list.data?.total ?? 0} 个</span></PageHeader>
+      </>}><span className="text-sm font-normal text-muted-foreground">{list.data?.total ?? 0} 个</span></PageHeader>
       <ErrorAlert error={list.error} />
       {list.data && !list.data.total && !q.trim() ? <Empty variant="panel" title={`还没有${name}`} description={empty} action={canCreate && createButton('md', 'primary')} /> : <section className="list-panel" aria-label={`${title}列表`} aria-busy={list.isFetching}>
         <div key={`${list.page}-${list.pageSize}-${q}`} className="list-table-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
@@ -67,7 +67,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
               <DocTableRow key={d.id} to={`/${kind}/${d.id}`}>
                 {shownColumns.map((c, i) => (
                   <td key={c.header} className={cx(listTd, c.className)}>
-                    {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}><span className="block truncate">{c.cell(d)}</span><span className="block truncate text-[length:var(--text-caption)] font-normal text-ink-muted" title={d.note}>{d.note || '无备注'}</span></Link> : c.cell(d)}
+                    {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}><span className="block truncate">{c.cell(d)}</span><span className="block truncate text-xs font-normal text-muted-foreground" title={d.note}>{d.note || '无备注'}</span></Link> : c.cell(d)}
                   </td>
                 ))}
                 {refreshable && <td className={listTd}><ResourceCacheStatus kind={kind} id={d.id}/></td>}
@@ -86,7 +86,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
               </DocTableRow>
             ))}
           </ListTable>
-          {!list.data && list.error && <div className="p-4 text-ink-muted">列表加载失败，请重试。<Button size="sm" onClick={() => void list.refetch()}>重试</Button></div>}
+          {!list.data && list.error && <div className="p-4 text-muted-foreground">列表加载失败，请重试。<Button size="sm" onClick={() => void list.refetch()}>重试</Button></div>}
           {list.data && !rows.length && <div className="p-4"><Empty title={q.trim() ? `没有名称包含「${q.trim()}」的${name}` : `还没有${name}`} description={!q.trim() && empty} action={!q.trim() && canCreate && createButton('sm', 'default')} /></div>}
         </div>
         <Pagination page={list.data?.page ?? list.page} pageSize={list.pageSize} total={list.data?.total ?? 0} totalPages={list.data?.totalPages ?? 1}
@@ -99,5 +99,5 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
 
 function LastProfileAccess({ id }: { id: string }) {
   const logs = useQuery(accessLogOptions(id));
-  return <span className="text-ink-muted">{logs.data?.[0] ? formatTime(logs.data[0].at).slice(5,16) : '从未访问'}</span>;
+  return <span className="text-muted-foreground">{logs.data?.[0] ? formatTime(logs.data[0].at).slice(5,16) : '从未访问'}</span>;
 }

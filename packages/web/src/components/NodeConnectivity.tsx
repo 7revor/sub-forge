@@ -45,21 +45,21 @@ export function NodeConnectivity({ node, text, compact = false, onResult }: { no
   const stale = !!result && result.text !== text;
   const status = running ? '测试中…' : stale ? '配置已修改，请重新测试' : result?.data.message ?? (capability.isPending ? '检查测试服务…' : capability.error ? '无法获取测试服务状态' : capability.data?.available ? '未测试' : '测试服务未配置');
   if (compact) return <div className="flex items-center gap-2" title={status}>
-    {result && !stale && !running && <span role="status" className={`text-[length:var(--text-caption)] ${result.data.ok ? 'text-ok' : 'text-err'}`}>{result.data.ok ? `${result.data.delay} ms` : result.data.message}</span>}
+    {result && !stale && !running && <span role="status" className={`text-xs ${result.data.ok ? 'text-ok' : 'text-destructive'}`}>{result.data.ok ? `${result.data.delay} ms` : result.data.message}</span>}
     <Button size="sm" disabled={!running && (!node || !capability.data?.available)} onClick={() => { if (running) { cancel(); setRunning(false); } else void run(); }}>{running ? '取消测试' : '测试连通性'}</Button>
     {capability.error && <Button size="sm" variant="ghost" onClick={() => void capability.refetch()}>重试</Button>}
   </div>;
-  return <div className="flex flex-col gap-2 border-t border-line pt-3">
+  return <div className="flex flex-col gap-2 border-t border-border pt-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-2" role="status">
-        <span className="text-[length:var(--text-control)] text-ink-muted">连通性</span>
+        <span className="text-sm text-muted-foreground">连通性</span>
         <Badge tone={running || stale ? 'neutral' : result?.data.ok ? 'ok' : result?.data.status === 'failed' ? 'err' : 'neutral'}>{status}</Badge>
-        {!running && !stale && result?.data.ok && <span className="font-mono text-[length:var(--text-control)]">{result.data.delay} ms</span>}
+        {!running && !stale && result?.data.ok && <span className="font-mono text-sm">{result.data.delay} ms</span>}
       </div>
       {running ? <Button size="sm" onClick={() => { cancel(); setRunning(false); setResult({ text, data: { ok: false, status: 'cancelled', message: '测试已取消', testedAt: Date.now(), target: '' } }); }}>取消测试</Button>
         : <Button size="sm" disabled={!node || !capability.data?.available} onClick={() => void run()}>测试连通性</Button>}
     </div>
-    <div className="text-[length:var(--text-caption)] leading-relaxed text-ink-muted">
+    <div className="text-xs leading-relaxed text-muted-foreground">
       从 Sub Forge 服务端发起，测试当前配置，无需先保存。
       {result && !running && !stale && <span> 上次测试：{new Date(result.data.testedAt).toLocaleString('zh-CN')}{result.data.target ? ` · ${result.data.target}` : ''}</span>}
       {capability.error && <Button size="sm" onClick={() => void capability.refetch()}>重试</Button>}

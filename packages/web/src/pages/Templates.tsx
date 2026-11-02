@@ -55,7 +55,7 @@ export function TemplateList() {
                 <td className={listTd}><Link to={path} className={docNameLinkClass}>{t.name ?? t.id}</Link></td>
                 <td className={listTd}>{t.groups.length} 个</td>
                 <td className={listTd}>{t.rules.length} 条</td>
-                <td className={cx(listTd, 'whitespace-nowrap text-ink-2')}>{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</td>
+                <td className={cx(listTd, 'whitespace-nowrap text-foreground')}>{!profiles.data ? profiles.error ? '读取失败' : '读取中…' : n ? `${n} 个配置订阅在用` : '未使用'}</td>
                 <td className={cx(listTd, 'whitespace-nowrap text-right')}><ListActions>
                   <Link to={`/profiles/new?template=${encodeURIComponent(t.id)}`} className={buttonClass('default', 'sm')}>新建订阅</Link>
                   <DocActionLink to={path} name={t.name ?? t.id} />
@@ -63,7 +63,7 @@ export function TemplateList() {
               </DocTableRow>;
             })}
           </ListTable>
-          {!list.data && list.error && <div className="p-4 text-ink-muted">列表加载失败，请重试。<Button size="sm" onClick={() => void list.refetch()}>重试</Button></div>}
+          {!list.data && list.error && <div className="p-4 text-muted-foreground">列表加载失败，请重试。<Button size="sm" onClick={() => void list.refetch()}>重试</Button></div>}
           {list.data && !list.data.items.length && <div className="p-4"><Empty title={list.q.trim() ? `没有名称包含「${list.q.trim()}」的模板` : '还没有模板'} action={!list.q.trim() && <Link to="/templates/new" className={buttonClass('default', 'sm')}>新建模板</Link>} /></div>}
         </div>
         <Pagination page={list.data?.page ?? list.page} pageSize={list.pageSize} total={list.data?.total ?? 0} totalPages={list.data?.totalPages ?? 1}
@@ -91,7 +91,7 @@ export function TemplateEdit() {
   const { id = 'new', tab } = useParams();
   const tpl = useQuery({ queryKey: ['template', id], enabled: id !== 'new' && !tab, queryFn: () => api<TemplateResponse>('GET', queryUrl('/templates', { id })) });
   if (tab) return <Navigate to={`/templates/${encodeURIComponent(id)}`} replace />;
-  if (id !== 'new' && !tpl.data) return tpl.error ? <ErrorAlert error={tpl.error} /> : <div className="text-ink-muted">加载中…</div>;
+  if (id !== 'new' && !tpl.data) return tpl.error ? <ErrorAlert error={tpl.error} /> : <div className="text-muted-foreground">加载中…</div>;
   return <TemplatePage key={id} id={id} initial={tpl.data?.item} />;
 }
 
@@ -200,7 +200,7 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
   };
 
   return <>
-    <PageHeader title={isNew ? '新建模板' : draft.name} crumbs={<><Link to="/templates" className="text-ink-muted no-underline">模板</Link> / {isNew ? '新建模板' : draft.name}</>}
+    <PageHeader title={isNew ? '新建模板' : draft.name} crumbs={<><Link to="/templates" className="text-muted-foreground no-underline">模板</Link> / {isNew ? '新建模板' : draft.name}</>}
       actions={<><Button onClick={openYaml}>从 YAML 导入</Button>{dirty && <Button variant="ghost" onClick={() => { setDraft(base); setPendingRules(new Set()); }}>放弃修改</Button>}<Button variant="primary" disabled={!canSave || (!isNew && !dirty)} onClick={() => save.mutate(draft)}>{save.isPending ? '检查并保存中…' : dirty || isNew ? '保存' : '已保存'}</Button><ActionMenu size="md" items={[
         { label: '修改模板名称', onSelect: async () => { const result = await Frame.modal.prompt({ title: '模板名称', initialValue: draft.name, placeholder: '填写模板名称' }); if (result.status === 'confirmed') setDraft({ ...draft, name: result.data }); } },
         ...(!isNew ? [
@@ -214,22 +214,22 @@ function TemplatePage({ id, initial }: { id: string; initial?: TemplateDoc }) {
     </PageHeader>
     <PageScroll>
       <ErrorAlert error={save.error ?? rulesets.error} />
-      {(initial?.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-[length:var(--text-control)] text-warn">{note}</p>)}
+      {(initial?.migrationNotes ?? []).map((note, i) => <p key={i} role="status" className="text-sm text-warn">{note}</p>)}
       {currentValidation?.error && <FieldError error={currentValidation.error} />}
       {visibleErrors.length > 0 && <Notice tone="err" actions={firstLocation && <Button size="sm" onClick={() => locate(firstLocation)}>定位</Button>}>
         <span>{visibleErrors[0]!.message}{visibleErrors.length > 1 ? `（共 ${visibleErrors.length} 项待修复）` : ''}</span>
       </Notice>}
       {failure?.report?.length ? <Card title="保存检查"><TemplateReport items={failure.report} onLocate={locate} /></Card> : null}
       {!!failure?.impact?.length && <Card title="请先修复绑定订阅冲突">
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">{failure.impact.map(item => <li key={item.profileId} className="text-[length:var(--text-control)]">
-          <Link to={`/profiles/${item.profileId}/groups`} className="font-medium text-brand">{item.profileName}</Link>
-          <ul className="mt-1 pl-5 text-ink-2">{item.issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul>
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">{failure.impact.map(item => <li key={item.profileId} className="text-sm">
+          <Link to={`/profiles/${item.profileId}/groups`} className="font-medium text-primary">{item.profileName}</Link>
+          <ul className="mt-1 pl-5 text-foreground">{item.issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul>
         </li>)}</ul>
       </Card>}
       {savedWarnings.length > 0 && <Card title="已保存 · 注意事项"><TemplateReport items={savedWarnings} onLocate={locate} /></Card>}
       <fieldset disabled={save.isPending} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
         {isNew && <Field label="模板名称">{id => <Input id={id} placeholder="填写模板名称" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} />}</Field>}
-        {!isNew && inUse > 0 && <Notice tone="accent" actions={<Button variant="ghost" size="sm" className="h-auto p-0 text-accent-ink" disabled={checkImpact.isPending} onClick={() => checkImpact.mutate()}>{checkImpact.isPending ? '检查中…' : '检查影响'}</Button>}>保存后会同步到 {inUse} 个跟随的订阅。删除仍被订阅引用的组会被阻止。</Notice>}
+        {!isNew && inUse > 0 && <Notice tone="accent" actions={<Button variant="ghost" size="sm" className="h-auto p-0 text-primary" disabled={checkImpact.isPending} onClick={() => checkImpact.mutate()}>{checkImpact.isPending ? '检查中…' : '检查影响'}</Button>}>保存后会同步到 {inUse} 个跟随的订阅。删除仍被订阅引用的组会被阻止。</Notice>}
         <TemplateGroupsEditor value={body} onChange={updateBody} report={report} />
         <TemplateRulesEditor importedUrls={importedUrls} value={body} onChange={updateBody} ctx={ctx} report={visibleReport} onRuleValidationReady={onRuleValidationReady} />
       </fieldset>
@@ -244,7 +244,7 @@ const TemplateYamlModal = createModal<{ body: TemplateBody; ctx: ConvertCtx }, T
   return <ModalContent className="max-h-[85dvh] overflow-y-auto"><ModalHeader><ModalTitle>从 YAML 导入</ModalTitle></ModalHeader>
     <Field label="mihomo YAML" hint="导入后通过策略组和规则表单维护，保存后仍需保存模板。">{id => <YamlTextarea placeholder="粘贴包含策略组和规则的 Mihomo YAML 配置" id={id} rows={6} spellCheck={false} value={yaml} onChange={e => setYaml(e.target.value)} />}</Field>
     {!!yaml.trim() && !result.ok && <FieldError error={`第 ${result.line ?? 1} 行：${result.error}`} />}
-    {result.ok && result.notes.length > 0 && <ul className="m-0 pl-5 text-[length:var(--text-control)] text-ink-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
+    {result.ok && result.notes.length > 0 && <ul className="m-0 pl-5 text-sm text-muted-foreground">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
     <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!result.ok} onClick={() => { if (result.ok) modal.confirm(result.value); }}>应用</Button></ModalFooter>
   </ModalContent>;
 });

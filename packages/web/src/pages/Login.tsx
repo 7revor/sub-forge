@@ -34,15 +34,15 @@ export function Login() {
     <div className="flex h-dvh min-h-0 flex-col login-bg">
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto overscroll-contain px-4 py-12 sm:py-12 [&>*]:shrink-0">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-7 place-items-center rounded-lg bg-brand text-[15px] font-semibold text-white">S</span>
-          <span className="font-mono text-[length:var(--text-title)] font-semibold text-white">Sub Forge</span>
+          <span className="grid size-7 place-items-center rounded-lg bg-primary text-base font-semibold text-white">S</span>
+          <span className="font-mono text-lg font-semibold text-white">Sub Forge</span>
         </div>
-        <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-panel p-6 shadow-modal">
-          <h1 className="m-0 text-[length:var(--text-title)] font-semibold">登录</h1>
+        <form onSubmit={submit} className="flex w-full max-w-[380px] flex-col gap-4 rounded-xl bg-card p-6 shadow-lg">
+          <h1 className="m-0 text-lg font-semibold">登录</h1>
           <Field label="用户名">{(id) => <Input placeholder="输入用户名" id={id} autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />}</Field>
           <Field label="密码">{(id) => <Input placeholder="输入密码" id={id} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}</Field>
           <Button type="submit" variant="primary" disabled={busy}>{busy ? '登录中…' : '登录'}</Button>
-          <span className="text-[length:var(--text-caption)] text-center text-ink-muted">账户由管理员创建，忘记密码请联系管理员</span>
+          <span className="text-xs text-center text-muted-foreground">账户由管理员创建，忘记密码请联系管理员</span>
         </form>
       </div>
     </div>

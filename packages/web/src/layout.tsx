@@ -24,7 +24,7 @@ function Logo() {
   return (
     <div className="flex items-center gap-2.5 px-2 py-1">
       <LogoMark size={24} />
-      <span className="font-mono text-[length:var(--text-section)] font-semibold text-white">Sub Forge</span>
+      <span className="font-mono text-base font-semibold text-white">Sub Forge</span>
     </div>
   );
 }
@@ -54,7 +54,7 @@ export function AppLayout() {
     return ()=>events.close();
   },[me.data?.id,qc]);
 
-  if (me.isLoading) return <div className="p-8 text-ink-muted">加载中…</div>;
+  if (me.isLoading) return <div className="p-8 text-muted-foreground">加载中…</div>;
   if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   const isAdmin = me.data.role === 'admin';
 
@@ -67,7 +67,7 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-ground md:flex-row">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-muted md:flex-row">
       <Sidebar collapsible="none" className="app-sidebar w-full shrink-0 overflow-hidden px-3 py-3 max-md:max-h-[65dvh] md:w-[232px] md:py-5">
         <SidebarHeader className="shrink-0 flex-row items-center justify-between p-0 pb-3">
           <Logo />
@@ -81,13 +81,13 @@ export function AppLayout() {
             <nav aria-label="主导航" className="flex flex-col gap-5">
               {NAV.filter(g => !g.admin || isAdmin).map(g => (
                 <SidebarGroup key={g.id} role="group" aria-labelledby={`nav-${g.id}`} className={cx('gap-1 p-0', g.admin && 'border-t border-sidebar-border pt-4')}>
-                  <SidebarGroupLabel id={`nav-${g.id}`} className="h-5 px-2 text-[length:var(--text-caption)] font-semibold tracking-[.08em] text-nav-label">{g.title}</SidebarGroupLabel>
+                  <SidebarGroupLabel id={`nav-${g.id}`} className="h-5 px-2 text-xs font-semibold tracking-[.08em] text-nav-label">{g.title}</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu className="gap-0.5">
                       {g.items.map(it => {
                         const active = it.to === '/' || it.end ? location.pathname === it.to : location.pathname === it.to || location.pathname.startsWith(`${it.to}/`);
                         return <SidebarMenuItem key={it.to}>
-                          <SidebarMenuButton asChild isActive={active} className="h-9 gap-3 px-3 text-[length:var(--text-control)] no-underline transition-colors max-md:h-11 [&>svg]:text-nav-icon data-[active=true]:[&>svg]:text-nav-icon-active data-[active=true]:bg-nav-active data-[active=true]:font-semibold data-[active=true]:text-white">
+                          <SidebarMenuButton asChild isActive={active} className="h-9 gap-3 px-3 text-sm no-underline transition-colors max-md:h-11 [&>svg]:text-nav-icon data-[active=true]:[&>svg]:text-nav-icon-active data-[active=true]:bg-nav-active data-[active=true]:font-semibold data-[active=true]:text-white">
                             <NavLink to={it.to} end={it.to === '/' || it.end}><it.icon aria-hidden="true" /><span>{it.label}</span></NavLink>
                           </SidebarMenuButton>
                         </SidebarMenuItem>;
@@ -103,18 +103,18 @@ export function AppLayout() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location.pathname === '/account'} className="h-auto min-h-10 gap-3 px-3">
-                  <NavLink to="/account"><UserRound aria-hidden="true" className="text-nav-icon" /><span className="flex min-w-0 flex-col gap-0.5"><span className="truncate text-[length:var(--text-control)]">{me.data.username}</span><span className="text-[length:var(--text-caption)] text-faint">{isAdmin ? '管理员' : '普通用户'}</span></span></NavLink>
+                  <NavLink to="/account"><UserRound aria-hidden="true" className="text-nav-icon" /><span className="flex min-w-0 flex-col gap-0.5"><span className="truncate text-sm">{me.data.username}</span><span className="text-xs text-muted-foreground">{isAdmin ? '管理员' : '普通用户'}</span></span></NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton type="button" onClick={logout} className="h-9 gap-3 px-3 text-[length:var(--text-caption)] text-faint max-md:h-11"><LogOut aria-hidden="true" />退出登录</SidebarMenuButton>
+                <SidebarMenuButton type="button" onClick={logout} className="h-9 gap-3 px-3 text-xs text-muted-foreground max-md:h-11"><LogOut aria-hidden="true" />退出登录</SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>
         </div>
       </Sidebar>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {reconnecting && <div role="status" className="border-b border-line bg-warn-soft px-4 py-2 text-[length:var(--text-caption)] text-warn">实时连接已断开，正在重连；可刷新页面重新读取。</div>}
+        {reconnecting && <div role="status" className="border-b border-border bg-warn-soft px-4 py-2 text-xs text-warn">实时连接已断开，正在重连；可刷新页面重新读取。</div>}
         <div className="page-layout">
           <Outlet />
         </div>
@@ -125,6 +125,6 @@ export function AppLayout() {
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const me = useMe();
-  if (me.data?.role !== 'admin') return <div className="text-ink-muted">需要管理员权限。</div>;
+  if (me.data?.role !== 'admin') return <div className="text-muted-foreground">需要管理员权限。</div>;
   return <>{children}</>;
 }

@@ -43,15 +43,15 @@ export function Users() {
                 const s = st(u.id);
                 return (
                   <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
-                    <td className={cx(listTd, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-[length:var(--text-caption)] font-normal text-ink-muted">（我）</span>}</td>
+                    <td className={cx(listTd, 'font-medium whitespace-nowrap')}>{u.username}{self && <span className="ml-2 text-xs font-normal text-muted-foreground">（我）</span>}</td>
                     <td className={listTd}>
                       {self ? <span>管理员</span> : <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} className="h-8 w-28 data-[size=default]:h-8" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
                         <option value="user">用户</option><option value="admin">管理员</option>
                       </Select>}
                     </td>
-                    <td className={listTd}>{u.role === 'admin' ? <span className="text-[length:var(--text-control)] text-ink-muted">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
+                    <td className={listTd}>{u.role === 'admin' ? <span className="text-sm text-muted-foreground">管理员默认可写</span> : <Switch label={`${u.username} 的脚本编写权限`} checked={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</td>
                     <td className={cx(listTd, listMono)}>{s?.profiles ?? '—'}</td>
-                    <td className={cx(listTd, 'whitespace-nowrap text-ink-2')}>{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</td>
+                    <td className={cx(listTd, 'whitespace-nowrap text-foreground')}>{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</td>
 
                     <td className={listTd}><Badge tone={u.disabled ? 'neutral' : 'ok'}>{u.disabled ? '已禁用' : '正常'}</Badge></td>
                     <td className={listTd}>
@@ -71,9 +71,9 @@ export function Users() {
           actions={<Button disabled={!!shares.data?.pending} onClick={async () => { const result = await ShareModal.show({ sources: sources.data ?? [], collections: collections.data ?? [], users: list.filter(u => u.id !== me?.id) }); if (result.status === 'confirmed') { notifySuccess('共享已添加'); void qc.invalidateQueries({ queryKey: ['shares'] }); } }}>共享…</Button>}>
           <div className="flex flex-col">
             {(shares.data?.items ?? []).map((x) => (
-              <div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-line-2 py-2.5 first:border-0">
-                <span className="text-[length:var(--text-control)] font-medium">{x.name}</span><Badge>{x.kind === 'source' ? '订阅源' : '组合'}</Badge>
-                <span className="text-[length:var(--text-control)] text-ink-muted">共享给：{x.to.map(nameOf).join('、') || '—'}</span>
+              <div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-border py-2.5 first:border-0">
+                <span className="text-sm font-medium">{x.name}</span><Badge>{x.kind === 'source' ? '订阅源' : '组合'}</Badge>
+                <span className="text-sm text-muted-foreground">共享给：{x.to.map(nameOf).join('、') || '—'}</span>
               </div>
             ))}
             {!shares.data?.items.length && <Empty title={shares.data?.pending ? '共享功能暂未开放' : '还没有共享'} />}
@@ -94,7 +94,7 @@ const CreateUserModal = createModal<Record<string, never>>(function CreateUser({
           <Field label="角色">{id => <div id={id}><Segmented label="用户角色" value={form.role} options={[{ value: 'user', label: '普通用户' }, { value: 'admin', label: '管理员' }]} onChange={role => setForm({ ...form, role })} /></div>}</Field>
           <Field label="初始密码" className="col-span-2">{(id) => <Input placeholder="设置至少 8 位的初始密码" id={id} type="password" autoComplete="new-password" className="font-mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />}</Field>
         </div>
-        {form.role !== 'admin' && <label className="flex items-center gap-2 text-[length:var(--text-control)]"><Switch label="允许编写脚本处理器" checked={form.scriptAllowed} onChange={scriptAllowed => setForm({ ...form, scriptAllowed })} />允许编写脚本处理器</label>}
+        {form.role !== 'admin' && <label className="flex items-center gap-2 text-sm"><Switch label="允许编写脚本处理器" checked={form.scriptAllowed} onChange={scriptAllowed => setForm({ ...form, scriptAllowed })} />允许编写脚本处理器</label>}
 
       </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={modal.pending} onClick={() => modal.submit(async () => { const { user } = await api<{ user: User }>('POST', '/users', form); if (form.scriptAllowed && form.role !== 'admin') await api('PATCH', `/users/${user.id}`, { scriptAllowed: true }); })}>{modal.pending ? '创建中…' : '创建'}</Button></>}</ModalFooter></ModalContent>;
 });
@@ -108,7 +108,7 @@ const ShareModal = createModal<{ sources: { id: string; name: string }[]; collec
         </Select>}</Field>
         <Field label="共享给">{id => <MultiSelect id={id} placeholder="选择共享用户（可多选）" value={share.to} onChange={to => setShare({ ...share, to })}>{users.map(user => <option key={user.id} value={user.id}>{user.username}</option>)}</MultiSelect>}</Field>
 
-        <span className="text-[length:var(--text-caption)] text-ink-muted">仅可引用，无法查看原始 URL 或修改处理链。</span>
+        <span className="text-xs text-muted-foreground">仅可引用，无法查看原始 URL 或修改处理链。</span>
 
       </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!share.doc || !share.to.length || modal.pending} onClick={() => modal.submit(async () => { const [kind, id] = share.doc.split(':'); await api('POST', '/shares', { kind, id, to: share.to }); })}>共享</Button></>}</ModalFooter></ModalContent>;
 });

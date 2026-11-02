@@ -36,7 +36,7 @@ export function SourceList() {
         columns={[
           { header: '名称', width: 160, cell: (s) => s.name },
           { header: '备注', width: 168, cell: (s) => <NoteCell note={s.note} /> },
-          { header: '地址', width: 200, cell: (s) => <span className="block max-w-[260px] truncate font-mono text-[length:var(--text-control)] text-ink-2">{s.url}</span> },
+          { header: '地址', width: 200, cell: (s) => <span className="block max-w-[260px] truncate font-mono text-sm text-foreground">{s.url}</span> },
           { header: '节点', width: 68, cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
         ]} />
     </>
@@ -71,7 +71,7 @@ function BasicSettings({ draft, set }: {
         }</Field>
       <NoteField compact value={draft.note} onChange={(note) => set({ note })} />
       </div>
-      <p className="m-0 text-[length:var(--text-caption)] text-ink-muted">到期自动重新拉取（管理员在「系统」中统一设置）；失败时继续使用上次成功的内容。</p>
+      <p className="m-0 text-xs text-muted-foreground">到期自动重新拉取（管理员在「系统」中统一设置）；失败时继续使用上次成功的内容。</p>
     </Card>
   );
 }
@@ -110,7 +110,7 @@ export function SourceEdit() {
   }, [justCreated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (id === 'new') return <Navigate to="/sources" replace state={{ create: true }} />;
-  if (!draft) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-ink-muted">加载中…</div>;
+  if (!draft) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-muted-foreground">加载中…</div>;
   const set = (patch: Partial<SourceDoc>) => setDraft({ ...draft, ...patch });
   const dirty = JSON.stringify(draft) !== JSON.stringify(doc.data);
   const submit = () => {
@@ -127,7 +127,7 @@ export function SourceEdit() {
 
   return (
     <>
-      <PageHeader crumbs={<><Link to="/sources" className="text-ink-muted no-underline">订阅源</Link> / {doc.data?.name}</>}
+      <PageHeader crumbs={<><Link to="/sources" className="text-muted-foreground no-underline">订阅源</Link> / {doc.data?.name}</>}
         title={draft.name || '未命名'}
         actions={<>
           <ResourceLinkButton kind="sources" id={draft.id} name={draft.name} disabled={dirty} />
@@ -147,7 +147,7 @@ export function SourceEdit() {
 
       <PageScroll className="source-detail-content">
         {preview.data?.report.filter((r) => r.level === 'error' || (r.level === 'warn' && r.code !== 'source.fetch-failed')).map((r, i) => (
-          <Notice key={i} tone={r.level === 'error' ? 'err' : 'warn'} actions={r.level === 'error' && <Button size="sm" variant="ghost" className="text-err" disabled={busy || !ready} onClick={saveAndRefresh}>重试</Button>}>{r.message}</Notice>
+          <Notice key={i} tone={r.level === 'error' ? 'err' : 'warn'} actions={r.level === 'error' && <Button size="sm" variant="ghost" className="text-destructive" disabled={busy || !ready} onClick={saveAndRefresh}>重试</Button>}>{r.message}</Notice>
         ))}
         <BasicSettings draft={draft} set={set} />
         <PipelineEditor steps={draft.pipeline} onChange={(pipeline) => set({ pipeline })} {...(preview.data ? { preview: preview.data } : {})}

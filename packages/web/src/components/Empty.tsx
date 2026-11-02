@@ -8,12 +8,12 @@ export function Empty({ title, description, action, children, className, size = 
 }) {
   return <div className={cx(
     'flex min-w-0 shrink-0 flex-col items-center gap-2 text-center [overflow-wrap:anywhere]',
-    variant === 'panel' && 'rounded-xl border border-dashed border-control-line bg-panel',
+    variant === 'panel' && 'rounded-xl border border-dashed border-input bg-card',
     size === 'compact' ? 'p-3' : variant === 'panel' ? 'px-7 py-10' : 'px-4 py-4', className,
   )}>
-    {title && <div className={cx('max-w-full font-normal leading-relaxed text-ink-muted', size === 'compact' ? 'text-[length:var(--text-control)]' : 'text-[length:var(--text-body)]')}>{title}</div>}
-    {description && <div className="max-w-[420px] text-[length:var(--text-control)] leading-relaxed text-ink-muted">{description}</div>}
-    {children && <div className="max-w-full text-[length:var(--text-control)] leading-relaxed text-ink-muted">{children}</div>}
+    {title && <div className={cx('max-w-full font-normal leading-relaxed text-muted-foreground', size === 'compact' ? 'text-sm' : 'text-sm')}>{title}</div>}
+    {description && <div className="max-w-[420px] text-sm leading-relaxed text-muted-foreground">{description}</div>}
+    {children && <div className="max-w-full text-sm leading-relaxed text-muted-foreground">{children}</div>}
     {action && <div className="mt-2 flex max-w-full flex-wrap justify-center gap-2">{action}</div>}
   </div>;
 }

@@ -33,6 +33,6 @@ export function RuleTargetSelect({ value, onChange, groups, nodeSets, label = '�
     {value.kind === 'node' && <PopoverTrigger asChild><Button size="sm" variant="ghost" className="shrink-0 px-1.5" aria-label={`配置${label}节点`}><Settings2 size={14} /></Button></PopoverTrigger>}
   </div></PopoverAnchor><PopoverContent align="end" className="w-[min(420px,calc(100vw-2rem))] p-4">
     {draft && <NodePicker label={label} value={draft.ref} onChange={ref => setDraft({ ...draft, ref })} nodeSets={nodeSets} />}
-    <div className="mt-4 flex justify-end gap-2 border-t border-line-2 pt-3"><Button onClick={() => setOpen(false)}>取消</Button><Button variant="primary" disabled={!draft?.ref.nodeSet.id || !('exact' in draft.ref.match ? draft.ref.match.exact : draft.ref.match.regex).trim()} onClick={() => { if (draft) { onChange(structuredClone(draft)); setOpen(false); } }}>确定</Button></div>
+    <div className="mt-4 flex justify-end gap-2 border-t border-border pt-3"><Button onClick={() => setOpen(false)}>取消</Button><Button variant="primary" disabled={!draft?.ref.nodeSet.id || !('exact' in draft.ref.match ? draft.ref.match.exact : draft.ref.match.regex).trim()} onClick={() => { if (draft) { onChange(structuredClone(draft)); setOpen(false); } }}>确定</Button></div>
   </PopoverContent></Popover>;
 }

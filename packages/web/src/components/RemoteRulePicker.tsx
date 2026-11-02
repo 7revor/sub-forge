@@ -12,7 +12,7 @@ export const RemoteRuleDialog = createModal<{ value?: string }, RuleSetMatcher>(
   try { matcher = remoteRuleMatcher(url); } catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
   return <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"远程链接"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-4">
     <Field label="规则地址">{id => <RemoteRuleInput id={id} value={url} onChange={setUrl} />}</Field>
-    <p className="m-0 text-[length:var(--text-caption)] text-ink-muted">自动识别远程规则格式，确认后引用此地址。</p>
+    <p className="m-0 text-xs text-muted-foreground">自动识别远程规则格式，确认后引用此地址。</p>
     {url && error && <FieldError error={error} />}
   </div><ModalFooter>{<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!matcher} onClick={() => { if (matcher) { onSelect(matcher); } }}>使用此地址</Button></>}</ModalFooter></ModalContent>;
 });

@@ -29,21 +29,21 @@ export function RulesetOverrides({ value, legacySources, onChange, onRemoveLegac
   onRemoveLegacy: (id: string) => void;
 }) {
   const update = (index: number, item: ContentOverride) => onChange(value.map((entry, i) => i === index ? item : entry));
-  return <Card title="内核改写" subtitle="某个内核不支持的规则，替换成等价写法或跳过" bodyClass={value.length ? 'px-4 pb-1' : 'border-t border-line-2 px-5 py-4'} actions={<Button size="sm" className="gap-1" onClick={() => onChange([...value, { match: '', override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
-    {legacySources.filter((s) => s.overrides?.length).map((s) => <div key={s.id} className="mb-4 rounded-lg border border-line p-3 text-[length:var(--text-control)]">
+  return <Card title="内核改写" subtitle="某个内核不支持的规则，替换成等价写法或跳过" bodyClass={value.length ? 'px-4 pb-1' : 'border-t border-border px-5 py-4'} actions={<Button size="sm" className="gap-1" onClick={() => onChange([...value, { match: '', override: newClientOverride() }])}><Plus size={15} />添加改写</Button>}>
+    {legacySources.filter((s) => s.overrides?.length).map((s) => <div key={s.id} className="mb-4 rounded-lg border border-border p-3 text-sm">
       <p className="mt-0">来源「{s.name || s.url || '本地规则'}」有 {s.overrides!.length} 条旧改写尚无法转换为内容匹配，仍按原配置生效。请补充规则内容或拉取远程内容后保存，或添加组级改写后移除旧配置。</p>
       <ul className="pl-5">{s.overrides!.map((o, i) => <li key={i} className="break-all">{o.match ? `内容 ${o.match}` : `原第 ${o.line} 行`} · {o.override.when.client} · {'drop' in o.override.action ? '丢弃' : 'append' in o.override.action ? `追加 ${o.override.action.append.map(formatRuleLine).join('；')}` : `替换为 ${o.override.action.replace.map(formatRuleLine).join('；')}`}</li>)}</ul>
       <Button size="sm" onClick={() => onRemoveLegacy(s.id)}>移除该来源的旧改写</Button>
     </div>)}
-    {!value.length ? <p className="m-0 py-0.5 text-center text-[length:var(--text-caption)] text-ink-muted">暂无改写，所有内核输出相同规则。</p> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => (
-      <div role="group" aria-label={`内核改写 ${i + 1}`} className="min-w-0 border-t border-line-2 py-3">
+    {!value.length ? <p className="m-0 py-0.5 text-center text-xs text-muted-foreground">暂无改写，所有内核输出相同规则。</p> : <SortableList items={value} onReorder={onChange} renderItem={(item, i, handle) => (
+      <div role="group" aria-label={`内核改写 ${i + 1}`} className="min-w-0 border-t border-border py-3">
         <ClientOverrides single allowAppend value={[item.override]} leading={handle}
           trailing={<Button size="sm" variant="ghost" aria-label={`删除内核改写 ${i + 1}`} onClick={() => onChange(value.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>}
           onChange={(overrides) => {
             const override = overrides[0]!;
             update(i, 'append' in override.action ? { override } : { ...item, match: item.match ?? '', override });
           }} matchInput={!('append' in item.override.action) && <Field label="规则内容精确匹配">{(id) => <Input id={id} className="font-mono" placeholder="完整规则，不含出口，如 DOMAIN,example.com" value={item.match ?? ''} onChange={(e) => update(i, { ...item, match: e.target.value })} />}</Field>} />
-        {contentOverrideError(item) && <p role="alert" className="m-0 mt-3 text-[length:var(--text-caption)] text-err">{contentOverrideError(item)}</p>}
+        {contentOverrideError(item) && <p role="alert" className="m-0 mt-3 text-xs text-destructive">{contentOverrideError(item)}</p>}
       </div>
     )} />}
   </Card>;

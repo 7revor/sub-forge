@@ -93,18 +93,18 @@ function LegacyGroups() {
   const templateMembers = g?.origin === 'template' && <ul className="m-0 list-none p-0">
     {g.members.map((m, i) => {
       const l = memberLabel(m, groupName, nodeSetName);
-      return <li key={i} className="flex items-center gap-2.5 border-b border-line-2 px-3.5 py-2.5"><Badge>{l.kind}</Badge><span className="text-[length:var(--text-control)]">{l.text}</span><span className="ml-auto flex items-center gap-1 text-[length:var(--text-caption)] text-ink-muted"><Lock size={12} />来自模板</span></li>;
+      return <li key={i} className="flex items-center gap-2.5 border-b border-border px-3.5 py-2.5"><Badge>{l.kind}</Badge><span className="text-sm">{l.text}</span><span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground"><Lock size={12} />来自模板</span></li>;
     })}
   </ul>;
 
   return (
     <>
       {orphans.length > 0 && (
-        <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, groupPatches: Object.fromEntries(Object.entries(o.groupPatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[length:var(--text-control)]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除这些组（{orphans.join('、')}），对它们的填充已失效。</span></Notice>
+        <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, groupPatches: Object.fromEntries(Object.entries(o.groupPatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-sm"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除这些组（{orphans.join('、')}），对它们的填充已失效。</span></Notice>
       )}
       <div className="flex flex-wrap items-start gap-5">
         <Card title="策略组" className="min-w-0 flex-[1_1_300px]" bodyClass="px-4 pb-2">
-          {templateIds.length > 0 && <p className="mt-0 text-[length:var(--text-caption)] text-ink-muted">模板结构只读，可在组内添加节点或引用。</p>}
+          {templateIds.length > 0 && <p className="mt-0 text-xs text-muted-foreground">模板结构只读，可在组内添加节点或引用。</p>}
           <div className="-mx-4"><SortableList items={groups} getKey={(x) => x.id} isLocked={(x) => x.origin === 'template'}
             canDrop={(_from, to) => !templateIds.length || to > 0}
             onReorder={(ordered) => patchOverlay((o) => ({ ...o, extraGroups: reorderExtraGroups(templateIds, ordered.map((x) => x.id), o.extraGroups ?? []) }))}
@@ -112,25 +112,25 @@ function LegacyGroups() {
               const n = totalMembers(x);
               const current = x.origin === 'template' ? { ...x, ...draft.overlay.groupPatches?.[x.id]?.set } : x;
               return (
-                <div className={cx('flex items-center gap-1 border-t border-line-2 px-2', x.id === g?.id ? 'bg-accent-soft' : 'bg-panel hover:bg-ground')}>
+                <div className={cx('flex items-center gap-1 border-t border-border px-2', x.id === g?.id ? 'bg-primary/10' : 'bg-card hover:bg-accent')}>
                   {handle}
                   <button type="button" onClick={() => setSelectedId(x.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-2.5 text-left">
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-[length:var(--text-control)] font-medium">{x.name}</span>
-                      <span className="text-[length:var(--text-caption)] text-ink-muted">{current.type.toUpperCase()} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
+                      <span className="text-sm font-medium">{x.name}</span>
+                      <span className="text-xs text-muted-foreground">{current.type.toUpperCase()} · {x.origin === 'template' ? '模板组' : '私有组'}</span>
                     </span>
-                    {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-[length:var(--text-caption)] text-ink-2">{n} 成员</span>}
+                    {n === 0 ? <Badge tone="warn">空 · REJECT</Badge> : <span className="font-mono text-xs text-foreground">{n} 成员</span>}
                   </button>
                   <div className="flex shrink-0 flex-col items-center gap-1 px-2 py-2">
-                    <span className="text-[length:var(--text-caption)] text-ink-muted">隐藏</span>
-                    {x.origin === 'template' || bound ? <span className="text-[length:var(--text-caption)] text-ink-muted" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
+                    <span className="text-xs text-muted-foreground">隐藏</span>
+                    {x.origin === 'template' || bound ? <span className="text-xs text-muted-foreground" title="模板设定，只读">{current.display?.hidden ? '开' : '关'}</span> : <Switch label={`隐藏策略组「${x.name || '未命名组'}」`} checked={current.display?.hidden ?? false}
                       onChange={hidden => patchOverlay(o => ({ ...o, extraGroups: (o.extraGroups ?? []).map(item => item.group.id === x.id ? { ...item, group: { ...item.group, display: { ...item.group.display, hidden } } } : item) }))} />}
                   </div>
                 </div>
               );
             }} /></div>
           {!groups.length && <Empty title="没有组" />}
-          {!bound && <div className="-mx-4 mt-4 flex flex-col gap-2 border-t border-line-2 px-4 pt-2.5">
+          {!bound && <div className="-mx-4 mt-4 flex flex-col gap-2 border-t border-border px-4 pt-2.5">
             <NodeSetSelect label="地区节点来源" value={regionNodeSet?.ref} options={profileNodeSets} onChange={setRegionSource} placeholder="先在「节点集」中加入" />
             <Button onClick={addRegions}><Plus size={15} />添加地区节点</Button>
             <Button className="w-full border-dashed" onClick={addPrivate}><Plus size={15} />新增私有组</Button>
@@ -141,7 +141,7 @@ function LegacyGroups() {
           <Card className="min-w-0 flex-[999_1_560px]"
             title={<div className="flex flex-col gap-1">
               <h2 className="m-0 text-lg font-semibold">{g.origin === 'template' ? g.name : <Input placeholder="填写策略组在配置中的名称" aria-label="组名" value={g.name} onChange={(e) => patchOverlay((o) => ({ ...o, extraGroups: (o.extraGroups ?? []).map((x) => (x.group.id === g.id ? { ...x, group: { ...x.group, name: e.target.value } } : x)) }))} />}</h2>
-              <span className="text-[length:var(--text-control)] text-ink-muted">{g.origin === 'template' ? '模板组' : '私有组'}</span>
+              <span className="text-sm text-muted-foreground">{g.origin === 'template' ? '模板组' : '私有组'}</span>
             </div>}
             actions={g.origin === 'template' ? (g.hint ? <Badge>模板提示：{g.hint}</Badge> : undefined) : <Button variant="danger" size="sm" onClick={removePrivate}><Trash2 size={14} />删除组</Button>}>
             <div className="flex flex-col gap-5">
@@ -150,16 +150,16 @@ function LegacyGroups() {
               </div>
 
               <div className="flex flex-col gap-2.5">
-                <span className="text-[length:var(--text-body)] font-semibold">成员</span>
+                <span className="text-sm font-semibold">成员</span>
                 {!bound && g.origin === 'template' && <Segmented label="追加成员位置" value={patch.memberOrder ?? 'append'}
                   options={[{ value: 'prepend', label: '追加成员放在模板成员之前' }, { value: 'append', label: '追加成员放在模板成员之后' }]}
                   onChange={(memberOrder) => patchOverlay((o) => ({ ...o, groupPatches: { ...o.groupPatches, [g.id]: { ...o.groupPatches?.[g.id], memberOrder } } }))} />}
-                <div className="flex flex-col overflow-hidden rounded-lg border border-line">
+                <div className="flex flex-col overflow-hidden rounded-lg border border-border">
                   {patch.memberOrder !== 'prepend' && templateMembers}
                   <SortableList key={g.id} items={added} onReorder={setMembers} renderItem={(m, i, handle) => {
                     const l = memberLabel(m, groupName, nodeSetName);
-                    return <div className="flex items-center gap-2.5 border-b border-line-2 px-3.5 py-2.5">
-                      {handle}<Badge tone="accent">{l.kind}</Badge><span className="text-[length:var(--text-control)] font-medium">{l.text}</span>
+                    return <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-2.5">
+                      {handle}<Badge tone="accent">{l.kind}</Badge><span className="text-sm font-medium">{l.text}</span>
                       <Button size="sm" variant="ghost" className="ml-auto" aria-label={`移除 ${l.text}`} onClick={() => setMembers(added.filter((_, j) => j !== i))}><Trash2 size={14} /></Button>
                     </div>;
                   }} />
@@ -178,7 +178,7 @@ function LegacyGroups() {
                 {previewNodeSets.length > 1 && <Select placeholder="选择用于预览筛选结果的节点集" aria-label="预览节点集" value={previewNodeSet?.[0] ?? ''} onChange={(e) => setPreviewSelection({ groupId: g.id, key: e.target.value })}>
                   {previewNodeSets.map(([key, ref]) => <option key={key} value={key}>{nodeSetName(ref)}</option>)}
                 </Select>}
-                {previewNodeSet ? <><span className="text-[length:var(--text-caption)] text-ink-muted">节点集：{nodeSetName(previewNodeSet[1])}</span><MatchPreview nodeSet={previewNodeSet[1]} filter={eff.filter} excludeFilter={eff.excludeFilter} excludeType={eff.excludeType} /></> : <span className="text-[length:var(--text-caption)] text-ink-muted">组里没有节点集成员，filter 不生效</span>}
+                {previewNodeSet ? <><span className="text-xs text-muted-foreground">节点集：{nodeSetName(previewNodeSet[1])}</span><MatchPreview nodeSet={previewNodeSet[1]} filter={eff.filter} excludeFilter={eff.excludeFilter} excludeType={eff.excludeType} /></> : <span className="text-xs text-muted-foreground">组里没有节点集成员，filter 不生效</span>}
               </div>
 
               <fieldset disabled={bound} className="m-0 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 border-0 p-0">

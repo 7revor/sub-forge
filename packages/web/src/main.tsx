@@ -66,7 +66,7 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="system" element={<RequireAdmin><System /></RequireAdmin>} />
       <Route path="users" element={<RequireAdmin><Users /></RequireAdmin>} />
       <Route path="account" element={<Account />} />
-      <Route path="*" element={<div className="text-ink-muted">页面不存在</div>} />
+      <Route path="*" element={<div className="text-muted-foreground">页面不存在</div>} />
     </Route>
   </Route>
 ));

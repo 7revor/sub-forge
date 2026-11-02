@@ -29,16 +29,16 @@ export function RuleCard({ handle, icon, children, count, hint, target, readOnly
       {target && <div className={targetClass}>{target}</div>}
     </div>
     {!readOnly && <div className="col-start-3 row-start-1 ml-auto w-16 shrink-0"><RoutingCardActions label={label} onEdit={onEdit} onDelete={onDelete} /></div>}
-    {readOnly && <span className="col-start-3 row-start-1 w-16 shrink-0 text-right text-[length:var(--text-caption)] text-ink-muted" aria-label="来自模板"><LockKeyhole size={14} className="ml-auto" /></span>}
+    {readOnly && <span className="col-start-3 row-start-1 w-16 shrink-0 text-right text-xs text-muted-foreground" aria-label="来自模板"><LockKeyhole size={14} className="ml-auto" /></span>}
   </RoutingCard>;
 }
 
 /** MATCH 固定在排序列表之后，共用规则卡片尺寸，仅允许修改出口。 */
 export function RuleFinalCard({ target, targetId, readOnly }: { target: ReactNode; targetId: string; readOnly?: boolean }) {
   return <RoutingCard className={layoutClass}>
-    <span role="img" aria-label="MATCH 固定在末尾" title="固定在末尾" className="grid h-8 w-5 shrink-0 place-items-center text-faint"><LockKeyhole size={16} /></span>
-    <div className={contentClass}><RoutingCardIcon><CornerDownRight size={16} /></RoutingCardIcon><span className="font-medium">其余流量 <span className="ml-2 font-mono text-[length:var(--text-caption)] text-ink-muted">MATCH</span></span></div>
+    <span role="img" aria-label="MATCH 固定在末尾" title="固定在末尾" className="grid h-8 w-5 shrink-0 place-items-center text-muted-foreground"><LockKeyhole size={16} /></span>
+    <div className={contentClass}><RoutingCardIcon><CornerDownRight size={16} /></RoutingCardIcon><span className="font-medium">其余流量 <span className="ml-2 font-mono text-xs text-muted-foreground">MATCH</span></span></div>
     <div className="col-span-2 col-start-2 row-start-2 flex min-w-0 justify-end sm:contents"><div id={targetId} className={targetClass}>{target}</div></div>
-    {readOnly ? <span className="col-start-3 row-start-1 w-16 shrink-0 text-right text-[length:var(--text-caption)] text-ink-muted" aria-label="来自模板"><LockKeyhole size={14} className="ml-auto" /></span> : <span className="col-start-3 row-start-1 w-16 shrink-0" aria-hidden />}
+    {readOnly ? <span className="col-start-3 row-start-1 w-16 shrink-0 text-right text-xs text-muted-foreground" aria-label="来自模板"><LockKeyhole size={14} className="ml-auto" /></span> : <span className="col-start-3 row-start-1 w-16 shrink-0" aria-hidden />}
   </RoutingCard>;
 }

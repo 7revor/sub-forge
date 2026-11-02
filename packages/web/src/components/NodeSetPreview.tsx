@@ -1,4 +1,3 @@
-import { Check } from 'lucide-react';
 import { useState } from 'react';
 import type { NodeRef, NodeSetID } from '@sub-forge/core';
 import { useQueries } from '@tanstack/react-query';
@@ -6,6 +5,7 @@ import { nodeListOptions } from '../hooks.ts';
 import { useModalPresentation } from '../modals/index.tsx';
 import { filterNodes, resolveRef } from './nodeMatch.ts';
 import { Button, Empty } from './ui.tsx';
+import { SelectIndicator } from './SelectIndicator.tsx';
 
 /** 预览与最终输出共用正则语义；留空包含全部节点，点选只缩小当前草稿范围。 */
 export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label = '节点', firstMatch = false, selection, multiple = false, search, onSelect }: {
@@ -41,30 +41,30 @@ export function NodeSetPreview({ nodeSet, nodeSets, filter, excludeFilter, label
   const key = JSON.stringify([sources.map(source => source.ref), filter, excludeFilter]);
   const size = page.key === key ? page.size : 100;
   if (!sources.length) return <Empty variant="plain" title="当前类型没有节点来源" />;
-  return <div className="flex min-w-0 flex-col gap-2 text-[length:var(--text-caption)]" aria-label={`${label}预览`}>
-    {query.isLoading && <p className="m-0 text-ink-muted">正在加载节点…</p>}
-    {query.error && <div role="alert" className="text-err">节点加载失败：{query.error.message}<Button size="sm" variant="ghost" onClick={() => void query.refetch()}>重新加载</Button></div>}
-    {validation.error && <p role="alert" className="m-0 text-err">{validation.error}</p>}
-    {displayed.error && <p role="alert" className="m-0 text-err">{displayed.error}</p>}
-    {selectionError && <p role="alert" className="m-0 text-err">{selectionError}</p>}
-    {query.data?.report.map((item, i) => <p key={i} className={`m-0 ${item.level === 'error' ? 'text-err' : 'text-ink-muted'}`}>{item.message}</p>)}
+  return <div className="flex min-w-0 flex-col gap-2 text-xs" aria-label={`${label}预览`}>
+    {query.isLoading && <p className="m-0 text-muted-foreground">正在加载节点…</p>}
+    {query.error && <div role="alert" className="text-destructive">节点加载失败：{query.error.message}<Button size="sm" variant="ghost" onClick={() => void query.refetch()}>重新加载</Button></div>}
+    {validation.error && <p role="alert" className="m-0 text-destructive">{validation.error}</p>}
+    {displayed.error && <p role="alert" className="m-0 text-destructive">{displayed.error}</p>}
+    {selectionError && <p role="alert" className="m-0 text-destructive">{selectionError}</p>}
+    {query.data?.report.map((item, i) => <p key={i} className={`m-0 ${item.level === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{item.message}</p>)}
     {query.data && !query.error && !validation.error && <>
-      <p aria-live="polite" className="m-0 text-ink-muted">{multiple ? `已选 ${selectedNodes.size} / ${query.data.total}` : `${filter || excludeFilter ? '筛选' : '全部'} ${query.data.total} / ${query.data.unfilteredTotal ?? query.data.total}`} 个节点{search && ` · 筛选 ${displayedNodes.length} 个`}</p>
+      <p aria-live="polite" className="m-0 text-muted-foreground">{multiple ? `已选 ${selectedNodes.size} / ${query.data.total}` : `${filter || excludeFilter ? '筛选' : '全部'} ${query.data.total} / ${query.data.unfilteredTotal ?? query.data.total}`} 个节点{search && ` · 筛选 ${displayedNodes.length} 个`}</p>
       <div className="max-h-[280px] overflow-y-auto" aria-label={`${label}列表`}>
         {displayedNodes.slice(0, size).map((node, i) => {
           const active = selection ? selectedNodes.has(node) : firstMatch && i === 0;
           // 自动采用首个节点时只标注「当前采用」，选择框仍留给用户的明确点选。
           const marked = !!selection && active;
           const content = <>
-            {onSelect && <span className={`flex size-3.5 shrink-0 items-center justify-center border ${multiple ? 'rounded-[2px]' : 'rounded-full'} ${marked ? multiple ? 'border-brand bg-brand text-white' : 'border-[4px] border-brand' : 'border-control-line'}`}>{multiple && marked && <Check size={11} />}</span>}
-            <span className="min-w-0 flex-1 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-[length:var(--text-caption)] text-ink-muted">{node.sourceName}</span>}</span>
-            <span className="flex shrink-0 items-center gap-2 text-[length:var(--text-caption)] text-ink-muted">
+            {onSelect && <SelectIndicator checked={marked} multiple={multiple} />}
+            <span className="min-w-0 flex-1 break-all">{node.name}{sources.length > 1 && <span className="ml-2 text-xs text-muted-foreground">{node.sourceName}</span>}</span>
+            <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               {active && <span>{firstMatch ? '当前采用' : '已选'}</span>}
               <span>{node.type.toUpperCase()}</span>
             </span>
           </>;
-          const className = 'flex w-full items-center justify-between gap-2.5 rounded-md px-2 py-2.5 text-left text-[length:var(--text-control)] last:border-0';
-          return onSelect ? <button key={`${i}:${node.name}`} type="button" role={multiple ? 'checkbox' : undefined} aria-checked={multiple ? active : undefined} aria-pressed={!multiple && selection ? active : undefined} disabled={multiple && query.data?.truncated} className={`${className} cursor-pointer hover:bg-ground focus-visible:bg-ground ${selection && active ? 'bg-selected' : ''}`} title={`${multiple ? active ? '取消选择' : '选择' : '仅使用'} ${node.name}`} onClick={() => onSelect(node.name, node.nodeSet, nodes.filter(item => item.name === node.name ? !active : selectedNodes.has(item)).map(item => item.name))}>{content}</button> : <div key={`${i}:${node.name}`} className={className}>{content}</div>;
+          const className = 'flex w-full items-center justify-between gap-2.5 rounded-md px-2 py-2.5 text-left text-sm last:border-0';
+          return onSelect ? <button key={`${i}:${node.name}`} type="button" role={multiple ? 'checkbox' : undefined} aria-checked={multiple ? active : undefined} aria-pressed={!multiple && selection ? active : undefined} disabled={multiple && query.data?.truncated} className={`${className} cursor-pointer hover:bg-accent focus-visible:bg-accent ${selection && active ? 'bg-primary/5' : ''}`} title={`${multiple ? active ? '取消选择' : '选择' : '仅使用'} ${node.name}`} onClick={() => onSelect(node.name, node.nodeSet, nodes.filter(item => item.name === node.name ? !active : selectedNodes.has(item)).map(item => item.name))}>{content}</button> : <div key={`${i}:${node.name}`} className={className}>{content}</div>;
         })}
         {!displayedNodes.length && <Empty variant="plain" title="没有匹配节点" />}
         {size < displayedNodes.length && <Button variant="ghost" className="w-full" onClick={() => setPage({ key, size: size + 100 })}>显示更多（剩余 {displayedNodes.length - size} 个）</Button>}

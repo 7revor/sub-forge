@@ -11,8 +11,8 @@ describe('cx', () => {
   });
 
   it('语义字号覆盖原字号且保留文字颜色', () => {
-    expect(cx('text-sm text-ink', 'text-[length:var(--text-control)]')).toBe('text-[length:var(--text-control)] text-ink');
-    expect(cx('md:text-[length:var(--text-body)]', 'md:text-[length:var(--text-caption)]')).toBe('md:text-[length:var(--text-caption)]');
+    expect(cx('text-sm text-foreground', 'text-sm')).toBe('text-sm text-foreground');
+    expect(cx('md:text-sm', 'md:text-xs')).toBe('md:text-xs');
   });
 
   it('不同断点各自比较，并丢弃假值', () => {

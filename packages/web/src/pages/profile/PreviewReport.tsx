@@ -5,22 +5,22 @@ import { cx } from '../../components/cx.ts';
 import { previewIssueMessage } from './previewReport.ts';
 
 const LEVEL = {
-  error: { label: '错误', icon: CircleAlert, className: 'text-err' },
+  error: { label: '错误', icon: CircleAlert, className: 'text-destructive' },
   warn: { label: '告警', icon: TriangleAlert, className: 'text-warn' },
-  info: { label: '提示', icon: Info, className: 'text-accent-ink' },
+  info: { label: '提示', icon: Info, className: 'text-primary' },
 };
 
 export function PreviewReport({ items, locations, selected, onLocate }: {
   items: ReportItem[]; locations: (CodeRange | undefined)[]; selected?: number; onLocate: (index: number) => void;
 }) {
-  if (!items.length) return <p className="m-0 text-[length:var(--text-control)] text-ok">没有问题</p>;
+  if (!items.length) return <p className="m-0 text-sm text-ok">没有问题</p>;
   return <ul className="m-0 list-none p-0">{items.map((item, i) => {
     const level = LEVEL[item.level], Icon = level.icon, location = locations[i];
     const message = previewIssueMessage(item);
     const description = `${level.label}：${item.message}${location ? `；点击定位第 ${location.startLine} 行` : ''}`;
-    const className = cx('flex min-h-9 w-full min-w-0 items-start gap-2.5 px-5 py-3 text-left text-[length:var(--text-control)]', location && 'cursor-pointer hover:bg-accent-soft focus-visible:outline-brand', selected === i && 'bg-accent-soft');
-    const content = <><Icon size={14} aria-hidden className={cx('mt-1 shrink-0', level.className)} /><span className="min-w-0 flex-1 break-words">{message}{location && <span className="mt-1 block text-[length:var(--text-caption)] text-ink-muted">{item.where?.startsWith('group:') ? '策略组' : item.where?.startsWith('rule:') ? '规则' : '配置'} · 第 {location.startLine} 行</span>}</span>{location && <LocateFixed size={13} aria-hidden className="mt-1 shrink-0 text-ink-muted" />}</>;
-    return <li key={i} className="border-b border-line-2 last:border-0">{location
+    const className = cx('flex min-h-9 w-full min-w-0 items-start gap-2.5 px-5 py-3 text-left text-sm', location && 'cursor-pointer hover:bg-primary/10 focus-visible:outline-primary', selected === i && 'bg-primary/10');
+    const content = <><Icon size={14} aria-hidden className={cx('mt-1 shrink-0', level.className)} /><span className="min-w-0 flex-1 break-words">{message}{location && <span className="mt-1 block text-xs text-muted-foreground">{item.where?.startsWith('group:') ? '策略组' : item.where?.startsWith('rule:') ? '规则' : '配置'} · 第 {location.startLine} 行</span>}</span>{location && <LocateFixed size={13} aria-hidden className="mt-1 shrink-0 text-muted-foreground" />}</>;
+    return <li key={i} className="border-b border-border last:border-0">{location
       ? <button type="button" title={description} aria-label={description} aria-pressed={selected === i} className={className} onClick={() => onLocate(i)}>{content}</button>
       : <div tabIndex={0} title={description} aria-label={description} className={className}>{content}</div>}
     </li>;

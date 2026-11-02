@@ -41,7 +41,7 @@ export function ProfileDetail() {
 
   const dirty = !!draft && JSON.stringify(draft) !== JSON.stringify(doc.data);
   const { leave } = useLeaveGuard(dirty, ({ nextLocation }) => !nextLocation.pathname.startsWith(`/profiles/${id}/`) && nextLocation.pathname !== `/profiles/${id}`, () => ({ what: draft?.name ?? '配置订阅', canSave: !!draft?.name.trim(), onSave: async () => { if (draft) { const saved = await save.mutateAsync({ ...draft, name: draft.name.trim() }); setDraft(saved); } } }));
-  if (!draft || !ctx) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-ink-muted">加载中…</div>;
+  if (!draft || !ctx) return doc.error ? <ErrorAlert error={doc.error} /> : <div className="text-muted-foreground">加载中…</div>;
   const validName = !!draft.name.trim();
   const discard = () => { setDraft(doc.data);  };
   const subscriptionUrl = tokens.data?.[0]?.url;
@@ -49,7 +49,7 @@ export function ProfileDetail() {
   return (
     <ProfileContext.Provider value={ctx}>
       <div className="flex flex-col gap-2">
-        <PageHeader crumbs={<><Link to="/profiles" className="text-ink-muted no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
+        <PageHeader crumbs={<><Link to="/profiles" className="text-muted-foreground no-underline">配置订阅</Link> / {draft.name}</>} title={draft.name}
           actions={<>
             {dirty && <Button variant="ghost" onClick={discard}>放弃修改</Button>}
             <Button variant="primary" disabled={!validName || !dirty || save.isPending} onClick={() => { if (validName) save.mutate({ ...draft, name: draft.name.trim() }, { onSuccess: saved => setDraft(current => acceptProfileSave(current, draft, saved)) }); }}>{save.isPending ? '保存中…' : dirty ? '保存' : '已保存'}</Button>
@@ -64,18 +64,18 @@ export function ProfileDetail() {
           </Badge>
           {dirty && <Badge tone="warn">未保存</Badge>}
         </PageHeader>
-        <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-[length:var(--text-control)]">
+        <div aria-label="订阅链接" className="flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           {subscriptionUrl ? <>
             <CopyField value={subscriptionUrl} />
-            <span className="text-[length:var(--text-caption)] text-ink-muted">自动适配客户端{draft.note ? ` · 备注：${draft.note}` : ''}</span>
-          </> : tokens.isPending ? <span className="text-ink-muted">正在加载订阅链接…</span> : <>
-            <span role="alert" className="text-err">{tokens.error?.message ?? '暂未获取到订阅链接'}</span>
+            <span className="text-xs text-muted-foreground">自动适配客户端{draft.note ? ` · 备注：${draft.note}` : ''}</span>
+          </> : tokens.isPending ? <span className="text-muted-foreground">正在加载订阅链接…</span> : <>
+            <span role="alert" className="text-destructive">{tokens.error?.message ?? '暂未获取到订阅链接'}</span>
             <Button size="sm" onClick={() => void tokens.refetch()}>重新加载链接</Button>
           </>}
         </div>
       </div>
       <ErrorAlert error={save.error} />
-      {draft.migration && <div className="rounded-lg bg-ground px-4 py-3 text-[length:var(--text-control)]">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-brand" href={queryUrl('/api/profiles/migration-backup', { id: draft.id })} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
+      {draft.migration && <div className="rounded-lg bg-muted px-4 py-3 text-sm">迁移记录：{draft.migration.reason}。迁移前配置已备份。<a className="ml-2 text-primary" href={queryUrl('/api/profiles/migration-backup', { id: draft.id })} download={`${draft.id}-迁移前配置.json`}>下载迁移前配置</a>{draft.migration.issues.length > 0 && ` 有 ${draft.migration.issues.length} 项历史诊断，请检查预览。`}</div>}
       {template.error && <ErrorAlert error={template.error} />}
 
       <ProfileSections initialSection={tab} routingReady={draft.routing?.mode !== 'bound' || !!template.data} />

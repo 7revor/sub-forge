@@ -24,6 +24,7 @@
 
 ## 前端组件
 
+- **组件样式以 shadcn/ui 默认实现为标准（硬性规则）**：只通过 `packages/web/src/index.css` 的 `:root` 主题变量配置品牌色、状态色与字体，`--radius` 保持 shadcn 推导。基础控件一律使用 `components/ui/*`（通过 shadcn CLI 安装）或 `components/ui.tsx` 中对其的薄包装；不得新增全局 `[data-slot]` 覆盖、手绘复选框 / 单选框或自定义尺寸，除非用户特别要求。需要调整时直接修改 `components/ui/*` 源码并说明原因。
 - 弹窗必须遵循 [AGENTS.md](AGENTS.md) 的“弹窗唯一入口（硬性规则）”和 [统一弹窗规范](docs/18-unified-modals.md)。业务弹窗仅允许 `createModal` + 静态 `show(data)` + Promise；简单交互使用同一运行时的 `Frame.modal.*`。**不允许使用其他形式的弹窗封装**，页面不维护 visible/open、不挂载弹窗 JSX。
 - 独立 DTO/草稿、明确保存、取消丢弃、异步防重、路由清理与真实退场完成由统一运行时管理。底层官方 Dialog 仅在运行时内部使用，保留官方动画；本规则取代此前业务页面直接组合官方 Dialog / AlertDialog 的约定。
 

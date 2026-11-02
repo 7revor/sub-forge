@@ -27,15 +27,15 @@ export function ProfileSections({ initialSection, routingReady = true, templateN
     }
   }, [initialSection]);
   return <>
-    <div role="tablist" aria-label="订阅设置" className="-mt-2 flex shrink-0 gap-6 border-b border-line bg-ground">
+    <div role="tablist" aria-label="订阅设置" className="-mt-2 flex shrink-0 gap-6 border-b border-border bg-muted">
       {TABS.map(([key, label], index) => <button key={key} ref={el => { tabs.current[index] = el; }} type="button" disabled={disabled} role="tab" id={`${id}-${key}-tab`} aria-controls={`${id}-${key}-panel`} aria-selected={active === key} tabIndex={active === key ? 0 : -1}
-        className={cx('flex h-11 items-center border-b-2 text-[length:var(--text-body)] outline-offset-4 transition-colors', active === key ? 'border-brand font-semibold text-ink' : 'border-transparent text-ink-muted hover:text-ink')}
+        className={cx('flex h-11 items-center border-b-2 text-sm outline-offset-4 transition-colors', active === key ? 'border-primary font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
         onClick={() => setActive(key)} onKeyDown={event => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
           event.preventDefault();
           const next = event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
           setActive(TABS[next]![0]); tabs.current[next]?.focus();
-        }}>{label}{key === 'nodes' && <span className="ml-1.5 text-[length:var(--text-caption)] font-normal text-ink-muted">{draft.nodeSets.length}</span>}{key === 'routing' && <span className="ml-1.5 text-[length:var(--text-caption)] font-normal text-ink-muted">{groups.length} 组 · {ruleCount} 规则</span>}</button>)}
+        }}>{label}{key === 'nodes' && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{draft.nodeSets.length}</span>}{key === 'routing' && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{groups.length} 组 · {ruleCount} 规则</span>}</button>)}
     </div>
     <PageScroll contained={active === 'preview'}>
       <fieldset disabled={disabled} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">

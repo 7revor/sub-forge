@@ -1,6 +1,8 @@
 import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
 import { Button, Field, Input, Select, cx } from '../../components/ui.tsx';
 import { useSaveDoc, useTemplates, type ProfileDoc } from '../../hooks.ts';
+import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group.tsx';
+import { Label } from '../../components/ui/label.tsx';
 
 /** 新建只选择名称与分流起点，创建成功后进入完整编辑工作区。 */
 export const NewProfileModal = createModal<{ templateId?: string }, ProfileDoc>(function NewProfile({ data, modal }) {
@@ -14,7 +16,7 @@ export const NewProfileModal = createModal<{ templateId?: string }, ProfileDoc>(
     <ModalHeader><ModalTitle>新建配置订阅</ModalTitle></ModalHeader>
     <div className="flex flex-col gap-4">
       <Field label="名称">{id => <Input id={id} autoFocus placeholder="例如：日常使用" value={name} onChange={event => setName(event.target.value)} />}</Field>
-      <Field label="分流起点">{() => <div role="radiogroup" aria-label="分流起点" className="grid grid-cols-2 gap-2">{([{ value: 'template', label: '跟随模板' }, { value: 'blank', label: '空白开始' }] as const).map(option => <label key={option.value} className={cx('flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-[length:var(--text-control)] font-medium', mode === option.value ? 'border-brand bg-selected' : 'border-control-line')}><input type="radio" name="profile-start" className="size-[13px] accent-brand" checked={mode === option.value} onChange={() => setMode(option.value)} />{option.label}</label>)}</div>}</Field>
+      <Field label="分流起点">{() => <RadioGroup aria-label="分流起点" value={mode} onValueChange={value => setMode(value as typeof mode)} className="flex gap-6">{([{ value: 'template', label: '跟随模板' }, { value: 'blank', label: '空白开始' }] as const).map(option => <Label key={option.value} className="cursor-pointer font-normal"><RadioGroupItem value={option.value} />{option.label}</Label>)}</RadioGroup>}</Field>
       {mode === 'template' && <Field label="模板">{id => <Select id={id} placeholder="选择作为分流起点的模板" value={templateId} onChange={event => setTemplateId(event.target.value)}>{templates.map(template => <option key={template.id} value={template.id}>{template.name} · {template.groups.length} 组 · {template.rules.length} 规则</option>)}</Select>}</Field>}
     </div>
     <ModalFooter><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={!ready || modal.pending} onClick={() => modal.submit(() => save.mutateAsync({

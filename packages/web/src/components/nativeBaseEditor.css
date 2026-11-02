@@ -1,13 +1,13 @@
 /* 目标目录与原文编辑区共享一层面板，分别滚动。 */
-.native-base-workspace { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-width: 0; min-height: 516px; border-top: 1px solid var(--color-line-2); }
-.native-base-targets { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; background: var(--color-panel); border-right: 1px solid var(--color-line-2); overflow: auto; }
-.native-base-target { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 0 8px; border-radius: 6px; font-size: var(--text-control); text-align: left; cursor: pointer; }
-.native-base-target:hover { background: var(--color-hover); }
-.native-base-child { padding-left: 18px; color: var(--color-ink-muted); }
-.native-base-target-active { background: var(--color-accent-soft); color: var(--color-accent-ink); font-weight: 500; }
+.native-base-workspace { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-width: 0; min-height: 516px; border-top: 1px solid var(--border); }
+.native-base-targets { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; background: var(--card); border-right: 1px solid var(--border); overflow: auto; }
+.native-base-target { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 0 8px; border-radius: 6px; font-size: var(--text-sm); text-align: left; cursor: pointer; }
+.native-base-target:hover { background: var(--accent); }
+.native-base-child { padding-left: 18px; color: var(--muted-foreground); }
+.native-base-target-active { background: color-mix(in oklab, var(--primary) 10%, transparent); color: var(--primary); font-weight: 500; }
 .native-base-content { display: flex; flex-direction: column; min-width: 0; overflow: auto; padding: 20px; }
 .native-base-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 12px; }
-.native-base-source.yaml-textarea { flex: 1; border: 0; border-radius: 0; background: var(--color-panel); }
+.native-base-source.yaml-textarea { flex: 1; border: 0; border-radius: 0; background: var(--card); }
 .native-base-source > textarea { min-height: 390px; }
 @media (max-width: 639px) {
   .native-base-workspace { grid-template-columns: 140px minmax(0, 1fr); }
@@ -18,8 +18,8 @@
 }
 
 .native-base-row { display: flex; align-items: center; position: relative; border-radius: 6px; }
-.native-base-row:has(.native-base-target-active) { background: var(--color-accent-soft); }
-.native-base-row-child { border-left: 1px solid var(--color-line-2); margin-left: 14px; padding-left: 0; }
+.native-base-row:has(.native-base-target-active) { background: color-mix(in oklab, var(--primary) 10%, transparent); }
+.native-base-row-child { border-left: 1px solid var(--border); margin-left: 14px; padding-left: 0; }
 .native-base-target { flex: 1; min-width: 0; }
-.native-base-expand { width: 18px; flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: var(--color-faint); }
-.native-base-editor-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--color-control-line); border-radius: 8px; }
+.native-base-expand { width: 18px; flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: var(--muted-foreground); }
+.native-base-editor-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--input); border-radius: 8px; }

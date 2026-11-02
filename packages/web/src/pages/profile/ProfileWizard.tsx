@@ -27,16 +27,16 @@ export function ProfileWizard() {
     if (!leaving) leave(`/profiles/${p.id}/overview`);
   };
   return <ProfileContext.Provider value={ctx!}>
-    <PageHeader crumbs={<><Link to="/profiles" className="text-ink-muted no-underline">配置订阅</Link> / 新建</>} title="新建配置订阅" actions={<Button variant="primary" disabled={!canSave} onClick={() => finish()}>{save.isPending ? '正在创建…' : '创建订阅'}</Button>}>
-      <span className="text-[length:var(--text-control)] text-ink-muted">选择节点并配置分流，保存后自动生成唯一订阅链接。</span>
+    <PageHeader crumbs={<><Link to="/profiles" className="text-muted-foreground no-underline">配置订阅</Link> / 新建</>} title="新建配置订阅" actions={<Button variant="primary" disabled={!canSave} onClick={() => finish()}>{save.isPending ? '正在创建…' : '创建订阅'}</Button>}>
+      <span className="text-sm text-muted-foreground">选择节点并配置分流，保存后自动生成唯一订阅链接。</span>
     </PageHeader>
     <ErrorAlert error={save.error} />
     <TabProfileInfo />
       <ProfileSections disabled={save.isPending} routingReady={templateReady} templateNotice={<>
       <ErrorAlert error={template.error} />
-      {!templateReady && <div className="flex items-center gap-3 text-[length:var(--text-control)] text-ink-muted">{template.isError ? '模板加载失败，请重试或更换模板。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
+      {!templateReady && <div className="flex items-center gap-3 text-sm text-muted-foreground">{template.isError ? '模板加载失败，请重试或更换模板。' : '正在加载模板…'}{template.isError && <Button onClick={() => void template.refetch()}>重试</Button>}</div>}
     </>}>
-      {!!issues.length && <p role="status" className="m-0 text-[length:var(--text-control)] text-err">{issues[0]!.message}（{issues.length} 项待补全）</p>}
+      {!!issues.length && <p role="status" className="m-0 text-sm text-destructive">{issues[0]!.message}（{issues.length} 项待补全）</p>}
     </ProfileSections>
   </ProfileContext.Provider>;
 }

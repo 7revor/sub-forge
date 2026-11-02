@@ -26,7 +26,7 @@ export function RejectedRulesPopover({ sourceName, status }: { sourceName: strin
       aria-expanded={open} aria-controls={open ? id : undefined}
       onMouseEnter={show} onMouseLeave={leave} onFocus={show}
       onClick={() => { cancelClose(); pinned.current = !pinned.current; setOpen(pinned.current); }}
-      className="cursor-pointer rounded-full border-0 bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+      className="cursor-pointer rounded-full border-0 bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
       <Badge tone="warn">已解析 {status.rules} 条 · 未解析 {status.rejected} 行</Badge>
     </button></PopoverAnchor>
     <PopoverContent ref={panel} id={id} role="region" aria-label={`${sourceName} 未解析的规则`} align="end" sideOffset={6} collisionPadding={12}
@@ -37,17 +37,17 @@ export function RejectedRulesPopover({ sourceName, status }: { sourceName: strin
       style={{ maxHeight: 'min(360px, var(--radix-popover-content-available-height))' }}
       className="w-[min(520px,calc(100vw-24px))] overflow-auto overscroll-contain p-3.5">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <strong className="min-w-0 break-all text-[length:var(--text-control)]">{sourceName} · 未解析 {status.rejected} 行</strong>
-        <button type="button" aria-label="关闭规则详情" className="shrink-0 cursor-pointer border-0 bg-transparent text-[length:var(--text-caption)] text-ink-muted hover:text-ink"
+        <strong className="min-w-0 break-all text-sm">{sourceName} · 未解析 {status.rejected} 行</strong>
+        <button type="button" aria-label="关闭规则详情" className="shrink-0 cursor-pointer border-0 bg-transparent text-xs text-muted-foreground hover:text-foreground"
           onClick={() => { anchor.current?.focus(); close(); }}>关闭</button>
       </div>
       <div className="flex flex-col gap-3">
-        {details.map((r, i) => <div key={`${r.line}-${i}`} className="min-w-0 border-t border-line-2 pt-2 text-[length:var(--text-caption)]">
-          <div className="mb-1 text-ink-muted">第 {r.line} 行 · {r.reason.includes('不支持') ? `本系统暂未支持解析：${r.reason}` : `输入格式有误：${r.reason}`} </div>
-          <code className="block whitespace-pre-wrap break-all rounded bg-ground p-2 font-mono">{r.text}</code>
+        {details.map((r, i) => <div key={`${r.line}-${i}`} className="min-w-0 border-t border-border pt-2 text-xs">
+          <div className="mb-1 text-muted-foreground">第 {r.line} 行 · {r.reason.includes('不支持') ? `本系统暂未支持解析：${r.reason}` : `输入格式有误：${r.reason}`} </div>
+          <code className="block whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono">{r.text}</code>
         </div>)}
-        {!details.length && <span className="text-[length:var(--text-caption)] text-ink-muted">暂无详情，请刷新预览后重试。</span>}
-        {!!details.length && details.length < (status.rejected ?? 0) && <span className="text-[length:var(--text-caption)] text-ink-muted">显示前 {details.length} 行，共 {status.rejected} 行。</span>}
+        {!details.length && <span className="text-xs text-muted-foreground">暂无详情，请刷新预览后重试。</span>}
+        {!!details.length && details.length < (status.rejected ?? 0) && <span className="text-xs text-muted-foreground">显示前 {details.length} 行，共 {status.rejected} 行。</span>}
       </div>
     </PopoverContent>
   </Popover>;

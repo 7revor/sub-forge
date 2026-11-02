@@ -56,10 +56,10 @@ export function TemplateGroupsEditor({ value, onChange, report, readOnly = false
           return <RoutingCard id={`template-group-${g.id}`} className={columns} invalid={error}>
             {handle}
             <RoutingCardIcon muted={isGroupReadOnly(g)}><Layers3 size={16} /></RoutingCardIcon>
-            <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left text-[length:var(--text-body)] font-medium', error && 'text-err')}>{g.name || '未命名组'}</span>
+            <span title={g.name || '未命名组'} className={cx('min-w-0 truncate text-left text-sm font-medium', error && 'text-destructive')}>{g.name || '未命名组'}</span>
             <div className="col-span-2 col-start-3 row-start-2 flex min-w-0 items-center gap-3 md:contents">
-              <span className="shrink-0 text-ink-2" title="策略组类型">{GROUP_TYPE_LABEL[g.type]}</span>
-              <span className={cx("min-w-0 flex-1 truncate", !g.members.length ? memberSummary ? "text-warn" : "text-faint" : "text-ink-muted")} title={members}>{members}</span>
+              <span className="shrink-0 text-foreground" title="策略组类型">{GROUP_TYPE_LABEL[g.type]}</span>
+              <span className={cx("min-w-0 flex-1 truncate", !g.members.length ? memberSummary ? "text-warn" : "text-muted-foreground" : "text-muted-foreground")} title={members}>{members}</span>
               <span className="flex flex-wrap gap-1">{!g.members.length && memberSummary && <Badge tone="warn">空组</Badge>}{g.display?.hidden && <Badge>已隐藏</Badge>}</span>
             </div>
             <div className="col-start-4 row-start-1 md:col-start-7">
@@ -96,18 +96,18 @@ export const TemplateGroupModal = createModal<{ group: GroupSpec; groups: GroupS
         </fieldset>
 
         <section className="flex min-w-0 flex-col gap-3" aria-label="策略组成员">
-          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-[length:var(--text-body)] font-semibold">成员 <span className="ml-2 text-[length:var(--text-caption)] font-normal text-ink-muted">{group.members.length} 个</span></h3>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="m-0 text-sm font-semibold">成员 <span className="ml-2 text-xs font-normal text-muted-foreground">{group.members.length} 个</span></h3>
             <TemplateTargetSelect action label="添加成员" value={undefined} groups={value.groups.filter(g => g.id !== group.id)} onChange={member => update({ members: [...group.members, member] })} />
           </div>
-          {!group.members.length ? <Empty title="还没有成员" /> : <div className="rounded-lg border border-line px-3">
-            <SortableList items={group.members} onReorder={members => update({ members })} renderItem={(m, index, handle) => <div className="flex items-center gap-2 border-b border-line-2 py-2 last:border-0">
-              {handle}<span className="min-w-0 flex-1 break-all text-[length:var(--text-control)]">{memberLabel(m, groupName, ref => ref.id).text}</span>
+          {!group.members.length ? <Empty title="还没有成员" /> : <div className="rounded-lg border border-border px-3">
+            <SortableList items={group.members} onReorder={members => update({ members })} renderItem={(m, index, handle) => <div className="flex items-center gap-2 border-b border-border py-2 last:border-0">
+              {handle}<span className="min-w-0 flex-1 break-all text-sm">{memberLabel(m, groupName, ref => ref.id).text}</span>
               <Button size="sm" onClick={() => update({ members: group.members.filter((_, i) => i !== index) })}>删除</Button>
             </div>} />
           </div>}
         </section>
-        <fieldset disabled={readOnly} className="contents">        <details className="mt-4"><summary className="cursor-pointer text-[length:var(--text-control)] font-medium">高级设置</summary><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-[length:var(--text-control)] sm:col-span-2"><Switch label="在客户端面板中隐藏" checked={group.display?.hidden ?? false} onChange={hidden => update({ display: { ...group.display, hidden } })} />在客户端面板中隐藏</label>
+        <fieldset disabled={readOnly} className="contents">        <details className="mt-4"><summary className="cursor-pointer text-sm font-medium">高级设置</summary><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm sm:col-span-2"><Switch label="在客户端面板中隐藏" checked={group.display?.hidden ?? false} onChange={hidden => update({ display: { ...group.display, hidden } })} />在客户端面板中隐藏</label>
           <GroupSettingsFields section="advanced" disabled={readOnly} value={group} onChange={(key, next) => update({ [key]: next })} />
           <Field label="filter（保留）" hint="订阅填入节点集后生效">{id => <Input id={id} className="font-mono" placeholder="输入保留节点的正则表达式" value={group.filter ?? ''} onChange={e => update({ filter: e.target.value || undefined })} />}</Field>
           <Field label="exclude-filter（剔除）">{id => <Input id={id} className="font-mono" placeholder="输入剔除节点的正则表达式" value={group.excludeFilter ?? ''} onChange={e => update({ excludeFilter: e.target.value || undefined })} />}</Field>

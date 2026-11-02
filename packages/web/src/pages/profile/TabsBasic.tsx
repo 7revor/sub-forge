@@ -25,10 +25,10 @@ export function TabProfileInfo() {
   const collections = useList('collections');
   const sources = allNodeSets.filter(n => n.ref.type === 'source');
   const selected = trafficSourceIds(draft, collections.data ?? []);
-  return <section aria-label="订阅基本信息" className="grid min-w-0 gap-5 rounded-xl border border-line bg-panel p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[1fr_1fr_1.2fr]">
+  return <section aria-label="订阅基本信息" className="grid min-w-0 gap-5 rounded-xl border bg-card shadow-sm p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[1fr_1fr_1.2fr]">
     <div className="min-w-0">
       <Field label="订阅名称">{id => <Input id={id} required placeholder="例如：日常使用" value={draft.name} aria-invalid={!!draft.id && !draft.name.trim()} onChange={e => setDraft({ ...draft, name: e.target.value })} />}</Field>
-      {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-[length:var(--text-caption)] text-err">请填写订阅名称</p>}
+      {!!draft.id && !draft.name.trim() && <p role="alert" className="mt-1 mb-0 text-xs text-destructive">请填写订阅名称</p>}
     </div>
     <Field label="流量 / 到期信息" className="min-w-0">{id => <MultiSelect placeholder="选择节点订阅（可多选）" id={id} value={selected}
       onChange={sourceIds => setDraft({ ...draft, userinfo: { mode: 'sources', sourceIds } })}>
@@ -43,21 +43,21 @@ export function TabProfileInfo() {
 export function TabBase() {
   const { draft, setDraft } = useProfile();
   const enabled = draft.base !== undefined && draft.base.enabled !== false;
-  return <section aria-label="基础配置追加" className="min-w-0 overflow-hidden rounded-xl border border-line bg-panel">
+  return <section aria-label="基础配置追加" className="min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-      <div><h2 className="m-0 text-[length:var(--text-section)] font-semibold">配置追加</h2><p className="m-0 text-[length:var(--text-caption)] text-ink-muted">把这些片段合并进生成的配置，例如端口、DNS、TUN</p></div>
+      <div><h2 className="m-0 text-base font-semibold">配置追加</h2><p className="m-0 text-xs text-muted-foreground">把这些片段合并进生成的配置，例如端口、DNS、TUN</p></div>
       <div className="flex items-center gap-2.5">
         <Switch label="启用基础配置追加" checked={enabled} onChange={value => setDraft({ ...draft, base: { ...draft.base, enabled: value } })} />
-        <span className="text-[length:var(--text-control)] text-ink">启用</span>
+        <span className="text-sm text-foreground">启用</span>
       </div>
     </div>
-    {!enabled && <p className="m-0 border-t border-line-2 px-5 py-4 text-[length:var(--text-control)] text-ink-muted">启用后编辑追加配置。</p>}
+    {!enabled && <p className="m-0 border-t border-border px-5 py-4 text-sm text-muted-foreground">启用后编辑追加配置。</p>}
     <div hidden={!enabled}>
       <NativeBaseEditor value={draft.base ?? {}} onChange={base => setDraft({ ...draft, base: { ...base, enabled: true } })} />
     </div>
-    {!!draft.migrationNotes?.length && <div className="flex items-start gap-3 border-t border-line-2 px-5 py-3 text-[length:var(--text-control)]">
+    {!!draft.migrationNotes?.length && <div className="flex items-start gap-3 border-t border-border px-5 py-3 text-sm">
       <Badge className="shrink-0">迁移记录 {draft.migrationNotes.length}</Badge>
-      <div className="min-w-0 flex-1 space-y-1 leading-relaxed text-ink-muted">{draft.migrationNotes.map((note, i) => <p key={i} className="m-0">{note}</p>)}</div>
+      <div className="min-w-0 flex-1 space-y-1 leading-relaxed text-muted-foreground">{draft.migrationNotes.map((note, i) => <p key={i} className="m-0">{note}</p>)}</div>
     </div>}
   </section>;
 }
@@ -82,10 +82,10 @@ export function TabNodeSets() {
         actions={<Button onClick={async () => { const result = await NodeSetPickerDialog.show({ options: allNodeSets, added: draft.nodeSets.map(n => n.ref) }); if (result.status === 'confirmed') setDraft({ ...draft, nodeSets: [...draft.nodeSets, ...result.data.map(ref => ({ ref, output: 'provider' as const }))] }); }}><Plus size={16} />添加节点来源</Button>}>
         {!draft.nodeSets.length ? <Empty title="还没有节点来源" /> : <SortableList items={draft.nodeSets} getKey={n => `${n.ref.type}:${n.ref.id}`} onReorder={nodeSets => setDraft({ ...draft, nodeSets })} renderItem={(n, i, handle) => <RoutingCard className="grid grid-cols-[20px_32px_minmax(0,1fr)_28px] lg:grid-cols-[20px_32px_minmax(0,1fr)_132px_128px_64px]">
           {handle}<RoutingCardIcon>{n.ref.type === 'source' ? <Server size={16} /> : n.ref.type === 'local' ? <Monitor size={16} /> : <Layers size={16} />}</RoutingCardIcon>
-          <div className="flex min-w-0 flex-col"><ResourceFileLink kind={n.ref.type === 'source' ? 'sources' : n.ref.type === 'collection' ? 'collections' : 'locals'} id={n.ref.id} name={nodeSetName(n.ref)} className="block truncate text-[length:var(--text-body)] leading-5 font-medium text-ink no-underline hover:text-brand" />
-          <span className="text-[length:var(--text-caption)] text-ink-muted">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span></div>
+          <div className="flex min-w-0 flex-col"><ResourceFileLink kind={n.ref.type === 'source' ? 'sources' : n.ref.type === 'collection' ? 'collections' : 'locals'} id={n.ref.id} name={nodeSetName(n.ref)} className="block truncate text-sm leading-5 font-medium text-foreground no-underline hover:text-primary" />
+          <span className="text-xs text-muted-foreground">{NODE_SET_LABEL[n.ref.type]} · <NodeSetCount nodeSet={n.ref} /> 个节点</span></div>
           <div className="col-start-3 row-start-2 lg:col-auto lg:row-auto"><Segmented label={`${nodeSetName(n.ref)}输出方式`} size="sm" value={n.output} options={[{ value: 'provider', label: '引用' }, { value: 'inline', label: '展开' }]} onChange={output => setDraft({ ...draft, nodeSets: draft.nodeSets.map((x, j) => j === i ? { ...x, output } : x) })} /></div>
-          <div className="col-start-3 row-start-3 lg:col-auto lg:row-auto">{n.ref.type === 'source' ? <label className="inline-flex items-center gap-2 text-[length:var(--text-control)]"><Switch label={`${nodeSetName(n.ref)}提供流量信息`} checked={traffic.includes(n.ref.id)} onChange={checked => setDraft({ ...draft, userinfo: { mode: 'sources', sourceIds: checked ? [...traffic, n.ref.id] : traffic.filter(id => id !== n.ref.id) } })} />流量信息</label> : <span className="text-faint">—</span>}</div>
+          <div className="col-start-3 row-start-3 lg:col-auto lg:row-auto">{n.ref.type === 'source' ? <label className="inline-flex items-center gap-2 text-sm"><Switch label={`${nodeSetName(n.ref)}提供流量信息`} checked={traffic.includes(n.ref.id)} onChange={checked => setDraft({ ...draft, userinfo: { mode: 'sources', sourceIds: checked ? [...traffic, n.ref.id] : traffic.filter(id => id !== n.ref.id) } })} />流量信息</label> : <span className="text-muted-foreground">—</span>}</div>
           <div className="col-start-4 row-start-1 flex justify-end lg:col-auto lg:row-auto"><ActionMenu label={`${nodeSetName(n.ref)}更多操作`} items={[
             ...(n.output === 'provider' ? [{ label: '追加独立策略组', onSelect: () => setDraft(appendProviderGroup(draft, n.ref, nodeSetName(n.ref), groups)) }] : []),
             { label: '移除节点来源', danger: true, onSelect: () => void remove(n.ref) },

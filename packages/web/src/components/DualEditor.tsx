@@ -80,17 +80,17 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
     {modeControlContainer === undefined ? modeControl : modeControlContainer && createPortal(modeControl, modeControlContainer)}
     <div className="editor-content flex flex-col gap-3">
       {current === 'form' ? <>
-        {!!recoveryNotes.length && <div role="status" className="rounded-lg bg-warn-soft px-3 py-2.5 text-[length:var(--text-control)] text-warn">
+        {!!recoveryNotes.length && <div role="status" className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
           <p className="m-0">部分内容无法转为表单，已保留可识别的字段：</p>
           <ul className="m-0 mt-1 pl-5">{recoveryNotes.map((note, i) => <li key={i}>{note}</li>)}</ul>
         </div>}
         {renderForm()}
       </> : <>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[length:var(--text-control)] text-ink-muted">{rawLabel}</span>
+          <span className="text-sm text-muted-foreground">{rawLabel}</span>
           <CopyButton size="sm" text={text} />
         </div>
-        {rawHint && <span className="text-[length:var(--text-caption)] leading-relaxed text-ink-muted">{rawHint}</span>}
+        {rawHint && <span className="text-xs leading-relaxed text-muted-foreground">{rawHint}</span>}
         <YamlTextarea placeholder="填写此客户端的配置文本" aria-label={rawLabel} aria-invalid={!!error} rows={16} className="font-mono" spellCheck={false} value={text} onPaste={(event) => {
           const imported = fromPaste?.(event.clipboardData.getData('text/plain'));
           if (!imported) return;
@@ -121,7 +121,7 @@ export function DualEditor<T>({ value, onChange, renderForm, toRaw, fromRaw, rec
           }
         }} />
         <FieldError error={error && `${error}；可返回表单继续编辑，返回时将忽略错误内容。`} />
-        {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-[length:var(--text-control)] text-ink-muted">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
+        {result.ok && !!result.notes?.length && <ul className="m-0 pl-5 text-sm text-muted-foreground">{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}
       </>}
     </div>
   </div>;

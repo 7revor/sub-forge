@@ -25,7 +25,7 @@ export function TemplateBoundList<T extends { id: string }>({ items, templateIds
   const reorder = (next: TemplateListItem<T>[]) => { const result = flattenTemplateItems(next); onReorder(result.items, result.templateStart); };
   return <SortableList draggingClassName="[&_[data-routing-card]]:shadow-md" items={rows} getKey={row => row.kind === 'template' ? 'template:block' : `custom:${row.item.id}`} isLocked={row => row.kind === 'template' || !!isLocked?.(row.item)} onReorder={reorder} renderItem={(row, _index, handle) => {
     if (row.kind === 'template') return <section aria-label={`模板${label}整体`} className="min-h-2">
-      {row.items.map(item => <div key={item.id}>{renderItem(item, items.indexOf(item), <span className="grid h-8 w-6 place-items-center text-ink-muted" aria-label="跟随模板"><LockKeyhole size={16} /></span>)}</div>)}
+      {row.items.map(item => <div key={item.id}>{renderItem(item, items.indexOf(item), <span className="grid h-8 w-6 place-items-center text-muted-foreground" aria-label="跟随模板"><LockKeyhole size={16} /></span>)}</div>)}
     </section>;
     return <div className="custom-routing-item">
       {renderItem(row.item, items.indexOf(row.item), handle)}

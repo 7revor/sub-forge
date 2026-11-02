@@ -44,7 +44,7 @@ export function ModalContent(props: React.ComponentProps<typeof DialogContent>) 
   }).current;
   return <DialogContent aria-describedby={undefined} {...props} data-modal-session={session.id} ref={ref} onCloseAutoFocus={event => { event.preventDefault(); props.onCloseAutoFocus?.(event); }}>
     <fieldset disabled={session.pending || session.phase === 'closing'} className="m-0 contents border-0 p-0">{props.children}</fieldset>
-    {view.error && <p role="alert" className="m-0 whitespace-pre-wrap text-[length:var(--text-control)] text-err">{view.error}</p>}
+    {view.error && <p role="alert" className="m-0 whitespace-pre-wrap text-sm text-destructive">{view.error}</p>}
   </DialogContent>;
 }
 export { DialogHeader as ModalHeader, DialogTitle as ModalTitle, DialogDescription as ModalDescription, DialogFooter as ModalFooter };

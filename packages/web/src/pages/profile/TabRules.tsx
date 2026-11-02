@@ -56,10 +56,10 @@ function PrivateRuleFields({ value, onChange, single = false }: { value: RuleEnt
         const { noResolve: _noResolve, src: _src, ...options } = value.options ?? {};
         onChange({ ...value, matcher: { ...matcher, rule }, ...(value.options ? { options } : {}) });
       }} onChange={(matcher) => onChange({ ...value, matcher })} />
-    <div className="flex flex-col gap-1.5"><span className="text-[length:var(--text-control)] font-medium text-ink-muted">出口</span>
+    <div className="flex flex-col gap-1.5"><span className="text-sm font-medium text-muted-foreground">出口</span>
       <TargetPicker label="出口" value={value.target} onChange={(target) => onChange({ ...value, target })} groups={groupOptions} nodeSets={profileNodeSets} /></div>
-    {matcher.kind !== 'ruleset' && <details className="advanced-settings border-t border-line-2 pt-4">
-      <summary className="cursor-pointer text-[length:var(--text-control)] font-medium">按客户端改写 · {matcher.overrides?.length ?? 0} 条</summary>
+    {matcher.kind !== 'ruleset' && <details className="advanced-settings border-t border-border pt-4">
+      <summary className="cursor-pointer text-sm font-medium">按客户端改写 · {matcher.overrides?.length ?? 0} 条</summary>
       <div className="mt-3"><ClientOverrides value={matcher.overrides ?? []} onChange={(overrides) => onChange({ ...value, matcher: { ...matcher, overrides } })} /></div>
     </details>}
   </div>;
@@ -89,7 +89,7 @@ export const ExtraRuleModal = createModal<ProfileModalData & { prepend: boolean 
 function PrivateRuleEdit({ rule, onApply, onClose, single = false }: { rule: RuleEntry; onApply: (rule: RuleEntry) => void; onClose: () => void; single?: boolean }) {
   const [value, setValue] = useState(rule);
   const error = privateRuleError(value);
-  return <div className="flex flex-col gap-3 border-t border-line-2 bg-ground p-4">
+  return <div className="flex flex-col gap-3 border-t border-border bg-muted p-4">
     <PrivateRuleFields single={single} value={value} onChange={setValue} />
     <FieldError error={error} />
     <div className="flex gap-2"><Button variant="primary" disabled={!!error} onClick={() => { onApply(value); onClose(); }}>应用修改</Button><Button onClick={onClose}>取消</Button></div>
@@ -127,12 +127,12 @@ function LegacyRules() {
     <Card title="前置规则" actions={<Button onClick={() => void add(true)}><Plus size={15} />添加前置规则</Button>}>
       {!prependRules.length ? <Empty title="没有前置规则" /> : <SortableList items={prependRules} getKey={rule => rule.id}
         onReorder={prependRules => patchOverlay(o => ({ ...o, extraRules: [...prependRules].reverse().map(rule => ({ anchor: 'top', rule })) }))}
-        renderItem={(rule, index, handle) => <div className="border-t border-line-2">
+        renderItem={(rule, index, handle) => <div className="border-t border-border">
           <div className="flex flex-wrap items-center gap-3 py-3">
-            {handle}<span className="font-mono text-[length:var(--text-caption)] text-ink-muted">{index + 1}</span>
-            <button type="button" aria-expanded={editing === rule.id} className="min-w-0 flex-1 cursor-pointer break-all text-left font-mono text-[length:var(--text-control)]"
+            {handle}<span className="font-mono text-xs text-muted-foreground">{index + 1}</span>
+            <button type="button" aria-expanded={editing === rule.id} className="min-w-0 flex-1 cursor-pointer break-all text-left font-mono text-sm"
               onClick={() => setEditing(editing === rule.id ? undefined : rule.id)}>{label(rule.matcher).text}</button>
-            <button type="button" className="cursor-pointer text-left text-[length:var(--text-control)] hover:text-brand" onClick={() => setEditing(rule.id)}>{targetLabel(rule.target, groupName, nodeSetName)}</button>
+            <button type="button" className="cursor-pointer text-left text-sm hover:text-primary" onClick={() => setEditing(rule.id)}>{targetLabel(rule.target, groupName, nodeSetName)}</button>
             <Button size="sm" variant="ghost" aria-label={`删除前置规则 ${index + 1}`} onClick={() => { setExtra(rule.id, () => undefined); if (editing === rule.id) setEditing(undefined); }}><Trash2 size={14} /></Button>
           </div>
           {editing === rule.id && <PrivateRuleEdit single key={rule.id} rule={rule} onApply={value => setExtra(rule.id, () => value)} onClose={() => setEditing(undefined)} />}
@@ -140,21 +140,21 @@ function LegacyRules() {
     </Card>
     <Card title="模板规则" subtitle="顺序与出口跟随模板更新" bodyClass="flex flex-col gap-4 px-4 pb-4">
       <SearchInput aria-label="搜索规则" placeholder="搜索规则或出口" value={search} onChange={e => setSearch(e.target.value)} />
-      <div className="divide-y divide-line-2">
-        {(template?.rules ?? []).filter(r => matchesNameSearch(`${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`, search)).map(r => <div key={r.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 py-3 text-[length:var(--text-control)] sm:grid-cols-[auto_minmax(0,1fr)_minmax(80px,auto)]">
+      <div className="divide-y divide-border">
+        {(template?.rules ?? []).filter(r => matchesNameSearch(`${label(r.matcher).text} ${targetLabel(r.target, groupName, nodeSetName)}`, search)).map(r => <div key={r.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 py-3 text-sm sm:grid-cols-[auto_minmax(0,1fr)_minmax(80px,auto)]">
           <Badge>模板</Badge>
           <span className="min-w-0 break-all font-mono leading-6">{label(r.matcher).text}</span>
-          <span className="col-start-2 min-w-0 break-words text-ink-2 sm:col-start-auto sm:text-right">{targetLabel(r.target, groupName, nodeSetName)}</span>
+          <span className="col-start-2 min-w-0 break-words text-foreground sm:col-start-auto sm:text-right">{targetLabel(r.target, groupName, nodeSetName)}</span>
         </div>)}
       </div>
-      <div className="flex items-start justify-between gap-4 border-t border-line-2 pt-4 text-[length:var(--text-control)]">
-        <span className="font-mono">MATCH</span><span className="min-w-0 break-words text-right text-ink-2">{targetLabel(final, groupName, nodeSetName)}</span>
+      <div className="flex items-start justify-between gap-4 border-t border-border pt-4 text-sm">
+        <span className="font-mono">MATCH</span><span className="min-w-0 break-words text-right text-foreground">{targetLabel(final, groupName, nodeSetName)}</span>
       </div>
     </Card>
   </>;
 
   return <>
-    {orphans.length > 0 && <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-[length:var(--text-control)]"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span></Notice>}
+    {orphans.length > 0 && <Notice tone="warn" actions={<Button size="sm" onClick={() => patchOverlay((o) => ({ ...o, rulePatches: Object.fromEntries(Object.entries(o.rulePatches ?? {}).filter(([id]) => !orphans.includes(id))) }))}>清理</Button>}><span className="text-sm"><b>{orphans.length} 个孤儿覆盖项不再输出：</b>模板已删除对应的规则。</span></Notice>}
     <Card title={`规则（自上而下匹配）`}
       actions={<Button onClick={() => void add(false)}><Plus size={15} />插入规则</Button>}>
       {!rows.length ? <Empty title="没有规则" description="未匹配的流量走 MATCH。" /> : <SortableList items={rows} getKey={(r) => r.id} isLocked={(r) => r.origin === 'template'}
@@ -162,20 +162,20 @@ function LegacyRules() {
         renderItem={(r, i, handle) => {
           const l = label(r.matcher);
           const overridden = r.origin === 'template' && patches[r.id]?.target;
-          return <div className="border-t border-line-2">
+          return <div className="border-t border-border">
             <div className={cx('flex flex-wrap items-center gap-3 py-3', r.origin === 'profile' && 'cursor-pointer')}
               onClick={() => { if (r.origin === 'profile') setEditing(r.id); }}>
               <span onClick={(e) => e.stopPropagation()}>{handle}</span>
-              <span className="font-mono text-[length:var(--text-caption)] text-ink-muted">{i + 1}</span>
+              <span className="font-mono text-xs text-muted-foreground">{i + 1}</span>
               <button type="button" className="flex w-[calc(100%-64px)] min-w-0 flex-none cursor-pointer flex-wrap items-center gap-2 text-left sm:w-auto sm:flex-1" aria-expanded={editing === r.id}
                 onClick={(e) => { e.stopPropagation(); setEditing(editing === r.id ? undefined : r.id); }}>
-                <Badge>{l.kind}</Badge><span className="break-all font-mono text-[length:var(--text-control)]">{l.text}</span>
+                <Badge>{l.kind}</Badge><span className="break-all font-mono text-sm">{l.text}</span>
               </button>
-              <button type="button" className="cursor-pointer text-left text-[length:var(--text-control)] font-medium hover:text-brand" onClick={() => setEditing(r.id)}>
-                {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-[length:var(--text-caption)] font-normal text-brand">已改出口</span>}
+              <button type="button" className="cursor-pointer text-left text-sm font-medium hover:text-primary" onClick={() => setEditing(r.id)}>
+                {targetLabel(r.target, groupName, nodeSetName)}{overridden && <span className="ml-2 text-xs font-normal text-primary">已改出口</span>}
               </button>
               <Badge tone={r.origin === 'profile' ? 'ok' : 'neutral'}>{r.origin === 'profile' ? '私有' : '模板'}</Badge>
-              <span className="flex gap-1" aria-label="客户端输出">{['Mihomo', 'Surge', 'Stash', 'Loon'].map(name => <span key={name} className="rounded border border-line bg-ground px-1.5 py-0.5 font-mono text-[length:var(--text-caption)] text-ink-2">{name}</span>)}</span>
+              <span className="flex gap-1" aria-label="客户端输出">{['Mihomo', 'Surge', 'Stash', 'Loon'].map(name => <span key={name} className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{name}</span>)}</span>
               <span onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
                 {r.origin === 'profile' && <Button size="sm" variant="ghost" aria-label={`删除规则 ${i + 1}`} onClick={() => { setExtra(r.id, () => undefined); if (editing === r.id) setEditing(undefined); }}><Trash2 size={14} /></Button>}
               </span>
@@ -190,8 +190,8 @@ function LegacyRules() {
               </div>)}
           </div>;
         }} />}
-      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
-        <span className="font-mono text-[length:var(--text-control)]">MATCH</span>
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
+        <span className="font-mono text-sm">MATCH</span>
         <TargetPicker label="MATCH 出口" value={final} groups={groupOptions} nodeSets={profileNodeSets} onChange={(target) => patchOverlay((o) => ({ ...o, final: target }))} />
         {template && draft.overlay.final && <Button size="sm" variant="ghost" onClick={() => patchOverlay((o) => { const { final: _, ...rest } = o; return rest; })}>还原为模板</Button>}
       </div>
