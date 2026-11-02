@@ -322,3 +322,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-02 分页：`Pagination` 改为图标紧凑样式，移除未被调用的 `compact` 入口；公共 `Select` 通过 `size="sm"` 使用 32px 触发框，不再用 class 覆盖高度。
 
 2026-11-02 分页：每页条数下拉改为无边框，样式只写在 `Pagination` 这一处，公共 `Select` 默认样式不变。
+
+2026-11-02 策略组隐藏与分段控件：`TemplateGroupsEditor` 每行显示「隐藏」开关，弹窗高级设置不再提供该入口；绑定订阅的模板组写入 `routing.groupHidden`，与模板不同时显示标记。`components/ui/toggle.tsx` 的选中态改为品牌色（默认 `--accent` 与页面灰底几乎相同），全部 `Segmented` 随之更新。

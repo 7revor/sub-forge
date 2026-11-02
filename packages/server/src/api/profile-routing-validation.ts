@@ -33,13 +33,15 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
   if (doc.template !== undefined || Object.keys(doc.overlay).length) throw bad('新分流模式不能同时保存旧模板引用或覆盖层');
   let template;
   if (r.mode === 'bound') {
-    if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions', 'prependRules', 'appendRules', 'extraGroups', 'prependGroupIds'].includes(k))) throw bad('绑定模式只能保存模板引用、追加成员、独立策略组和自定义规则');
+    if (Object.keys(r).some(k => !['mode', 'templateId', 'groupAdditions', 'prependRules', 'appendRules', 'extraGroups', 'prependGroupIds', 'groupHidden'].includes(k))) throw bad('绑定模式只能保存模板引用、追加成员、独立策略组、隐藏设置和自定义规则');
     if (!isStr(r.templateId) || !(template = store.getTemplate(r.templateId))) throw bad('模板不存在');
     if (!obj(r.groupAdditions)) throw bad('追加成员必须按策略组 ID 保存');
     for (const [id, members] of Object.entries(r.groupAdditions)) {
       if (!template.groups.some(g => g.id === id)) throw bad(`追加成员指向不存在的策略组 ${id}`);
       if (!Array.isArray(members)) throw bad(`策略组 ${id} 的追加成员必须是数组`);
     }
+    // 不校验组 ID 是否存在：模板删组后旧记录只产生告警，不应阻止用户保存订阅。
+    if (r.groupHidden !== undefined && (!obj(r.groupHidden) || Object.values(r.groupHidden).some(hidden => typeof hidden !== 'boolean'))) throw bad('策略组隐藏设置必须按策略组 ID 保存布尔值');
     if (r.extraGroups !== undefined) {
       if (!Array.isArray(r.extraGroups)) throw bad('独立策略组必须是数组');
       for (const group of r.extraGroups) {

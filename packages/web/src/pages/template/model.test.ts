@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
-import { draftIssues, removeGroup } from './model.ts';
+import { draftIssues, removeGroup, setGroupHidden } from './model.ts';
 
 const direct = { kind: 'builtin', name: 'DIRECT' } as const;
 const selected = { kind: 'group', groupId: 'g1' } as const;
@@ -41,5 +41,14 @@ describe('模板草稿', () => {
     expect(next.rules[2]!.options).toEqual({ noResolve: true, src: true });
     expect(next.final).toEqual({ kind: 'builtin', name: 'REJECT' });
     expect(body).toEqual(snapshot);
+  });
+});
+
+describe('setGroupHidden', () => {
+  const group: TemplateBody['groups'][number] = { id: 'g', name: '组', type: 'select', members: [] };
+  it('取消隐藏时删除字段，保留其他展示参数', () => {
+    expect(setGroupHidden(group, true).display).toEqual({ hidden: true });
+    expect('display' in setGroupHidden({ ...group, display: { hidden: true } }, false)).toBe(false);
+    expect(setGroupHidden({ ...group, display: { hidden: true, icon: 'a' } }, false).display).toEqual({ icon: 'a' });
   });
 });

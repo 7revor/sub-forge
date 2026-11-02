@@ -285,6 +285,8 @@ export type ProfileRouting =
     extraGroups?: GroupSpec[];
     /** 放在模板组之前的独立组 ID，顺序仍由 extraGroups 决定。 */
     prependGroupIds?: ID[];
+    /** 本订阅对模板组隐藏状态的覆盖，只保存与模板不同的值；没有记录的组跟随模板。 */
+    groupHidden?: Record<ID, boolean>;
   }
   | { mode: 'independent'; config: RoutingConfig; initializedFrom?: { templateId: ID; version?: number; name?: string } };
 

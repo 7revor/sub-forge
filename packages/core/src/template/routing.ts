@@ -1,5 +1,5 @@
 // 订阅分流配置：绑定模式补充成员与模板前后的自定义规则，独立模式拥有完整配置。
-import type { GroupMember, Overlay, Profile, RoutingConfig, Target, Template } from '../types.ts';
+import type { GroupMember, Overlay, Profile, ProfileRouting, RoutingConfig, Target, Template } from '../types.ts';
 import { Report } from '../report.ts';
 import { findGroupCycles, mergeTemplate, type Effective } from './merge.ts';
 
@@ -56,10 +56,26 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
     checkTarget(rule.target, `rule:${rule.id}`);
   }
   const effective = mergeTemplate(template, profileEditorOverlay(profile), report);
+  const groupHidden = profile.routing.groupHidden ?? {};
+  for (const id of Object.keys(groupHidden)) {
+    if (!template.groups.some(g => g.id === id)) report.warn('binding.orphan', `策略组 ${id} 已删除，它的隐藏设置不再生效`, `group:${id}`);
+  }
+  effective.groups = effective.groups.map(g => {
+    const hidden = g.origin === 'template' ? groupHidden[g.id] : undefined;
+    return hidden === undefined ? g : { ...g, display: { ...g.display, hidden } };
+  });
   const before = new Set(profile.routing.prependGroupIds ?? []);
   effective.groups = [...effective.groups.filter(g => g.origin === 'profile' && before.has(g.id)), ...effective.groups.filter(g => g.origin === 'template'), ...effective.groups.filter(g => g.origin === 'profile' && !before.has(g.id))];
   for (const cycle of findGroupCycles(effective.groups)) report.error('binding.group-cycle', `模板与追加成员的组引用成环：${cycle.join(' → ')}`);
   return effective;
+}
+
+/** 设置模板组在本订阅的隐藏状态：与模板相同即恢复跟随，同时清理已删除组的旧记录。 */
+export function withGroupHidden<R extends Extract<ProfileRouting, { mode: 'bound' }>>(routing: R, template: Pick<Template, 'groups'>, id: string, hidden: boolean): R {
+  const next = Object.fromEntries(Object.entries(routing.groupHidden ?? {}).filter(([key]) => key !== id && template.groups.some(g => g.id === key)));
+  if (hidden !== !!template.groups.find(g => g.id === id)?.display?.hidden) next[id] = hidden;
+  const { groupHidden: _old, ...rest } = routing;
+  return (Object.keys(next).length ? { ...rest, groupHidden: next } : rest) as R;
 }
 
 export function additionsFromOverlay(overlay: Overlay): Record<string, GroupMember[]> {

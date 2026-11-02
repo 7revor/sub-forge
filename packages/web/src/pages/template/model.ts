@@ -1,4 +1,4 @@
-import { localRulesError, rawRuleError, type ReportItem, type RuleIR } from '@sub-forge/core';
+import { localRulesError, rawRuleError, type GroupSpec, type ReportItem, type RuleIR } from '@sub-forge/core';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
 
 export function incompleteRule(rule: RuleIR): boolean {
@@ -17,6 +17,14 @@ export function draftIssues(body: TemplateBody): ReportItem[] {
       level: 'error', code: 'template.empty-matcher', message: '请补全规则匹配项后再保存', where: `rule:${r.id}`,
     })),
   ];
+}
+
+/** 取消隐藏时删除字段，模板 YAML 不写入默认的 hidden: false。 */
+export function setGroupHidden<G extends Pick<GroupSpec, 'display'>>(group: G, hidden: boolean): G {
+  const { hidden: _old, ...display } = group.display ?? {};
+  if (hidden) return { ...group, display: { ...display, hidden } };
+  const { display: _display, ...rest } = group;
+  return (Object.keys(display).length ? { ...rest, display } : rest) as G;
 }
 
 export function removeGroup(body: TemplateBody, id: string): TemplateBody {

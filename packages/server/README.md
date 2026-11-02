@@ -256,7 +256,7 @@ SQLite v15 清除订阅源旧 UA / 超时，只保留 `fetch.ttlSec`，保留文
 
 ## 模板关系与旧数据升级（数据库 v16）
 
-新订阅保存 `routing.mode = bound | independent` 与空 `overlay`。绑定保存模板 ID、`groupAdditions` 与可选前置规则，不需要版本号；独立保存完整 groups/rules/final，初始化来源仅作说明。旧的 template/overlay 创建请求与种子会自动转换，新模式 PUT 不允许回退为旧形状。
+新订阅保存 `routing.mode = bound | independent` 与空 `overlay`。绑定保存模板 ID、`groupAdditions`、可选的 `groupHidden`（与模板不同的隐藏状态）与可选前置规则，不需要版本号；独立保存完整 groups/rules/final，初始化来源仅作说明。旧的 template/overlay 创建请求与种子会自动转换，新模式 PUT 不允许回退为旧形状。
 
 - `POST /api/profiles/routing/convert`：`{ profile, mode, templateId?, mapping? }`。只返回 `{ item, changes }` 草稿；mapping 以旧组 ID 映射目标 ID，null 表示明确不迁移。应用后通过原 PUT 保存，后保存的内容覆盖当前内容。
 - `GET /api/profiles/migration-backup?id=ID`：仅订阅所有者可读，返回 `{ item: 原始文档 }`；备份在库内加密，删除订阅时一并删除。
