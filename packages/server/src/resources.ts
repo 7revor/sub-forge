@@ -5,7 +5,7 @@ import { ResourceAccessError } from './resource-access.ts';
 // 资源调度与手动刷新使用同一依赖收集和状态。任务持久化，重启后明确标记中断。
 import type { NodeSetID } from '@sub-forge/core';
 import { profileTemplate } from './profile-routing.ts';
-import type { ProfileDoc, RuleSetDoc } from './docs.ts';
+import type { RuleSetDoc } from './docs.ts';
 import { randomId } from './crypto.ts';
 import type { RenderService } from './render.ts';
 import type { SnapshotFetchOptions, SnapshotService } from './snapshots.ts';
@@ -79,7 +79,7 @@ export class ResourceService {
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
-      ...this.store.listTemplates().flatMap(t=>Object.values(this.renderer.collectRules({id:'',name:'',nodeSets:[],chains:[],refPolicy:{default:'wrap'},overlay:{},template:{id:t.id,follow:'latest'}} satisfies ProfileDoc,t).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
+      ...this.store.listTemplates().flatMap(t=>Object.values(this.renderer.collectRuleEntries(t.rules).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
     ]);
   }
   private async each(resources:Resource[],read:(r:Resource,index:number)=>Promise<void>) {

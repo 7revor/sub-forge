@@ -1,21 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ChainResolution, ChainRule } from '@sub-forge/core';
-import { api, type ProfilePreview } from '../../api.ts';
+import { chainCheckOptions, chainCheckSnapshot } from './chainCheckQuery.ts';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { useProfile } from './context.ts';
 
 /** 每份草稿对应独立查询；改动后立即隐藏旧结果，防抖后检查当前配置。 */
 export function useChainCheck() {
   const { draft, template } = useProfile();
-  const snapshot = JSON.stringify({ profile: draft, templateVersion: template?.version });
+  const snapshot = chainCheckSnapshot(draft, template);
   const settled = useDebouncedValue(snapshot, 450);
   const query = useQuery({
-    queryKey: ['profile-chain-check', settled], enabled: draft.chains.length > 0 && snapshot === settled,
-    queryFn: () => {
-      const { profile } = JSON.parse(settled);
-      return api<ProfilePreview>('POST', profile.id ? `/profiles/${profile.id}/preview` : '/profiles/preview', { profile, client: 'mihomo' });
-    },
-    retry: false, refetchOnWindowFocus: false, staleTime: 0,
+    ...chainCheckOptions(settled), enabled: draft.chains.length > 0 && snapshot === settled,
   });
   const current = snapshot === settled && !query.isFetching && !query.error;
   return { result: current ? query.data : undefined, checking: snapshot !== settled || query.isFetching || query.isPending, error: snapshot === settled ? query.error : undefined, refresh: () => void query.refetch() };

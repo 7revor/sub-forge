@@ -1,4 +1,4 @@
-import { stringifyIniBase as testIni } from '@sub-forge/core';
+import { remoteRuleMatcher, stringifyIniBase as testIni } from '@sub-forge/core';
 import { issueProfileToken } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
@@ -21,6 +21,17 @@ async function done(api:Awaited<ReturnType<typeof setup>>['api'],id:string){
   for(let i=0;i<100;i++){const result=await api.get(`/api/refresh-jobs?id=${id}`);if(result.json.job.state!=='running')return result.json.job;await new Promise(r=>setTimeout(r,5));}throw new Error('刷新任务没有结束');
 }
 describe('资源刷新任务',()=>{
+  it('未被订阅绑定的模板也收集远程依赖，保留模板作用域并跳过停用规则', async () => {
+    const h = setupApp(); active.push(h);
+    const target = { kind: 'builtin' as const, name: 'DIRECT' as const };
+    const rule = { id: 'r', matcher: remoteRuleMatcher('https://rules.test/template'), target };
+    h.store.putTemplate({ id: 't', name: '独立模板', groups: [], rules: [rule, { ...rule, id: 'same' }, { ...rule, id: 'off', enabled: false, matcher: remoteRuleMatcher('https://rules.test/disabled') }], final: target });
+    const service = new ResourceService(h.store, h.snapshots, h.renderer);
+    const resources = service.all();
+    expect(resources.map(resource => ({ url: resource.url, scope: resource.options.scope }))).toEqual([{ url: 'https://rules.test/template', scope: 'template:t' }]);
+    expect(h.store.list('profile')).toEqual([]);
+    await service.stop();
+  });
   it('手动刷新同时重建已发布的 Surge 和 Loon 配置', async () => {
     const h = await setup();
     for (const client of ['surge', 'loon'] as const) expect((await h.renderer.render('p', { client, platform: 'ios' })).ok).toBe(true);

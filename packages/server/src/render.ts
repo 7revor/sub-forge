@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { stringify } from 'yaml';
 import {
   resolveProfileRouting, Report, renderMihomo, renderStash, renderSurge, renderLoon, isIniClient, stringifySurge, surgeProxyLine, loonProxyLine, exportStashConfig, sourceKey, sourceLabel, stableStringify,
-  type Client, type HostedRuleReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs,
+  type Client, type HostedRuleReference, type DependencyEntry, type Matcher, type MihomoRenderResult, type NodeSetID, type NodeSetInputs, type Platform, type ReportItem, type RuleSetInputs, type RuleEntry,
 } from '@sub-forge/core';
 import type { ProfileDoc, RuleSetDoc, SourceDoc, TemplateVersionDoc } from './docs.ts';
 import type { SnapshotService } from './snapshots.ts';
@@ -330,7 +330,7 @@ export class RenderService {
     if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
     if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
     const result = (target.client === 'loon' ? renderLoon : target.client === 'surge' ? renderSurge : target.client === 'stash' ? renderStash : renderMihomo)({
-      profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], refPolicy: { default: 'wrap' }, overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
+      profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
       platform: target.platform,
       nodeSets: loaded.inputs, rules: { rulesets: {}, snapshots: {} }, urls: { provider: key => key, ruleset: key => key },
     });
@@ -362,15 +362,19 @@ export class RenderService {
 
   /** 模板规则与 Profile 私有规则引用到的规则集 */
   collectRules(profile: ProfileDoc, template: TemplateVersionDoc | undefined): RuleSetInputs {
+    // 合并报告由渲染统一返回；历史输入仍由同一解析器兼容。
+    return this.collectRuleEntries(resolveProfileRouting(profile, template, new Report()).rules);
+  }
+
+  /** 已有有效规则直接收集依赖，模板无需构造临时订阅。 */
+  collectRuleEntries(rules: RuleEntry[]): RuleSetInputs {
     const out: RuleSetInputs = { rulesets: {}, snapshots: {} };
     const visit = (m: Matcher) => {
       if (m.kind !== 'ruleset') return;
       const d = resolveRuleSetReference(m, this.store);
       if (d) out.rulesets[m.id] = d;
     };
-    // 与内核渲染使用同一份有效规则：覆盖层可禁用或重新启用模板规则，孤儿锚点也不再参与拉取。
-    // 合并报告由 renderMihomo 统一返回，避免重复记录。
-    for (const r of resolveProfileRouting(profile, template, new Report()).rules) {
+    for (const r of rules) {
       if (r.enabled !== false) visit(r.matcher);
     }
     return out;
