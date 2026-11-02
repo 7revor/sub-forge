@@ -119,7 +119,7 @@ export class SnapshotService {
     this.inflight.set(resource,p);
     return p;
   }
-  async get(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}, policy: { waitForFresh?: boolean; refresh?: boolean } = {}): Promise<SnapshotResult> {
+  async get(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}, policy: { refresh?: boolean } = {}): Promise<SnapshotResult> {
     const status = this.status(kind,id,url,opts);
     let latest = this.store.latestSnapshot(kind,status.resource,url);
     if (policy.refresh || status.nextFetchAt === undefined || this.now() >= status.nextFetchAt || status.refreshing) {

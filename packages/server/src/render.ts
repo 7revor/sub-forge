@@ -4,9 +4,9 @@ import { queryUrl } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
-// 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 缓存；失败时返回上一份成功结果（OUT-05 / TPL-12）。
+// 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 记录成功结果；失败时返回上一份成功结果（OUT-05 / TPL-12）。
 // 渲染结果与 token 无关：地址里先写占位符，下发时再替换成请求所用的 token，
-// 这样重置订阅链接后仍可复用同一 Profile 的缓存与"上一份成功结果"。
+// 这样重置订阅链接后仍可复用同一 Profile 的"上一份成功结果"。
 
 import { createHash } from 'node:crypto';
 import { stringify } from 'yaml';
@@ -45,7 +45,7 @@ export type StoredRender = {
 };
 
 export type RenderOutcome =
-  | { ok: true; source: 'fresh' | 'cache' | 'last-good'; render: StoredRender; report: ReportItem[] }
+  | { ok: true; source: 'fresh' | 'last-good'; render: StoredRender; report: ReportItem[] }
   | { ok: false; message: string; report: ReportItem[]; accessDenied?: true };
 
 export type Verifier = (yaml: string) => Promise<{ ok: boolean; output: string }>;
@@ -55,7 +55,6 @@ export type RenderServiceOptions = {
   publicUrl: string;
   /** 可选：渲染后用 mihomo -t 校验（REF-08 P1） */
   verify?: Verifier;
-  cacheSize?: number;
 };
 
 /** 流量累加，缺失字段不补零，到期时间取已知的最早值。 */
@@ -86,7 +85,7 @@ function nodeTraffic(ref: NodeSetID, inputs: NodeSetInputs, infos: Map<string, T
 
 class ConcurrentRenderChange extends Error {}
 
-type Attempt = { from?: 'fresh' | 'cache'; render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
+type Attempt = { render?: StoredRender; report: ReportItem[]; failure?: string; result?: MihomoRenderResult };
 
 export type PreviewOutcome = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; exportUnavailableReason?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 
@@ -112,7 +111,7 @@ export class RenderService {
       // 内核抛出的异常（如依赖解析不收敛）也按渲染失败处理，走兜底
       attempt = { report: pre, failure: `渲染异常：${(e as Error).message}` };
     }
-    if (attempt.render) return { ok: true, source: attempt.from ?? 'fresh', render: attempt.render, report: attempt.report };
+    if (attempt.render) return { ok: true, source: 'fresh', render: attempt.render, report: attempt.report };
 
     if (!this.store.get('profile', profileId)) return { ok: false, message: 'Profile 不存在', report: attempt.report };
     const saved = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
@@ -155,7 +154,7 @@ export class RenderService {
   }
 
   /**
-   * 预演：不读写缓存、不更新"上一份成功结果"。用于 Profile 预览，以及模板发布前对现有 Profile 的试渲染（TPL-07 ②）。
+   * 预演：复用上游快照，不读写"上一份成功结果"。用于 Profile 预览，以及模板发布前对现有 Profile 的试渲染（TPL-07 ②）。
    * template 传入时代替 Profile 当前引用的模板版本。
    */
   async preview(profileId: string, target: Target, overrides: { profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<PreviewOutcome> {
@@ -171,7 +170,7 @@ export class RenderService {
     } finally { this.store.pruneResourceBindings(); }
   }
 
-  /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不读写渲染缓存、last-good 或访问日志。 */
+  /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不读写 last-good 或访问日志。 */
   async previewDraft(profile: ProfileDoc, target: Target, owner?: string): Promise<PreviewOutcome> {
     return this.preview('', target, { profile: { ...profile, id: '' }, owner });
   }
@@ -290,7 +289,7 @@ export class RenderService {
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };
-    if (opts.dry) return { from: 'fresh', render, report, result };
+    if (opts.dry) return { render, report, result };
 
     this.store.db.transaction(() => {
       for (const [file, reference] of ruleReferences) {
@@ -299,18 +298,16 @@ export class RenderService {
       }
       this.remember(profileId, target, render);
     })();
-    return { from: 'fresh', render, report };
+    return { render, report };
   }
 
   /**
    * 收集节点集（含组合成员，递归）并取得远程订阅源的快照。处理链逐步预览也用它。
-   * 返回的 hashes 用作缓存键的一部分（用快照哈希而不是正文）。
    */
-  async loadNodeSets(refs: NodeSetID[], owner?: string | null): Promise<{ inputs: NodeSetInputs; userinfo: Map<string, TrafficInfo>; hashes: string[]; report: ReportItem[]; snapshots: {snapshot:SnapshotRow;revision?:string}[] }> {
+  async loadNodeSets(refs: NodeSetID[], owner?: string | null): Promise<{ inputs: NodeSetInputs; userinfo: Map<string, TrafficInfo>; report: ReportItem[]; snapshots: {snapshot:SnapshotRow;revision?:string}[] }> {
     const configurationRevision = this.store.configurationRevision;
     const { inputs, sources } = this.collectNodeSets(refs, owner);
     const userinfo = new Map<string, TrafficInfo>();
-    const hashes: string[] = [];
     const snapshots: {snapshot:SnapshotRow;revision?:string}[] = [];
     const report: ReportItem[] = [];
     for (const src of sources) {
@@ -319,12 +316,11 @@ export class RenderService {
       if (r.snapshot) snapshots.push({snapshot:r.snapshot,revision:r.revision});
       if (r.snapshot?.body !== undefined) {
         inputs.snapshots[src.id] = [r.snapshot.body];
-        hashes.push(`${src.id}|${src.url}|${r.snapshot.hash}`);
         if (r.snapshot.userinfo) userinfo.set(src.id, r.snapshot.userinfo);
       }
       if (r.error) report.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
     }
-    return { inputs, userinfo, hashes, report, snapshots };
+    return { inputs, userinfo, report, snapshots };
   }
 
   async nodeSet(ref: NodeSetID, owner: string, target: Target = { client: 'mihomo' }): Promise<{ yaml: string; userinfo?: TrafficInfo }> {

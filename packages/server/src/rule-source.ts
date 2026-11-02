@@ -25,7 +25,7 @@ export class RuleSourceService {
       const prior = saved?.sources.find(s => s.kind === 'remote' && s.url === source.url && s.format === source.format && s.behavior === source.behavior && JSON.stringify({ua:s.fetch?.ua,timeoutMs:s.fetch?.timeoutMs}) === JSON.stringify({ua:source.fetch?.ua,timeoutMs:source.fetch?.timeoutMs}));
       if (saved && prior) {
         const binding = ruleBinding(saved.id, context);
-        const result = await this.limited(() => this.snapshots.get('ruleset', binding.id, source.url!, { ...source.fetch, format: source.format, behavior: source.behavior, scope: binding.scope }, { waitForFresh: true, refresh }));
+        const result = await this.limited(() => this.snapshots.get('ruleset', binding.id, source.url!, { ...source.fetch, format: source.format, behavior: source.behavior, scope: binding.scope }, { refresh }));
         content = result.snapshot?.body; fetchedAt = result.snapshot?.fetchedAt; error = result.error; stale = result.stale;
       } else {
         const key = JSON.stringify([userId, source.url, source.format, source.fetch ?? {}]);
