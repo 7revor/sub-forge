@@ -1,3 +1,4 @@
+import { SCHEMA_VERSION } from '../src/schema.ts';
 import { previewRuleset } from './helpers.ts';
 import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
@@ -38,7 +39,7 @@ describe('no-resolve 以内容为准', () => {
       const historical = { rulesets: { 'old.list': 'IP-CIDR,198.51.100.0/24,no-resolve\n' } };
       store.putLastGood('bound', 'mihomo', historical);
       store.db.pragma('user_version = 17'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       expect(store.getWithOwner('ruleset', 'rs')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { sources: [source] } });
       expect(store.get('ruleset', 'rs')).not.toHaveProperty('noResolve');
       expect(store.listTemplates()).toHaveLength(1);

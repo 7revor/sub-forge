@@ -39,7 +39,7 @@
 | 动态成员与远程资源 | 展开 `include-all*`；包含／排除正则、类型排除和精确远程节点在服务端筛选；生成稳定子集资源；筛空组用 REJECT；空原始资源不下发 | 继续尊重每个来源的 provider／inline 选择；保留公共 provider 字段；删除生成组的 `empty-fallback` 与已由服务端执行的筛选字段 |
 | 代理链 | 共用前置选择、隐藏组名称、精确远程节点引用、依赖和循环校验 | 已删除同 provider／跨 provider 专用阻断及网卡与 dialer 组合阻断，不另建 Stash 链实现 |
 | 规则方言 | URL-REGEX、USER-AGENT 正常输出；端口集合转 OR；源 CIDR 转 SRC-IP；简单进程名称正则转通配；不能等价表达的规则给诊断并跳过 | 仍拒绝源 ASN/GEOIP、路径通配／路径正则、非 Surge 的 extended-matching；逻辑子条件失败整条跳过，不放宽匹配 |
-| 原文继承、缓存与交付 | Mihomo 公共 → 历史 Stash 公共 → Stash 应用追加；主配置含 `#SUBSCRIBED`；公共规则版本按本次修复更新；文本规则可独立内嵌 | 保留独立应用与产物身份；MRS 不能内嵌到独立文本；含远程节点的草稿导出受限；主配置禁止回退旧专用生成结果 |
+| 原文继承、缓存与交付 | Mihomo 公共 → Stash 应用追加；主配置含 `#SUBSCRIBED`；公共规则版本按本次修复更新；文本规则可独立内嵌 | 保留独立应用与产物身份；MRS 不能内嵌到独立文本；含远程节点的草稿导出受限；主配置禁止回退旧专用生成结果 |
 
 实现依据：[节点语义](../packages/core/src/render/node-semantics.ts)、[Stash 最末层适配](../packages/core/src/render/stash-config.ts)、[远程节点](../packages/core/src/render/remote-providers.ts)、[规则方言](../packages/core/src/rules/client.ts)、[主配置交付与缓存](../packages/server/src/render.ts)。基础原文不套节点／组白名单，不会自动剔除 Mihomo 专属基础字段。
 
@@ -52,7 +52,7 @@
 | A01 | [types / base/native](../packages/core/src/base/native.ts)：身份和产品分组 | 四输出 Mihomo／Surge／Stash／Loon，三组产品菜单；区分 YAML／INI；应用原文独立 |
 | A02 | [server/client](../packages/server/src/client.ts)：UA 与参数识别 | 参数优先；clash 别名归 Mihomo；默认 Mihomo；应用与内核／系统匹配；Apple 应用推断 |
 | A03 | [server/render](../packages/server/src/render.ts)：目标归一和 API 校验 | 各端目标组合校验；非 Mihomo 的显式系统只允许 iOS／macOS；多入口仍各有校验 |
-| A04 | [base/native](../packages/core/src/base/native.ts)：原文继承 | Mihomo／Surge／Loon 按内核→应用；Stash 额外承接历史 Stash 公共原文 |
+| A04 | [base/native](../packages/core/src/base/native.ts)：原文继承 | Mihomo／Surge／Loon 按内核→应用；Stash 直接继承 Mihomo；v33 将旧公共差异去重迁入应用追加 |
 | A05 | [base/native](../packages/core/src/base/native.ts)：原文合并 | YAML 递归映射合并、数组整体替换；INI General／Host／MITM 按键覆盖，其余追加；拒绝受管理段；INI 测速值仍供生成联动 |
 | A06 | [native-migration](../packages/server/src/native-migration.ts)：旧公共映射 | 仅 v28 升级／旧种子导入；展开 common／patch／raw／旧预设；停用并备份旧平台规则条件 |
 | A07 | [proxy/parse](../packages/core/src/proxy/parse.ts)：节点输入 | Clash YAML、Surge／Loon 节点行、URI／base64 转统一节点；不恢复整份基础配置导入 |

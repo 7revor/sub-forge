@@ -11,7 +11,7 @@ const GROUPS = BASE_KERNELS.map(scope => ({ label: scope.label, targets: [
   ...BASE_CLIENT_APPS.filter(app => baseKernel(app.kernel) === scope.value).map(app => ({ kernel: app.kernel, app: app.id, label: app.label, title: app.label })),
 ] as Target[] }));
 const TARGETS = GROUPS.flatMap(group => group.targets);
-const scopeLabel = (kernel: Client) => kernel === 'stash' ? '历史 Stash 公共配置' : `${BASE_KERNELS.find(scope => scope.value === kernel)!.label} 公共配置`;
+const scopeLabel = (kernel: Client) => `${BASE_KERNELS.find(scope => scope.value === baseKernel(kernel))!.label} 公共配置`;
 const lineCount = (text: string) => text.trimEnd().split('\n').length;
 const INHERITED_MAX_ROWS = 8;
 
@@ -22,13 +22,13 @@ export function NativeBaseEditor({ value, onChange }: { value: NativeBase; onCha
   const [selected, setSelected] = useState(0);
   const [error, setError] = useState<string>();
   const { kernel, app, title } = TARGETS[selected]!;
-  const textOf = (target: Target) => (target.app ? value.clients?.[target.app] : value.kernels?.[target.kernel]) ?? '';
+  const textOf = (target: Target) => (target.app ? value.clients?.[target.app] : value.kernels?.[baseKernel(target.kernel)]) ?? '';
   const inherited = nativeBaseParents(kernel, app).map(parent => ({ kernel: parent, label: scopeLabel(parent), text: value.kernels?.[parent] ?? '' })).filter(parent => parent.text.trim());
   const format = isIniClient(kernel) ? 'INI' : 'YAML';
   const scopeHint = !app ? '本内核客户端共用，客户端配置优先。' : !inherited.length ? '当前客户端专用。' : format === 'YAML' ? '合并字段，客户端优先；列表整体替换。' : 'General、Host、MITM 同名键覆盖，其他段落追加。';
   const text = textOf(TARGETS[selected]!);
   const select = (index: number) => { setSelected(index); setError(undefined); };
-  const update = (text: string) => { setError(undefined); onChange(app ? { ...value, clients: { ...value.clients, [app]: text } } : { ...value, kernels: { ...value.kernels, [kernel]: text } }); };
+  const update = (text: string) => { setError(undefined); onChange(app ? { ...value, clients: { ...value.clients, [app]: text } } : { ...value, kernels: { ...value.kernels, [baseKernel(kernel)]: text } }); };
   return <div className="native-base-workspace">
     <div role="tablist" aria-label="配置目标" aria-orientation="vertical" className="native-base-targets">
       {GROUPS.map(group => <div key={group.label} role="presentation" className="native-base-group">

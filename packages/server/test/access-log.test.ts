@@ -1,3 +1,4 @@
+import { SCHEMA_VERSION } from '../src/schema.ts';
 import { serve } from '@hono/node-server';
 import { once } from 'node:events';
 import { afterEach, expect, it } from 'vitest';
@@ -184,7 +185,7 @@ it.each([24, 25])('v%s 升级保留原日志，旧记录 IP 为空，新记录�
     expect(store.getLastGood('p', 'mihomo')).toBeUndefined();
     store.logAccess({ ...record, clientIp: '2001:db8::9', peerIp: '10.2.0.2', ipSource: 'x-forwarded-for' });
     store.close(); store = new Store(path, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
     const result = store.userAccessPage(user.id, { page: 1, pageSize: 20, q: '' });
     expect(result.total).toBe(2);
     expect(result.items[0]).toMatchObject({ clientIp: '2001:db8::9', peerIp: '10.2.0.2', ipSource: 'x-forwarded-for' });

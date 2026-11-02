@@ -19,13 +19,13 @@
 }
 ```
 
-内核公共追加匹配同组客户端；客户端层可选，只匹配所选应用。2026-11-02 起，产品顶层分组统一为 Mihomo、Surge、Loon，Mihomo 下直接列出 Stash iOS、Stash macOS；Surge 下列出 Surge iOS、Surge macOS；Loon 下列出 Loon iOS、Loon macOS。不设置中间 Stash 菜单，也不再单列 FlClash、Clash Verge Rev 等标准 Mihomo 客户端。Stash 两端继承 Mihomo 公共 YAML，再应用各自追加。[Stash 官方](https://stash.wiki/)仍称其为兼容 Clash 配置的自研内核，此处是项目的配置分组与继承约定；按用户要求不增加兼容过滤或字段转换。原有 `kernels.stash`、`clients.stash-ios`、`clients.stash-macos` 槽位保留，既有原文无需迁移。Surge 与 Loon 各自保存 INI。
+内核公共追加匹配同组客户端；客户端层可选，只匹配所选应用。2026-11-02 起，产品顶层分组统一为 Mihomo、Surge、Loon，Mihomo 下直接列出 Stash iOS、Stash macOS；Surge 下列出 Surge iOS、Surge macOS；Loon 下列出 Loon iOS、Loon macOS。不设置中间 Stash 菜单，也不再单列 FlClash、Clash Verge Rev 等标准 Mihomo 客户端。Stash 两端继承 Mihomo 公共 YAML，再应用各自追加。[Stash 官方](https://stash.wiki/)仍称其为兼容 Clash 配置的自研内核，此处是项目的配置分组与继承约定；按用户要求不增加兼容过滤或字段转换。`kernels` 仅允许 `mihomo`、`surge`、`loon`；Stash 使用 `clients.stash-ios`、`clients.stash-macos` 保存应用追加，旧 `kernels.stash` 由 v33 迁移退役。Surge 与 Loon 各自保存 INI。
 
 编辑器只提供目标和文本框，不把原文解析为表单。原文的注释、空行、引号、未完成语法均直接保存；切换选项不改写或迁移文本。清空客户端选择只是切换编辑视图，已有内容仍保存并参与相应客户端生成；要移除某应用追加，应清空其文本框。
 
 2026-11-02 工作区重设计（取代此前的折叠树与深色继承区）：左侧按 Mihomo、Surge、Loon 分组常驻展开，每组为「公共配置」加各客户端，已填写的目标显示行数。右侧是一个编辑框：顶栏显示 YAML / INI、用途或合并规则，以及格式化（仅 YAML）和清空；中部从上到下叠放继承层与当前层；底栏提醒节点、策略组和规则由系统生成，请勿在此填写。
 
-选中客户端时，按继承顺序显示非空的只读继承层，浅灰底、不折叠，标题为「继承自 Mihomo 公共配置 · 只读」，超过 8 行时在层内滚动；缺省、空字符串或纯空白公共配置不占位。Stash iOS/macOS 展示 Mihomo 公共配置，已有 `kernels.stash` 非空时额外展示其历史公共原文。有继承层时当前层标题为「当前客户端追加」。右侧不重复客户端标题，当前目标由左侧选中项表达。合并规则说明：内核页「本内核客户端共用，客户端配置优先」；有继承内容时 YAML「合并字段，客户端优先；列表整体替换」或 INI「General、Host、MITM 同名键覆盖，其他段落追加」；无公共内容时「当前客户端专用」。
+选中客户端时，按继承顺序显示非空的只读继承层，浅灰底、不折叠，标题为「继承自 Mihomo 公共配置 · 只读」，超过 8 行时在层内滚动；缺省、空字符串或纯空白公共配置不占位。Stash iOS/macOS 展示 Mihomo 公共配置，不再展示或读取历史 Stash 公共层。有继承层时当前层标题为「当前客户端追加」。右侧不重复客户端标题，当前目标由左侧选中项表达。合并规则说明：内核页「本内核客户端共用，客户端配置优先」；有继承内容时 YAML「合并字段，客户端优先；列表整体替换」或 INI「General、Host、MITM 同名键覆盖，其他段落追加」；无公共内容时「当前客户端专用」。
 
 继承区直接读取当前 `value`，因此未保存的内核草稿也会立即回显；不解析、不复制到客户端、不写回持久层。格式化和清空只作用于当前目标原文。本轮不增加合并结果视图或逐字段覆盖标注。
 
@@ -38,7 +38,7 @@
 
 客户端层高于内核层。只处理命中目标的文本，其他内核或应用中未完成的文本不会影响当前输出。
 
-Stash 的顺序为 **Mihomo 公共原文 → 历史 Stash 公共原文（若存在） → Stash iOS/macOS 原文（可选）**。缺省或空的下层继续继承上层；Mihomo 错误会使 Stash 生成失败，Stash 错误不影响 Mihomo、Surge、Loon。客户端覆盖过的字段遵循下述规则，未覆盖字段随内核更新。原文始终独立保存。
+Stash 的顺序为 **Mihomo 公共原文 → Stash iOS/macOS 原文（可选）**。缺省或空的下层继续继承上层；Mihomo 错误会使 Stash 生成失败，Stash 错误不影响 Mihomo、Surge、Loon。客户端覆盖过的字段遵循下述规则，未覆盖字段随内核更新。当前两层原文始终独立保存。未识别应用的 `target=stash` 仅使用 Mihomo 公共原文。
 
 - YAML：映射递归合并，数组、标量及 `null` 整体替换；保留 `false`、`0`、空数组和含冒号/逗号的 DNS policy 键。输出会重新排版，保存的原文不变。重复键、循环别名、非映射顶层及非法键会报错。
 - INI：只识别段落和必要的键。General、Host、MITM 同名键由后层替换，其余段落按顺序追加；不转换 DNS/Hosts 的值，保留原生指令及条件注释。重复键的合并不等于客户端语义校验。
@@ -53,7 +53,7 @@ Stash 的顺序为 **Mihomo 公共原文 → 历史 Stash 公共原文（若存�
 
 `target=mihomo|surge|stash|loon` 选择内核；`app` 选择可选客户端：`flclash`、`clash-verge`、`surge-ios`、`surge-macos`、`stash-ios`、`stash-macos`、`loon-ios`、`loon-macos`。不匹配的内核/应用组合返回错误。历史 `platform` 参数继续用于应用识别与日志，不参与规则转换。
 
-常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源、刷新链接和最近成功配置包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下只提供 Stash iOS/macOS 两个应用选项，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。旧 FlClash、Clash Verge Rev 应用参数及已保存的追加继续兼容，本轮不迁移或删除已有配置。
+常见 User-Agent 自动识别应用；无法识别应用时只使用对应公共追加。显式 `app` 优先；主订阅、节点资源、刷新链接和最近成功配置包含应用维度，避免借用另一应用的基础追加。完整订阅预览的顶层只有 Mihomo、Surge、Loon，Mihomo 下只提供 Stash iOS/macOS 两个应用选项，仍请求已有 Stash 输出目标；可留空应用只看 Mihomo 层。API 的 `target=stash`、原有 Stash 序列化和规则适配继续保留，不因界面分组改变。旧 FlClash、Clash Verge Rev 应用参数及已保存的追加继续兼容，对应应用追加继续保留。
 
 ## 规则只区分内核
 
@@ -62,6 +62,10 @@ Stash 的顺序为 **Mihomo 公共原文 → 历史 Stash 公共原文（若存�
 不能用此变化推断每个客户端都会安全忽略所有未知规则；这里不新增版本/平台过滤器，也不拆掉逻辑条件放宽匹配。
 
 ## 升级
+
+数据库 v33 在升级及旧种子导入的事务内退役 `kernels.stash`：递归去除与 Mihomo 公共原文重复的字段，将剩余差异合并到 Stash iOS/macOS 追加，已有应用追加优先。列表整体比较，保留 `false`、`0`、`null`、空列表及必要的空映射。没有差异时不改写应用原文；需要去重或合并时 YAML 会重新排版，原始注释、格式等可从加密备份恢复。
+
+迁移前的文档以 `kind=profile-stash-common-v33` 独立存入 `native_migration_backups`，不覆盖以前的迁移备份，归属和更新时间不变；受影响订阅的最近成功产物清除，避免回退到旧覆盖结果。重启和重复导入当前结构均不再迁移。无效 YAML 保留到应用层并给出诊断；无法等价折叠的映射/非映射交叉覆盖保留两份原文并报告错误，修复后再生成。非法文本类型使整个事务回滚。新建、更新和草稿预览拒绝 `kernels.stash`，包括空字符串。
 
 数据库 v28 在事务中备份受影响文档到 `native_migration_backups`，使用当前数据库密钥加密。保留原归属及更新时间；迁移失败整体回滚，重启后不重复转换原文。
 

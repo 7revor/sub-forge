@@ -1,3 +1,4 @@
+import { SCHEMA_VERSION } from '../src/schema.ts';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -26,7 +27,7 @@ describe('刷新任务存储', () => {
       expect(jobs(store)).toEqual([]);
       store.db.exec('DROP TABLE refresh_jobs; PRAGMA user_version = 31');
       store.close(); store = new Store(file, { cipher });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       putJob(store, 'kept', 'profile', 'p');
       store.db.pragma('user_version = 31');
       store.close(); store = new Store(file, { cipher });

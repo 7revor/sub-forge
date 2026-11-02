@@ -86,7 +86,7 @@
 当前基础配置没有公共字段到各内核的自动映射，没有预设 API。配置菜单分 Mihomo／Surge／Loon，输出目标仍包含 Stash。
 
 - Mihomo／Surge／Loon：内核原文 → 应用原文。
-- Stash：Mihomo 公共 → 历史 Stash 公共（若有）→ Stash 应用原文。
+- Stash：Mihomo 公共 → Stash 应用原文（v33 迁移退役旧 Stash 公共层）。
 - YAML 映射递归合并、数组及标量后层替换；INI General／Host／MITM 按键覆盖，其余段追加。
 - 保存保留原文；生成时检查语法与受管理段冲突，基础字段不做跨内核翻译或兼容过滤。
 - `common / patch / surgePatch / stashPatch / loonPatch / raw / presetId` 仅在 v28 历史升级及旧种子导入边界转换；原文与备份兼容保留。`kernels.stash` 和隐藏应用追加仍有实际用途。

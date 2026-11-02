@@ -20,7 +20,7 @@ async function scenario() {
   const user = await addUser(env.store, 'alice', 'admin'); await addUser(env.store, 'bob');
   const alice = client(env.app), bob = client(env.app); await alice.login('alice'); await bob.login('bob');
   env.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '测试节点', type: 'hysteria2', server: 'example.test', port: 443, password: 'example-password' }] }, user.id);
-  const draft = { name: '双客户端订阅', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, 'allow-lan': true , dns: { enable: true } }), stash: testYaml({ mode: 'rule', dns: { nameserver: ['https://dns.example.test/dns-query'] }, 'log-level': 'warning' }) } },
+  const draft = { name: '双客户端订阅', nodeSets: [{ ref: { type: 'local', id: 'nodes' }, output: 'provider' }], chains: [], overlay: {}, refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890, 'allow-lan': true , dns: { enable: true } }), }, clients: { 'stash-ios': testYaml({ mode: 'rule', dns: { nameserver: ['https://dns.example.test/dns-query'] }, 'log-level': 'warning' }), 'stash-macos': testYaml({ mode: 'rule', dns: { nameserver: ['https://dns.example.test/dns-query'] }, 'log-level': 'warning' }) } },
     routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '代理', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'nodes' } }] }], rules: [
       { id: 'remote', matcher: remoteRuleMatcher(rulesUrl), target: { kind: 'group', groupId: 'g' } },
       { id: 'proc', matcher: { kind: 'rule', rule: { type: 'PROCESS', kind: 'name', mode: 'exact', value: 'Example' } }, target: { kind: 'group', groupId: 'g' } },
@@ -32,6 +32,24 @@ async function scenario() {
 }
 
 describe('Stash 主订阅与资源隔离', () => {
+  it('新建、更新和两种草稿预览均拒绝重新写入旧 Stash 公共层，包含空字符串', async () => {
+    const h = await scenario();
+    for (const text of ['', 'ipv6: false\n']) {
+      const profile = { ...h.profile, base: { kernels: { stash: text } } };
+      const responses = [
+        await h.alice.post('/api/profiles', profile),
+        await h.alice.put(`/api/profiles/${h.profile.id}`, profile),
+        await h.alice.post('/api/profiles/preview', { profile, client: 'stash' }),
+        await h.alice.post(`/api/profiles/${h.profile.id}/preview`, { profile, client: 'stash' }),
+      ];
+      for (const response of responses) {
+        expect(response.status, response.text).toBe(400);
+        expect(response.text).toContain('Stash 公共配置已移除');
+      }
+    }
+    expect(h.store.get('profile', h.profile.id)!.base).toEqual(h.profile.base);
+  });
+
   it('UA 与参数正确识别，macOS 优先于 iOS 默认值', () => {
     expect(detectClient('Stash/3.6.0', {})).toMatchObject({ client: 'stash', platform: 'ios', by: 'ua' });
     expect(detectClient('Stash/4.3.0 (macOS)', {})).toMatchObject({ client: 'stash', platform: 'macos', by: 'ua' });
@@ -84,7 +102,7 @@ describe('Stash 主订阅与资源隔离', () => {
     const config = parse(await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=ios`)).text());
     const url = (Object.values(config['rule-providers'])[0] as { url: string }).url;
     const doc = h.store.get('profile', h.profile.id)!;
-    h.store.put('profile', { ...doc, base: { ...doc.base, kernels: { stash: testYaml({ mode: 'direct' }) } } }, h.user.id);
+    h.store.put('profile', { ...doc, base: { ...doc.base, clients: { ...doc.base?.clients, 'stash-ios': testYaml({ mode: 'direct' }) } } }, h.user.id);
     expect((await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=ios`)).status).toBe(200);
     expect(await (await h.app.request(url)).text()).toContain('USER-AGENT,PayPal*');
     expect((await h.app.request(`${url}&platform=macos`)).status).toBe(400);

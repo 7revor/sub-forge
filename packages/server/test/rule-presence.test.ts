@@ -1,3 +1,4 @@
+import { SCHEMA_VERSION } from '../src/schema.ts';
 import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -39,7 +40,7 @@ describe('规则存在即生效', () => {
         rules: { rulesets: { rs: store.get('ruleset', 'rs')! }, snapshots: {} }, urls: { provider: key => key, ruleset: key => key } }).yaml;
       const before = ['p', 'independent'].map(output);
       store.db.pragma('user_version = 16'); store.close(); store = new Store(file, { cipher, now: () => 9999 });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       expect(['p', 'independent'].map(output)).toEqual(before);
       expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 1234 });
       expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'p')?.owner);

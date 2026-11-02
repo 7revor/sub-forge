@@ -1,3 +1,4 @@
+import { SCHEMA_VERSION } from '../src/schema.ts';
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -56,7 +57,7 @@ describe('订阅源单 URL 契约', () => {
     old.addSnapshot({ ownerKind: 'source', ownerId: 's', url, fetchedAt: 100, ok: true, body: '旧快照' });
     old.db.pragma(`user_version = ${version}`); old.close();
     const s = new Store(file, { cipher }); stores.push(s);
-    expect(s.db.pragma('user_version', { simple: true })).toBe(32);
+    expect(s.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
     expect(s.getWithOwner('source', 's')).toMatchObject({ owner: 'alice', doc: { id: 's', url } });
     expect(s.get('source', 's')).not.toHaveProperty('urls');
     expect(s.get('source', 's')).not.toHaveProperty('fetch');

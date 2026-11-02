@@ -1,13 +1,14 @@
 // 只在历史文档导入/升级时运行；新文档始终保存原文，不经过字段映射。
-import { CLIENT_APPS, mergeNativeIni, mergeNativeObjects, parseNativeYaml, CLIENTS, isIniClient, stringifyIniBase, type NativeBase, type Client } from '@sub-forge/core';
+import { CLIENT_APPS, mergeNativeIni, mergeNativeObjects, parseNativeYaml, CLIENTS, isIniClient, stringifyIniBase, type Client } from '@sub-forge/core';
+import type { LegacyNativeBase } from './docs.ts';
 import { stringify } from 'yaml';
 import { lowerCommonBase, mergeBase, type CommonBase } from './legacy-common-base.ts';
 
 type Doc = Record<string, any>;
 const patchKey = (kernel: Client) => kernel === 'mihomo' ? 'patch' : kernel + 'Patch';
 
-function convert(common: CommonBase, native: Doc, notes: Set<string>): NativeBase {
-  const result: NativeBase = { kernels: {}, clients: {} };
+function convert(common: CommonBase, native: Doc, notes: Set<string>): LegacyNativeBase {
+  const result: LegacyNativeBase = { kernels: {}, clients: {} };
   if (common.testUrl !== undefined || common.testTimeoutMs !== undefined) notes.add('旧公共测速默认值已保留在 INI 原文；Mihomo/Stash 没有对应的基础全局项，请在策略组高级设置中确认测速 URL 和超时。原公共值已备份。');
   for (const kernel of CLIENTS) {
     const mapped = lowerCommonBase(common, kernel, kernel === 'surge' ? 'macos' : undefined, native[kernel] ?? {});

@@ -42,7 +42,7 @@ describe('每个用户一个资源令牌', () => {
   it('同一链接按 UA 自动适配客户端，浏览器与未知客户端回落 Mihomo', async () => {
     const h = setupApp();
     try {
-      h.store.put('profile', { id: 'p', name: '多客户端', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890 }), stash: testYaml({ 'log-level': 'warning' }) } } });
+      h.store.put('profile', { id: 'p', name: '多客户端', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, base: { kernels: {mihomo: testYaml({ 'mixed-port': 7890 }) }, clients: { 'stash-ios': testYaml({ 'log-level': 'warning' }), 'stash-macos': testYaml({ 'log-level': 'warning' }) } } });
       issueProfileToken(h.store, { token: 'test', profileId: 'p' });
       for (const ua of ['Stash/3.6.0', 'FlClash/v0.9.2 clash-verge Platform/android', 'clash-verge/v2.5.0', 'Mozilla/5.0', 'curl/8.0', 'Stash/4.3.0 (macOS)']) {
         const res = await h.app.request('/subs/profile?token=test&id=p', { headers: { 'user-agent': ua } });

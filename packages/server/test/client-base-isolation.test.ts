@@ -52,12 +52,12 @@ it('原文逐字保存，Stash 继承 Mihomo、其他内核隔离；仅生成时
   const h = setupApp();
   try {
     await addUser(h.store, 'native', 'admin'); const api = client(h.app); await api.login('native');
-    const config = { kernels: { mihomo, surge, stash: 'dns:\n  nameserver: [https://doh.pub/dns-query]\n', loon: '[General]\nip-mode = v4-only\n[Host]\n*.example.test = server:1.1.1.1\n' }, clients: { 'surge-ios': '[General]\nallow-wifi-access = false\n', 'surge-macos': '[General]\nsocks5-listen = 0.0.0.0:10001, 0.0.0.0:10002\n' } };
+    const config = { kernels: { mihomo, surge, loon: '[General]\nip-mode = v4-only\n[Host]\n*.example.test = server:1.1.1.1\n' }, clients: { 'stash-ios': 'dns:\n  nameserver: [https://doh.pub/dns-query]\n', 'stash-macos': 'dns:\n  nameserver: [https://doh.pub/dns-query]\n', 'surge-ios': '[General]\nallow-wifi-access = false\n', 'surge-macos': '[General]\nsocks5-listen = 0.0.0.0:10001, 0.0.0.0:10002\n' } };
     const base = { ...config, clients: { ...config.clients, flclash: 'allow-lan: false\nport: 0\ndns:\n  nameserver: [9.9.9.9]\n  nameserver-policy:\n    "rule-set:custom": ["tls://1.1.1.1"]\n' } };
     const saved = await api.post('/api/profiles', { ...draft, base }); expect(saved.status, saved.text).toBe(201);
     const id = saved.json.item.id;
     for (const kernel of ['mihomo', 'stash', 'surge', 'loon'] as const) {
-      const output = await h.renderer.render(id, { client: kernel, ...(kernel === 'mihomo' ? { app: 'flclash' as const } : {}) }); expect(output.ok, JSON.stringify(output.report)).toBe(true);
+      const output = await h.renderer.render(id, { client: kernel, ...(kernel === 'mihomo' ? { app: 'flclash' as const } : kernel === 'stash' ? { app: 'stash-ios' as const } : {}) }); expect(output.ok, JSON.stringify(output.report)).toBe(true);
       if (!output.ok) throw new Error(output.message);
       if (kernel === 'mihomo') {
         const actual = parse(output.render.yaml);

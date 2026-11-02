@@ -1,8 +1,8 @@
 import { parseDocument, stringify } from 'yaml';
-import { CLIENTS, isIniClient, type Client } from '../types.ts';
+import { isIniClient, type Client } from '../types.ts';
 import { stripIniComment } from '../render/ini-format.ts';
 
-/** 产品中的配置分组；Stash 归入 Mihomo，但保留已有输出目标与原文槽位。 */
+/** 公共配置只有三组；Stash 保留输出目标，公共原文归入 Mihomo。 */
 export const BASE_KERNELS = [
   { value: 'mihomo', label: 'Mihomo' },
   { value: 'surge', label: 'Surge' },
@@ -12,8 +12,8 @@ export type BaseKernel = typeof BASE_KERNELS[number]['value'];
 export const baseKernel = (client: Client): BaseKernel => client === 'stash' ? 'mihomo' : client;
 
 /** 继承顺序同时用于生成与只读展示，不将上层原文复制到下层。 */
-export function nativeBaseParents(kernel: Client, app?: ClientApp): Client[] {
-  return [...(kernel === 'stash' ? ['mihomo' as const] : []), ...(app ? [kernel] : [])];
+export function nativeBaseParents(kernel: Client, app?: ClientApp): BaseKernel[] {
+  return app ? [baseKernel(kernel)] : [];
 }
 
 /** 配置族与应用分别命名；规则转换只使用 Client（配置族）。 */
@@ -31,7 +31,7 @@ export type ClientApp = typeof CLIENT_APPS[number]['id'];
 /** 编辑与预览只单列需要平台追加的应用，标准 Mihomo 客户端不再占用菜单。旧应用身份继续兼容已有配置与链接。 */
 export const BASE_CLIENT_APPS = CLIENT_APPS.filter(app => app.kernel !== 'mihomo');
 export type NativeBase = {
-  kernels?: Partial<Record<Client, string>>;
+  kernels?: Partial<Record<BaseKernel, string>>;
   clients?: Partial<Record<ClientApp, string>>;
 };
 export type ProfileBase = NativeBase & { enabled?: boolean };
@@ -138,7 +138,8 @@ export function validateNativeBase(value: unknown): asserts value is ProfileBase
     if (configs === undefined) continue;
     if (!object(configs)) throw new Error(field + ' 必须是对象');
     for (const [id, text] of Object.entries(configs)) {
-      const kernel = field === 'kernels' ? CLIENTS.find(k => k === id) : CLIENT_APPS.find(c => c.id === id)?.kernel;
+      if (field === 'kernels' && id === 'stash') throw new Error('Stash 公共配置已移除，请使用 Mihomo 公共配置或 Stash 客户端追加');
+      const kernel = field === 'kernels' ? BASE_KERNELS.find(k => k.value === id)?.value : CLIENT_APPS.find(c => c.id === id)?.kernel;
       if (!kernel) throw new Error('未知的内核或客户端：' + id);
       if (typeof text !== 'string') throw new Error(id + '：追加配置必须是原始文本');
     }
@@ -148,7 +149,7 @@ export function validateNativeBase(value: unknown): asserts value is ProfileBase
 /** 上层公共内容先于当前追加；Stash 直接继承 Mihomo，不转换兼容字段。原文从不回写。 */
 export function resolveNativeBase(kernel: Client, app: ClientApp | undefined, profile?: NativeBase): string {
   if (app && CLIENT_APPS.find(c => c.id === app)?.kernel !== kernel) throw new Error('客户端与内核不匹配');
-  const texts = [...nativeBaseParents(kernel, app).map(parent => profile?.kernels?.[parent]), app ? profile?.clients?.[app] : profile?.kernels?.[kernel]].filter((s): s is string => s !== undefined);
+  const texts = [...nativeBaseParents(kernel, app).map(parent => profile?.kernels?.[parent]), app ? profile?.clients?.[app] : profile?.kernels?.[baseKernel(kernel)]].filter((s): s is string => s !== undefined);
   texts.forEach(text => validateNativeText(text, kernel));
   return isIniClient(kernel) ? mergeNativeIni(texts) : texts.length ? stringify(texts.reduce((out, text) => mergeNativeObjects(out, parseNativeYaml(text)), {}), { lineWidth: 0 }) : '';
 }

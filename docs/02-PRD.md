@@ -229,7 +229,7 @@
 | BS-01 | Mihomo 内核公共原文与对应应用追加使用 YAML；不提取成公共字段或自动做客户端兼容过滤 | P0 |
 | BS-02 | Surge／Loon 内核及应用追加使用原生 INI；生成时合并结构并检查受管理段冲突 | P0 |
 | BS-03 | 基础预设已移除；各订阅独立保存 kernels／clients 原文。旧预设引用在 v28 升级或旧种子导入时备份后展开 | P0 |
-| BS-04 | 原文是基础配置的主要编辑入口。允许保存未写完的原文；生成时报告解析错误。Stash 继承 Mihomo→历史 Stash→应用追加 | P0 |
+| BS-04 | 原文是基础配置的主要编辑入口。允许保存未写完的原文；生成时报告解析错误。Stash 继承 Mihomo→应用追加，旧公共层由 v33 迁移退役 | P0 |
 | BS-05 | 原 find-process-mode 表单联动告警属于退役草案；当前不解析公共表单字段，规则不按操作系统主动删除 | 历史 |
 
 ### 4.8 模板（Template）
@@ -487,7 +487,7 @@ RS-07 扩展：管理员添加、启停、更新、删除公开 GitHub 仓库；
 
 2026-10-29 最新调整（取代前文独立 no-resolve 开关及兼容生效的说明）：规则集、规则增强、模板和订阅统一移除独立 no-resolve 配置。远程以来源文件每行的标记为准，本地单条与增强替换 / 追加以实际原文为准。数据库 v18 清理旧 `RuleSet.noResolve`、`RuleEntry.options.noResolve`，原文和结构化规则自身标记保留；预览、YAML 往返与下载遵循同一语义。历史已发资源仍保留版本。模板规则列表采用平整行布局，保留上下间距，主内容、来源、出口、删除分层呈现；无整行套娃边框。实现说明见 [规则转换](ruleset-conversion.md#no-resolve-以规则内容为准)。
 
-2026-10-29 Stash 接入的历史 preset.stash／base.stashPatch 和强制内联方案已退役。当前继承 Mihomo 公共→历史 Stash 公共→应用原文，四端均遵守 provider／inline 选择；Stash 共用 Clash 生成，字段、测速、规则及交付差异见 [04](04-client-matrix.md)、[19](19-client-conversion.md)。旧格式仍由迁移入口兼容。
+2026-10-29 Stash 接入的历史 preset.stash／base.stashPatch 和强制内联方案已退役。当前继承 Mihomo 公共→应用原文，v33 将旧 Stash 公共差异去重后迁入应用追加，四端均遵守 provider／inline 选择；Stash 共用 Clash 生成，字段、测速、规则及交付差异见 [04](04-client-matrix.md)、[19](19-client-conversion.md)。旧格式仍由迁移入口兼容。
 
 ## 2026-10-29：全部名称筛选统一
 

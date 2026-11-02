@@ -7,7 +7,7 @@
 | 项目 | Mihomo | Surge | Loon | Stash |
 | --- | --- | --- | --- | --- |
 | 完整主订阅 | YAML | INI | INI | YAML |
-| 订阅追加原文 | `base.kernels.mihomo` | `base.kernels.surge` | `base.kernels.loon` | `base.kernels.stash` |
+| 订阅公共原文 | `base.kernels.mihomo` | `base.kernels.surge` | `base.kernels.loon` | 共用 `base.kernels.mihomo`；应用追加保存到 `base.clients.stash-ios/stash-macos` |
 | 节点集 | provider / inline | policy-path / inline | Remote Proxy / inline | proxy-providers / inline |
 | 规则集 | 托管 provider | 托管 LIST | 托管 `[Remote Rule]` | 托管 provider |
 | 独立文件 | 现有 YAML 导出 | 规则内嵌 `.conf` | 含规则时通过正式订阅获取 `.conf` | 规则内嵌 YAML |
@@ -43,7 +43,7 @@
 
 常规合并顺序为：**订阅内核公共原文 → 订阅客户端原文（可选）**。产品内核分组为 Mihomo、Surge、Loon；FlClash、Clash Verge Rev、Stash 归入 Mihomo，Apple 两端按应用选择。保存只检查目标及字符串类型，未写完的原文也能保存。生成时解析必要的结构：YAML 映射递归合并、数组/标量/null 后层替换；INI General/Host/MITM 同名键后层替换，其余段落按顺序追加。原文不回写，错误会在预览报告，不会静默丢字段。
 
-Stash iOS/macOS 直接列在 Mihomo 下，无中间 Stash 菜单；FlClash、Clash Verge Rev 不再单列。Stash 的继承顺序为 **Mihomo 公共 → 历史 Stash 公共（若存在） → Stash 应用追加**。Stash 输出目标与序列化保留，其他应用仍按两层合并。客户端页直接展示非空的上层只读原文，不套卡片、不折叠，代码区底部只保留来源与只读标识；空公共配置不显示。当前目标由左侧导航表达，格式化与清空位于编辑器底栏。规则集合预览仅保留三个顶层选项。完整约定见 [20](20-native-client-append.md)。
+Stash iOS/macOS 直接列在 Mihomo 下，无中间 Stash 菜单；FlClash、Clash Verge Rev 不再单列。Stash 的继承顺序为 **Mihomo 公共 → Stash 应用追加**。Stash 输出目标与序列化保留，其他应用仍按两层合并。客户端页直接展示非空的上层只读原文，不套卡片、不折叠，代码区底部只保留来源与只读标识；空公共配置不显示。当前目标由左侧导航表达，格式化与清空位于编辑器底栏。规则集合预览仅保留三个顶层选项。完整约定见 [20](20-native-client-append.md)。
 
 节点、策略组、规则仍由原有模块管理；原文包含这些受管理的段时生成报错。listeners 仅允许放在订阅追加。基础预设已移除；旧引用迁移为订阅原文。升级前的对象及公共映射只在 v28 一次迁移中使用，保留加密备份与迁移提示。
 
@@ -117,7 +117,7 @@ Loon 没有在本机执行官方配置校验器；Surge/Loon 的真实客户端�
 - Stash 最末层仅处理 Hysteria/Hysteria2 字段与带宽单位、节点测速参数、空集合保护，以及明确不同的规则写法。`auth/up-speed/down-speed` 输入在公共层归一化，再按目标输出，认证或带宽别名冲突明确报错。Stash 的 `block-quic: off` 原样保留，结构化 `URL-REGEX` 和 `USER-AGENT` 正常输出。
 - 动态成员先使用公共 Clash 表达；需要托管筛选和空集合保护时再展开。原生扩展中的 `include-all*` 也经过同一保护。Stash 的派生远程子集仍保持稳定地址和 REJECT 语义，这一差异不修改代理链前置名称。
 - `dialer-proxy: upstream-select` 在两端保持一致；精确远程节点前置在两端使用相同隐藏组名称、依赖记录及落地引用。本服务不为 Stash 额外改写、禁止或提示这些代理链组合；引用缺失、循环等公共校验继续生效。
-- Stash 缓存记录公共生成版本，失败不会回退到旧专用改写产物。基础配置继续遵循 Mihomo 公共 → 历史 Stash 公共 → Stash 应用追加的继承顺序。
+- Stash 缓存记录公共生成版本，失败不会回退到旧专用改写产物。基础配置继续遵循 Mihomo 公共 → Stash 应用追加（v33 迁移退役旧公共层）的继承顺序。
 
 公共规则使用独立的内容版本。2026-11-02 将版本从 2 提升为 3，避免规则来源未变化时继续命中旧版省略 `URL-REGEX` 的正文。该版本只参与内容哈希，不改变资源身份和已发布链接；旧产物下次读取时按需重建，成功后继续缓存。主配置与公共规则的失败策略分别保留：主配置禁止回退旧 Stash 专用生成结果；公共规则重建失败仍带告警返回最后成功正文，并保留旧内容版本以便后续重试。
 

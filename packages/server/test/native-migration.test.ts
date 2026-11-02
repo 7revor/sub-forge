@@ -51,7 +51,9 @@ it('移除预设时保留四片段优先级、原文、停用状态和孤立备�
     store.importSeed({ presets: [preset, { id: 'unused', name: '未使用', version: 1, config: { kernels: { mihomo: '# 未完成\ndns: [' } } }], profiles: [old] });
     const base = store.get('profile', 'sub')!.base!;
     expect(base).not.toHaveProperty('presetId'); expect(base.enabled).toBe(false);
-    expect(base.kernels!.stash).toBe(unmodified);
+    expect(base.kernels).not.toHaveProperty('stash');
+    expect(base.clients?.['stash-ios']).toBe(unmodified);
+    expect(base.clients?.['stash-macos']).toBe(unmodified);
     expect(parse(resolveNativeBase('mihomo', undefined, base))).toEqual({ port: 0, dns: { enable: true, nameserver: [] } });
     expect(parse(resolveNativeBase('mihomo', 'flclash', base))).toEqual({ port: 7892, dns: { enable: true, nameserver: [], ipv6: false, 'nameserver-policy': { 'geosite:cn,private': '223.5.5.5' } } });
     const ini = resolveNativeBase('surge', 'surge-macos', base);

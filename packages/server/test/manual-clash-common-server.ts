@@ -16,7 +16,7 @@ const ref = { type: 'source' as const, id: 'fixture-source' };
 env.store.put('source', { id: ref.id, name: '花云（虚构验收）', url: 'https://fixture.example.test/nodes', pipeline: [] }, user.id);
 env.store.put('local', { id: 'fixture-local', name: '本地落地', proxies: [{ name: 'vless-hk', type: 'vless', server: 'hk.example.test', port: 443, uuid: '00000000-0000-0000-0000-000000000001', tls: true }] }, user.id);
 env.store.put('profile', { id: 'clash-common-profile', name: '公共 Clash 生成（验收样例）', nodeSets: [{ ref, output: 'provider' }, { ref: { type: 'local', id: 'fixture-local' }, output: 'inline' }],
-  base: { kernels: { mihomo: 'mixed-port: 7890', stash: 'log-level: warning' } },
+  base: { kernels: { mihomo: 'mixed-port: 7890' }, clients: { 'stash-ios': 'log-level: warning', 'stash-macos': 'log-level: warning' } },
   chains: [
     { id: 'local-chain', landing: { nodeSet: { type: 'local', id: 'fixture-local' } }, via: { kind: 'group', groupId: 'upstream' } },
     { id: 'remote-chain', landing: { nodeSet: ref, filter: '日本' }, via: { kind: 'group', groupId: 'upstream' } },

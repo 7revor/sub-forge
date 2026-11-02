@@ -109,7 +109,7 @@ for (const target of ['surge', 'loon', 'stash'] as const) describe(target + ' �
     const { nodeProviderDelivery: _version, ...old } = saved.data;
     h.store.putLastGood('p', key, old);
     const profile = h.store.get('profile', 'p')!;
-    profile.base = { kernels: { [target]: target === 'stash' ? 'proxies: []' : '[Proxy]\n非法 = direct' } };
+    profile.base = { kernels: { [target === 'stash' ? 'mihomo' : target]: target === 'stash' ? 'proxies: []' : '[Proxy]\n非法 = direct' } };
     h.store.put('profile', profile, h.user.id);
     expect((await h.renderer.render('p', client)).ok).toBe(false);
     h.store.putLastGood('p', key, saved.data);
@@ -141,7 +141,7 @@ it('Stash 失败不回退旧专用生成器的成功缓存', async () => {
   const { clashDelivery: _version, ...legacy } = saved.data;
   h.store.putLastGood('p', key, legacy);
   const profile = h.store.get('profile', 'p')!;
-  profile.base = { kernels: { stash: 'proxies: []' } };
+  profile.base = { clients: { 'stash-ios': 'proxies: []' } };
   h.store.put('profile', profile, h.user.id);
   expect((await h.renderer.render('p', target)).ok).toBe(false);
   h.store.putLastGood('p', key, saved.data);

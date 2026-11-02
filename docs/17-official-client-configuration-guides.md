@@ -117,7 +117,7 @@ Stash 使用 YAML；配置、节点集和规则集的形状与 Clash 家族相�
 
 Stash User-Agent 可以自动识别；显式参数优先。前端订阅页头只提供一个无参数链接，Stash 与 Mihomo 客户端共用该链接，浏览器直接显示 Mihomo YAML；「预览」在 Mihomo 下选择 Stash iOS/macOS，可查看草稿及导出独立 YAML 文件。导出文件把本次已转换的托管规则内嵌到 `rules` 中，避免依赖预览占位 token；原始远程规则集合继续使用其真实 URL。
 
-当前基础配置使用原文槽位，预设与旧 patch 已迁移。2026-11-02 起，Stash 按 `base.kernels.mihomo` → 历史 `base.kernels.stash`（若存在）→ `base.clients.stash-ios/stash-macos` 继承，公共配置直接合并，不做字段兼容转换；这属于项目的产品约定，不表示 Stash 使用 Mihomo 内核。菜单在 Mihomo 下直接列出 Stash iOS/macOS，不设 Stash 中间菜单，也不单列 FlClash、Clash Verge Rev；Surge、Loon 各自列出 iOS/macOS。完整预览采用相同应用候选，规则集合预览只提供 Mihomo、Surge、Loon。详见[原文追加约定](20-native-client-append.md)。
+当前基础配置使用原文槽位，预设与旧 patch 已迁移。2026-11-02 起，Stash 按 `base.kernels.mihomo` → `base.clients.stash-ios/stash-macos`（v33 将旧 `base.kernels.stash` 去重迁入应用追加） 继承，公共配置直接合并，不做字段兼容转换；这属于项目的产品约定，不表示 Stash 使用 Mihomo 内核。菜单在 Mihomo 下直接列出 Stash iOS/macOS，不设 Stash 中间菜单，也不单列 FlClash、Clash Verge Rev；Surge、Loon 各自列出 iOS/macOS。完整预览采用相同应用候选，规则集合预览只提供 Mihomo、Surge、Loon。详见[原文追加约定](20-native-client-append.md)。
 
 主订阅、节点资源、缓存、last-good 和保留的结构版本区分内核与应用；公共规则产物仅区分内核。修改 `target` 或 `platform` 不能借用另一套资源；撤销 token 后资源链接失效。
 
