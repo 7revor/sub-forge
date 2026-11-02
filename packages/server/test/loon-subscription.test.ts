@@ -99,7 +99,6 @@ describe('Loon 订阅与管理接口', () => {
     const text = await main.text(), link = text.split('[Remote Rule]\n')[1]!.split(',policy=')[0]!;
     const url = new URL(link), key = url.searchParams.get('key')!;
     expect((await h.app.request(link)).status).toBe(200);
-    expect(h.store.getSharedRule(key)).toBeUndefined();
     expect((await h.app.request(`/resources/ruleset?key=${key}&token=${h.token}`)).status).toBe(404);
     const profile = h.store.get('profile', h.profile.id)!;
     if (profile.routing?.mode !== 'independent') throw new Error('测试需要独立分流');

@@ -93,7 +93,7 @@ export class Store {
   configurationRevision = 0;
   readonly listeners = new Set<() => void>();
   /** 在途资源读取用短期监听器撤销，避免相同 ID 删除后重建造成旧请求复活。 */
-  readonly invalidationListeners = new Set<(kind: DocKind | 'shared-rule' | 'repository', id: string) => void>();
+  readonly invalidationListeners = new Set<(kind: DocKind | 'repository', id: string) => void>();
   /** 在删除事务内同步执行，随文档一起提交或回滚。 */
   readonly documentDeleteHooks = new Set<(kind: DocKind, id: string) => void>();
   eventsClosed = false;
@@ -161,13 +161,6 @@ export class Store {
     }
   }
   pruneResourceBindings(templates: TemplateReader = this.currentTemplates): void {
-    // 失效公共定义不能由缓存记录自身继续保活，撤销通知同时阻止在途编译回写。
-    const sharedRules = this.listSharedRules<{ reference: import('@sub-forge/core').RuleResourceReference }>().filter(row => {
-      if (!row.data.reference.matcher.remote && resolveRuleSetReference(row.data.reference.matcher, this)) return true;
-      this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
-      for (const listener of this.invalidationListeners) listener('shared-rule', row.key);
-      return false;
-    });
     const keep = new Map<string, Set<string>>();
     const add = (kind: string, id: string, urls: string[]) => {
       const key = `${kind}:${id}`;
@@ -196,7 +189,6 @@ export class Store {
       }
     }
     templates.list().forEach(t => walk(t, `template:${t.id}`));
-    sharedRules.forEach(r => walk(r.data));
     for (const row of this.db.prepare('SELECT * FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
       // 仓库正文由索引缓存维护，其生命周期不取决于配置订阅。
       if (row.id.startsWith('repository-file:')) {
@@ -291,7 +283,6 @@ export class Store {
       const removed = this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
       for (const hook of this.documentDeleteHooks) hook(kind, id);
       if (kind === 'profile') this.deleteProfileData(id);
-      if (kind === 'ruleset') this.db.prepare('DELETE FROM shared_rule_resources WHERE ruleset_id = ?').run(id);
       this.pruneResourceBindings();
       return removed;
     })();
@@ -376,7 +367,7 @@ export class Store {
     return this.db.prepare('DELETE FROM user_tokens WHERE token_hash = ?').run(this.cipher.hmac(token)).changes > 0;
   }
 
-  /** 只删除订阅专属产物；用户凭证与公共规则资源独立存在。 */
+  /** 只删除订阅专属数据；用户凭证独立存在。 */
   deleteProfileData(profileId: string): void {
     this.db.transaction(() => {
       // 访问记录独立保留 30 天；删除资源不抹除用户自己的历史。
@@ -384,31 +375,6 @@ export class Store {
     })();
   }
 
-  putSharedRule(key: string, rulesetId: string, data: unknown): void {
-    this.db.prepare('INSERT INTO shared_rule_resources VALUES (?, ?, ?, ?) ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
-      .run(key, rulesetId, this.cipher.encrypt(JSON.stringify(data)), this.now());
-  }
-  getSharedRule<T>(key: string): T | undefined {
-    const row = this.db.prepare('SELECT data FROM shared_rule_resources WHERE key = ?').get(key) as { data: string } | undefined;
-    return row ? JSON.parse(this.cipher.decrypt(row.data)) as T : undefined;
-  }
-  listSharedRules<T>(): { key: string; rulesetId: string; data: T; updatedAt: number }[] {
-    return (this.db.prepare('SELECT * FROM shared_rule_resources ORDER BY key').all() as { key: string; ruleset_id: string; data: string; updated_at: number }[])
-      .map(r => ({ key: r.key, rulesetId: r.ruleset_id, data: JSON.parse(this.cipher.decrypt(r.data)), updatedAt: r.updated_at }));
-  }
-  /** 系统页分页读取；只解密当前页，按 key 排序保持翻页稳定。 */
-  sharedRulesPage<T>(options: PageOptions): PageResult<{ key: string; rulesetId: string; data: T; updatedAt: number }> {
-    const total = (this.db.prepare('SELECT COUNT(*) AS n FROM shared_rule_resources').get() as { n: number }).n;
-    const meta = pageMeta(total, options);
-    const rows = this.db.prepare('SELECT * FROM shared_rule_resources ORDER BY key LIMIT ? OFFSET ?').all(meta.pageSize, (meta.page - 1) * meta.pageSize) as { key: string; ruleset_id: string; data: string; updated_at: number }[];
-    return { ...meta, items: rows.map(r => ({ key: r.key, rulesetId: r.ruleset_id, data: JSON.parse(this.cipher.decrypt(r.data)) as T, updatedAt: r.updated_at })) };
-  }
-  deleteSharedRule(key: string): void {
-    this.configurationRevision++;
-    this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(key);
-    for (const listener of this.invalidationListeners) listener('shared-rule', key);
-    this.pruneResourceBindings();
-  }
 
   // ---------- 快照 ----------
 

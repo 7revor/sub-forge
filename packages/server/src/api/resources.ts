@@ -1,8 +1,4 @@
 import { requiredQuery } from '../query.ts';
-import type { SharedRuleRecord } from '../shared-rules.ts';
-import { findReferrers } from './validate.ts';
-import { readPagination } from './pagination.ts';
-import { HttpError } from './common.ts';
 import { getCookie } from 'hono/cookie';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
@@ -39,20 +35,6 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
     const resource = all[index];
     if (!resource) throw notFound();
     return c.json({ job: resources.startJob(c.get('user').id, 'system-resource', key, [resource]) }, 202);
-  });
-  app.get('/system/rule-resources', requireAdmin, c => {
-    const result = store.sharedRulesPage<SharedRuleRecord>(readPagination(c.req.query()) ?? { page: 1, pageSize: 20, q: '' });
-    return c.json({ ...result, items: result.items.map(r => ({
-      key: r.key, rulesetId: r.rulesetId, name: r.data.name, target: r.data.target, updatedAt: r.updatedAt, error: r.data.error, referenced: findReferrers(store, c.get('user').id, 'ruleset', r.rulesetId).length > 0,
-    })) });
-  });
-  app.delete('/system/rule-resources/:key', requireAdmin, c => {
-    const key = c.req.param('key');
-    const record = store.getSharedRule<SharedRuleRecord>(key);
-    if (!record) throw notFound();
-    if (findReferrers(store, c.get('user').id, 'ruleset', record.reference.matcher.id).length) throw new HttpError(409, '公共规则资源仍被配置或模板引用');
-    store.deleteSharedRule(key); store.changed();
-    return c.json({ ok: true });
   });
   // 事件不携带文档、URL 或其他用户数据；实际读取仍经每个接口授权。
   app.get('/events',requireUser,c=>streamSSE(c,async stream=>{

@@ -40,10 +40,6 @@ CREATE INDEX IF NOT EXISTS snapshots_owner ON snapshots (owner_kind, owner_id, u
 CREATE TABLE IF NOT EXISTS user_tokens (
   user_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, token_enc TEXT NOT NULL, created_at INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS shared_rule_resources (
-  key TEXT PRIMARY KEY, ruleset_id TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS shared_rule_resources_ruleset ON shared_rule_resources (ruleset_id);
 CREATE TABLE IF NOT EXISTS access_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   token TEXT NOT NULL, profile_id TEXT NOT NULL, at INTEGER NOT NULL, ua TEXT NOT NULL,

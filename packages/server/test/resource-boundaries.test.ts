@@ -1,7 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
 import { ResourceService } from '../src/resources.ts';
-import type { SharedRuleRecord } from '../src/shared-rules.ts';
 import { setupApp } from './helpers.ts';
 
 const envs: ReturnType<typeof setupApp>[] = [];
@@ -68,12 +67,12 @@ it('后台刷新排队期间删除的来源不会重新被请求', async () => {
   expect(calls).toBe(4);
 });
 
-it('公共规则从文本改成 MRS 后生成独立变体，旧文本链接不返回二进制', async () => {
+it('公共规则从文本改成 MRS 后地址变化，旧文本链接不返回二进制', async () => {
   const h = setup(), oldUrl = ruleUrl(await h.main());
   h.store.put('ruleset', { id: 'r', name: '公共规则', sources: [{ id: 'binary', kind: 'remote', format: 'mrs', behavior: 'domain', url: 'https://rules.test/a.mrs' }] }, h.user.id);
   h.fetcher.mockResolvedValue({ status: 200, body: '#subforge-binary-mrs\n' + Buffer.from('模拟已校验的二进制').toString('base64') });
   const newUrl = ruleUrl(await h.main()); expect(newUrl).not.toBe(oldUrl);
-  const old = await h.app.request(oldUrl); expect(old.headers.get('content-type')).toContain('text/plain'); expect(await old.text()).toContain('DOMAIN,example.test');
+  expect((await h.app.request(oldUrl)).status).toBe(409);
   expect((await h.app.request(newUrl)).headers.get('content-type')).toBe('application/octet-stream');
 });
 
@@ -86,17 +85,22 @@ it('私有 provider 的原型属性路径视为不存在', async () => {
   expect((await h.app.request(url.href)).status).toBe(404);
 });
 
-it('未记录输出契约的旧 MRS 资源不能被当前文本配置覆盖', async () => {
+it('主配置的格式契约阻止文本 provider 收到 MRS 字节，刷新主配置后恢复', async () => {
   const h = setup();
   h.store.put('ruleset', { id: 'r', name: '公共规则', sources: [{ id: 'binary', kind: 'remote', format: 'mrs', behavior: 'domain', url: 'https://rules.test/a.mrs' }] }, h.user.id);
   h.fetcher.mockResolvedValue({ status: 200, body: '#subforge-binary-mrs\n' + Buffer.from('模拟已校验的二进制').toString('base64') });
-  const oldUrl = ruleUrl(await h.main()), key = new URL(oldUrl).searchParams.get('key')!;
-  const { delivery: _legacyMissing, ...legacy } = h.store.getSharedRule<SharedRuleRecord>(key)!;
-  h.store.putSharedRule(key, 'r', legacy);
+  const oldUrl = ruleUrl(await h.main());
+  const binary = await h.app.request(oldUrl);
+  expect(binary.headers.get('content-type')).toBe('application/octet-stream'); expect(await binary.text()).toBe('模拟已校验的二进制');
   h.store.put('ruleset', { id: 'r', name: '公共规则', sources: [{ id: 'text', kind: 'local', format: 'auto', content: 'DOMAIN,new.test' }] }, h.user.id);
-  const response = await h.app.request(oldUrl);
-  expect(response.status).toBe(200); expect(response.headers.get('content-type')).toBe('application/octet-stream');
-  expect(response.headers.get('x-sub-forge-warning')).toBe('last-good-rule');
-  expect(await response.text()).toBe('模拟已校验的二进制');
-  expect(ruleUrl(await h.main())).not.toBe(oldUrl);
+  expect((await h.app.request(oldUrl)).status).toBe(409);
+  const newUrl = ruleUrl(await h.main());
+  expect(newUrl).not.toBe(oldUrl);
+  expect(await (await h.app.request(newUrl)).text()).toBe('DOMAIN,new.test\n');
+});
+
+it('旧 key 地址返回 404，不再解析', async () => {
+  const h = setup();
+  expect((await h.app.request(`/resources/ruleset?key=old&token=${h.token}`)).status).toBe(404);
+  expect((await h.app.request(`/resources/repo?key=old&token=${h.token}`)).status).toBe(404);
 });

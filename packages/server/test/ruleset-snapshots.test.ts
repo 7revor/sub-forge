@@ -44,14 +44,14 @@ describe('远程规则快照有效性', () => {
     const before = await h.renderer.render('p', { client: 'mihomo' });
     expect(before.ok).toBe(true);
     if (!before.ok) throw new Error(before.message);
-    expect(Object.keys(ruleBodies(h.store, before.render))).toHaveLength(1);
+    expect(Object.keys((await ruleBodies(h.renderer, 'p')))).toHaveLength(1);
     expect((await h.refresh(invalid)).ok).toBe(false);
     expect(h.store.latestSnapshot('ruleset', 'r', 'https://rules.example.test/list')?.body).toBe(valid);
     const after = await h.renderer.render('p', { client: 'mihomo' });
     expect(after.ok).toBe(true);
     if (!after.ok) throw new Error(after.message);
     expect(after.render.yaml).toBe(before.render.yaml);
-    expect(ruleBodies(h.store, after.render)).toEqual(ruleBodies(h.store, before.render));
+    expect((await ruleBodies(h.renderer, 'p'))).toEqual((await ruleBodies(h.renderer, 'p')));
     expect(after.report).toContainEqual(expect.objectContaining({ code: 'ruleset.fetch-failed', level: 'warn' }));
   });
 
@@ -63,12 +63,12 @@ describe('远程规则快照有效性', () => {
   it('部分行无法解析仍保留有效规则，并允许之后恢复正常更新', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test\nUNKNOWN,value');
     const before = await h.renderer.render('p', { client: 'mihomo' });
-    expect(before.ok && ruleBodies(h.store, before.render)['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n# [本系统暂未支持解析：不支持的规则类型 UNKNOWN] UNKNOWN,value\n');
+    expect(before.ok && (await ruleBodies(h.renderer, 'p'))['rs_r_classical.list']).toBe('DOMAIN,valid.example.test\n# [本系统暂未支持解析：不支持的规则类型 UNKNOWN] UNKNOWN,value\n');
     expect(before.report.some(item => ['ruleset.rejected-lines', 'rule.unimplemented'].includes(item.code))).toBe(false);
     expect((await h.refresh('<html>error</html>')).ok).toBe(false);
     expect((await h.refresh('DOMAIN,recovered.example.test')).ok).toBe(true);
     const after = await h.renderer.render('p', { client: 'mihomo' });
-    expect(after.ok && ruleBodies(h.store, after.render)['rs_r_classical.list']).toBe('DOMAIN,recovered.example.test\n');
+    expect(after.ok && (await ruleBodies(h.renderer, 'p'))['rs_r_classical.list']).toBe('DOMAIN,recovered.example.test\n');
   });
 
   it('历史库中已存在错误快照时保护主配置', async () => {

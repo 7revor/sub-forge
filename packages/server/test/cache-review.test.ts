@@ -38,7 +38,7 @@ it('渲染校验期间更新配置与快照，旧任务不能覆盖新结果', a
   await h.snapshots.refresh('ruleset', ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id, 'https://rules.test/a', { scope: 'profile:p' });
   await renderer.render('p', { client: 'mihomo' }); held.release();
   const rendered = await old;
-  expect(rendered.ok && Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('new.test');
+  expect(rendered.ok && Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('new.test');
 });
 it('渲染等待中删除订阅，不得返回成功配置', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,a.test' }; } });
@@ -71,7 +71,7 @@ it('只刷新快照时，延迟完成的旧校验也不能回写旧原文', asyn
   const pending = renderer.render('p',{client:'mihomo'}); await entered.promise;
   body='DOMAIN,new.test'; await h.snapshots.refresh('ruleset',ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id,'https://rules.test/a',{scope:'profile:p'});
   held.release(); const result=await pending;
-  expect(result.ok && Object.values(ruleBodies(h.store, result.render)).join('')).toContain('new.test');
+  expect(result.ok && Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('new.test');
 });
 it('已保存组合的嵌套依赖不能跨用户读取或刷新', async () => {
   let calls=0; const h=setup({fetcher:async()=>{calls++;return {status:200,body:'trojan://test@node.test:443#secret'};}});
@@ -166,5 +166,5 @@ it('校验期间新发生的拉取失败不会丢失告警，仍使用最后成�
   const pending=renderer.render('p',{client:'mihomo'});await entered.promise;fail=true;
   await h.snapshots.refresh('ruleset',ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id,'https://rules.test/a',{scope:'profile:p'});held.release();
   const result=await pending;expect(result.ok).toBe(true);expect(result.report).toContainEqual(expect.objectContaining({code:'ruleset.fetch-failed',level:'warn'}));
-  expect(result.ok&&Object.values(ruleBodies(h.store, result.render)).join('')).toContain('retained.test');
+  expect(result.ok&&Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('retained.test');
 });

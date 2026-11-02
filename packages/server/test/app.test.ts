@@ -88,7 +88,7 @@ describe('订阅接口', () => {
     expect(nodes.searchParams.has('version')).toBe(false);
     const rules = new URL(cfg['rule-providers'].Telegram.url);
     expect(rules.pathname).toBe('/resources/ruleset');
-    expect(Object.fromEntries(rules.searchParams)).toEqual({ token: 'tk-mac', key: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    expect(Object.fromEntries(rules.searchParams)).toEqual({ id: 'tg', target: 'mihomo', format: 'text', token: 'tk-mac' });
     expect(cfg.proxies[0]['dialer-proxy']).toMatch(/^__ref_air_/);
     expect(cfg.rules.at(-1)).toBe('MATCH,🚀 节点选择');
   });

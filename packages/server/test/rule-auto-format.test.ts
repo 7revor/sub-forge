@@ -34,7 +34,7 @@ describe('自动格式贯通预览、保存与下载', () => {
       expect(provider.format).toBe('text');
       const url = new URL(provider.url);
       expect(url.pathname).toBe('/resources/ruleset');
-      expect(url.searchParams.get('key')).toMatch(/^[0-9a-f]{64}$/);
+      expect(url.searchParams.get('target')).toBe('mihomo');
       const download = await h.app.request(url.pathname + url.search);
       expect(download.status).toBe(200);
       expect((await download.text()).trim().split('\n')).toEqual(preview.json.lines);
@@ -69,7 +69,7 @@ describe('自动格式贯通预览、保存与下载', () => {
       expect(providers[0]).toMatchObject({ behavior: 'classical', format: 'text' });
       const url = new URL(providers[0]!.url);
       expect(url.pathname).toBe('/resources/ruleset');
-      expect(url.searchParams.get('key')).toMatch(/^[0-9a-f]{64}$/);
+      expect(url.searchParams.get('target')).toBe('mihomo');
       const download = await h.app.request(url.pathname + url.search);
       expect(download.status).toBe(200);
       expect((await download.text()).trim().split('\n')).toEqual(mergedPre.json.lines);
@@ -94,7 +94,7 @@ describe('自动格式贯通预览、保存与下载', () => {
       if (!after.ok) throw new Error(after.message);
       expect(parse(after.render.yaml)['rule-providers']['旧设置']).toMatchObject({ format: 'text', behavior: 'classical' });
       expect(parse(after.render.yaml)['rule-providers']['旧设置'].url).toBe(parse(before.render.yaml)['rule-providers']['旧设置'].url);
-      expect(ruleBodies(h.store, after.render)['rs_r_classical.list']).toContain('192.0.2.0/24');
+      expect((await ruleBodies(h.renderer, 'p'))['rs_r_classical.list']).toContain('192.0.2.0/24');
     } finally { await h.snapshots.settled(); h.store.close(); }
   });
   it('输入未完成的本地 YAML 时按来源报告错误，不阻断其他来源预览', async () => {

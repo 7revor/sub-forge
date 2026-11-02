@@ -40,18 +40,18 @@ it('五类复制链接使用当前用户 token，公共规则可复制他人定�
   expect(await (await h.api('/resource-links?kind=rulesets&id=r', 'b')).json()).toMatchObject({ item: { userId: h.b.id, token: h.other, url: `https://sub.test/resources/ruleset?id=r&token=${h.other}` } });
   expect((await h.app.request('/api/resource-links?kind=rulesets&id=r')).status).toBe(401);
   expect((await h.api('/resource-links?kind=__proto__&id=r')).status).toBe(404);
-  expect(h.fetcher).not.toHaveBeenCalled(); expect(h.store.listSharedRules()).toEqual([]);
+  expect(h.fetcher).not.toHaveBeenCalled();
   const next = h.store.resetToken(h.token)!;
   expect(await (await h.api('/resource-links?kind=sources&id=a')).json()).toMatchObject({ item: { token: next.token, url: `https://sub.test/subs/nodes?kind=source&id=a&token=${next.token}` } });
 });
 
-it('未被订阅引用的增强可独立下载，按 UA 转换，共享产物和原文，不创建私有配置', async () => {
+it('未被订阅引用的增强可独立下载，按 UA 转换，共享原文，不创建私有配置', async () => {
   const h = setup(); h.store.delete('profile', 'p');
   const mihomo = await h.app.request(`/resources/ruleset?token=${h.other}&id=r`, { headers: { 'user-agent': 'clash.meta' } });
   expect(mihomo.status).toBe(200); expect(await mihomo.text()).toContain('# [mihomo 不支持 USER-AGENT]');
   const stash = await h.app.request(`/resources/ruleset?token=${h.token}&id=r`, { headers: { 'user-agent': 'Stash/3.6.0' } });
   expect(stash.status).toBe(200); expect(await stash.text()).toContain('USER-AGENT,Example*');
-  expect(h.store.listSharedRules()).toHaveLength(2); expect(h.fetcher).toHaveBeenCalledTimes(1);
+  expect(h.fetcher).toHaveBeenCalledTimes(1);
   h.store.updateUser(h.a.id, { disabled: true });
   expect((await h.app.request(`/resources/ruleset?token=${h.other}&id=r`)).status).toBe(200);
   expect((await h.app.request(`/resources/ruleset?token=${h.token}&id=r`)).status).toBe(404);
@@ -60,12 +60,12 @@ it('未被订阅引用的增强可独立下载，按 UA 转换，共享产物和
 
 it('独立规则链接与配置规则引用复用相同产物，失败首次生成不留下空产物', async () => {
   const h = setup(); h.fail();
-  expect((await h.app.request(`/resources/ruleset?token=${h.token}&id=r`)).status).toBe(503); expect(h.store.listSharedRules()).toEqual([]);
+  expect((await h.app.request(`/resources/ruleset?token=${h.token}&id=r`)).status).toBe(503);
   h.store.put('ruleset', { id: 'r', name: '公共增强', sources: [{ id: 'local', kind: 'local', format: 'auto', content: 'DOMAIN,local.test' }] }, h.a.id);
   expect((await h.app.request(`/resources/ruleset?token=${h.token}&id=r`)).status).toBe(200);
   // 使用本地节点避免上游模拟失败干扰配置生成。
   h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: [{ ref: { type: 'local', id: 'l' }, output: 'provider' }] }, h.a.id);
-  expect((await h.app.request(`/subs/profile?token=${h.token}&id=p`)).status).toBe(200); expect(h.store.listSharedRules()).toHaveLength(1);
+  expect((await h.app.request(`/subs/profile?token=${h.token}&id=p`)).status).toBe(200);
 });
 
 it.each(['clash.meta', 'Stash/3.6.0'])('节点链接向 %s 的 GET 和 HEAD 返回流量，失败使用上次成功流量，成功缺失后清除', async ua => {
@@ -121,7 +121,7 @@ it('首次生成规则时删除并重建同 ID，也不允许旧请求写入新�
   const pending = h.app.request(`/resources/ruleset?token=${h.token}&id=r`); await entered.promise;
   const rule = h.store.get('ruleset', 'r')!;
   h.store.delete('profile', 'p'); h.store.delete('ruleset', 'r'); h.store.put('ruleset', { ...rule, sources: [{ id: 'local', kind: 'local', format: 'auto', content: 'DOMAIN,new.test' }] }, h.a.id);
-  held.release(); expect((await pending).status).toBe(404); expect(h.store.listSharedRules()).toEqual([]);
+  held.release(); expect((await pending).status).toBe(404);
   expect(await (await h.app.request(`/resources/ruleset?token=${h.token}&id=r`)).text()).toBe('DOMAIN,new.test\n');
   expect(h.store.invalidationListeners.size).toBe(0);
 });

@@ -169,9 +169,6 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       if (version < 25) {
         // 旧配置中的路径 token 地址全部失效，不能用 last-good 再下发旧入口。
         this.db.exec('DELETE FROM last_good');
-        for (const row of this.store.listSharedRules<{ reference: { matcher: { remote?: unknown } } }>()) {
-          if (row.data.reference.matcher.remote) this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
-        }
         this.store.pruneResourceBindings(this.legacyTemplates);
       }
       if (version < 26) {
@@ -199,8 +196,8 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         this.db.exec('DROP TABLE IF EXISTS sub_tokens');
       }
       this.finishTemplateMigration();
-      // v33：渲染结果不再落库，规则和节点按上游快照实时生成。
-      this.db.exec('DROP TABLE IF EXISTS last_good');
+      // v33：渲染结果和公共规则产物不再落库，全部按上游快照实时生成。
+      this.db.exec('DROP TABLE IF EXISTS last_good; DROP TABLE IF EXISTS shared_rule_resources');
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();

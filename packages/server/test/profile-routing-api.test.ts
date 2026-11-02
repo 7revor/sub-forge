@@ -105,10 +105,10 @@ describe('模板绑定与独立模式', () => {
     detached.routing.config.rules = [{ id: 'rs-rule', matcher: { kind: 'ruleset', id: 'rs' }, target: { kind: 'builtin', name: 'DIRECT' } }];
     expect((await alice.put(`/api/profiles/${profile.id}`, detached)).status).toBe(200);
     const before = await renderer.render(profile.id, { client: 'mihomo' });
-    expect(before.ok && Object.values(ruleBodies(store, before.render)).join('')).toContain('one.test');
+    expect(before.ok && Object.values((await ruleBodies(renderer, profile.id))).join('')).toContain('one.test');
     store.put('ruleset', { id: 'rs', name: '规则', sources: [{ id: 's', kind: 'local', format: 'auto', content: 'DOMAIN,two.test' }] }, user.id);
     const after = await renderer.render(profile.id, { client: 'mihomo' });
-    expect(after.ok && Object.values(ruleBodies(store, after.render)).join('')).toContain('two.test');
+    expect(after.ok && Object.values((await ruleBodies(renderer, profile.id))).join('')).toContain('two.test');
     expect((await alice.del('/api/rulesets/rs')).status).toBe(409);
   });
 });

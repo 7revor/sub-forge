@@ -110,19 +110,16 @@ it('格式错误仍原样保存，生成时明确失败；非当前内核的错�
   } finally { await h.snapshots.settled(); h.store.close(); }
 });
 
-it('同内核规则产物在所有客户端间共享，进程与逻辑规则保持完整', async () => {
+it('同内核规则在所有客户端间一致，进程与逻辑规则保持完整', async () => {
   const h = setupApp();
   try {
     h.store.put('ruleset', { id: 'r', name: '进程', sources: [{ id: 's', kind: 'local', format: 'auto', content: 'PROCESS-NAME,Example\nNOT,((PROCESS-NAME,Example))' }] });
     const reference = { matcher: { kind: 'ruleset' as const, id: 'r' } };
     for (const kernel of ['surge', 'stash', 'loon'] as const) {
-      const ios = { client: kernel, platform: 'ios', app: kernel + '-ios' }, mac = { client: kernel, platform: 'macos', app: kernel + '-macos' };
-      expect(h.renderer.sharedRules.key(reference, ios)).toBe(h.renderer.sharedRules.key(reference, mac));
-      const text = await h.renderer.sharedRules.readReference(reference, ios);
+      const text = (await h.renderer.sharedRules.read(reference, { client: kernel }))?.body;
       expect(text).toContain('PROCESS-NAME,Example'); expect(text).toContain('NOT,((PROCESS-NAME,Example))');
       expect(text).not.toContain('不支持进程');
     }
-    expect(h.store.listSharedRules()).toHaveLength(3);
   } finally { await h.snapshots.settled(); h.store.close(); }
 });
 

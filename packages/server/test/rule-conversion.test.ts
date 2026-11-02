@@ -28,9 +28,9 @@ describe('远程 YAML 转换为托管 LIST', () => {
       expect(providers).toHaveLength(1);
       expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub.test/resources/ruleset?'))).toBe(true);
       expect(rendered.render.yaml).not.toContain(source.url);
-      expect(Object.values(ruleBodies(h.store, rendered.render)).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
-      expect(Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('# [YAML 原文] payload:');
-      expect(Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('UNKNOWN,Unsupported*');
+      expect(Object.values((await ruleBodies(h.renderer, 'profile'))).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
+      expect(Object.values((await ruleBodies(h.renderer, 'profile'))).join('')).toContain('# [YAML 原文] payload:');
+      expect(Object.values((await ruleBodies(h.renderer, 'profile'))).join('')).toContain('UNKNOWN,Unsupported*');
       expect((await c.get(`/api/rulesets?id=${id}`)).json.item.sources[0].url).toBe(source.url);
     } finally { h.store.close(); }
   });

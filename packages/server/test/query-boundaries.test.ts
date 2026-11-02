@@ -50,7 +50,7 @@ it('专属规则按订阅隔离原文及产物，客户端格式变化不改变�
   const secondLink = Object.values<{ url: string }>(parse(await second.text())['rule-providers'])[0]!.url;
   expect((await h.app.request(secondLink.replace(h.otherToken, h.token))).status).toBe(404);
   expect((await h.app.request(first.replace(h.token, h.otherToken))).status).toBe(404);
-  expect(h.store.listSharedRules()).toEqual([]); expect(h.fetcher).toHaveBeenCalledTimes(2);
+  expect(h.fetcher).toHaveBeenCalledTimes(2);
   h.store.put('profile', { ...h.store.get('profile', 'p')!, routing: { mode: 'independent', config: { ...h.config, rules: [] } } }, h.owner.id);
   expect((await h.app.request(first)).status).toBe(404);
   expect((await h.app.request(secondLink)).status).toBe(200);
@@ -85,10 +85,8 @@ it('升级清空旧地址配置和公共远程引用，不变更用户 token；�
   try {
     const owner = store.createUser({ username: 'a', passwordHash: 'fixture', role: 'user' });
     const token = store.userToken(owner.id)!.token;
-    const matcher = remoteRuleMatcher('https://private.test/old');
-    store.putSharedRule('old', matcher.id, { reference: { matcher }, target: { client: 'mihomo' }, body: 'DOMAIN,private.test' });
     store.db.pragma('user_version = 24'); store.close(); store = new Store(file, { cipher });
-    expect(store.userToken(owner.id)!.token).toBe(token); expect(store.listSharedRules()).toEqual([]);
+    expect(store.userToken(owner.id)!.token).toBe(token);
     store.close(); store = new Store(file, { cipher }); expect(store.userToken(owner.id)!.token).toBe(token);
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });

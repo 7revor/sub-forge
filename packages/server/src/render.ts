@@ -1,6 +1,6 @@
 import { CLIENT_APPS, resolveNativeBase, type ClientApp } from '@sub-forge/core';
 import { ruleBinding } from './rule-binding.ts';
-import { queryUrl } from '@sub-forge/core';
+import { managedRuleDelivery, queryUrl, type RuleResourceReference } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
@@ -41,7 +41,6 @@ export type StoredRender = {
   providers: Record<string, string>;
   providerUserinfo?: Record<string, TrafficInfo>;
   nodeDependencies: NodeSetID[];
-  ruleResources: string[];
   privateRules?: Record<string, { reference: HostedRuleReference; body: string }>;
   userinfo?: TrafficInfo;
   warnings: number;
@@ -131,10 +130,20 @@ export class RenderService {
     return Array.isArray(render.nodeDependencies) && render.nodeDependencies.every(ref => this.store.getWithOwner(ref.type, ref.id)?.owner === owner);
   }
 
+  /** 订阅专属规则的地址标识：只用于在当前配置中定位规则，不存储。 */
   private ruleKey(reference: HostedRuleReference, target: Target): string {
-    return reference.matcher.kind === 'ruleset'
-      ? this.sharedRules.key({ ...reference, matcher: reference.matcher }, target)
-      : createHash('sha256').update(stableStringify({ matcher: reference.matcher, options: reference.options, target })).digest('hex');
+    return createHash('sha256').update(stableStringify({ matcher: reference.matcher, options: reference.options, target })).digest('hex');
+  }
+
+  /** 公共规则地址写明身份、内核和格式契约，服务端无需保存任何映射即可按需转换。 */
+  private publicRuleUrl(reference: RuleResourceReference, rs: RuleSetDoc, target: Target): string {
+    const delivery = managedRuleDelivery(rs, target, reference.options);
+    const contract = delivery.mode === 'managed' ? { format: delivery.format, ...(delivery.format === 'mrs' ? { behavior: delivery.behavior } : {}) } : {};
+    const common = { target: target.client, ...contract, ...(reference.options?.src ? { src: '1' } : {}), token: TOKEN_PLACEHOLDER };
+    const repository = reference.matcher.repository;
+    if (!repository) return queryUrl('/resources/ruleset', { id: reference.matcher.id, ...common }, this.opts.publicUrl.replace(/\/$/, ''));
+    const files = repository.sources.filter(source => source.enabled !== false).map(source => ({ ref: source.repository!.ref, path: source.repository!.path }));
+    return queryUrl('/resources/repo', { id: repository.repo, files: JSON.stringify(files), ...common }, this.opts.publicUrl.replace(/\/$/, ''));
   }
 
   canReadRule(profileId: string, reference: HostedRuleReference): boolean {
@@ -147,11 +156,7 @@ export class RenderService {
   }
 
   canReadRules(profileId: string, render: StoredRender): boolean {
-    return Object.values(render.privateRules ?? {}).every(rule => this.canReadRule(profileId, rule.reference))
-      && render.ruleResources.every(key => {
-        const record = this.store.getSharedRule<import('./shared-rules.ts').SharedRuleRecord>(key);
-        return record && !record.reference.matcher.remote && !!resolveRuleSetReference(record.reference.matcher, this.store);
-      });
+    return Object.values(render.privateRules ?? {}).every(rule => this.canReadRule(profileId, rule.reference));
   }
 
   /**
@@ -258,10 +263,8 @@ export class RenderService {
         ruleset: (k, reference) => {
           if (!reference) throw new Error('托管规则缺少资源定义');
           ruleReferences.set(k, reference);
-          const key = this.ruleKey(reference, target);
-          return reference.matcher.kind !== 'ruleset' || reference.matcher.remote
-            ? queryUrl('/subs/ruleset', { profile: profile.id, key, ...output }, publicUrl)
-            : queryUrl(reference.matcher.repository ? '/resources/repo' : '/resources/ruleset', { key, token: TOKEN_PLACEHOLDER }, publicUrl);
+          if (reference.matcher.kind === 'ruleset' && !reference.matcher.remote) return this.publicRuleUrl({ ...reference, matcher: reference.matcher }, rules.rulesets[reference.matcher.id] as RuleSetDoc, target);
+          return queryUrl('/subs/ruleset', { profile: profile.id, key: this.ruleKey(reference, target), ...output }, publicUrl);
         },
       },
     }, target.client);
@@ -304,19 +307,11 @@ export class RenderService {
         const info = sumTraffic(infos.values());
         return info ? [[key, info]] : [];
       })),
-      ruleResources: [...new Set([...ruleReferences.values()].filter(ref => ref.matcher.kind === 'ruleset' && !ref.matcher.remote).map(ref => this.ruleKey(ref, target)))],
       privateRules: Object.fromEntries([...ruleReferences].filter(([, ref]) => ref.matcher.kind !== 'ruleset' || ref.matcher.remote).map(([file, reference]) => [this.ruleKey(reference, target), { reference, body: result.rulesets[file]!.text }])),
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };
     if (opts.dry) return { render, report, result };
-
-    this.store.db.transaction(() => {
-      for (const [file, reference] of ruleReferences) {
-        const body = result.rulesets[file]?.text;
-        if (body !== undefined && reference.matcher.kind === 'ruleset' && !reference.matcher.remote) this.sharedRules.register({ ...reference, matcher: reference.matcher }, target, rules.rulesets[reference.matcher.id] as RuleSetDoc, rules, body);
-      }
-    })();
     return { render, report };
   }
 

@@ -8,6 +8,7 @@ import { buildCatalog } from './catalog.ts';
 import { findRuleFile } from './options.ts';
 import { randomId } from '../crypto.ts';
 import { isIndexedRuleFile, parseCustomRepo, parseScans } from './generic.ts';
+import type { RuleSetDoc } from '../docs.ts';
 import type { Store } from '../store.ts';
 import type { UpstreamFetcher } from '../net/upstream.ts';
 import { HttpError, bad, notFound } from '../api/common.ts';
@@ -125,6 +126,16 @@ export class RuleRepoService {
     this.assertEnabled(id);
     if (!findRuleFile(this.store.db,id,ref,path) || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中');
     return {kind:'ruleset' as const,id:`repository-file:${id}:${ref}:${path}`,name:path,url:rawUrl(this.definition(id,true),{ref,path,format:'auto'}),options:{format:'auto' as const,scope:'public-rules'}};
+  }
+  /** 按索引文件构造转换用规则集；绑定不计入配置引用，无人引用时由定时清理回收。文件失效返回 undefined。 */
+  ruleSetFromFiles(id:string,files:{ref:string;path:string}[]):RuleSetDoc|undefined {
+    try {
+      const sources = files.map((file,index) => ({id:`file-${index}`,kind:'remote' as const,name:file.path,url:this.fileResource(id,file.ref,file.path).url,format:'auto' as const,repository:{repo:id,entry:findRuleFile(this.store.db,id,file.ref,file.path)!.entry ?? file.path,ref:file.ref,path:file.path}}));
+      return {id:`repo-read:${createHash('sha256').update(JSON.stringify([id,files])).digest('hex').slice(0,32)}`,name:files[0]!.path.split('/').at(-1)!,sources};
+    } catch (error) {
+      if (error instanceof HttpError) return undefined;
+      throw error;
+    }
   }
   /** 只调度已实际读取的公开正文，不预抓取整库文件。失效索引不再自动拉取。 */
   cachedResources() {
