@@ -16,7 +16,7 @@ import { ItemIssues, TemplateTargetSelect } from './TemplateFields.tsx';
 import { removeGroup, setGroupHidden } from './model.ts';
 import { createRegionGroups, REGION_GROUPS } from '../../convert/regionGroups.ts';
 
-const columns = 'grid grid-cols-[20px_32px_minmax(0,1fr)_64px] md:grid-cols-[20px_32px_minmax(160px,1fr)_88px_minmax(0,1.6fr)_124px_240px_64px]';
+const columns = 'grid grid-cols-[20px_32px_minmax(0,1fr)_64px] md:grid-cols-[20px_32px_minmax(160px,1fr)_88px_minmax(0,1.6fr)_124px_168px_64px]';
 
 export function TemplateGroupsEditor({ value, onChange, report, readOnly = false, isGroupReadOnly = () => readOnly, onRemoveGroup, onEditGroup, memberSummary, nodeSetName = ref => ref.id, templateGroupIds, templateStart, hiddenOverride }: {
   value: TemplateBody; onChange: (body: TemplateBody, templateStart?: number) => void; report: ReportItem[];

@@ -330,3 +330,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-02 新增 `BooleanSegmented`，列表行内布尔项（策略组显示状态、节点来源流量信息、用户脚本权限）统一使用，其余位置保留 `Switch`。Tailwind v4 按钮默认没有手型，`index.css` 补充按钮、`summary` 与勾选类 `label` 的光标；`components/ui` 的菜单、下拉和命令项从 `cursor-default` 改为 `cursor-pointer`；`toggle.tsx` 禁用态改为禁止光标，悬停样式只作用于可用的未选中项。
 
 2026-11-02 节点来源流量信息改用 `components/ui/toggle.tsx` 的单个开关按钮，不再占用分段控件，非订阅源行不渲染该列。`RoutingCard.tsx` 导出 `routingControlClass`（窄屏 168px，`sm` 起 240px），节点来源、策略组、规则的控件列共用，控件靠左。
+
+2026-11-02 `routingControlClass` 收窄为固定 168px；节点来源行的流量信息按钮单独占一条自适应列，位于「引用 / 展开」左侧。
