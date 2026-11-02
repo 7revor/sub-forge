@@ -587,3 +587,7 @@ URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应�
 2026-10-30 访问日志增加 `clientIp`、`peerIp`、`ipSource`，分别表示解析后的客户端地址、TCP 连接对端及来源（socket / x-forwarded-for / unknown）。SQLite v26 保留旧记录并将未知 IP 留空；访问日志仍按令牌所属用户隔离并保留 30 天。IP 解析属于服务端部署适配，核心订阅领域、渲染及种子无需改变。可信代理配置与传递链路见 [部署说明](20-deployment-client-ip.md)。
 
 2026-11-02 代码审查清理：旧模板引用、覆盖层和规则集单来源结构只由存储迁移与种子导入转换，管理接口要求现行 `routing` 和 `sources`；领域模型字段不变。本文上方提到的 `/api/rule-repos/files`、`/api/rule-repos/file-preview`、`/api/rule-repos/import` 已删除，仓库文件统一经 `/api/rule-options/*` 关联。种子导入不再清除 `last_good`，该清理只在升级到 v28 时执行一次。
+
+## 2026-11-02：SQLite v32 与存储边界
+
+v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变。当前读取路径只访问 `templates`；`template_versions` 仅在升级事务和旧种子导入的临时表中存在，由 `store-migrations.ts` 显式读取，用于展开锁定版本。资源绑定只在调度、刷新和实际读取资源时建立，查询状态不产生写入。

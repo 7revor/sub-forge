@@ -446,3 +446,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-10-30：SQLite v27 删除 `render_generations`，清空带旧参数的渲染缓存。节点 provider 和订阅专属规则 URL 移除 `version`、`hash`，读取时按当前配置生成；保留 last_good 失败兜底。升级后刷新完整主订阅，节点内容通过客户端定时或手动更新。
 
 2026-11-02 存储收敛：v30 移除当前订阅的空覆盖层、手动引用策略及其他退役字段，清除远程订阅源 `kind`；旧凭据表只在早期迁移中建立，升级完成后删除。v31 使用 `templates(id,data,updated_at)` 保存当前模板，正常读取无需版本聚合。原始配置备份、迁移说明、归属和更新时间保留，旧种子锁定版本继续按原内容展开。资源调度直接收集模板规则依赖，不再构造旧格式订阅。
+
+2026-11-02 存储边界：`store.ts` 只保留当前读写；跨版本升级、旧种子转换和历史模板读取位于 `store-migrations.ts`，当前结构位于 `schema.ts`。`getTemplate` 与模板查询只读 `templates`；升级和种子事务通过显式的 `TemplateReader` 读取 `template_versions`。v32 把 `refresh_jobs` 纳入当前结构，文档删除时由 `ResourceService` 在同一事务内清理对应任务。`SnapshotService.status` 与状态接口只读，调度和刷新任务在拉取前建立绑定。`pruneResourceBindings` 只解密来源、规则集和订阅文档。
