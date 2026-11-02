@@ -142,6 +142,8 @@ const toUser = (r: RawUser): User => ({ id: r.id, username: r.username, role: r.
 /** 有归属的文档种类；模板由管理员维护，所有人可引用 */
 export const OWNED_KINDS = ['source', 'collection', 'local', 'ruleset', 'profile'] as const;
 
+export type TemplateReader = { get(id: string, version?: number): TemplateVersionDoc | undefined; list(): TemplateVersionDoc[] };
+
 export type StoreOptions = { now?: () => number; cipher?: Cipher };
 
 export class Store {
@@ -160,7 +162,20 @@ export class Store {
     try { this.migrate(); } catch (e) { this.db.close(); throw e; }
   }
 
-  private legacyTemplateMode = false;
+  private readonly currentTemplates: TemplateReader = { get: (id, version) => this.getTemplate(id, version), list: () => this.listTemplates() };
+  /** 只在升级和旧种子事务内使用：此时 template_versions 尚未销毁，锁定引用仍可按原版本展开。 */
+  private readonly legacyTemplates: TemplateReader = {
+    get: (id, version) => {
+      const row = (version === undefined
+        ? this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? ORDER BY version DESC LIMIT 1').get(id)
+        : this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? AND version = ?').get(id, version)) as { data: string } | undefined;
+      const template = row ? JSON.parse(row.data) as TemplateVersionDoc : undefined;
+      return version === undefined || template?.version === version ? template : undefined;
+    },
+    list: () => (this.db.prepare(`SELECT t.data FROM template_versions t
+      JOIN (SELECT template_id, MAX(version) v FROM template_versions GROUP BY template_id) m ON m.template_id = t.template_id AND m.v = t.version
+      ORDER BY t.template_id`).all() as { data: string }[]).map(row => JSON.parse(row.data)),
+  };
 
   configurationRevision = 0;
   readonly listeners = new Set<() => void>();
@@ -224,20 +239,20 @@ export class Store {
       this.pruneUnusedResource(row.resource);
     }
   }
-  private prunePrivateRules(profileId: string): void {
+  private prunePrivateRules(profileId: string, templates: TemplateReader = this.currentTemplates): void {
     // 订阅/模板移除专属引用时清理兜底正文。
     for (const row of this.db.prepare('SELECT rowid, data FROM last_good WHERE profile_id = ?').all(profileId) as { rowid: number; data: string }[]) {
       const render = JSON.parse(this.cipher.decrypt(row.data)) as import('./render.ts').StoredRender;
       const privateRules = Object.values(render.privateRules ?? {});
       if (!privateRules.length) continue;
       const profile = this.get('profile', profileId);
-      const template = profile ? profileTemplate(profile, (id, version) => this.getTemplate(id, version)) : undefined;
+      const template = profile ? profileTemplate(profile, templates.get) : undefined;
       const rules = profile ? resolveProfileRouting(profile, template, new Report()).rules : [];
       if (privateRules.some(saved => !rules.some(rule => rule.enabled !== false && stableStringify(rule.matcher) === stableStringify(saved.reference.matcher) && !!rule.options?.src === !!saved.reference.options?.src))) this.db.prepare('DELETE FROM last_good WHERE rowid = ?').run(row.rowid);
     }
   }
 
-  pruneResourceBindings(): void {
+  pruneResourceBindings(templates: TemplateReader = this.currentTemplates): void {
     // 失效公共定义不能由缓存记录自身继续保活，撤销通知同时阻止在途编译回写。
     for (const row of this.listSharedRules<{ reference: import('@sub-forge/core').RuleResourceReference }>()) {
       if (row.data.reference.matcher.remote || !resolveRuleSetReference(row.data.reference.matcher, this)) {
@@ -267,11 +282,11 @@ export class Store {
       if (row.kind === 'ruleset' && resolveRuleSetReference({ kind: 'ruleset', id: row.id }, this)) add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
       if (row.kind === 'profile') {
         walk(doc, `profile:${row.id}`);
-        const template = profileTemplate(doc, (id, version) => this.getTemplate(id, version));
+        const template = profileTemplate(doc, templates.get);
         if (template) walk(template, `profile:${row.id}`);
       }
     }
-    this.listTemplates().forEach(t => walk(t, `template:${t.id}`));
+    templates.list().forEach(t => walk(t, `template:${t.id}`));
     this.listSharedRules<unknown>().forEach(r => walk(r.data));
     for (const row of this.db.prepare('SELECT * FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
       // 仓库正文由索引缓存维护，其生命周期不取决于配置订阅。
@@ -378,7 +393,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
           const previous = JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc;
           if (previous.routing) continue;
-          const migrated = migrateProfile(previous, profileTemplate(previous, (id, v) => this.getTemplate(id, v)));
+          const migrated = migrateProfile(previous, profileTemplate(previous, this.legacyTemplates.get));
           this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
             .run(row.id, this.cipher.encrypt(JSON.stringify(previous)), this.now());
           // 不触碰归属、更新时间、订阅链接、成功配置及历史资源。
@@ -410,7 +425,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         // 不能把仅能访问某个订阅的旧凭证升级为用户全部私有资源的通行证。
         for (const user of this.listUsers()) this.createToken(user.id);
         this.db.exec('DROP TABLE sub_tokens; DELETE FROM last_good;');
-        this.pruneResourceBindings();
+        this.pruneResourceBindings(this.legacyTemplates);
       }
       if (version < 24) {
         const columns = new Set((this.db.prepare('PRAGMA table_info(access_log)').all() as { name: string }[]).map(column => column.name));
@@ -426,7 +441,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         for (const row of this.listSharedRules<{ reference: { matcher: { remote?: unknown } } }>()) {
           if (row.data.reference.matcher.remote) this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
         }
-        this.pruneResourceBindings();
+        this.pruneResourceBindings(this.legacyTemplates);
       }
       if (version < 26) {
         const columns = new Set((this.db.prepare('PRAGMA table_info(access_log)').all() as { name: string }[]).map(column => column.name));
@@ -455,8 +470,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.finishTemplateMigration();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
-    this.legacyTemplateMode = true;
-    try { tx(); } finally { this.legacyTemplateMode = false; }
+    tx();
     // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
     if (version < 23) this.db.pragma('wal_checkpoint(TRUNCATE)');
     if (hadSnapshots && version < 3) {
@@ -621,7 +635,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       let document = JSON.parse(original);
       if (row.kind === 'profile' && !document.routing) {
         const previous = document as ProfileDoc;
-        document = migrateProfile(previous, profileTemplate(previous, (id, version) => this.getTemplate(id, version)));
+        document = migrateProfile(previous, profileTemplate(previous, this.legacyTemplates.get));
         this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
           .run(previous.id, this.cipher.encrypt(original), this.now());
       }
@@ -639,7 +653,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
       const original = this.cipher.decrypt(row.data);
       const previous = JSON.parse(original) as ProfileDoc;
-      const next = migrateProfile(previous, profileTemplate(previous, (id, version) => this.getTemplate(id, version)));
+      const next = migrateProfile(previous, profileTemplate(previous, this.legacyTemplates.get));
       const normalized = JSON.stringify(next);
       if (normalized === original) continue;
       this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
@@ -653,7 +667,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     for (const row of this.db.prepare("SELECT id, data FROM docs WHERE kind = 'profile'").all() as { id: string; data: string }[]) {
       const previous = JSON.parse(this.cipher.decrypt(row.data)) as ProfileDoc;
       if (previous.routing) continue;
-      const next = migrateProfile(previous, profileTemplate(previous, (id, version) => this.getTemplate(id, version)));
+      const next = migrateProfile(previous, profileTemplate(previous, this.legacyTemplates.get));
       this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
         .run(row.id, row.data, this.now());
       this.db.prepare("UPDATE docs SET data = ? WHERE kind = 'profile' AND id = ?")
@@ -714,10 +728,10 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
   // ---------- 文档 ----------
 
   /** owner 为 null 表示历史系统级文档，只在新建时写入，更新时保持原归属 */
-  put<K extends DocKind>(kind: K, input: DocInputTypes[K], owner: string | null = null): void {
+  put<K extends DocKind>(kind: K, input: DocInputTypes[K], owner: string | null = null, templates: TemplateReader = this.currentTemplates): void {
     let doc = structuredClone(input) as DocTypes[K];
     this.stripResourceTiming(doc as unknown as Record<string, any>);
-    if (kind === 'profile') doc = migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, (id, version) => this.getTemplate(id, version))) as DocTypes[K];
+    if (kind === 'profile') doc = migrateProfile(doc as ProfileDoc, profileTemplate(doc as ProfileDoc, templates.get)) as DocTypes[K];
     if (kind === 'source') doc = normalizeSourceFetch(doc as SourceDoc) as DocTypes[K];
     this.db.transaction(() => {
       if (kind === 'profile' && !(input as ProfileDoc).routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)')
@@ -727,10 +741,10 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
 
     })();
     this.configurationRevision++;
-    if (kind === 'profile') this.prunePrivateRules(doc.id);
+    if (kind === 'profile') this.prunePrivateRules(doc.id, templates);
     if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
     if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
-    this.pruneResourceBindings();
+    this.pruneResourceBindings(templates);
     this.changed();
   }
 
@@ -799,33 +813,19 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     this.changed();
   }
 
-  /** version 只在历史数据库或旧种子迁移期间有效。 */
+  /** 活动表不保留历史版本，带版本的锁定引用一律未命中。 */
   getTemplate(id: string, version?: number): TemplateVersionDoc | undefined {
-    if (!this.legacyTemplateMode) {
-      if (version !== undefined) return undefined;
-      const row = this.db.prepare('SELECT data FROM templates WHERE id = ?').get(id) as { data: string } | undefined;
-      return row ? JSON.parse(row.data) : undefined;
-    }
-    const row = (version === undefined
-      ? this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? ORDER BY version DESC LIMIT 1').get(id)
-      : this.db.prepare('SELECT data FROM template_versions WHERE template_id = ? AND version = ?').get(id, version)) as { data: string } | undefined;
-    const template = row ? JSON.parse(row.data) as TemplateVersionDoc : undefined;
-    return version === undefined || template?.version === version ? template : undefined;
-  }
-
-  private templateQuery(): string {
-    if (!this.legacyTemplateMode) return 'SELECT data FROM templates ORDER BY id';
-    return `SELECT t.data FROM template_versions t
-      JOIN (SELECT template_id, MAX(version) v FROM template_versions GROUP BY template_id) m ON m.template_id = t.template_id AND m.v = t.version
-      ORDER BY t.template_id`;
+    if (version !== undefined) return undefined;
+    const row = this.db.prepare('SELECT data FROM templates WHERE id = ?').get(id) as { data: string } | undefined;
+    return row ? JSON.parse(row.data) : undefined;
   }
 
   listTemplates(): TemplateVersionDoc[] {
-    return (this.db.prepare(this.templateQuery()).all() as { data: string }[]).map(row => JSON.parse(row.data));
+    return (this.db.prepare('SELECT data FROM templates ORDER BY id').all() as { data: string }[]).map(row => JSON.parse(row.data));
   }
 
   listTemplatesPage(options: PageOptions): PageResult<TemplateVersionDoc> {
-    return this.readPage(this.templateQuery(), [], options, data => JSON.parse(data) as TemplateVersionDoc);
+    return this.readPage('SELECT data FROM templates ORDER BY id', [], options, data => JSON.parse(data) as TemplateVersionDoc);
   }
 
   /** 历史版本已由订阅迁移器展开，活动表只留下当前模板；同一事务内完成。 */
@@ -1101,16 +1101,16 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     const tx = this.db.transaction(() => {
       this.db.exec(LEGACY_TEMPLATE_SCHEMA.replace('CREATE TABLE', 'CREATE TEMP TABLE'));
       this.db.exec('INSERT INTO template_versions SELECT id, 1, data, updated_at FROM templates');
-      for (const d of seed.sources ?? []) this.put('source', d, owner);
-      for (const d of seed.collections ?? []) this.put('collection', d, owner);
-      for (const d of seed.locals ?? []) this.put('local', d, owner);
-      for (const d of seed.rulesets ?? []) this.put('ruleset', d, owner);
+      for (const d of seed.sources ?? []) this.put('source', d, owner, this.legacyTemplates);
+      for (const d of seed.collections ?? []) this.put('collection', d, owner, this.legacyTemplates);
+      for (const d of seed.locals ?? []) this.put('local', d, owner, this.legacyTemplates);
+      for (const d of seed.rulesets ?? []) this.put('ruleset', d, owner, this.legacyTemplates);
       // 旧种子里的规则包先按原样写入，下面统一转成规则集
       for (const d of seed.bundles ?? []) {
         this.db.prepare("INSERT OR REPLACE INTO docs (kind, id, owner, data, updated_at) VALUES ('bundle', ?, ?, ?, ?)")
           .run((d as { id: string }).id, owner, this.cipher.encrypt(JSON.stringify(d)), this.now());
       }
-      for (const d of seed.presets ?? []) this.put('preset', d);
+      for (const d of seed.presets ?? []) this.put('preset', d, null, this.legacyTemplates);
 
       for (const t of seed.templates ?? []) {
         // 旧种子可能包含锁定引用，先载入全部模板，订阅迁移后再只留当前内容。
@@ -1120,9 +1120,9 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       for (const d of seed.profiles ?? []) {
         // 预设展开的备份必须保留原始输入，不能先被 routing 规范化丢掉历史字段。
         if (d.base?.presetId) this.db.prepare('INSERT OR IGNORE INTO native_migration_backups VALUES (?,?,?,?)').run('profile', d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
-        const next = migrateProfile(d, profileTemplate(d, (id, v) => this.getTemplate(id, v)));
+        const next = migrateProfile(d, profileTemplate(d, this.legacyTemplates.get));
         if (!d.routing) this.db.prepare('INSERT OR IGNORE INTO profile_migration_backups (profile_id, data, created_at) VALUES (?, ?, ?)').run(d.id, this.cipher.encrypt(JSON.stringify(d)), this.now());
-        this.put('profile', next, owner);
+        this.put('profile', next, owner, this.legacyTemplates);
       }
       // 旧订阅级凭证不升级权限；新种子仅允许给明确用户设置用户级凭证。
       for (const t of seed.tokens ?? []) if ('userId' in t) this.putToken(t);
@@ -1138,7 +1138,6 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.migrateNativeConfigs();
       this.finishTemplateMigration();
     });
-    this.legacyTemplateMode = true;
-    try { tx(); } finally { this.legacyTemplateMode = false; }
+    tx();
   }
 }
