@@ -6,7 +6,7 @@ import { bad, HttpError, jsonBody, requireAdmin, requireUser, type ApiEnv } from
 export function ruleRepoRoutes(store: Store, repos: RuleRepoService) {
   const app = new Hono<ApiEnv>();
   app.use('/rule-repos/*', requireUser);
-  app.get('/rule-repos', requireUser, c => { repos.refreshIfDue(); return c.json({ repos: repos.list() }); });
+  app.get('/rule-repos', requireUser, c => c.json({ repos: repos.list() }));
   app.post('/rule-repos', requireAdmin, async c => {
     const id = await repos.addCustom(await jsonBody(c));
     void repos.refresh(id);

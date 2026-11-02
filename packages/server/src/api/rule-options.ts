@@ -23,7 +23,6 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
     const local = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(rs => ({
       id: rs.id, name: rs.name, hint: rs.note || `${rs.sources.length} 个来源`,
     }));
-    repos.refreshIfDue();
     const notices = repos.list().filter(r => r.enabled && (!repository || r.id === repository)).flatMap(r => {
       if (r.error || !r.builtAt) return [`${r.name}：${r.error ? '索引更新失败' : '索引尚未就绪'}${r.entries ? '，使用已有索引' : ''}`];
       return store.db.prepare('SELECT 1 FROM rule_repo_catalog WHERE repo = ?').get(r.id) ? [] : [`${r.name}：完整文件索引待更新`];
