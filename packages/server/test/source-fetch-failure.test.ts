@@ -29,7 +29,6 @@ describe('单地址订阅源的失败回退', () => {
     const h = setup(good);
     h.responses[good] = new Error('模拟失败');
     expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(503);
-    expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
   });
 
   it('当前拉取失败时继续输出该 URL 的成功快照', async () => {
@@ -45,13 +44,11 @@ describe('单地址订阅源的失败回退', () => {
     expect(res.report.some(r => r.level === 'error')).toBe(false);
   });
 
-  it('先有成功结果，后来换成完全不可用的地址时返回上一份成功配置', async () => {
+  it('先有成功结果，后来换成完全不可用的地址时直接失败', async () => {
     const h = setup(good);
-    const before = await (await h.app.request('/subs/profile?token=token&id=p')).text();
+    expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(200);
     h.store.put('source', { ...h.store.get('source', 's')!, url: bad });
-    const res = await h.renderer.render('p', { client: 'mihomo' });
-    expect(res.ok && res.source).toBe('last-good');
-    expect(res.ok && res.render.yaml).toBe(before);
+    expect((await h.renderer.render('p', { client: 'mihomo' })).ok).toBe(false);
   });
 
   it('组合的某个成员整体不可用时仍失败，不新增成员跳过策略', async () => {

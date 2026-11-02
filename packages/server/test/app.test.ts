@@ -145,14 +145,13 @@ describe('订阅接口', () => {
 });
 
 describe('失败兜底', () => {
-  it('渲染出错时返回上一份成功结果', async () => {
+  it('渲染出错时返回 503，不回退旧配置', async () => {
     const { app, store } = setup();
-    const ok = await (await get(app, '/subs/profile?token=tk-mac&id=p1')).text();
+    expect((await get(app, '/subs/profile?token=tk-mac&id=p1')).status).toBe(200);
     store.put('profile', { ...PROFILE, overlay: { ...PROFILE.overlay, rulePatches: { 'r-tg': { target: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'air' }, match: { exact: '不存在' } } } } } } });
     const res = await get(app, '/subs/profile?token=tk-mac&id=p1');
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe(ok);
-    expect(store.recentAccess('p1')[0]!.source).toBe('last-good');
+    expect(res.status).toBe(503);
+    expect(store.recentAccess('p1')[0]!.source).toBe('failed');
   });
 
   it('从未成功渲染过：503 与纯文本说明', async () => {

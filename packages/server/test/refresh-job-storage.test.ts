@@ -26,7 +26,7 @@ describe('刷新任务存储', () => {
       expect(jobs(store)).toEqual([]);
       store.db.exec('DROP TABLE refresh_jobs; PRAGMA user_version = 31');
       store.close(); store = new Store(file, { cipher });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(33);
       putJob(store, 'kept', 'profile', 'p');
       store.db.pragma('user_version = 31');
       store.close(); store = new Store(file, { cipher });

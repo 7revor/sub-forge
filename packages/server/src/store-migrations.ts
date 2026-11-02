@@ -59,6 +59,8 @@ class StoreMigration {
       }
       this.db.exec(SCHEMA);
       this.db.exec(LEGACY_TEMPLATE_SCHEMA);
+      // 已退役的产物表：历史迁移步骤仍会访问，升级结束统一删除。
+      this.db.exec('CREATE TABLE IF NOT EXISTS last_good (profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (profile_id, target))');
       this.db.exec('INSERT OR IGNORE INTO template_versions SELECT id, 1, data, updated_at FROM templates');
       // 已退役表仅在旧凭据迁移期间使用，不能由当前建表脚本重建。
       if (version < 23) this.db.exec(`CREATE TABLE IF NOT EXISTS sub_tokens (
@@ -197,11 +199,15 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         this.db.exec('DROP TABLE IF EXISTS sub_tokens');
       }
       this.finishTemplateMigration();
+      // v33：渲染结果不再落库，规则和节点按上游快照实时生成。
+      this.db.exec('DROP TABLE IF EXISTS last_good');
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
     // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
     if (version < 23) this.db.pragma('wal_checkpoint(TRUNCATE)');
+    // 回收已删除产物占用的空间，避免继续增大文件和备份。
+    if (version > 0 && version < 33) this.db.exec('VACUUM');
     if (hadSnapshots && version < 3) {
       // 清除迁移前留在空闲页和 WAL 中的明文副本。
       this.db.pragma('wal_checkpoint(TRUNCATE)');

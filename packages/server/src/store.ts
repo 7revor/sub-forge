@@ -160,19 +160,6 @@ export class Store {
       this.pruneUnusedResource(row.resource);
     }
   }
-  private prunePrivateRules(profileId: string, templates: TemplateReader = this.currentTemplates): void {
-    // 订阅/模板移除专属引用时清理兜底正文。
-    for (const row of this.db.prepare('SELECT rowid, data FROM last_good WHERE profile_id = ?').all(profileId) as { rowid: number; data: string }[]) {
-      const render = JSON.parse(this.cipher.decrypt(row.data)) as import('./render.ts').StoredRender;
-      const privateRules = Object.values(render.privateRules ?? {});
-      if (!privateRules.length) continue;
-      const profile = this.get('profile', profileId);
-      const template = profile ? profileTemplate(profile, templates.get) : undefined;
-      const rules = profile ? resolveProfileRouting(profile, template, new Report()).rules : [];
-      if (privateRules.some(saved => !rules.some(rule => rule.enabled !== false && stableStringify(rule.matcher) === stableStringify(saved.reference.matcher) && !!rule.options?.src === !!saved.reference.options?.src))) this.db.prepare('DELETE FROM last_good WHERE rowid = ?').run(row.rowid);
-    }
-  }
-
   pruneResourceBindings(templates: TemplateReader = this.currentTemplates): void {
     // 失效公共定义不能由缓存记录自身继续保活，撤销通知同时阻止在途编译回写。
     const sharedRules = this.listSharedRules<{ reference: import('@sub-forge/core').RuleResourceReference }>().filter(row => {
@@ -255,7 +242,6 @@ export class Store {
 
     })();
     this.configurationRevision++;
-    if (kind === 'profile') this.prunePrivateRules(doc.id, templates);
     if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
     if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
     this.pruneResourceBindings(templates);
@@ -320,9 +306,6 @@ export class Store {
     this.db.prepare('INSERT INTO templates (id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
       .run(t.id, JSON.stringify(current), this.now());
     this.configurationRevision++;
-    for (const profile of this.list('profile')) {
-      if (profile.routing.mode === 'bound' && profile.routing.templateId === t.id) this.prunePrivateRules(profile.id);
-    }
     this.pruneResourceBindings();
     this.changed();
   }
@@ -396,7 +379,6 @@ export class Store {
   /** 只删除订阅专属产物；用户凭证与公共规则资源独立存在。 */
   deleteProfileData(profileId: string): void {
     this.db.transaction(() => {
-      this.db.prepare('DELETE FROM last_good WHERE profile_id = ?').run(profileId);
       // 访问记录独立保留 30 天；删除资源不抹除用户自己的历史。
       this.db.prepare('DELETE FROM profile_migration_backups WHERE profile_id = ?').run(profileId);
     })();
@@ -495,18 +477,6 @@ export class Store {
     const row = this.db.prepare('SELECT SUM(ok = 1) ok, SUM(ok = 0) failed FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?')
       .get(ownerKind, ownerId, this.cipher.hmac(url)) as { ok: number | null; failed: number | null };
     return { ok: row.ok ?? 0, failed: row.failed ?? 0 };
-  }
-
-  // ---------- 最近一次成功的渲染 ----------
-
-  putLastGood(profileId: string, target: string, data: unknown): void {
-    this.db.prepare('INSERT INTO last_good (profile_id, target, rendered_at, data) VALUES (?, ?, ?, ?) ON CONFLICT (profile_id, target) DO UPDATE SET rendered_at = excluded.rendered_at, data = excluded.data')
-      .run(profileId, target, this.now(), this.cipher.encrypt(JSON.stringify(data)));
-  }
-
-  getLastGood<T>(profileId: string, target: string): { renderedAt: number; data: T } | undefined {
-    const row = this.db.prepare('SELECT rendered_at, data FROM last_good WHERE profile_id = ? AND target = ?').get(profileId, target) as { rendered_at: number; data: string } | undefined;
-    return row ? { renderedAt: row.rendered_at, data: JSON.parse(this.cipher.decrypt(row.data)) as T } : undefined;
   }
 
   // ---------- 访问日志 ----------

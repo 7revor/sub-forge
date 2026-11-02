@@ -77,7 +77,7 @@ it('v18 升级先展开旧锁定订阅，再清理历史；绑定、归属、链
     store.put('profile', { ...rest, id: 'bound', routing: { mode: 'bound', templateId: 't', groupAdditions: {} } }, 'owner');
     issueProfileToken(store, { token: 'unchanged', profileId: 'pinned' });
     store.db.pragma('user_version = 18'); store.close(); store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(33);
     expect(store.getWithOwner('profile', 'pinned')).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { routing: { mode: 'independent', config: { groups: [{ name: '组1' }] } } } });
     expect(store.get('profile', 'bound')?.routing).toMatchObject({ mode: 'bound', templateId: 't' });
     expect(store.getTemplate('t')).toMatchObject({ groups: [{ name: '组2' }] });
@@ -127,9 +127,8 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
     store.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, ?)').run('profile', 'p', 'owner', encrypted, 1234);
     store.db.prepare('INSERT INTO profile_migration_backups VALUES (?, ?, ?)').run('p', encrypted, 1234);
     issueProfileToken(store, { token: 'same-token', profileId: 'p' });
-    store.putLastGood('p', 'mihomo', { yaml: '原成功内容' });
     store.db.pragma('user_version = 19'); store.close(); store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(33);
     expect(store.getTemplate('t')).toEqual({ ...template, id: 't' });
     const profile = store.getWithOwner('profile', 'p');
     expect(profile).toMatchObject({ owner: 'owner', updatedAt: 1234, doc: { routing: oldProfile.routing } });
@@ -137,7 +136,6 @@ it('v19 升级清除并发字段，保留绑定、内容、归属、时间与旧
     expect(profile?.doc).not.toHaveProperty('templateVersion');
     expect(store.getProfileMigrationBackup('p')).toEqual(oldProfile);
     expect(store.getToken('same-token')?.userId).toBe(store.getWithOwner('profile', 'p')?.owner);
-    expect(store.getLastGood('p', 'mihomo')).toBeUndefined();
     const before = [store.getTemplate('t'), profile];
     store.close(); store = new Store(file, { cipher });
     expect([store.getTemplate('t'), store.getWithOwner('profile', 'p')]).toEqual(before);

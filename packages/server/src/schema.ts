@@ -1,6 +1,6 @@
 // 当前数据库结构。旧版结构的转换见 store-migrations.ts。
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS native_migration_backups (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
@@ -44,10 +44,6 @@ CREATE TABLE IF NOT EXISTS shared_rule_resources (
   key TEXT PRIMARY KEY, ruleset_id TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shared_rule_resources_ruleset ON shared_rule_resources (ruleset_id);
-CREATE TABLE IF NOT EXISTS last_good (
-  profile_id TEXT NOT NULL, target TEXT NOT NULL, rendered_at INTEGER NOT NULL, data TEXT NOT NULL,
-  PRIMARY KEY (profile_id, target)
-);
 CREATE TABLE IF NOT EXISTS access_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   token TEXT NOT NULL, profile_id TEXT NOT NULL, at INTEGER NOT NULL, ua TEXT NOT NULL,

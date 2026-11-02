@@ -58,7 +58,6 @@ describe('远程规则快照有效性', () => {
   it('首次收到错误页面时返回 503，不生成只有兜底规则的成功配置', async () => {
     const h = setup('auto', '<html>Not available</html>');
     expect((await h.app.request('/subs/profile?token=test-token&id=p')).status).toBe(503);
-    expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
   });
 
   it('部分行无法解析仍保留有效规则，并允许之后恢复正常更新', async () => {
@@ -72,21 +71,14 @@ describe('远程规则快照有效性', () => {
     expect(after.ok && ruleBodies(h.store, after.render)['rs_r_classical.list']).toBe('DOMAIN,recovered.example.test\n');
   });
 
-  it.each([false, true])('历史库中已存在错误快照时保护主配置（已有成功配置：%s）', async hasLastGood => {
+  it('历史库中已存在错误快照时保护主配置', async () => {
     const h = setup('classical', 'DOMAIN,valid.example.test');
-    const before = hasLastGood ? await h.renderer.render('p', { client: 'mihomo' }) : undefined;
     h.advance(1000);
     const body = '<html>旧版本错误保存的页面</html>';
     h.store.addSnapshot({ ownerKind: 'ruleset', ownerId: 'r', url: 'https://rules.example.test/list', fetchedAt: 1_700_000_001_000, ok: true, body, hash: stableHash(body) });
     const after = await h.renderer.render('p', { client: 'mihomo' });
     expect(after.report).toContainEqual(expect.objectContaining({ code: 'ruleset.invalid-content', level: 'error' }));
-    if (hasLastGood) {
-      expect(after.ok && after.source).toBe('last-good');
-      expect(after.ok && after.render.yaml).toBe(before?.ok && before.render.yaml);
-    } else {
-      expect(after.ok).toBe(false);
-      expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
-    }
+    expect(after.ok).toBe(false);
   });
 
   it('有效规则被客户端覆盖全部丢弃时仍允许输出', async () => {

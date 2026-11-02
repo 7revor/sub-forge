@@ -4,9 +4,8 @@ import { queryUrl } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
-// 渲染服务：从存储组装内核输入 → 渲染 → 校验 → 记录成功结果；失败时返回上一份成功结果（OUT-05 / TPL-12）。
-// 渲染结果与 token 无关：地址里先写占位符，下发时再替换成请求所用的 token，
-// 这样重置订阅链接后仍可复用同一 Profile 的"上一份成功结果"。
+// 渲染服务：从存储组装内核输入 → 渲染 → 校验；结果不落库，失败直接返回错误，由客户端保留本地配置。
+// 渲染结果与 token 无关：地址里先写占位符，下发时再替换成请求所用的 token。
 
 import { createHash } from 'node:crypto';
 import { stringify } from 'yaml';
@@ -35,15 +34,8 @@ function renderForClient(input: Parameters<typeof renderClash>[0], client: Clien
   return client === 'surge' ? renderSurge(input) : client === 'loon' ? renderLoon(input) : renderClash(input, client);
 }
 
-/** 可下发的渲染结果（也是"上一份成功结果"的存储格式） */
+/** 可下发的渲染结果 */
 export type StoredRender = {
-  /** Loon 全部分流规则已托管；旧内联产物不可作为回退。 */
-  loonRuleDelivery?: 'remote';
-  /** 原生远程节点输出版本；禁止回退到旧版强制内联产物。 */
-  nodeProviderDelivery?: 1;
-  /** Stash 已切换到公共 Clash 生成，不回退到旧专用改写。 */
-  clashDelivery?: 1;
-  nodeOutputSignature?: string;
   providerNodeCounts?: Record<string, number>;
   yaml: string;
   providers: Record<string, string>;
@@ -56,7 +48,7 @@ export type StoredRender = {
 };
 
 export type RenderOutcome =
-  | { ok: true; source: 'fresh' | 'last-good'; render: StoredRender; report: ReportItem[] }
+  | { ok: true; render: StoredRender; report: ReportItem[] }
   | { ok: false; message: string; report: ReportItem[]; accessDenied?: true };
 
 export type Verifier = (yaml: string) => Promise<{ ok: boolean; output: string }>;
@@ -100,8 +92,6 @@ type Attempt = { render?: StoredRender; report: ReportItem[]; failure?: string; 
 
 export type PreviewOutcome = { ok: boolean; format?: 'yaml' | 'ini'; yaml?: string; exportYaml?: string; exportUnavailableReason?: string; dependencies?: DependencyEntry[]; chainResolutions?: import('@sub-forge/core').ChainResolution[]; report: ReportItem[]; failure?: string };
 
-const targetKey = (t: Target) => `${t.client}:${t.platform ?? 'any'}${t.app ? ':' + t.app : ''}`;
-
 export class RenderService {
   readonly sharedRules: SharedRuleService;
 
@@ -133,16 +123,7 @@ export class RenderService {
       // 内核抛出的异常（如依赖解析不收敛）也按渲染失败处理，走兜底
       attempt = { report: pre, failure: `渲染异常：${(e as Error).message}` };
     }
-    if (attempt.render) return { ok: true, source: 'fresh', render: attempt.render, report: attempt.report };
-
-    if (!this.store.get('profile', profileId)) return { ok: false, message: 'Profile 不存在', report: attempt.report };
-    const saved = this.store.getLastGood<StoredRender>(profileId, targetKey(target));
-    const requiresRemote = target.client !== 'mihomo' && this.store.get('profile', profileId)?.nodeSets.some(s => s.output === 'provider');
-    const changedOutput = saved?.data.nodeOutputSignature !== undefined && saved.data.nodeOutputSignature !== stableStringify(this.store.get('profile', profileId)?.nodeSets);
-    const last = target.client === 'stash' && saved?.data.clashDelivery !== 1 || changedOutput || target.client === 'loon' && saved?.data.loonRuleDelivery !== 'remote' || requiresRemote && saved?.data.nodeProviderDelivery !== 1 ? undefined : saved;
-    if (last && this.store.getWithOwner('profile', profileId)?.owner && !this.canReadNodes(last.data, this.store.getWithOwner('profile', profileId)!.owner!)) return { ok: false, accessDenied: true, message: '节点资源权限已变化', report: attempt.report };
-    if (last && !this.canReadRules(profileId, last.data)) return { ok: false, accessDenied: true, message: '规则资源已移除或失效', report: attempt.report };
-    if (last) return { ok: true, source: 'last-good', render: { ...last.data, yaml: this.managedProfileYaml(last.data.yaml, profileId, target) }, report: [...attempt.report, { level: 'warn', code: 'render.last-good', message: `本次渲染失败，返回 ${new Date(last.renderedAt).toISOString()} 的成功结果：${attempt.failure}` }] };
+    if (attempt.render) return { ok: true, render: attempt.render, report: attempt.report };
     return { ok: false, message: attempt.failure ?? '渲染失败', report: attempt.report };
   }
 
@@ -173,10 +154,6 @@ export class RenderService {
       });
   }
 
-  private remember(profileId: string, target: Target, render: StoredRender): void {
-    this.store.putLastGood(profileId, targetKey(target), render);
-  }
-
   /**
    * 预演：复用上游快照，不读写"上一份成功结果"。用于 Profile 预览，以及模板发布前对现有 Profile 的试渲染（TPL-07 ②）。
    * template 传入时代替 Profile 当前引用的模板版本。
@@ -203,7 +180,7 @@ export class RenderService {
     } finally { this.store.pruneResourceBindings(); }
   }
 
-  /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不读写 last-good 或访问日志。 */
+  /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不写访问日志。 */
   async previewDraft(profile: ProfileDoc, target: Target, owner?: string): Promise<PreviewOutcome> {
     return this.preview('', target, { profile: { ...profile, id: '' }, owner });
   }
@@ -303,11 +280,7 @@ export class RenderService {
 
     checkCurrent();
     const render: StoredRender = {
-      nodeProviderDelivery: 1,
-      ...(!isIniClient(target.client) ? { clashDelivery: 1 as const } : {}),
-      nodeOutputSignature: stableStringify(profile.nodeSets),
       providerNodeCounts: Object.fromEntries(Object.entries(result.providers).flatMap(([key, provider]) => provider.nodeCount === undefined ? [] : [[key, provider.nodeCount]])),
-      ...(target.client === 'loon' ? { loonRuleDelivery: 'remote' as const } : {}),
       yaml: this.managedProfileYaml(result.yaml, profile.id, target),
       nodeDependencies: [
         ...Object.keys(nodeSets.sources).map(id => ({ type: 'source' as const, id })),
@@ -343,7 +316,6 @@ export class RenderService {
         const body = result.rulesets[file]?.text;
         if (body !== undefined && reference.matcher.kind === 'ruleset' && !reference.matcher.remote) this.sharedRules.register({ ...reference, matcher: reference.matcher }, target, rules.rulesets[reference.matcher.id] as RuleSetDoc, rules, body);
       }
-      this.remember(profileId, target, render);
     })();
     return { render, report };
   }

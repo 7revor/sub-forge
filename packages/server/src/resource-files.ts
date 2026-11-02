@@ -126,7 +126,6 @@ export function subscriptionRuleRoutes(store: Store, renderer: RenderService, sn
     const selected = result.render.privateRules?.[key];
     if (!selected || !renderer.canReadRule(profileId, selected.reference)) return c.body(null, 404);
     c.set('accessResource', { kind: 'rule-collection', resourceId: key, resourceName: store.get('profile', profileId)!.name + ' · 专属规则' });
-    if (result.source === 'last-good') c.header('x-sub-forge-warning', 'last-good-rule');
     return ruleBody(c, selected.body);
   });
   return app;

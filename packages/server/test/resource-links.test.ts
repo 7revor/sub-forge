@@ -52,7 +52,6 @@ it('未被订阅引用的增强可独立下载，按 UA 转换，共享产物和
   const stash = await h.app.request(`/resources/ruleset?token=${h.token}&id=r`, { headers: { 'user-agent': 'Stash/3.6.0' } });
   expect(stash.status).toBe(200); expect(await stash.text()).toContain('USER-AGENT,Example*');
   expect(h.store.listSharedRules()).toHaveLength(2); expect(h.fetcher).toHaveBeenCalledTimes(1);
-  expect(h.store.db.prepare('SELECT * FROM last_good').all()).toEqual([]);
   h.store.updateUser(h.a.id, { disabled: true });
   expect((await h.app.request(`/resources/ruleset?token=${h.other}&id=r`)).status).toBe(200);
   expect((await h.app.request(`/resources/ruleset?token=${h.token}&id=r`)).status).toBe(404);

@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.ts';
 import { Cipher } from '../src/crypto.ts';
 import type { ProfileDoc, TemplateVersionDoc } from '../src/docs.ts';
-import { RenderService, TOKEN_PLACEHOLDER, type StoredRender } from '../src/render.ts';
+import { RenderService } from '../src/render.ts';
 import { SnapshotService } from '../src/snapshots.ts';
 import { Store } from '../src/store.ts';
 
@@ -124,18 +124,17 @@ describe('订阅资源按当前配置独立刷新', () => {
     expect((await h.get(urls(await h.main()).provider)).status).toBe(200);
   });
 
-  it('生成失败仍使用最近一次成功结果', async () => {
+  it('生成失败时订阅和节点资源返回错误，不回退旧结果', async () => {
     const h = harness(); seed(h.store);
     const first = await h.main();
     h.store.put('profile', { ...profile, name: '临时名称' }); await h.main();
     h.store.put('profile', structuredClone(profile)); expect(await h.main()).toEqual(first);
     h.store.putTemplate({ ...template(2), final: { kind: 'group', groupId: 'missing' } });
-    expect(await h.main()).toEqual(first);
-    expect((await h.get(urls(first).provider)).status).toBe(200);
-    expect((await h.get(urls(first).ruleset)).status).toBe(200);
+    expect(await h.main()).toContain('订阅暂时不可用');
+    expect((await h.get(urls(first).provider)).status).toBe(503);
   });
 
-  it('最近成功结果加密持久化，重启读取当前资源；删除订阅时清理', async () => {
+  it('渲染结果不落库，重启后读取当前资源', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-generations-'));
     const file = join(dir, 'db.sqlite'); const cipher = new Cipher(randomBytes(32));
     let store = new Store(file, { cipher });
@@ -143,19 +142,14 @@ describe('订阅资源按当前配置独立刷新', () => {
       const first = harness(store); seed(store);
       const old = urls(await first.main());
       store.putTemplate(template(2, '新前置')); await first.main();
-      expect(JSON.stringify(store.db.prepare('SELECT * FROM last_good').all())).not.toContain('node.test');
       store.close(); store = new Store(file, { cipher });
       const restarted = harness(store);
       expect(parse(await (await restarted.get(old.provider)).text()).proxies[0]['dialer-proxy']).toBe('新前置');
-      store.deleteProfileData('p');
-      expect(store.db.prepare('SELECT * FROM last_good').all()).toEqual([]);
     } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('旧版 provider 路径和短版本均拒绝访问', async () => {
     const h = harness(); seed(h.store);
-    const legacy: StoredRender = { yaml: `proxy-providers:\n  S:\n    url: https://sub.test/p/${TOKEN_PLACEHOLDER}/source%3As?v=1234abcd\n`, providers: { 'source:s': 'proxies: []\n' }, ruleResources: [], nodeDependencies: [], warnings: 0 };
-    h.store.putLastGood('p', 'mihomo:macos', legacy);
     await h.main('?platform=macos');
     expect((await h.get('/p/token/source%3As?v=1234abcd')).status).toBe(404);
     expect((await h.get('/p/token/source%3As?v=deadbeef')).status).toBe(404);
@@ -201,20 +195,16 @@ it('v26 升级删除结构版本与旧渲染缓存，保留配置、令牌和上
     const saved = store.getWithOwner('profile', 'p'), token = store.getToken('token');
     store.addSnapshot({ ownerKind: 'source', ownerId: 's', url: 'https://example.test/source', fetchedAt: 1000, ok: true, status: 200, body: '旧成功原文' });
     const legacy = { generation: 'old', yaml: 'version=old&hash=old' };
-    store.putLastGood('p', 'mihomo:any', legacy);
     store.db.exec('CREATE TABLE render_generations (profile_id TEXT, target TEXT, version TEXT, sequence INTEGER, data TEXT)');
     store.db.prepare('INSERT INTO render_generations VALUES (?, ?, ?, ?, ?)').run('p', 'mihomo:any', 'old', 1, cipher.encrypt(JSON.stringify(legacy)));
     store.db.pragma('user_version = 26'); store.close();
     store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(33);
     expect(store.db.prepare("SELECT name FROM sqlite_master WHERE name='render_generations'").get()).toBeUndefined();
-    expect(store.getLastGood('p', 'mihomo:any')).toBeUndefined();
     expect(store.getWithOwner('profile', 'p')).toEqual(saved);
     expect(store.getToken('token')).toEqual(token);
     expect(store.latestSnapshot('source', 's', 'https://example.test/source')?.body).toBe('旧成功原文');
-    store.putLastGood('p', 'mihomo:any', { yaml: '无版本的新结果' });
     store.close(); store = new Store(file, { cipher });
-    expect(store.getLastGood('p', 'mihomo:any')?.data).toEqual({ yaml: '无版本的新结果' });
     expect(store.getToken('token')).toEqual(token);
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });

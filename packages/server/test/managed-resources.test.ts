@@ -32,7 +32,6 @@ it('不同用户同规则同处理共用产物和原文，平台变体独立，�
   expect(ruleUrl(a).replace(h.tokenA, '')).toBe(ruleUrl(b).replace(h.tokenB, ''));
   expect(Object.keys(a['rule-providers'])).toEqual(['规则增强']);
   expect(h.store.listSharedRules()).toHaveLength(1); expect(h.fetcher).toHaveBeenCalledTimes(1);
-  expect(h.store.getLastGood('a', 'mihomo:any')!.data).not.toHaveProperty('rulesets');
   const stash = await h.main(h.tokenB, 'b', '?target=stash&platform=ios');
   expect(ruleUrl(stash)).not.toBe(ruleUrl(b)); expect(h.store.listSharedRules()).toHaveLength(2);
   expect(h.fetcher).toHaveBeenCalledTimes(1);
@@ -47,7 +46,6 @@ it('删除订阅只清理私有产物；公共规则继续更新，删除规则�
   await h.main(h.tokenA, 'a', '?target=stash&platform=ios');
   h.store.delete('profile', 'a');
   expect(h.store.getActiveToken(h.tokenA)).toBeDefined();
-  expect(h.store.db.prepare('SELECT * FROM last_good').all()).toEqual([]);
   h.update('DOMAIN,two.test'); expect(await (await h.app.request(url)).text()).toBe('DOMAIN,two.test\n');
   h.store.delete('ruleset', 'r');
   expect((await h.app.request(url)).status).toBe(404);
@@ -56,7 +54,7 @@ it('删除订阅只清理私有产物；公共规则继续更新，删除规则�
   expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });
 
-it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理正文、兜底产物和原文绑定', async () => {
+it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理原文绑定', async () => {
   const h = setup(); h.profile('a', h.a.id, remoteRuleMatcher('https://rules.test/Apple.list?download=1'));
   const cfg = await h.main(h.tokenA, 'a'), url = ruleUrl(cfg), key = new URL(url).searchParams.get('key')!;
   expect(Object.keys(cfg['rule-providers'])).toEqual(['Apple']);
@@ -67,7 +65,7 @@ it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理�
   expect((await h.app.request(`/resources/ruleset?key=${key}&token=${h.tokenB}`)).status).toBe(404);
   h.store.delete('profile', 'a');
   expect((await h.app.request(url)).status).toBe(404);
-  for (const table of ['last_good', 'resource_bindings', 'snapshots']) expect(h.store.db.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
+  for (const table of ['resource_bindings', 'snapshots']) expect(h.store.db.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
 });
 
 it('旧转换 token 入口不可用，修改下载参数不能把规则资源变为任意 URL 代理', async () => {

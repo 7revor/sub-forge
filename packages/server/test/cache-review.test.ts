@@ -36,14 +36,14 @@ it('渲染校验期间更新配置与快照，旧任务不能覆盖新结果', a
   const old = renderer.render('p', { client: 'mihomo' }); await entered.promise;
   body = 'DOMAIN,new.test'; h.store.put('profile', { ...profile(), name: '新订阅' });
   await h.snapshots.refresh('ruleset', ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id, 'https://rules.test/a', { scope: 'profile:p' });
-  await renderer.render('p', { client: 'mihomo' }); held.release(); await old;
-  const saved = h.store.getLastGood<import('../src/render.ts').StoredRender>('p', 'mihomo:any')!;
-  expect(Object.values(ruleBodies(h.store, saved.data)).join('')).toContain('new.test');
+  await renderer.render('p', { client: 'mihomo' }); held.release();
+  const rendered = await old;
+  expect(rendered.ok && Object.values(ruleBodies(h.store, rendered.render)).join('')).toContain('new.test');
 });
-it('渲染等待中删除订阅，不得重新写成功配置', async () => {
+it('渲染等待中删除订阅，不得返回成功配置', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,a.test' }; } });
   h.store.put('profile', profile()); const pending = h.renderer.render('p', { client: 'mihomo' });
-  await entered.promise; h.store.delete('profile', 'p'); held.release(); expect((await pending).ok).toBe(false); expect(h.store.getLastGood('p', 'mihomo:any')).toBeUndefined();
+  await entered.promise; h.store.delete('profile', 'p'); held.release(); expect((await pending).ok).toBe(false);
 });
 it('等待刷新时撤销 token，完成后不得下发内容', async () => {
   const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,secret.test' }; } });

@@ -50,10 +50,9 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       if (r.ok) before.set(p.id, r.render.yaml);
     }
     legacyRead.mockRestore();
-    const oldLast = store.getLastGood('full', 'mihomo:any');
     store.db.pragma('user_version = 15');
     const plan = await profileMigrationPlan(file, cipher);
-    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(32);
+    expect(plan.sourceVersion).toBe(15); expect(plan.targetVersion).toBe(33);
     expect(plan.profiles).toHaveLength(5);
     expect(store.db.pragma('user_version', { simple: true })).toBe(15);
     expect(store.get('profile', 'full')!.routing).toBeUndefined();
@@ -75,7 +74,6 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       expect(rendered.ok).toBe(true);
       if (rendered.ok) expect(rendered.render.yaml).toBe(before.get(old.id));
     }
-    expect(oldLast).toBeTruthy();
     expect(store.db.prepare('SELECT data FROM profile_migration_backups').all().every((r: any) => !r.data.includes('香港'))).toBe(true);
     const full = store.get('profile', 'full');
     store.close(); store = new Store(file, { cipher });

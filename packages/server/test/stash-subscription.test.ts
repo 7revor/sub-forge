@@ -104,7 +104,6 @@ describe('Stash 主订阅与资源隔离', () => {
       expect(yaml['rule-providers']).toBeUndefined();
       expect(yaml.rules).toEqual(['DOMAIN,paypal.test,代理', 'USER-AGENT,PayPal*,代理', 'IP-CIDR,192.0.2.0/24,代理,no-resolve', 'PROCESS-NAME,Example,代理', 'MATCH,DIRECT']);
     }
-    expect(h.store.getLastGood(h.profile.id, 'stash:ios:stash-ios')).toBeUndefined();
     expect((await h.bob.post(`/api/profiles/${h.profile.id}/preview`, { client: 'stash' })).status).toBe(404);
     expect((await h.bob.post('/api/profiles/preview', { profile: h.profile, client: 'stash' })).status).toBe(400);
   });
@@ -124,25 +123,17 @@ describe('Stash 主订阅与资源隔离', () => {
     expect((await h.alice.post('/api/profiles', { ...h.draft, base: { kernels: { stash: [] } } })).status).toBe(400);
   });
 
-  it('失败只回退同客户端的成功结果，不调用 Mihomo 校验器验证 Stash', async () => {
+  it('失败时直接报错，不调用 Mihomo 校验器验证 Stash', async () => {
     const h = await scenario();
     const verify = vi.fn(async () => ({ ok: true, output: '' }));
     const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify });
     const original = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
     expect(original.ok).toBe(true);
     if (!original.ok) throw new Error(original.message);
-    // 模拟升级前缺少 Stash 更新声明的历史成功结果。
-    h.store.putLastGood(h.profile.id, 'stash:ios:stash-ios', { ...original.render, yaml: original.render.yaml.replace(/^#SUBSCRIBED[^\n]*\n/, '') });
     expect(verify).not.toHaveBeenCalled();
     expect((await renderer.render(h.profile.id, { client: 'mihomo' })).ok).toBe(true);
     expect(verify).toHaveBeenCalledTimes(1);
     h.store.put('local', { id: 'nodes', name: '认证冲突', proxies: [{ name: '测试节点', type: 'hysteria2', server: 'example.test', port: 443, password: 'one', auth: 'two' }] }, h.user.id);
-    const fallback = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
-    expect(fallback).toMatchObject({ ok: true, source: 'last-good' });
-    if (!fallback.ok) throw new Error(fallback.message);
-    expect(fallback.render.yaml.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token=__SF_TOKEN__`);
-    expect(fallback.render.yaml.match(/^#SUBSCRIBED /gm)).toHaveLength(1);
-    expect(parse(fallback.render.providers['local:nodes']!).proxies[0].auth).toBe('example-password');
-    expect((await renderer.render(h.profile.id, { client: 'stash', platform: 'macos' })).ok).toBe(false);
+    expect((await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' })).ok).toBe(false);
   });
 });

@@ -74,12 +74,11 @@ describe('每个用户一个资源令牌', () => {
       const user = store.createUser({ username: 'alice', passwordHash: 'fixture', role: 'user' });
       store.put('profile', { id: 'p', name: '旧订阅', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' } }, user.id);
       const before = store.getWithOwner('profile', 'p');
-      store.putLastGood('p', 'mihomo:any', { yaml: '旧链接' });
       store.db.exec('DELETE FROM user_tokens; CREATE TABLE sub_tokens (token_hash TEXT PRIMARY KEY, token_enc TEXT NOT NULL, profile_id TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL)');
       store.db.prepare('INSERT INTO sub_tokens VALUES (?,?,?,?,?)').run(cipher.hmac('legacy'), cipher.encrypt('legacy'), 'p', null, 1);
       store.db.pragma('user_version = 22'); store.close(); store = new Store(file, { cipher });
       const token = store.userToken(user.id)!; expect(token.token).not.toBe('legacy'); expect(store.getToken('legacy')).toBeUndefined();
-      expect(store.getWithOwner('profile', 'p')).toEqual(before); expect(store.getLastGood('p', 'mihomo:any')).toBeUndefined();
+      expect(store.getWithOwner('profile', 'p')).toEqual(before);
       expect(store.db.prepare("SELECT 1 FROM sqlite_master WHERE name='sub_tokens'").get()).toBeUndefined();
       store.close(); store = new Store(file, { cipher }); expect(store.userToken(user.id)).toEqual(token);
     } finally { store.close(); rmSync(dir, { recursive: true }); }

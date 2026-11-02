@@ -37,11 +37,9 @@ describe('代码审查回归', () => {
     t.store.close();
   });
 
-  it('导入种子保留现有订阅的兜底配置', () => {
+  it('导入种子写入来源文档', () => {
     const t = setupApp();
-    t.store.putLastGood('existing', 'mihomo:any', { yaml: 'a: 1' });
     t.store.importSeed({ sources: [{ id: 's', name: '种子来源', url: 'https://seed.test', pipeline: [] }] });
-    expect(t.store.getLastGood('existing', 'mihomo:any')?.data).toEqual({ yaml: 'a: 1' });
     expect(t.store.get('source', 's')?.name).toBe('种子来源');
     t.store.close();
   });

@@ -49,7 +49,7 @@ it.each(['constructor', 'toString', '__proto__'])('v15 的特殊组 ID %s 可升
     store.db.prepare('INSERT INTO template_versions VALUES (?,?,?,?)').run('t', 1, JSON.stringify({ ...template(id), id: 't', version: 1 }), 123);
     store.db.prepare('INSERT INTO docs VALUES (?,?,?,?,?)').run('profile', 'p', 'owner', cipher.encrypt(JSON.stringify(old)), 123);
     store.close(); store = new Store(file, { cipher });
-    expect(store.db.pragma('user_version', { simple: true })).toBe(32);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(33);
     expect(store.getWithOwner('profile', 'p')).toMatchObject({ owner: 'owner', updatedAt: 123, doc: { routing: { mode: 'bound', groupAdditions: {} } } });
     expect(store.getProfileMigrationBackup('p')).toEqual(old);
     store.close(); store = new Store(file, { cipher });

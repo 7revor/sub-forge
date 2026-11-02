@@ -145,7 +145,7 @@ export function createApp(deps: AppDeps) {
 
     const setAccessResult = (outcome?: RenderOutcome) => c.set('accessResult', {
       warnings: outcome?.ok ? outcome.render.warnings : 0,
-      source: outcome ? (outcome.ok ? outcome.source : 'failed') : 'unsupported',
+      source: outcome ? (outcome.ok ? 'fresh' : 'failed') : 'unsupported',
     });
 
     if (detected.client !== 'mihomo' && detected.platform && detected.platform !== 'ios' && detected.platform !== 'macos') {
