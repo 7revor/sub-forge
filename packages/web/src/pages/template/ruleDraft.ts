@@ -1,4 +1,4 @@
-import type { RuleEntry } from '@sub-forge/core';
+import type { Matcher, RuleEntry } from '@sub-forge/core';
 import type { TemplateBody } from '../../convert/templateYaml.ts';
 
 /** 仅提交匹配内容与选项，保留列表中最新的出口和顺序。 */
@@ -16,6 +16,18 @@ export function applyRuleDraft(body: TemplateBody, draft: RuleEntry, adding = fa
   return { ...body, rules, ...(body.ruleProviders && oldUrl && oldUrl !== newUrl ? {
     ruleProviders: body.ruleProviders.filter(provider => provider.url !== oldUrl || rules.some(rule => rule.matcher.kind === 'ruleset' && rule.matcher.remote?.url === oldUrl)),
   } : {}) };
+}
+
+/** 一键关联：按地址替换可编辑的远程规则，保留规则标识、顺序和出口。 */
+export function linkRepositoryRules(body: TemplateBody, resolved: Map<string, Matcher>, editable: (rule: RuleEntry) => boolean) {
+  let linked = 0;
+  const next = body.rules.reduce((current, rule) => {
+    const matcher = rule.matcher.kind === 'ruleset' && rule.matcher.remote && editable(rule) ? resolved.get(rule.matcher.remote.url) : undefined;
+    if (!matcher) return current;
+    linked++;
+    return applyRuleDraft(current, { ...rule, matcher });
+  }, body);
+  return { body: next, linked };
 }
 
 /** 绑定模板时新增自定义规则，可插入模板块之前；不改动模板块内顺序。 */

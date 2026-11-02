@@ -2,9 +2,12 @@ import { useLocation } from 'react-router';
 import type { Matcher } from '@sub-forge/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.ts';
+import { notifySuccess } from '../feedback.ts';
 
 export type RepositoryUrlMatch = { repo: string; entry: string; ref: string; path: string; label: string; hint: string };
-type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
+export type RuleSetMatcher = Extract<Matcher, { kind: 'ruleset' }>;
+
+const LINK_CONCURRENCY = 4;
 
 export async function matchRepositoryUrls(urls: string[]) {
   const unique = [...new Set(urls)];
@@ -19,10 +22,11 @@ export function useRepositoryUrlMatches() {
   const [matches, setMatches] = useState<Record<string, RepositoryUrlMatch[]>>({});
   const [error, setError] = useState<unknown>();
   const [pending, setPending] = useState(0);
+  const [isLinkingAll, setLinkingAll] = useState(false);
   const session = useRef(0);
   const revisions = useRef(new Map<string, number>());
   useEffect(() => {
-    session.current++; revisions.current.clear(); setMatches({}); setError(undefined); setPending(0);
+    session.current++; revisions.current.clear(); setMatches({}); setError(undefined); setPending(0); setLinkingAll(false);
     return () => { session.current++; };
   }, [pathname]);
   const clear = useCallback((urls: string[]) => {
@@ -43,7 +47,21 @@ export function useRepositoryUrlMatches() {
     } catch (cause) { if (session.current === epoch) setError(cause); }
     finally { if (session.current === epoch) setPending(n => n - 1); }
   }, []);
-  return { matches, error, isPending: pending > 0, detect, clear };
+  /** urls 按列表项传入，同一地址多次出现时都计入；apply 基于最新草稿替换并返回实际关联的项数。 */
+  const linkAll = async (urls: string[], apply: (resolved: Map<string, RuleSetMatcher>) => number) => {
+    const epoch = session.current;
+    setLinkingAll(true); setError(undefined);
+    try {
+      const { resolved, failures } = await resolveRepositoryUrlMatches(uniqueRepositoryMatches(urls, matches));
+      if (session.current !== epoch) return;
+      const linked = resolved.size ? apply(resolved) : 0;
+      clear([...resolved.keys()]);
+      const ambiguous = urls.filter(url => (matches[url]?.length ?? 0) > 1).length;
+      if (linked) notifySuccess(`已关联 ${linked} 项${ambiguous ? `，${ambiguous} 项有多个候选，请单独选择` : ''}`);
+      if (failures.length) setError(new Error(`${failures.length} 个地址关联失败：${failures[0]}`));
+    } finally { if (session.current === epoch) setLinkingAll(false); }
+  };
+  return { matches, error, isPending: pending > 0, isLinkingAll, detect, clear, linkAll };
 }
 
 /** 点击候选后重验当前索引；仅展示建议不会修改原 URL 或关联身份。 */
@@ -53,4 +71,23 @@ export async function resolveRepositoryUrlMatch(url: string, match: RepositoryUr
   });
   if (matcher.repository?.sources.length !== 1 || matcher.repository.sources[0]?.url !== url) throw new Error('仓库文件地址已变化，请重新匹配');
   return matcher;
+}
+
+/** 一键关联只处理唯一候选；多候选保留标记，由用户逐项选择。 */
+export function uniqueRepositoryMatches(urls: string[], matches: Record<string, RepositoryUrlMatch[]>) {
+  return Object.fromEntries(urls.flatMap(url => matches[url]?.length === 1 ? [[url, matches[url][0]!]] : [])) as Record<string, RepositoryUrlMatch>;
+}
+
+/** 解析会读取文件正文，因此限制并发；单项失败不影响其余项。 */
+export async function resolveRepositoryUrlMatches(matches: Record<string, RepositoryUrlMatch>, resolve = resolveRepositoryUrlMatch) {
+  const queue = Object.entries(matches);
+  const resolved = new Map<string, RuleSetMatcher>();
+  const failures: string[] = [];
+  await Promise.all(Array.from({ length: Math.min(LINK_CONCURRENCY, queue.length) }, async () => {
+    for (let next = queue.shift(); next; next = queue.shift()) {
+      try { resolved.set(next[0], await resolve(next[0], next[1])); }
+      catch (cause) { failures.push(cause instanceof Error ? cause.message : String(cause)); }
+    }
+  }));
+  return { resolved, failures };
 }

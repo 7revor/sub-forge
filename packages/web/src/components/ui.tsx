@@ -83,7 +83,7 @@ export function Card({ title, count, subtitle, description, actions, children, c
   const panel = (
     <ShadcnCard className={className}>
       {(title || actions) && <CardHeader>
-        {title && <CardTitle>{title}{count !== undefined && <span className="ml-1.5 text-sm font-normal text-muted-foreground">{count}</span>}</CardTitle>}
+        {title && <CardTitle className={actions ? 'whitespace-nowrap' : undefined}>{title}{count !== undefined && <span className="ml-1.5 text-sm font-normal text-muted-foreground">{count}</span>}</CardTitle>}
         {subtitle && <CardDescription>{subtitle}</CardDescription>}
         {actions && <CardAction className="flex flex-wrap gap-2">{actions}</CardAction>}
       </CardHeader>}
