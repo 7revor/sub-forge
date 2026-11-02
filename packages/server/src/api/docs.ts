@@ -1,5 +1,4 @@
 import { requiredQuery } from '../query.ts';
-import { normalizeRulePresence } from '../rule-presence.ts';
 import type { ProfileDoc } from '../docs.ts';
 // 文档增删改查：订阅源、组合、本地节点组、规则集、配置订阅（按用户隔离）。
 
@@ -51,7 +50,6 @@ export function docRoutes(store: Store) {
       const body = await jsonBody(c);
       let doc = validateDoc(kind, body, randomId(9), user, store);
       if (kind === 'profile') doc = { ...doc, migration: undefined };
-      doc = normalizeRulePresence(kind, doc);
       store.put(kind, doc, user.id);
       return c.json({ item: doc }, 201);
     });
@@ -66,7 +64,6 @@ export function docRoutes(store: Store) {
       if (kind === 'profile' && (current.doc as ProfileDoc).routing && body.routing === undefined) throw new HttpError(400, '不能移除分流模式，请使用模式转换');
       let doc = validateDoc(kind, body, id, user, store);
       if (kind === 'profile') doc = { ...doc, migration: (current.doc as ProfileDoc).migration };
-      doc = normalizeRulePresence(kind, doc);
       store.put(kind, doc, kind === 'ruleset' ? current.owner : user.id);
       return c.json({ item: doc });
     });

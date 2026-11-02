@@ -11,6 +11,11 @@ export function routingConfig(effective: RoutingConfig): RoutingConfig {
   });
 }
 
+/** 组 ID 是外部数据；缺少自身记录时没有追加成员，不能读取对象原型。 */
+export function addedGroupMembers(routing: Extract<ProfileRouting, { mode: 'bound' }>, id: string): GroupMember[] {
+  return Object.hasOwn(routing.groupAdditions, id) ? routing.groupAdditions[id] ?? [] : [];
+}
+
 export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overlay'>, template: Template | undefined, report: Report): Effective {
   if (!profile.routing) return mergeTemplate(template, profile.overlay ?? {}, report);
   if (profile.routing.mode === 'independent') return {
@@ -45,7 +50,7 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
   const routing = profile.routing;
   const effective: Effective = {
     groups: [
-      ...template.groups.map(group => ({ ...group, members: [...group.members, ...(routing.groupAdditions[group.id] ?? [])], origin: 'template' as const })),
+      ...template.groups.map(group => ({ ...group, members: [...group.members, ...addedGroupMembers(routing, group.id)], origin: 'template' as const })),
       ...(profile.routing.extraGroups ?? []).map(group => ({ ...group, origin: 'profile' as const })),
     ],
     rules: [
@@ -60,7 +65,7 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
     if (!template.groups.some(g => g.id === id)) report.warn('binding.orphan', `策略组 ${id} 已删除，它的隐藏设置不再生效`, `group:${id}`);
   }
   effective.groups = effective.groups.map(g => {
-    const hidden = g.origin === 'template' ? groupHidden[g.id] : undefined;
+    const hidden = g.origin === 'template' && Object.hasOwn(groupHidden, g.id) ? groupHidden[g.id] : undefined;
     return hidden === undefined ? g : { ...g, display: { ...g.display, hidden } };
   });
   const before = new Set(profile.routing.prependGroupIds ?? []);
@@ -71,10 +76,10 @@ export function resolveProfileRouting(profile: Pick<Profile, 'routing' | 'overla
 
 /** 设置模板组在本订阅的隐藏状态：与模板相同即恢复跟随，同时清理已删除组的旧记录。 */
 export function withGroupHidden<R extends Extract<ProfileRouting, { mode: 'bound' }>>(routing: R, template: Pick<Template, 'groups'>, id: string, hidden: boolean): R {
-  const next = Object.fromEntries(Object.entries(routing.groupHidden ?? {}).filter(([key]) => key !== id && template.groups.some(g => g.id === key)));
-  if (hidden !== !!template.groups.find(g => g.id === id)?.display?.hidden) next[id] = hidden;
+  const entries = Object.entries(routing.groupHidden ?? {}).filter(([key]) => key !== id && template.groups.some(g => g.id === key));
+  if (hidden !== !!template.groups.find(g => g.id === id)?.display?.hidden) entries.push([id, hidden]);
   const { groupHidden: _old, ...rest } = routing;
-  return (Object.keys(next).length ? { ...rest, groupHidden: next } : rest) as R;
+  return (entries.length ? { ...rest, groupHidden: Object.fromEntries(entries) } : rest) as R;
 }
 
 export function additionsFromOverlay(overlay: Overlay): Record<string, GroupMember[]> {

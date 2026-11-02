@@ -3,7 +3,7 @@ import { useModalProfile, type ProfileModalData } from './modalProfile.ts';
 import type { ProfileDoc } from '../../hooks.ts';
 import { ExcludeTypeSelect } from '../../components/ExcludeTypeSelect.tsx';
 import { groupPlaceholders } from '../../schemas/placeholders.ts';
-import { compileUserRegex, type GroupSpec } from '@sub-forge/core';
+import { addedGroupMembers, compileUserRegex, type GroupSpec } from '@sub-forge/core';
 import { createModal, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../../modals/index.tsx';
 import { GROUP_TYPE_LABEL, GroupSettingsFields } from '../../components/GroupSettingsFields.tsx';
 import { ExtraFields } from '../../components/ExtraFields.tsx';
@@ -20,7 +20,7 @@ export const ProfileGroupDialog = createModal<ProfileModalData & { groupId: stri
   const group = ctx?.groups.find(g => g.id === groupId);
   const bound = routing.mode === 'bound' && group?.origin === 'template';
   if (!ctx || !group) throw new Error('策略组不存在，请重新打开');
-  const members = bound && routing.mode === 'bound' ? routing.groupAdditions[group.id] ?? [] : group.members;
+  const members = bound && routing.mode === 'bound' ? addedGroupMembers(routing, group.id) : group.members;
   const inherited = bound ? group.members : [];
   const patch = (value: Partial<GroupSpec>) => {
     if (routing.mode === 'bound' && !bound) setWorking({ ...working, routing: { ...routing, extraGroups: (routing.extraGroups ?? []).map(g => g.id === groupId ? { ...g, ...value } : g) } });

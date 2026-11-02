@@ -1,7 +1,7 @@
-import type { GroupSpec, Profile, ChainTarget } from '@sub-forge/core';
+import { addedGroupMembers, type GroupSpec, type Profile, type ChainTarget } from '@sub-forge/core';
 
 /** 只要求映射仍需保留的填充及引用，避免为无关策略组制造空表单。 */
-export function associationRequirements(profile: Profile, groups: GroupSpec[], mapping: Record<string, string> = {}) {
+export function associationRequirements(profile: Profile, groups: GroupSpec[], mapping: Record<string, string | null> = {}) {
   const privateGroups = profile.routing?.mode === 'bound' ? profile.routing.extraGroups ?? [] : [];
   const privateIds = new Set(privateGroups.map(group => group.id));
   const required = new Map<string, { id: string; name: string; reasons: string[]; canDrop: boolean }>();
@@ -17,10 +17,10 @@ export function associationRequirements(profile: Profile, groups: GroupSpec[], m
     else if (target.kind === 'node' && target.ref.fallback && target.ref.fallback !== 'error') visit(target.ref.fallback, reason);
   };
   for (const group of groups) {
-    const members = profile.routing?.mode === 'bound' ? profile.routing.groupAdditions[group.id] ?? [] : group.members.filter(m => ['node', 'nodeset', 'all'].includes(m.kind));
+    const members = profile.routing?.mode === 'bound' ? addedGroupMembers(profile.routing, group.id) : group.members.filter(m => ['node', 'nodeset', 'all'].includes(m.kind));
     if (!members.length) continue;
     add(group.id, `${members.length} 项节点填充`);
-    if (mapping[group.id] !== '__drop') for (const member of members) if (member.kind === 'node' || member.kind === 'group') visit(member, '成员引用');
+    if (mapping[group.id] !== null) for (const member of members) if (member.kind === 'node' || member.kind === 'group') visit(member, '成员引用');
   }
   for (const group of privateGroups) for (const member of group.members) if (member.kind === 'group' || member.kind === 'node') visit(member, '独立组成员引用');
   for (const chain of profile.chains) visit(chain.via, '代理链引用');
