@@ -392,3 +392,19 @@ USER-AGENT 示例待同步（2026-10-29）：规则集画板中 `USER-AGENT,PayP
 代码已接通两客户端的基础配置/预设表单与 INI 双视图、规则转换和客户端改写入口、完整 `.conf` 预览与下载、订阅链接复制。数据仍使用现有领域模型及统一弹窗运行时；没有新增平行弹窗。外部设计画布本轮未编辑，需后续同步客户端选项、INI 文案和平台差异。实现与验收见 [19](19-client-conversion.md)。
 
 2026-10-30 待同步：Overview 访问日志在资源与客户端之间增加“客户端 IP”列。示例包括 IPv4、较长 IPv6、直连的“连接来源”、代理的“可信代理透传”和历史“未记录”；IP 单元格悬停展示连接来源，窄屏只横向滚动表格。内置浏览器访问外部画布返回“Sign in to view this page”，未修改外部画板。对应截图见 `research/verification/access-log-client-ip-20261030/desktop.png`。
+
+
+## 2026-11-02：Stash 继承与客户端只读原文（待同步画布）
+
+本次内置浏览器打开画布显示“Sign in to view this page”，未编辑外部画布。后续同步 V2ProfileClient、V2ProfilePreview、V2RuleSet：
+
+- Mihomo 下增加可展开的 Stash 公共配置及 iOS/macOS；顶层仅 Mihomo、Surge、Loon。
+- 客户端编辑框上方显示默认折叠的“继承自 Mihomo 内核 · 只读”等区块；Stash 应用显示两层，空内核显示暂无公共配置。原文来自当前草稿，不复制到客户端。
+- 显示 YAML 映射递归合并、数组整体替换，以及 INI General/Host/MITM 同名键替换、其他段落追加的说明。
+- 规则集合仅按三个内核预览；完整配置在 Mihomo 下选 Stash 应用。
+- 本轮不绘制合并结果或逐字段覆盖标识。参照 [本地设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)。
+
+
+2026-11-02 菜单层级更正（取代上方 Stash 中间菜单）：V2ProfileClient 采用三组各两个直接子项：Mihomo → Stash iOS / Stash macOS，Surge → Surge iOS / Surge macOS，Loon → Loon iOS / Loon macOS。去掉 FlClash、Clash Verge Rev 及独立 Stash 公共菜单；V2ProfilePreview 的应用候选同步。规则集合仍只选择三个内核。已有原文和服务端识别保持兼容；历史 Stash 公共内容仅在非空时只读展示。外部画布沿用本任务已核实的登录限制，本轮未编辑。
+
+2026-11-02 菜单样式更正：V2ProfileClient 的选中与悬停背景仅覆盖文字按钮，左侧展开箭头不随之高亮；展开子项保留缩进，移除左侧边框。实现与内置浏览器截图已更新，见 [设计与验收](../research/verification/stash-inheritance-20261102/设计与验收.md)；外部画布仍待登录后同步。

@@ -39,14 +39,14 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(detectClient('curl', { target: 'stash', platform: 'macos' })).toMatchObject({ client: 'stash', platform: 'macos', by: 'param' });
   });
 
-  it('完整订阅有独立基础设置、节点字段、平台规则及可下载的配套规则', async () => {
+  it('完整订阅继承 Mihomo 基础设置，保留 Stash 覆盖、节点字段及可下载的配套规则', async () => {
     const h = await scenario();
     const res = await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}`, { headers: { 'user-agent': 'Stash/3.6.0' } });
     expect(res.status).toBe(200);
     const yaml = parse(await res.text());
-    expect(yaml['mixed-port']).toBeUndefined(); expect(yaml['allow-lan']).toBeUndefined();
+    expect(yaml['mixed-port']).toBe(7890); expect(yaml['allow-lan']).toBe(true);
     expect(yaml['log-level']).toBe('warning');
-    expect(yaml.dns).toEqual({ nameserver: ['https://dns.example.test/dns-query'] });
+    expect(yaml.dns).toEqual({ enable: true, nameserver: ['https://dns.example.test/dns-query'] });
     expect(yaml.proxies[0]).toMatchObject({ name: '测试节点', auth: 'example-password' });
     expect(yaml.proxies[0].password).toBeUndefined();
     expect(yaml['proxy-providers']).toBeUndefined();
@@ -85,6 +85,8 @@ describe('Stash 主订阅与资源隔离', () => {
       expect(preview.status).toBe(200); expect(preview.json.ok, preview.text).toBe(true);
       expect(preview.json.exportYaml).not.toMatch(/\{token\}|__SF_TOKEN__/);
       const yaml = parse(preview.json.exportYaml);
+      expect(yaml['mixed-port']).toBe(7890);
+      expect(yaml.dns).toEqual({ enable: true, nameserver: ['https://dns.example.test/dns-query'] });
       expect(yaml['rule-providers']).toBeUndefined();
       expect(yaml.rules).toEqual(['DOMAIN,paypal.test,代理', 'USER-AGENT,PayPal*,代理', 'IP-CIDR,192.0.2.0/24,代理,no-resolve', 'PROCESS-NAME,Example,代理', 'MATCH,DIRECT']);
     }
