@@ -8,20 +8,21 @@
 
 | 项 | 值 |
 |---|---|
-| 工作目录 | `.claude/worktrees/lazy-upstream-plain-store` |
-| 分支 | `refactor/lazy-upstream-plain-store`，未合并，未推送 |
-| 基线 | 本文所在提交。`main` 领先该分支 1 个提交（`07ccb5a`，分页修复），合并时无文本冲突 |
-| 结构版本 | `main` 是 v34；分支是 v35（明文迁移），因未发布，本次继续扩展 v35，不新增版本 |
+| 工作目录 | 从 `main` 新建 worktree：`.claude/worktrees/upstream-cache-refactor` |
+| 分支 | `refactor/upstream-cache-layering` |
+| 基线 | `main`。懒加载、定时清理和明文存储已合并（`2284c50`），尚未推送 |
+| 结构版本 | `main` 是 v35。**如果 v35 还没有部署到任何环境**，可以继续扩展 v35；**一旦已部署，必须新增 v36**，否则已升级的库不会执行新迁移。开始前先向用户确认 |
 | 已落地 | 见第 3 节 |
 
 开始前执行：
 
 ```bash
-git merge main
+git worktree add -b refactor/upstream-cache-layering .claude/worktrees/upstream-cache-refactor main
+cd .claude/worktrees/upstream-cache-refactor
 pnpm install --offline --frozen-lockfile
 ```
 
-三个包的基线测试应全部通过：core 756、server 694、web 361（数字以 `main` 合并后为准，只要求没有失败）。
+三个包的基线测试应全部通过：core 756、server 694、web 361（`2284c50` 上的结果，只要求没有失败）。
 
 ## 2. 目标模型（用户已确认）
 
@@ -88,11 +89,11 @@ export function cacheCycleStart(now: number, ttlSec: number): number {
 
 下发主配置**不读规则源，也不读规则快照**，只从数据库读规则定义，确定 provider 名称和格式，然后写入规则地址（坐标）。规则内容由客户端另行请求。节点快照仍要读，因为策略组筛选和代理链需要节点名，流量信息头也来自节点快照。
 
-## 3. 分支已完成的工作（不要重做）
+## 3. `main` 已完成的工作（不要重做）
 
 | 提交 | 内容 |
 |---|---|
-| `main` 上 `0c4b8e9` 等 | 删除 `last_good`、`shared_rule_resources`；公共规则改为自描述地址 `/resources/ruleset?id&target&format[&behavior][&src]` 和 `/resources/repo?id&files&target&format…`；主配置用 `deferRuleBody` 跳过规则转换；旧 `?key=` 返回 404 |
+| `0c4b8e9` 等 | 删除 `last_good`、`shared_rule_resources`；公共规则改为自描述地址 `/resources/ruleset?id&target&format[&behavior][&src]` 和 `/resources/repo?id&files&target&format…`；主配置用 `deferRuleBody` 跳过规则转换；旧 `?key=` 返回 404 |
 | `223f571` | 懒加载：`SnapshotService.get` 限时等待；节点并行拉取；`latestSnapshotMeta` 不读正文；主配置不拉规则 |
 | `95acd04` | 去掉后台拉取；`ResourceService.sweep` 只清理；`RuleRepoService.refreshIfDue` |
 | `8df02b0` | v35：文档、迁移备份、快照、刷新任务、令牌原文改明文，`token_enc` 改名 `token`，数据库文件 0600；`Store.legacyEncoded` 只在升级时为真 |
@@ -169,9 +170,9 @@ refreshNodeSource(source) / refreshRuleContent(url, params) // 手动刷新
   - `start` 继续每 60 秒检查，跨过周期边界才清理；启动时补做一次。读取路径也按周期判定，所以清理延迟不影响下发。
   - `all()`、`statuses()` 只列节点订阅和仓库索引；规则失败不进“资源异常”。手动刷新配置时仍可刷新其规则，结果写入任务。
 
-### 5.4 迁移（扩展 v35，`store-migrations.ts`）
+### 5.4 迁移（`store-migrations.ts`，版本见第 1 节）
 
-在已有的 `decryptStoredData` 之后执行：
+在 `decryptStoredData` 之后执行（新增 v36 时作为独立步骤）：
 
 1. 用 `resource_bindings` 把节点快照的 `owner_id` 从 `resource:…` 改回订阅源 ID。多个订阅源绑定同一资源时，为每个复制一份。无法对应的节点快照删除。
 2. 删除全部 `owner_kind = 'ruleset'` 的快照（可重建）。
@@ -220,7 +221,7 @@ refreshNodeSource(source) / refreshRuleContent(url, params) // 手动刷新
 
 1. `refactor`：引入 `cacheCycleStart`，节点和规则按全局周期判定过期。
 2. `refactor`：拆分节点和规则的上游接口，规则失败不写缓存，到期不再当旧数据；移除规则的限时等待和告警头。
-3. `refactor`：规则缓存键改为“URL 加读取参数”，删除 `resource_bindings`、`ruleBinding` 和相关身份，扩展 v35 迁移。
+3. `refactor`：规则缓存键改为“URL 加读取参数”，删除 `resource_bindings`、`ruleBinding` 和相关身份，补充迁移。
 4. `refactor`：`/subs/ruleset` 不再渲染配置；预览规则并行；加全局并发上限。
 5. `refactor`：`sweep` 改为按周期删除规则快照，仓库索引按周期更新。
 6. `feat`：系统页显示下次缓存失效时间，调整规则资源状态显示，同步设计稿。
@@ -240,7 +241,7 @@ refreshNodeSource(source) / refreshRuleContent(url, params) // 手动刷新
 - 节点订阅故障时，`/subs/ruleset` 和公共规则文件仍能下发。
 - 主配置请求不调用任何规则读取（上游调用次数为 0）。
 - 全局并发上限生效，相同身份仍只拉一次。
-- 迁移：从带密文和绑定的 v34 升级，节点快照可读，规则快照被清除，`resource_bindings` 已删除，重启幂等；多个订阅源绑定同一资源时都有快照。
+- 迁移：从带密文和绑定的 v34 以及带绑定的 v35 升级（如果新增 v36），节点快照可读，规则快照被清除，`resource_bindings` 已删除，重启幂等；多个订阅源绑定同一资源时都有快照。
 
 ## 8. 验收
 
@@ -254,7 +255,7 @@ pnpm -r test
 
 ### 8.2 真实升级和链路
 
-用 `main` 的代码生成 v34 库，再用分支代码启动。启动方式：
+用 `07ccb5a`（v34）的代码生成旧库，再用分支代码启动；如果新增 v36，再用 `2284c50`（v35）的代码生成一份验证。启动方式：
 
 1. 在主仓库创建临时的 `.claude/launch.json`（已被 git 忽略；`preview_start` 从主仓库读取）。配置上游静态服务 `python3 -I -m http.server 18089 --bind 127.0.0.1 --directory <夹具目录>`，和服务端 `env SUBFORGE_DB=<临时库> SSRF_ALLOW=127.0.0.1 PORT=18088 HOST=127.0.0.1 PUBLIC_URL=http://127.0.0.1:18088 ALLOWED_ORIGINS=http://127.0.0.1:18088 WEB_DIR=<分支>/packages/web/dist <分支>/packages/server/node_modules/.bin/tsx <分支>/packages/server/src/cli.ts serve`。
 2. 先在 `packages/web` 运行 `./node_modules/.bin/vite build`。
@@ -262,7 +263,7 @@ pnpm -r test
 
 检查项：
 
-- 版本为 v35，`resource_bindings` 已删除，节点快照可用，规则快照已清除。
+- 版本为最新结构版本，`resource_bindings` 已删除，节点快照可用，规则快照已清除。
 - 启动后上游没有请求。
 - 主配置只触发节点来源读取；规则文件请求才触发规则读取。
 - 把周期改短后，规则快照失效；删除上游文件后，规则文件返回错误，恢复后下次请求成功；节点上游失败时继续用旧数据。
