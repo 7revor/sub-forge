@@ -333,3 +333,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-01 改为以 shadcn/ui 默认样式为标准：用 CLI 补装 input、textarea、badge、switch、checkbox、radio-group、tabs、card、table、toggle-group、label、separator、alert，并把 button、select、dialog、dropdown-menu、command、sonner 重置为官方实现；`:root` 只保留品牌色、状态色与字体，删除全局 `[data-slot]` 覆盖与自定义圆角；页面类名改用 foreground / border / card 等 shadcn 语义和 Tailwind 默认字号（控件文字 14px）；原生勾选控件统一为 Checkbox / RadioGroup，分段控件为 ToggleGroup，图标按钮用 icon / icon-sm 尺寸。设计画布 v2 的字号 13px、圆角 8px 等自定义规格以此为准替换。仅前端样式，领域模型与服务端无变化。
 
 2026-11-02 代理链来源与节点点选分离：画板 `V2ProfileDialogs` 的两个代理链弹窗已同步（来源 + 查找框 + 可点选节点 + 弱提示），对应 `ChainRuleEditor`。渲染在 `packages/core` 实现，无新增后端待实现项。旧画板 `ProfileChain` 属于已废弃的依赖节点版式，本次未修改。
+
+2026-11-02 代理链前置移除「自动」：`V2ProfileDialogs` 同步去掉该选项行，落地区块改为与前置相同的默认边框、无背景，对应 `ChainRuleEditor`。无新增后端待实现项。

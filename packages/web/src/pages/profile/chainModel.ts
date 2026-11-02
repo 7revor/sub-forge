@@ -24,8 +24,8 @@ export function landingNodeNames(landing: ChainRule['landing']): string[] | unde
 }
 
 export function viaConstraintHint(scope: string, match: NodeRef['match']): string {
-  if ('exact' in match) return `范围：${scope} · 按名称精确匹配，节点改名后需重新点选`;
-  return match.regex ? `范围：${scope} · 沿用已有正则 ${match.regex}，点选节点可替换` : `范围：${scope} · 取第一个可用节点，自动跳过落地节点`;
+  if ('exact' in match) return match.exact ? `范围：${scope} · 按名称精确匹配，节点改名后需重新点选` : `范围：${scope} · 尚未选择前置节点`;
+  return match.regex ? `范围：${scope} · 沿用已有正则 ${match.regex}，点选节点可替换` : `范围：${scope} · 沿用已有规则：取排在最前的非落地节点，点选节点可替换`;
 }
 
 export function landingConstraintHint(scope: string, landing: ChainRule['landing']): string {
