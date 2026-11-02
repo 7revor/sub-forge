@@ -116,3 +116,6 @@ export function indexedEntries(store: Store, q = '', repo?: string, targetClient
     .filter(e => (!repo || e.repo === repo) && e.name.toLowerCase().includes(q.toLowerCase()) && (!targetClient || e.variants.some(v => v.client === targetClient || v.client === 'any')));
   return { items, total: items.length };
 }
+
+/** 订阅接口要求 routing；测试只关心节点或规则时使用的独立配置。 */
+export const independentRouting = (rules: unknown[] = []) => ({ mode: 'independent' as const, config: { groups: [], rules, final: { kind: 'builtin' as const, name: 'DIRECT' as const } } });

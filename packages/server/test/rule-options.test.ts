@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildCatalog } from '../src/rule-repos/catalog.ts';
 import { buildEntries, BUILTIN_REPOS } from '../src/rule-repos/adapters.ts';
@@ -266,7 +267,7 @@ describe('物理文件平铺搜索与分页', () => {
     const rules = [{ id: 'r', matcher, target: { kind: 'builtin', name: 'REJECT' } }];
     const published = await h.admin.post('/api/templates', { name: '列表文件模板', groups: [], rules, final: { kind: 'builtin', name: 'DIRECT' } });
     expect(published.status).toBe(201);
-    const saved = await h.admin.post('/api/profiles', { name: '列表文件订阅', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: rules[0] }] } });
+    const saved = await h.admin.post('/api/profiles', { name: '列表文件订阅', nodeSets: [], routing: independentRouting([rules[0]]) });
     expect(saved.status).toBe(201);
     expect((await h.renderer.preview(saved.json.item.id, { client: 'mihomo' })).ok).toBe(true);
     expect(h.store.list('ruleset')).toHaveLength(2);

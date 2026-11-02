@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { ruleBodies } from './helpers.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { remoteRuleMatcher, type Matcher } from '@sub-forge/core';
@@ -100,7 +101,7 @@ describe('模板统一规则引用', () => {
     const h = await setup();
     expect((await h.admin.post('/api/templates', template({ kind: 'ruleset', id: 'local-google' }))).status).toBe(201);
     const matcher = await h.resolve();
-    const profile = await h.admin.post('/api/profiles', { name: '私有引用', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: template(matcher).rules[0] }] } });
+    const profile = await h.admin.post('/api/profiles', { name: '私有引用', nodeSets: [], routing: independentRouting([template(matcher).rules[0]]) });
     expect(profile.status).toBe(201);
     const preview = await h.renderer.preview(profile.json.item.id, { client: 'mihomo' });
     expect(preview.ok).toBe(true);

@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { previewRuleset } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
@@ -6,7 +7,7 @@ import { addUser, client, setupApp } from './helpers.ts';
 const raw = (text: string) => ({ type: 'RAW', text });
 const direct = { kind: 'builtin', name: 'DIRECT' };
 const entry = (id: string, text: string) => ({ id, matcher: { kind: 'rule', rule: raw(text) }, target: direct });
-const profile = (extraRules: unknown[]) => ({ name: 'RAW 订阅', nodeSets: [], chains: [], overlay: { extraRules } });
+const profile = (extraRules: { rule: unknown; anchor?: string }[]) => ({ name: 'RAW 订阅', nodeSets: [], chains: [], routing: independentRouting(extraRules.map(item => item.rule)) });
 const template = (text: string) => ({ name: 'RAW 模板', groups: [], rules: [entry('t-raw', text)], final: direct });
 const ruleset = (text: string) => ({ name: 'RAW 改写', sources: [{ id: 's', kind: 'local', content: 'PROCESS-PATH-WILDCARD,/Apps/*' }], overrides: [{ override: { when: { client: 'mihomo' }, action: { append: [raw(text)] } } }] });
 
@@ -19,7 +20,7 @@ describe('三个入口的 RAW 保存及输出', () => {
       const published = await c.post('/api/templates', template(text));
       expect(published.status).toBe(201);
       expect(published.json.item.rules[0].matcher.rule).toEqual(raw(text));
-      const created = await c.post('/api/profiles', { ...profile([{ anchor: 'top', rule: entry('private-raw', 'IP-SUFFIX,8.8.8.8/24,no-resolve,src') }]), template: { id: published.json.item.id, follow: 'latest' } });
+      const created = await c.post('/api/profiles', profile([{ rule: entry('private-raw', 'IP-SUFFIX,8.8.8.8/24,no-resolve,src') }, ...published.json.item.rules.map((rule: unknown) => ({ rule }))]));
       expect(created.status).toBe(201);
       const id = created.json.item.id;
       const saved = (await c.get(`/api/profiles?id=${id}`)).json.item;

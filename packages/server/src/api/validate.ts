@@ -1,7 +1,7 @@
 import { validateNativeBase } from '@sub-forge/core';
 import { localRulesError } from '@sub-forge/core';
 import { normalizeRulePresence } from '../rule-presence.ts';
-import { migrateProfile, profileTemplate } from '../profile-routing.ts';
+import { migrateProfile } from '../profile-routing.ts';
 import { validateProfileRouting } from './profile-routing-validation.ts';
 import { isIndexedRuleFile } from '../rule-repos/generic.ts';
 import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/adapters.ts';
@@ -11,10 +11,9 @@ import { rawUrl, type IndexedEntry, type RepoDefinition } from '../rule-repos/ad
 import { compileUserRegex, findCollectionCycles, isYamlRuleUrl, rawRuleError, type Collection, type NodeSetID } from '@sub-forge/core';
 import type { DocKind, DocTypes, RuleSetDoc } from '../docs.ts';
 import type { Store, User } from '../store.ts';
-import { normalizeRuleSet, promoteRuleSetOverrides } from '../legacy-rules.ts';
+import { promoteRuleSetOverrides } from '../legacy-rules.ts';
 import { normalizeSourceFetch, sourceUrl } from '../source-url.ts';
 import { bad, isStr } from './common.ts';
-import { checkRuleSetReference, type RuleSetMatcher } from '../ruleset-reference.ts';
 
 const OPS = new Set(['filter.regex', 'filter.type', 'filter.useless', 'rename.regex', 'rename.delete', 'rename.affix', 'flag', 'sort.name', 'sort.regex', 'dedupe', 'set', 'script']);
 const RULESET_FORMATS = new Set(['auto', 'classical', 'domain', 'ipcidr', 'domain-set', 'yaml', 'mrs', 'srs']);
@@ -245,13 +244,6 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       break;
     }
     case 'ruleset': {
-      // 兼容旧客户端的单一来源写法（kind / url / content 平铺）
-      if (doc.sources === undefined && doc.kind !== undefined) {
-        const normalized = normalizeRuleSet(doc);
-        delete doc.overrides;
-        Object.assign(doc, normalized, { id });
-      }
-      for (const k of ['kind', 'url', 'content', 'format', 'behavior', 'fetch']) delete doc[k];
       if (!Array.isArray(doc.sources)) throw bad('sources 必须是数组');
       checkRuleSetOverrides(doc.overrides);
       if (doc.noResolve !== undefined && typeof doc.noResolve !== 'boolean') throw bad('noResolve 必须是布尔值');
@@ -295,30 +287,8 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
           (u.sourceIds as string[]).forEach(id => refs.nodeSet({ type: 'source', id }, '流量信息来源'));
         } else if (u.mode === 'source') refs.nodeSet({ type: 'source', id: u.sourceId }, '流量信息来源');
       }
-      if (doc.template !== undefined) {
-        if (!isObj(doc.template) || !isStr(doc.template.id) || !store.getTemplate(doc.template.id)) throw bad('模板不存在');
-        const f = doc.template.follow;
-        if (f !== 'latest' && !(isObj(f) && typeof f.pinned === 'number' && store.getTemplate(doc.template.id, f.pinned))) throw bad('模板版本不存在');
-      }
       if (doc.base !== undefined) try { validateNativeBase(doc.base); } catch (error) { throw bad((error as Error).message); }
-      doc.overlay = isObj(doc.overlay) ? doc.overlay : {};
       doc.chains = Array.isArray(doc.chains) ? doc.chains : [];
-      const extraRules = (doc.overlay as { extraRules?: unknown }).extraRules;
-      if (extraRules !== undefined) {
-        if (!Array.isArray(extraRules)) throw bad('extraRules 必须是数组');
-        extraRules.forEach((er: unknown, i) => {
-          const m = isObj(er) && isObj(er.rule) && isObj(er.rule.matcher) ? er.rule.matcher : undefined;
-          if (!m) throw bad(`私有规则 ${i + 1} 格式错误`);
-          checkRawRules(m, `私有规则 ${i + 1}`);
-          if (m.kind === 'ruleset') {
-            const previous = store.get('profile', id);
-            const previousRules = previous?.routing.mode === 'independent' ? previous.routing.config.rules : [...(previous?.routing.prependRules ?? []), ...(previous?.routing.appendRules ?? [])];
-            const prior = previousRules.find(r => r.id === (er as { rule: { id: string } }).rule.id)?.matcher;
-            checkRuleSetReference(m as RuleSetMatcher, store, prior?.kind === 'ruleset' ? prior : undefined);
-            if (!isStr(m.id) || (!m.repository && !m.remote && !refs.ruleVisible(m.id))) throw bad(`私有规则 ${i + 1}：规则集不存在`);
-          }
-        });
-      }
       (doc.chains as Record<string, unknown>[]).forEach((ch, i) => {
         if (!isObj(ch) || !isObj(ch.landing)) throw bad(`链规则 ${i + 1} 格式错误`);
         refs.chainSource(ch.landing.nodeSet, `链规则 ${i + 1} 的落地`);
@@ -326,12 +296,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (isObj(ch.via) && ch.via.kind === 'node' && isObj(ch.via.ref)) refs.chainSource(ch.via.ref.nodeSet, `链规则 ${i + 1} 的前置`);
         else refs.target(ch.via, `链规则 ${i + 1} 的前置`);
       });
-      // 旧草稿在边界迁移；预览、转换与保存使用同一份 routing，不能用旧字段绕过现用引用校验。
-      if (doc.routing === undefined) {
-        const legacy = doc as unknown as import('../docs.ts').ProfileDoc;
-        try { doc = normalizeRulePresence('profile', migrateProfile(legacy, profileTemplate(legacy, (id, version) => store.getTemplate(id, version)))) as unknown as Record<string, unknown>; }
-        catch (error) { throw bad((error as Error).message); }
-      }
+      if (doc.routing === undefined) throw bad('请选择分流方式');
       validateProfileRouting(doc as unknown as import('../docs.ts').ProfileDoc, store, refs);
       checkRawRules((doc.routing as { config?: { rules?: unknown } }).config?.rules, '分流规则');
       doc = migrateProfile(doc as unknown as import('../docs.ts').ProfileDoc, undefined) as unknown as Record<string, unknown>;

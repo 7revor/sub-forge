@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { previewRuleset } from './helpers.ts';
 import { ruleBodies } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
@@ -322,7 +323,7 @@ describe('规则集组级改写保存与预览', () => {
     }
     const surge = await previewRuleset(alice, { ruleset: rs, client: 'surge' });
     expect(surge.json.lines).toContain('DOMAIN,same.test');
-    const profile = await alice.post('/api/profiles', { name: '改写输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
+    const profile = await alice.post('/api/profiles', { name: '改写输出', nodeSets: [], routing: independentRouting([{ id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } }]) });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
     expect(rendered.ok && Object.values(ruleBodies(store, rendered.render)).join('')).toContain('changed.test');
@@ -349,7 +350,7 @@ describe('规则集组级改写保存与预览', () => {
     expect(activeLines(preview.json.lines)).toEqual(['DOMAIN,keep.test', 'DOMAIN,added.test']);
     const surge = await previewRuleset(alice, { ruleset: rs, client: 'surge' });
     expect(activeLines(surge.json.lines)).toEqual(['DOMAIN,keep.test']);
-    const profile = await alice.post('/api/profiles', { name: '追加输出', nodeSets: [], overlay: { extraRules: [{ anchor: 'top', rule: { id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } } }] } });
+    const profile = await alice.post('/api/profiles', { name: '追加输出', nodeSets: [], routing: independentRouting([{ id: 'r', matcher: { kind: 'ruleset', id: rs.id }, target: { kind: 'builtin', name: 'DIRECT' } }]) });
     const rendered = await renderer.render(profile.json.item.id, { client: 'mihomo' });
     expect(rendered.ok).toBe(true);
     expect(rendered.ok && Object.values(ruleBodies(store, rendered.render)).join('')).toContain('added.test');

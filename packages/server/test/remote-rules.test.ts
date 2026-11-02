@@ -1,3 +1,4 @@
+import { independentRouting } from './helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { remoteRuleMatcher } from '@sub-forge/core';
@@ -14,11 +15,11 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       const user = await addUser(h.store, 'admin', 'admin'); const c = client(h.app); await c.login('admin');
       const published = await c.post('/api/templates', draft());
       expect(published.status, published.text).toBe(201);
-      const routing = mode === 'bound'
-        ? { routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} }, templateVersion: 1 }
-        : { template: { id: published.json.item.id, follow: 'latest' } };
-      const p = await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], overlay: {}, ...routing });
-      expect(p.status, p.text).toBe(201);
+      // 旧结构只经存储层迁移进入系统。
+      const p = mode === 'bound'
+        ? await c.post('/api/profiles', { name: '外部规则订阅', nodeSets: [], routing: { mode: 'bound', templateId: published.json.item.id, groupAdditions: {} } })
+        : { json: { item: { id: 'legacy-profile' } } };
+      if (mode === 'legacy') h.store.put('profile', { id: 'legacy-profile', name: '外部规则订阅', nodeSets: [], chains: [], template: { id: published.json.item.id, follow: 'latest' } }, user.id);
       const token = h.store.createToken(user.id).token;
       const main = await h.app.request(`/subs/profile?token=${token}&id=${p.json.item.id}`);
       expect(main.status).toBe(200);
@@ -67,7 +68,7 @@ describe('外部 URL 与系统 ID 分开引用', () => {
         const rule = { ...draft().rules[0], matcher };
         return c.post('/api/profiles', { name: '私有规则引用', nodeSets: [], ...(mode === 'independent'
           ? { overlay: {}, routing: { mode, config: { groups: [], rules: [rule], final: draft().final } } }
-          : { overlay: { extraRules: [{ anchor: 'top', rule }] } }) });
+          : { routing: independentRouting([rule]) }) });
       };
       const external = await create(remoteRuleMatcher(url)); expect(external.status).toBe(201);
       const internal = await create({ kind: 'ruleset', id: 'system' }); expect(internal.status).toBe(201);
