@@ -1,6 +1,6 @@
 import { importSeedDocuments, migrateDatabase } from './store-migrations.ts';
 import { ruleBinding } from './rule-binding.ts';
-import { resolveRuleSetReference } from './ruleset-reference.ts';
+import { resolveRuleSetReference, usableRuleSet } from './ruleset-reference.ts';
 import { findRuleFile } from './rule-repos/options.ts';
 import { Report, resolveProfileRouting, stableStringify } from '@sub-forge/core';
 import type { ClientAddress } from './net/client-ip.ts';
@@ -167,12 +167,12 @@ export class Store {
 
   pruneResourceBindings(templates: TemplateReader = this.currentTemplates): void {
     // 失效公共定义不能由缓存记录自身继续保活，撤销通知同时阻止在途编译回写。
-    for (const row of this.listSharedRules<{ reference: import('@sub-forge/core').RuleResourceReference }>()) {
-      if (row.data.reference.matcher.remote || !resolveRuleSetReference(row.data.reference.matcher, this)) {
-        this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
-        for (const listener of this.invalidationListeners) listener('shared-rule', row.key);
-      }
-    }
+    const sharedRules = this.listSharedRules<{ reference: import('@sub-forge/core').RuleResourceReference }>().filter(row => {
+      if (!row.data.reference.matcher.remote && resolveRuleSetReference(row.data.reference.matcher, this)) return true;
+      this.db.prepare('DELETE FROM shared_rule_resources WHERE key = ?').run(row.key);
+      for (const listener of this.invalidationListeners) listener('shared-rule', row.key);
+      return false;
+    });
     const keep = new Map<string, Set<string>>();
     const add = (kind: string, id: string, urls: string[]) => {
       const key = `${kind}:${id}`;
@@ -189,10 +189,11 @@ export class Store {
       }
       Object.values(v).forEach(item => walk(item, context));
     };
-    for (const row of this.db.prepare('SELECT kind,id,data FROM docs').all() as {kind:string;id:string;data:string}[]) {
+    // 只有这三类文档持有资源地址；本地节点组可能很大，不必解密。
+    for (const row of this.db.prepare("SELECT kind,id,data FROM docs WHERE kind IN ('source','ruleset','profile')").all() as {kind:string;id:string;data:string}[]) {
       const doc = JSON.parse(this.cipher.decrypt(row.data));
       if (row.kind === 'source' && doc.url) add('source', row.id, [doc.url]);
-      if (row.kind === 'ruleset' && resolveRuleSetReference({ kind: 'ruleset', id: row.id }, this)) add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
+      if (row.kind === 'ruleset' && usableRuleSet(doc, this)) add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
       if (row.kind === 'profile') {
         walk(doc, `profile:${row.id}`);
         const template = profileTemplate(doc, templates.get);
@@ -200,7 +201,7 @@ export class Store {
       }
     }
     templates.list().forEach(t => walk(t, `template:${t.id}`));
-    this.listSharedRules<unknown>().forEach(r => walk(r.data));
+    sharedRules.forEach(r => walk(r.data));
     for (const row of this.db.prepare('SELECT * FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
       // 仓库正文由索引缓存维护，其生命周期不取决于配置订阅。
       if (row.id.startsWith('repository-file:')) {
