@@ -142,7 +142,7 @@ export function RulesetEdit() {
       <DropdownMenu><DropdownMenuTrigger asChild><Button><Plus size={15} />添加来源</Button></DropdownMenuTrigger><DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true, repository: true })}>规则仓库</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void edit({ source: newRemote(), adding: true })}>远程地址</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void edit({ source: newLocal(), adding: true })}>手写规则</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void edit({ source: newLocal(), adding: true })}>本地规则</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu>
     </>}>
       <ErrorAlert error={matches.error} /><FieldError error={linkError} />

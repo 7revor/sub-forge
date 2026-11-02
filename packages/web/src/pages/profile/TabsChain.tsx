@@ -103,7 +103,7 @@ export function TabPreview() {
       <ErrorAlert error={preview.error} />
       {preview.data && !current && !preview.isPending && <p role="status" className="text-sm text-muted-foreground">配置已更改，请重新生成预览。</p>}
       {client !== 'mihomo' && client !== 'loon' && <p className="text-sm text-muted-foreground">节点随主订阅刷新更新；节点集内联输出，空策略组保持拒绝连接。下载配置文件会内嵌已转换的规则，可直接导入。</p>}
-      {client === 'loon' && <p className="text-sm text-muted-foreground">手写规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
+      {client === 'loon' && <p className="text-sm text-muted-foreground">本地规则和规则集按列表顺序托管，最终兜底保留在主配置；节点随主订阅刷新更新。</p>}
       {current && preview.data.exportUnavailableReason && <p role="status" className="text-sm text-muted-foreground">{preview.data.exportUnavailableReason}</p>}
       {current && (
         <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[minmax(0,1fr)]">

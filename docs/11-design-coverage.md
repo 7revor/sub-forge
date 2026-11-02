@@ -359,3 +359,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-02 代码审查清理：`V2Template` 增加「请先修复绑定订阅冲突」状态，区分本人订阅（可跳转）与其他用户的订阅（只显示说明），跟随数改由 `GET /api/templates/usage` 提供并覆盖全部用户，`/templates` 与 `/templates/:id` 为仅有的模板路由，旧 `/templates/manage`、`?id=` 和 `/templates/:id/:tab` 跳转已删除。未改动 v1 现状画板。无新增后端待实现项。
 
 2026-11-02 一键关联：`V2RuleSet`（补画「检测仓库关联」）、`V2Template`、`V2ProfileRouting` 工具栏增加「一键关联 N 项」；画布已同步，前端已实现，后端复用现有接口，无新增待实现项。卡片带操作时标题不换行，避免工具栏变宽后竖排。
+
+2026-11-02 规则弹窗统一：`V2ProfileDialogs`、`V2MoreDialogs` 的规则来源与规则编辑弹窗改为 640×620，编辑规则的匹配类型改为分段控件，两块画板高度调整为 2100px、2800px；v2 页「手写」统一改为「本地规则」。前端对应 `RuleEditShell`、`LocalRulesInput`、`MatcherEditor`、`RulesetSourceDialog`、`RuleEditDialog`。仅界面变化，无后端待实现项。
