@@ -109,8 +109,6 @@ it('示例种子覆盖两种模式，原 demo 有效配置和链接保持不变'
   const seed = JSON.parse(readFileSync(new URL('../examples/seed.example.json', import.meta.url), 'utf8')) as Seed;
   const store = new Store(':memory:');
   try {
-    // 示例地址需要用户填写；测试使用有效的占位域名，不访问网络。
-    seed.sources![0]!.url = 'https://subscription.example.test/sub';
     store.importSeed(seed, 'owner');
     const independent = store.get('profile', 'demo')!;
     const bound = store.get('profile', 'demo-bound')!;
