@@ -40,7 +40,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       { ...base('blank', { extraGroups: [{ group: { id: 'mine', name: '自己的组', type: 'select', members: [node] } }] }), template: undefined },
       base('orphan', { groupPatches: { missing: { addMembers: [node] } }, extraRules: [{ anchor: { before: 'gone' }, rule: { ...template.rules[0]!, id: 'orphan-rule' } }] }),
     ];
-    profiles.forEach(p => { store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(p.id, 'owner', cipher.encrypt(JSON.stringify(p)), 1234); issueProfileToken(store, { token: `${p.id}-secret-token`, profileId: p.id }); });
+    profiles.forEach(p => { store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(p.id, 'owner', JSON.stringify(p), 1234); issueProfileToken(store, { token: `${p.id}-secret-token`, profileId: p.id }); });
     const renderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }), { publicUrl: 'https://test.local' });
     // 旧库的渲染基线仍按历史表读取；迁移时恢复真实 Store 接口。
     const legacyRead = vi.spyOn(store, 'getTemplate').mockImplementation((id, version) => historical.find(t => t.id === id && t.version === (version ?? 2)));
@@ -75,7 +75,6 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       expect(rendered.ok).toBe(true);
       if (rendered.ok) expect(rendered.render.yaml).toBe(before.get(old.id));
     }
-    expect(store.db.prepare('SELECT data FROM profile_migration_backups').all().every((r: any) => !r.data.includes('香港'))).toBe(true);
     const full = store.get('profile', 'full');
     store.close(); store = new Store(file, { cipher });
     expect(store.get('profile', 'full')).toEqual(full);
@@ -89,7 +88,7 @@ it.each([15, 28])('v%i 模板版本缺失时整批回滚，数据库版本、原
   const store = new Store(file, { cipher });
   const valid = { ...base('a-valid', {}), template: undefined };
   const missing = base('z-missing', {});
-  for (const p of [valid, missing]) store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,NULL,?,?)").run(p.id, cipher.encrypt(JSON.stringify(p)), 1234);
+  for (const p of [valid, missing]) store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,NULL,?,?)").run(p.id, JSON.stringify(p), 1234);
   issueProfileToken(store, { token: 'keep', profileId: missing.id });
   store.db.pragma(`user_version = ${version}`); store.close();
   try {

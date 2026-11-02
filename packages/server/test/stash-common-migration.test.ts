@@ -69,7 +69,7 @@ it('不能等价折叠的类型覆盖保留两份原文并要求修复，避免�
   expect(parse(resolveNativeBase('stash', 'stash-macos', next.base))).toEqual({ dns: null });
 });
 
-it.each([28, 30, 32, 33])('v%d 升级和旧种子导入执行相同迁移，加密备份、归属、时间与重启幂等，产物表保持退役', version => {
+it.each([28, 30, 32, 33])('v%d 升级和旧种子导入执行相同迁移，备份、归属、时间与重启幂等，产物表保持退役', version => {
   const dir = mkdtempSync(join(tmpdir(), 'sf-stash-common-')), file = join(dir, 'test.db'), cipher = new Cipher(randomBytes(32));
   let store = new Store(file, { cipher });
   try {
@@ -82,16 +82,15 @@ it.each([28, 30, 32, 33])('v%d 升级和旧种子导入执行相同迁移，加�
     }
     store.db.pragma(`user_version = ${version}`); store.close(); store = new Store(file, { cipher });
     const saved = store.get('profile', 'sub')!;
-    expect(store.db.pragma('user_version', { simple: true })).toBe(34);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(35);
     expect(saved.base?.kernels).not.toHaveProperty('stash');
     expect(parse(saved.base!.clients!['stash-ios']!)).toEqual({ dns: { ipv6: false }, mode: 'rule' });
     expect(saved.base!.clients!['stash-macos']).toBe('dns:\n  ipv6: false\n');
     expect(store.getWithOwner('profile', 'sub')).toMatchObject({ owner: 'owner', updatedAt: 123 });
     const backup = store.db.prepare("SELECT data FROM native_migration_backups WHERE kind = 'profile-stash-common-v34' AND id = 'sub'").get() as { data: string };
-    expect(backup.data).not.toContain('ipv6');
-    expect(JSON.parse(cipher.decrypt(backup.data))).toMatchObject(original);
+    expect(JSON.parse(backup.data)).toMatchObject(original);
     const older = store.db.prepare("SELECT data FROM native_migration_backups WHERE kind = 'profile' AND id = 'sub'").get() as { data: string };
-    expect(JSON.parse(cipher.decrypt(older.data))).toEqual({ older: true });
+    expect(JSON.parse(older.data)).toEqual({ older: true });
     expect(store.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('last_good', 'shared_rule_resources')").all()).toEqual([]);
     store.close(); store = new Store(file, { cipher });
     expect(store.get('profile', 'sub')).toEqual(saved);

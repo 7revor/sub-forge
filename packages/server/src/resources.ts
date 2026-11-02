@@ -24,13 +24,13 @@ export class ResourceService {
   constructor(private store:Store,private snapshots:SnapshotService,private renderer:RenderService,private now:()=>number=Date.now) {
     store.documentDeleteHooks.add(this.dropDocumentJobs);
     for (const row of store.db.prepare('SELECT data FROM refresh_jobs').all() as {data:string}[]) {
-      const job = JSON.parse(store.cipher.decrypt(row.data)) as RefreshJob;
+      const job = JSON.parse(row.data) as RefreshJob;
       if (job.state === 'running') { job.state = 'interrupted';job.error = '服务重启，刷新任务已中断，请重新刷新';this.interruptPending(job);this.save(job); }
     }
   }
   private readonly dropDocumentJobs = (kind:string,id:string) => {
     for (const row of this.store.db.prepare('SELECT id,data FROM refresh_jobs').all() as {id:string;data:string}[]) {
-      const job = JSON.parse(this.store.cipher.decrypt(row.data)) as RefreshJob;
+      const job = JSON.parse(row.data) as RefreshJob;
       if (job.kind === kind && job.documentId === id) this.store.db.prepare('DELETE FROM refresh_jobs WHERE id = ?').run(row.id);
     }
   };
@@ -41,12 +41,12 @@ export class ResourceService {
   }
   private save(job:RefreshJob) {
     if (job.documentBound !== false && ['profile', 'source', 'collection', 'ruleset'].includes(job.kind) && !this.store.get(job.kind as 'profile' | 'source' | 'collection' | 'ruleset', job.documentId)) return;
-    this.store.db.prepare('INSERT OR REPLACE INTO refresh_jobs VALUES (?,?,?,?)').run(job.id,job.owner,this.store.cipher.encrypt(JSON.stringify(job)),this.now());
+    this.store.db.prepare('INSERT OR REPLACE INTO refresh_jobs VALUES (?,?,?,?)').run(job.id,job.owner,JSON.stringify(job),this.now());
     this.store.changed();
   }
   getJob(id:string):RefreshJob|undefined {
     const row = this.store.db.prepare('SELECT data FROM refresh_jobs WHERE id = ?').get(id) as {data:string}|undefined;
-    return row ? JSON.parse(this.store.cipher.decrypt(row.data)) : undefined;
+    return row ? JSON.parse(row.data) : undefined;
   }
   ruleResources(rs:RuleSetDoc,scope?:string):Resource[] {
     return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',id:ruleBinding(rs.id,scope).id,name:`${rs.name} / ${s.name || s.id}`,url:s.url!,options:{...s.fetch,format:s.format,behavior:s.behavior,scope:ruleBinding(rs.id,scope).scope}}));
@@ -104,7 +104,7 @@ export class ResourceService {
   startJob(owner:string,kind:string,id:string,explicit?:Resource[]):RefreshJob {
     if (this.stopping) throw new Error('服务正在关闭');
     const existing = this.store.db.prepare('SELECT data FROM refresh_jobs WHERE owner = ? ORDER BY at DESC').all(owner) as {data:string}[];
-    for (const row of existing) { const j = JSON.parse(this.store.cipher.decrypt(row.data)) as RefreshJob;if(j.state==='running' && j.kind===kind && j.documentId===id) return j; }
+    for (const row of existing) { const j = JSON.parse(row.data) as RefreshJob;if(j.state==='running' && j.kind===kind && j.documentId===id) return j; }
     const resources = this.unique(explicit ?? this.collect(kind,id));
     const dependencyKey = (items:Resource[]) => JSON.stringify(this.unique(items).map(r=>this.snapshots.identity(r.kind,r.id,r.url,r.options)).sort());
     const initialDependencies = dependencyKey(resources);

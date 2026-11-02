@@ -1,7 +1,7 @@
 import { SCHEMA_VERSION } from '../src/schema.ts';
 import { issueProfileToken } from './helpers.ts';
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -78,13 +78,13 @@ describe('加密与迁移', () => {
     let store = new Store(file, { cipher, now: () => 42 });
     try {
       const legacy = { id: 's', name: '旧订阅源', url: 'https://a.test/sub', pipeline: [], fetch: { ua: '旧 UA', timeoutMs: 1500, ttlSec: 7200 } };
-      store.db.prepare("INSERT INTO docs (kind, id, owner, data, updated_at) VALUES ('source', 's', 'u1', ?, 42)").run(cipher.encrypt(JSON.stringify(legacy)));
+      store.db.prepare("INSERT INTO docs (kind, id, owner, data, updated_at) VALUES ('source', 's', 'u1', ?, 42)").run(JSON.stringify(legacy));
       store.put('ruleset', { id: 'r', name: '规则集', sources: [{ id: 'remote', kind: 'remote', format: 'auto', url: 'https://r.test/list', fetch: { ua: '规则 UA', timeoutMs: 2000 } }] }, 'u1');
       const insert = store.db.prepare('INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, body, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
       for (const kind of ['source', 'ruleset']) {
         const id = kind === 'source' ? 's' : 'r';
-        for (let i = 0; i < 5; i++) insert.run(kind, id, cipher.encrypt(legacy.url), cipher.hmac(legacy.url), i === 4 ? 3 : i, 1, cipher.encrypt(`内容${i}`), null);
-        for (let i = 0; i < 2; i++) insert.run(kind, id, cipher.encrypt(legacy.url), cipher.hmac(legacy.url), 10 + i, 0, null, cipher.encrypt(`失败${i}`));
+        for (let i = 0; i < 5; i++) insert.run(kind, id, legacy.url, cipher.hmac(legacy.url), i === 4 ? 3 : i, 1, `内容${i}`, null);
+        for (let i = 0; i < 2; i++) insert.run(kind, id, legacy.url, cipher.hmac(legacy.url), 10 + i, 0, null, `失败${i}`);
       }
       store.db.pragma(`user_version = ${version}`);
       store.close();
@@ -106,7 +106,7 @@ describe('加密与迁移', () => {
     } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('文档、快照正文、token 落盘时加密；token 按 HMAC 查找', () => {
+  it('文档、快照、令牌原文明文存储；token 按 HMAC 查找，备份设置仍加密', () => {
     const s = new Store(':memory:');
     s.put('source', { id: 'a', name: 'A', url: 'https://secret.example.com/sub?token=xyz', pipeline: [] }, 'u1');
     const url = 'https://secret.example.com/sub?token=xyz';
@@ -118,9 +118,13 @@ describe('加密与迁移', () => {
       s.db.prepare('SELECT * FROM snapshots').all(),
       s.db.prepare('SELECT * FROM user_tokens').all(),
     ]);
-    expect(dump).not.toContain('secret.example.com');
-    expect(dump).not.toContain('hunter2');
-    expect(dump).not.toContain(t.token);
+    expect(dump).toContain('secret.example.com');
+    expect(dump).toContain('hunter2');
+    expect(dump).toContain(t.token);
+    expect(s.db.prepare('SELECT token_hash FROM user_tokens WHERE user_id = ?').get(user.id)).not.toEqual({ token_hash: t.token });
+    s.setSecureSetting('fixture', { password: 'webdav-secret' });
+    expect(JSON.stringify(s.db.prepare('SELECT * FROM system_settings').all())).not.toContain('webdav-secret');
+    expect(s.getSecureSetting('fixture')).toEqual({ password: 'webdav-secret' });
     expect(s.get('source', 'a')!.url).toEqual('https://secret.example.com/sub?token=xyz');
     expect(s.getWithOwner('source', 'a')!.owner).toBe('u1');
     expect(s.latestSnapshot('source', 'a', url)).toMatchObject({ url, body: 'password: hunter2', error: `连接 ${url} 失败` });
@@ -208,7 +212,7 @@ describe('加密与迁移', () => {
     const file = join(dir, `v${version}.db`);
     const cipher = new Cipher(randomBytes(32));
     const old = new Store(file, { cipher });
-    const raw = (kind: string, doc: { id: string }, owner: string | null) => old.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, 0)').run(kind, doc.id, owner, cipher.encrypt(JSON.stringify(doc)));
+    const raw = (kind: string, doc: { id: string }, owner: string | null) => old.db.prepare('INSERT INTO docs (kind, id, owner, data, updated_at) VALUES (?, ?, ?, ?, 0)').run(kind, doc.id, owner, JSON.stringify(doc));
     const overrides = [{ line: 1, override: { when: { client: 'surge' }, action: { drop: true } } }];
     raw('ruleset', { id: 'tg', name: 'Telegram', kind: 'remote', format: 'classical', url: 'https://r.test/tg.list', fetch:{ttlSec:3600} } as never, 'u1');
     raw('ruleset', { id: 'own', name: '自定', kind: 'local', format: 'auto', content: 'DOMAIN,a.test', overrides } as never, 'u1');
@@ -260,7 +264,7 @@ describe('加密与迁移', () => {
     expect(() => new Store('/tmp/never-created.db')).toThrow(/密钥/);
   });
 
-  it('v2 快照 URL 与错误迁移为密文，查询、历史与再次启动保持有效', () => {
+  it('v2 快照升级后查询、历史与再次启动保持有效', () => {
     const dir = mkdtempSync(join(tmpdir(), 'sf-url-migration-'));
     const file = join(dir, 'old.db');
     const cipher = new Cipher(randomBytes(32));
@@ -277,10 +281,8 @@ describe('加密与迁移', () => {
         const upgraded = new Store(file, { cipher });
         expect(upgraded.latestSnapshot('source', 's', url)).toMatchObject({ url, body: '旧正文', error: `拉取 ${url} 失败` });
         expect(upgraded.countSnapshots('source', 's', url)).toEqual({ ok: 1, failed: 0 });
-        expect(JSON.stringify(upgraded.db.prepare('SELECT * FROM snapshots').all())).not.toContain('MIGRATION_SECRET');
         upgraded.close();
       }
-      expect(readFileSync(file).includes(Buffer.from('MIGRATION_SECRET'))).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
@@ -326,5 +328,37 @@ it('v32 升级删除渲染结果表，保留文档并回收空间', () => {
     expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
     expect(store.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'last_good'").get()).toBeUndefined();
     expect(store.get('ruleset', 'r')?.name).toBe('规则');
+  } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+it('v34 升级把文档、快照、令牌和刷新任务改为明文，令牌仍可查找，备份设置保持加密，重启幂等', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sf-plain-'));
+  const file = join(dir, 'db.sqlite'), cipher = new Cipher(randomBytes(32));
+  let store = new Store(file, { cipher });
+  try {
+    const user = store.createUser({ username: 'a', passwordHash: 'x', role: 'user' }), token = store.userToken(user.id)!.token;
+    store.put('source', { id: 's', name: '源', url: 'https://secret.example.com/sub', pipeline: [] }, user.id);
+    store.addSnapshot({ ownerKind: 'source', ownerId: 's', url: 'https://secret.example.com/sub', fetchedAt: 1, ok: true, body: 'password: hunter2' });
+    store.addSnapshot({ ownerKind: 'source', ownerId: 's', url: 'https://secret.example.com/sub', fetchedAt: 2, ok: false, error: '失败详情' });
+    store.db.prepare('INSERT INTO refresh_jobs VALUES (?, ?, ?, ?)').run('j', user.id, JSON.stringify({ id: 'j', state: 'done' }), 1);
+    store.db.prepare('INSERT INTO native_migration_backups VALUES (?, ?, ?, ?)').run('profile', 'p', '{"older":true}', 1);
+    store.setSecureSetting('backup', { passphrase: 'keep-encrypted' });
+    const encrypt = (table: string, column: string) => { for (const row of store.db.prepare(`SELECT rowid AS id, ${column} AS value FROM ${table} WHERE ${column} IS NOT NULL`).all() as { id: number; value: string }[]) store.db.prepare(`UPDATE ${table} SET ${column} = ? WHERE rowid = ?`).run(cipher.encrypt(row.value), row.id); };
+    encrypt('docs', 'data'); encrypt('snapshots', 'url'); encrypt('snapshots', 'body'); encrypt('snapshots', 'error'); encrypt('refresh_jobs', 'data'); encrypt('native_migration_backups', 'data'); encrypt('user_tokens', 'token');
+    store.db.exec('ALTER TABLE user_tokens RENAME COLUMN token TO token_enc');
+    store.db.pragma('user_version = 34'); store.close();
+    for (let i = 0; i < 2; i++) {
+      store = new Store(file, { cipher });
+      expect(store.db.pragma('user_version', { simple: true })).toBe(35);
+      expect(store.get('source', 's')?.url).toBe('https://secret.example.com/sub');
+      expect(store.latestSnapshot('source', 's', 'https://secret.example.com/sub')?.body).toBe('password: hunter2');
+      expect(store.getToken(token)).toEqual({ token, userId: user.id });
+      expect(store.getSecureSetting('backup')).toEqual({ passphrase: 'keep-encrypted' });
+      const dump = JSON.stringify(['docs', 'snapshots', 'user_tokens', 'refresh_jobs', 'native_migration_backups'].map(table => store.db.prepare(`SELECT * FROM ${table}`).all()));
+      expect(dump).not.toContain('enc:v1:');
+      expect(JSON.stringify(store.db.prepare('SELECT * FROM system_settings').all())).not.toContain('keep-encrypted');
+      store.close();
+    }
+    store = new Store(file, { cipher });
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });
