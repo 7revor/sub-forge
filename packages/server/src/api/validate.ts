@@ -255,8 +255,8 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
       if (!Array.isArray(doc.sources)) throw bad('sources 必须是数组');
       checkRuleSetOverrides(doc.overrides);
       if (doc.noResolve !== undefined && typeof doc.noResolve !== 'boolean') throw bad('noResolve 必须是布尔值');
-      const previous = store.getWithOwner('ruleset', id);
-      const priorSources = previous?.owner === user.id ? previous.doc.sources : [];
+      // 写权限由路由确认；已保存关联对作者和管理员都适用同一约束。
+      const priorSources = store.get('ruleset', id)?.sources ?? [];
       const ids = new Set<string>();
       (doc.sources as unknown[]).forEach((src, i) => {
         const at = `来源 ${i + 1}`;
