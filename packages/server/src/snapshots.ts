@@ -38,7 +38,7 @@ export class SnapshotService {
     const format = opts.format ?? source?.format ?? 'auto';
     return { ...(format === 'mrs' ? { behavior: opts.behavior ?? source?.behavior } : {}), ua: opts.ua ?? DEFAULT_UA, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, format, scope: opts.scope ?? 'public-rules' };
   }
-  identity(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): string {
+  private readIdentity(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions) {
     const { scope, ...options } = this.options(kind, id, url, opts);
     const saved = this.store.getWithOwner(kind, id);
     const sources = kind === 'ruleset' ? this.store.get('ruleset', id)?.sources.filter(s => s.url === url) : undefined;
@@ -46,7 +46,11 @@ export class SnapshotService {
       options.ua === (source.fetch?.ua ?? DEFAULT_UA) && options.timeoutMs === (source.fetch?.timeoutMs ?? DEFAULT_TIMEOUT_MS) && options.format === source.format && (options.format !== 'mrs' || options.behavior === source.behavior));
     // 升级旧快照时不能把旧参数或旧权限的正文绑定到本次草稿读取身份。
     const migrateLegacy = compatible && (!scope || !saved?.owner || scope === saved.owner || kind === 'ruleset' && scope === 'public-rules');
-    return this.store.bindResource(kind, id, url, options, scope, !!migrateLegacy);
+    return { options, scope, migrateLegacy: !!migrateLegacy };
+  }
+  identity(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): string {
+    const { options, scope, migrateLegacy } = this.readIdentity(kind, id, url, opts);
+    return this.store.bindResource(kind, id, url, options, scope, migrateLegacy);
   }
   /** 排队任务只检查现有绑定，不能因为检查状态重新绑定已删除的来源。 */
   isBound(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): boolean {
@@ -61,10 +65,23 @@ export class SnapshotService {
   isCurrent(snapshot: SnapshotRow, revision: string | undefined): boolean {
     return this.revision(snapshot) === revision;
   }
+  /** 只读的资源标识，与 identity 建立绑定后的结果相同。 */
+  resourceId(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}): string {
+    const { options, scope } = this.readIdentity(kind, id, url, opts);
+    return this.store.resourceKey(kind, id, url, options, scope);
+  }
+  /** 只读：不建立绑定、不迁移旧快照。尚未绑定时按 bindResource 的规则预览旧快照。 */
   status(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}) {
-    const resource = this.identity(kind,id,url,opts);
-    const success = this.store.latestSnapshot(kind,resource,url);
-    const attempt = this.store.latestSnapshot(kind,resource,url,false);
+    const { migrateLegacy } = this.readIdentity(kind, id, url, opts);
+    const resource = this.resourceId(kind, id, url, opts);
+    const legacy = migrateLegacy && !this.store.resourceBinding(kind, id, url);
+    const latest = (okOnly: boolean) => {
+      const current = this.store.latestSnapshot(kind,resource,url,okOnly);
+      const previous = legacy ? this.store.latestSnapshot(kind,id,url,okOnly) : undefined;
+      return previous && (!current || previous.fetchedAt > current.fetchedAt) ? previous : current;
+    };
+    const success = latest(true);
+    const attempt = latest(false);
     return { resource, lastSuccessAt: success?.fetchedAt, lastAttemptAt: attempt?.fetchedAt,
       nextFetchAt: attempt ? attempt.fetchedAt + this.store.resourceCacheTtlSec * 1000 : undefined,
       refreshing: this.inflight.has(resource), error: attempt && !attempt.ok ? attempt.error : undefined, available: !!success };
@@ -120,6 +137,7 @@ export class SnapshotService {
     return p;
   }
   async get(kind: SnapshotOwner, id: string, url: string, opts: SnapshotFetchOptions = {}, policy: { refresh?: boolean } = {}): Promise<SnapshotResult> {
+    this.identity(kind,id,url,opts);
     const status = this.status(kind,id,url,opts);
     let latest = this.store.latestSnapshot(kind,status.resource,url);
     if (policy.refresh || status.nextFetchAt === undefined || this.now() >= status.nextFetchAt || status.refreshing) {

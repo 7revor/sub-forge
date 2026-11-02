@@ -68,9 +68,13 @@ export class ResourceService {
     return [...new Map(resources.map(r=>[this.snapshots.identity(r.kind,r.id,r.url,r.options),r])).values()];
   }
   statuses(resources:Resource[]) {
-    return this.unique(resources).map(r=>({name:r.name,...this.snapshots.status(r.kind,r.id,r.url,r.options)}));
+    return [...new Map(resources.map(r=>{ const status = this.snapshots.status(r.kind,r.id,r.url,r.options); return [status.resource,{name:r.name,...status}]; })).values()];
   }
+  /** 只读：状态页不应改变绑定；调度任务自行绑定后再拉取。 */
   all():Resource[] {
+    return [...new Map(this.dependencies().map(r=>[this.snapshots.resourceId(r.kind,r.id,r.url,r.options),r])).values()];
+  }
+  private dependencies():Resource[] {
     const collect = (kind:string,id:string) => {
       try { return this.collect(kind,id); }
       catch (error) {
@@ -79,14 +83,14 @@ export class ResourceService {
         return [];
       }
     };
-    return this.unique([
+    return [
       ...this.additionalResources(),
       ...this.store.listSharedRules<SharedRuleRecord>().flatMap(r => { const rs = resolveRuleSetReference(r.data.reference.matcher, this.store); return rs ? this.ruleResources(rs) : []; }),
       ...this.store.list('source').flatMap(s=>collect('source',s.id)),
       ...this.store.list('ruleset').flatMap(s=>collect('ruleset',s.id)),
       ...this.store.list('profile').flatMap(p=>collect('profile',p.id)),
       ...this.store.listTemplates().flatMap(t=>Object.values(this.renderer.collectRuleEntries(t.rules).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
-    ]);
+    ];
   }
   private async each(resources:Resource[],read:(r:Resource,index:number)=>Promise<void>) {
     let next = 0;
@@ -154,7 +158,7 @@ export class ResourceService {
     if (this.stopping) return Promise.resolve();
     if (this.ticking) return this.ticking;
     const work = (async()=>{
-      await this.each(this.all(),async r=>{
+      await this.each(this.unique(this.dependencies()),async r=>{
         if (!this.snapshots.isBound(r.kind, r.id, r.url, r.options)) return;
         const status=this.snapshots.status(r.kind,r.id,r.url,r.options);
         if(status.nextFetchAt===undefined || this.now()>=status.nextFetchAt) await this.snapshots.get(r.kind,r.id,r.url,r.options);
