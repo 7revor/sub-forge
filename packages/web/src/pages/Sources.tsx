@@ -71,7 +71,7 @@ function BasicSettings({ draft, set }: {
         }</Field>
       <NoteField compact value={draft.note} onChange={(note) => set({ note })} />
       </div>
-      <p className="m-0 text-xs text-muted-foreground">到期自动重新拉取（管理员在「系统」中统一设置）；失败时继续使用上次成功的内容。</p>
+      <p className="m-0 text-xs text-muted-foreground">到期后下次使用时重新拉取（管理员在「系统」中统一设置）；失败时继续使用上次成功的内容。</p>
     </Card>
   );
 }

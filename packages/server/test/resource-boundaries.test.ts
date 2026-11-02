@@ -55,17 +55,6 @@ it.each([false, true])('删除规则增强时，正在执行的刷新任务不�
   expect(h.store.invalidationListeners.size).toBe(0);
 });
 
-it('后台刷新排队期间删除的来源不会重新被请求', async () => {
-  const h = setup(), entered = gate(), held = gate();
-  h.store.delete('profile', 'p'); h.store.delete('ruleset', 'r');
-  for (let i = 0; i < 6; i++) h.store.put('source', { id: `s${i}`, name: `源${i}`, url: `https://nodes.test/${i}`, pipeline: [] }, h.user.id);
-  let calls = 0;
-  h.fetcher.mockImplementation(async () => { if (++calls === 4) entered.release(); await held.promise; return { status: 200, body: 'trojan://fixture@node.test:443#节点' }; });
-  const service = new ResourceService(h.store, h.snapshots, h.renderer), pending = service.tick(); await entered.promise;
-  h.store.delete('source', 's4'); h.store.delete('source', 's5'); held.release(); await pending; await service.stop();
-  expect(calls).toBe(4);
-});
-
 it('公共规则从文本改成 MRS 后地址变化，旧文本链接不返回二进制', async () => {
   const h = setup(), oldUrl = ruleUrl(await h.main());
   h.store.put('ruleset', { id: 'r', name: '公共规则', sources: [{ id: 'binary', kind: 'remote', format: 'mrs', behavior: 'domain', url: 'https://rules.test/a.mrs' }] }, h.user.id);

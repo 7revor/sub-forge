@@ -148,6 +148,17 @@ export class Store {
       this.db.prepare('DELETE FROM snapshots WHERE owner_id = ?').run(resource);
     }
   }
+  /** 删除不在 live 中、最近一次拉取早于 before 的绑定；仍有其他绑定的资源保留快照。 */
+  pruneStaleBindings(live: Set<string>, before: number): void {
+    for (const row of this.db.prepare('SELECT kind, id, url_hash, resource FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
+      if (live.has(row.resource)) continue;
+      const { newest } = this.db.prepare('SELECT MAX(fetched_at) AS newest FROM snapshots WHERE owner_id = ?').get(row.resource) as { newest: number | null };
+      // 没有快照说明首次拉取还在进行，留给下一轮判断。
+      if (newest === null || newest >= before) continue;
+      this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(row.kind, row.id, row.url_hash);
+      this.pruneUnusedResource(row.resource);
+    }
+  }
   private dropResourceBindings(kind: SnapshotOwner, id: string, urls: string[] = []): void {
     const keep = new Set(urls.map(url => this.cipher.hmac(url)));
     for (const row of this.db.prepare('SELECT DISTINCT url_hash FROM snapshots WHERE owner_kind = ? AND owner_id = ?').all(kind, id) as { url_hash: string }[]) {

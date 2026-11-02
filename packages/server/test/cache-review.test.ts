@@ -132,8 +132,8 @@ it('已浏览但未引用的仓库正文也参与调度，失败可见且保留�
   const id=await repo.addCustom({name:'测试',url:'https://github.com/fixture/rules',scans:[{ref:'main',directory:'rules',format:'auto',client:'any',groupBy:'path'}]});await repo.refresh(id);
   const first=await repo.filePreview(id,'main','rules/a.list');expect(calls).toBe(1);
   const service=new ResourceService(h.store,h.snapshots,h.renderer,()=>now);service.setAdditionalResources(()=>repo.cachedResources());
-  expect(service.all()).toHaveLength(1);fail=true;now+=86400001;await service.tick();expect(calls).toBe(2);
-  const stale=await repo.filePreview(id,'main','rules/a.list');expect(stale.content).toBe(first.content);expect(stale.cache?.error).toBe('模拟文件失败');expect(stale.cache?.lastSuccessAt).toBe(first.cache?.lastSuccessAt);
+  expect(service.all()).toHaveLength(1);fail=true;now+=86400001;
+  const stale=await repo.filePreview(id,'main','rules/a.list');expect(calls).toBe(2);expect(stale.content).toBe(first.content);expect(stale.cache?.error).toBe('模拟文件失败');expect(stale.cache?.lastSuccessAt).toBe(first.cache?.lastSuccessAt);
   expect(service.statuses(service.all())[0]?.error).toBe('模拟文件失败');await service.stop();await repo.stop();
 });
 it('来源换地址或删除后回收旧原文，但不误删其他来源共享的缓存', async () => {

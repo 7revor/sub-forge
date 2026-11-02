@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
+import { ResourceService } from '../src/resources.ts';
 import { STALE_WAIT_MS } from '../src/snapshots.ts';
 import { setupApp } from './helpers.ts';
 
@@ -81,4 +82,44 @@ it('检查快照状态时不读取正文', async () => {
   h.snapshots.status('source', 's', URL_A);
   expect(read).not.toHaveBeenCalled();
   h.store.close();
+});
+
+describe('按系统缓存时间清理无引用资源', () => {
+  const DAY = 86400_000;
+  function env() {
+    vi.useRealTimers();
+    let now = 1_700_000_000_000; const fetcher = vi.fn(async (url: string) => ({ status: 200, body: url.includes('nodes') ? nodes('甲') : 'DOMAIN,a.test' }));
+    const h = setupApp({ fetcher, now: () => now });
+    const service = new ResourceService(h.store, h.snapshots, h.renderer, () => now);
+    h.store.put('source', { id: 'used', name: '使用中', url: URL_A, pipeline: [] }, 'u');
+    h.store.put('source', { id: 'idle', name: '无人使用', url: URL_B, pipeline: [] }, 'u');
+    h.store.put('profile', { id: 'p', name: 'p', nodeSets: [{ ref: { type: 'source', id: 'used' }, output: 'provider' }], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }, 'u');
+    const bound = (id: string) => h.store.resourceBinding('source', id, id === 'used' ? URL_A : URL_B);
+    return { ...h, service, fetcher, bound, tick: (ms: number) => { now += ms; } };
+  }
+
+  it('超过缓存时间且无人使用才清理，使用中和未到期的保留，清理不访问上游', async () => {
+    const h = env();
+    await h.snapshots.get('source', 'used', URL_A); await h.snapshots.get('source', 'idle', URL_B);
+    h.fetcher.mockClear();
+    h.service.sweep();
+    expect(h.bound('idle')).toBeDefined();
+    h.tick(DAY + 1); h.service.sweep();
+    expect(h.bound('idle')).toBeUndefined(); expect(h.bound('used')).toBeDefined();
+    expect(h.store.db.prepare("SELECT COUNT(*) AS n FROM snapshots WHERE ok = 1").get()).toEqual({ n: 1 });
+    expect(h.fetcher).not.toHaveBeenCalled();
+    expect(h.store.get('source', 'idle')?.name).toBe('无人使用');
+    expect((await h.snapshots.get('source', 'idle', URL_B)).snapshot?.body).toContain('甲');
+    expect(h.fetcher).toHaveBeenCalledTimes(1);
+    await h.service.stop(); h.store.close();
+  });
+
+  it('清理周期跟随系统缓存时间设置', async () => {
+    const h = env();
+    h.store.setResourceCacheTtlSec(3600);
+    await h.snapshots.get('source', 'idle', URL_B);
+    h.tick(3600_001); h.service.sweep();
+    expect(h.bound('idle')).toBeUndefined();
+    await h.service.stop(); h.store.close();
+  });
 });

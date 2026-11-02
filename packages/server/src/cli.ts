@@ -114,7 +114,6 @@ async function start(): Promise<void> {
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins,
   });
-  ruleRepos.start();
   resources.start();
   backups.start();
   store.pruneAccessLog();

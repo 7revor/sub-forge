@@ -20,7 +20,7 @@ export class ResourceService {
   private stopping = false;
   private additionalResources: () => Resource[] = () => [];
   setAdditionalResources(read: () => Resource[]) { this.additionalResources = read; }
-  private ticking?: Promise<void>;
+  private lastSweepAt?: number;
   constructor(private store:Store,private snapshots:SnapshotService,private renderer:RenderService,private now:()=>number=Date.now) {
     store.documentDeleteHooks.add(this.dropDocumentJobs);
     for (const row of store.db.prepare('SELECT data FROM refresh_jobs').all() as {data:string}[]) {
@@ -145,24 +145,36 @@ export class ResourceService {
     this.running.set(job.id,work);
     return job;
   }
-  tick():Promise<void> {
-    if (this.stopping) return Promise.resolve();
-    if (this.ticking) return this.ticking;
-    const work = (async()=>{
-      await this.each(this.unique(this.dependencies()),async r=>{
-        if (!this.snapshots.isBound(r.kind, r.id, r.url, r.options)) return;
-        const status=this.snapshots.status(r.kind,r.id,r.url,r.options);
-        if(status.nextFetchAt===undefined || this.now()>=status.nextFetchAt) await this.snapshots.get(r.kind,r.id,r.url,r.options);
-      });
-      this.store.pruneResourceBindings();
-      this.store.db.prepare('DELETE FROM refresh_jobs WHERE at < ?').run(this.now()-7*86400000);
-    })().finally(()=>{this.ticking=undefined;});
-    this.ticking=work;return work;
+  /** 正被配置订阅或模板使用的资源。规则集、订阅源文档本身不算使用。 */
+  private liveResources():Set<string> {
+    const collect = (id:string) => {
+      try { return this.collect('profile',id); }
+      catch (error) {
+        if (!(error instanceof ResourceAccessError)) throw error;
+        return [];
+      }
+    };
+    return new Set([
+      ...this.store.list('profile').flatMap(p=>collect(p.id)),
+      ...this.store.listTemplates().flatMap(t=>Object.values(this.renderer.collectRuleEntries(t.rules).rulesets).flatMap(rs=>this.ruleResources(rs as RuleSetDoc,`template:${t.id}`))),
+    ].map(r=>this.snapshots.resourceId(r.kind,r.id,r.url,r.options)));
   }
+  /** 只清理、不拉取：无人使用且超过系统缓存时间的资源下次读取时重新拉取。 */
+  sweep():void {
+    if (this.stopping) return;
+    this.lastSweepAt=this.now();
+    this.store.pruneResourceBindings();
+    this.store.pruneStaleBindings(this.liveResources(),this.now()-this.store.resourceCacheTtlSec*1000);
+    this.store.db.prepare('DELETE FROM refresh_jobs WHERE at < ?').run(this.now()-7*86400000);
+  }
+  /** 清理周期跟随系统缓存时间，修改设置后无需重启。 */
   start() {
     if(this.timer || this.stopping)return;
-    const run=()=>void this.tick().catch(error=>console.error('资源调度失败',error));
+    const run=()=>{
+      if(this.lastSweepAt!==undefined && this.now()-this.lastSweepAt<this.store.resourceCacheTtlSec*1000)return;
+      try { this.sweep(); } catch (error) { console.error('资源清理失败',error); }
+    };
     run();this.timer=setInterval(run,60_000);this.timer.unref();
   }
-  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all([...this.running.values(),this.ticking]);this.store.documentDeleteHooks.delete(this.dropDocumentJobs);}
+  async stop(){this.stopping=true;clearInterval(this.timer);await Promise.all(this.running.values());this.store.documentDeleteHooks.delete(this.dropDocumentJobs);}
 }

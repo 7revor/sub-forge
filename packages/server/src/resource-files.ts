@@ -75,6 +75,7 @@ export function resourceFileRoutes(store: Store, renderer: RenderService, snapsh
     const convert = c.req.query('target') !== undefined;
     allowedQuery(c, convert ? ['id', 'files', 'target', 'format', 'behavior', 'src', 'token'] : ['id', 'ref', 'path', 'files', 'token']);
     const id = requiredQuery(c, 'id');
+    repos.refreshIfDue(id);
     let files: { ref: string; path: string }[];
     if (c.req.query('files') !== undefined) {
       if (c.req.query('ref') !== undefined || c.req.query('path') !== undefined) throw new HttpError(400, '仓库文件参数冲突');
