@@ -23,12 +23,14 @@ describe('订阅专属 Provider 服务端覆写', () => {
     expect(parse(result.providers['source:s']!.yaml).proxies.map((p: any) => p['dialer-proxy'])).toEqual(['DIRECT', 'DIRECT']);
     expect(JSON.stringify(f)).toBe(before);
   });
-  it.each([false, true])('整集覆写优先于部分规则，与排列无关（反向 %s）', reverse => {
+  it.each([false, true])('单节点规则优先于整集默认规则，与排列无关（反向 %s）', reverse => {
     const f = fixture(); f.profile.chains = reverse ? [partial, whole] : [whole, partial];
     const m = renderMihomo(f), s = renderStash(f);
-    expect(parse(m.providers['source:s']!.yaml).proxies.map((p: any) => p['dialer-proxy'])).toEqual(['DIRECT', 'DIRECT']);
-    expect((s.config.proxies as any[]).map(p => p['dialer-proxy'])).toEqual(['DIRECT', 'DIRECT']);
-    expect(m.report.byCode('chain.overridden')).toHaveLength(1);
+    const names = parse(m.providers['source:s']!.yaml).proxies.map((p: any) => p.name);
+    const expected = names.map((name: string) => name === '落地' ? 'REJECT' : 'DIRECT');
+    expect(parse(m.providers['source:s']!.yaml).proxies.map((p: any) => p['dialer-proxy'])).toEqual(expected);
+    expect((s.config.proxies as any[]).map(p => p['dialer-proxy'])).toEqual(expected);
+    expect(m.report.hasErrors).toBe(false);
     expect(s.report.hasErrors).toBe(false);
   });
   it('不解析已被覆写的失效上游前置', () => {
@@ -43,6 +45,12 @@ describe('订阅专属 Provider 服务端覆写', () => {
     f.profile.chains = [whole, { ...whole, id: 'other', via: partial.via }];
     expect(renderMihomo(f).report.hasErrors).toBe(true);
   });
+  it('两条单节点规则重叠且前置不同时报错，范围不重叠可共存', () => {
+    const f = fixture(); f.profile.chains = [whole, partial, { ...partial, id: 'other', via: direct }];
+    expect(renderMihomo(f).report.byCode('chain.conflict')).toHaveLength(1);
+    f.profile.chains = [partial, { ...partial, id: 'other', landing: { nodeSet: ref, filter: '^前置$' }, via: direct }];
+    expect(renderMihomo(f).report.hasErrors).toBe(false);
+  });
   it('整集引用同源前置节点会成环，部分落地排除前置则可用', () => {
     const f = fixture(); f.profile.chains[0] = { ...whole, landing: { ...whole.landing }, via: { kind: 'node', ref: { nodeSet: ref, match: { exact: '前置' } } } };
     expect(renderMihomo(f).report.byCode('chain.cycle')).toHaveLength(1);
@@ -50,6 +58,25 @@ describe('订阅专属 Provider 服务端覆写', () => {
     const result = renderMihomo(f);
     expect(result.report.hasErrors).toBe(false);
     expect(result.config['proxy-groups']).toContainEqual(expect.objectContaining({ filter: '^前置$', hidden: true, 'empty-fallback': 'REJECT' }));
+  });
+  it('自动前置跳过本条链的全部落地，只有一个前置且不成环', () => {
+    const f = fixture(); f.profile.chains = [{ id: 'auto', landing: { nodeSet: ref, filter: '^落地$' }, via: { kind: 'node', ref: { nodeSet: ref, match: { regex: '' } } } }];
+    const result = renderMihomo(f);
+    expect(result.report.hasErrors).toBe(false);
+    expect(result.chainResolutions[0]!.viaName).toBe('前置');
+    expect(parse(result.providers['source:s']!.yaml).proxies.find((p: any) => p.name === '前置')['dialer-proxy']).toBeUndefined();
+  });
+  it('全部来源范围内点选的节点保持范围，隐藏组仍精确筛选', () => {
+    const f = fixture(); const scope = { type: 'all' as const, id: 'provider' as const };
+    f.profile.chains = [{ id: 'pick', landing: { nodeSet: scope, filter: '^落地$' }, via: { kind: 'node', ref: { nodeSet: scope, match: { exact: '前置' } } } }];
+    const result = renderMihomo(f);
+    expect(result.report.hasErrors).toBe(false);
+    expect(result.config['proxy-groups']).toContainEqual(expect.objectContaining({ use: ['来源'], filter: '^前置$', hidden: true }));
+    expect(parse(result.providers['source:s']!.yaml).proxies.find((p: any) => p.name === '落地')['dialer-proxy']).toMatch(/^__ref_/);
+  });
+  it('自动前置范围全是落地时明确报错，不生成直连节点', () => {
+    const f = fixture(); f.profile.chains = [{ ...whole, via: { kind: 'node', ref: { nodeSet: ref, match: { regex: '' } } } }];
+    expect(renderMihomo(f).report.byCode('ref.unresolved')[0]!.message).toContain('落地以外');
   });
   it('旧复制策略不生成多余节点，整集覆写仍写入 Provider', () => {
     const f = fixture(); f.profile.refPolicy.default = 'copy';

@@ -214,15 +214,17 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const deps = new Map<string, DependencyEntry>();
   const wrapperNode = new Map<string, { set: NS; node: ProxyIR }>();
 
-  const findNode = (ref: ChainNodeRef, where: string): { set: NS; node: ProxyIR } | undefined => {
+  const refName = (n: RenderNode) => inlineNodes ? n[inlineOriginalName] ?? n.name : n.name;
+  /** 正则取首个命中时跳过 skip（本条链的落地节点）；精确点选是明确选择，不跳过，成环由环检测报告。 */
+  const findNode = (ref: ChainNodeRef, where: string, skip?: Set<string>): { set: NS; node: ProxyIR } | undefined => {
     const candidates = chainSources(ref.nodeSet, profile.nodeSets).map(source => sets.get(nodeSetKey(source.ref))!).filter(Boolean);
     if (!candidates.length) { report.error('ref.nodeset-not-in-profile', `前置范围 ${nodeSetKey(ref.nodeSet)} 中没有可用节点集`, where); return undefined; }
     const match = ref.match;
     const regex = 'regex' in match ? compileUserRegex(match.regex) : undefined;
     for (const set of candidates) {
       const node = set.nodes.find(n => {
-        const name = inlineNodes ? n[inlineOriginalName] ?? n.name : n.name;
-        return 'exact' in match ? name === match.exact : regex!.test(name);
+        const name = refName(n);
+        return 'exact' in match ? name === match.exact : regex!.test(name) && !skip?.has(name);
       });
       if (node) return { set, node };
     }
@@ -242,7 +244,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     return output;
   };
 
-  const resolveTarget = (t: ChainTarget, where: string): string | undefined => {
+  const resolveTarget = (t: ChainTarget, where: string, skip?: Set<string>): string | undefined => {
     if (client === 'loon' && t.kind === 'builtin' && t.name === 'PASS') report.error('loon.policy', 'Loon 不支持 PASS 策略', where);
     if (isIniClient(client) && t.kind === 'builtin') { try { iniName(t.name); } catch (error) { report.error('surge.target', String(error), where); } }
     if (t.kind === 'builtin') { resolvedTargetNames.set(where, t.name); return t.name; }
@@ -252,16 +254,16 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       if (n !== undefined) resolvedTargetNames.set(where, n);
       return n;
     }
-    const found = findNode(t.ref, where);
+    const found = findNode(t.ref, where, skip);
     if (found) { resolvedTargetNames.set(where, found.node.name); return nameForNode(found.set, found.node, where); }
     const desc = 'exact' in t.ref.match ? t.ref.match.exact : `/${t.ref.match.regex}/`;
     const fb = t.ref.fallback;
     if (fb && fb !== 'error') {
-      const name = resolveTarget(fb, where);
+      const name = resolveTarget(fb, where, skip);
       report.warn('ref.fallback', `节点 ${desc} 在 ${nodeSetKey(t.ref.nodeSet)} 中已不存在，回退到 ${name}`, where);
       return name;
     }
-    report.error('ref.unresolved', `节点 ${desc} 在 ${nodeSetKey(t.ref.nodeSet)} 中已不存在`, where);
+    report.error('ref.unresolved', skip?.size && 'regex' in t.ref.match ? `前置范围 ${nodeSetKey(t.ref.nodeSet)} 中没有落地以外的可用节点` : `节点 ${desc} 在 ${nodeSetKey(t.ref.nodeSet)} 中已不存在`, where);
     return undefined;
   };
 
@@ -349,11 +351,15 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const groups = eff.groups.map(lowerGroup);
 
   // ---------- 代理链：先确定有效前置，再写入订阅专属节点副本 ----------
-  // 整集覆写保持 Mihomo override 的优先级；所有客户端共用已覆写的内容，
-  // 不依赖客户端的 provider override，也不修改输入快照或原始节点。
+  // 逐节点写入，不使用 Mihomo provider 的 override：整集规则是默认值，命中单节点规则的节点按单节点规则。
+  // 所有客户端共用写入后的内容，不修改输入快照或原始节点。
   const chainOwners = new Map<ProxyIR, string[]>();
   const chainCounts = new Map<string, { landingCount: number; appliedCount: number }>();
   const resolvedChains = new Map<(typeof profile.chains)[number], string | undefined>();
+  const landingNames = (chain: (typeof profile.chains)[number]) => new Set(chainSources(chain.landing.nodeSet, profile.nodeSets).flatMap(source => {
+    const set = sets.get(nodeSetKey(source.ref));
+    return set ? filterNodes(set.nodes, chain.landing).map(refName) : [];
+  }));
   for (const set of sets.values()) {
     const rules = profile.chains.filter(c => chainSources(c.landing.nodeSet, profile.nodeSets).some(source => nodeSetKey(source.ref) === set.key));
     const whole = rules.filter(c => !c.landing.filter && !c.landing.excludeFilter);
@@ -361,22 +367,24 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     if (whole.length > 1 && new Set(whole.map(c => JSON.stringify(c.via))).size > 1) {
       report.error('chain.conflict', `节点集「${set.providerName}」有不同的整集前置，请保留一个`, set.key, whole.map(c => c.id));
     }
-    if (whole.length && partial.length) report.warn('chain.overridden', `节点集「${set.providerName}」的 ${partial.length} 条局部规则被整集前置覆盖；要设置例外，请先调整整集规则`, set.key, partial.map(c => c.id));
     const matches = new Map(partial.map(c => [c, new Set(filterNodes(set.nodes, c.landing))]));
+    const partialFor = (n: ProxyIR) => partial.filter(c => matches.get(c)!.has(n));
+    const wholeCount = set.nodes.filter(n => !partialFor(n).length).length;
     for (const c of rules) {
-      const landingCount = matches.get(c)?.size ?? set.nodes.length;
+      const landingCount = matches.get(c)?.size ?? wholeCount;
       const counts = chainCounts.get(c.id) ?? { landingCount: 0, appliedCount: 0 };
       chainCounts.set(c.id, { ...counts, landingCount: counts.landingCount + landingCount });
     }
     for (const n of set.nodes) {
-      const selected = whole.length ? whole : partial.filter(c => matches.get(c)!.has(n));
+      const hit = partialFor(n);
+      const selected = hit.length ? hit : whole;
       if (selected.length > 1 && new Set(selected.map(c => JSON.stringify(c.via))).size > 1) {
         report.error('chain.conflict', `节点「${n.name}」命中不同的前置规则，请消除重叠`, set.key, selected.map(c => c.id));
       }
       const chain = selected.at(-1);
       if (chain) {
         chainOwners.set(n, selected.map(c => c.id));
-        if (!resolvedChains.has(chain)) resolvedChains.set(chain, resolveTarget(chain.via, `chain:${chain.id}`));
+        if (!resolvedChains.has(chain)) resolvedChains.set(chain, resolveTarget(chain.via, `chain:${chain.id}`, landingNames(chain)));
         const via = resolvedChains.get(chain);
         if (via) { n['dialer-proxy'] = via; chainCounts.get(chain.id)!.appliedCount++; }
       } else if (n.upstreamDialer) {
