@@ -302,11 +302,6 @@ body {
   background: var(--card);
 }
 
-/* 表格加载、空态和数据使用同一列宽；滚动条出现时也保留内容宽度。 */
-.list-table-scroll {
-  scrollbar-gutter: stable;
-}
-
 .list-table {
   width: 100%;
   table-layout: fixed;
