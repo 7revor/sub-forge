@@ -24,7 +24,8 @@ describe('主配置按需生成规则正文', () => {
     expect(renderMihomo(input(snapshots, true)).yaml).toBe(renderMihomo(input(snapshots, false)).yaml);
   });
 
-  it('来源从未拉取成功时仍报错', () => {
-    expect(renderMihomo(input({}, true)).report.items).toContainEqual(expect.objectContaining({ level: 'error', code: 'ruleset.no-snapshot' }));
+  it('延后时不需要快照，完整生成才报错', () => {
+    expect(renderMihomo(input({}, true)).report.hasErrors).toBe(false);
+    expect(renderMihomo(input({}, false)).report.items).toContainEqual(expect.objectContaining({ level: 'error', code: 'ruleset.no-snapshot' }));
   });
 });

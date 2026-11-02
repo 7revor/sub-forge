@@ -427,6 +427,14 @@ export class Store {
     return row ? this.toSnapshot(row) : undefined;
   }
 
+  /** 只判断新旧和状态时使用：不读取、不解码正文。 */
+  latestSnapshotMeta(ownerKind: SnapshotOwner, ownerId: string, url: string, okOnly = true): Omit<SnapshotRow, 'body'> | undefined {
+    ownerId = this.snapshotOwner(ownerKind, ownerId, url);
+    const row = this.db.prepare(`SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
+      .get(ownerKind, ownerId, this.cipher.hmac(url)) as RawSnapshot | undefined;
+    return row ? this.toSnapshot(row) : undefined;
+  }
+
   /** 快照历史（不含正文），供 UI 展示 */
   snapshotHistory(ownerKind: SnapshotOwner, ownerId: string): Omit<SnapshotRow, 'body'>[] {
     const rows = this.db.prepare('SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND (owner_id = ? OR owner_id IN (SELECT resource FROM resource_bindings WHERE kind = ? AND id = ?)) ORDER BY fetched_at DESC, id DESC')

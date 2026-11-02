@@ -20,25 +20,24 @@ function setup() {
 }
 const ruleUrl = (config: any): string => Object.values<{ url: string }>(config['rule-providers'])[0]!.url;
 
-it('多来源公共规则在首个拉取期间删除后，不再启动后续来源或重建绑定', async () => {
+it('多来源公共规则在拉取期间删除后，晚到的响应不重建绑定和快照', async () => {
   const h = setup(), url = ruleUrl(await h.main()), entered = gate(), held = gate();
   h.fetcher.mockClear().mockImplementation(async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,late.test' }; });
   h.advance(86400001); const pending = h.app.request(url); await entered.promise;
   h.store.delete('profile', 'p'); h.store.delete('ruleset', 'r'); held.release();
   expect((await pending).status).toBe(404);
-  expect(h.fetcher).toHaveBeenCalledTimes(1);
   expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
   expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });
 
-it('节点依赖串行拉取期间删除订阅及来源，不拉取已删除的后续来源', async () => {
+it('节点依赖并行拉取期间删除订阅及来源，晚到的响应不重建绑定和快照', async () => {
   const h = setup(), entered = gate(), held = gate();
   for (const id of ['a', 'b']) h.store.put('source', { id, name: id, url: `https://nodes.test/${id}`, pipeline: [] }, h.user.id);
   h.store.put('profile', { ...h.store.get('profile', 'p')!, nodeSets: ['a', 'b'].map(id => ({ ref: { type: 'source', id }, output: 'provider' })) }, h.user.id);
   h.fetcher.mockImplementation(async () => { entered.release(); await held.promise; return { status: 200, body: 'trojan://fixture@node.test:443#节点' }; });
   const pending = h.app.request(`/subs/profile?token=${h.token}&id=p`); await entered.promise;
   h.store.delete('profile', 'p'); for (const id of ['a', 'b']) h.store.delete('source', id); held.release();
-  expect((await pending).status).toBe(404); expect(h.fetcher).toHaveBeenCalledTimes(1);
+  expect((await pending).status).toBe(404);
   expect(h.store.db.prepare("SELECT * FROM resource_bindings WHERE kind='source'").all()).toEqual([]);
   expect(h.store.db.prepare("SELECT * FROM snapshots WHERE owner_kind='source'").all()).toEqual([]);
 });

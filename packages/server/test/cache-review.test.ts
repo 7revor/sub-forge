@@ -41,15 +41,12 @@ it('渲染校验期间更新配置与快照，旧任务不能覆盖新结果', a
   const rendered = await old;
   expect(rendered.ok && Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('new.test');
 });
-it('渲染等待中删除订阅，不得返回成功配置', async () => {
-  const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,a.test' }; } });
-  h.store.put('profile', profile()); const pending = h.renderer.render('p', { client: 'mihomo' });
+it('专属规则渲染等待中删除订阅，不得返回成功配置', async () => {
+  const entered = gate(), held = gate(); let block = false; const h = setup({ fetcher: async () => { if (block) { entered.release(); await held.promise; } return { status: 200, body: 'DOMAIN,a.test' }; } });
+  h.store.put('profile', profile()); const first = await h.renderer.render('p', { client: 'mihomo' }); if (!first.ok) throw new Error('准备失败');
+  const key = new URL(Object.values<{ url: string }>(parse(first.render.yaml)['rule-providers'])[0]!.url).searchParams.get('key')!;
+  block = true; const pending = h.renderer.render('p', { client: 'mihomo' }, key);
   await entered.promise; h.store.delete('profile', 'p'); held.release(); expect((await pending).ok).toBe(false);
-});
-it('等待刷新时撤销 token，完成后不得下发内容', async () => {
-  const entered = gate(), held = gate(); const h = setup({ fetcher: async () => { entered.release(); await held.promise; return { status: 200, body: 'DOMAIN,secret.test' }; } });
-  h.store.put('profile', profile()); issueProfileToken(h.store, { token: 'old-token', profileId: 'p' });
-  const pending = h.app.request('/subs/profile?token=old-token&id=p'); await entered.promise; h.store.deleteToken('old-token'); held.release(); expect((await pending).status).toBe(404);
 });
 it('旧快照首次绑定不得被不同 UA 的草稿冒用', async () => {
   let calls = 0; const h = setup({ fetcher: async () => { calls++; return { status: 200, body: 'DOMAIN,new.test' }; } });
@@ -159,13 +156,4 @@ it('等待刷新时撤销 token，专属规则入口也拒绝返回正文',async
   const key=new URL(Object.values<{url:string}>(parse(result.render.yaml)['rule-providers'])[0]!.url).searchParams.get('key')!;block=true;h.advance(86400001);
   const url=`/subs/ruleset?profile=p&token=token&key=${key}`;
   const pending=h.app.request(url);await entered.promise;h.store.deleteToken('token');held.release();expect((await pending).status).toBe(404);
-});
-it('校验期间新发生的拉取失败不会丢失告警，仍使用最后成功内容', async () => {
-  let fail=false;const entered=gate(),held=gate();let verified=0;
-  const h=setup({fetcher:async()=>{if(fail)throw new Error('最新失败');return {status:200,body:'DOMAIN,retained.test'};}});h.store.put('profile',profile());
-  const renderer=new RenderService(h.store,h.snapshots,{publicUrl:'https://sub.test',verify:async()=>{if(++verified===1){entered.release();await held.promise;}return {ok:true,output:''};}});
-  const pending=renderer.render('p',{client:'mihomo'});await entered.promise;fail=true;
-  await h.snapshots.refresh('ruleset',ruleBinding(profile().overlay.extraRules[0]!.rule.matcher.id, 'profile:p').id,'https://rules.test/a',{scope:'profile:p'});held.release();
-  const result=await pending;expect(result.ok).toBe(true);expect(result.report).toContainEqual(expect.objectContaining({code:'ruleset.fetch-failed',level:'warn'}));
-  expect(result.ok&&Object.values((await ruleBodies(h.renderer, 'p'))).join('')).toContain('retained.test');
 });

@@ -58,7 +58,7 @@ describe('规则预览、实际下发与来源异常恢复', () => {
     expect(failed.json.status).toMatchObject({ ok: false, error: '瞬时上游错误' });
     expect(failed.json.content).toBeUndefined();
     expect(calls).toBe(1);
-    expect((await h.app.request('/subs/profile?token=preview-test&id=p')).status).toBe(503);
+    expect((await h.app.request('/subs/profile?token=preview-test&id=p')).status).toBe(200);
     expect((await h.read()).json.status.ok).toBe(false);
     expect(calls).toBe(1);
     const recovered = await h.read(true);

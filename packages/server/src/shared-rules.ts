@@ -41,10 +41,12 @@ export class SharedRuleService {
     };
     const rules: RuleSetInputs = { rulesets: { [rs.id]: rs }, snapshots: {} };
     const loaded = [];
-    for (const src of rs.sources.filter(s => s.enabled !== false && s.kind === 'remote')) {
-      const result = await this.snapshots.get('ruleset', rs.id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' });
-      if (cancelled() || !definition()) return undefined;
-      if (stableStringify(definition()) !== stableStringify(rs)) return retry();
+    const remote = rs.sources.filter(s => s.enabled !== false && s.kind === 'remote');
+    const results = await Promise.all(remote.map(src => this.snapshots.get('ruleset', rs.id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: 'public-rules' })));
+    if (cancelled() || !definition()) return undefined;
+    if (stableStringify(definition()) !== stableStringify(rs)) return retry();
+    for (const [index, src] of remote.entries()) {
+      const result = results[index]!;
       if (!result.snapshot?.body) throw new Error(`规则来源没有可用内容：${result.error ?? src.name ?? src.id}`);
       rules.snapshots[sourceKey(rs.id, src.id)] = result.snapshot.body;
       loaded.push(result);

@@ -48,7 +48,7 @@ export type RenderInput = {
   urls: UrlBuilder;
   /** 已按内核和客户端选取的原生追加文本，仅生成时合并 */
   base?: string;
-  /** 主配置只写规则地址时返回 true：跳过正文解析和转换，由规则文件请求按需生成。 */
+  /** 主配置只写规则地址时返回 true：不需要快照，也不解析和转换正文，由规则文件请求按需生成。 */
   deferRuleBody?(reference: HostedRuleReference): boolean;
 };
 
@@ -478,21 +478,21 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     if (delivery.mode === 'unsupported') {
       report.error('ruleset.conversion-unavailable', delivery.reason, where); continue;
     }
+    const deferred = input.deferRuleBody?.(reference) ?? false;
     if (delivery.format === 'mrs') {
       const src = enabled[0]!;
       const body = input.rules.snapshots[sourceKey(rs.id,src.id)];
-      if (enabled.length !== 1 || src.format !== 'mrs' || !['domain','ipcidr'].includes(src.behavior ?? '') || rs.overrides?.length || src.overrides?.length || r.options?.src || !body?.startsWith('#subforge-binary-mrs\n')) {
+      if (enabled.length !== 1 || src.format !== 'mrs' || !['domain','ipcidr'].includes(src.behavior ?? '') || rs.overrides?.length || src.overrides?.length || r.options?.src || (!deferred && !body?.startsWith('#subforge-binary-mrs\n'))) {
         report.error('ruleset.binary-unavailable','MRS 需要单一有效来源且不能合并或改写；SRS 暂不支持托管',where);
         continue;
       }
       const key = `${base}_binary`, file = `${key}.mrs`;
-      rulesets[file] = { behavior: src.behavior as Behavior, text: body, providerName };
+      if (!deferred) rulesets[file] = { behavior: src.behavior as Behavior, text: body!, providerName };
       ruleProviders[providerName] = { type:'http',behavior:src.behavior,format:'mrs',url:input.urls.ruleset(file, reference),interval:input.resourceIntervalSec ?? RULESET_INTERVAL,...(!isIniClient(client) ? {proxy:FETCH_VIA} : {}) };
       ruleLines.push(`RULE-SET,${providerName},${target}`);
       continue;
     }
     // 只解析一次：校验、输出方式判断和正文转换共用容错文档。
-    const deferred = input.deferRuleBody?.(reference) ?? false;
     const documents = new Map<string, RuleDocument>();
     for (const src of rs.sources.filter(s => s.enabled !== false)) {
       const label = `规则集「${rs.name}」的来源「${sourceLabel(src)}」`;
@@ -501,12 +501,12 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
         report.error('ruleset.conversion-requires-managed', `${label}的 YAML 规则只能转换为 LIST 托管，不能标记为二进制`, where);
         continue;
       }
+      if (deferred) continue;
       const content = src.kind === 'local' ? src.content ?? '' : input.rules.snapshots[sourceKey(rs.id, src.id)];
       if (content === undefined && !binary) {
         report.error('ruleset.no-snapshot', `${label}没有可用快照`, where);
         continue;
       }
-      if (deferred) continue;
       const document = prepareRuleDocument(content ?? '', src);
       documents.set(src.id, document);
       // 保留远程错误页面保护，不能把失败响应当作空分流配置下发。
