@@ -18,6 +18,9 @@ export type SharedRuleRecord = {
 };
 const hash = (value: unknown) => createHash('sha256').update(stableStringify(value)).digest('hex');
 const canonical = (ref: RuleResourceReference): RuleResourceReference => ({ matcher: ref.matcher, ...(ref.options?.src ? { options: { src: true } } : {}) });
+// 转换语义变化时递增，使旧正文按需重建；不参与资源 key，保持已发布链接有效。
+// v3：Stash 公共生成保留 URL-REGEX，不再复用旧版省略该规则的正文。
+const SHARED_RULE_RENDER_VERSION = 3;
 
 export class SharedRuleService {
   private readonly inflight = new Map<string, Promise<string | undefined>>();
@@ -31,7 +34,7 @@ export class SharedRuleService {
     return hash({ identity, options: canonical(reference).options, target: { client: target.client }, delivery: delivery?.mode === 'managed' ? delivery : undefined });
   }
   private inputHash(rs: RuleSetDoc, rules: RuleSetInputs, reference: RuleResourceReference, target: Target): string {
-    return hash({ version: 2, rs, target: { client: target.client }, options: canonical(reference).options, bodies: rs.sources.filter(s => s.enabled !== false).map(s => s.kind === 'local' ? s.content : rules.snapshots[sourceKey(rs.id, s.id)]) });
+    return hash({ version: SHARED_RULE_RENDER_VERSION, rs, target: { client: target.client }, options: canonical(reference).options, bodies: rs.sources.filter(s => s.enabled !== false).map(s => s.kind === 'local' ? s.content : rules.snapshots[sourceKey(rs.id, s.id)]) });
   }
   register(reference: RuleResourceReference, target: Target, rs: RuleSetDoc, rules: RuleSetInputs, body: string): void {
     if (reference.matcher.remote) throw new Error('订阅专属规则不能注册为公共资源');
