@@ -4,10 +4,11 @@
 .native-base-target { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 0 8px; border-radius: 6px; font-size: var(--text-sm); text-align: left; cursor: pointer; }
 .native-base-target:hover { background: var(--accent); }
 .native-base-child { padding-left: 18px; color: var(--muted-foreground); }
-.native-base-target-active { background: color-mix(in oklab, var(--primary) 10%, transparent); color: var(--primary); font-weight: 500; }
+.native-base-target-active { background: color-mix(in oklab, var(--primary) 10%, transparent); color: var(--primary); }
 .native-base-content { display: flex; flex-direction: column; min-width: 0; overflow: auto; padding: 20px; }
 .native-base-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 12px; }
 .native-base-source.yaml-textarea { flex: 1; border: 0; border-radius: 0; background: var(--card); }
+.native-base-source.yaml-textarea:focus-within { box-shadow: none; }
 .native-base-source > textarea { min-height: 390px; }
 @media (max-width: 639px) {
   .native-base-workspace { grid-template-columns: 140px minmax(0, 1fr); }
