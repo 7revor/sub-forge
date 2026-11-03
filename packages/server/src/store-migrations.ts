@@ -210,6 +210,11 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       }
       // v38：WebDAV 备份退役，配置里的账号、密码和备份口令不再保留。
       this.db.exec("DELETE FROM system_settings WHERE name IN ('backup', 'backupState')");
+      // v39：管理员只能有一个。保留最早创建的可用管理员，其余降为普通用户并保留原有的脚本编写能力。
+      const admins = this.db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY disabled, created_at, rowid").all() as { id: string }[];
+      for (const { id } of admins.slice(1)) this.db.prepare("UPDATE users SET role = 'user', script_allowed = 1 WHERE id = ?").run(id);
+      if (admins[0]) this.db.prepare('UPDATE users SET disabled = 0 WHERE id = ?').run(admins[0].id);
+      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_single_admin ON users (role) WHERE role = 'admin'");
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();

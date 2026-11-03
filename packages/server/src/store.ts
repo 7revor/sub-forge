@@ -467,9 +467,10 @@ export class Store {
     return (this.db.prepare('SELECT COUNT(*) n FROM users').get() as { n: number }).n;
   }
 
-  updateUser(id: string, patch: { role?: Role; disabled?: boolean; scriptAllowed?: boolean; passwordHash?: string }): void {
+  updateUser(id: string, patch: { username?: string; role?: Role; disabled?: boolean; scriptAllowed?: boolean; passwordHash?: string }): void {
     const sets: string[] = [];
     const args: unknown[] = [];
+    if (patch.username !== undefined) { sets.push('username = ?'); args.push(patch.username); }
     if (patch.role !== undefined) { sets.push('role = ?'); args.push(patch.role); }
     if (patch.disabled !== undefined) { sets.push('disabled = ?'); args.push(patch.disabled ? 1 : 0); }
     if (patch.scriptAllowed !== undefined) { sets.push('script_allowed = ?'); args.push(patch.scriptAllowed ? 1 : 0); }
@@ -477,6 +478,24 @@ export class Store {
     if (!sets.length) return;
     this.configurationRevision++;
     this.db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...args, id);
+  }
+
+  /** 删除用户及其名下全部文档、令牌、会话、访问日志和分享。别人引用这些文档的配置按「取消分享」的语义失效，不自动改写。 */
+  deleteUser(id: string): void {
+    this.configurationRevision++;
+    this.db.transaction(() => {
+      const docs = this.db.prepare('SELECT kind, id FROM docs WHERE owner = ?').all(id) as { kind: DocKind; id: string }[];
+      for (const doc of docs) {
+        this.delete(doc.kind, doc.id);
+        this.db.prepare('DELETE FROM native_migration_backups WHERE kind = ? AND id = ?').run(doc.kind, doc.id);
+      }
+      this.db.prepare('DELETE FROM source_shares WHERE user_id = ?').run(id);
+      this.db.prepare('DELETE FROM refresh_jobs WHERE owner = ?').run(id);
+      this.db.prepare('DELETE FROM access_log WHERE user_id = ?').run(id);
+      this.db.prepare('DELETE FROM user_tokens WHERE user_id = ?').run(id);
+      this.deleteUserSessions(id);
+      this.db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    })();
   }
 
   createSession(userId: string, ttlMs: number): string {
