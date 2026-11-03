@@ -13,7 +13,7 @@ docker login
 ./scripts/docker-push your-name/sub-forge
 ```
 
-脚本默认构建 `linux/amd64` 和 `linux/arm64`，推送 `latest` 和当前提交的短哈希两个标签，选项见[脚本说明](../scripts/README.md#发布-docker-镜像)。
+脚本默认构建 `linux/amd64` 和 `linux/arm64`，推送时间戳和当前提交的短哈希两个标签，不再推送 `latest`。发布完成后脚本会输出镜像标签和可写入 `.env` 的 `SUBFORGE_IMAGE`，选项见[脚本说明](../scripts/README.md#发布-docker-镜像)。
 
 ## 启动（服务器）
 
@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/7revor/sub-forge/main/docker/compos
 curl -fsSL https://raw.githubusercontent.com/7revor/sub-forge/main/docker/.env.example -o .env
 ```
 
-编辑 `.env`，填写镜像名和管理员密码（至少 8 位），然后启动：
+编辑 `.env`，填写发布时输出的镜像和管理员密码（至少 8 位），然后启动：
 
 ```bash
 docker compose up -d
@@ -38,14 +38,14 @@ docker compose up -d
 ```bash
 docker run -d --name sub-forge --restart unless-stopped -p 8080:8080 -v "$PWD/data":/data \
   -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD='请改成强密码' \
-  your-name/sub-forge:latest
+  your-name/sub-forge:20261103130512
 ```
 
 ## 配置项
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `SUBFORGE_IMAGE` | 无，必填 | 镜像名。写短哈希标签可以固定版本 |
+| `SUBFORGE_IMAGE` | 无，必填 | 带标签的镜像，如 `your-name/sub-forge:20261103130512` |
 | `SUBFORGE_ADMIN_USERNAME` / `SUBFORGE_ADMIN_PASSWORD` | 空 | 没有用户时用来创建管理员 |
 | `SUBFORGE_PORT` | `8080` | 对外开放的端口 |
 | `SUBFORGE_DATA_DIR` | `./data` | 数据库和密钥所在目录，不存在时自动创建，容器启动时自动授权 |
@@ -66,16 +66,15 @@ docker run -d --name sub-forge --restart unless-stopped -p 8080:8080 -v "$PWD/da
 
 ## 更新
 
-先发布新镜像，在系统页点一次立即备份，再到服务器的 `~/sub-forge` 目录执行：
+先发布新镜像，在系统页点一次立即备份，再把服务器 `~/sub-forge/.env` 的 `SUBFORGE_IMAGE` 改成新标签，然后执行：
 
 ```bash
-docker compose pull
 docker compose up -d
 ```
 
 - **数据：** 数据目录和 `.env` 在容器之外，更新时保留。
 - **数据库结构：** 新版本启动时自动迁移。
-- **回退：** 把 `SUBFORGE_IMAGE` 改成旧的短哈希标签。这不会回退数据库结构，需要用更新前的备份恢复数据，见[恢复流程](22-database-backup.md#恢复流程)。
+- **回退：** 把 `SUBFORGE_IMAGE` 改成旧标签。这不会回退数据库结构，需要用更新前的备份恢复数据，见[恢复流程](22-database-backup.md#恢复流程)。
 
 ## 从旧部署迁移
 

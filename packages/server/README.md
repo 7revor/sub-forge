@@ -26,7 +26,7 @@ pnpm --filter @sub-forge/server start
 ```bash
 docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
   -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD='请改成强密码' \
-  your-name/sub-forge:latest
+  your-name/sub-forge:20261103130512
 ```
 
 - 启动时授权 `/data` 后以非 root 用户运行；数据库与密钥文件 `secret.key`（0600）放在 `/data`，备份时两者一起备份，丢了密钥就无法解密数据。

@@ -54,9 +54,11 @@ SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo ./scripts/stop
 `docker-push` 构建生产镜像并推送到指定仓库，部署时由 Compose 直接拉取，见 [部署指引](../docs/24-first-deployment.md)。先执行 `docker login`：
 
 ```bash
-./scripts/docker-push your-name/sub-forge            # 推送 latest 和当前提交的短哈希
+./scripts/docker-push your-name/sub-forge            # 推送时间戳和当前提交的短哈希
 ./scripts/docker-push your-name/sub-forge v0.2.0     # 推送 v0.2.0 和当前提交的短哈希
 ```
+
+不再推送 `latest`。默认标签是本机时间的时间戳，如 `20261103130512`；发布完成后脚本会输出镜像标签和可写入 `.env` 的 `SUBFORGE_IMAGE`。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |

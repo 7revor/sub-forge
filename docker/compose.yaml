@@ -1,11 +1,11 @@
 # 一个容器，开放一个端口。把本文件和 .env 放在同一目录后执行：
 #   docker compose up -d
-# 更新：
-#   docker compose pull && docker compose up -d
+# 更新：把 .env 的 SUBFORGE_IMAGE 改成新标签后执行
+#   docker compose up -d
 name: sub-forge
 services:
   sub-forge:
-    image: ${SUBFORGE_IMAGE:?请在 .env 中设置 Docker Hub 镜像，例如 your-name/sub-forge:latest}
+    image: ${SUBFORGE_IMAGE:?请在 .env 中设置 Docker Hub 镜像，例如 your-name/sub-forge:20261103130512}
     restart: unless-stopped
     environment:
       TZ: ${TZ:-UTC}

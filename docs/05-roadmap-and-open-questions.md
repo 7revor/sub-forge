@@ -381,3 +381,5 @@ Docker 验证中发现并修复的问题：
 2026-11-03 Cloudflare Tunnel 部署：已完成配置和文档。Tunnel 由用户单独运行，Sub Forge 经 `SUBFORGE_BIND` 绑定内网 IP 供其访问；同日移除了内置 `cloudflared` 的 `docker/compose.tunnel.yaml`。相关文档已于同日随代理支持移除。长请求超时和后端出站暴露 IP 的限制尚未处理。
 
 2026-11-03 部署简化：已完成。一个容器开放一个端口即可访问，删除 Nginx 示例、Tunnel 文档和反向代理支持（`PUBLIC_URL`、`ALLOWED_ORIGINS`、`SUBFORGE_TRUSTED_PROXIES`、`SUBFORGE_BIND`、Secure Cookie、转发头解析）。订阅链接在输出时按当前请求来源生成；访问日志只记录连接来源，数据库升级到 v37。容器启动时自动授权数据目录。
+
+2026-11-03 镜像标签：已完成。`scripts/docker-push` 默认标签由 `latest` 改为时间戳，发布完成后输出镜像标签和 `SUBFORGE_IMAGE`；更新时修改 `.env` 中的标签。
