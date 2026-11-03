@@ -402,3 +402,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 节点订阅分享：`Users` 改为「分享的订阅源」并增加修改、取消操作，`V2Source` 页头增加「分享」，新增画板 `V2SourceShare`。对应 `pages/Users.tsx`、`pages/Sources.tsx`、`components/ShareSourceModal.tsx`；后端 `api/shares.ts`，无待实现项。示例种子不含分享关系，无需修改。
 
 2026-11-03 部署简化：移除代理配置和访问日志的 `peerIp`、`ipSource`。页面控件和文案没有变化，已检查画布中与部署、代理相关的文案，无需修改画板。无后端待实现项。
+
+2026-11-03 更多菜单项去掉残留阴影：`ActionMenu` 内的按钮和链接原来只清除了边框，`outline` 变体的 `shadow-xs` 仍然显示，看起来像每项带边框；现在同时清除阴影和链接背景。画板 `V2Lists`、`V2Components`、`V2ProfileRouting` 的菜单项本来就没有边框和阴影，无需修改。仅前端样式，领域模型与服务端无变化，无后端待实现项。
