@@ -291,7 +291,7 @@
 | SYS-05 | 订阅接口限流与异常 UA 拦截 | P1 |
 | SYS-06 | 管理员共享：把自己的 Source/Collection 共享给指定用户，用户只能引用、不可见原始 URL | P1 |
 | SYS-07 | 备份/恢复：数据库定时加密备份到 WebDAV，并可从备份恢复（2026-11-02 修订，替代“导出全部配置为 JSON”，见 [22](22-database-backup.md)） | P1 |
-| SYS-08 | 单容器部署（Docker Compose），SQLite 存储，支持 Nginx 反向代理（见 [20](20-deployment-client-ip.md)） | P0 |
+| SYS-08 | 单容器部署（Docker Compose 拉取 Docker Hub 镜像，服务器不需要源码），SQLite 存储，数据目录可挂载到宿主机，支持 Nginx 反向代理（见 [24](24-first-deployment.md)、[20](20-deployment-client-ip.md)） | P0 |
 
 ---
 

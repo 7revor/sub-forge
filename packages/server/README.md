@@ -21,14 +21,13 @@ pnpm --filter @sub-forge/server start
 
 ### Docker（生产，SYS-08）
 
-推荐用 `docker/compose.yaml` 和 `docker/nginx.conf.example`，步骤见 [初次部署指引](../../docs/24-first-deployment.md)，其他拓扑见 [部署文档](../../docs/20-deployment-client-ip.md)，更新命令见 [更新](../../docs/24-first-deployment.md#更新)。下面是直接运行的方式。
+镜像由 `./scripts/docker-push <repo> [tag]` 发布到 Docker Hub，服务器不需要源码。推荐用 `docker/compose.yaml` 和 `docker/nginx.conf.example`，数据默认挂载到 Compose 文件旁的 `./data`（`SUBFORGE_DATA_DIR`），步骤见 [初次部署指引](../../docs/24-first-deployment.md)，其他拓扑见 [部署文档](../../docs/20-deployment-client-ip.md)，更新命令见 [更新](../../docs/24-first-deployment.md#更新)。下面是直接运行的方式。
 
 ```bash
-docker build -f docker/Dockerfile -t sub-forge .
 docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
   -e PUBLIC_URL=https://sub.example.com -e ALLOWED_ORIGINS=https://sub.example.com \
   -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD='请改成强密码' \
-  sub-forge
+  your-name/sub-forge:latest
 ```
 
 - 以非 root 用户运行；数据库与密钥文件 `secret.key`（0600）放在 `/data`，备份时两者一起备份，丢了密钥就无法解密数据。

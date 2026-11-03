@@ -49,6 +49,21 @@ SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo SUBFORGE_LOCAL_PORT=18080 SUBFORG
 SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo ./scripts/stop
 ```
 
+## 发布 Docker 镜像
+
+`docker-push` 构建生产镜像并推送到指定仓库，部署时由 Compose 直接拉取，见 [初次部署指引](../docs/24-first-deployment.md)。先执行 `docker login`：
+
+```bash
+./scripts/docker-push your-name/sub-forge            # 推送 latest 和当前提交的短哈希
+./scripts/docker-push your-name/sub-forge v0.2.0     # 推送 v0.2.0 和当前提交的短哈希
+```
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `SUBFORGE_PLATFORMS` | `linux/amd64,linux/arm64` | 构建平台，逗号分隔 |
+| `SUBFORGE_BUILDER` | `sub-forge-builder` | buildx 构建器名称，不存在时自动创建 |
+| `SUBFORGE_ALLOW_DIRTY` | 空 | 设为 `1` 时允许工作树有未提交改动，哈希标签带 `-dirty` 后缀；默认拒绝发布 |
+
 ## 验证脚本
 
 ```bash

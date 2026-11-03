@@ -6,17 +6,20 @@
 
 镜像只含应用（单容器，前端、管理接口、订阅接口同源），对外由 Nginx 负责 HTTPS。
 
-```bash
-cp docker/.env.example docker/.env
-```
-
-填写 `docker/.env` 的 `PUBLIC_URL`、`ALLOWED_ORIGINS`、管理员账号密码后启动：
+开发机用 `./scripts/docker-push your-name/sub-forge` 把镜像发布到 Docker Hub。服务器不需要源码，把 [docker/compose.yaml](../docker/compose.yaml) 和 [docker/.env.example](../docker/.env.example) 下载到同一目录，后者改名为 `.env`，并创建数据目录：
 
 ```bash
-docker compose -f docker/compose.yaml up -d --build
+mkdir -p data
+sudo chown 1000:1000 data
 ```
 
-之后更新时，先备份，再执行 `git pull` 和同一条 Compose 命令，详见[更新](24-first-deployment.md#更新)。
+填写 `.env` 的 `SUBFORGE_IMAGE`、`PUBLIC_URL`、`ALLOWED_ORIGINS`、管理员账号密码后启动：
+
+```bash
+docker compose up -d
+```
+
+之后更新时，先发布新镜像并备份，再执行 `docker compose pull` 和 `docker compose up -d`，详见[更新](24-first-deployment.md#更新)。
 
 不需要新增 Nginx 容器，使用服务器上现有的 Nginx 即可，Compose 只启动应用一个容器，并只绑定 `127.0.0.1:8080`（端口由 `SUBFORGE_PORT` 决定）：
 
@@ -29,7 +32,7 @@ docker compose -f docker/compose.yaml up -d --build
 - `/api/events`（SSE）关闭缓冲、放宽读取超时；否则页面收不到实时刷新。
 - 把一般请求的读取超时放宽到 600 秒，覆盖手动备份和恢复。
 
-`ALLOWED_ORIGINS` 必须配置为浏览器实际访问的来源（协议 + 域名 + 非默认端口，不带路径），通常与 `PUBLIC_URL` 相同。TLS 在 Nginx 终止，应用只看到 http，不会判为同源，也不会自动信任 `PUBLIC_URL`；未配置或填错时，登录和所有写操作都会返回“跨站请求被拒绝”，服务启动时会告警，Compose 则直接拒绝启动。必须部署在域名根路径，不支持子路径。数据都在 `sub-forge-data` 卷中，定时备份见 [22](22-database-backup.md)。恢复备份在进程内完成，不需要重启容器。
+`ALLOWED_ORIGINS` 必须配置为浏览器实际访问的来源（协议 + 域名 + 非默认端口，不带路径），通常与 `PUBLIC_URL` 相同。TLS 在 Nginx 终止，应用只看到 http，不会判为同源，也不会自动信任 `PUBLIC_URL`；未配置或填错时，登录和所有写操作都会返回“跨站请求被拒绝”，服务启动时会告警，Compose 则直接拒绝启动。必须部署在域名根路径，不支持子路径。数据都在 `SUBFORGE_DATA_DIR` 指向的宿主机目录中（默认 `./data`，须授权给 UID 1000），定时备份见 [22](22-database-backup.md)。恢复备份在进程内完成，不需要重启容器。
 
 ## 日志含义与配置
 
@@ -60,7 +63,7 @@ IPv4、IPv6 均可记录，IPv4 映射的 IPv6 规范化成 IPv4。SQLite v26 �
 ```yaml
 services:
   sub-forge:
-    image: sub-forge
+    image: your-name/sub-forge:latest
     environment:
       PUBLIC_URL: https://sub.example.com
       ALLOWED_ORIGINS: https://sub.example.com
@@ -108,7 +111,7 @@ docker run -d --name sub-forge -p 127.0.0.1:8080:8080 \
   -e PUBLIC_URL=https://sub.example.com \
   -e ALLOWED_ORIGINS=https://sub.example.com \
   -e SUBFORGE_TRUSTED_PROXIES='<应用观察到的宿主机代理 IP>' \
-  sub-forge
+  your-name/sub-forge:latest
 ```
 
 上面的占位 IP 必须替换，第一次可以省略信任变量，发起测试下载后从日志的“连接来源”读取 `peerIp`。Nginx 使用 `proxy_pass http://127.0.0.1:8080`，其他头部设置同上。确认对端属于该入口后，再把它配置为精确可信 IP 并重建应用容器；不要直接假定应用看到的一定是 `127.0.0.1` 或 `172.17.0.1`。
@@ -139,4 +142,4 @@ Docker bridge、端口映射、IPv6 到 IPv4 的用户态代理、Docker Desktop
 
 ## 缓存周期的时区（2026-11-03）
 
-全局缓存周期按服务器本地时间对齐，24 小时周期落在每天 0 点。容器默认时区是 UTC，需要按本地 0 点切换时在 `docker/.env` 设置 `TZ`，例如 `TZ=Asia/Shanghai`，Compose 会传给容器。规则快照在周期切换时同时失效，下一次请求重新读取。
+全局缓存周期按服务器本地时间对齐，24 小时周期落在每天 0 点。容器默认时区是 UTC，需要按本地 0 点切换时在 `.env` 设置 `TZ`，例如 `TZ=Asia/Shanghai`，Compose 会传给容器。规则快照在周期切换时同时失效，下一次请求重新读取。

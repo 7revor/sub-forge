@@ -372,3 +372,5 @@ Docker 验证中发现并修复的问题：
 2026-11-03 已完成：上游缓存分层重构，规则快照按全局周期到期清理、节点快照永不清理，删除 `resource_bindings`，`/subs/ruleset` 不再渲染配置，仓库索引改为后台定时任务。详见 [23](23-upstream-cache-refactor-plan.md)。
 
 2026-11-03 移除本地节点连通性测试：已完成。前端、接口和测试全部删除，`MIHOMO_BIN` 只保留 `mihomo -t` 校验用途。
+
+2026-11-03 部署改为镜像发布：已完成。`scripts/docker-push` 发布到指定仓库，`docker/compose.yaml` 不再从源码构建，改为拉取 `SUBFORGE_IMAGE`；数据默认绑定挂载到 `./data`（`SUBFORGE_DATA_DIR`），已有命名卷的迁移步骤见 [24](24-first-deployment.md#从源码构建部署迁移)。

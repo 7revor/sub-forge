@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euo pipefail
+export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
+REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+
+usage() {
+  cat >&2 <<'EOF'
+用法：./scripts/docker-push <repo> [tag]
+  repo  镜像仓库，不带标签，例如 your-name/sub-forge
+  tag   附加标签，默认 latest；同时总是推送当前提交的短哈希标签
+
+环境变量：
+  SUBFORGE_PLATFORMS    构建平台，默认 linux/amd64,linux/arm64
+  SUBFORGE_BUILDER      buildx 构建器名称，默认 sub-forge-builder，不存在时自动创建
+  SUBFORGE_ALLOW_DIRTY  设为 1 时允许工作树有未提交改动，哈希标签带 -dirty 后缀
+EOF
+}
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  usage
+  exit 1
+fi
+repo="$1"
+tag="${2:-latest}"
+if [[ "${repo##*/}" == *:* ]]; then
+  echo "repo 不能带标签：$repo。标签通过第二个参数指定。" >&2
+  exit 1
+fi
+
+cd "$REPO_ROOT"
+revision="$(git rev-parse --short=12 HEAD)"
+if [ -n "$(git status --porcelain)" ]; then
+  if [ "${SUBFORGE_ALLOW_DIRTY:-}" != "1" ]; then
+    echo "工作树有未提交改动，镜像内容会与提交不一致。请先提交，或设置 SUBFORGE_ALLOW_DIRTY=1。" >&2
+    exit 1
+  fi
+  revision="$revision-dirty"
+fi
+
+platforms="${SUBFORGE_PLATFORMS:-linux/amd64,linux/arm64}"
+builder="${SUBFORGE_BUILDER:-sub-forge-builder}"
+# 多平台构建需要 docker-container 驱动，默认构建器不一定支持
+if ! docker buildx inspect "$builder" >/dev/null 2>&1; then
+  docker buildx create --name "$builder" --driver docker-container >/dev/null
+fi
+
+docker buildx build \
+  --builder "$builder" \
+  --platform "$platforms" \
+  --file docker/Dockerfile \
+  --tag "$repo:$tag" \
+  --tag "$repo:$revision" \
+  --push \
+  .
+
+echo "已推送 $repo:$tag 和 $repo:$revision（$platforms）"

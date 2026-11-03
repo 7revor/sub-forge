@@ -1,16 +1,15 @@
 # 生产镜像（SYS-08）：单容器，订阅接口、管理接口与前端同源；SQLite 与密钥文件放在挂载的 /data。
 #
-# 推荐用 Compose 部署（见 docs/20-deployment-client-ip.md）：
-#   cp docker/.env.example docker/.env   # 填写对外地址和管理员
-#   docker compose -f docker/compose.yaml up -d --build
-# 更新：先备份，git pull 后重新执行上面的 Compose 命令（见 docs/24-first-deployment.md）
+# 发布到 Docker Hub（在开发机执行）：
+#   ./scripts/docker-push your-name/sub-forge
+#
+# 推荐用 Compose 部署，服务器不需要源码（见 docs/24-first-deployment.md）。
 #
 # 或直接运行：
-#   docker build -f docker/Dockerfile -t sub-forge .
 #   docker run -d --name sub-forge --restart unless-stopped -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
 #     -e PUBLIC_URL=https://sub.example.com -e ALLOWED_ORIGINS=https://sub.example.com \
 #     -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD=请改成强密码 \
-#     sub-forge
+#     your-name/sub-forge:latest
 #
 # 反向代理示例见 docker/nginx.conf.example。
 # 真实 IP 透传须按 docs/20-deployment-client-ip.md 配置可信代理；不默认信任容器网关或转发头。
