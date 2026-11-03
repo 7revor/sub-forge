@@ -1,11 +1,7 @@
 import { importSeedDocuments, migrateDatabase } from './store-migrations.ts';
-import { ruleBinding } from './rule-binding.ts';
-import { resolveRuleSetReference, usableRuleSet } from './ruleset-reference.ts';
-import { findRuleFile } from './rule-repos/options.ts';
-import { Report, resolveProfileRouting, stableStringify } from '@sub-forge/core';
 import type { ClientAddress } from './net/client-ip.ts';
 import { migrateProfile, profileTemplate } from './profile-routing.ts';
-// SQLite 存储。保存文档、快照与最近一次成功的渲染结果。
+// SQLite 存储。保存文档和上游快照；渲染结果不落库。
 // 文档、快照和令牌原文明文存储（2026-11-02 修订 SYS-04）；数据库文件权限为 0600，备份凭据和备份文件仍加密。
 
 import Database from 'better-sqlite3';
@@ -13,10 +9,14 @@ import { pageMeta, type PageOptions, type PageResult } from './pagination.ts';
 import { matchesNameSearch, normalizeNameSearch } from '@sub-forge/core';
 import { randomBytes } from 'node:crypto';
 import { Cipher, randomId } from './crypto.ts';
-import type { DocKind, DocTypes, DocInputTypes, ProfileDoc, RuleSetDoc, Seed, SourceDoc, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import type { RuleSetFormat } from '@sub-forge/core';
+import type { DocKind, DocTypes, DocInputTypes, FetchOptions, ProfileDoc, Seed, SourceDoc, TemplateVersionDoc, TokenDoc } from './docs.ts';
+import { DEFAULT_TIMEOUT_MS, DEFAULT_UA } from './net/upstream.ts';
 import { normalizeSourceFetch, stripResourceTiming } from './source-url.ts';
 
 export type SnapshotOwner = 'source' | 'ruleset';
+/** 规则读取参数；与 URL 一起构成规则快照身份，不含任何用户、配置或模板。 */
+export type RuleFetchParams = FetchOptions & { format?: RuleSetFormat; behavior?: 'domain' | 'ipcidr' | 'classical' };
 
 export type TrafficInfo = { upload?: number; download?: number; total?: number; expire?: number };
 
@@ -53,9 +53,6 @@ export type AccessLogRow = Partial<ClientAddress> & {
 
 export type Role = 'admin' | 'user';
 export type User = { id: string; username: string; role: Role; disabled: boolean; scriptAllowed: boolean; createdAt: number };
-
-/** 规则集每个 URL 保留的成功快照份数；订阅源只保留最近一次成功。 */
-const KEEP_OK_SNAPSHOTS = 1;
 
 type RawSnapshot = {
   id: number; owner_kind: SnapshotOwner; owner_id: string; url: string; fetched_at: number;
@@ -121,111 +118,18 @@ export class Store {
   setSecureSetting(name: string, value: unknown): void {
     this.db.prepare('INSERT OR REPLACE INTO system_settings VALUES (?, ?)').run(name, this.cipher.encrypt(JSON.stringify(value)));
   }
-  /** 相同权限、地址与读取参数共享一份成功原文。绑定不改变文档归属。 */
-  resourceKey(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string): string {
-    const owner = scope ?? this.getWithOwner(kind, id)?.owner ?? `reference:${id}`;
-    return 'resource:' + this.cipher.hmac(JSON.stringify([kind, owner, url, options]));
-  }
-  resourceBinding(kind: SnapshotOwner, id: string, url: string): string | undefined {
-    return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind, id, this.cipher.hmac(url)) as { resource: string } | undefined)?.resource;
-  }
-  bindResource(kind: SnapshotOwner, id: string, url: string, options: unknown, scope?: string, migrateLegacy = true): string {
-    const resource = this.resourceKey(kind, id, url, options, scope);
-    const urlHash = this.cipher.hmac(url);
-    const prior = this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,urlHash) as { resource: string } | undefined;
-    if (prior?.resource === resource) return resource;
-    // 旧快照只在首次绑定时迁移；参数变化不能沿用旧读取身份的正文。
-    if (!prior && migrateLegacy) {
-      for (const ok of [true, false]) {
-        const legacy = this.latestSnapshot(kind,id,url,ok);
-        const current = this.latestSnapshot(kind,resource,url,ok);
-        if (legacy && (!current || legacy.fetchedAt > current.fetchedAt)) this.addSnapshot({ ...legacy, ownerId: resource });
-      }
-      this.db.prepare('DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?').run(kind,id,urlHash);
-    }
-    this.db.prepare('INSERT OR REPLACE INTO resource_bindings VALUES (?, ?, ?, ?)').run(kind,id,urlHash,resource);
-    if (prior && prior.resource !== resource) this.pruneUnusedResource(prior.resource);
-    return resource;
-  }
-  pruneUnusedResource(resource: string): void {
-    if (resource.startsWith('resource:') && !this.db.prepare('SELECT 1 FROM resource_bindings WHERE resource = ? LIMIT 1').get(resource)) {
-      this.db.prepare('DELETE FROM snapshots WHERE owner_id = ?').run(resource);
-    }
-  }
-  /** 删除不在 live 中、最近一次拉取早于 before 的绑定；仍有其他绑定的资源保留快照。 */
-  pruneStaleBindings(live: Set<string>, before: number): void {
-    for (const row of this.db.prepare('SELECT kind, id, url_hash, resource FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
-      if (live.has(row.resource)) continue;
-      const { newest } = this.db.prepare('SELECT MAX(fetched_at) AS newest FROM snapshots WHERE owner_id = ?').get(row.resource) as { newest: number | null };
-      // 没有快照说明首次拉取还在进行，留给下一轮判断。
-      if (newest === null || newest >= before) continue;
-      this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(row.kind, row.id, row.url_hash);
-      this.pruneUnusedResource(row.resource);
-    }
-  }
-  private dropResourceBindings(kind: SnapshotOwner, id: string, urls: string[] = []): void {
-    const keep = new Set(urls.map(url => this.cipher.hmac(url)));
-    for (const row of this.db.prepare('SELECT DISTINCT url_hash FROM snapshots WHERE owner_kind = ? AND owner_id = ?').all(kind, id) as { url_hash: string }[]) {
-      if (!keep.has(row.url_hash)) this.db.prepare('DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?').run(kind, id, row.url_hash);
-    }
-    const rows = this.db.prepare('SELECT url_hash, resource FROM resource_bindings WHERE kind = ? AND id = ?').all(kind,id) as {url_hash:string;resource:string}[];
-    for (const row of rows) {
-      if (keep.has(row.url_hash)) continue;
-      this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(kind,id,row.url_hash);
-      this.pruneUnusedResource(row.resource);
-    }
-  }
-  pruneResourceBindings(templates: TemplateReader = this.currentTemplates): void {
-    const keep = new Map<string, Set<string>>();
-    const add = (kind: string, id: string, urls: string[]) => {
-      const key = `${kind}:${id}`;
-      const hashes = keep.get(key) ?? new Set<string>();
-      urls.forEach(url => hashes.add(this.cipher.hmac(url))); keep.set(key, hashes);
-    };
-    const walk = (value: unknown, context?: string): void => {
-      if (!value || typeof value !== 'object') return;
-      if (Array.isArray(value)) { value.forEach(item => walk(item, context)); return; }
-      const v = value as Record<string, any>;
-      if (v.kind === 'ruleset' && typeof v.id === 'string') {
-        if (v.remote?.url && context) add('ruleset', ruleBinding(v.id, context).id, [v.remote.url]);
-        if (v.repository?.sources && resolveRuleSetReference(v as import('./ruleset-reference.ts').RuleSetMatcher, this)) add('ruleset', v.id, v.repository.sources.flatMap((s: { url?: string }) => s.url ? [s.url] : []));
-      }
-      Object.values(v).forEach(item => walk(item, context));
-    };
-    // 只有这三类文档持有资源地址；本地节点组可能很大，不必解析。
-    for (const row of this.db.prepare("SELECT kind,id,data FROM docs WHERE kind IN ('source','ruleset','profile')").all() as {kind:string;id:string;data:string}[]) {
-      const doc = JSON.parse(this.readText(row.data));
-      if (row.kind === 'source' && doc.url) add('source', row.id, [doc.url]);
-      if (row.kind === 'ruleset' && usableRuleSet(doc, this)) add('ruleset', row.id, (doc.sources ?? []).flatMap((s: {url?:string}) => s.url ? [s.url] : []));
-      if (row.kind === 'profile') {
-        walk(doc, `profile:${row.id}`);
-        const template = profileTemplate(doc, templates.get);
-        if (template) walk(template, `profile:${row.id}`);
-      }
-    }
-    templates.list().forEach(t => walk(t, `template:${t.id}`));
-    for (const row of this.db.prepare('SELECT * FROM resource_bindings').all() as { kind: string; id: string; url_hash: string; resource: string }[]) {
-      // 仓库正文由索引缓存维护，其生命周期不取决于配置订阅。
-      if (row.id.startsWith('repository-file:')) {
-        const match = /^repository-file:([^:]+):([^:]+):(.+)$/.exec(row.id);
-        if (match && this.db.prepare('SELECT 1 FROM rule_repos WHERE id = ? AND enabled = 1').get(match[1]!) && findRuleFile(this.db, match[1]!, match[2]!, match[3]!)) continue;
-      } else if (keep.get(`${row.kind}:${row.id}`)?.has(row.url_hash)) continue;
-      this.db.prepare('DELETE FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').run(row.kind, row.id, row.url_hash);
-      this.pruneUnusedResource(row.resource);
-    }
-    this.db.exec("DELETE FROM snapshots WHERE owner_id LIKE 'resource:%' AND owner_id NOT IN (SELECT resource FROM resource_bindings)");
+  /** 规则快照身份：URL 加读取参数。behavior 只影响 MRS。读取权限在入口校验，不靠缓存隔离。 */
+  ruleSnapshotKey(url: string, params: RuleFetchParams = {}): string {
+    const format = params.format ?? 'auto';
+    return this.cipher.hmac(JSON.stringify([url, { ua: params.ua ?? DEFAULT_UA, timeoutMs: params.timeoutMs ?? DEFAULT_TIMEOUT_MS, format, ...(format === 'mrs' ? { behavior: params.behavior } : {}) }]));
   }
 
   invalidateRepository(id: string): void {
     this.configurationRevision++;
-    this.pruneResourceBindings();
     for (const listener of this.invalidationListeners) listener('repository', id);
     this.changed();
   }
 
-  private snapshotOwner(kind: SnapshotOwner, id: string, url: string): string {
-    return (this.db.prepare('SELECT resource FROM resource_bindings WHERE kind = ? AND id = ? AND url_hash = ?').get(kind,id,this.cipher.hmac(url)) as {resource:string}|undefined)?.resource ?? id;
-  }
   close(): void { this.closeEvents(); this.listeners.clear(); this.invalidationListeners.clear(); this.documentDeleteHooks.clear(); this.db.close(); }
 
   getProfileMigrationBackup(id: string): ProfileDoc | undefined {
@@ -249,9 +153,7 @@ export class Store {
 
     })();
     this.configurationRevision++;
-    if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.dropResourceBindings('source',doc.id,[(doc as SourceDoc).url]);
-    if (kind === 'ruleset' && Array.isArray((doc as RuleSetDoc).sources)) this.dropResourceBindings('ruleset',doc.id,(doc as RuleSetDoc).sources.flatMap(s=>s.kind==='remote' && s.url ? [s.url] : []));
-    this.pruneResourceBindings(templates);
+    if (kind === 'source' && typeof (doc as SourceDoc).url === 'string') this.deleteSourceSnapshots(doc.id, (doc as SourceDoc).url);
     this.changed();
   }
 
@@ -294,11 +196,10 @@ export class Store {
   delete(kind: DocKind, id: string): boolean {
     this.configurationRevision++;
     const removed = this.db.transaction(() => {
-      if (kind === 'source' || kind === 'ruleset') this.dropResourceBindings(kind,id);
+      if (kind === 'source') this.deleteSourceSnapshots(id);
       const removed = this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
       for (const hook of this.documentDeleteHooks) hook(kind, id);
       if (kind === 'profile') this.deleteProfileData(id);
-      this.pruneResourceBindings();
       return removed;
     })();
     for (const listener of this.invalidationListeners) listener(kind, id);
@@ -312,7 +213,6 @@ export class Store {
     this.db.prepare('INSERT INTO templates (id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
       .run(t.id, JSON.stringify(current), this.now());
     this.configurationRevision++;
-    this.pruneResourceBindings();
     this.changed();
   }
 
@@ -394,29 +294,28 @@ export class Store {
   // ---------- 快照 ----------
 
   addSnapshot(s: Omit<SnapshotRow, 'id'>): SnapshotRow {
-    s = { ...s, ownerId:this.snapshotOwner(s.ownerKind,s.ownerId,s.url) };
     const urlHash = this.cipher.hmac(s.url);
     const tx = this.db.transaction(() => {
       const inserted = this.db.prepare('INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         .run(s.ownerKind, s.ownerId, s.url, urlHash, s.fetchedAt, s.ok ? 1 : 0, s.status ?? null, s.body === undefined ? null : s.body, s.hash ?? null, s.userinfo ? JSON.stringify(s.userinfo) : null, s.error === undefined ? null : s.error);
-      const row = { ...s, id: Number(inserted.lastInsertRowid) };
-      if (s.ownerKind === 'source') {
-        // 一个订阅源只留最新成功内容和最新失败状态，换地址也不累积历史。
-        this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = 'source' AND owner_id = ? AND ok = ? AND id NOT IN (
-          SELECT id FROM snapshots WHERE owner_kind = 'source' AND owner_id = ? AND ok = ? ORDER BY fetched_at DESC, id DESC LIMIT 1)`)
-          .run(s.ownerId, s.ok ? 1 : 0, s.ownerId, s.ok ? 1 : 0);
-        return row;
-      }
-      // 规则集成功快照保留最近 N 份；失败记录只保留最新一条
-      this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 1 AND id NOT IN (
-        SELECT id FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 1 ORDER BY fetched_at DESC, id DESC LIMIT ?)`)
-        .run(s.ownerKind, s.ownerId, urlHash, s.ownerKind, s.ownerId, urlHash, KEEP_OK_SNAPSHOTS);
-      this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 0 AND id NOT IN (
-        SELECT id FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? AND ok = 0 ORDER BY fetched_at DESC, id DESC LIMIT 1)`)
-        .run(s.ownerKind, s.ownerId, urlHash, s.ownerKind, s.ownerId, urlHash);
-      return row;
+      // 每个身份只留最新成功内容和最新失败状态，换地址也不累积历史。
+      this.db.prepare(`DELETE FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND ok = ? AND id NOT IN (
+        SELECT id FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND ok = ? ORDER BY fetched_at DESC, id DESC LIMIT 1)`)
+        .run(s.ownerKind, s.ownerId, s.ok ? 1 : 0, s.ownerKind, s.ownerId, s.ok ? 1 : 0);
+      return { ...s, id: Number(inserted.lastInsertRowid) };
     });
     return tx();
+  }
+
+  /** 删除订阅源的快照；keepUrl 用于修改 URL：只移除旧地址的内容。 */
+  deleteSourceSnapshots(sourceId: string, keepUrl?: string): void {
+    if (keepUrl === undefined) this.db.prepare("DELETE FROM snapshots WHERE owner_kind = 'source' AND owner_id = ?").run(sourceId);
+    else this.db.prepare("DELETE FROM snapshots WHERE owner_kind = 'source' AND owner_id = ? AND url_hash <> ?").run(sourceId, this.cipher.hmac(keepUrl));
+  }
+
+  /** 规则快照到期立刻清理，不管有没有引用；读取路径也按周期判定，清理延迟不影响下发。 */
+  deleteExpiredRuleSnapshots(cycleStart: number): number {
+    return this.db.prepare("DELETE FROM snapshots WHERE owner_kind = 'ruleset' AND fetched_at < ?").run(cycleStart).changes;
   }
 
   /** 上游内容与最近一份成功快照相同：只更新拉取时间、状态码与流量信息，不新增一份，避免挤掉历史版本 */
@@ -436,7 +335,6 @@ export class Store {
   }
 
   latestSnapshot(ownerKind: SnapshotOwner, ownerId: string, url: string, okOnly = true): SnapshotRow | undefined {
-    ownerId = this.snapshotOwner(ownerKind, ownerId, url);
     const row = this.db.prepare(`SELECT * FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
       .get(ownerKind, ownerId, this.cipher.hmac(url)) as RawSnapshot | undefined;
     return row ? this.toSnapshot(row) : undefined;
@@ -444,7 +342,6 @@ export class Store {
 
   /** 只判断新旧和状态时使用：不读取、不解码正文。 */
   latestSnapshotMeta(ownerKind: SnapshotOwner, ownerId: string, url: string, okOnly = true): Omit<SnapshotRow, 'body'> | undefined {
-    ownerId = this.snapshotOwner(ownerKind, ownerId, url);
     const row = this.db.prepare(`SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ? ${okOnly ? 'AND ok = 1' : ''} ORDER BY fetched_at DESC, id DESC LIMIT 1`)
       .get(ownerKind, ownerId, this.cipher.hmac(url)) as RawSnapshot | undefined;
     return row ? this.toSnapshot(row) : undefined;
@@ -452,8 +349,8 @@ export class Store {
 
   /** 快照历史（不含正文），供 UI 展示 */
   snapshotHistory(ownerKind: SnapshotOwner, ownerId: string): Omit<SnapshotRow, 'body'>[] {
-    const rows = this.db.prepare('SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND (owner_id = ? OR owner_id IN (SELECT resource FROM resource_bindings WHERE kind = ? AND id = ?)) ORDER BY fetched_at DESC, id DESC')
-      .all(ownerKind, ownerId, ownerKind, ownerId) as RawSnapshot[];
+    const rows = this.db.prepare('SELECT id, owner_kind, owner_id, url, fetched_at, ok, status, NULL AS body, hash, userinfo, error FROM snapshots WHERE owner_kind = ? AND owner_id = ? ORDER BY fetched_at DESC, id DESC')
+      .all(ownerKind, ownerId) as RawSnapshot[];
     const result=rows.map((r) => this.toSnapshot(r));
     if(ownerKind !== 'source')return result;
     const source=this.get('source',ownerId);
@@ -462,7 +359,6 @@ export class Store {
   }
 
   countSnapshots(ownerKind: SnapshotOwner, ownerId: string, url: string): { ok: number; failed: number } {
-    ownerId = this.snapshotOwner(ownerKind, ownerId, url);
     const row = this.db.prepare('SELECT SUM(ok = 1) ok, SUM(ok = 0) failed FROM snapshots WHERE owner_kind = ? AND owner_id = ? AND url_hash = ?')
       .get(ownerKind, ownerId, this.cipher.hmac(url)) as { ok: number | null; failed: number | null };
     return { ok: row.ok ?? 0, failed: row.failed ?? 0 };

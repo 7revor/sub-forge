@@ -30,10 +30,10 @@ describe('MRS 转统一 LIST', () => {
     const fetcher=createUpstreamFetcher({allow:parseAllowList([]),fetchImpl:async()=>({status:200,headers:{get:()=>null},text:async()=>{throw new Error('二进制不能按 UTF-8 读取');},arrayBuffer:async()=>new Uint8Array(binary).buffer})});
     const h=setupApp({fetcher});
     try {
-      const saved=await h.snapshots.get('ruleset','remote','https://example.com/download',{format:'auto',ttlSec:86400});
-      expect(saved.error).toBeUndefined(); expect(saved.snapshot?.body).toContain('DOMAIN-SUFFIX,bilibili.com');
+      const saved=await h.snapshots.getRuleContent('https://example.com/download',{format:'auto',ttlSec:86400});
+      expect(saved.body).toContain('DOMAIN-SUFFIX,bilibili.com');
       const draft=await h.snapshots.peekRuleContent('https://example.com/download');
-      expect(draft.body).toBe(saved.snapshot?.body);
+      expect(draft.body).toBe(saved.body);
     } finally {h.store.close();}
   });
 

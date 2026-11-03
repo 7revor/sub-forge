@@ -40,7 +40,7 @@ it('订阅专属原文用所有者 token，绑定模板后也只通过订阅暴�
   expect((await h.app.request(h.sessionLink + '&token=' + h.token, { headers: h.headers })).status).toBe(400);
   const head = await h.app.request(h.link(), { method: 'HEAD' });
   expect(head.status).toBe(200); expect(await head.text()).toBe('');
-  expect(h.fetcher).toHaveBeenCalledTimes(2); // 两份私有订阅各有绑定，权限范围不混用。
+  expect(h.fetcher).toHaveBeenCalledTimes(1); // 同一 URL 只存一份；权限在入口校验。
 });
 
 it('无效凭证不回退登录态，拒绝未保存引用、过期 revision、未知和重复查询参数', async () => {
@@ -109,23 +109,18 @@ it.each(['logout', 'disable'])('管理接口在途 %s 后拒绝正文，资源 t
   expect((await h.app.request(h.sessionLink + '&token=' + h.token, { headers: h.headers })).status).toBe(401);
 });
 
-it('排队原文请求在删除后才开始拉取，也不能遗留私有绑定和快照', async () => {
+it('同一 URL 的在途读取合并；其中一个订阅被删除时只有它返回 404，缓存只存一份', async () => {
   const h = setup();
   let release!: () => void, started!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   const began = new Promise<void>(resolve => { started = resolve; });
-  let calls = 0;
-  h.fetcher.mockImplementation(async () => { if (++calls === 4) started(); await gate; return { status: 200, body: h.raw }; });
-  for (const id of ['active-1', 'active-2', 'active-3', 'active-4', 'queued']) h.store.put('profile', { ...h.store.get('profile', 'profile')!, id }, h.owner.id);
-  const active = ['active-1', 'active-2', 'active-3', 'active-4'].map(id => h.app.request(h.link(id)));
+  h.fetcher.mockImplementation(async () => { started(); await gate; return { status: 200, body: h.raw }; });
+  for (const id of ['kept', 'removed']) h.store.put('profile', { ...h.store.get('profile', 'profile')!, id }, h.owner.id);
+  const kept = h.app.request(h.link('kept')), removed = h.app.request(h.link('removed'));
   await began;
-  const queued = h.app.request(h.link('queued'));
-  // app.request 同步进入路由；队列中的第五次读取尚未触发 fetcher。
-  expect(calls).toBe(4);
-  h.store.delete('profile', 'queued'); release();
-  expect((await queued).status).toBe(404);
-  expect((await Promise.all(active)).map(response => response.status)).toEqual([200, 200, 200, 200]);
-  expect(calls).toBe(5);
-  expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM resource_bindings').get()).toEqual({ n: 4 });
-  expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM snapshots').get()).toEqual({ n: 4 });
+  h.store.delete('profile', 'removed'); release();
+  expect((await removed).status).toBe(404);
+  expect((await kept).status).toBe(200);
+  expect(h.fetcher).toHaveBeenCalledTimes(1);
+  expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM snapshots').get()).toEqual({ n: 1 });
 });

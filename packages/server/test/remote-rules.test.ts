@@ -40,10 +40,10 @@ describe('外部 URL 与系统 ID 分开引用', () => {
       expect(output).toContain('IP-CIDR,192.0.2.0/24,no-resolve');
       expect(published.json.item.rules[0].options?.noResolve).toBeUndefined();
       expect(download.headers.get('content-type')).toContain('text/plain');
-      expect(calls).toEqual([url, url]); // 模板内部读取与订阅私有原文分别绑定
+      expect(calls).toEqual([url]); // 模板校验和规则文件共用一份快照
       const edited = new URL(provider.url); edited.searchParams.set('url', 'https://unrelated.test/list');
       expect((await h.app.request(edited.href)).status).toBe(400);
-      expect(calls).toEqual([url, url]); // 模板内部读取与订阅私有原文分别绑定
+      expect(calls).toEqual([url]); // 模板校验和规则文件共用一份快照
       const otherUser = await addUser(h.store, 'other');
       const other = h.store.userToken(otherUser.id)!.token;
       expect((await h.app.request(provider.url.replace(token, other))).status).toBe(404);

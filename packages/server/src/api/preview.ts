@@ -67,7 +67,7 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
 
   app.post('/sources/:id/refresh', async (c) => {
     const src = own('source', c.req.param('id'), c.get('user').id);
-    const r = await snapshots.refresh('source', src.id, src.url, src.fetch ?? {});
+    const r = await snapshots.refreshNodeSource(src);
     return c.json({ items: [{ url: src.url, ok: r.ok, fetchedAt: r.fetchedAt, ...(r.error ? { error: r.error } : {}), ...(r.userinfo ? { userinfo: r.userinfo } : {}) }] });
   });
 

@@ -20,7 +20,7 @@ const env = setupApp({ now: Date.now, fetcher: async (url, opts) => {
 } });
 const user = await addUser(env.store, 'source-admin', 'admin');
 env.store.put('source', { id: 'source-fixture', name: '订阅源示例', url: 'https://fixture.example.test/sub', pipeline: [], fetch: { ttlSec: 86400 }, note: '内置浏览器验收数据' }, user.id);
-await env.snapshots.refresh('source', 'source-fixture', 'https://fixture.example.test/sub');
+await env.snapshots.refreshNodeSource({ id: 'source-fixture', url: 'https://fixture.example.test/sub' });
 
 const app = new Hono();
 app.get('/__fixture', c => c.json({ requests, records: env.store.snapshotHistory('source', 'source-fixture') }));

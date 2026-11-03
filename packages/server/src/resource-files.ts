@@ -68,7 +68,6 @@ export function resourceFileRoutes(store: Store, renderer: RenderService, snapsh
     const result = await renderer.sharedRules.read(reference, output);
     if (!result || !read()) return c.body(null, 404);
     c.set('accessResource', { kind: 'enhancement', resourceId: id, resourceName: result.name });
-    if (result.stale) c.header('x-sub-forge-warning', 'last-good-rule');
     return ruleBody(c, result.body);
   });
   app.get('/repo', async c => {
@@ -91,19 +90,17 @@ export function resourceFileRoutes(store: Store, renderer: RenderService, snapsh
       const result = await renderer.sharedRules.read({ matcher: { kind: 'ruleset', id: rs.id }, ...(options ? { options } : {}) }, output, definition);
       if (!result) return c.body(null, 404);
       c.set('accessResource', { kind: 'rule-collection', resourceId: rs.id, resourceName: rs.name });
-      if (result.stale) c.header('x-sub-forge-warning', 'last-good-rule');
       return ruleBody(c, result.body);
     }
     // 先验证全部文件属于当前启用索引，再读取；多来源也不接受任意上游 URL。
-    const identities = files.map(file => repos.fileResource(id, file.ref, file.path).url);
+    const identities = files.map(file => repos.fileUrl(id, file.ref, file.path));
     const bodies: string[] = [];
     let name = '';
     for (const file of files) {
       const result = await repos.filePreview(id, file.ref, file.path);
       bodies.push(result.content); name ||= result.name;
-      if (result.cache?.error) c.header('x-sub-forge-warning', 'last-good-source');
     }
-    if (files.some((file, index) => repos.fileResource(id, file.ref, file.path).url !== identities[index])) throw new HttpError(409, '仓库文件在读取期间发生变化');
+    if (files.some((file, index) => repos.fileUrl(id, file.ref, file.path) !== identities[index])) throw new HttpError(409, '仓库文件在读取期间发生变化');
     c.set('accessResource', { kind: 'rule-collection', resourceId: `${id}:${files.map(file => `${file.ref}:${file.path}`).join(',')}`, resourceName: name });
     c.header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(name)}`);
     return c.text(bodies.join('\n'));
@@ -127,16 +124,30 @@ export function subscriptionRuleRoutes(store: Store, renderer: RenderService, sn
         const template = profileTemplate(profile, (id, version) => store.getTemplate(id, version));
         const matcher = resolveProfileRouting(profile, template, new Report()).rules.find(r => r.id === rule)?.matcher;
         return matcher?.kind === 'ruleset' && matcher.remote ? matcher : undefined;
-      }, `profile:${profileId}`, { kind: 'profile', id: profileId });
+      }, { kind: 'profile', id: profileId });
     }
     allowedQuery(c, ['profile', 'key', 'target', 'platform', 'app', 'token']);
     const key = requiredQuery(c, 'key'), output = target(c, true);
-    const result = await renderer.render(profileId, output, key);
-    if (!owned()) return c.body(null, 404);
-    if (!result.ok) return result.accessDenied ? c.body(null, 404) : c.text(`规则暂时不可用：${result.message}`, 503);
-    if (result.render.ruleBody === undefined) return c.body(null, 404);
-    c.set('accessResource', { kind: 'rule-collection', resourceId: key, resourceName: store.get('profile', profileId)!.name + ' · 专属规则' });
-    return ruleBody(c, result.render.ruleBody);
+    const profile = () => owned() ? store.get('profile', profileId) : undefined;
+    const reference = renderer.profileRule(profile()!, output, key);
+    // 只有托管规则有地址；规则已从配置移除或地址过期都是 404。
+    if (!reference) return c.body(null, 404);
+    const name = `${profile()!.name} · 专属规则`;
+    // 上游读取期间配置可能变化：定义不再存在的规则不能下发，手写规则没有规则集文档，只提供名称。
+    const definition = () => {
+      const current = profile();
+      if (!current || !renderer.profileRule(current, output, key)) return undefined;
+      return reference.matcher.kind === 'ruleset' ? resolveRuleSetReference(reference.matcher, store) : { id: '$local', name, sources: [] };
+    };
+    let result;
+    try { result = await renderer.sharedRules.read(reference, output, definition); }
+    catch (error) {
+      if (error instanceof HttpError) throw error;
+      return c.text(`规则暂时不可用：${(error as Error).message}`, 503);
+    }
+    if (!result || !owned()) return c.body(null, 404);
+    c.set('accessResource', { kind: 'rule-collection', resourceId: key, resourceName: name });
+    return ruleBody(c, result.body);
   });
   return app;
 }

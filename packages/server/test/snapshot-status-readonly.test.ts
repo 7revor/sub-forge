@@ -5,7 +5,6 @@ import { SnapshotService } from '../src/snapshots.ts';
 import { Store } from '../src/store.ts';
 
 const changes = (store: Store) => (store.db.prepare('SELECT total_changes() AS n').get() as { n: number }).n;
-const bindings = (store: Store) => store.db.prepare('SELECT * FROM resource_bindings').all();
 const setup = () => {
   const store = new Store(':memory:');
   const fetcher = vi.fn(async () => ({ status: 200, body: 'trojan://p@a.test:1#节点' }));
@@ -16,43 +15,38 @@ const setup = () => {
 };
 
 describe('资源状态只读', () => {
-  it('读取状态不写库；资源标识与之后的绑定一致', () => {
+  const source = { id: 's', url: 'https://a.test/s' };
+  it('读取状态不写库', () => {
     const { store, snapshots, resources } = setup();
     try {
       const before = changes(store);
-      const status = snapshots.status('source', 's', 'https://a.test/s');
+      const status = snapshots.nodeStatus(source);
       resources.statuses(resources.collect('source', 's'));
       resources.statuses(resources.all());
       expect(changes(store)).toBe(before);
-      expect(bindings(store)).toEqual([]);
-      expect(status).toMatchObject({ available: false, nextFetchAt: undefined });
-      expect(snapshots.identity('source', 's', 'https://a.test/s')).toBe(status.resource);
+      expect(status).toMatchObject({ kind: 'source', resource: 'source:s', available: false });
     } finally { store.close(); }
   });
 
-  it('未绑定的旧快照可见但不被迁移，绑定后状态不变', () => {
+  it('节点快照按订阅源 ID 存放，过期后仍算可用', () => {
     const { store, snapshots } = setup();
     try {
-      store.addSnapshot({ ownerKind: 'source', ownerId: 's', url: 'https://a.test/s', fetchedAt: 100, ok: true, status: 200, body: 'old', hash: 'h' });
-      const before = changes(store);
-      const status = snapshots.status('source', 's', 'https://a.test/s');
-      expect(changes(store)).toBe(before);
-      expect(status).toMatchObject({ available: true, lastSuccessAt: 100, lastAttemptAt: 100 });
+      store.addSnapshot({ ownerKind: 'source', ownerId: 's', url: source.url, fetchedAt: 100, ok: true, status: 200, body: 'old', hash: 'h' });
+      expect(snapshots.nodeStatus(source)).toMatchObject({ available: true, lastSuccessAt: 100, lastAttemptAt: 100 });
       expect((store.db.prepare('SELECT owner_id FROM snapshots').get() as { owner_id: string }).owner_id).toBe('s');
-      expect(snapshots.identity('source', 's', 'https://a.test/s')).toBe(status.resource);
-      expect(snapshots.status('source', 's', 'https://a.test/s')).toEqual(status);
-      expect((store.db.prepare('SELECT owner_id FROM snapshots').get() as { owner_id: string }).owner_id).toBe(status.resource);
     } finally { store.close(); }
   });
 
-  it('参数不兼容的草稿读取不能看到旧快照正文的状态', () => {
+  it('规则状态按读取参数区分，过期内容不算可用', () => {
     const { store, snapshots } = setup();
     try {
-      store.put('ruleset', { id: 'r', name: '规则', sources: [{ id: 'a', kind: 'remote', url: 'https://r.test/a', format: 'auto' }] }, 'u');
-      store.addSnapshot({ ownerKind: 'ruleset', ownerId: 'r', url: 'https://r.test/a', fetchedAt: 100, ok: true, status: 200, body: 'DOMAIN,a.test', hash: 'h' });
-      expect(snapshots.status('ruleset', 'r', 'https://r.test/a', { ua: '其他客户端' }).available).toBe(false);
-      expect(snapshots.status('ruleset', 'r', 'https://r.test/a').available).toBe(true);
+      const url = 'https://r.test/a';
+      store.addSnapshot({ ownerKind: 'ruleset', ownerId: store.ruleSnapshotKey(url), url, fetchedAt: Date.now(), ok: true, status: 200, body: 'DOMAIN,a.test', hash: 'h' });
+      expect(snapshots.ruleStatus(url, { ua: '其他客户端' }).available).toBe(false);
+      expect(snapshots.ruleStatus(url).available).toBe(true);
+      store.db.exec('UPDATE snapshots SET fetched_at = 100');
+      expect(snapshots.ruleStatus(url)).toMatchObject({ kind: 'ruleset', available: false, lastSuccessAt: undefined });
+      expect(snapshots.ruleStatus(url).error).toBeUndefined();
     } finally { store.close(); }
   });
-
 });

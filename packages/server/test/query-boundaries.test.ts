@@ -43,7 +43,7 @@ it('管理 GET 只使用登录态，文件 GET 只使用 token；旧入口和动
   expect(texts.join('\n')).not.toMatch(/\.get\(['`][^\n]*\/:\w/);
 });
 
-it('专属规则按订阅隔离原文及产物，客户端格式变化不改变权限；配置移除规则即清理历史正文', async () => {
+it('专属规则按订阅校验权限，客户端格式变化不改变权限；配置移除规则后地址失效', async () => {
   const h = setup(), first = await h.ruleLink();
   h.store.put('profile', { ...h.store.get('profile', 'p')!, id: 'second' }, h.other.id);
   const second = await h.app.request(queryUrl('/subs/profile', { id: 'second', token: h.otherToken, target: 'stash' }));
@@ -54,10 +54,9 @@ it('专属规则按订阅隔离原文及产物，客户端格式变化不改变�
   h.store.put('profile', { ...h.store.get('profile', 'p')!, routing: { mode: 'independent', config: { ...h.config, rules: [] } } }, h.owner.id);
   expect((await h.app.request(first)).status).toBe(404);
   expect((await h.app.request(secondLink)).status).toBe(200);
-  expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM resource_bindings').get()).toEqual({ n: 1 });
 });
 
-it.each(['delete', 'recreate', 'remove-rule', 'reset', 'disable'])('专属规则刷新在途 %s 后不返回旧正文或复活已删除缓存', async action => {
+it.each(['delete', 'recreate', 'remove-rule', 'reset', 'disable'])('专属规则刷新在途 %s 后不返回旧正文', async action => {
   const h = setup(), url = await h.ruleLink();
   let entered!: () => void, release!: () => void;
   const began = new Promise<void>(resolve => { entered = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
@@ -72,10 +71,6 @@ it.each(['delete', 'recreate', 'remove-rule', 'reset', 'disable'])('专属规则
   if (action === 'disable') h.store.updateUser(h.owner.id, { disabled: true });
   release(); const response = await request;
   expect(response.status).toBe(404); expect(await response.text()).not.toContain('late.test');
-  if (action === 'delete' || action === 'remove-rule') {
-    expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
-    expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
-  }
 });
 
 it('升级清空旧地址配置和公共远程引用，不变更用户 token；重启幂等', () => {

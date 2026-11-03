@@ -42,7 +42,7 @@ it('不同用户同规则同处理共用产物和原文，平台变体独立，�
   expect((await h.app.request(ruleUrl(a).replace(h.tokenA, 'invalid'))).status).toBe(404);
 });
 
-it('删除订阅只清理私有产物；公共规则继续更新，删除规则定义清理全部变体和最后原文', async () => {
+it('删除订阅不影响公共规则继续更新；删除规则定义后地址失效', async () => {
   const h = setup(); h.profile('a', h.a.id);
   const url = ruleUrl(await h.main(h.tokenA, 'a'));
   await h.main(h.tokenA, 'a', '?target=stash&platform=ios');
@@ -51,11 +51,9 @@ it('删除订阅只清理私有产物；公共规则继续更新，删除规则�
   h.update('DOMAIN,two.test'); expect(await (await h.app.request(url)).text()).toBe('DOMAIN,two.test\n');
   h.store.delete('ruleset', 'r');
   expect((await h.app.request(url)).status).toBe(404);
-  expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
-  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });
 
-it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理原文绑定', async () => {
+it('直接 URL 属于订阅，其他用户不可读；删除订阅后地址失效', async () => {
   const h = setup(); h.profile('a', h.a.id, remoteRuleMatcher('https://rules.test/Apple.list?download=1'));
   const cfg = await h.main(h.tokenA, 'a'), url = ruleUrl(cfg), key = new URL(url).searchParams.get('key')!;
   expect(Object.keys(cfg['rule-providers'])).toEqual(['Apple']);
@@ -65,7 +63,6 @@ it('直接 URL 属于订阅，其他用户不可读；删除订阅同时清理�
   expect((await h.app.request(`/resources/ruleset?key=${key}&token=${h.tokenB}`)).status).toBe(404);
   h.store.delete('profile', 'a');
   expect((await h.app.request(url)).status).toBe(404);
-  for (const table of ['resource_bindings', 'snapshots']) expect(h.store.db.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
 });
 
 it('旧转换 token 入口不可用，修改下载参数不能把规则资源变为任意 URL 代理', async () => {
@@ -99,16 +96,16 @@ it('规则增强公共读取，普通用户不能修改他人定义；引用关�
   expect((await h.api('/rulesets/r', 'DELETE')).status).toBe(409);
 });
 
-it('上游失败使用成功原文并标记告警，改写不可用返回 409，修复后恢复', async () => {
+it('跨周期后上游失败返回 503，不下发过期内容；改写不可用返回 409，修复后恢复', async () => {
   const h = setup(); h.profile('a', h.a.id); const url = ruleUrl(await h.main(h.tokenA, 'a'));
   expect((await h.app.request(url)).status).toBe(200);
   h.fail();
-  const stale = await h.app.request(url); expect(await stale.text()).toBe('DOMAIN,one.test\n'); expect(stale.headers.get('x-sub-forge-warning')).toBe('last-good-rule');
+  const failed = await h.app.request(url); expect(failed.status).toBe(503); expect(await failed.text()).not.toContain('one.test');
   const rs = h.store.get('ruleset', 'r')!;
   h.store.put('ruleset', { ...rs, sources: [{ id: 's', kind: 'remote', url: 'https://rules.test/unsupported.srs', format: 'srs' }] }, h.a.id);
   expect((await h.app.request(url)).status).toBe(409);
   h.store.put('ruleset', { ...rs, sources: [{ id: 'l', kind: 'local', format: 'auto', content: 'DOMAIN,repaired.test' }] }, h.a.id);
-  const repaired = await h.app.request(url); expect(await repaired.text()).toBe('DOMAIN,repaired.test\n'); expect(repaired.headers.get('x-sub-forge-warning')).toBeNull();
+  const repaired = await h.app.request(url); expect(await repaired.text()).toBe('DOMAIN,repaired.test\n');
 });
 
 it('原始节点下载按用户隔离，历史配置也不能绕过节点归属变化', async () => {
@@ -125,7 +122,7 @@ it('原始节点下载按用户隔离，历史配置也不能绕过节点归属�
   expect((await h.app.request(`/subs/nodes?token=${h.tokenA}&kind=local&id=nodes`)).status).toBe(404);
 });
 
-it('规则和订阅刷新在途删除不会恢复缓存、产物或刷新任务', async () => {
+it('规则和订阅刷新在途删除后不下发内容、不恢复刷新任务', async () => {
   const h = setup(); h.profile('a', h.a.id); const url = ruleUrl(await h.main(h.tokenA, 'a'));
   let entered!: () => void, release!: () => void;
   const started = new Promise<void>(r => entered = r), held = new Promise<void>(r => release = r);
@@ -133,7 +130,6 @@ it('规则和订阅刷新在途删除不会恢复缓存、产物或刷新任务'
   h.advance(86400001); const pending = h.app.request(url); await started;
   h.store.delete('profile', 'a'); h.store.delete('ruleset', 'r'); release();
   expect((await pending).status).toBe(404);
-  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
   h.profile('job', h.a.id, remoteRuleMatcher('https://rules.test/job.list'));
   let startedJob!: () => void, finishJob!: () => void;
   const waitJob = new Promise<void>(r => startedJob = r), holdJob = new Promise<void>(r => finishJob = r);
@@ -141,5 +137,5 @@ it('规则和订阅刷新在途删除不会恢复缓存、产物或刷新任务'
   const service = new ResourceService(h.store, h.snapshots, h.renderer);
   const job = service.startJob(h.a.id, 'profile', 'job'); await waitJob;
   h.store.delete('profile', 'job'); finishJob(); await service.stop();
-  expect(service.getJob(job.id)).toBeUndefined(); expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
+  expect(service.getJob(job.id)).toBeUndefined();
 });

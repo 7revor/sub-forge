@@ -1,5 +1,4 @@
 import { CLIENT_APPS, resolveNativeBase, type ClientApp } from '@sub-forge/core';
-import { ruleBinding } from './rule-binding.ts';
 import { managedRuleDelivery, queryUrl, type RuleResourceReference } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
 import { ResourceAccessError } from './resource-access.ts';
@@ -41,8 +40,6 @@ export type StoredRender = {
   providers: Record<string, string>;
   providerUserinfo?: Record<string, TrafficInfo>;
   nodeDependencies: NodeSetID[];
-  /** 按 ruleKey 请求时才有：订阅专属规则正文。 */
-  ruleBody?: string;
   userinfo?: TrafficInfo;
   warnings: number;
 };
@@ -112,12 +109,12 @@ export class RenderService {
     return header + '\n' + yaml.replace(/^(?:#!MANAGED-CONFIG|#SUBSCRIBED)\b[^\r\n]*(?:\r?\n|$)/, '');
   }
 
-  async render(profileId: string, target: Target, ruleKey?: string): Promise<RenderOutcome> {
+  async render(profileId: string, target: Target): Promise<RenderOutcome> {
     target = normalizeTarget(target);
     const pre: ReportItem[] = [];
     let attempt: Attempt;
     try {
-      attempt = await this.attempt(profileId, target, pre, ruleKey ? { ruleKey } : {});
+      attempt = await this.attempt(profileId, target, pre);
     } catch (e) {
       if (e instanceof ResourceAccessError) return { ok: false, accessDenied: true, message: e.message, report: pre };
       // 内核抛出的异常（如依赖解析不收敛）也按渲染失败处理，走兜底
@@ -136,6 +133,18 @@ export class RenderService {
     return createHash('sha256').update(stableStringify({ matcher: reference.matcher, options: reference.options, target })).digest('hex');
   }
 
+  /** 按地址标识在配置的当前规则中定位，只读规则定义，不读节点和正文。 */
+  profileRule(profile: ProfileDoc, target: Target, key: string): HostedRuleReference | undefined {
+    target = normalizeTarget(target);
+    const template = profile.routing?.mode === 'independent' ? undefined : profileTemplate(profile, (id, v) => this.store.getTemplate(id, v));
+    for (const rule of resolveProfileRouting(profile, template, new Report()).rules) {
+      if (rule.enabled === false) continue;
+      const reference: HostedRuleReference = { matcher: rule.matcher, ...(rule.options?.src ? { options: { src: true } } : {}) };
+      if (this.ruleKey(reference, target) === key) return reference;
+    }
+    return undefined;
+  }
+
   /** 公共规则地址写明身份、内核和格式契约，服务端无需保存任何映射即可按需转换。 */
   private publicRuleUrl(reference: RuleResourceReference, rs: RuleSetDoc, target: Target): string {
     const delivery = managedRuleDelivery(rs, target, reference.options);
@@ -148,7 +157,7 @@ export class RenderService {
   }
 
   /**
-   * 预演：复用上游快照，不读写"上一份成功结果"。用于 Profile 预览，以及模板发布前对现有 Profile 的试渲染（TPL-07 ②）。
+   * 预演：读取全部规则正文，结果不落库。用于 Profile 预览，以及模板发布前对现有 Profile 的试渲染（TPL-07 ②）。
    * template 传入时代替 Profile 当前引用的模板版本。
    */
   async preview(profileId: string, target: Target, overrides: { profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<PreviewOutcome> {
@@ -170,7 +179,7 @@ export class RenderService {
       };
     } catch (e) {
       return { ok: false, report: pre, failure: `渲染异常：${(e as Error).message}` };
-    } finally { this.store.pruneResourceBindings(); }
+    }
   }
 
   /** 新建草稿只使用传入对象，不读取已保存的 Profile，也不写访问日志。 */
@@ -178,7 +187,7 @@ export class RenderService {
     return this.preview('', target, { profile: { ...profile, id: '' }, owner });
   }
 
-  private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; ruleKey?: string; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<Attempt> {
+  private async attempt(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string } = {}): Promise<Attempt> {
     for (let retry = 0; ; retry++) {
       const start = pre.length;
       try { return await this.attemptOnce(profileId, target, pre, opts); }
@@ -189,7 +198,7 @@ export class RenderService {
     }
   }
 
-  private async attemptOnce(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; ruleKey?: string; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string }): Promise<Attempt> {
+  private async attemptOnce(profileId: string, target: Target, pre: ReportItem[], opts: { dry?: boolean; profile?: ProfileDoc; template?: TemplateVersionDoc; owner?: string }): Promise<Attempt> {
     const configurationRevision = this.store.configurationRevision;
     const usedSnapshots: {snapshot:SnapshotRow;revision?:string}[] = [];
     const checkCurrent = () => {
@@ -218,23 +227,17 @@ export class RenderService {
 
     const rules = this.collectRules(profile, template);
     for (const note of template?.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
-    // 主配置只写地址，不拉规则；专属规则请求只拉所需规则；预览才需要全部正文。
-    const neededRules = opts.dry ? undefined : new Set(resolveProfileRouting(profile, template, new Report()).rules
-      .filter(rule => opts.ruleKey !== undefined && rule.enabled !== false && this.ruleKey({ matcher: rule.matcher, ...(rule.options?.src ? { options: { src: true } } : {}) }, target) === opts.ruleKey)
-      .map(rule => rule.matcher.kind === 'ruleset' ? rule.matcher.id : ''));
     for (const rs of Object.values(rules.rulesets) as RuleSetDoc[]) {
       for (const note of rs.migrationNotes ?? []) pre.push({ level: 'warn', code: 'rules.migrated', message: note });
-      if (neededRules && !neededRules.has(rs.id)) continue;
-      for (const src of rs.sources) {
-        if (src.enabled === false || src.kind !== 'remote' || !src.url) continue;
-        const binding = ruleBinding(rs.id, `profile:${profileId || `draft:${owner}`}`);
-        const r = await this.snapshots.get('ruleset', binding.id, src.url, { ...src.fetch, format: src.format, behavior: src.behavior, scope: binding.scope });
-        checkCurrent();
-        if (r.snapshot) usedSnapshots.push({snapshot:r.snapshot,revision:r.revision});
-        if (r.snapshot?.body !== undefined) {
-          rules.snapshots[sourceKey(rs.id, src.id)] = r.snapshot.body;
-        }
-        if (r.error) pre.push({ level: r.snapshot ? 'warn' : 'error', code: 'ruleset.fetch-failed', message: `规则集「${rs.name}」的来源「${sourceLabel(src)}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `ruleset:${rs.id}` });
+    }
+    // 主配置只写地址，不读规则；预览才需要全部正文。
+    if (opts.dry) {
+      const remote = (Object.values(rules.rulesets) as RuleSetDoc[]).flatMap(rs => rs.sources.filter(src => src.enabled !== false && src.kind === 'remote' && src.url).map(src => ({ rs, src })));
+      const loaded = await Promise.allSettled(remote.map(({ src }) => this.snapshots.getRuleContent(src.url!, { ...src.fetch, format: src.format, behavior: src.behavior })));
+      for (const [index, { rs, src }] of remote.entries()) {
+        const result = loaded[index]!;
+        if (result.status === 'fulfilled') rules.snapshots[sourceKey(rs.id, src.id)] = result.value.body;
+        else pre.push({ level: 'error', code: 'ruleset.fetch-failed', message: `规则集「${rs.name}」的来源「${sourceLabel(src)}」拉取失败：${(result.reason as Error).message}`, where: `ruleset:${rs.id}` });
       }
     }
 
@@ -245,19 +248,17 @@ export class RenderService {
 
     const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const output = { target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER };
-    const ruleReferences = new Map<string, HostedRuleReference>();
     const result = renderForClient({
       profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
       ...(template ? { template } : {}),
       ...(target.platform ? { platform: target.platform } : {}),
       ...(base ? { base } : {}),
       // 预览需要完整诊断和可导出的正文；主配置只写地址，正文由规则文件请求生成。
-      ...(opts.dry ? {} : { deferRuleBody: reference => this.ruleKey(reference, target) !== opts.ruleKey }),
+      ...(opts.dry ? {} : { deferRuleBody: () => true }),
       urls: {
         provider: k => queryUrl('/subs/nodes', { kind: 'provider', profile: profile.id, id: k, ...output }, publicUrl),
         ruleset: (k, reference) => {
           if (!reference) throw new Error('托管规则缺少资源定义');
-          ruleReferences.set(k, reference);
           if (reference.matcher.kind === 'ruleset' && !reference.matcher.remote) return this.publicRuleUrl({ ...reference, matcher: reference.matcher }, rules.rulesets[reference.matcher.id] as RuleSetDoc, target);
           return queryUrl('/subs/ruleset', { profile: profile.id, key: this.ruleKey(reference, target), ...output }, publicUrl);
         },
@@ -277,7 +278,6 @@ export class RenderService {
     }
 
     checkCurrent();
-    const requestedRule = opts.ruleKey ? [...ruleReferences].find(([, reference]) => (reference.matcher.kind !== 'ruleset' || reference.matcher.remote) && this.ruleKey(reference, target) === opts.ruleKey) : undefined;
     const render: StoredRender = {
       providerNodeCounts: Object.fromEntries(Object.entries(result.providers).flatMap(([key, provider]) => provider.nodeCount === undefined ? [] : [[key, provider.nodeCount]])),
       yaml: this.managedProfileYaml(result.yaml, profile.id, target),
@@ -303,7 +303,6 @@ export class RenderService {
         const info = sumTraffic(infos.values());
         return info ? [[key, info]] : [];
       })),
-      ...(requestedRule ? { ruleBody: result.rulesets[requestedRule[0]]?.text } : {}),
       warnings: report.filter((i) => i.level === 'warn').length,
       ...(userinfo ? { userinfo } : {}),
     };
@@ -321,7 +320,7 @@ export class RenderService {
     const snapshots: {snapshot:SnapshotRow;revision?:string}[] = [];
     const report: ReportItem[] = [];
     // 并行拉取：等待时间取决于最慢的来源，不随来源数累加。
-    const results = await Promise.all(sources.map(src => this.snapshots.get('source', src.id, src.url, {})));
+    const results = await Promise.all(sources.map(src => this.snapshots.getNodeSource(src)));
     for (const [index, src] of sources.entries()) {
       const r = results[index]!;
       if (configurationRevision !== this.store.configurationRevision) throw new ConcurrentRenderChange('节点依赖在拉取期间变化，请重试');

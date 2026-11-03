@@ -13,34 +13,14 @@ describe('统一资源缓存', () => {
     expect(t.store.resourceCacheTtlSec).toBe(3600);
     t.store.close();
   });
-  it('到期等待刷新，失败按统一周期延后且保留真实成功时间，手动刷新绕过周期', async () => {
-    let body = 'DOMAIN,a.test', fail = false, calls = 0;
-    const t = setupApp({fetcher:async () => { calls++; if (fail) throw new Error('模拟上游故障'); return {status:200,body}; }});
-    const first = await t.snapshots.get('ruleset','r','https://r.test',{ttlSec:300});
-    t.advance(301000);
-    await t.snapshots.get('ruleset','r','https://r.test',{ttlSec:300});
-    expect(calls).toBe(1);
-    t.advance(86400000); fail = true;
-    const failed = await t.snapshots.get('ruleset','r','https://r.test');
-    expect(failed.snapshot?.fetchedAt).toBe(first.snapshot?.fetchedAt);
-    expect(failed.error).toBe('模拟上游故障');
-    t.advance(600000); await t.snapshots.get('ruleset','r','https://r.test'); expect(calls).toBe(2);
-    fail = false; body = 'DOMAIN,b.test';
-    const updated = await t.snapshots.get('ruleset','r','https://r.test',{}, {refresh:true});
-    expect(updated.snapshot?.body).toBe(body);
-    expect(t.store.countSnapshots('ruleset','r','https://r.test').ok).toBe(1);
-    expect(t.snapshots.status('ruleset','r','https://r.test').error).toBeUndefined();
-    t.store.close();
-  });
-  it('公共规则同参数跨用户合并在途和成功内容，不复用已改变的读取参数', async () => {
+  it('相同 URL 和参数跨用户共用一份内容，读取参数不同各存一份', async () => {
     let calls = 0;
     const t = setupApp({fetcher:async () => { calls++; return {status:200,body:'DOMAIN,a.test'}; }});
-    const a = await addUser(t.store,'a'), b = await addUser(t.store,'b');
-    for (const [id,owner] of [['r1',a.id],['r2',a.id],['r3',b.id]]) t.store.put('ruleset',{id:id!,name:id!,sources:[]},owner!);
-    await Promise.all(['r1','r2'].map(id=>t.snapshots.get('ruleset',id,'https://r.test')));
+    await Promise.all([t.snapshots.getRuleContent('https://r.test'), t.snapshots.getRuleContent('https://r.test')]);
     expect(calls).toBe(1);
-    await t.snapshots.get('ruleset','r3','https://r.test'); expect(calls).toBe(1);
-    await t.snapshots.get('ruleset','r1','https://r.test',{ua:'other'}); expect(calls).toBe(2);
+    await t.snapshots.getRuleContent('https://r.test'); expect(calls).toBe(1);
+    await t.snapshots.getRuleContent('https://r.test',{ua:'other'}); expect(calls).toBe(2);
+    await t.snapshots.getRuleContent('https://r.test',{ttlSec:300}); expect(calls).toBe(2);
     t.store.close();
   });
 });

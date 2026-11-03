@@ -27,7 +27,7 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
     if(!job || job.owner!==c.get('user').id)throw notFound();
     return c.json({job});
   });
-  app.get('/system/resources',requireAdmin,c=>c.json({items:[...resources.statuses(resources.all()),...repos.list().filter(r=>r.enabled).map(r=>({repositoryId:r.id,name:`规则仓库索引 / ${r.name}`,lastSuccessAt:r.builtAt,lastAttemptAt:r.checkedAt,nextFetchAt:r.checkedAt ? r.checkedAt+store.resourceCacheTtlSec*1000 : undefined,refreshing:r.indexing,error:r.error,available:!!r.builtAt}))]}));
+  app.get('/system/resources',requireAdmin,c=>c.json({items:[...resources.statuses(resources.all()),...repos.list().filter(r=>r.enabled).map(r=>({repositoryId:r.id,name:`规则仓库索引 / ${r.name}`,lastSuccessAt:r.builtAt,lastAttemptAt:r.checkedAt,refreshing:r.indexing,error:r.error,available:!!r.builtAt}))]}));
   app.post('/system/resources/:resource/refresh', requireAdmin, c => {
     const key = c.req.param('resource');
     const all = resources.all();

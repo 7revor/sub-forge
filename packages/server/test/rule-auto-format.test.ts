@@ -88,7 +88,7 @@ describe('自动格式贯通预览、保存与下载', () => {
       if (!before.ok) throw new Error(before.message);
       expect(parse(before.render.yaml)['rule-providers']['旧设置']).toMatchObject({ format: 'text', behavior: 'classical' });
       body = '192.0.2.0/24';
-      await h.snapshots.refresh('ruleset', 'r', 'https://example.test/no-extension', { format: 'ipcidr' });
+      await h.snapshots.refreshRuleContent('https://example.test/no-extension', { format: 'ipcidr' });
       const after = await h.renderer.render('p', { client: 'mihomo' });
       expect(after.ok).toBe(true);
       if (!after.ok) throw new Error(after.message);

@@ -94,7 +94,7 @@ describe('加密与迁移', () => {
       expect(store.snapshotHistory('source', 's')).toHaveLength(2);
       expect(store.latestSnapshot('source', 's', legacy.url)?.body).toBe('内容4');
       expect(store.latestSnapshot('source', 's', legacy.url, false)?.error).toBe('失败1');
-      expect(store.snapshotHistory('ruleset', 'r')).toHaveLength(2);
+      expect(store.snapshotHistory('ruleset', 'r')).toHaveLength(0); // 规则快照可重建，v35 清除
       expect(store.get('ruleset', 'r')?.sources[0]?.fetch).toEqual({ ua: '规则 UA', timeoutMs: 2000 });
       const before = store.snapshotHistory('source', 's');
       store.close();
@@ -239,7 +239,7 @@ describe('加密与迁移', () => {
       { id: 'tg', name: 'Telegram', kind: 'remote', url: 'https://r.test/tg.list' },
       { id: 'rules', name: '单条规则', kind: 'local', format: 'classical', content: 'IP-CIDR,10.0.0.0/8' },
     ] } });
-    expect(s.latestSnapshot('ruleset', 'fin', 'https://r.test/tg.list')?.body).toBe('DOMAIN,t.me');
+    expect(s.latestSnapshot('ruleset', 'fin', 'https://r.test/tg.list')).toBeUndefined();
     const renamed = s.list('ruleset', 'u2');
     expect(renamed).toHaveLength(1);
     expect(renamed[0]!.id).not.toBe('own');
@@ -255,7 +255,7 @@ describe('加密与迁移', () => {
     expect(reopened.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
     expect(reopened.get('profile', 'p')).toEqual(migratedProfile);
     expect(reopened.list('ruleset')).toEqual(migratedRulesets);
-    expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 1, failed: 0 });
+    expect(reopened.countSnapshots('ruleset', 'fin', 'https://r.test/tg.list')).toEqual({ ok: 0, failed: 0 });
     reopened.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -271,6 +271,7 @@ describe('加密与迁移', () => {
     const url = 'https://example.test/sub?token=MIGRATION_SECRET';
     try {
       const original = new Store(file, { cipher });
+      original.put('source', { id: 's', name: '源', url, pipeline: [] });
       original.addSnapshot({ ownerKind: 'source', ownerId: 's', url, fetchedAt: 42, ok: true, body: '旧正文' });
       original.close();
       const old = new Database(file);

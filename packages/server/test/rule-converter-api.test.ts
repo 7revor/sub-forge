@@ -65,7 +65,7 @@ describe('来源获取与服务端转换分离', () => {
     const id = saved.json.item.id;
     expect((await bob.post('/api/rulesets/source', { id, source: remote })).status).toBe(200);
     expect((await alice.post('/api/rulesets/source', { id, source: remote })).json.content).toBe(content);
-    expect(store.latestSnapshot('ruleset', id, remote.url)?.body).toBe(content);
+    expect(store.latestSnapshot('ruleset', store.ruleSnapshotKey(remote.url, { format: remote.format as 'auto' }), remote.url)?.body).toBe(content);
     await alice.post('/api/rulesets/source', { source: remote });
     await bob.post('/api/rulesets/source', { source: remote });
     expect(calls).toHaveLength(3);

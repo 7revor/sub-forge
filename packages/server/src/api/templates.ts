@@ -1,4 +1,3 @@
-import { ruleBinding } from '../rule-binding.ts';
 import { requiredQuery } from '../query.ts';
 import { normalizeRulePresence } from '../rule-presence.ts';
 // 模板：所有人可读，管理员直接保存。保存时检查模板与绑定订阅：
@@ -67,13 +66,11 @@ async function selfCheck(store: Store, snapshots: SnapshotService, t: Template, 
       }
       let content = src.content ?? '';
       if (src.kind === 'remote') {
-        const result = await snapshots.get('ruleset', ruleBinding(id, `template:${t.id}`).id, src.url!, { ...src.fetch, format: src.format, behavior: src.behavior, scope: ruleBinding(id, `template:${t.id}`).scope });
-        if (!result.snapshot) {
-          report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `${label}没有可用快照：${result.error ?? '无法拉取'}`, where });
+        try { content = (await snapshots.getRuleContent(src.url!, { ...src.fetch, format: src.format, behavior: src.behavior })).body; }
+        catch (error) {
+          report.push({ level: 'error', code: 'template.ruleset-unavailable', message: `${label}无法拉取：${(error as Error).message}`, where });
           continue;
         }
-        content = result.snapshot.body ?? '';
-        if (result.error || result.stale) report.push({ level: 'warn', code: 'template.ruleset-snapshot', message: `${label}使用可用快照${result.error ? `：${result.error}` : '，后台刷新中'}`, where });
       }
       if (src.format === 'mrs') {
         if (!content.startsWith('#subforge-binary-mrs\n')) report.push({ level: 'error', code: 'template.ruleset-invalid', message: `${label}没有有效的托管 MRS 内容`, where });

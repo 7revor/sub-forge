@@ -161,7 +161,6 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
         // 不能把仅能访问某个订阅的旧凭证升级为用户全部私有资源的通行证。
         for (const user of this.store.listUsers()) this.store.createToken(user.id);
         this.db.exec('DROP TABLE sub_tokens; DELETE FROM last_good;');
-        this.store.pruneResourceBindings(this.legacyTemplates);
       }
       if (version < 24) {
         const columns = new Set((this.db.prepare('PRAGMA table_info(access_log)').all() as { name: string }[]).map(column => column.name));
@@ -174,7 +173,6 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       if (version < 25) {
         // 旧配置中的路径 token 地址全部失效，不能用 last-good 再下发旧入口。
         this.db.exec('DELETE FROM last_good');
-        this.store.pruneResourceBindings(this.legacyTemplates);
       }
       if (version < 26) {
         const columns = new Set((this.db.prepare('PRAGMA table_info(access_log)').all() as { name: string }[]).map(column => column.name));
@@ -205,6 +203,7 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       // v33：渲染结果和公共规则产物不再落库，全部按上游快照实时生成。
       this.db.exec('DROP TABLE IF EXISTS last_good; DROP TABLE IF EXISTS shared_rule_resources');
       this.decryptStoredData();
+      this.retireResourceBindings();
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
@@ -237,10 +236,37 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
     plain('snapshots', ['url', 'body', 'error']);
   }
 
-  /** v8：来源改写提升为组级内容匹配，远程行号只依据已有成功快照转换。 */
+  /**
+   * v35：缓存只属于上游，不再记录下游引用。节点快照改回按订阅源 ID 存放，多个订阅源绑定同一资源时各留一份；
+   * 对应不上当前订阅源的节点快照删除。规则快照可重建，直接清除。
+   */
+  private retireResourceBindings(): void {
+    if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'resource_bindings'").get()) {
+      this.db.prepare(`INSERT INTO snapshots (owner_kind, owner_id, url, url_hash, fetched_at, ok, status, body, hash, userinfo, error)
+        SELECT 'source', b.id, s.url, s.url_hash, s.fetched_at, s.ok, s.status, s.body, s.hash, s.userinfo, s.error
+        FROM resource_bindings b JOIN snapshots s ON s.owner_kind = 'source' AND s.owner_id = b.resource AND s.url_hash = b.url_hash
+        WHERE b.kind = 'source'`).run();
+      this.db.exec('DROP TABLE resource_bindings');
+    }
+    this.db.exec("DELETE FROM snapshots WHERE owner_kind = 'ruleset' OR (owner_kind = 'source' AND owner_id LIKE 'resource:%')");
+    const urls = new Map((this.db.prepare("SELECT id, data FROM docs WHERE kind = 'source'").all() as { id: string; data: string }[])
+      .map(row => [row.id, this.cipher.hmac((JSON.parse(row.data) as SourceDoc).url)]));
+    for (const row of this.db.prepare("SELECT DISTINCT owner_id, url_hash FROM snapshots WHERE owner_kind = 'source'").all() as { owner_id: string; url_hash: string }[]) {
+      if (urls.get(row.owner_id) !== row.url_hash) this.db.prepare("DELETE FROM snapshots WHERE owner_kind = 'source' AND owner_id = ? AND url_hash = ?").run(row.owner_id, row.url_hash);
+    }
+    this.db.exec(`DELETE FROM snapshots WHERE id NOT IN (SELECT id FROM (
+      SELECT id, ROW_NUMBER() OVER (PARTITION BY owner_id, ok ORDER BY fetched_at DESC, id DESC) AS position FROM snapshots) WHERE position = 1)`);
+  }
+
+  /** v8：来源改写提升为组级内容匹配，远程行号只依据已有成功快照转换；没有内容时保留原样，可再次重试。 */
   private promoteRuleOverrides(): void {
+    // 升级可能经过旧版本的快照行，这里按当时的 owner_id 读取，不依赖新的缓存键格式。
+    const legacyBody = (id: string, url: string) => {
+      const row = this.db.prepare("SELECT body FROM snapshots WHERE owner_kind = 'ruleset' AND owner_id = ? AND url_hash = ? AND ok = 1 ORDER BY fetched_at DESC, id DESC LIMIT 1").get(id, this.cipher.hmac(url)) as { body: string | null } | undefined;
+      return row?.body == null ? undefined : this.cipher.decrypt(row.body);
+    };
     for (const rs of this.store.list('ruleset')) {
-      const next = promoteRuleSetOverrides(rs, (src) => src.url ? this.store.latestSnapshot('ruleset', rs.id, src.url)?.body : undefined);
+      const next = promoteRuleSetOverrides(rs, (src) => src.url ? legacyBody(rs.id, src.url) : undefined);
       if (JSON.stringify(next) !== JSON.stringify(rs)) {
         this.db.prepare("UPDATE docs SET data = ?, updated_at = ? WHERE kind = 'ruleset' AND id = ?")
           .run(JSON.stringify(next), this.now(), rs.id);

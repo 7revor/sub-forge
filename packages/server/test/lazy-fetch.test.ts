@@ -29,15 +29,15 @@ it('内容过期时最多等待限定时间，超时先返回旧内容，刷新�
   let body = nodes('旧'), hold: Promise<void> | undefined;
   const h = setupApp({ fetcher: async () => { if (hold) await hold; return { status: 200, body }; } });
   h.store.put('source', { id: 's', name: '源', url: URL_A, pipeline: [] }, 'u');
-  await h.snapshots.get('source', 's', URL_A);
+  await h.snapshots.getNodeSource({ id: 's', url: URL_A });
   h.advance(86400_001); body = nodes('新');
   let release!: () => void; hold = new Promise(resolve => { release = resolve; });
-  const pending = h.snapshots.get('source', 's', URL_A);
+  const pending = h.snapshots.getNodeSource({ id: 's', url: URL_A });
   await vi.advanceTimersByTimeAsync(STALE_WAIT_MS);
   const result = await pending;
   expect(result).toMatchObject({ stale: true }); expect(result.snapshot?.body).toContain('旧'); expect(result.error).toContain('后台更新');
   release(); await h.snapshots.settled();
-  expect(h.store.latestSnapshot('source', h.snapshots.resourceId('source', 's', URL_A), URL_A)?.body).toContain('新');
+  expect(h.store.latestSnapshot('source', 's', URL_A)?.body).toContain('新');
   h.store.close();
 });
 
@@ -45,9 +45,9 @@ it('内容过期但上游及时响应时返回新内容', async () => {
   let body = nodes('旧');
   const h = setupApp({ fetcher: async () => ({ status: 200, body }) });
   h.store.put('source', { id: 's', name: '源', url: URL_A, pipeline: [] }, 'u');
-  await h.snapshots.get('source', 's', URL_A);
+  await h.snapshots.getNodeSource({ id: 's', url: URL_A });
   h.advance(86400_001); body = nodes('新');
-  const result = await h.snapshots.get('source', 's', URL_A);
+  const result = await h.snapshots.getNodeSource({ id: 's', url: URL_A });
   expect(result).toMatchObject({ stale: false }); expect(result.snapshot?.body).toContain('新');
   h.store.close();
 });
@@ -56,7 +56,7 @@ it('从未拉取成功时等到上游结束，不提前返回', async () => {
   let release!: () => void; const hold = new Promise<void>(resolve => { release = resolve; });
   const h = setupApp({ fetcher: async () => { await hold; return { status: 200, body: nodes('首次') }; } });
   h.store.put('source', { id: 's', name: '源', url: URL_A, pipeline: [] }, 'u');
-  let done = false; const pending = h.snapshots.get('source', 's', URL_A).then(r => { done = true; return r; });
+  let done = false; const pending = h.snapshots.getNodeSource({ id: 's', url: URL_A }).then(r => { done = true; return r; });
   await vi.advanceTimersByTimeAsync(STALE_WAIT_MS * 2);
   expect(done).toBe(false);
   release(); expect((await pending).snapshot?.body).toContain('首次');
@@ -77,49 +77,50 @@ it('检查快照状态时不读取正文', async () => {
   vi.useRealTimers();
   const h = setupApp({ fetcher: async () => ({ status: 200, body: nodes('甲') }) });
   h.store.put('source', { id: 's', name: '源', url: URL_A, pipeline: [] }, 'u');
-  await h.snapshots.get('source', 's', URL_A);
+  await h.snapshots.getNodeSource({ id: 's', url: URL_A });
   const read = vi.spyOn(h.store, 'latestSnapshot');
-  h.snapshots.status('source', 's', URL_A);
+  h.snapshots.nodeStatus({ id: 's', url: URL_A });
   expect(read).not.toHaveBeenCalled();
   h.store.close();
 });
 
-describe('按系统缓存时间清理无引用资源', () => {
+describe('按全局周期清理', () => {
   const DAY = 86400_000;
   function env() {
     vi.useRealTimers();
-    let now = 1_700_000_000_000; const fetcher = vi.fn(async (url: string) => ({ status: 200, body: url.includes('nodes') ? nodes('甲') : 'DOMAIN,a.test' }));
+    let now = new Date(2026, 10, 3, 1).getTime(); const fetcher = vi.fn(async (url: string) => ({ status: 200, body: url.includes('nodes') ? nodes('甲') : 'DOMAIN,a.test' }));
     const h = setupApp({ fetcher, now: () => now });
     const service = new ResourceService(h.store, h.snapshots, h.renderer, () => now);
-    h.store.put('source', { id: 'used', name: '使用中', url: URL_A, pipeline: [] }, 'u');
     h.store.put('source', { id: 'idle', name: '无人使用', url: URL_B, pipeline: [] }, 'u');
-    h.store.put('profile', { id: 'p', name: 'p', nodeSets: [{ ref: { type: 'source', id: 'used' }, output: 'provider' }], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }, 'u');
-    const bound = (id: string) => h.store.resourceBinding('source', id, id === 'used' ? URL_A : URL_B);
-    return { ...h, service, fetcher, bound, tick: (ms: number) => { now += ms; } };
+    h.store.put('ruleset', { id: 'r', name: '规则', sources: [{ id: 's', kind: 'remote', url: 'https://rules.test/a', format: 'auto' }] }, 'u');
+    h.store.put('profile', { id: 'p', name: 'p', nodeSets: [], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [{ id: 'x', matcher: { kind: 'ruleset', id: 'r' }, target: { kind: 'builtin', name: 'DIRECT' } }], final: { kind: 'builtin', name: 'DIRECT' } } } }, 'u');
+    const count = (kind: string) => (h.store.db.prepare('SELECT COUNT(*) AS n FROM snapshots WHERE owner_kind = ?').get(kind) as { n: number }).n;
+    return { ...h, service, fetcher, count, tick: (ms: number) => { now += ms; } };
   }
 
-  it('超过缓存时间且无人使用才清理，使用中和未到期的保留，清理不访问上游', async () => {
+  it('规则快照跨周期就删除，有引用也一样；节点快照永不清理；清理不访问上游', async () => {
     const h = env();
-    await h.snapshots.get('source', 'used', URL_A); await h.snapshots.get('source', 'idle', URL_B);
+    await h.snapshots.getNodeSource({ id: 'idle', url: URL_B }); await h.snapshots.getRuleContent('https://rules.test/a', { format: 'auto' });
     h.fetcher.mockClear();
     h.service.sweep();
-    expect(h.bound('idle')).toBeDefined();
-    h.tick(DAY + 1); h.service.sweep();
-    expect(h.bound('idle')).toBeUndefined(); expect(h.bound('used')).toBeDefined();
-    expect(h.store.db.prepare("SELECT COUNT(*) AS n FROM snapshots WHERE ok = 1").get()).toEqual({ n: 1 });
+    expect([h.count('source'), h.count('ruleset')]).toEqual([1, 1]);
+    h.tick(DAY); h.service.sweep();
+    expect([h.count('source'), h.count('ruleset')]).toEqual([1, 0]);
+    h.tick(DAY * 400); h.service.sweep();
+    expect(h.count('source')).toBe(1);
     expect(h.fetcher).not.toHaveBeenCalled();
-    expect(h.store.get('source', 'idle')?.name).toBe('无人使用');
-    expect((await h.snapshots.get('source', 'idle', URL_B)).snapshot?.body).toContain('甲');
-    expect(h.fetcher).toHaveBeenCalledTimes(1);
     await h.service.stop(); h.store.close();
   });
 
-  it('清理周期跟随系统缓存时间设置', async () => {
-    const h = env();
-    h.store.setResourceCacheTtlSec(3600);
-    await h.snapshots.get('source', 'idle', URL_B);
-    h.tick(3600_001); h.service.sweep();
-    expect(h.bound('idle')).toBeUndefined();
-    await h.service.stop(); h.store.close();
+  it('定时器只在跨过周期边界时清理，启动时补做一次；修改周期后按新周期判定', async () => {
+    const h = env(), sweep = vi.spyOn(h.service, 'sweep');
+    vi.useFakeTimers();
+    h.service.start(); expect(sweep).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(120_000); expect(sweep).toHaveBeenCalledTimes(1);
+    h.tick(DAY); await vi.advanceTimersByTimeAsync(60_000); expect(sweep).toHaveBeenCalledTimes(2);
+    h.store.setResourceCacheTtlSec(3600); h.tick(3600_000); await vi.advanceTimersByTimeAsync(60_000); expect(sweep).toHaveBeenCalledTimes(3);
+    await h.service.stop();
+    h.tick(DAY); await vi.advanceTimersByTimeAsync(60_000); expect(sweep).toHaveBeenCalledTimes(3);
+    h.store.close();
   });
 });

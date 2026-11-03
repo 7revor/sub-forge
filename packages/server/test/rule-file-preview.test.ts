@@ -86,24 +86,21 @@ it('主配置写入仓库文件身份，地址无需服务端映射即可转换�
 
 const rawRepositoryUrl = (token: string) => `/resources/repo?${new URLSearchParams({ id: 'blackmatrix7', ref: 'master', path: 'rule/Surge/Google/Google.list', token })}`;
 
-it.each(['disable', 'remove-index', 'delete'])('仓库 %s 清除原文绑定和无引用快照，旧链接不可访问', async action => {
+it.each(['disable', 'remove-index', 'delete'])('仓库 %s 后旧链接不可访问，转换不再下发', async action => {
   const h = await setup({ cacheSnapshots: true });
   const token = h.store.userToken(h.privateUser.id)!.token;
   const matcher = await h.resolve(), reference = { matcher }, target = { client: 'mihomo' as const };
   expect((await h.renderer.sharedRules.read(reference, target))?.body).toContain('google.example.test');
   const raw = rawRepositoryUrl(token);
   expect((await h.app.request(raw)).status).toBe(200);
-  expect(h.store.db.prepare('SELECT COUNT(*) AS n FROM resource_bindings').get()).toEqual({ n: 2 });
   if (action === 'disable') h.repos.setEnabled('blackmatrix7', false);
   else if (action === 'delete') await h.repos.removeCustom('blackmatrix7');
   else { h.setPaths([]); await h.repos.refresh('blackmatrix7'); }
-  expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
-  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
   expect(await h.renderer.sharedRules.read(reference, target)).toBeUndefined();
   expect((await h.app.request(raw)).status).toBe(action === 'remove-index' ? 400 : 404);
 });
 
-it.each(['raw', 'first-compile'])('仓库停用后重新启用不恢复在途 %s 请求或旧缓存', async mode => {
+it.each(['raw', 'first-compile'])('仓库停用后重新启用不恢复在途 %s 请求', async mode => {
   const h = await setup({ cacheSnapshots: true });
   const token = h.store.userToken(h.privateUser.id)!.token;
   let started!: () => void, release!: () => void;
@@ -117,6 +114,4 @@ it.each(['raw', 'first-compile'])('仓库停用后重新启用不恢复在途 %s
   const result = await pending;
   if (mode === 'raw') expect((result as Response).status).toBe(404);
   else expect(result).toBeUndefined();
-  expect(h.store.db.prepare('SELECT * FROM resource_bindings').all()).toEqual([]);
-  expect(h.store.db.prepare('SELECT * FROM snapshots').all()).toEqual([]);
 });

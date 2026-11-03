@@ -122,31 +122,21 @@ export class RuleRepoService {
       files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path) || a.ref.localeCompare(b.ref))
         .map(file => ({ ...file, url: rawUrl(definition, file), upstream: upstreamUrl(definition, file) })) };
   }
-  fileResource(id:string,ref:string,path:string) {
+  /** 校验文件属于当前启用索引后返回上游地址；不接受任意 URL。 */
+  fileUrl(id:string,ref:string,path:string):string {
     this.assertEnabled(id);
     if (!findRuleFile(this.store.db,id,ref,path) || !isIndexedRuleFile(path)) throw bad('所选文件不在当前文本目录中');
-    return {kind:'ruleset' as const,id:`repository-file:${id}:${ref}:${path}`,name:path,url:rawUrl(this.definition(id,true),{ref,path,format:'auto'}),options:{format:'auto' as const,scope:'public-rules'}};
+    return rawUrl(this.definition(id,true),{ref,path,format:'auto'});
   }
-  /** 按索引文件构造转换用规则集；绑定不计入配置引用，无人引用时由定时清理回收。文件失效返回 undefined。 */
+  /** 按索引文件构造转换用规则集，只用于本次下发，不进入缓存身份。文件失效返回 undefined。 */
   ruleSetFromFiles(id:string,files:{ref:string;path:string}[]):RuleSetDoc|undefined {
     try {
-      const sources = files.map((file,index) => ({id:`file-${index}`,kind:'remote' as const,name:file.path,url:this.fileResource(id,file.ref,file.path).url,format:'auto' as const,repository:{repo:id,entry:findRuleFile(this.store.db,id,file.ref,file.path)!.entry ?? file.path,ref:file.ref,path:file.path}}));
-      return {id:`repo-read:${createHash('sha256').update(JSON.stringify([id,files])).digest('hex').slice(0,32)}`,name:files[0]!.path.split('/').at(-1)!,sources};
+      const sources = files.map((file,index) => ({id:`file-${index}`,kind:'remote' as const,name:file.path,url:this.fileUrl(id,file.ref,file.path),format:'auto' as const,repository:{repo:id,entry:findRuleFile(this.store.db,id,file.ref,file.path)!.entry ?? file.path,ref:file.ref,path:file.path}}));
+      return {id:`repo:${createHash('sha256').update(JSON.stringify([id,files])).digest('hex').slice(0,32)}`,name:files[0]!.path.split('/').at(-1)!,sources};
     } catch (error) {
       if (error instanceof HttpError) return undefined;
       throw error;
     }
-  }
-  /** 只调度已实际读取的公开正文，不预抓取整库文件。失效索引不再自动拉取。 */
-  cachedResources() {
-    const rows = this.store.db.prepare("SELECT DISTINCT id FROM resource_bindings WHERE kind = 'ruleset' AND id LIKE 'repository-file:%'").all() as {id:string}[];
-    return rows.flatMap(row => {
-      const match = /^repository-file:([^:]+):([^:]+):(.+)$/.exec(row.id);
-      if (!match) return [];
-      const id=match[1]!, ref=match[2]!, path=match[3]!;
-      if (!this.rows().some(r => r.id === id && r.enabled) || !findRuleFile(this.store.db,id,ref,path)) return [];
-      return [this.fileResource(id,ref,path)];
-    });
   }
   /** 只预览选中的目录文件，保留注释和空行，不解析 README 或聚合其他来源。 */
   async filePreview(id: string, ref: string, path: string) {
@@ -161,7 +151,6 @@ export class RuleRepoService {
     const content = await this.readFile(definition, file);
     this.assertSnapshot(id, version);
     return { repo: id, entry: node.entry ?? undefined, ref, path, name: path.split('/').at(-1)!, content,
-      ...(this.snapshots ? {cache:this.snapshots.status('ruleset',`repository-file:${id}:${ref}:${path}`,rawUrl(definition,file),{format:'auto',scope:'public-rules'})} : {}),
       url: rawUrl(definition, file), upstream: upstreamUrl(definition, file), license: definition.license };
   }
   async linkedFileSource(repo: string, path: string, selected: { ref: string; path: string }) {
@@ -302,9 +291,7 @@ export class RuleRepoService {
     try {
       let content: string;
       if (this.snapshots && isIndexedRuleFile(file.path)) {
-        const result = await this.snapshots.get('ruleset', `repository-file:${repo.id}:${file.ref}:${file.path}`, rawUrl(repo, file), { format: 'auto', scope: 'public-rules' });
-        if (!result.snapshot?.body) throw new Error(result.error ?? '没有可用规则缓存');
-        content = result.snapshot.body;
+        content = (await this.snapshots.getRuleContent(rawUrl(repo, file), { format: 'auto' })).body;
       } else if (file.commit) content = await this.cache.read(repo, file.commit, file.path);
       else {
         // 迁移前的旧索引仍可使用；首次 Git 同步后每个文件均携带固定提交。
@@ -312,7 +299,7 @@ export class RuleRepoService {
         if (response.status !== 200) throw new Error(`规则文件读取失败：HTTP ${response.status}`);
         content = response.body;
       }
-      // 停用后重新启用也属于撤销；不能让后续 status() 重新建立已清除的绑定。
+      // 停用后重新启用也属于撤销。
       if (invalidated) throw notFound('仓库文件');
       this.assertEnabled(repo.id);
       return content;

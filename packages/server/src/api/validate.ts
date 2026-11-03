@@ -268,7 +268,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         if (src.format === 'mrs' && src.behavior !== 'domain' && src.behavior !== 'ipcidr') throw bad(`${at}：mrs 需要声明 behavior 为 domain 或 ipcidr`);
         if (src.overrides !== undefined && !Array.isArray(src.overrides)) throw bad(`${at}：overrides 必须是数组`);
       });
-      Object.assign(doc, promoteRuleSetOverrides(doc as unknown as RuleSetDoc, (src) => src.url ? store.latestSnapshot('ruleset', id, src.url)?.body : undefined));
+      Object.assign(doc, promoteRuleSetOverrides(doc as unknown as RuleSetDoc, (src) => src.url ? store.latestSnapshot('ruleset', store.ruleSnapshotKey(src.url, { ...src.fetch, format: src.format, behavior: src.behavior }), src.url)?.body : undefined));
       break;
     }
     case 'preset': throw bad('基础设置预设已移除');

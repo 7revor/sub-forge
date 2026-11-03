@@ -70,7 +70,6 @@ export function createApi(deps: ApiDeps) {
   // 占位接口先于 /users/:id 等通配路由注册
   const repos = deps.ruleRepos ?? new RuleRepoService(deps.store, createUpstreamFetcher({ allow: parseAllowList([]) }), deps.now,undefined,deps.snapshots);
   const resources=deps.resources ?? new ResourceService(deps.store,deps.snapshots,deps.renderer,deps.now);
-  resources.setAdditionalResources(() => repos.cachedResources());
   api.route('/', ruleRepoRoutes(deps.store, repos));
   api.route('/', ruleOptionRoutes(deps.store, repos));
 

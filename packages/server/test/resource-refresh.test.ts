@@ -21,15 +21,11 @@ async function done(api:Awaited<ReturnType<typeof setup>>['api'],id:string){
   for(let i=0;i<100;i++){const result=await api.get(`/api/refresh-jobs?id=${id}`);if(result.json.job.state!=='running')return result.json.job;await new Promise(r=>setTimeout(r,5));}throw new Error('刷新任务没有结束');
 }
 describe('资源刷新任务',()=>{
-  it('未被订阅绑定的模板也收集远程依赖，保留模板作用域并跳过停用规则', async () => {
-    const h = setupApp(); active.push(h);
-    const target = { kind: 'builtin' as const, name: 'DIRECT' as const };
-    const rule = { id: 'r', matcher: remoteRuleMatcher('https://rules.test/template'), target };
-    h.store.putTemplate({ id: 't', name: '独立模板', groups: [], rules: [rule, { ...rule, id: 'same' }, { ...rule, id: 'off', enabled: false, matcher: remoteRuleMatcher('https://rules.test/disabled') }], final: target });
+  it('系统资源只列节点订阅；规则不进入资源异常', async () => {
+    const h = await setup();
     const service = new ResourceService(h.store, h.snapshots, h.renderer);
-    const resources = service.all();
-    expect(resources.map(resource => ({ url: resource.url, scope: resource.options.scope }))).toEqual([{ url: 'https://rules.test/template', scope: 'template:t' }]);
-    expect(h.store.list('profile')).toEqual([]);
+    expect(service.all().map(resource => resource.url)).toEqual(['https://node.test']);
+    expect(service.collect('profile', 'p').map(resource => resource.kind).sort()).toEqual(['ruleset', 'source']);
     await service.stop();
   });
   it('手动刷新后 Surge 和 Loon 按当前配置生成', async () => {
@@ -88,7 +84,7 @@ describe('资源刷新任务',()=>{
       return {status:200,body:'DOMAIN,example.test'};
     }});active.push(h);
     const service=new ResourceService(h.store,h.snapshots,h.renderer);
-    const resources=Array.from({length:6},(_,i)=>({kind:'ruleset' as const,id:`r${i}`,name:`子规则 ${i}`,url:`https://rules.test/${i}`,options:{format:'auto' as const}}));
+    const resources=Array.from({length:6},(_,i)=>({kind:'ruleset' as const,name:`子规则 ${i}`,url:`https://rules.test/${i}`,params:{format:'auto' as const}}));
     const job=service.startJob('u','ruleset','r',resources);
     const stopping=service.stop();
     release();
@@ -111,8 +107,10 @@ describe('资源刷新任务',()=>{
     expect(job.total).toBe(2);expect(job.completed).toBe(2);expect(job.results.filter((r:any)=>!r.ok)).toHaveLength(1);expect(job.render.ok).toBe(true);
     expect(h.calls.sort()).toEqual(['https://node.test','https://rules.test']);
     const failedState=(await h.api.get('/api/rulesets/cache?id=r')).json.items[0];
-    expect(failedState).toMatchObject({lastSuccessAt:lastSuccess,available:true,error:'模拟失败'});
-    expect(failedState.lastAttemptAt).toBeGreaterThan(lastSuccess);
+    // 手动刷新失败只报告在任务结果里，本周期仍有效的快照保留。
+    expect(failedState).toMatchObject({kind:'ruleset',lastSuccessAt:lastSuccess,available:true});
+    expect(failedState.error).toBeUndefined();
+    expect(job.results.find((r:any)=>!r.ok)).toMatchObject({available:true,error:'模拟失败'});
     expect((await h.api.get('/api/sources/cache?id=s')).json.items[0].lastSuccessAt).toBeGreaterThan(lastSuccess);
     const sub=await h.app.request('/subs/profile?token=t&id=p');const cfg=parse(await sub.text());
     expect(sub.headers.get('profile-update-interval')).toBe('24');
@@ -128,7 +126,7 @@ describe('资源刷新任务',()=>{
   });
 });
 
-it('MRS 校验成功后原样托管，损坏的新响应不会覆盖上次成功文件',async()=>{
+it('MRS 校验成功后原样托管，手动刷新收到损坏响应时保留本周期的快照',async()=>{
   const {readFile}=await import('node:fs/promises');
   const {createUpstreamFetcher}=await import('../src/net/upstream.ts');
   const {parseAllowList}=await import('../src/net/ssrf.ts');
@@ -143,6 +141,6 @@ it('MRS 校验成功后原样托管，损坏的新响应不会覆盖上次成功
   const provider=Object.values(parse(await sub.text())['rule-providers'])[0] as {url:string;format:string};
   expect(provider.format).toBe('mrs');const url=new URL(provider.url);
   const res=await h.app.request(url.pathname+url.search);expect(Buffer.from(await res.arrayBuffer())).toEqual(bytes);
-  bad=true;const refreshed=await h.snapshots.refresh('ruleset','r','https://mrs.test',{format:'mrs'});expect(refreshed.ok).toBe(false);
+  bad=true;await expect(h.snapshots.refreshRuleContent('https://mrs.test',{format:'mrs',behavior:'domain'})).rejects.toThrow();
   const fallback=await h.app.request(url.pathname+url.search);expect(Buffer.from(await fallback.arrayBuffer())).toEqual(bytes);
 });

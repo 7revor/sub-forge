@@ -35,7 +35,7 @@ describe('单地址订阅源的失败回退', () => {
     const h = setup(good);
     expect((await h.app.request('/subs/profile?token=token&id=p')).status).toBe(200);
     h.responses[good] = new Error('已用地址也不可用'); h.advance(1000);
-    await h.snapshots.refresh('source', 's', good);
+    await h.snapshots.refreshNodeSource({ id: 's', url: good });
     const res = await h.renderer.render('p', { client: 'mihomo' });
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error(res.message);

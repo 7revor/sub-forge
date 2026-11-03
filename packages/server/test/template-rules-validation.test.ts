@@ -73,14 +73,16 @@ describe('模板自身的规则可用性检查', () => {
     expect(h.store.listTemplates().filter(t => t.id === id)).toEqual([first.json.item]);
   });
 
-  it('远程暂时失败但有可用快照时允许发布并告警', async () => {
+  it('本周期已有规则快照时不再读源，可以发布；跨周期后读源失败不能发布', async () => {
     const h = await setup(); h.respond('DOMAIN,valid.example.test');
-    await h.snapshots.refresh('ruleset', 'r', 'https://rules.example.test/list');
+    expect((await h.admin.post('/api/templates', h.template)).status).toBe(201);
     h.respond(new Error('暂时不可用'));
-    await h.snapshots.refresh('ruleset', 'r', 'https://rules.example.test/list');
-    const res = await h.admin.post('/api/templates', h.template);
-    expect(res.status).toBe(201);
-    expect(res.json.report).toContainEqual(expect.objectContaining({ level: 'warn', code: 'template.ruleset-snapshot' }));
+    const cached = await h.admin.post('/api/templates', { ...h.template, name: '第二份' });
+    expect(cached.status).toBe(201);
+    h.advance(86_401_000);
+    const failed = await h.admin.post('/api/templates', { ...h.template, name: '第三份' });
+    expect(failed.status).toBe(400);
+    expect(failed.text).toContain('暂时不可用');
   });
 
   it('禁用规则与规则集停用的来源不触发拉取', async () => {

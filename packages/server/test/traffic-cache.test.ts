@@ -23,7 +23,7 @@ function setup() {
   issueProfileToken(h.store, { token: 'token', profileId: 'p' });
   return { ...h, traffic, fail: () => { failed = true; }, refresh: async () => {
     h.advance(1000);
-    await h.snapshots.refresh('source', 's', a);
+    await h.snapshots.refreshNodeSource({ id: 's', url: a });
   } };
 }
 
@@ -103,7 +103,7 @@ describe('多选流量来源', () => {
     h.traffic[a] = { download: 10, total: 1000, expire: 2000000000 };
     h.traffic[b] = { upload: 0, download: 20, total: 2000, expire: 1900000000 };
     await h.refresh();
-    await h.snapshots.refresh('source', 's2', b);
+    await h.snapshots.refreshNodeSource({ id: 's2', url: b });
     h.store.put('profile', { ...profile, userinfo: { mode: 'sources', sourceIds: ['s', 's2'] } });
     expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBe('upload=0; download=30; total=3000; expire=1900000000');
     h.store.put('profile', { ...profile, userinfo: { mode: 'sources', sourceIds: [] } });
@@ -118,7 +118,7 @@ describe('多选流量来源', () => {
     expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBe('upload=0; expire=0');
     h.traffic[a] = undefined;
     await h.refresh();
-    await h.snapshots.refresh('source', 'same', a);
+    await h.snapshots.refreshNodeSource({ id: 'same', url: a });
     expect((await h.app.request('/subs/profile?token=token&id=p')).headers.get('subscription-userinfo')).toBeNull();
   });
 
