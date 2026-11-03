@@ -420,4 +420,4 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 2026-11-03 本地节点工作区：`V2LocalNode` 改为页面上的名称与备注，加上节点列表与编辑器合并的工作区（拖拽手柄、两行节点行、铺满的编辑器、底部状态栏）；新增画板 `V2LocalNodeNew` 画未选中状态（右侧为空，删除按钮变为「添加」）。对应 `pages/Locals.tsx`、`components/LocalNodeYamlEditor.tsx`、`domain/localNodeDrafts.ts`。沿用现有接口，无后端待实现项。
 
-2026-11-03 规则出口单节点：出口菜单直接列出 inline 来源的节点，超长时选项区滚动，移除二级浮层；provider 节点不再自动创建隐藏组。前端、core、server 已实现。**画布 `V2ProfileRouting`、`V2ProfileDialogs` 待同步**。
+2026-11-03 规则出口单节点：出口菜单直接列出 inline 来源的节点，超长时选项区滚动，移除二级浮层；provider 节点不再自动创建隐藏组。前端对应 `RuleTargetSelect`、`RoutingTargetMenu`，core、server 已实现。画布 `V2ProfileRouting`（规则行出口示例为节点）、`V2ProfileDialogs`（「编辑第 N 项规则」绘制展开的出口菜单）已同步，无后端待实现项。

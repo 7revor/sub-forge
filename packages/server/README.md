@@ -450,3 +450,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-03 规则来源名称：`POST /api/rulesets`、`PUT /api/rulesets/:id` 保存时移除远程来源的 `name`；`/api/rule-options/resolve` 返回的来源 `name` 不变，供模板和订阅的规则展示。
 
 2026-11-03 列表状态只反映节点来源：`/{kind}/cache` 接口不变，仍返回节点和规则的缓存状态；前端状态徽标只读取节点项，规则项用于上次刷新时间。
+
+2026-11-03 规则出口单节点：`validateProfileRouting` 拒绝规则和最终出口（含嵌套兜底）指向 provider 来源的节点，保存和草稿预览都返回 400。

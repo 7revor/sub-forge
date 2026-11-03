@@ -32,7 +32,7 @@ export function RoutingTargetMenu({ value, options, onChange, label, placeholder
     </button>}</DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="flex max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-[260px] min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[min(360px,calc(100vw-2rem))] flex-col overflow-y-hidden" aria-label={label}>
       <div className="shrink-0 p-1" onKeyDown={event => { if (event.key !== 'Escape' && event.key !== 'Tab') event.stopPropagation(); }}><SearchInput className={cx('h-8', field && 'max-w-none')} aria-label={`搜索出口${searchLabel}`} placeholder={`搜索${searchLabel}`} value={search} onChange={event => setSearch(event.target.value)} /></div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <DropdownMenuRadioGroup value={value} onValueChange={next => { if (next !== value) onChange(next); }}>
           {sections.map((section, i) => <Fragment key={i}>
             {i > 0 && <DropdownMenuSeparator />}
