@@ -430,6 +430,4 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 2026-11-03 预览状态与 HTTP 复制：处理链总览首次加载时只显示一处「预览中…」（此前标题下与内容区各一处）；`useClipboard` 在 HTTP 部署没有 `navigator.clipboard` 或写入被拒时退回选区复制，弹窗内同样可用。画板只绘制预览加载完成后的状态，复制按钮外观和文案不变，画布无需修改；后端无变化。
 
-2026-11-03 策略组预览只显示名称：`V2GroupDialog` 画板与 `GroupMemberPicker` 的「客户端里显示」移除每行右侧的来源和类型标签，只保留名称；后端无变化，无后端待实现项。
-
 2026-11-03 候选预览与规则集合原文：`V2Pickers` 的 AsyncSelect 候选增加预览图标（画布已同步）；前端对应 `OptionPage`、`RuleCard`、`rulePreview`、`useUserToken`；后端 `/api/rule-options/search` 给本地规则集合返回带令牌的 `url`，无后端待实现项。规则集详情的 `#preview` 定位随之移除。
