@@ -358,3 +358,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-03：数据库备份改为手动（`components/BackupSettings.tsx`）：「下载备份」保存 `.sfbak` 文件，「上传恢复」选择文件后恢复并按 `/healthz` 的 `x-boot-id` 判断重启完成；移除 WebDAV 配置、定时和备份列表。见 [22](../../docs/22-database-backup.md)。
 
 2026-11-03 规则来源名称独立：`RulesetSourceDialog` 和规则集合的关联操作通过 `linkRepositoryFile` 写入文件字段并保留用户名称；名称留空时卡片显示仓库文件名。
+
+2026-11-03 弹窗不自动聚焦：`ModalContent` 打开时把焦点放到弹窗容器，不再聚焦第一个控件；显式 `autoFocus` 的字段不受影响。详见 [统一弹窗规范](../../docs/18-unified-modals.md)。

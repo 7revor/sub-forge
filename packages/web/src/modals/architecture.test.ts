@@ -35,4 +35,8 @@ describe('弹窗架构硬性规则', () => {
     }
     expect(violations).toEqual([]);
   });
+  it('打开时不自动聚焦内部控件，焦点放到弹窗容器', () => {
+    const source = readFileSync(join(root, 'modals/index.tsx'), 'utf8');
+    expect(source).toMatch(/onOpenAutoFocus=\{event => \{ event\.preventDefault\(\); \(event\.currentTarget as HTMLElement\)\.focus\(\);/);
+  });
 });

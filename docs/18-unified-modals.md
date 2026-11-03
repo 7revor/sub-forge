@@ -30,6 +30,7 @@ if (name.status === 'confirmed') setDraft({ ...value, name: name.data });
 - 取消返回 cancelled；提交期间普通关闭被阻止，路由变化与 Host 销毁仍能终止会话。运行中的请求可能已在服务器执行，取消不代表服务器回滚；客户端过期结果不能写入外部或新会话。
 - 会话从 open 进入 closing 时保留完整内容。Radix Presence 监听实际动画结束；Content ref 真正 detach 后销毁并结算 Promise。微任务只用于排除 StrictMode 同步重挂，不替代动画事件、不按毫秒猜退场。
 - 查询展示在关闭时通过 `useModalPresentation` 保留。嵌套会话独立结算，焦点回到原触发器；连续打开时不让下层退场抢走上层焦点；顶层关闭且仍有父弹窗时，焦点不能退到背景页面。
+- 打开时不自动聚焦内部控件（2026-11-03）：`ModalContent` 阻止 Radix 的自动聚焦，把焦点放到弹窗容器上，避免页面加载后首次打开时分段按钮等控件显示键盘焦点环，也避免焦点留在遮罩后的触发器上。需要直接输入的弹窗仍可给字段写 `autoFocus`。
 - 同一事件连续 `show` 时，Host 逐个提交新增会话，让上一层 Radix 可访问性隔离先建立，避免并发挂载互相 `aria-hidden`。尚未挂载即被取消的会话必须正常结算；不能等待不存在的退场事件。
 - 全局一个 ModalRoot，位于 Router 与 QueryClient Provider 内。底层官方组件只供运行时使用。渲染异常有可关闭的错误界面，不能留下悬空 Promise。
 - 策略组默认展示名称、类型、成员；其他设置折叠到高级设置。
