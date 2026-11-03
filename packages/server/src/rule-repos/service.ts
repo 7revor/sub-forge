@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { GitRepoCache, type RepoCache } from './git-cache.ts';
 import { buildCatalog } from './catalog.ts';
+import { cacheCycleStart } from '../cache-cycle.ts';
 import { findRuleFile } from './options.ts';
 import { randomId } from '../crypto.ts';
 import { isIndexedRuleFile, parseCustomRepo, parseScans } from './generic.ts';
@@ -22,7 +23,7 @@ export class RuleRepoService {
   private details = new Map<string, Promise<ReturnType<RuleRepoService['formatDetail']>>>();
   private detailJobs = new Set<Promise<ReturnType<RuleRepoService['formatDetail']>>>();
   private stopped = false;
-  private started = false;
+  private timer?: ReturnType<typeof setInterval>;
   private editing = new Set<string>();
   private cache: RepoCache;
   constructor(private store: Store, private fetcher: UpstreamFetcher, private now: () => number = Date.now, cache?: RepoCache, private snapshots?: SnapshotService) {
@@ -349,17 +350,26 @@ export class RuleRepoService {
       console.warn(`规则仓库 ${id} 索引更新失败：${message}`);
     }
   }
-  /** 服务启动后才允许按需同步；本身不启动定时器，也不立即访问上游。 */
-  start() { this.started = true; }
-  /** 没有定时同步：有人读取目录或规则时，到期的仓库在后台更新，本次先用现有索引。 */
-  refreshIfDue(id?: string) {
-    if (!this.started || this.stopped) return;
-    for (const row of this.rows()) {
-      if ((id === undefined || row.id === id) && !this.editing.has(row.id) && row.enabled && (row.checked_at === null || this.now() - row.checked_at >= (this.store.resourceCacheTtlSec * 1000))) void this.refresh(row.id);
-    }
+  /**
+   * Git 和文件目录索引是后台定时任务，不依赖请求：每 60 秒检查，拉取时间早于当前周期的启用仓库自动同步，启动时补做一次。
+   * 只同步目录，不下载规则文件内容。失败也记录检查时间，保留旧索引，下个周期再试。
+   */
+  start() {
+    if (this.timer || this.stopped) return;
+    const tick = () => {
+      const cycle = cacheCycleStart(this.now(), this.store.resourceCacheTtlSec);
+      for (const row of this.rows()) {
+        if (!row.enabled || this.editing.has(row.id) || this.jobs.has(row.id) || (row.checked_at !== null && row.checked_at >= cycle)) continue;
+        this.refresh(row.id).catch(error => console.error(`规则仓库 ${row.id} 同步失败`, error));
+      }
+    };
+    tick();
+    this.timer = setInterval(tick, 60_000);
+    this.timer.unref();
   }
   async stop() {
     this.stopped = true;
+    clearInterval(this.timer);
     await this.cache.stop();
     await Promise.all(this.jobs.values());
     await Promise.allSettled(this.detailJobs);

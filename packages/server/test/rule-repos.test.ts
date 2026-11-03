@@ -139,25 +139,51 @@ describe('规则仓库索引', () => {
     expect(indexedEntries(h.store, 'Legacy', undefined, undefined).total).toBe(0);
     await restart.stop();
   });
-  it('没有定时同步：到期后读取目录才更新，停止后不再更新', async () => {
+  it('后台定时同步：启动时补做一次，跨周期自动更新，读取不触发，同步不读文件内容，停止后不再运行', async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 3, 1));
     const h = setup();
-    const service = new RuleRepoService(h.store, h.fetcher, Date.now, fixtureCache(h.fetcher));
+    const cache = fixtureCache(h.fetcher), sync = vi.spyOn(cache, 'sync'), read = vi.spyOn(cache, 'read');
+    const service = new RuleRepoService(h.store, h.fetcher, Date.now, cache);
     try {
-      service.start(); await service.refresh('blackmatrix7'); await service.refresh('zydou');
-      const calls = h.fetcher.mock.calls.length;
-      service.refreshIfDue();
-      await vi.advanceTimersByTimeAsync(86_400_000);
-      expect(h.fetcher.mock.calls.length).toBe(calls);
-      service.refreshIfDue();
+      service.start();
       await vi.advanceTimersByTimeAsync(0);
-      expect(h.fetcher.mock.calls.length).toBeGreaterThan(calls);
+      const repos = service.list().filter(r => r.enabled).length;
+      expect(sync).toHaveBeenCalledTimes(repos);
+      await vi.advanceTimersByTimeAsync(3600_000);
+      expect(sync).toHaveBeenCalledTimes(repos);
+      service.list();
+      expect(sync).toHaveBeenCalledTimes(repos);
+      await vi.advanceTimersByTimeAsync(86_400_000);
+      expect(sync).toHaveBeenCalledTimes(repos * 2);
+      expect(read).not.toHaveBeenCalled();
       await service.stop();
-      const stoppedCalls = h.fetcher.mock.calls.length;
-      await vi.advanceTimersByTimeAsync(86_400_000);
-      service.refreshIfDue();
+      await vi.advanceTimersByTimeAsync(86_400_000 * 2);
+      expect(sync).toHaveBeenCalledTimes(repos * 2);
+    } finally { await service.stop(); vi.useRealTimers(); }
+  });
+  it('同步失败保留旧索引；从未成功时同一周期不自动重试，手动同步可立即重试', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 3, 1));
+    const h = setup();
+    const cache = fixtureCache(h.fetcher), sync = vi.spyOn(cache, 'sync');
+    const service = new RuleRepoService(h.store, h.fetcher, Date.now, cache);
+    h.store.db.prepare("UPDATE rule_repos SET enabled = 0 WHERE id <> 'blackmatrix7'").run();
+    try {
+      sync.mockRejectedValueOnce(new Error('首次失败'));
+      service.start();
       await vi.advanceTimersByTimeAsync(0);
-      expect(h.fetcher.mock.calls.length).toBe(stoppedCalls);
+      expect(service.list().find(r => r.id === 'blackmatrix7')).toMatchObject({ entries: 0, error: expect.stringContaining('首次失败') });
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(sync).toHaveBeenCalledTimes(1);
+      await service.refresh('blackmatrix7');
+      expect(sync).toHaveBeenCalledTimes(2);
+      const entries = service.list().find(r => r.id === 'blackmatrix7')!.entries;
+      expect(entries).toBeGreaterThan(0);
+      sync.mockRejectedValueOnce(new Error('跨周期失败'));
+      await vi.advanceTimersByTimeAsync(86_400_000);
+      expect(sync).toHaveBeenCalledTimes(3);
+      expect(service.list().find(r => r.id === 'blackmatrix7')).toMatchObject({ entries, error: expect.stringContaining('跨周期失败') });
     } finally { await service.stop(); vi.useRealTimers(); }
   });
   it('保存索引并可按仓库和客户端读取', async () => {
