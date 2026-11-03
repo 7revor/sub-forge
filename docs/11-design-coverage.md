@@ -409,4 +409,4 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 
 2026-11-03 更多菜单项去掉残留阴影：`ActionMenu` 内的按钮和链接原来只清除了边框，`outline` 变体的 `shadow-xs` 仍然显示，看起来像每项带边框；现在同时清除阴影和链接背景。画板 `V2Lists`、`V2Components`、`V2ProfileRouting` 的菜单项本来就没有边框和阴影，无需修改。仅前端样式，领域模型与服务端无变化，无后端待实现项。
 
-2026-11-03 用户改名与删除：`V2Settings` 用户表的操作统一收进更多菜单，新增菜单项「修改用户名」（仅管理员）和「删除用户」（仅普通用户），并补两个弹窗状态；管理员唯一，角色列改为只读文字，`V2MoreDialogs` 创建用户弹窗去掉角色选择。对应 `pages/Users.tsx`；后端 `PATCH /api/users/:id` 支持 `username`，新增 `GET /api/users/deletion-impact?id=ID` 和 `DELETE /api/users/:id`。未改动 v1 现状画板，无后端待实现项。
+2026-11-03 用户改名与删除：`V2Settings` 用户表的操作统一收进更多菜单，新增菜单项「修改用户名」（仅管理员）和「删除用户」（仅普通用户），并补两个弹窗状态；管理员唯一，角色列改为只读文字，`V2MoreDialogs` 创建用户弹窗去掉角色选择。对应 `pages/Users.tsx`；后端 `PATCH /api/users/:id` 支持 `username`，新增 `GET /api/users/deletion-impact?id=ID` 和 `DELETE /api/users/:id`。`reset-admin-password` 只是命令行，不涉及画板。无后端待实现项。

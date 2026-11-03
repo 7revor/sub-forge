@@ -31,7 +31,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 - 启动时授权 `/data` 后以非 root 用户运行；数据库与密钥文件 `secret.key`（0600）放在 `/data`，备份时两者一起备份，丢了密钥就无法解密数据。
 - 最终运行镜像在构建时通过 apt 安装 `git` 和 `ca-certificates`，宿主机无需安装 Git，容器启动时无需安装软件。可运行 `docker run --rm --entrypoint git sub-forge --version` 检查。默认 Git 缓存位于 `/data/rule-repo-cache`，上述 `/data` 卷会一并持久化；自定义 `SUBFORGE_REPO_CACHE` 时须保证该目录可由容器的 node 用户写入并单独挂载。
-- 首次启动且没有用户时按 `SUBFORGE_ADMIN_*` 创建管理员，之后可以去掉这两个变量。系统只能有一个管理员，已有管理员时 `create-admin` 会报错。
+- 首次启动且没有用户时按 `SUBFORGE_ADMIN_*` 创建管理员，之后可以去掉这两个变量。系统只能有一个管理员，已有管理员时 `create-admin` 会报错；忘记密码时用 `reset-admin-password` 重置，见 [部署指引](../../docs/24-first-deployment.md#忘记管理员密码)。
 - 使用明文 HTTP，可由保留 `Host` 的外部入口提供 HTTPS；订阅链接按当前请求地址生成，访问日志记录 TCP 连接来源。
 
 | 环境变量 | 默认值 | 说明 |
@@ -39,7 +39,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | `SUBFORGE_DB` | `./data/sub-forge.db`（镜像中为 `/data/sub-forge.db`） | SQLite 文件路径 |
 | `SUBFORGE_REPO_CACHE` | 数据库同目录的 `rule-repo-cache` | 公开规则仓库的 Git 缓存，需可写且建议持久化；本地运行需安装 Git，生产镜像已包含 |
 | `SUBFORGE_SECRET` | 数据库旁的 `secret.key` | 32 字节 Base64 主密钥，用于计算令牌、URL 的 HMAC 索引（SYS-04）；不设置时首次启动自动生成 |
-| `SUBFORGE_ADMIN_USERNAME` / `SUBFORGE_ADMIN_PASSWORD` | 空 | 首次启动时创建管理员；`create-admin` 命令也从 `SUBFORGE_ADMIN_PASSWORD` 取密码 |
+| `SUBFORGE_ADMIN_USERNAME` / `SUBFORGE_ADMIN_PASSWORD` | 空 | 首次启动时创建管理员；`create-admin` 和 `reset-admin-password` 命令也从 `SUBFORGE_ADMIN_PASSWORD` 取密码 |
 | `HOST` / `PORT` | `127.0.0.1` / `8080`（镜像中 HOST 为 `0.0.0.0`） | 监听地址 |
 | `SSRF_ALLOW` | 空 | 逗号分隔的字面 IP / CIDR 白名单；兼容接受主机名，域名本身已默认放行 |
 | `MIHOMO_BIN` | 空 | 设置后每次渲染都执行 `mihomo -t` 校验，失败时返回 503 |

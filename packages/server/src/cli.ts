@@ -2,6 +2,7 @@ import { ResourceService } from './resources.ts';
 import { profileMigrationPlan } from './profile-migration-plan.ts';
 // 命令行入口：
 //   tsx src/cli.ts create-admin <用户名>          创建管理员，密码取自 SUBFORGE_ADMIN_PASSWORD
+//   tsx src/cli.ts reset-admin-password           重置管理员密码，新密码取自 SUBFORGE_ADMIN_PASSWORD，已有登录全部失效
 //   tsx src/cli.ts seed <seed.json> [用户名]      导入种子文件，有归属的文档写到该用户名下
 //   tsx src/cli.ts profile-migration-plan         在一致性副本上只读预检旧订阅迁移
 //   tsx src/cli.ts serve                          启动服务
@@ -36,8 +37,22 @@ function openStore(masterKey?: Buffer): Store {
   return store;
 }
 
-async function createAdmin(store: Store, username: string, password: string | undefined): Promise<void> {
+function adminPassword(password: string | undefined): string {
   if (!password || password.length < 8) throw new Error('请通过 SUBFORGE_ADMIN_PASSWORD 提供至少 8 位的密码');
+  return password;
+}
+
+async function resetAdminPassword(store: Store, password: string | undefined): Promise<void> {
+  const next = adminPassword(password);
+  const admin = store.listUsers().find(u => u.role === 'admin');
+  if (!admin) throw new Error('还没有管理员，请先运行 create-admin');
+  store.updateUser(admin.id, { passwordHash: await hashPassword(next) });
+  store.deleteUserSessions(admin.id);
+  console.log(`已重置管理员 ${admin.username} 的密码，已有登录全部失效`);
+}
+
+async function createAdmin(store: Store, username: string, input: string | undefined): Promise<void> {
+  const password = adminPassword(input);
   if (store.listUsers().some(u => u.role === 'admin')) throw new Error('管理员已存在，系统只能有一个管理员');
   if (store.getUserAuth(username)) throw new Error(`用户 ${username} 已存在`);
   store.createUser({ username, passwordHash: await hashPassword(password), role: 'admin' });
@@ -59,6 +74,11 @@ async function main(): Promise<void> {
     try { await createAdmin(store, arg, env.SUBFORGE_ADMIN_PASSWORD); } finally { store.close(); }
     return;
   }
+  if (cmd === 'reset-admin-password') {
+    const store = openStore();
+    try { await resetAdminPassword(store, env.SUBFORGE_ADMIN_PASSWORD); } finally { store.close(); }
+    return;
+  }
   if (cmd === 'seed') {
     if (!arg) throw new Error('用法：cli.ts seed <seed.json> [用户名]');
     const store = openStore();
@@ -73,7 +93,7 @@ async function main(): Promise<void> {
     return;
   }
   if (cmd === 'serve') return start();
-  throw new Error('用法：cli.ts create-admin <用户名> | seed <seed.json> [用户名] | profile-migration-plan | serve');
+  throw new Error('用法：cli.ts create-admin <用户名> | reset-admin-password | seed <seed.json> [用户名] | profile-migration-plan | serve');
 }
 
 async function start(): Promise<void> {

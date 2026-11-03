@@ -57,6 +57,22 @@ docker run -d --name sub-forge --restart unless-stopped -p 8080:8080 -v "$PWD/da
 - **访问日志 IP：** 记录 TCP 连接来源。经外部入口访问时是入口的地址；Docker Desktop 或部分网络模式下可能是网关地址。
 - **写操作：** `Origin` 的主机必须与请求的 `Host` 一致。
 
+## 忘记管理员密码
+
+系统只有一个管理员，所以命令不需要用户名。服务不用停，把命令里的密码换成至少 8 位的新密码：
+
+```bash
+docker compose exec --user node -e SUBFORGE_ADMIN_PASSWORD='新密码' sub-forge ./node_modules/.bin/tsx src/cli.ts reset-admin-password
+```
+
+不用 Compose 时：
+
+```bash
+docker exec --user node -e SUBFORGE_ADMIN_PASSWORD='新密码' sub-forge ./node_modules/.bin/tsx src/cli.ts reset-admin-password
+```
+
+已有登录全部失效，订阅链接不受影响。如果连续输错密码被锁定，最多 15 分钟后恢复，重启容器可立即解除。
+
 ## 备份
 
 在系统页的「数据库备份」里点「下载备份」保存备份文件，恢复时点「上传恢复」，详情见[数据库备份](22-database-backup.md)。系统不会自动备份，请定期手动下载。
