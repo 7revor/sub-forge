@@ -18,7 +18,7 @@ describe('绑定订阅的前置单条规则', () => {
     expect(resolveProfileRouting({ overlay: {}, routing: bound([first, second]) }, TEMPLATE, new Report()).rules.slice(0, 2).map(rule => rule.id)).toEqual(['first', 'second']);
   });
 
-  it.each(['wrap', 'copy', 'inline'] as const)('旧策略 %s 自动处理，规则与代理链重复引用复用精确隐藏组', strategy => {
+  it.each(['wrap', 'copy', 'inline'] as const)('旧策略 %s 自动处理，代理链生成精确隐藏组，规则出口不复用而走兜底', strategy => {
     const result = render({
       nodeSets: [{ ref: { type: 'source', id: 'T' }, output: 'provider' }, { ref: { type: 'source', id: 'L' }, output: 'provider' }],
       routing: bound([rule('node', node)]), refPolicy: { default: strategy },
@@ -26,21 +26,36 @@ describe('绑定订阅的前置单条规则', () => {
     });
     expect(result.report.items.filter(item => item.level === 'error')).toEqual([]);
     expect(result.dependencies).toHaveLength(1);
-    expect(result.dependencies[0]).toMatchObject({ strategy: 'wrap', usedBy: ['chain:chain', 'rule:node'] });
+    expect(result.dependencies[0]).toMatchObject({ strategy: 'wrap', usedBy: ['chain:chain'] });
     const output = result.dependencies[0]!.output;
-    expect(result.config.rules).toContain(`DOMAIN,node.test,${output}`);
+    expect(result.config.rules).toContain('DOMAIN,node.test,REJECT');
     expect(result.config['proxy-groups']).toContainEqual(expect.objectContaining({ name: output, use: ['中转'], hidden: true }));
     expect(result.config.proxies).toEqual([]);
     expect(parse(result.providers['source:T']!.yaml).proxies).toHaveLength(2);
   });
 
-  it('只有规则引用的远端节点也生成依赖，未命中使用同一兜底', () => {
-    const result = render({ nodeSets: [{ ref: { type: 'source', id: 'T' }, output: 'provider' }], routing: bound([rule('node', node)]) });
-    expect(result.dependencies[0]?.usedBy).toEqual(['rule:node']);
+  it('inline 节点直接作为规则出口，不生成隐藏组；未命中使用兜底', () => {
+    const inline = render({ nodeSets: [{ ref: { type: 'source', id: 'T' }, output: 'inline' }], routing: bound([rule('node', node)]) });
+    expect(inline.dependencies).toEqual([]);
+    expect(inline.config.rules).toContain('DOMAIN,node.test,🇭🇰 IPLC-01');
+    expect((inline.config['proxy-groups'] as { name: string }[]).filter(group => group.name.startsWith('__ref_'))).toEqual([]);
     const missing: Target = { kind: 'node', ref: { nodeSet: { type: 'source', id: 'T' }, match: { exact: '已消失' }, fallback: { kind: 'builtin', name: 'REJECT' } } };
-    const fallback = render({ nodeSets: [{ ref: { type: 'source', id: 'T' }, output: 'provider' }], routing: bound([rule('gone', missing)]) });
+    const fallback = render({ nodeSets: [{ ref: { type: 'source', id: 'T' }, output: 'inline' }], routing: bound([rule('gone', missing)]) });
     expect(fallback.config.rules).toContain('DOMAIN,gone.test,REJECT');
     expect(fallback.report.byCode('ref.fallback')).toHaveLength(1);
+  });
+
+  it('Provider 节点不能作为规则出口：有兜底时告警并回退，不生成隐藏组；无兜底时报错', () => {
+    const provider = [{ ref: { type: 'source' as const, id: 'T' }, output: 'provider' as const }];
+    const result = render({ nodeSets: provider, routing: bound([rule('node', node)]) });
+    expect(result.dependencies).toEqual([]);
+    expect(result.config.rules).toContain('DOMAIN,node.test,REJECT');
+    expect((result.config['proxy-groups'] as { name: string }[]).filter(group => group.name.startsWith('__ref_'))).toEqual([]);
+    expect(result.report.byCode('ref.fallback')[0]?.message).toContain('只能选择 inline');
+    const strict: Target = { kind: 'node', ref: { nodeSet: { type: 'source', id: 'T' }, match: { exact: '🇭🇰 IPLC-01' }, fallback: 'error' } };
+    const failed = render({ nodeSets: provider, routing: bound([rule('strict', strict)]) });
+    expect(failed.report.byCode('ref.provider-rule-exit')).toHaveLength(1);
+    expect(failed.config.rules).not.toContain('DOMAIN,strict.test,REJECT');
   });
 
   it('模板更新后前置规则仍在最前，ID 冲突报告错误', () => {
@@ -71,5 +86,5 @@ it('旧复制策略不再向 include-all-proxies 注入额外节点', () => {
   });
   expect(result.report.byCode('chain.cycle')).toEqual([]);
   expect(result.config.proxies).toEqual([]);
-  expect(result.dependencies[0]?.strategy).toBe('wrap');
+  expect(result.dependencies).toEqual([]);
 });

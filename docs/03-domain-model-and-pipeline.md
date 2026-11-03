@@ -231,7 +231,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 输入：有效 groups、rules、chains、各 NodeSet 输出方式、目标客户端（旧 refPolicy 不参与计算）
 1. 收集引用点 R：
    - 组成员中的 {kind:'node'}
-   - 规则 / final 的 target {kind:'node'}
+   - 规则 / final 的 target {kind:'node'}（2026-11-03 起只接受 inline 来源，不进入步骤 4；Provider 来源按引用不可用走 fallback，无 fallback 报 ref.provider-rule-exit）
    - ChainRule.via 为 node 时
    - 上游订阅自带的 dialer-proxy（本地节点不设置前置，代理链只来自 Profile 的链规则）
 2. 对每个引用 r 解析出具体节点 n（按 NodeRef.match 在 NodeSet 处理结果中查找）：
@@ -436,7 +436,7 @@ type ProfileRouting =
 
 前置节点出口共用 `resolveTarget / nameForNode`：按客户端自动处理，Mihomo／Stash Provider 共用精确隐藏组，Inline 直接引用；Surge／Loon 在远程资源层转换引用；与代理链重复引用时复用依赖。保存及草稿预览检查出口归属、节点集已加入订阅、匹配项和规则 ID；规则 ID 不得与模板或其他前置规则冲突。模板发布检查全部前置出口（含禁用项、节点兜底组），删除所引用组或引入冲突 ID 时不可强制发布。绑定转独立会将前置规则完整固化，绑定间转换映射前置出口及兜底组。
 
-规则出口也会生成隐藏引用组，因此代理链的成环与跳数检查在全部规则出口解析完成后执行，并展开 `include-all-proxies` 等动态成员。
+（2026-11-03 起规则出口不再生成隐藏引用组，只有组成员和代理链前置会生成。）规则出口也会生成隐藏引用组，因此代理链的成环与跳数检查在全部规则出口解析完成后执行，并展开 `include-all-proxies` 等动态成员。
 
 
 ### 2026-10-29：移除规则启停状态（SQLite v17）
@@ -634,3 +634,5 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 `resourceCacheSummary` 只读取 `/{kind}/cache` 返回项中的节点资源（`kind !== 'ruleset'`），规则资源只用于上次刷新时间和手动刷新。资源状态接口、核心模型、缓存语义和示例种子不变；规则仍不保存失败记录。
 
 2026-11-03 本地节点工作区：领域模型和渲染管线不变。`LocalProxyGroup.proxies` 本来就是有序数组，节点排序只改变数组顺序，渲染按此顺序输出。
+
+2026-11-03 规则出口单节点收窄：`Target`、`NodeRef` 类型与存储格式不变，示例种子无需修改。规则与 MATCH 出口（含嵌套 fallback）只接受 inline 来源：渲染不为 Provider 节点创建 `__ref_` 组，有 fallback 时告警并回退，无 fallback 时报 `ref.provider-rule-exit`，四端一致；服务端保存和草稿预览拒绝这类出口。组成员、代理链前置仍可引用 Provider 节点。来源由 inline 改为 provider 时，`planProfileChange` 把相关规则出口改为 REJECT 并在确认框列出。已保存的 inline 正则出口继续生效，点选节点可替换。

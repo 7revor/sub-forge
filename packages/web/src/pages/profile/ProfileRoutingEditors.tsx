@@ -56,9 +56,10 @@ export function ProfileGroupsEditor() {
 
 export function ProfileRulesEditor() {
   const { draft, setDraft, template, groupOptions, profileNodeSets } = useProfile();
+  const inlineNodeSets = profileNodeSets.filter(set => draft.nodeSets.some(n => n.output === 'inline' && n.ref.type === set.ref.type && n.ref.id === set.ref.id));
   const { body, bound } = useRoutingBody();
   const rulesets = useRuleSetRefs();
-  const props = { ctx: { rulesets: rulesets.data ?? [] }, onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={profileNodeSets} />, extendedOptions: true };
+  const props = { ctx: { rulesets: rulesets.data ?? [] }, onRuleValidationReady: () => {}, renderTarget: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => <RuleTargetSelect label={label} value={value} onChange={onChange} groups={groupOptions} nodeSets={inlineNodeSets} />, inlineNodeSets, extendedOptions: true };
   const changeRules = (next: TemplateBody, templateStart?: number) => setDraft(withRoutingRules(draft, next, template, templateStart));
   return <>
     <ErrorAlert error={rulesets.error} />
