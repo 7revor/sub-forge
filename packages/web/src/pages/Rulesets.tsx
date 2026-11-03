@@ -1,5 +1,6 @@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/ui/dropdown-menu.tsx';
 import { sourcePreviewHref } from '../domain/rulePreview.ts';
+import { linkRepositoryFile } from '../domain/rulesetSources.ts';
 import { queryUrl } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
@@ -31,7 +32,7 @@ import { newId } from '../convert/templateYaml.ts';
 import { localRuleLines } from '@sub-forge/core';
 
 const isBinary = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
-const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '').map(line => line.text).join(',') || '尚未填写');
+const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || s.repository?.path.split('/').at(-1) || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '').map(line => line.text).join(',') || '尚未填写');
 
 function sourceSummary(rs: RuleSetDoc): string {
   const remote = rs.sources.filter((s) => s.kind === 'remote').length;
@@ -101,7 +102,7 @@ export function RulesetEdit() {
       const next = resolved.repository?.sources[0];
       const current = latest.current;
       if (!next || !current?.sources.some(s => s.id === id && s.url === url && !s.repository)) return;
-      e.setDraft({ ...current, sources: current.sources.map(s => s.id === id ? { ...s, ...next, id: newId('src') } : s) });
+      e.setDraft({ ...current, sources: current.sources.map(s => s.id === id ? linkRepositoryFile(s, next, newId('src')) : s) });
       matches.clear([url]);
     } catch (cause) { setLinkError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setLinking(undefined); }
@@ -114,7 +115,7 @@ export function RulesetEdit() {
       const source = s.kind === 'remote' && !s.repository && s.url ? resolved.get(s.url)?.repository?.sources[0] : undefined;
       if (!source) return s;
       linked++;
-      return { ...s, ...source, id: newId('src') };
+      return linkRepositoryFile(s, source, newId('src'));
     });
     if (linked) e.setDraft({ ...current, sources: next });
     return linked;

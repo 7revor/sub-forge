@@ -1,11 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { rulesetSourceQuery, rulesetSourceState, type RuleSourceContent } from './rulesetSources.ts';
+import { linkRepositoryFile, rulesetSourceQuery, rulesetSourceState, type RuleSourceContent } from './rulesetSources.ts';
 import type { RuleSetSourceDoc } from '../hooks.ts';
 const source: RuleSetSourceDoc = { id: 's', kind: 'remote', format: 'auto', url: 'https://rules.test/list' };
 const success: RuleSourceContent = { content: 'DOMAIN,ok.test', status: { id: 's', ok: true } };
 const result = (data?: RuleSourceContent) => ({ data, error: null, isPending: !data, isFetching: false });
 afterEach(() => { vi.unstubAllGlobals(); });
+
+describe('关联仓库文件', () => {
+  const file: RuleSetSourceDoc = { id: 'file-0', kind: 'remote', name: 'zydou/domain-list-community-converter · wise.txt', url: 'https://raw.test/wise.txt', format: 'auto', repository: { repo: 'zydou', entry: 'wise.txt', ref: 'main', path: 'wise.txt' } };
+  it('不把文件名写入来源名称：未填写时保持为空', () => {
+    const linked = linkRepositoryFile(source, file, 'next');
+    expect(linked.name).toBeUndefined();
+    expect(linked).toMatchObject({ id: 'next', url: file.url, repository: file.repository });
+  });
+  it('更换文件时保留用户填写的名称', () => {
+    expect(linkRepositoryFile({ ...source, name: '我的来源' }, file, 'next').name).toBe('我的来源');
+  });
+});
 
 describe('来源失败状态与显式重试', () => {
   it('业务错误、HTTP 错误、缺失正文和刷新中均阻止转换；其他预览范围不阻塞，存在的来源都参与检查', () => {

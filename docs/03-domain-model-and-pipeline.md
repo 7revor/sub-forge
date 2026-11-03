@@ -616,3 +616,7 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 新增 `source_shares (source_id, user_id, created_at)`，只记录分享关系，文档归属不变；删除订阅源时一并清除。`Store.canUseNodeSet` 统一判断节点集能否被读取和引用：自己的节点集，或分享给该用户的订阅源。组合和本地节点组不能分享。渲染、引用校验、节点文件和访问日志都走这个判断，撤销后在途渲染因配置变化重试，随后按无权访问处理。
 
 接收者读到的订阅源只含 `id`、`name`、`sharedBy`，`url` 为空、`pipeline` 为空数组；快照和资源状态去掉地址，上游错误替换为固定文案。这些脱敏集中在 `packages/server/src/source-share.ts`。节点快照仍按订阅源存放，接收者与分享者读同一份。
+
+## 2026-11-03：来源名称独立于仓库文件
+
+`RuleSetSource.name` 只保存用户填写的名称。前端关联仓库文件时只取 `url`、`format`、`repository` 等文件字段，保留原 `name`；未填写时保持缺省，由展示层回退到文件名。`POST /api/rule-options/resolve` 返回的来源 `name` 不变，模板和订阅的规则引用仍用它展示。数据结构、接口和示例种子无变化。

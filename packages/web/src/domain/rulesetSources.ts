@@ -31,3 +31,8 @@ export function rulesetSourceState(sources: RuleSetSourceDoc[], results: SourceR
   const ready = !reading && !error && required.every(i => results[i]?.data?.status.ok);
   return { required, reading, ready, error };
 }
+
+/** 关联仓库文件只替换规则文件；来源名称由用户维护，不随文件变化。 */
+export function linkRepositoryFile(source: RuleSetSourceDoc, file: RuleSetSourceDoc, id: string): RuleSetSourceDoc {
+  return { ...source, ...file, name: source.name, id };
+}
