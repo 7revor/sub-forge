@@ -44,9 +44,9 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
     ? <Button variant={variant} size={size} onClick={onCreate}>{size === 'md' && <Plus size={16} />}新建{name}</Button>
     : <Link to={`/${kind}/new`} className={buttonClass(variant, size)}>{size === 'md' && <Plus size={16} />}新建{name}</Link>;
   const rows = list.data?.items ?? [];
-  const canWrite = (id: string) => kind !== 'rulesets' || list.data?.writableIds?.includes(id) === true;
+  const canWrite = (id: string) => (kind !== 'rulesets' && kind !== 'sources') || list.data?.writableIds?.includes(id) === true;
   const refreshable=['sources','collections','rulesets','profiles'].includes(kind);
-  const canRefresh=(d:DocMap[K])=>kind!=='rulesets'||(d as DocMap['rulesets']).sources.some(s=>s.kind==='remote'&&s.enabled!==false);
+  const canRefresh=(d:DocMap[K])=>kind==='sources'?canWrite(d.id):kind!=='rulesets'||(d as DocMap['rulesets']).sources.some(s=>s.kind==='remote'&&s.enabled!==false);
   const shownColumns = columns.filter(column => column.header !== '备注');
   const tableColumns = [
     ...shownColumns.map(column => ({ header: column.header, width: column.width ?? 180 })),

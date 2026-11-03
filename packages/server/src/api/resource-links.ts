@@ -14,7 +14,8 @@ export function resourceLinkRoutes(store: Store, renderer: RenderService, public
     if (!Object.hasOwn(kinds, segment)) throw notFound();
     const kind = kinds[segment as keyof typeof kinds], id = requiredQuery(c, 'id'), user = c.get('user');
     const row = store.getWithOwner(kind, id);
-    if (!row || kind !== 'ruleset' && row.owner !== user.id) throw notFound();
+    if (!row) throw notFound();
+    if (kind === 'source' || kind === 'collection' || kind === 'local' ? !store.canUseNodeSet(kind, id, user.id) : kind !== 'ruleset' && row.owner !== user.id) throw notFound();
     if (kind === 'source' || kind === 'collection' || kind === 'local') renderer.collectNodeSets([{ type: kind, id }], user.id);
     const token = store.createToken(user.id);
     const path = kind === 'profile' ? '/subs/profile' : kind === 'ruleset' ? '/resources/ruleset' : '/subs/nodes';

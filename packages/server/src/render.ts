@@ -1,6 +1,7 @@
 import { CLIENT_APPS, resolveNativeBase, type ClientApp } from '@sub-forge/core';
 import { managedRuleDelivery, queryUrl, type RuleResourceReference } from '@sub-forge/core';
 import { SharedRuleService } from './shared-rules.ts';
+import { SHARED_SOURCE_ERROR } from './source-share.ts';
 import { ResourceAccessError } from './resource-access.ts';
 import { profileTemplate } from './profile-routing.ts';
 // 渲染服务：从存储组装内核输入 → 渲染 → 校验；结果不落库，失败直接返回错误，由客户端保留本地配置。
@@ -125,7 +126,7 @@ export class RenderService {
   }
 
   canReadNodes(render: StoredRender, owner: string): boolean {
-    return Array.isArray(render.nodeDependencies) && render.nodeDependencies.every(ref => this.store.getWithOwner(ref.type, ref.id)?.owner === owner);
+    return Array.isArray(render.nodeDependencies) && render.nodeDependencies.every(ref => this.store.canUseNodeSet(ref.type, ref.id, owner));
   }
 
   /** 订阅专属规则的地址标识：只用于在当前配置中定位规则，不存储。 */
@@ -217,7 +218,7 @@ export class RenderService {
       ? profile.userinfo.sourceIds.map(id => ({ type: 'source', id })) : [];
     for (const ref of trafficRefs) {
       const row = this.store.getWithOwner('source', ref.id);
-      if (!row || (owner && row.owner !== owner)) throw new ResourceAccessError();
+      if (!row || (owner && !this.store.canUseNodeSet('source', ref.id, owner))) throw new ResourceAccessError();
     }
     const loaded = await this.loadNodeSets([...profile.nodeSets.map(n => n.ref), ...trafficRefs], owner);
     usedSnapshots.push(...loaded.snapshots);
@@ -329,17 +330,19 @@ export class RenderService {
         inputs.snapshots[src.id] = [r.snapshot.body];
         if (r.snapshot.userinfo) userinfo.set(src.id, r.snapshot.userinfo);
       }
-      if (r.error) report.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${r.error}`, where: `source:${src.id}` });
+      // 上游错误可能带主机名：被分享的用户只看到结果，详情仅所有者可见。
+      const error = r.error && owner && this.store.getWithOwner('source', src.id)?.owner !== owner ? SHARED_SOURCE_ERROR : r.error;
+      if (error) report.push({ level: r.snapshot ? 'warn' : 'error', code: 'source.fetch-failed', message: `订阅源「${src.name}」拉取失败${r.snapshot ? '，正在使用快照' : ''}：${error}`, where: `source:${src.id}` });
     }
     return { inputs, userinfo, report, snapshots };
   }
 
   async nodeSet(ref: NodeSetID, owner: string, target: Target = { client: 'mihomo' }): Promise<{ yaml: string; userinfo?: TrafficInfo }> {
-    if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
+    if (!this.store.canUseNodeSet(ref.type, ref.id, owner)) throw new ResourceAccessError();
     const revision = this.store.configurationRevision;
     const loaded = await this.loadNodeSets([ref], owner);
     if (revision !== this.store.configurationRevision) throw new ResourceAccessError();
-    if (this.store.getWithOwner(ref.type, ref.id)?.owner !== owner) throw new ResourceAccessError();
+    if (!this.store.canUseNodeSet(ref.type, ref.id, owner)) throw new ResourceAccessError();
     const result = renderForClient({
       profile: { id: '$nodes', name: '', nodeSets: [{ ref, output: 'inline' }], chains: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } },
       platform: target.platform,
@@ -359,7 +362,7 @@ export class RenderService {
     const seen = new Set<string>();
     const walk = (ref: NodeSetID, expectedOwner?: string | null) => {
       const row = this.store.getWithOwner(ref.type, ref.id);
-      if (row && expectedOwner && row.owner !== expectedOwner) throw new ResourceAccessError();
+      if (row && expectedOwner && !this.store.canUseNodeSet(ref.type, ref.id, expectedOwner)) throw new ResourceAccessError();
       const k = `${ref.type}:${ref.id}`;
       if (seen.has(k)) return;
       seen.add(k);

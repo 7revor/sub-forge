@@ -615,3 +615,9 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 2026-11-03 上游缓存分层（v35）：缓存只存在于上游，下游调用 `SnapshotService` 的 `getNodeSource`、`getRuleContent`、`refreshNodeSource`、`refreshRuleContent`，不关心内容来自缓存还是实时读取。`snapshots` 表身份分两类：节点 `owner_kind = 'source'`、`owner_id` 为订阅源 ID，最多 1 条成功加 1 条最新失败；规则 `owner_kind = 'ruleset'`、`owner_id` 为 `cipher.hmac(JSON.stringify([url, { ua, timeoutMs, format, behavior }]))`，最多 1 条成功，没有失败行，`behavior` 只在 `format === 'mrs'` 时进入键。缓存键不含用户、配置、模板或规则集 ID，读取权限在入口校验。过期判定用 `cacheCycleStart(now, ttlSec)`（`packages/server/src/cache-cycle.ts`）：按服务器本地时区对齐，快照拉取时间早于周期开始就算过期。删除 `resource_bindings` 表、`rule-binding.ts`、`repository-file:` 和 `repo-read:` 身份；`StoredRender.ruleBody` 移除，`deferRuleBody` 在非预览时恒为真。迁移并入 v35：节点快照按绑定改回订阅源 ID，对应不上的删除；规则快照全部清除。
 
 2026-11-03 移除本地节点连通性测试：领域模型和渲染管线不变。`TESTABLE_PROXY_TYPES` 改名为 `KNOWN_PROXY_TYPES`，取值不变。
+
+## 2026-11-03：订阅源分享（v36）
+
+新增 `source_shares (source_id, user_id, created_at)`，只记录分享关系，文档归属不变；删除订阅源时一并清除。`Store.canUseNodeSet` 统一判断节点集能否被读取和引用：自己的节点集，或分享给该用户的订阅源。组合和本地节点组不能分享。渲染、引用校验、节点文件和访问日志都走这个判断，撤销后在途渲染因配置变化重试，随后按无权访问处理。
+
+接收者读到的订阅源只含 `id`、`name`、`sharedBy`，`url` 为空、`pipeline` 为空数组；快照和资源状态去掉地址，上游错误替换为固定文案。这些脱敏集中在 `packages/server/src/source-share.ts`。节点快照仍按订阅源存放，接收者与分享者读同一份。

@@ -13,6 +13,7 @@ import { Hono, type Context } from 'hono';
 import type { RenderService } from '../render.ts';
 import type { SourceDoc } from '../docs.ts';
 import type { SnapshotService } from '../snapshots.ts';
+import { sharedSnapshotView } from '../source-share.ts';
 import { sourceUrl } from '../source-url.ts';
 import type { Store } from '../store.ts';
 import { bad, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
@@ -41,8 +42,9 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
     const query = c.req.query('q') ?? '';
     if (query.length > 200) throw bad('关键词最多 200 个字符');
     if (type !== 'source' && type !== 'collection' && type !== 'local') throw bad('type 只能是 source、collection 或 local');
-    const doc = own(type, requiredQuery(c, 'id'), c.get('user').id);
-    const ref: NodeSetID = { type, id: doc.id };
+    const id = requiredQuery(c, 'id');
+    if (!store.canUseNodeSet(type, id, c.get('user').id)) own(type, id, c.get('user').id);
+    const ref: NodeSetID = { type, id };
     const filter = c.req.query('filter') ?? '';
     const excludeFilter = c.req.query('excludeFilter') ?? '';
     let include: RegExp | undefined;
@@ -72,7 +74,10 @@ export function previewRoutes(store: Store, renderer: RenderService, snapshots: 
   });
 
   app.get('/sources/snapshots', (c) => {
-    const src = own('source', requiredQuery(c, 'id'), c.get('user').id);
+    const id = requiredQuery(c, 'id'), userId = c.get('user').id;
+    const row = store.getWithOwner('source', id);
+    if (row && row.owner !== userId && store.isSourceSharedWith(id, userId)) return c.json({ items: store.snapshotHistory('source', id).map(sharedSnapshotView) });
+    const src = own('source', id, userId);
     return c.json({ items: store.snapshotHistory('source', src.id) });
   });
 

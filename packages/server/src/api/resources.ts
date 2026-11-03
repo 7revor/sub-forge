@@ -5,6 +5,7 @@ import { streamSSE } from 'hono/streaming';
 import type { RuleRepoService } from '../rule-repos/service.ts';
 import type { Store } from '../store.ts';
 import type { ResourceService } from '../resources.ts';
+import { sharedStatusView } from '../source-share.ts';
 import { SESSION_COOKIE, notFound, requireAdmin, requireUser, type ApiEnv } from './common.ts';
 
 export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleRepoService) {
@@ -12,9 +13,9 @@ export function resourceRoutes(store:Store,resources:ResourceService,repos:RuleR
   const kinds = {sources:'source',collections:'collection',rulesets:'ruleset',profiles:'profile'} as const;
   for (const [path,kind] of Object.entries(kinds)) {
     app.get(`/${path}/cache`,requireUser,c=>{
-      const id=requiredQuery(c, 'id')!;const doc=store.getWithOwner(kind,id);
-      if(!doc || kind !== 'ruleset' && doc.owner!==c.get('user').id)throw notFound();
-      return c.json({items:resources.statuses(resources.collect(kind,id))});
+      const id=requiredQuery(c, 'id')!;const doc=store.getWithOwner(kind,id);const userId=c.get('user').id;
+      if(!doc || kind !== 'ruleset' && doc.owner!==userId && !(kind==='source' && store.isSourceSharedWith(id,userId)))throw notFound();
+      return c.json({items:resources.statuses(resources.collect(kind,id)).map(item=>sharedStatusView(store,item,userId))});
     });
     app.post(`/${path}/:id/refresh-cache`,requireUser,c=>{
       const id=c.req.param('id')!;const doc=store.getWithOwner(kind,id);

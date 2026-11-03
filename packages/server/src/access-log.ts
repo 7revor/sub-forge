@@ -37,7 +37,7 @@ export function accessLogger(store: Store, now: () => number, trustedProxies = p
       const type = c.req.query('kind');
       if (type === 'source' || type === 'collection' || type === 'local') {
         const row = store.getWithOwner(type, id);
-        if (row?.owner === user.userId) resourceName = row.doc.name;
+        if (row && store.canUseNodeSet(type, id, user.userId)) resourceName = row.doc.name;
         resourceId = `${type}/${id}`;
       }
     } else if (path === '/resources/ruleset' && !key) resourceName = store.get('ruleset', id)?.name ?? resourceName;

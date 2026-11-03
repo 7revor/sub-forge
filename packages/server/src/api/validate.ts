@@ -152,7 +152,7 @@ export class RefChecker {
   nodeSet(ref: unknown, where: string): NodeSetID {
     if (!isObj(ref) || !NODESET_KINDS.has(ref.type as string) || !isStr(ref.id)) throw bad(`${where}：节点来源引用格式错误`);
     const r = ref as NodeSetID;
-    if (!this.owned(r.type, r.id)) throw bad(`${where}：节点来源 ${r.type}:${r.id} 不存在`);
+    if (!this.store.canUseNodeSet(r.type, r.id, this.user.id)) throw bad(`${where}：节点来源 ${r.type}:${r.id} 不存在`);
     return r;
   }
 

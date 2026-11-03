@@ -350,7 +350,7 @@ it('v34 升级把文档、快照、令牌和刷新任务改为明文，令牌仍
     store.db.pragma('user_version = 34'); store.close();
     for (let i = 0; i < 2; i++) {
       store = new Store(file, { cipher });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(35);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(36);
       expect(store.get('source', 's')?.url).toBe('https://secret.example.com/sub');
       expect(store.latestSnapshot('source', 's', 'https://secret.example.com/sub')?.body).toBe('password: hunter2');
       expect(store.getToken(token)).toEqual({ token, userId: user.id });

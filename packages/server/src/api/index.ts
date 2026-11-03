@@ -22,6 +22,7 @@ import { ruleRepoRoutes } from './rule-repos.ts';
 import { ruleOptionRoutes } from './rule-options.ts';
 import { authRoutes } from './auth.ts';
 import { pendingRoutes } from './pending.ts';
+import { shareRoutes } from './shares.ts';
 import { docRoutes } from './docs.ts';
 import { previewRoutes } from './preview.ts';
 import { profileRoutes } from './profiles.ts';
@@ -74,6 +75,7 @@ export function createApi(deps: ApiDeps) {
   api.route('/', resourceLinkRoutes(deps.store, deps.renderer, deps.publicUrl));
   api.route('/', systemRoutes(deps.store, deps.now));
   if (deps.backups) api.route('/', backupRoutes(deps.backups));
+  api.route('/', shareRoutes(deps.store));
   api.route('/', pendingRoutes());
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
   api.route('/', templateRoutes(deps.store, deps.renderer, deps.snapshots));

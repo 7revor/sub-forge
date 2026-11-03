@@ -7,6 +7,7 @@ import { cacheCycleStart } from './cache-cycle.ts';
 import { randomId } from './crypto.ts';
 import type { RenderService } from './render.ts';
 import type { RuleFetchParams, SnapshotService } from './snapshots.ts';
+import { SHARED_SOURCE_ERROR } from './source-share.ts';
 import type { Store } from './store.ts';
 
 export type Resource = { kind:'source'; id:string; name:string; url:string } | { kind:'ruleset'; name:string; url:string; params:RuleFetchParams };
@@ -116,6 +117,8 @@ export class ResourceService {
         const item = job.results[index]!;
         item.state = 'running';this.save(job);
         const result = await this.refresh(r);
+        // 配置订阅可能引用别人分享的订阅源，上游错误详情仅所有者可见。
+        if (!explicit && result.error && r.kind === 'source' && this.store.getWithOwner('source',r.id)?.owner !== owner) result.error = SHARED_SOURCE_ERROR;
         if (cancelled) throw new Error('刷新对象已删除');
         Object.assign(item,{state:'done',...result});
         job.completed++; this.save(job);
