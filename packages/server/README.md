@@ -38,7 +38,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | --- | --- | --- |
 | `SUBFORGE_DB` | `./data/sub-forge.db`（镜像中为 `/data/sub-forge.db`） | SQLite 文件路径 |
 | `SUBFORGE_REPO_CACHE` | 数据库同目录的 `rule-repo-cache` | 公开规则仓库的 Git 缓存，需可写且建议持久化；本地运行需安装 Git，生产镜像已包含 |
-| `SUBFORGE_SECRET` | 数据库旁的 `secret.key` | 32 字节 Base64 主密钥，用于加密备份凭据和计算令牌、URL 的 HMAC 索引（SYS-04）；不设置时首次启动自动生成 |
+| `SUBFORGE_SECRET` | 数据库旁的 `secret.key` | 32 字节 Base64 主密钥，用于计算令牌、URL 的 HMAC 索引（SYS-04）；不设置时首次启动自动生成 |
 | `SUBFORGE_ADMIN_USERNAME` / `SUBFORGE_ADMIN_PASSWORD` | 空 | 首次启动时创建管理员；`create-admin` 命令也从 `SUBFORGE_ADMIN_PASSWORD` 取密码 |
 | `HOST` / `PORT` | `127.0.0.1` / `8080`（镜像中 HOST 为 `0.0.0.0`） | 监听地址 |
 | `SSRF_ALLOW` | 空 | 逗号分隔的字面 IP / CIDR 白名单；兼容接受主机名，域名本身已默认放行 |
@@ -121,11 +121,11 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 ## 数据库备份
 
-系统页可把数据库定时加密备份到 WebDAV 并恢复，接口与格式见 [22 · 数据库备份](../../docs/22-database-backup.md)。备份口令丢失后无法解密；设置了 `SUBFORGE_SECRET` 时只能恢复使用相同主密钥的备份。恢复前的文件保存为 `<数据库>.before-restore` 和 `secret.key.before-restore`。
+系统页可手动下载备份文件，并上传备份文件恢复，接口与格式见 [22 · 数据库备份](../../docs/22-database-backup.md)。备份文件不加密，含主密钥、令牌和节点凭据，请妥善保管；设置了 `SUBFORGE_SECRET` 时只能恢复使用相同主密钥的备份。恢复前的文件保存为 `<数据库>.before-restore` 和 `secret.key.before-restore`。
 
 ## 敏感数据
 
-文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、订阅 token 自 v35 起明文存储，数据库文件权限为 0600；系统设置中的备份凭据用 AES-256-GCM 加密；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
+文档正文（含订阅地址、节点凭据）、快照 URL / 正文 / 错误、订阅 token 自 v35 起明文存储，数据库文件权限为 0600；快照 URL 与 token 以 HMAC 为查询索引，访问日志只记 token 的 HMAC 前缀；会话 ID 只存 HMAC；密码用 scrypt。旧版数据库启动时自动升级，迁移后清理快照旧明文所在的空闲页与 WAL；v6 起本地节点上的前置迁移为配置订阅中的链规则（本地节点只录入节点信息）；v7 把旧规则集与规则包统一迁移为多来源规则集，同时保留归属、引用与远程快照；v8 提升规则集客户端改写为组级；v9 将订阅源的单元素 `urls` 转为 `url`，保留更新时间和快照，意外多地址会使迁移事务回滚。合并前两条分支都曾使用 v8，因此 v9 幂等补齐规则集改写与单地址两项转换，兼容任一分支已升级的数据。
 
 ## 测试
 

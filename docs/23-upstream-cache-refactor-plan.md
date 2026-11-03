@@ -112,7 +112,7 @@ export function cacheCycleStart(now: number, ttlSec: number): number {
 | `e4d5aeb`、`7a908e7` | 文档和前端文案（部分描述会被本计划替换） |
 | `978c77e` | `RuleRepoService.start()` 只开启按需同步，避免测试访问真实 Git。**这里的按需同步是过渡实现，本次重构要改掉，见 5.3** |
 
-加密保留范围（已实现，不要改）：用户密码 scrypt、令牌和 URL 的 HMAC 索引、会话哈希、系统设置里的备份凭据、WebDAV 备份文件。
+加密保留范围（已实现，不要改）：用户密码 scrypt、令牌和 URL 的 HMAC 索引、会话哈希。系统设置里的备份凭据、WebDAV 备份文件原也在此列，已于 2026-11-03 随 WebDAV 备份移除，见 [22](22-database-backup.md)。
 
 ## 4. 代码现状与目标的差距
 

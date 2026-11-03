@@ -601,12 +601,7 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 
 ## 系统设置中的备份（2026-11-02）
 
-`system_settings` 新增两条用主密钥加密的记录，不改变表结构（结构版本不变），也不进入种子文件：
-
-- `backup`：`{ enabled, url, username, password, passphrase, intervalHours, retain }`
-- `backupState`：`{ lastAttemptAt, lastSuccessAt, lastFile, lastSize, lastError, lastWarning, lastRestoreAt, lastRestoreFile }`
-
-恢复时这两条保留当前实例的值，其余数据全部以备份为准。见 [22](22-database-backup.md)。
+2026-11-03：备份改为手动下载和上传，不再保存任何配置或状态。v38 迁移删除 `system_settings` 中的 `backup`、`backupState` 两条记录（WebDAV 账号、密码、备份口令和最近状态），不解密，不改变表结构。恢复后全部数据以备份为准。见 [22](22-database-backup.md)。
 
 2026-11-02 缓存模型：持久缓存只有上游内容，即 `snapshots`、`data/rule-repo-cache` 裸仓库和仓库索引表（`resource_bindings` 已于 2026-11-03 删除）；`last_good`、`shared_rule_resources` 在 v33 删除。`RenderInput.deferRuleBody` 让主配置跳过规则正文解析，规则文件请求和预览才转换。全部规则都不适用于目标内核时，主配置仍声明 provider，规则文件返回只含注释的内容。
 

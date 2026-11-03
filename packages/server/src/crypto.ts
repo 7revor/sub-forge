@@ -1,5 +1,5 @@
-// 主密钥只用于两件事：系统设置中备份凭据（WebDAV 密码、备份口令）的 AES-256-GCM 加密，以及令牌、URL 查找索引的 HMAC。
-// 文档、快照和令牌原文自 v35 起明文存储，decrypt 只再用于读取备份设置和升级旧数据。
+// 主密钥现在只用于令牌、URL 查找索引的 HMAC。
+// 文档、快照和令牌原文自 v35 起明文存储，decrypt 只再用于升级旧数据。
 // 密钥来自环境变量 SUBFORGE_SECRET，未设置时在数据库旁生成 secret.key（权限 0600）。
 
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';

@@ -37,7 +37,10 @@ export function csrfGuard(): MiddlewareHandler {
       if (!URL.canParse(origin) || new URL(origin).host !== new URL(c.req.url).host) throw new HttpError(403, '跨站请求被拒绝');
     }
     const hasBody = (c.req.header('content-length') ?? '0') !== '0' || c.req.header('transfer-encoding');
-    if (hasBody && !(c.req.header('content-type') ?? '').startsWith('application/json')) throw new HttpError(400, '请求体必须是 JSON');
+    const contentType = c.req.header('content-type') ?? '';
+    // 备份文件是唯一的二进制上传；octet-stream 与 JSON 一样不是简单请求，跨站时会先被预检拦下。
+    const binaryUpload = c.req.path === '/api/system/backup/restore' && contentType === 'application/octet-stream';
+    if (hasBody && !binaryUpload && !contentType.startsWith('application/json')) throw new HttpError(400, '请求体必须是 JSON');
     return next();
   };
 }

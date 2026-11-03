@@ -15,7 +15,7 @@ export function restorePending(dbPath: string): boolean {
 }
 
 /** 校验备份并写入暂存目录；此时不影响运行中的数据库。 */
-export async function stageRestore(dbPath: string, backup: BackupContents, options: { currentKey: Buffer; keyFromEnv: boolean; prepare: (restored: Store) => void }): Promise<void> {
+export async function stageRestore(dbPath: string, backup: BackupContents, options: { currentKey: Buffer; keyFromEnv: boolean }): Promise<void> {
   if (backup.schemaVersion > SCHEMA_VERSION) throw new BackupError(400, `备份来自更新的版本（结构 v${backup.schemaVersion}），当前版本只支持到 v${SCHEMA_VERSION}，请先升级`);
   const sameKey = backup.masterKey.equals(options.currentKey);
   if (options.keyFromEnv && !sameKey) throw new BackupError(400, '备份使用的主密钥与 SUBFORGE_SECRET 不一致。请移除该环境变量改用 secret.key，或改为备份时的密钥后重试');
@@ -32,7 +32,6 @@ export async function stageRestore(dbPath: string, backup: BackupContents, optio
     try {
       const integrity = restored.db.pragma('integrity_check', { simple: true });
       if (integrity !== 'ok') throw new BackupError(400, `备份数据库校验失败：${String(integrity)}`);
-      options.prepare(restored);
     } finally { restored.close(); }
     rmSync(`${file}-wal`, { force: true });
     rmSync(`${file}-shm`, { force: true });

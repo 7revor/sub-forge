@@ -1,7 +1,7 @@
 import { importSeedDocuments, migrateDatabase } from './store-migrations.ts';
 import { migrateProfile, profileTemplate } from './profile-routing.ts';
 // SQLite 存储。保存文档和上游快照；渲染结果不落库。
-// 文档、快照和令牌原文明文存储（2026-11-02 修订 SYS-04）；数据库文件权限为 0600，备份凭据和备份文件仍加密。
+// 文档、快照和令牌原文明文存储（2026-11-02 修订 SYS-04）；数据库文件权限为 0600。
 
 import Database from 'better-sqlite3';
 import { pageMeta, type PageOptions, type PageResult } from './pagination.ts';
@@ -109,14 +109,6 @@ export class Store {
     this.configurationRevision++;
     this.db.prepare("INSERT OR REPLACE INTO system_settings VALUES ('resourceCacheTtlSec', ?)").run(String(value));
     this.changed();
-  }
-  /** 含凭据的系统设置加密保存；只有持有主密钥才能读取。 */
-  getSecureSetting<T>(name: string): T | undefined {
-    const row = this.db.prepare('SELECT value FROM system_settings WHERE name = ?').get(name) as { value: string } | undefined;
-    return row ? JSON.parse(this.cipher.decrypt(row.value)) as T : undefined;
-  }
-  setSecureSetting(name: string, value: unknown): void {
-    this.db.prepare('INSERT OR REPLACE INTO system_settings VALUES (?, ?)').run(name, this.cipher.encrypt(JSON.stringify(value)));
   }
   /** 规则快照身份：URL 加读取参数。behavior 只影响 MRS。读取权限在入口校验，不靠缓存隔离。 */
   ruleSnapshotKey(url: string, params: RuleFetchParams = {}): string {

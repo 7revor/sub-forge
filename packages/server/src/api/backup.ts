@@ -1,8 +1,11 @@
-// 数据库备份配置、手动备份与恢复；仅管理员可用，响应不包含凭据。
+// 数据库备份文件的下载与上传恢复；仅管理员可用。
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { BackupError } from '../backup/errors.ts';
 import type { BackupService } from '../backup/service.ts';
-import { HttpError, jsonBody, requireAdmin, type ApiEnv } from './common.ts';
+import { HttpError, requireAdmin, type ApiEnv } from './common.ts';
+
+const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
 
 export function backupRoutes(backups: BackupService) {
   const app = new Hono<ApiEnv>();
@@ -10,15 +13,14 @@ export function backupRoutes(backups: BackupService) {
     try { return await work(); }
     catch (error) { if (error instanceof BackupError) throw new HttpError(error.status, error.message); throw error; }
   };
-  app.get('/system/backup', requireAdmin, c => c.json(backups.view()));
-  app.put('/system/backup', requireAdmin, async c => { const body = await jsonBody(c); return c.json(await guard(() => backups.save(body))); });
-  app.post('/system/backup/test', requireAdmin, async c => { const body = await jsonBody(c); return c.json(await guard(() => backups.test(body))); });
-  app.get('/system/backup/files', requireAdmin, async c => c.json({ items: await guard(() => backups.files()) }));
-  app.post('/system/backup/run', requireAdmin, async c => c.json(await guard(() => backups.run())));
-  app.post('/system/backup/restore', requireAdmin, async c => {
-    const body = await jsonBody<{ name?: unknown; passphrase?: unknown }>(c);
-    if (typeof body.name !== 'string' || (body.passphrase !== undefined && typeof body.passphrase !== 'string')) throw new HttpError(400, '请选择要恢复的备份');
-    await guard(() => backups.restore(body.name as string, body.passphrase as string | undefined));
+  app.get('/system/backup/download', requireAdmin, async c => {
+    const { name, body } = await guard(() => backups.create());
+    return c.body(new Uint8Array(body), 200, { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${name}"`, 'content-length': String(body.length) });
+  });
+  app.post('/system/backup/restore', requireAdmin, bodyLimit({ maxSize: MAX_UPLOAD_BYTES, onError: c => c.json({ error: '备份文件超过 512 MB' }, 413) }), async c => {
+    const body = Buffer.from(await c.req.arrayBuffer());
+    if (!body.length) throw new HttpError(400, '请选择要恢复的备份文件');
+    await guard(() => backups.restore(body));
     return c.json({ restarting: true }, 202);
   });
   return app;

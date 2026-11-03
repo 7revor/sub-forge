@@ -354,3 +354,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-03 订阅源分享：管理员从用户页或订阅源详情打开 `components/ShareSourceModal.tsx`。接收者的列表行标记「只读」，只有查看和复制链接；`/sources/:id` 进入只读详情，只展示节点、拉取状态和流量。
 
 2026-11-03 部署简化：访问日志接口不再返回 `peerIp`、`ipSource`，`AccessLogRow` 同步删除。页面展示不变，开发时订阅链接自动跟随 Vite 地址。
+
+2026-11-03：数据库备份改为手动（`components/BackupSettings.tsx`）：「下载备份」保存 `.sfbak` 文件，「上传恢复」选择文件后恢复并按 `/healthz` 的 `x-boot-id` 判断重启完成；移除 WebDAV 配置、定时和备份列表。见 [22](../../docs/22-database-backup.md)。

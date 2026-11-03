@@ -107,7 +107,6 @@ async function start(): Promise<void> {
   });
   ruleRepos.start();
   resources.start();
-  backups.start();
   store.pruneAccessLog();
   const prune = setInterval(() => store.pruneAccessLog(), DAY_MS);
   prune.unref();

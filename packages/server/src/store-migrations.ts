@@ -208,12 +208,14 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       for (const { name } of this.db.prepare("SELECT name FROM pragma_table_info('access_log') WHERE name IN ('peer_ip', 'ip_source')").all() as { name: string }[]) {
         this.db.exec(`ALTER TABLE access_log DROP COLUMN ${name}`);
       }
+      // v38：WebDAV 备份退役，配置里的账号、密码和备份口令不再保留。
+      this.db.exec("DELETE FROM system_settings WHERE name IN ('backup', 'backupState')");
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();
     this.store.legacyEncoded = false;
     // secure_delete 清除旧凭据所在记录，截断本次迁移前的 WAL。
-    if (version < 23) this.db.pragma('wal_checkpoint(TRUNCATE)');
+    if (version < 38) this.db.pragma('wal_checkpoint(TRUNCATE)');
     // 回收已删除数据和旧密文占用的空间，避免继续增大文件和备份。
     if (version > 0 && version < 35) { this.db.exec('VACUUM'); this.db.pragma('wal_checkpoint(TRUNCATE)'); }
     if (hadSnapshots && version < 3) {

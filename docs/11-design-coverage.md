@@ -60,7 +60,7 @@
 | 功能 | 前端 | 服务端现状 |
 |---|---|---|
 | 规则仓库后续（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | 内置索引/搜索/预览/文本导入已实现；自定义公开 GitHub 仓库增删及逐文件索引已实现，动态 repo 引用及 mrs 导入待实现 |
-| 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制。2026-11-02 备份与恢复已按 [22](22-database-backup.md) 实现（此前移除的是无界面调用的占位接口）；早先 `V2Settings` 不含该入口，需要时再按需求新增 |
+| 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制。2026-11-03 备份与恢复改为手动下载和上传，见 [22](22-database-backup.md)，`V2Settings`、`System` 已同步 |
 | 用户统计列 | 用户页「配置订阅 / 订阅源 / 最近订阅请求」 | `GET /api/users/stats` 返回空，显示「—」 |
 | 组合成员「拉取失败时」（COL-05） | 组合成员表 | 字段 `onFail` 随文档保存，渲染尚未读取，目前一律使用快照 |
 | 基础原文（BS-04，已实现） | 配置订阅原文编辑区 | kernels／clients 保存并参与生成；旧 base.raw 仅迁移读取，不属于待实现功能 |
@@ -402,3 +402,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 节点订阅分享：`Users` 改为「分享的订阅源」并增加修改、取消操作，`V2Source` 页头增加「分享」，新增画板 `V2SourceShare`。对应 `pages/Users.tsx`、`pages/Sources.tsx`、`components/ShareSourceModal.tsx`；后端 `api/shares.ts`，无待实现项。示例种子不含分享关系，无需修改。
 
 2026-11-03 部署简化：移除代理配置和访问日志的 `peerIp`、`ipSource`。页面控件和文案没有变化，已检查画布中与部署、代理相关的文案，无需修改画板。无后端待实现项。
+
+2026-11-03 备份改为手动：移除 WebDAV 配置、定时、备份列表和加密。数据库备份行只保留「下载备份」「上传恢复」和未加密提示，`BackupSettingsModal` 删除，`RestoreBackupModal` 改为选择文件。已同步画布：`V2Settings`（备份行、恢复弹窗，删除配置弹窗）、`System`（备份与恢复卡片）。无后端待实现项。

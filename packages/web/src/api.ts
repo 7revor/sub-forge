@@ -19,6 +19,10 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+  return readJson<T>(res, path);
+}
+
+async function readJson<T>(res: Response, path: string): Promise<T> {
   const text = await res.text();
   let data: unknown;
   try { data = text ? JSON.parse(text) : undefined; } catch { data = undefined; }
@@ -28,6 +32,23 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
     throw new ApiError(res.status, err?.error ?? `请求失败（HTTP ${res.status}）`, err?.details);
   }
   return data as T;
+}
+
+/** 上传文件原文；接口按二进制读取请求体。 */
+export async function uploadFile<T>(path: string, file: Blob): Promise<T> {
+  return readJson<T>(await fetch(`/api${path}`, { method: 'POST', cache: 'no-store', credentials: 'same-origin', headers: { 'content-type': 'application/octet-stream' }, body: file }), path);
+}
+
+/** 下载接口返回的附件，文件名取自 content-disposition；失败时按普通接口报错。 */
+export async function downloadFile(path: string): Promise<void> {
+  const res = await fetch(`/api${path}`, { cache: 'no-store', credentials: 'same-origin' });
+  if (!res.ok) return readJson<void>(res, path);
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'download';
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 // ---------- 接口返回的类型 ----------

@@ -122,9 +122,6 @@ describe('加密与迁移', () => {
     expect(dump).toContain('hunter2');
     expect(dump).toContain(t.token);
     expect(s.db.prepare('SELECT token_hash FROM user_tokens WHERE user_id = ?').get(user.id)).not.toEqual({ token_hash: t.token });
-    s.setSecureSetting('fixture', { password: 'webdav-secret' });
-    expect(JSON.stringify(s.db.prepare('SELECT * FROM system_settings').all())).not.toContain('webdav-secret');
-    expect(s.getSecureSetting('fixture')).toEqual({ password: 'webdav-secret' });
     expect(s.get('source', 'a')!.url).toEqual('https://secret.example.com/sub?token=xyz');
     expect(s.getWithOwner('source', 'a')!.owner).toBe('u1');
     expect(s.latestSnapshot('source', 'a', url)).toMatchObject({ url, body: 'password: hunter2', error: `连接 ${url} 失败` });
@@ -343,21 +340,22 @@ it('v34 升级把文档、快照、令牌和刷新任务改为明文，令牌仍
     store.addSnapshot({ ownerKind: 'source', ownerId: 's', url: 'https://secret.example.com/sub', fetchedAt: 2, ok: false, error: '失败详情' });
     store.db.prepare('INSERT INTO refresh_jobs VALUES (?, ?, ?, ?)').run('j', user.id, JSON.stringify({ id: 'j', state: 'done' }), 1);
     store.db.prepare('INSERT INTO native_migration_backups VALUES (?, ?, ?, ?)').run('profile', 'p', '{"older":true}', 1);
-    store.setSecureSetting('backup', { passphrase: 'keep-encrypted' });
+    for (const name of ['backup', 'backupState']) store.db.prepare('INSERT INTO system_settings VALUES (?, ?)').run(name, cipher.encrypt(JSON.stringify({ passphrase: 'retired-secret' })));
     const encrypt = (table: string, column: string) => { for (const row of store.db.prepare(`SELECT rowid AS id, ${column} AS value FROM ${table} WHERE ${column} IS NOT NULL`).all() as { id: number; value: string }[]) store.db.prepare(`UPDATE ${table} SET ${column} = ? WHERE rowid = ?`).run(cipher.encrypt(row.value), row.id); };
     encrypt('docs', 'data'); encrypt('snapshots', 'url'); encrypt('snapshots', 'body'); encrypt('snapshots', 'error'); encrypt('refresh_jobs', 'data'); encrypt('native_migration_backups', 'data'); encrypt('user_tokens', 'token');
     store.db.exec('ALTER TABLE user_tokens RENAME COLUMN token TO token_enc');
     store.db.pragma('user_version = 34'); store.close();
     for (let i = 0; i < 2; i++) {
       store = new Store(file, { cipher });
-      expect(store.db.pragma('user_version', { simple: true })).toBe(37);
+      expect(store.db.pragma('user_version', { simple: true })).toBe(38);
       expect(store.get('source', 's')?.url).toBe('https://secret.example.com/sub');
       expect(store.latestSnapshot('source', 's', 'https://secret.example.com/sub')?.body).toBe('password: hunter2');
       expect(store.getToken(token)).toEqual({ token, userId: user.id });
-      expect(store.getSecureSetting('backup')).toEqual({ passphrase: 'keep-encrypted' });
+      // v38 删除退役的 WebDAV 备份配置；不解密，主密钥变化也能升级。
+      expect(store.db.prepare("SELECT 1 FROM system_settings WHERE name IN ('backup', 'backupState')").all()).toEqual([]);
       const dump = JSON.stringify(['docs', 'snapshots', 'user_tokens', 'refresh_jobs', 'native_migration_backups'].map(table => store.db.prepare(`SELECT * FROM ${table}`).all()));
       expect(dump).not.toContain('enc:v1:');
-      expect(JSON.stringify(store.db.prepare('SELECT * FROM system_settings').all())).not.toContain('keep-encrypted');
+      expect(JSON.stringify(store.db.prepare('SELECT * FROM system_settings').all())).not.toContain('retired-secret');
       store.close();
     }
     store = new Store(file, { cipher });
