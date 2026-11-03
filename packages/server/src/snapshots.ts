@@ -5,6 +5,7 @@
 import { parseContent, parseRuleSourceContent, stableHash, type RuleSetFormat } from '@sub-forge/core';
 import type { FetchOptions } from './docs.ts';
 import { DEFAULT_TIMEOUT_MS, DEFAULT_UA, type UpstreamFetcher } from './net/upstream.ts';
+import { cacheCycleStart, nextCacheExpiry } from './cache-cycle.ts';
 import type { SnapshotOwner, SnapshotRow, Store } from './store.ts';
 
 const SOURCE_REQUEST_OPTIONS = { ua: DEFAULT_UA, timeoutMs: DEFAULT_TIMEOUT_MS };
@@ -85,8 +86,10 @@ export class SnapshotService {
     };
     const success = latest(true);
     const attempt = latest(false);
+    const ttl = this.store.resourceCacheTtlSec;
     return { resource, lastSuccessAt: success?.fetchedAt, lastAttemptAt: attempt?.fetchedAt,
-      nextFetchAt: attempt ? attempt.fetchedAt + this.store.resourceCacheTtlSec * 1000 : undefined,
+      // 本周期已尝试过就等下个周期；更早的尝试已过期，下次读取时立即拉取。
+      nextFetchAt: attempt ? (attempt.fetchedAt >= cacheCycleStart(this.now(), ttl) ? nextCacheExpiry(this.now(), ttl) : attempt.fetchedAt) : undefined,
       refreshing: this.inflight.has(resource), error: attempt && !attempt.ok ? attempt.error : undefined, available: !!success };
   }
   previewSource(id: string, url: string): Promise<{ body?: string; error?: string }> {
