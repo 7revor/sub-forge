@@ -9,6 +9,7 @@ import { targetLabel } from '../../components/pickers.tsx';
 import { ruleToLine } from '../../components/rule.ts';
 import { Badge, Button, Card, Empty, ErrorAlert, FieldError } from '../../components/ui.tsx';
 import { resolveRepositoryUrlMatch, useRepositoryUrlMatches, type RepositoryUrlMatch } from '../../hooks/useRepositoryUrlMatches.ts';
+import { useUserToken } from '../../hooks/useUserToken.ts';
 import { RuleSourcePreview } from '../../components/RuleSourcePreview.tsx';
 import { RuleCard, RuleFinalCard, type RuleKind } from '../../components/RuleCard.tsx';
 import { RepositoryMatchHint } from '../../components/RepositoryMatchHint.tsx';
@@ -44,6 +45,8 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   currentValue.current = value;
   const remoteUrls = readOnly ? [] : value.rules.filter(r => !ruleReadOnly(r)).flatMap(r => r.matcher.kind === 'ruleset' && r.matcher.remote ? [r.matcher.remote.url] : []);
   const repositoryMatches = useRepositoryUrlMatches();
+  const token = useUserToken(value.rules.some(rule => ruleMatcherKind(rule.matcher) === 'collection'));
+  const tokenHint = token.error ? `访问令牌读取失败：${token.error.message}` : '正在读取访问令牌';
   useEffect(() => { if (importedUrls && !readOnly) void repositoryMatches.detect(importedUrls); }, [importedUrls, readOnly, repositoryMatches.detect]);
   const linkableCount = remoteUrls.filter(url => repositoryMatches.matches[url]?.length === 1).length;
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
@@ -103,7 +106,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
           count={local ? <Badge>{matcher.kind === 'local' ? localRuleLines(matcher.content).length : 1} 条</Badge> : undefined}
           hint={!readOnly && matcher.kind === 'ruleset' && matcher.remote && <RepositoryMatchHint label={`第 ${i + 1} 项规则可关联仓库文件`} matches={repositoryMatches.matches[matcher.remote.url] ?? []} busy={!!linkingRule || repositoryMatches.isLinkingAll} onLink={match => linkRepository(r.id, matcher.remote!.url, match)} />}
           target={readOnly ? <span className="block truncate pr-1.5 pl-3 text-sm" title={targetLabel(r.target, groupName, ref => ref.id)}>{targetLabel(r.target, groupName, ref => ref.id)}</span> : renderTarget ? renderTarget(r.target, target => update({ ...r, target }), `第 ${i + 1} 项规则出口`) : <TemplateTargetSelect label={`第 ${i + 1} 项规则出口`} value={r.target} groups={value.groups} onChange={target => update({ ...r, target })} />}
-          externalPreview={!local} previewLinks={rulePreviewLinks(matcher)} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
+          externalPreview={!local} previewLinks={rulePreviewLinks(matcher, token.data)} previewHint={ruleMatcherKind(matcher) === 'collection' ? tokenHint : undefined} onPreview={() => void RuleSourcePreview.show({ matcher })} onEdit={() => void edit(r)} onDelete={() => {
             onChange({ ...value, rules: value.rules.filter(item => item.id !== r.id) });
             if (matcher.kind === 'ruleset' && matcher.remote) repositoryMatches.clear([matcher.remote.url]);
           }}><span title={label}>{label}</span></RuleCard>;

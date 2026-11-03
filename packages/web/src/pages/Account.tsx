@@ -1,15 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Frame } from '../modals/Frame.tsx';
 import { CopyButton } from '../components/CopyButton.tsx';
 import { api } from '../api.ts';
 import { Button, Card, ErrorAlert, Field, Input, PageHeader, PageScroll } from '../components/ui.tsx';
 import { useMe } from '../hooks.ts';
+import { useUserToken } from '../hooks/useUserToken.ts';
 
 export function Account() {
   const me = useMe().data;
   const qc = useQueryClient();
-  const token = useQuery({ queryKey: ['user-token'], queryFn: () => api<{ item: { token: string } }>('GET', '/me/token').then(r => r.item.token) });
+  const token = useUserToken();
   const resetToken = async () => {
     if (!token.data) return;
     const expected = token.data;

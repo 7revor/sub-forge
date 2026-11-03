@@ -370,3 +370,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-03 代理链落地默认值与经由提示：`ChainRuleEditor` 新建和切换落地来源后默认不选节点；`GroupMemberPicker` 的「经由」提示改用 `chainForNode` 按节点判断。
 
 2026-11-03 规则出口单节点：`RuleTargetSelect` 在出口菜单内按来源直接列出展开来源的节点，菜单打开后才加载，搜索走服务端；`RoutingTargetMenu` 搜索框固定、选项区滚动，已选项使用 shadcn 默认单选指示器。移除单节点二级浮层。规则列表和规则弹窗共用此选择器。
+
+2026-11-03：`PagedOptionList` 对带 `url` 的候选显示预览图标（与候选项同级，不触发选择）；`rulePreviewLinks(matcher, token)` 为规则集合生成托管原文地址，令牌由 `useUserToken` 提供。

@@ -18,7 +18,7 @@ import { RejectedRulesPopover } from '../components/RejectedRulesPopover.tsx';
 // 来源正文打开只读预览，编辑使用统一弹窗；下方始终显示合并结果。
 
 import { TriangleAlert, Link2, Plus, ScanSearch } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { RulesetSourceStatus } from '../api.ts';
 import { RulesetOverrides, overridesError } from '../components/RulesetOverrides.tsx';
 import { SortableList } from '../components/SortableList.tsx';
@@ -70,9 +70,6 @@ function rulesetError(d: RuleSetDoc): string | undefined {
 /** 左侧编辑来源与客户端改写，右侧即时预览合并结果。 */
 export function RulesetEdit() {
   const e = useDocEditor('rulesets', EMPTY_RS);
-  const previewRef = useCallback((element: HTMLDivElement | null) => {
-    if (element && window.location.hash === '#preview') element.scrollIntoView();
-  }, [e.id]);
   const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', queryUrl('/rulesets', { id: e.id })).then(r => r.writable) });
   const canEdit = e.isNew || permission.data === true;
   const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos') });
@@ -164,7 +161,7 @@ export function RulesetEdit() {
     <RulesetOverrides value={d.overrides ?? []} legacySources={d.sources} onChange={overrides => set({ overrides: overrides.length ? overrides : undefined })}
       onRemoveLegacy={id => set({ sources: d.sources.map(s => s.id === id ? { ...s, overrides: undefined } : s) })} />
     </fieldset>
-    </div><div id="preview" className="min-w-0 scroll-mt-4" ref={previewRef}><Card className="min-w-0" bodyClass="px-5 pt-4 pb-5">
+    </div><div className="min-w-0"><Card className="min-w-0" bodyClass="px-5 pt-4 pb-5">
       <RulesetPreview title="合并结果" key={e.id} inputs={sources.inputs} ready={sources.ready} sourceReading={sources.reading} onRefreshSources={sources.refresh}
         overrides={d.overrides} sourceError={sources.error} sourceNames={Object.fromEntries(d.sources.map(s => [s.id, sourceLabel(s)]))} />
     </Card></div></div>

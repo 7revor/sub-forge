@@ -429,3 +429,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 可清空下拉布局：`Select` 的 `clearable` 有值时，箭头固定在触发框最右侧，清空按钮紧贴箭头左侧，文字为按钮预留空间并在窄宽度下截断；此前触发框的右内边距把箭头挤到清空按钮左边。影响所有可清空下拉，含 `TabsChain` 预览页的客户端选择。画布 `V2Components` 的「可清空」项补上有值状态。只影响前端样式，无后端待实现项。
 
 2026-11-03 预览状态与 HTTP 复制：处理链总览首次加载时只显示一处「预览中…」（此前标题下与内容区各一处）；`useClipboard` 在 HTTP 部署没有 `navigator.clipboard` 或写入被拒时退回选区复制，弹窗内同样可用。画板只绘制预览加载完成后的状态，复制按钮外观和文案不变，画布无需修改；后端无变化。
+
+2026-11-03 候选预览与规则集合原文：`V2Pickers` 的 AsyncSelect 候选增加预览图标（画布已同步）；前端对应 `OptionPage`、`RuleCard`、`rulePreview`、`useUserToken`；后端 `/api/rule-options/search` 给本地规则集合返回带令牌的 `url`，无后端待实现项。规则集详情的 `#preview` 定位随之移除。
