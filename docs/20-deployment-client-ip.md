@@ -1,6 +1,6 @@
 # 部署与访问日志 IP 透传
 
-从零部署新实例时，先按[初次部署指引](24-first-deployment.md)操作。
+从零部署新实例时，先按[初次部署指引](24-first-deployment.md)操作。需要隐藏后端入口时，改用 [Cloudflare Tunnel 部署](25-cloudflare-tunnel.md)。
 
 ## 快速部署：Compose + 宿主机 Nginx
 

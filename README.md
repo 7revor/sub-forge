@@ -27,6 +27,7 @@
 | [docs/10-m1-stabilization.md](docs/10-m1-stabilization.md) | M1 稳定化修复、订阅资源版本与模板更新策略、验收记录 |
 | [docs/11-design-coverage.md](docs/11-design-coverage.md) | 前端页面与设计稿的逐页对照，服务端待实现的功能 |
 | [docs/24-first-deployment.md](docs/24-first-deployment.md) | 初次部署指引：从零部署新实例的完整步骤、上线检查与更新命令 |
+| [docs/25-cloudflare-tunnel.md](docs/25-cloudflare-tunnel.md) | Cloudflare Tunnel 部署：隐藏后端入口，不需要入站端口、Nginx 和证书 |
 | [docs/20-deployment-client-ip.md](docs/20-deployment-client-ip.md) | 访问日志 IP 来源、Docker / Nginx / CDN 部署与可信代理透传 |
 | [docs/12-backend-regression-fixes.md](docs/12-backend-regression-fixes.md) | 后端六项问题修复、边界约定与回归验证 |
 

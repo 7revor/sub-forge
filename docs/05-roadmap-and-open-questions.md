@@ -377,3 +377,5 @@ Docker 验证中发现并修复的问题：
 2026-11-03 部署改为镜像发布：已完成。`scripts/docker-push` 发布到指定仓库，`docker/compose.yaml` 不再从源码构建，改为拉取 `SUBFORGE_IMAGE`；数据默认绑定挂载到 `./data`（`SUBFORGE_DATA_DIR`），已有命名卷的迁移步骤见 [24](24-first-deployment.md#从源码构建部署迁移)。
 
 2026-11-03 节点订阅分享：已完成。数据库升级到 v36，服务端、前端和画板同步。
+
+2026-11-03 Cloudflare Tunnel 部署：已完成配置和文档。`docker/compose.tunnel.yaml` 由 `cloudflared` 连接 Cloudflare，应用不发布端口，只信任 `cloudflared` 的固定地址；见 [25](25-cloudflare-tunnel.md)。长请求超时和后端出站暴露 IP 的限制尚未处理。

@@ -21,7 +21,7 @@ pnpm --filter @sub-forge/server start
 
 ### Docker（生产，SYS-08）
 
-镜像由 `./scripts/docker-push <repo> [tag]` 发布到 Docker Hub，服务器不需要源码。推荐用 `docker/compose.yaml` 和 `docker/nginx.conf.example`，数据默认挂载到 Compose 文件旁的 `./data`（`SUBFORGE_DATA_DIR`），步骤见 [初次部署指引](../../docs/24-first-deployment.md)，其他拓扑见 [部署文档](../../docs/20-deployment-client-ip.md)，更新命令见 [更新](../../docs/24-first-deployment.md#更新)。下面是直接运行的方式。
+镜像由 `./scripts/docker-push <repo> [tag]` 发布到 Docker Hub，服务器不需要源码。推荐用 `docker/compose.yaml` 和 `docker/nginx.conf.example`，数据默认挂载到 Compose 文件旁的 `./data`（`SUBFORGE_DATA_DIR`），步骤见 [初次部署指引](../../docs/24-first-deployment.md)，其他拓扑见 [部署文档](../../docs/20-deployment-client-ip.md)，隐藏后端入口见 [Cloudflare Tunnel 部署](../../docs/25-cloudflare-tunnel.md)，更新命令见 [更新](../../docs/24-first-deployment.md#更新)。下面是直接运行的方式。
 
 ```bash
 docker run -d --name sub-forge -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \

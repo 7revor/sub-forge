@@ -1,6 +1,6 @@
 # 初次部署指引
 
-从零部署一个新实例的完整步骤：开发机把镜像发布到 Docker Hub，服务器用 Docker Compose 拉取运行，不需要源码和 Git；宿主机 Nginx 负责 HTTPS。其他拓扑（Nginx 在容器里、CDN、多级代理、`docker run`）和可信代理的解析规则见 [部署与访问日志 IP](20-deployment-client-ip.md)。
+从零部署一个新实例的完整步骤：开发机把镜像发布到 Docker Hub，服务器用 Docker Compose 拉取运行，不需要源码和 Git；宿主机 Nginx 负责 HTTPS。其他拓扑（Nginx 在容器里、CDN、多级代理、`docker run`）和可信代理的解析规则见 [部署与访问日志 IP](20-deployment-client-ip.md)。需要隐藏后端入口时，改用 [Cloudflare Tunnel 部署](25-cloudflare-tunnel.md)。
 
 下文的 `your-name/sub-forge` 和 `sub.example.com` 都要换成实际值。
 
