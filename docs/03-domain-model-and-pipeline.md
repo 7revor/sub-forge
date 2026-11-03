@@ -620,3 +620,7 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 ## 2026-11-03：来源名称独立于仓库文件
 
 `RuleSetSource.name` 只保存用户填写的名称。前端关联仓库文件时只取 `url`、`format`、`repository` 等文件字段，保留原 `name`；未填写时保持缺省，由展示层回退到文件名。`POST /api/rule-options/resolve` 返回的来源 `name` 不变，模板和订阅的规则引用仍用它展示。数据结构、接口和示例种子无变化。
+
+## 2026-11-03：列表状态只反映节点来源
+
+`resourceCacheSummary` 只读取 `/{kind}/cache` 返回项中的节点资源（`kind !== 'ruleset'`），规则资源只用于上次刷新时间和手动刷新。资源状态接口、核心模型、缓存语义和示例种子不变；规则仍不保存失败记录。
