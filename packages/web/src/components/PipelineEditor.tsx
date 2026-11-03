@@ -265,7 +265,7 @@ export function PipelineEditor({ compactOverview = false, steps, onChange, previ
             {loading && <span className="text-sm text-muted-foreground">预览中…</span>}
           </div>
           {before && after && <InputOutputView before={before} after={after} inLabel="输入" outLabel="输出" truncated={truncated} />}
-          {!preview && !previewError && <div className="px-4 pb-4 text-sm text-muted-foreground">{loading ? '预览中…' : '保存后可预览'}</div>}
+          {!preview && !previewError && !loading && <div className="px-4 pb-4 text-sm text-muted-foreground">保存后可预览</div>}
         </>}
 
         {mode === 'step' && step && <>

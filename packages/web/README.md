@@ -64,7 +64,7 @@ Profile 基础设置直接保存原文，未完成语法也可保存；生成时
 
 公共展示与业务表单的复用边界：
 
-- `CopyButton` / `useClipboard`：等待剪贴板写入成功再反馈，失败显示原因；文本变化与卸载使旧反馈失效。
+- `CopyButton` / `useClipboard`：等待剪贴板写入成功再反馈，失败显示原因；文本变化与卸载使旧反馈失效。HTTP 部署没有 `navigator.clipboard`，此时或写入被拒时退回 `execCommand('copy')`，弹窗内复制同样可用。
 - `CodePreview`、`Notice`、`NodeSetCount`、`SourceFetchStatus`、`Card subtitle`：统一预览、提示、节点计数、拉取状态与卡片标题说明。`ReportList` 可由调用方提供定位操作。
 - `GroupSettingsFields`、`MatcherEditor`、`OptionalBoolean`：模板与配置订阅共用字段；权限、继承和覆盖写入仍由页面负责。布尔值区分未设置、开启和关闭，数值 `0` 保留。规则匹配类型切换清理旧类型专属字段。
 - `NamedCreateDialog`：本地分组使用名称校验、回车提交、重复提交保护和错误展示。`ExtraFields.validateName` 同时用于新增和重命名，调用方通过业务校验函数限制字段，不依赖 DOM 事件捕获。
