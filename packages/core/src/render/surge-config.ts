@@ -39,9 +39,11 @@ export function surgeBenchmarks(groups: Fields[], nodes: Fields[], specs: GroupS
 
 function surgeGroup(group: Fields, report: Report): string {
   const name = iniName(group.name), fields = [String(group.type), ...[...new Set(group.proxies as string[] ?? [])].map(iniName)];
-  const known = new Set(['name','type','proxies','url','timeout','interval','tolerance','hidden','icon','strategy','lazy','max-failed-times','expected-status','empty-fallback','policy-path','update-interval']);
+  const known = new Set(['name','type','proxies','url','timeout','interval','tolerance','hidden','icon','strategy','lazy','max-failed-times','expected-status','empty-fallback','policy-path','update-interval','include-other-group','policy-regex-filter']);
   const add = (key: string, value: unknown) => { if (value !== undefined) fields.push(key + '=' + iniValue(value)); };
   add('policy-path', group['policy-path']); add('update-interval', group['update-interval']);
+  if (group['include-other-group'] !== undefined) fields.push('include-other-group=' + iniValue((group['include-other-group'] as string[]).map(iniName).join(','), true));
+  add('policy-regex-filter', group['policy-regex-filter']);
   add('interval', group.interval); add('tolerance', group.tolerance); add('hidden', group.hidden); add('icon-url', group.icon);
   for (const key of ['no-alert', 'evaluate-before-use', 'category', 'persistent']) { known.add(key); add(key, group[key]); }
   if (group.strategy === 'consistent-hashing') add('persistent', true);

@@ -31,7 +31,8 @@
 | 哈希负载均衡 | consistent-hashing → persistent | consistent-hashing → PCC |
 | 轮询负载均衡 | 没有等价转换，报错 | round-robin → Round-Robin |
 | 单次测速超时 | 毫秒转秒，下放节点；共享节点参数冲突报错 | 毫秒转秒放 General；组间或与基础设置冲突时报错 |
-| 空组 | REJECT | REJECT |
+| 无成员的组 | REJECT | REJECT |
+| 筛选结果为空（2026-11-03 起） | 客户端默认行为（手册为 DIRECT） | 客户端默认行为 |
 
 协议名出现在表内不代表所有可选参数都已覆盖。未适配协议、传输或重要参数给出错误；已明确允许省略的差异（例如部分显示/测速选项和上传带宽）在报告中说明。Loon 不输出 PASS、TUIC、Snell 或 WireGuard；Surge 不输出 VLESS/Reality。引用、重名、筛选和循环检测继续使用已有实现。
 
@@ -100,8 +101,8 @@ Loon 没有在本机执行官方配置校验器；Surge/Loon 的真实客户端�
 四个内核都保留每个来源的 `provider` / `inline` 选择。引用来源由本服务生成专属远程资源，展开来源写入主配置，支持两者混用。Surge 策略组使用 `policy-path` 和秒单位的 `update-interval`；Loon 声明 `[Remote Proxy]` 并在策略组引用订阅名，禁用额外解析器；Stash 与 Mihomo 共用 `proxy-providers` 声明及 `use` 引用，包括公共 `type: http`、`url`、`interval`、`proxy: DIRECT` 字段。
 
 - 远程资源仍走 `/subs/nodes?kind=provider&profile=…&id=…&target=…`，正文分别是 Surge 节点行、Loon 节点行、Stash YAML。来源处理链、组合成员及前后缀先执行；上游私有地址不会直接下发。
-- 三端组级包含 / 排除正则、排除类型和精确节点引用由服务端生成稳定的派生资源；每次刷新重新计算。Surge 多个引用来源合成一个远程资源，保持来源顺序。派生资源继承原来源的权限和去重流量统计。节点重名时同步改名与引用，Loon 订阅名与策略名冲突时分配独立名称。
-- 筛空的组输出 REJECT，不引用空集合；旧派生地址失效，空原始资源返回 503，避免客户端把空 provider 转成 DIRECT。后续新增节点后需刷新主订阅恢复空组的远程引用。网络失败时是否保留客户端本地缓存取决于客户端本身。
+- （2026-11-03 已由下节取代）三端组级包含 / 排除正则、排除类型和精确节点引用由服务端生成稳定的派生资源；每次刷新重新计算。Surge 多个引用来源合成一个远程资源，保持来源顺序。派生资源继承原来源的权限和去重流量统计。节点重名时同步改名与引用，Loon 订阅名与策略名冲突时分配独立名称。
+- （2026-11-03 已移除，见下节）筛空的组输出 REJECT，不引用空集合；旧派生地址失效，空原始资源返回 503，避免客户端把空 provider 转成 DIRECT。后续新增节点后需刷新主订阅恢复空组的远程引用。网络失败时是否保留客户端本地缓存取决于客户端本身。
 - Surge 远程正文保留 `underlying-proxy`；Mihomo 与 Stash 的代理链共用生成和校验：前置可以是普通策略组，远程单节点引用使用精确隐藏组，`dialer-proxy` 不直接填写 provider 名称。Stash 不额外改写同集前置，也不添加跨 provider、网卡组合等专用阻断或提示。Loon 远程落地仍不能携带 `[Proxy Chain]`，需要显式将落地来源设为展开。
 - 草稿远程链接含占位令牌，含远程节点时禁用独立文件下载，使用保存后的正式订阅链接。选择展开后恢复原有独立导出；Loon 含远程规则时仍需正式订阅。
 - 失败回退不会使用旧版强制内联的成功结果，也不会回退到与当前节点输出设置不同的产物。
@@ -109,12 +110,30 @@ Loon 没有在本机执行官方配置校验器；Surge/Loon 的真实客户端�
 依据（2026-11-02 核对）：[Surge 外部策略](https://manual.nssurge.com/policy-groups/policy-including.html)、[Loon 订阅节点](https://nsloon.app/docs/Node/subscription/)、[Loon 官方示例](https://github.com/Loon0x00/LoonExampleConfig/blob/master/example.conf)、[Stash 远程代理集](https://stash.wiki/proxy-protocols/proxy-providers)、[Stash 代理链](https://stash.wiki/proxy-protocols/dialer-proxy)。
 
 
+## 2026-11-03：远程来源改用客户端原生筛选
+
+Stash、Loon、Surge 的组级名称筛选和单节点引用不再生成派生资源，一个来源只对应一个远程资源：
+
+| 客户端 | 来源声明 | 组内引用与筛选 |
+| --- | --- | --- |
+| Stash | `proxy-providers` | `use` + `filter` |
+| Loon | `[Remote Proxy]` | `[Remote Filter]` 的 `组名_筛选 = NameRegex,来源…,FilterKey = 正则`，组成员写筛选器名；相同来源和正则共用一个筛选器 |
+| Surge | `来源名 = select, policy-path=…, update-interval=…, hidden=true` | `include-other-group="来源A,来源B"` + `policy-regex-filter` |
+
+- 不再有筛空保护：渲染时不把筛空组改成 REJECT，资源接口对空集合返回 200 和空内容。只有没有任何成员的组仍补 REJECT，因为 Surge 和 Loon 不接受没有成员的组行。Mihomo 的 `empty-fallback: REJECT` 不变。
+- `exclude-filter`、`exclude-type` 三端都没有原生写法，这类组继续使用 `view:` 派生资源，筛选在服务端随资源刷新执行。
+- 未被任何组引用的来源不写进主配置，资源接口仍可读取。
+- Surge 内联组与 Loon 订阅名和策略名共用引用空间，重名时分配 `__provider_<hash>`。
+- 待真机确认：Stash 组同时有 `proxies` 和 `filter` 时，筛选是否作用于静态成员；Stash 和 Loon 对 `(?i)` 的支持。Surge 手册写明筛选不影响显式成员。
+
+依据（2026-11-03 核对）：[Surge Policy Including](https://manual.nssurge.com/policy-groups/policy-including.html)、[Loon 官方示例](https://github.com/Loon0x00/LoonExampleConfig/blob/master/example.conf)、[Stash 策略组](https://stash.wiki/proxy-protocols/proxy-groups)。
+
 ## 2026-11-02：公共 Clash/Mihomo 生成
 
 服务端主订阅、草稿预览及独立节点接口均通过 `renderClash(input, client)` 生成 Mihomo / Stash YAML。`renderMihomo` 和 `renderStash` 仅作为兼容入口保留，共用解析、节点处理、策略组构造、provider 声明、依赖解析及循环校验。
 
 - Stash 不维护节点协议、传输或扩展字段白名单。`smux`、`ip-version`、组级扩展等按公共生成保留；保留字段只表示没有丢失用户配置，不代表已完成客户端执行验证。
-- Stash 最末层仅处理 Hysteria/Hysteria2 字段与带宽单位、节点测速参数、空集合保护，以及明确不同的规则写法。`auth/up-speed/down-speed` 输入在公共层归一化，再按目标输出，认证或带宽别名冲突明确报错。Stash 的 `block-quic: off` 原样保留，结构化 `URL-REGEX` 和 `USER-AGENT` 正常输出。
+- Stash 最末层仅处理 Hysteria/Hysteria2 字段与带宽单位、节点测速参数（空集合保护 2026-11-03 移除），以及明确不同的规则写法。`auth/up-speed/down-speed` 输入在公共层归一化，再按目标输出，认证或带宽别名冲突明确报错。Stash 的 `block-quic: off` 原样保留，结构化 `URL-REGEX` 和 `USER-AGENT` 正常输出。
 - 动态成员先使用公共 Clash 表达；需要托管筛选和空集合保护时再展开。原生扩展中的 `include-all*` 也经过同一保护。Stash 的派生远程子集仍保持稳定地址和 REJECT 语义，这一差异不修改代理链前置名称。
 - `dialer-proxy: upstream-select` 在两端保持一致；精确远程节点前置在两端使用相同隐藏组名称、依赖记录及落地引用。本服务不为 Stash 额外改写、禁止或提示这些代理链组合；引用缺失、循环等公共校验继续生效。
 - 基础配置继续遵循 Mihomo 公共 → Stash 应用追加（v34 迁移退役旧公共层）的继承顺序。

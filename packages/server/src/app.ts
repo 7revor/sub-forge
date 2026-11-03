@@ -188,7 +188,6 @@ export function createApp(deps: AppDeps) {
     if (!outcome.ok) return outcome.accessDenied ? notFound(c) : c.text(`节点暂时不可用：${outcome.message}`, 503);
     const selected = outcome.render;
     if (!renderer.canReadNodes(selected, t.userId) || typeof selected.providers[key] !== 'string') return notFound(c);
-    if (selected.providerNodeCounts?.[key] === 0) return c.text('节点集合为空，请刷新主订阅以应用拒绝策略', 503);
     const traffic = userinfoHeader(selected.providerUserinfo?.[key]);
     if (traffic) c.header('subscription-userinfo', traffic);
     c.header('content-type', 'text/plain; charset=utf-8');

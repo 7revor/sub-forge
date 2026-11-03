@@ -267,7 +267,7 @@ provider 必须是 **Profile 专属**的，因为注入的 `dialer-proxy` 指向
 
 - Surge 将节点级 `dialer-proxy` 转成 `underlying-proxy`；QUIC 端口跳跃与代理链不能同时使用，冲突时报错。
 - Loon 内联落地生成节点副本与 Proxy Chain；远程落地不能携带链段，要求显式设为 inline，前置来源可保留 provider。
-- Surge 远程成员用 policy-path，Loon 用 Remote Proxy 订阅名；筛选在服务端执行，无成员补 REJECT，空远程资源不成功下发。
+- Surge 每个远程来源声明一个以来源命名的隐藏内联组（policy-path），策略组用 include-other-group 引用；Loon 用 Remote Proxy 订阅名。名称筛选使用客户端原生能力，无成员补 REJECT，筛空不改写（2026-11-03 修订）。
 - Surge 规则集采用稳定地址的托管 LIST，独立文件导出时展开；Loon 将手写规则与规则集按列表顺序统一输出为 `[Remote Rule]` 托管链接，`[Rule]` 仅保留 `FINAL`，避免本地/远程来源跨段重排。手写规则属于订阅私有产物。
 - Loon 基础配置使用 kernels.loon 与 clients 对应应用原文；旧 loonPatch 仅迁移读取。范围、限制和验证边界见 [19](19-client-conversion.md)。
 
@@ -293,7 +293,7 @@ effective.final = overlay.final ?? template.final
 - 模板只存 `version`；Profile `follow: 'latest'` 时每次渲染读取最新版本，从而**模板更新自动同步**。
 - 规则出口改为节点（`rulePatches.target = {kind:'node'}`）只在覆盖层中允许，满足"模板中不可关联节点"。
 - 模板组不能在 Profile 中删除、改名（Q6）；旧覆盖层 `groupPatches.set` 中出现 `name` / `display.hidden` 时校验报错。绑定模式通过 `routing.groupHidden` 覆盖隐藏状态（2026-11-02 修订）。Profile 私有组（`extraGroups`）不受此限制。
-- 空组处理：模板和私有组统一拒绝。静态无成员补 REJECT；Mihomo 动态组固定 empty-fallback: REJECT；Surge／Loon／Stash 服务端筛选、生成子集并保护空资源。旧 whenEmpty 不改变策略，节点测速失败不等于空组。
+- 空组处理：模板和私有组统一拒绝。静态无成员补 REJECT；Mihomo 动态组固定 empty-fallback: REJECT；Surge／Loon／Stash 使用客户端原生筛选，筛空或空资源按客户端默认行为处理（2026-11-03 修订）。旧 whenEmpty 不改变策略，节点测速失败不等于空组。
 
 ## 6. 规则集转换与输出
 
@@ -636,3 +636,5 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 2026-11-03 本地节点工作区：领域模型和渲染管线不变。`LocalProxyGroup.proxies` 本来就是有序数组，节点排序只改变数组顺序，渲染按此顺序输出。
 
 2026-11-03 规则出口单节点收窄：`Target`、`NodeRef` 类型与存储格式不变，示例种子无需修改。规则与 MATCH 出口（含嵌套 fallback）只接受 inline 来源：渲染不为 Provider 节点创建 `__ref_` 组，有 fallback 时告警并回退，无 fallback 时报 `ref.provider-rule-exit`，四端一致；服务端保存和草稿预览拒绝这类出口。组成员、代理链前置仍可引用 Provider 节点。来源由 inline 改为 provider 时，`planProfileChange` 把相关规则出口改为 REJECT 并在确认框列出。已保存的 inline 正则出口继续生效，点选节点可替换。
+
+2026-11-03 远程来源原生筛选：领域模型字段、存储格式和示例种子不变，只改变输出。Stash 输出 `use` + `filter`；Surge 输出 `include-other-group` + `policy-regex-filter`，每个被引用的来源对应一个隐藏内联组；Loon 输出 `[Remote Filter]` 的 `NameRegex`。`exclude-filter`、`exclude-type` 三端都无原生写法，继续由 `view:` 派生资源筛选。未被任何组引用的来源不再声明，但资源接口仍可读取。详见 [19](19-client-conversion.md#2026-11-03远程来源改用客户端原生筛选)。

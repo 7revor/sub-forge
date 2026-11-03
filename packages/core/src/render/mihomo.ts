@@ -25,7 +25,7 @@ import { isIniClient } from '../types.ts';
 import { stringifyLoon, loonBenchmarks } from './loon-config.ts';
 import { iniName } from './ini-format.ts';
 import { applyStashCompatibility } from './stash-config.ts';
-import { lowerRemoteProviders } from './remote-providers.ts';
+import { lowerRemoteProviders, type RemoteFilter } from './remote-providers.ts';
 import { excludedAdapterTypes, isExcludedAdapter } from '../proxy/adapterType.ts';
 
 export type UrlBuilder = {
@@ -71,7 +71,7 @@ export type ChainResolution = {
   issues: ReportItem[];
 };
 
-export type ProviderOutput = { name: string; yaml: string; sourceKeys?: string[]; nodeCount?: number };
+export type ProviderOutput = { name: string; yaml: string; sourceKeys?: string[] };
 export type RulesetOutput = { behavior: Behavior; text: string; providerName?: string };
 
 export type MihomoRenderResult = {
@@ -159,7 +159,7 @@ function stripNode(n: ProxyIR): Record<string, unknown> {
 
 function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const { profile } = input;
-  // INI 远程格式及 Stash 空集合保护需要本服务管理成员；节点与代理链仍使用同一流程。
+  // INI 远程格式及 Stash 需要本服务改写动态成员；节点与代理链仍使用同一流程。
   const managedMembers = isIniClient(client) || client === 'stash';
   const report = new Report();
   const ctx: ClientCtx = { client };
@@ -353,7 +353,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     if (client === 'loon' && timeout !== undefined && Number.isFinite(timeout)) base.general = { 'test-timeout': timeout / 1000 };
   }
   const groups = eff.groups.map(lowerGroup);
-  // 先生成公共 Clash 成员表达，再为需要托管筛选/空集合保护的输出展开动态范围。
+  // 先生成公共 Clash 成员表达，再为不直接输出 include-all 的客户端展开动态范围。
   if (managedMembers) for (const group of groups) {
     const includeProviders = group['include-all'] === true || group['include-all-providers'] === true;
     const includeProxies = group['include-all'] === true || group['include-all-proxies'] === true;
@@ -551,6 +551,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   const inlineProxies = [...sets.values()].filter(s => s.output === 'inline').flatMap(s => s.nodes).map(stripNode);
   const providers: Record<string, ProviderOutput> = {};
   const proxyProviders: Record<string, Record<string, unknown>> = Object.create(null);
+  const remoteFilters: Record<string, RemoteFilter> = {};
   const providerNodes = new Map([...sets.values()].filter(s => s.output === 'provider').map(s => [s.providerName, s.nodes.map(stripNode)]));
   const allGroups = [...groups, ...wrappers];
   const benchmarkMembers = new Map(allGroups.map(g => [g.name, wrapperNode.has(g.name) ? [wrapperNode.get(g.name)!.node.name] : (g.use ?? []).flatMap(name => {
@@ -567,13 +568,14 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   validateReferences(allGroups, inlineProxies, providers, proxyProviders, report);
   if (managedMembers) {
     const originalNames = new Map([...sets.values()].flatMap(s => s.nodes.map(n => [n.name, refName(n)] as const)));
-    lowerRemoteProviders({ client, groups: allGroups, providers, proxyProviders, nodes: providerNodes, urls: input.urls, report, nodeReferences: new Map([...wrapperNode].map(([name, ref]) => [name, ref.node.name])),
+    lowerRemoteProviders({ client, groups: allGroups, providers, proxyProviders, remoteFilters, nodes: providerNodes, urls: input.urls, report, nodeReferences: new Set(wrapperNode.keys()),
       filter: (nodes, spec) => filterNodes(nodes.map(n => ({ ...n, [inlineOriginalName]: originalNames.get(String(n.name)) } as RenderNode)), spec),
     });
   }
 
   const config: Record<string, unknown> = { ...base, proxies: inlineProxies };
   if (Object.keys(proxyProviders).length) config['proxy-providers'] = proxyProviders;
+  if (Object.keys(remoteFilters).length) config['remote-filters'] = remoteFilters;
   config['proxy-groups'] = allGroups;
   if (Object.keys(ruleProviders).length) config['rule-providers'] = ruleProviders;
   config.rules = ruleLines;

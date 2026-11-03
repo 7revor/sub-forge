@@ -112,7 +112,7 @@ export function TabPreview() {
       </div>
       <ErrorAlert error={preview.error} />
       {preview.data && !current && !preview.isPending && <p role="status" className="text-sm text-muted-foreground">配置已更改，请重新生成预览。</p>}
-      <p className="text-sm text-muted-foreground">引用来源通过远程订阅更新；展开来源随主订阅更新。空策略组保持拒绝连接。</p>
+      <p className="text-sm text-muted-foreground">引用来源通过远程订阅更新；展开来源随主订阅更新。没有成员的策略组拒绝连接；筛选结果为空时按客户端默认行为处理。</p>
       {client === 'loon' && <p className="text-sm text-muted-foreground">本地规则和规则集按列表顺序托管，最终兜底保留在主配置。</p>}
       {current && preview.data.exportUnavailableReason && <p role="status" className="text-sm text-muted-foreground">{preview.data.exportUnavailableReason}</p>}
       {current && (

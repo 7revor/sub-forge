@@ -423,3 +423,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 代理链落地默认不选：`V2ProfileDialogs` 的「添加代理链」落地区块改为未勾选状态，对应 `ChainRuleEditor`。策略组成员「经由」提示判定修正只影响前端，配置输出不变，无新增后端待实现项。
 
 2026-11-03 规则出口单节点：出口菜单直接列出 inline 来源的节点，超长时选项区滚动，移除二级浮层；provider 节点不再自动创建隐藏组。前端对应 `RuleTargetSelect`、`RoutingTargetMenu`，core、server 已实现。画布 `V2ProfileRouting`（规则行出口示例为节点）、`V2ProfileDialogs`（「编辑第 N 项规则」绘制展开的出口菜单）已同步，无后端待实现项。
+
+2026-11-03 远程来源原生筛选：`V2ProfilePreview` 画板补上 `TabsChain` 预览页的说明文案，内容为「没有成员的策略组拒绝连接；筛选结果为空时按客户端默认行为处理。」。其余为服务端输出变化，无后端待实现项。

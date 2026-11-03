@@ -31,14 +31,15 @@ for (const target of ['surge', 'loon', 'stash'] as const) describe(target + ' �
     const body = await response.text();
     expect(body).not.toContain('upstream.example.test');
     expect(body).not.toContain('处理-香港');
-    const url = links(body).find(link => new URL(link).searchParams.get('id')!.startsWith('view:'))!;
-    expect(url).toBeDefined();
+    const url = links(body)[0]!;
+    expect(links(body)).toHaveLength(1);
+    expect(new URL(url).searchParams.get('id')).toBe('source:source');
     expect(new URL(url).searchParams.get('target')).toBe(target);
     expect(new URL(url).searchParams.get('app')).toBe(`${target}-ios`);
     const resource = await h.app.request(url);
     expect(resource.status).toBe(200);
     expect(resource.headers.get('subscription-userinfo')).toContain('total=10000');
-    expect(decodeNodes(target, await resource.text()).map((n: any) => n.name)).toEqual(['处理-香港']);
+    expect(decodeNodes(target, await resource.text()).map((n: any) => n.name)).toEqual(['处理-香港', '处理-日本']);
     const head = await h.app.request(url, { method: 'HEAD' });
     expect(head.status).toBe(200); expect(await head.text()).toBe('');
     expect(head.headers.get('subscription-userinfo')).toContain('download=100');
@@ -49,26 +50,24 @@ for (const target of ['surge', 'loon', 'stash'] as const) describe(target + ' �
     h.store.deleteToken(h.token);
     expect((await h.app.request(url)).status).toBe(404);
   });
-  it('同一个远程链接更新成员，筛空不下发空集合，切换展开后旧资源失效', async () => {
+  it('同一个远程链接更新成员，筛空保持引用，切换展开后旧资源失效', async () => {
     const h = await setup();
     const main = `/subs/profile?id=p&token=${h.token}&target=${target}&platform=ios`;
-    const url = links(await (await h.app.request(main)).text()).find(link => new URL(link).searchParams.get('id')!.startsWith('view:'))!;
+    const first = await (await h.app.request(main)).text(), url = links(first)[0]!;
     h.update([proxy('香港'), proxy('香港 2'), proxy('日本')]);
     const updated = await h.app.request(url);
     expect(updated.status).toBe(200);
-    expect(decodeNodes(target, await updated.text()).map((n: any) => n.name)).toEqual(['处理-香港', '处理-香港 2']);
+    expect(decodeNodes(target, await updated.text()).map((n: any) => n.name)).toEqual(['处理-香港', '处理-香港 2', '处理-日本']);
     h.update([proxy('日本')]);
-    expect((await h.app.request(url)).status).toBe(404);
-    const empty = await (await h.app.request(main)).text();
-    if (target === 'stash') expect(parse(empty)['proxy-groups'][0].proxies).toEqual(['REJECT']);
-    else expect(empty).toContain('代理 = select, REJECT');
+    expect((await h.app.request(url)).status).toBe(200);
+    expect(await (await h.app.request(main)).text()).toBe(first);
     const profile = h.store.get('profile', 'p')!; profile.nodeSets[0]!.output = 'inline'; h.store.put('profile', profile, h.user.id);
     expect((await h.app.request(url)).status).toBe(404);
     const inline = await (await h.app.request(main)).text();
     expect(links(inline)).toEqual([]);
     expect(inline).toContain('处理-日本');
   });
-  it('来源流水线筛空时原始远程资源返回 503，主订阅拒绝连接', async () => {
+  it('来源流水线筛空时远程资源下发空集合，主订阅保持引用', async () => {
     const h = await setup();
     const profile = h.store.get('profile', 'p')!;
     if (profile.routing.mode !== 'independent') throw new Error('测试配置必须使用独立分流');
@@ -81,12 +80,12 @@ for (const target of ['surge', 'loon', 'stash'] as const) describe(target + ' �
     source.pipeline.push({ op: 'filter.regex', patterns: ['不匹配任何节点'], keep: true });
     h.store.put('source', source, h.user.id);
     const resource = await h.app.request(url);
-    expect(resource.status).toBe(503);
-    expect(await resource.text()).toContain('节点集合为空');
+    expect(resource.status).toBe(200);
+    expect(decodeNodes(target, await resource.text())).toEqual([]);
     const body = await (await h.app.request(main)).text();
-    expect(links(body)).toEqual([]);
-    if (target === 'stash') expect(parse(body)['proxy-groups'][0].proxies).toEqual(['REJECT']);
-    else expect(body).toContain('代理 = select, REJECT');
+    expect(links(body)).toEqual([url]);
+    expect(body).not.toContain('代理 = select, REJECT');
+    if (target === 'stash') expect(parse(body)['proxy-groups'][0].proxies).toBeUndefined();
   });
   it('草稿保留远程引用并禁用含占位地址的导出，选择展开后恢复独立文件', async () => {
     const h = await setup();
@@ -114,6 +113,8 @@ it('Stash 正式订阅使用公共策略组前置，并返回带相同 dialer-pr
   const h = await setup(), profile = h.store.get('profile', 'p')!;
   profile.nodeSets[1]!.output = 'provider';
   profile.chains = [{ id: 'chain', landing: { nodeSet: { type: 'local', id: 'inline' } }, via: { kind: 'group', groupId: 'g' } }];
+  if (profile.routing.mode !== 'independent') throw new Error('测试配置必须使用独立分流');
+  profile.routing.config.groups.push({ id: 'landing', name: '落地', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'inline' } }] });
   h.store.put('profile', profile, h.user.id);
   const generated = await h.renderer.render('p', { client: 'stash', platform: 'ios' });
   expect(generated.ok).toBe(true);

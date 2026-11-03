@@ -17,6 +17,12 @@ export function loonBenchmarks(config: Fields, specs: GroupSpec[], report: Repor
   else { general['test-timeout'] = timeouts[0]; config.general = general; }
 }
 
+/** FilterKey 是正则原文：带逗号时才加引号，不做转义，否则反斜杠会被加倍。 */
+function loonFilterKey(filter: string): string {
+  if (/[\r\n\u2028\u2029\0"]/.test(filter)) throw new Error('Loon 节点筛选正则不能包含换行或双引号');
+  return /[,;']|^\s|\s$|\s#|\s\/\//.test(filter) ? '"' + filter + '"' : filter;
+}
+
 function loonGroup(group: Fields, report: Report): string {
   const name = iniName(group.name), type = String(group.type);
   const fields = [type, ...[...new Set([...(group.proxies as string[] ?? []), ...(group.use as string[] ?? [])])].map(iniName)];
@@ -58,6 +64,7 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
     });
     const groups = (config['proxy-groups'] as Fields[]).map(group => loonGroup(group, report));
     const remoteProxies = Object.entries(config['proxy-providers'] as Record<string, Fields> ?? {}).map(([name, provider]) => iniName(name) + ' = ' + iniValue(provider.url) + ',parser-enabled=false,enabled=true');
+    const remoteFilters = Object.entries(config['remote-filters'] as Record<string, { sources: string[]; filter: string }> ?? {}).map(([name, { sources, filter }]) => iniName(name) + ' = NameRegex,' + sources.map(iniName).join(',') + ',FilterKey = ' + loonFilterKey(filter));
     const remoteRules: string[] = [];
     const providers = (config['rule-providers'] ?? {}) as Record<string, Fields>;
     const rules = (config.rules as string[]).flatMap(line => {
@@ -70,6 +77,6 @@ export function stringifyLoon(result: Pick<MihomoRenderResult, 'config' | 'rules
       remoteRules.push(iniValue(url) + ',policy=' + iniName(match[2]) + ',tag=' + iniValue(match[1]) + ',enabled=true');
       return [];
     });
-    return [base.trim(), '[Proxy]', ...proxies, ...(remoteProxies.length ? ['', '[Remote Proxy]', ...remoteProxies] : []), ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ...(remoteRules.length ? ['', '[Remote Rule]', ...remoteRules] : []), ''].filter((s, i) => i !== 0 || s).join('\n');
+    return [base.trim(), '[Proxy]', ...proxies, ...(remoteProxies.length ? ['', '[Remote Proxy]', ...remoteProxies] : []), ...(remoteFilters.length ? ['', '[Remote Filter]', ...remoteFilters] : []), ...(chains.length ? ['', '[Proxy Chain]', ...chains] : []), '', '[Proxy Group]', ...groups, '', '[Rule]', ...rules, ...(remoteRules.length ? ['', '[Remote Rule]', ...remoteRules] : []), ''].filter((s, i) => i !== 0 || s).join('\n');
   } catch (cause) { report.error('loon.format', cause instanceof Error ? cause.message : 'Loon 配置格式不合法'); return ''; }
 }

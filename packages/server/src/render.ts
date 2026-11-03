@@ -40,7 +40,6 @@ function renderForClient(input: Parameters<typeof renderClash>[0], client: Clien
 
 /** 可下发的渲染结果 */
 export type StoredRender = {
-  providerNodeCounts?: Record<string, number>;
   yaml: string;
   providers: Record<string, string>;
   providerUserinfo?: Record<string, TrafficInfo>;
@@ -281,7 +280,6 @@ export class RenderService {
 
     checkCurrent();
     const render: StoredRender = {
-      providerNodeCounts: Object.fromEntries(Object.entries(result.providers).flatMap(([key, provider]) => provider.nodeCount === undefined ? [] : [[key, provider.nodeCount]])),
       yaml: this.managedProfileYaml(result.yaml, profile.id, target),
       nodeDependencies: [
         ...Object.keys(nodeSets.sources).map(id => ({ type: 'source' as const, id })),

@@ -56,7 +56,7 @@ describe('Clash/Mihomo 公共生成与 Stash 最小差异', () => {
     for (const group of groups) delete group['empty-fallback'];
     expect(stash.config['proxy-groups']).toEqual(groups);
   });
-  it('扩展 include-all 仍经过托管筛选和空集合保护', () => {
+  it('扩展 include-all 展开为 provider 引用并使用原生筛选', () => {
     const input = fixture('provider', 'inline'); input.profile.chains = [];
     if (input.profile.routing?.mode !== 'independent') throw new Error('测试需要独立分流');
     const group = input.profile.routing.config.groups[0]!;
@@ -66,10 +66,9 @@ describe('Clash/Mihomo 公共生成与 Stash 最小差异', () => {
     const selected = (out.config['proxy-groups'] as Record<string, unknown>[])[0]!;
     expect(selected).not.toHaveProperty('include-all');
     expect(selected.proxies ?? []).toEqual([]);
-    const subset = Object.entries(out.providers).find(([key]) => key.startsWith('view:'))![1];
-    expect(parse(subset.yaml).proxies.map((node: any) => node.name)).toEqual(['ss1']);
-    group.extra.filter = '不存在';
-    expect(renderClash(input, 'stash').config['proxy-groups']).toMatchObject([{ proxies: ['REJECT'] }]);
+    expect(selected.filter).toBe('^ss1$');
+    expect(selected.use).toEqual(Object.keys(out.config['proxy-providers'] as object));
+    expect(Object.keys(out.providers).some(key => key.startsWith('view:'))).toBe(false);
   });
   it('扩展测速字段按公共覆盖顺序换算，零值保留', () => {
     const input = fixture('inline', 'inline'); input.profile.chains = [];
