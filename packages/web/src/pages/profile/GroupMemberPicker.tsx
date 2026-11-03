@@ -83,19 +83,19 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
       </section>
       {advanced}
     </div>
-    <MemberPreview effective={effective} sources={previewSets} group={group} memberText={memberText} nodeSetName={nodeSetName} />
+    <MemberPreview effective={effective} sources={previewSets} group={group} memberText={memberText} />
   </div>;
 }
-function MemberPreview({ effective, sources, group, memberText, nodeSetName }: { effective: GroupMember[]; sources: { ref: NodeSetID; name: string }[]; group: GroupSpec; memberText: (member: GroupMember) => string; nodeSetName: (ref: NodeSetID) => string }) {
+function MemberPreview({ effective, sources, group, memberText }: { effective: GroupMember[]; sources: { ref: NodeSetID; name: string }[]; group: GroupSpec; memberText: (member: GroupMember) => string }) {
   const queries = useQueries({ queries: sources.map(source => nodeListOptions(source.ref)) });
-  const view = useModalPresentation({ loading: queries.some(query => query.isLoading), truncated: queries.some(query => query.data?.truncated), errors: queries.flatMap(query => query.error ? [query.error.message] : []), rows: queries.flatMap((query, i) => filterNodes(query.data?.nodes ?? [], { filter: group.filter, excludeFilter: group.excludeFilter, excludeType: group.excludeType }).nodes.map(node => ({ name: node.name, source: sources[i]!.name }))), total: queries.reduce((sum, query) => sum + (query.data?.total ?? 0), 0) });
+  const view = useModalPresentation({ loading: queries.some(query => query.isLoading), truncated: queries.some(query => query.data?.truncated), errors: queries.flatMap(query => query.error ? [query.error.message] : []), rows: queries.flatMap(query => filterNodes(query.data?.nodes ?? [], { filter: group.filter, excludeFilter: group.excludeFilter, excludeType: group.excludeType }).nodes.map(node => node.name)), total: queries.reduce((sum, query) => sum + (query.data?.total ?? 0), 0) });
   const direct = effective.filter(member => member.kind !== 'all' && member.kind !== 'nodeset');
   return <aside aria-label="客户端成员预览" className="flex min-h-0 min-w-0 flex-col border-t border-border bg-muted/50 md:border-t-0">
     <div className="flex items-baseline justify-between px-5 pt-5 pb-3"><h3 className="m-0 text-sm font-medium">客户端里显示</h3><span className="text-xs text-muted-foreground">{direct.length + view.rows.length} 项</span></div>
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3 text-sm">
-      {direct.map((member, i) => <div key={i} className="flex justify-between gap-2 rounded-md px-2 py-2"><span className="truncate">{memberText(member)}</span><span className="shrink-0 text-xs text-muted-foreground">{member.kind === 'builtin' ? '内置' : member.kind === 'group' ? '策略组' : member.kind === 'node' ? nodeSetName(member.ref.nodeSet) : ''}</span></div>)}
+      {direct.map((member, i) => <div key={i} className="truncate rounded-md px-2 py-2">{memberText(member)}</div>)}
       {!!direct.length && !!view.rows.length && <div className="mx-2 my-1 h-px bg-border" />}
-      {view.rows.slice(0,8).map((node,i) => <div key={i} className="flex justify-between gap-2 px-2 py-2"><span className="truncate">{node.name}</span><span className="shrink-0 text-xs text-muted-foreground">{node.source}</span></div>)}
+      {view.rows.slice(0,8).map((name,i) => <div key={i} className="truncate px-2 py-2">{name}</div>)}
       {view.rows.length > 8 && <span className="px-2 py-2 text-xs text-muted-foreground">另 {view.rows.length - 8} 个</span>}
       {view.loading && <span className="px-2 text-muted-foreground">正在加载…</span>}{view.errors.map((error,i) => <span role="alert" key={i} className="px-2 text-destructive">{error}</span>)}{view.errors.length > 0 && <Button size="sm" onClick={() => void Promise.allSettled(queries.map(query => query.refetch()))}>重新加载</Button>}{view.truncated && <p className="px-2 text-warn">预览列表已截断，命中数量仅统计当前返回的节点；完整结果以生成配置为准。</p>}
       {!effective.length && <span className="px-2 text-muted-foreground">添加成员后显示预览</span>}
