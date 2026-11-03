@@ -1,7 +1,7 @@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../../components/ui/dropdown-menu.tsx';
 import { SearchInput } from '../../components/SearchInput.tsx';
 import { rulePreviewLinks } from '../../domain/rulePreview.ts';
-import { type Matcher, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
+import { type Matcher, type NodeSetID, type ReportItem, type RuleEntry, localRuleLines } from '@sub-forge/core';
 import { ChevronDown, Link2, Plus, ScanSearch } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { TemplateBoundList } from '../../components/TemplateBoundList.tsx';
@@ -27,11 +27,12 @@ export function ruleMatcherLabel(matcher: Matcher, ctx: ConvertCtx) {
   return ctx.rulesets.find(r => r.id === matcher.id)?.name ?? matcher.id ?? '增强集合';
 }
 
-export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValidationReady, readOnly = false, title = '规则', hideFinal = false, staticOnly = false, renderTarget, extendedOptions, importedUrls, templateRuleIds, templateStart }: {
+export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValidationReady, readOnly = false, title = '规则', hideFinal = false, staticOnly = false, renderTarget, inlineNodeSets, extendedOptions, importedUrls, templateRuleIds, templateStart }: {
   value: TemplateBody; onChange: (value: TemplateBody, templateStart?: number) => void; ctx: ConvertCtx; report: ReportItem[];
   onRuleValidationReady: (id: string, ready: boolean) => void;
   readOnly?: boolean; title?: string; hideFinal?: boolean; staticOnly?: boolean; importedUrls?: string[];
   renderTarget?: (value: TemplateBody['final'], onChange: (target: TemplateBody['final']) => void, label: string) => ReactNode;
+  inlineNodeSets?: { ref: NodeSetID; name: string }[];
   templateRuleIds?: string[]; templateStart?: number;
   extendedOptions?: boolean;
 }) {
@@ -48,7 +49,7 @@ export function TemplateRulesEditor({ value, onChange, ctx, report, onRuleValida
   const groupName = (id: string) => value.groups.find(g => g.id === id)?.name ?? id;
   const update = (rule: RuleEntry) => onChange({ ...value, rules: value.rules.map(r => r.id === rule.id ? rule : r) });
   const edit = async (rule: RuleEntry, adding = false) => {
-    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions, bound: !!templateRuleIds, groups: value.groups });
+    const result = await RuleEditDialog.show({ rule, index: value.rules.indexOf(rule), ctx, staticOnly, adding, extendedOptions, bound: !!templateRuleIds, groups: value.groups, inlineNodeSets });
     if (result.status !== 'confirmed') return;
     const draft = result.data.rule;
     const old = currentValue.current.rules.find(r => r.id === draft.id)?.matcher;

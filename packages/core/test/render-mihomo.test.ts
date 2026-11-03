@@ -58,14 +58,14 @@ describe('PRD 场景 3：落地走中转（provider 内节点）', () => {
   });
 });
 
-describe('PRD 场景 4：规则出口为 provider 节点', () => {
-  it('合并规则输出一个 classical LIST，出口指向包装组', () => {
+describe('PRD 场景 4：规则出口为 inline 节点', () => {
+  it('合并规则输出一个 classical LIST，出口直接写节点名', () => {
     const r = render({
-      nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }],
+      nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'inline' }],
       overlay: { rulePatches: { 'r-fin': { target: { kind: 'node', ref: { nodeSet: { type: 'source', id: 'S' }, match: { exact: '🇺🇸 Home-Broadband' } } } } } },
     });
-    const w = r.dependencies[0]!.output;
-    expect((r.config.rules as string[])[0]).toBe(`RULE-SET,金融服务,${w}`);
+    expect(r.dependencies).toEqual([]);
+    expect((r.config.rules as string[])[0]).toBe('RULE-SET,金融服务,🇺🇸 Home-Broadband');
     expect(r.rulesets['rs_fin_classical.list']).toEqual({ behavior: 'classical', providerName: '金融服务', text: 'DOMAIN-SUFFIX,paypal.com\nDOMAIN-KEYWORD,paypal\nIP-CIDR,64.4.240.0/21,no-resolve\nIP-CIDR,192.0.2.0/24,no-resolve\n' });
     expect((r.config['rule-providers'] as Record<string, unknown>)["金融服务"]).toMatchObject({ format: 'text', behavior: 'classical', url: 'https://sub.example.com/r/TOKEN/rs_fin_classical.list' });
   });
@@ -92,12 +92,12 @@ describe('规则输出', () => {
 describe('依赖解析策略', () => {
   const ruleToNode = { rulePatches: { 'r-cn': { target: { kind: 'node' as const, ref: { nodeSet: { type: 'source' as const, id: 'S' }, match: { exact: '🇺🇸 Home-Broadband' } } } } } };
 
-  it.each(['copy', 'inline'] as const)('旧策略 %s 不覆盖节点集输出方式，自动生成精确隐藏组', strategy => {
+  it.each(['copy', 'inline'] as const)('旧策略 %s 不覆盖节点集输出方式，Provider 规则出口报错且不生成隐藏组', strategy => {
     const r = render({ nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }], overlay: ruleToNode, refPolicy: { default: strategy } });
     expect(r.config.proxies).toEqual([]);
     expect(providerProxies(r, 'source:S')).toHaveLength(1);
-    expect(r.dependencies[0]).toMatchObject({ strategy: 'wrap', node: '🇺🇸 Home-Broadband' });
-    expect(r.config.rules).toContain(`GEOIP,CN,${r.dependencies[0]!.output},no-resolve`);
+    expect(r.dependencies).toEqual([]);
+    expect(r.report.byCode('ref.provider-rule-exit')).toHaveLength(1);
   });
 
   it('引用失效时按 fallback 兜底，没有 fallback 时报错', () => {
@@ -105,7 +105,7 @@ describe('依赖解析策略', () => {
     const a = render({ nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }], overlay: gone({ kind: 'builtin', name: 'REJECT' }) });
     expect(a.config.rules).toContain('GEOIP,CN,REJECT,no-resolve');
     expect(a.report.byCode('ref.fallback')).toHaveLength(1);
-    const b = render({ nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'provider' }], overlay: gone() });
+    const b = render({ nodeSets: [{ ref: { type: 'source', id: 'S' }, output: 'inline' }], overlay: gone() });
     expect(b.report.byCode('ref.unresolved')).toHaveLength(1);
   });
 

@@ -250,7 +250,8 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     return output;
   };
 
-  const resolveTarget = (t: ChainTarget, where: string, skip?: Set<string>): string | undefined => {
+  /** inlineOnly 用于规则出口及其嵌套回退：Provider 节点不生成精确成员组，按引用不可用处理。 */
+  const resolveTarget = (t: ChainTarget, where: string, skip?: Set<string>, inlineOnly = false): string | undefined => {
     if (client === 'loon' && t.kind === 'builtin' && t.name === 'PASS') report.error('loon.policy', 'Loon 不支持 PASS 策略', where);
     if (isIniClient(client) && t.kind === 'builtin') { try { iniName(t.name); } catch (error) { report.error('surge.target', String(error), where); } }
     if (t.kind === 'builtin') { resolvedTargetNames.set(where, t.name); return t.name; }
@@ -260,15 +261,18 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
       if (n !== undefined) resolvedTargetNames.set(where, n);
       return n;
     }
-    const found = findNode(t.ref, where, skip);
+    const providerExit = inlineOnly && sets.get(nodeSetKey(t.ref.nodeSet))?.output === 'provider';
+    const found = providerExit ? undefined : findNode(t.ref, where, skip);
     if (found) { resolvedTargetNames.set(where, found.node.name); return nameForNode(found.set, found.node, where); }
     const desc = 'exact' in t.ref.match ? t.ref.match.exact : `/${t.ref.match.regex}/`;
+    const providerMessage = `规则出口只能选择 inline 来源的节点，节点 ${desc} 所在的 ${nodeSetKey(t.ref.nodeSet)} 是 provider 来源`;
     const fb = t.ref.fallback;
     if (fb && fb !== 'error') {
-      const name = resolveTarget(fb, where, skip);
-      report.warn('ref.fallback', `节点 ${desc} 在 ${nodeSetKey(t.ref.nodeSet)} 中已不存在，回退到 ${name}`, where);
+      const name = resolveTarget(fb, where, skip, inlineOnly);
+      report.warn('ref.fallback', providerExit ? `${providerMessage}，回退到 ${name}` : `节点 ${desc} 在 ${nodeSetKey(t.ref.nodeSet)} 中已不存在，回退到 ${name}`, where);
       return name;
     }
+    if (providerExit) { report.error('ref.provider-rule-exit', providerMessage, where); return undefined; }
     report.error('ref.unresolved', skip?.size && 'regex' in t.ref.match ? `前置范围 ${nodeSetKey(t.ref.nodeSet)} 中没有落地以外的可用节点` : `节点 ${desc} 在 ${nodeSetKey(t.ref.nodeSet)} 中已不存在`, where);
     return undefined;
   };
@@ -439,7 +443,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
   for (const r of eff.rules) {
     if (r.enabled === false) continue;
     const where = `rule:${r.id}`;
-    const target = resolveTarget(r.target, where);
+    const target = resolveTarget(r.target, where, undefined, true);
     if (target === undefined) continue;
     const m = r.matcher;
     if (m.kind === 'rule' || m.kind === 'local') {
@@ -537,7 +541,7 @@ function renderClient(input: RenderInput, client: Client): MihomoRenderResult {
     }
     ruleLines.push(`RULE-SET,${providerName},${target}`);
   }
-  const finalName = resolveTarget(eff.final, 'final') ?? 'DIRECT';
+  const finalName = resolveTarget(eff.final, 'final', undefined, true) ?? 'DIRECT';
   ruleLines.push(`MATCH,${finalName}`);
 
   // 全部引用解析后，按实际动态成员检查链环，并关联到受影响的链。

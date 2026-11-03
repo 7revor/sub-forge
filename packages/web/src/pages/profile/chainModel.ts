@@ -87,6 +87,8 @@ export function planProfileChange<T extends Profile>(profile: T, change: { nodeS
   const emptied = (chain: ChainRule) => chainScopes(chain).some(scope => chainSources(scope, profile.nodeSets).length > 0 && !chainSources(scope, nodeSets).length);
   const chains = requested.filter(chain => !emptied(chain));
   const usesRemoved = (target: Target) => removedKeys.some(key => targetUsesKey(target, key));
+  // 规则出口的单节点只接受 inline 来源，来源改为引用时一并清除。
+  const nowProvider = nodeSets.filter(source => source.output === 'provider' && profile.nodeSets.some(old => nodeSetKey(old.ref) === nodeSetKey(source.ref) && old.output === 'inline')).map(source => nodeSetKey(source.ref));
   const stale = (member: GroupMember) => (member.kind === 'nodeset' ? removedKeys.includes(nodeSetKey(member.ref)) : member.kind === 'node' && usesRemoved(member))
     || (profile.chains.some(chain => chainCoversMember(chain, member, profile.nodeSets)) && !chains.some(chain => chainCoversMember(chain, member, nodeSets)));
   const members: ClearedMember[] = [];
@@ -98,7 +100,7 @@ export function planProfileChange<T extends Profile>(profile: T, change: { nodeS
   });
   const cleanGroups = (groups: GroupSpec[]) => groups.map(group => ({ ...group, members: cleanMembers(group.id, group.members) }));
   const cleanTarget = (target: Target): Target => {
-    if (!usesRemoved(target)) return target;
+    if (!usesRemoved(target) && !nowProvider.some(key => targetUsesKey(target, key))) return target;
     rules++;
     return { kind: 'builtin', name: 'REJECT' };
   };

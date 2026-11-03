@@ -98,6 +98,13 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
     const ref = refs.nodeSet(value, where);
     if (!doc.nodeSets.some(n => n.ref.type === ref.type && n.ref.id === ref.id)) throw bad(`${where}：节点来源未加入本订阅`);
   };
+  /** 规则出口的单节点（含嵌套回退）不生成 Provider 精确组，只接受 inline 来源。 */
+  const inlineExit = (value: Record<string, unknown>, where: string) => {
+    if (value.kind !== 'node' || !obj(value.ref) || !obj(value.ref.nodeSet)) return;
+    const { type, id } = value.ref.nodeSet;
+    if (doc.nodeSets.some(n => n.ref.type === type && n.ref.id === id && n.output !== 'inline')) throw bad(`${where}：单个节点出口只能选择「展开」来源中的节点，请重新选择`);
+    if (obj(value.ref.fallback)) inlineExit(value.ref.fallback, where);
+  };
   const target = (value: unknown, where: string, depth = 0, allowAll = false): void => {
     if (depth > 20 || !obj(value)) throw bad(`${where}：引用格式错误`);
     if (value.kind === 'builtin' && builtins.has(value.name as string)) return;
@@ -126,6 +133,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
     if (!obj(rule) || !isStr(rule.id) || !obj(rule.matcher) || ruleIds.has(rule.id)) throw bad('规则格式错误或 ID 重复');
     ruleIds.add(rule.id);
     target(rule.target, `规则 ${rule.id}`);
+    inlineExit(rule.target as Record<string, unknown>, `规则 ${rule.id}`);
     if (rule.matcher.kind === 'ruleset') {
       // 模板内容由管理员发布；所有订阅自定义引用均校验身份，保留历史仓库映射。
       const prior = priorRules.find(p => p.id === rule.id)?.matcher;
@@ -139,6 +147,7 @@ export function validateProfileRouting(doc: ProfileDoc, store: Store, refs: RefC
     } else if (rule.matcher.kind !== 'rule' || !obj(rule.matcher.rule) || !isStr(rule.matcher.rule.type)) throw bad(`规则 ${rule.id}：匹配项不合法`);
   }
   target(effective.final, '最终出口');
+  inlineExit(effective.final as unknown as Record<string, unknown>, '最终出口');
   for (const chain of doc.chains) {
     if (chain.landing.nodeSet.type === 'all') refs.chainSource(chain.landing.nodeSet, `代理链 ${chain.id} 的落地`);
     else nodeSet(chain.landing.nodeSet, `代理链 ${chain.id} 的落地`);

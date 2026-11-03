@@ -419,3 +419,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 列表状态只反映节点来源：画板 `V2Lists` 的状态示例改为「1 项失败 · 使用旧内容」「正常」「无节点来源」，对应 `DocList.tsx`、`ResourceCache.tsx`、`domain/resourceStatus.ts`。规则集合列表移除状态列，取消“N 项可用”和规则“使用时拉取”徽标，取代上文上游缓存分层中“规则使用时拉取是中性状态”的说明。`V2Overview` 的状态来自访问日志，语义不同，不变。无新增后端待实现项。
 
 2026-11-03 本地节点工作区：`V2LocalNode` 改为页面上的名称与备注，加上节点列表与编辑器合并的工作区（拖拽手柄、两行节点行、铺满的编辑器、底部状态栏）；新增画板 `V2LocalNodeNew` 画未选中状态（右侧为空，删除按钮变为「添加」）。对应 `pages/Locals.tsx`、`components/LocalNodeYamlEditor.tsx`、`domain/localNodeDrafts.ts`。沿用现有接口，无后端待实现项。
+
+2026-11-03 规则出口单节点：出口菜单直接列出 inline 来源的节点，超长时选项区滚动，移除二级浮层；provider 节点不再自动创建隐藏组。前端、core、server 已实现。**画布 `V2ProfileRouting`、`V2ProfileDialogs` 待同步**。

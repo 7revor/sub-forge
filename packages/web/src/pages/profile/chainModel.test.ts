@@ -121,6 +121,16 @@ describe('节点来源 → 代理链 → 策略组级联清理', () => {
     expect(cascade.members.map(item => item.member)).toEqual([setMember(relay)]);
     expect(hasCascade(planProfileChange(base([setMember(relay)]), { nodeSets: toInline }))).toBe(false);
   });
+  it('来源由展开改为引用时，指向它的规则出口改为 REJECT；已是引用的历史出口不计入', () => {
+    const node = (nodeSet: typeof relay): Target => ({ kind: 'node', ref: { nodeSet, match: { exact: '甲' }, fallback: { kind: 'builtin', name: 'REJECT' } } });
+    const profile: Profile = { ...base([]), nodeSets: [{ ref: relay, output: 'inline' }, { ref: other, output: 'provider' }], routing: { mode: 'independent', config: { groups: [], rules: [{ id: 'r', matcher: { kind: 'rule', rule: { type: 'DOMAIN', value: 'a.test' } }, target: node(relay) }], final: node(other) } } };
+    const cascade = planProfileChange(profile, { nodeSets: profile.nodeSets.map(s => ({ ...s, output: 'provider' as const })) });
+    expect(cascade.rules).toBe(1);
+    const config = (cascade.next.routing as Extract<Profile['routing'], { mode: 'independent' }>).config;
+    expect(config.rules[0]!.target).toEqual({ kind: 'builtin', name: 'REJECT' });
+    expect(config.final).toEqual(node(other));
+    expect(hasCascade(planProfileChange(profile, { nodeSets: profile.nodeSets }))).toBe(false);
+  });
   it('绑定模板时只清理追加成员与独立组，清空的追加项被移除', () => {
     const profile: Profile = { ...base([]), routing: { mode: 'bound', templateId: 't', groupAdditions: { tpl: [setMember(relay)], keep: [setMember(other)] }, extraGroups: [{ id: 'x', name: '独立', type: 'select', members: [nodeMember(relay, '甲')] }] } };
     const cascade = removeProfileNodeSet(profile, relay);
