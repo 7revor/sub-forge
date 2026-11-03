@@ -22,7 +22,7 @@
 | 补充 `SourceFetch` | `/sources/:id` 的「基础设置」 | 已改为详情页顶部内嵌卡片：单个 URL、名称与拉取选项，表单参考规则集来源设置，快照历史页内展开；删除入口位于页头。旧弹窗画板待同步，见 [13](13-design-canvas-sync.md) |
 | 补充 `Lists` | `/sources`、`/collections`、`/locals`、`/profiles` | 搜索、计数、空状态卡片；订阅源新建为对话框；每行「删除」「编辑」 |
 | 组合 `Collection` | `/collections/:id` | 成员表含「拉取失败时」；成员表下方直接展开「组合自身的处理链」编辑器与逐步预览，被引用的配置订阅显示为头部徽章。2026-10-29 起 `/collections/:id/pipeline` 跳回详情页 |
-| 本地节点 `LocalNodes`、`LocalNodeEdit` | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML）；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由，同日去掉前置卡片与「前置」列，代理链只在 Profile「代理链」中设置 |
+| 本地节点 `LocalNodes`、`LocalNodeEdit`（当前设计见 `V2LocalNode`、`V2LocalNodeNew`） | `/locals`、`/locals/:id`、`/locals/:id/nodes/:index` | 分组列表 → 分组详情（节点表）→ 节点编辑子页（表单 / YAML）；2026-11-03 起分组详情改为左右工作区，见文末记录；2026-10-29 由「分组标签 + 右侧编辑」单页改为三层路由，同日去掉前置卡片与「前置」列，代理链只在 Profile「代理链」中设置 |
 | Profile · 新建向导 `ProfileNew` | `/profiles/new` | 可从模板页带 `?template=` 预选 |
 | Profile · 概览 / 基础设置 / 节点集 / 策略组 / 规则 / 代理链 / 预览 | `/profiles/:id/:tab` | 头部模板徽章打开模板对话框；节点集表格显示名称、类型、节点数、输出方式与备注 |
 | 规则集 `RuleSets` | `/rulesets/:id` | 自上而下：来源（多个远程地址 / 本地规则，可排序、启停，选中后展开地址、格式等字段）、独立的客户端改写区块（作用于整个规则集，只按规则内容精确匹配）、输出预览（选中来源时为该来源，本地规则在来源配置内实时编辑，预览只读；不选时为合并结果与 domain / classical / ipcidr 统计），每块独占一行。2026-10-29 取消「编辑来源」对话框与「解析结果」表，规则包并入规则集 |
@@ -417,3 +417,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 规则来源名称收窄：`V2MoreDialogs` 的远程和规则仓库状态移除名称，新增本地规则状态并保留名称；`V2RuleSet` 来源卡片改为单行，与模板、订阅一致。对应 `components/RulesetSourceDialog.tsx`、`pages/Rulesets.tsx`；服务端已在 `api/validate.ts` 移除远程来源名称，无待实现项。
 
 2026-11-03 列表状态只反映节点来源：画板 `V2Lists` 的状态示例改为「1 项失败 · 使用旧内容」「正常」「无节点来源」，对应 `DocList.tsx`、`ResourceCache.tsx`、`domain/resourceStatus.ts`。规则集合列表移除状态列，取消“N 项可用”和规则“使用时拉取”徽标，取代上文上游缓存分层中“规则使用时拉取是中性状态”的说明。`V2Overview` 的状态来自访问日志，语义不同，不变。无新增后端待实现项。
+
+2026-11-03 本地节点工作区：`V2LocalNode` 改为页面上的名称与备注，加上节点列表与编辑器合并的工作区（拖拽手柄、两行节点行、铺满的编辑器、底部状态栏）；新增画板 `V2LocalNodeNew` 画未选中状态（右侧为空，删除按钮变为「添加」）。对应 `pages/Locals.tsx`、`components/LocalNodeYamlEditor.tsx`、`domain/localNodeDrafts.ts`。沿用现有接口，无后端待实现项。

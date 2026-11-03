@@ -95,5 +95,7 @@
   user-select: none;
 }
 
-/* 本地节点工作区：工具栏和源码共享同一边框。 */
-.local-node-source { flex: 1; height: 100%; min-height: 470px; border: 0; border-radius: 0; }
+/* 本地节点工作区：源码区铺满工具栏与状态栏之间，尺寸由容器决定，不再单独拖拽。 */
+.local-node-source.yaml-textarea { flex: 1; min-height: 420px; border: 0; border-radius: 0; }
+.local-node-source.yaml-textarea:focus-within { box-shadow: none; }
+.local-node-source > textarea { position: absolute; inset: 0; height: 100%; resize: none; }
