@@ -406,3 +406,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 备份改为手动：移除 WebDAV 配置、定时、备份列表和加密。数据库备份行只保留「下载备份」「上传恢复」和未加密提示，`BackupSettingsModal` 删除，`RestoreBackupModal` 改为选择文件。已同步画布：`V2Settings`（备份行、恢复弹窗，删除配置弹窗）、`System`（备份与恢复卡片）。无后端待实现项。
 
 2026-11-03 规则来源名称独立：`V2MoreDialogs` 新增「添加规则来源 · 规则仓库」状态，名称留空显示 placeholder，仓库文件选择框只显示文件路径。对应 `components/RulesetSourceDialog.tsx`、`pages/Rulesets.tsx`；后端无待实现项。
+
+2026-11-03 更多菜单项去掉残留阴影：`ActionMenu` 内的按钮和链接原来只清除了边框，`outline` 变体的 `shadow-xs` 仍然显示，看起来像每项带边框；现在同时清除阴影和链接背景。画板 `V2Lists`、`V2Components`、`V2ProfileRouting` 的菜单项本来就没有边框和阴影，无需修改。仅前端样式，领域模型与服务端无变化，无后端待实现项。

@@ -14,7 +14,7 @@ export function ActionMenu({ label = '更多操作', items, children, size = 'sm
       if (target && !target.hasAttribute('disabled')) setOpen(false);
     }}>
       {items?.filter(item => !item.danger).map(item => <DropdownMenuItem key={item.label} disabled={item.disabled} onSelect={item.onSelect}>{item.label}</DropdownMenuItem>)}
-      {Children.toArray(children).filter(isValidElement).map((child, i) => <DropdownMenuItem key={i} className="p-0 [&_button]:h-auto [&_button]:w-full [&_button]:justify-start [&_button]:rounded-md [&_button]:border-0 [&_button]:bg-transparent [&_button]:px-2 [&_button]:py-2 [&_a]:block [&_a]:w-full [&_a]:border-0 [&_a]:px-2 [&_a]:py-2 [&>span]:w-full" onKeyDown={event => {
+      {Children.toArray(children).filter(isValidElement).map((child, i) => <DropdownMenuItem key={i} className="p-0 [&_button]:h-auto [&_button]:w-full [&_button]:justify-start [&_button]:rounded-md [&_button]:border-0 [&_button]:bg-transparent [&_button]:shadow-none [&_button]:px-2 [&_button]:py-2 [&_a]:block [&_a]:w-full [&_a]:border-0 [&_a]:bg-transparent [&_a]:shadow-none [&_a]:px-2 [&_a]:py-2 [&>span]:w-full" onKeyDown={event => {
         if (!['Enter', ' '].includes(event.key)) return;
         const target = event.currentTarget.querySelector<HTMLButtonElement | HTMLAnchorElement>('button,a');
         if (target && !target.hasAttribute('disabled')) { event.preventDefault(); target.click(); setOpen(false); }
