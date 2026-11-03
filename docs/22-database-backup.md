@@ -44,3 +44,5 @@ SFBAK1\n + 头部 JSON\n + AES-256-GCM(gzip(32 字节主密钥 + SQLite 文件))
 | `POST /api/system/backup/restore` | `{ name, passphrase? }`，校验通过返回 202 并重启 |
 
 验收记录：真实 WebDAV（Apache mod_dav）+ Nginx + 生产镜像完成配置、备份、错误口令、恢复与重启；内置浏览器走通配置弹窗、立即备份和恢复。
+
+2026-11-03：备份包含节点快照，不含已清理的规则快照。规则快照到期立刻删除，恢复后下次请求时重新读取。

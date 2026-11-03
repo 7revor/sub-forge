@@ -462,3 +462,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-02：SQLite v33 删除 `last_good` 和 `shared_rule_resources` 并回收空间，移除 `/api/system/rule-resources`。主配置只写规则地址；公共规则改为 `/resources/ruleset?id=…&target=…&format=…` 和 `/resources/repo?id=…&files=…&target=…&format=…`，按需转换，格式契约不符返回 409，旧 `?key=` 返回 404。渲染失败返回 503，不再回退；手动刷新配置时只校验 Mihomo 输出。
 
 2026-11-02：上游内容改为懒加载，主配置只拉节点来源，到期内容最多等待 3 秒，超时先返回旧内容。定时任务只做清理，周期等于系统缓存时间。SQLite v35 把文档、快照、令牌原文和刷新任务改为明文，`token_enc` 列改名为 `token`；升级时需要原主密钥，之后主密钥仍用于备份凭据和 HMAC 索引。
+
+2026-11-03：上游缓存分层。新增 `cache-cycle.ts`，全局周期按本地 0 点对齐；`SnapshotService` 拆成 `getNodeSource`、`getRuleContent`、`refreshNodeSource`、`refreshRuleContent`，节点和规则共用并发上限 8。规则同一 URL 加读取参数只存一份，到期立刻失效，失败不写表；节点失败用旧内容并顺延到下个周期，从未成功时每次请求重试。删除 `resource_bindings`、`rule-binding.ts`、`refreshIfDue`；`/subs/ruleset` 不再渲染配置；仓库索引改为后台定时任务；`GET /api/system` 增加 `nextCacheExpiryAt`。迁移并入 SQLite v35。

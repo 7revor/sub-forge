@@ -493,7 +493,7 @@ SQLite 文件索引、本地授权候选在同一查询中筛选、排序和 LIM
 
 ### 2026-10-30：缓存并发与授权补充
 
-资源身份包含用户/公开作用域及实际读取参数，MRS 类型进入身份并校验实际二进制。旧快照迁移绑定须匹配原读取身份。渲染捕获进程内配置修订与成功/尝试快照修订，异步校验后变化则重算，防止旧结果覆盖新状态；这不是新增文档字段。递归依赖权限和下发 token 在异步工作后复核，授权错误禁止 last_good 回退。来源换 URL 或删除后回收无其他绑定的缓存，已删除来源的迟到响应不留孤立原文。已浏览仓库文件根据仍有效的索引与绑定参与调度。数据库 schema 与示例种子无需修改。
+（2026-11-03 替代：资源身份见文末“上游缓存分层”，不再含用户或作用域，也没有绑定。）MRS 类型进入身份并校验实际二进制。渲染捕获进程内配置修订与成功/尝试快照修订，异步校验后变化则重算，防止旧结果覆盖新状态；这不是新增文档字段。递归依赖权限和下发 token 在异步工作后复核，授权错误禁止 last_good 回退。来源换 URL 或删除后回收无其他绑定的缓存，已删除来源的迟到响应不留孤立原文。已浏览仓库文件根据仍有效的索引与绑定参与调度。数据库 schema 与示例种子无需修改。
 
 
 ### 2026-10-30：规则卡片与操作间距
@@ -608,6 +608,8 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 
 恢复时这两条保留当前实例的值，其余数据全部以备份为准。见 [22](22-database-backup.md)。
 
-2026-11-02 缓存模型：持久缓存只有上游内容，即 `snapshots`、`resource_bindings`、`data/rule-repo-cache` 裸仓库和仓库索引表；`last_good`、`shared_rule_resources` 在 v33 删除。`RenderInput.deferRuleBody` 让主配置跳过规则正文解析，规则文件请求和预览才转换。全部规则都不适用于目标内核时，主配置仍声明 provider，规则文件返回只含注释的内容。
+2026-11-02 缓存模型：持久缓存只有上游内容，即 `snapshots`、`data/rule-repo-cache` 裸仓库和仓库索引表（`resource_bindings` 已于 2026-11-03 删除）；`last_good`、`shared_rule_resources` 在 v33 删除。`RenderInput.deferRuleBody` 让主配置跳过规则正文解析，规则文件请求和预览才转换。全部规则都不适用于目标内核时，主配置仍声明 provider，规则文件返回只含注释的内容。
 
 2026-11-02 懒加载与明文存储（v35）：`SnapshotService.get` 对过期且有旧内容的资源最多等待 3 秒（`STALE_WAIT_MS`），超时返回旧快照并标记 `stale`，刷新在后台完成；从未成功时等到上游结束。主配置不拉规则来源，节点来源并行拉取。`ResourceService.sweep` 只清理不拉取，周期等于系统缓存时间。`docs`、迁移备份、`snapshots`、`refresh_jobs` 和令牌原文（列 `token`）明文存储，`system_settings` 中的备份配置仍加密。
+
+2026-11-03 上游缓存分层（v35）：缓存只存在于上游，下游调用 `SnapshotService` 的 `getNodeSource`、`getRuleContent`、`refreshNodeSource`、`refreshRuleContent`，不关心内容来自缓存还是实时读取。`snapshots` 表身份分两类：节点 `owner_kind = 'source'`、`owner_id` 为订阅源 ID，最多 1 条成功加 1 条最新失败；规则 `owner_kind = 'ruleset'`、`owner_id` 为 `cipher.hmac(JSON.stringify([url, { ua, timeoutMs, format, behavior }]))`，最多 1 条成功，没有失败行，`behavior` 只在 `format === 'mrs'` 时进入键。缓存键不含用户、配置、模板或规则集 ID，读取权限在入口校验。过期判定用 `cacheCycleStart(now, ttlSec)`（`packages/server/src/cache-cycle.ts`）：按服务器本地时区对齐，快照拉取时间早于周期开始就算过期。删除 `resource_bindings` 表、`rule-binding.ts`、`repository-file:` 和 `repo-read:` 身份；`StoredRender.ruleBody` 移除，`deferRuleBody` 在非预览时恒为真。迁移并入 v35：节点快照按绑定改回订阅源 ID，对应不上的删除；规则快照全部清除。
