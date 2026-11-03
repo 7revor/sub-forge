@@ -400,3 +400,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 移除本地节点连通性测试：画板 `V2LocalNode` 去掉「连通性」列、「测试连通性」按钮和相关说明，对应 `pages/Locals.tsx` 与 `LocalNodeYamlEditor`。服务端已删除 `/api/node-probe`，无新增后端待实现项。
 
 2026-11-03 节点订阅分享：`Users` 改为「分享的订阅源」并增加修改、取消操作，`V2Source` 页头增加「分享」，新增画板 `V2SourceShare`。对应 `pages/Users.tsx`、`pages/Sources.tsx`、`components/ShareSourceModal.tsx`；后端 `api/shares.ts`，无待实现项。示例种子不含分享关系，无需修改。
+
+2026-11-03 部署简化：移除代理配置和访问日志的 `peerIp`、`ipSource`。页面控件和文案没有变化，已检查画布中与部署、代理相关的文案，无需修改画板。无后端待实现项。

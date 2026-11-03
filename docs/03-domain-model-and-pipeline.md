@@ -583,7 +583,7 @@ URL 检测复用 `POST /api/rule-options/match-urls`，仅由首次添加、应�
 
 绑定间切换模板保留独立组及其 ID，只对其中引用的模板组按映射更新；解除绑定将全部有效组复制到独立配置。节点来源与代理链列表复用策略组、规则的 `RoutingCard`。代理链路径与前置摘要只显示节点名或组名；全部/正则范围查询匹配节点名称，查询失败明确展示失败，关闭弹窗时保留最后展示。
 
-2026-10-30 访问日志增加 `clientIp`、`peerIp`、`ipSource`，分别表示解析后的客户端地址、TCP 连接对端及来源（socket / x-forwarded-for / unknown）。SQLite v26 保留旧记录并将未知 IP 留空；访问日志仍按令牌所属用户隔离并保留 30 天。IP 解析属于服务端部署适配，核心订阅领域、渲染及种子无需改变。可信代理配置与传递链路见 [部署说明](20-deployment-client-ip.md)。
+2026-10-30 访问日志增加 `clientIp`、`peerIp`、`ipSource`，分别表示解析后的客户端地址、TCP 连接对端及来源（socket / x-forwarded-for / unknown）。SQLite v26 保留旧记录并将未知 IP 留空；访问日志仍按令牌所属用户隔离并保留 30 天。IP 解析属于服务端部署适配，核心订阅领域、渲染及种子无需改变。2026-11-03 起不再解析转发头，访问日志只保留 `clientIp`（TCP 连接来源），SQLite v37 删除 `peer_ip`、`ip_source`。
 
 2026-11-02 代码审查清理：旧模板引用、覆盖层和规则集单来源结构只由存储迁移与种子导入转换，管理接口要求现行 `routing` 和 `sources`；领域模型字段不变。本文上方提到的 `/api/rule-repos/files`、`/api/rule-repos/file-preview`、`/api/rule-repos/import` 已删除，仓库文件统一经 `/api/rule-options/*` 关联。种子导入不再清除 `last_good`，该清理只在升级到 v28 时执行一次。
 

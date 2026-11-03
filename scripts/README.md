@@ -51,7 +51,7 @@ SUBFORGE_LOCAL_RUNTIME_DIR=/tmp/sub-forge-demo ./scripts/stop
 
 ## 发布 Docker 镜像
 
-`docker-push` 构建生产镜像并推送到指定仓库，部署时由 Compose 直接拉取，见 [初次部署指引](../docs/24-first-deployment.md)。先执行 `docker login`：
+`docker-push` 构建生产镜像并推送到指定仓库，部署时由 Compose 直接拉取，见 [部署指引](../docs/24-first-deployment.md)。先执行 `docker login`：
 
 ```bash
 ./scripts/docker-push your-name/sub-forge            # 推送 latest 和当前提交的短哈希

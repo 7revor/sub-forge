@@ -8,7 +8,7 @@
 
 ```bash
 # 终端 1：后端（示例数据见 packages/server/README.md）
-SUBFORGE_DB=./data/dev.db PORT=8787 PUBLIC_URL=http://127.0.0.1:5173 pnpm --filter @sub-forge/server start
+SUBFORGE_DB=./data/dev.db PORT=8787 pnpm --filter @sub-forge/server start
 # 终端 2：前端，/api /sub /p /r 代理到后端
 SUBFORGE_API=http://127.0.0.1:8787 pnpm --filter @sub-forge/web dev
 ```
@@ -352,3 +352,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-03 移除本地节点连通性测试：节点表去掉「连通性」列，节点编辑卡片去掉「测试连通性」按钮和说明，删除 `NodeConnectivity` 与 `probeRequestId`。
 
 2026-11-03 订阅源分享：管理员从用户页或订阅源详情打开 `components/ShareSourceModal.tsx`。接收者的列表行标记「只读」，只有查看和复制链接；`/sources/:id` 进入只读详情，只展示节点、拉取状态和流量。
+
+2026-11-03 部署简化：访问日志接口不再返回 `peerIp`、`ipSource`，`AccessLogRow` 同步删除。页面展示不变，开发时订阅链接自动跟随 Vite 地址。

@@ -17,7 +17,7 @@ it('CLI 收到退出信号后完成清理并正常退出', async () => {
   store.db.exec('UPDATE rule_repos SET enabled = 0');
   store.close();
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/cli.ts', 'serve'], {
-    env: { ...process.env, TMPDIR: root, SUBFORGE_DB: db, PORT: '0', HOST: '127.0.0.1', PUBLIC_URL: 'http://127.0.0.1', SUBFORGE_SECRET: Buffer.from('11'.repeat(32), 'hex').toString('base64') },
+    env: { ...process.env, TMPDIR: root, SUBFORGE_DB: db, PORT: '0', HOST: '127.0.0.1', SUBFORGE_SECRET: Buffer.from('11'.repeat(32), 'hex').toString('base64') },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';

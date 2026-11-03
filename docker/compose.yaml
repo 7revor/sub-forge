@@ -1,26 +1,17 @@
-# 单容器部署。服务器不需要源码，把本文件和同目录的 .env 放在一起即可（见 docs/24-first-deployment.md）。
-# 镜像由开发机的 scripts/docker-push 发布到 Docker Hub。
-# 应用默认只绑定本机回环端口，由宿主机上的 Nginx 反向代理对外提供 HTTPS；
-# 用独立的 Cloudflare Tunnel 时，把 SUBFORGE_BIND 改成内网 IP（见 docs/25-cloudflare-tunnel.md）。
+# 一个容器，开放一个端口。把本文件和 .env 放在同一目录后执行：
 #   docker compose up -d
-# 更新（先备份）：
-#   docker compose pull
-#   docker compose up -d
-# 项目名固定，不随部署目录变化
+# 更新：
+#   docker compose pull && docker compose up -d
 name: sub-forge
 services:
   sub-forge:
     image: ${SUBFORGE_IMAGE:?请在 .env 中设置 Docker Hub 镜像，例如 your-name/sub-forge:latest}
     restart: unless-stopped
     environment:
-      PUBLIC_URL: ${PUBLIC_URL:?请在 .env 中设置对外 HTTPS 地址}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?请在 .env 中设置浏览器访问的来源，通常与 PUBLIC_URL 相同}
-      SUBFORGE_TRUSTED_PROXIES: ${SUBFORGE_TRUSTED_PROXIES:-}
       TZ: ${TZ:-UTC}
       SUBFORGE_ADMIN_USERNAME: ${SUBFORGE_ADMIN_USERNAME:-}
       SUBFORGE_ADMIN_PASSWORD: ${SUBFORGE_ADMIN_PASSWORD:-}
     ports:
-      - "${SUBFORGE_BIND:-127.0.0.1}:${SUBFORGE_PORT:-8080}:8080"
+      - "${SUBFORGE_PORT:-8080}:8080"
     volumes:
-      # 数据库和密钥放在宿主机目录，容器以 UID 1000 运行，目录须提前创建并授权
       - ${SUBFORGE_DATA_DIR:-./data}:/data

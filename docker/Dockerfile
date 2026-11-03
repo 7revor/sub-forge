@@ -1,22 +1,10 @@
-# 生产镜像（SYS-08）：单容器，订阅接口、管理接口与前端同源；SQLite 与密钥文件放在挂载的 /data。
+# 生产镜像：单容器，前端、管理接口和订阅接口都走 8080 端口；数据库和密钥放在挂载的 /data。
 #
-# 发布到 Docker Hub（在开发机执行）：
-#   ./scripts/docker-push your-name/sub-forge
-#
-# 推荐用 Compose 部署，服务器不需要源码（见 docs/24-first-deployment.md）。
-#
-# 或直接运行：
-#   docker run -d --name sub-forge --restart unless-stopped -p 127.0.0.1:8080:8080 -v sub-forge-data:/data \
-#     -e PUBLIC_URL=https://sub.example.com -e ALLOWED_ORIGINS=https://sub.example.com \
-#     -e SUBFORGE_ADMIN_USERNAME=admin -e SUBFORGE_ADMIN_PASSWORD=请改成强密码 \
-#     your-name/sub-forge:latest
-#
-# 反向代理示例见 docker/nginx.conf.example。
-# 真实 IP 透传须按 docs/20-deployment-client-ip.md 配置可信代理；不默认信任容器网关或转发头。
-# 首次启动且没有用户时按 SUBFORGE_ADMIN_* 创建管理员；之后这两个变量可以去掉。
+# 发布（开发机）：./scripts/docker-push your-name/sub-forge
+# 部署（服务器）：见 docs/24-first-deployment.md
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:3ed748ce9dea62d2f0f0205cdbb6823106d9f973a6f555c402fe2575f8d6e1ae
 
-# 前端构建需要开发依赖（Vite 等），单独一个阶段，只把 dist 带走
-FROM node:22-bookworm-slim@sha256:3ed748ce9dea62d2f0f0205cdbb6823106d9f973a6f555c402fe2575f8d6e1ae AS web
+FROM ${NODE_IMAGE} AS base
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ \
  && rm -rf /var/lib/apt/lists/*
@@ -26,41 +14,37 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
+
+# 前端构建需要开发依赖，只把 dist 带走
+FROM base AS web
 RUN pnpm install --frozen-lockfile
 COPY packages/core/src packages/core/src
 COPY packages/web packages/web
 RUN pnpm --filter @sub-forge/web build
 
-FROM node:22-bookworm-slim@sha256:3ed748ce9dea62d2f0f0205cdbb6823106d9f973a6f555c402fe2575f8d6e1ae AS build
-RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 make g++ \
- && rm -rf /var/lib/apt/lists/*
-RUN corepack enable && corepack prepare pnpm@10.18.1 --activate
-WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
-COPY packages/core/package.json packages/core/
-COPY packages/server/package.json packages/server/
+FROM base AS server
 RUN pnpm install --frozen-lockfile --prod --filter @sub-forge/server...
 COPY packages/core/src packages/core/src
 COPY packages/server/src packages/server/src
 
-FROM node:22-bookworm-slim@sha256:3ed748ce9dea62d2f0f0205cdbb6823106d9f973a6f555c402fe2575f8d6e1ae
+FROM ${NODE_IMAGE}
+# git 用于规则仓库
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates \
- && apt-get clean
+ && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
-    SUBFORGE_DB=/data/sub-forge.db \
+    HOME=/home/node \
     HOST=0.0.0.0 \
     PORT=8080 \
+    SUBFORGE_DB=/data/sub-forge.db \
     WEB_DIR=/app/packages/web/dist
-WORKDIR /app
-COPY --from=build /app /app
+COPY --from=server /app /app
 COPY --from=web /app/packages/web/dist /app/packages/web/dist
-RUN mkdir -p /data && chown node:node /data
-USER node
+COPY docker/entrypoint.sh /usr/local/bin/sub-forge-entrypoint
+RUN mkdir -p /data
 VOLUME /data
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 WORKDIR /app/packages/server
-ENTRYPOINT ["./node_modules/.bin/tsx", "src/cli.ts"]
+ENTRYPOINT ["sub-forge-entrypoint", "./node_modules/.bin/tsx", "src/cli.ts"]
 CMD ["serve"]
