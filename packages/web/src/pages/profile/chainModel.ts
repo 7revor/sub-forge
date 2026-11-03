@@ -73,6 +73,20 @@ function chainCoversMember(chain: ChainRule, member: GroupMember, nodeSets: Prof
   return member.kind === 'nodeset' || !('exact' in member.ref.match) || landingIncludes(chain.landing, member.ref.match.exact);
 }
 
+/**
+ * 单节点成员实际经过的代理链，判定顺序与渲染一致：单节点规则优先，整集规则只作用于其余节点，同类取最后一条。
+ * 历史正则成员在编辑时不解析到具体节点：存在单节点规则就无法断言，不显示。
+ */
+export function chainForNode(chains: ChainRule[], ref: NodeRef, nodeSets: Profile['nodeSets']): ChainRule | undefined {
+  const key = nodeSetKey(ref.nodeSet);
+  const rules = chains.filter(chain => chainSources(chain.landing.nodeSet, nodeSets).some(source => nodeSetKey(source.ref) === key));
+  const partial = rules.filter(chain => chain.landing.filter || chain.landing.excludeFilter);
+  const whole = rules.filter(chain => !chain.landing.filter && !chain.landing.excludeFilter).at(-1);
+  if (!('exact' in ref.match)) return partial.length ? undefined : whole;
+  const name = ref.match.exact;
+  return partial.filter(chain => landingIncludes(chain.landing, name)).at(-1) ?? whole;
+}
+
 export type ClearedMember = { groupId: string; member: GroupMember };
 export type ProfileCascade<T> = { next: T; chains: ChainRule[]; members: ClearedMember[]; rules: number };
 

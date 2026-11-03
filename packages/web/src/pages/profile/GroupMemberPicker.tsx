@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { nodeListOptions } from '../../hooks.ts';
 import { filterNodes } from '../../components/nodeMatch.ts';
-import { addedGroupMembers, chainSources, type GroupMember, type GroupSpec, type NodeSetID } from '@sub-forge/core';
+import { addedGroupMembers, type GroupMember, type GroupSpec, type NodeRef, type NodeSetID } from '@sub-forge/core';
 import { Plus, X, LockKeyhole, Link2, Layers, Server, Crosshair } from 'lucide-react';
 import { useNodeList } from '../../hooks.ts';
 import { useModalPresentation } from '../../modals/index.tsx';
@@ -13,7 +13,7 @@ import { Badge, Button, Empty, Segmented, Select, cx } from '../../components/ui
 import { GROUP_TYPE_LABEL } from '../../components/GroupSettingsFields.tsx';
 import { useProfile } from './context.ts';
 import { canReferenceGroup, memberKey, nodeSetKey, toggleMember } from './memberModel.ts';
-import { planProfileChange } from './chainModel.ts';
+import { chainForNode, planProfileChange } from './chainModel.ts';
 import { useCascadeConfirm } from './useCascadeConfirm.ts';
 import { useChainNames } from './useChainNames.ts';
 import { Checkbox } from '../../components/ui/checkbox.tsx';
@@ -55,7 +55,7 @@ export function GroupMemberPicker({ group, members, inherited, onChange, advance
   const memberRow = (member: GroupMember, index: number, handle?: ReactNode) => <div className="my-2 grid min-h-[44px] grid-cols-[20px_28px_minmax(0,1fr)_28px] items-center gap-2.5 rounded-lg border border-border px-3 py-1.5 text-sm">
     {handle ?? <LockKeyhole size={14} className="text-muted-foreground" />}
     <span className={cx('grid size-7 place-items-center rounded-md', member.kind === 'node' ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground')}>{member.kind === 'builtin' ? <span className="text-xs font-semibold">{member.name.slice(0,2)}</span> : member.kind === 'node' ? <Crosshair size={14} /> : member.kind === 'group' ? <Layers size={14} /> : <Server size={14} />}</span>
-    <div className="min-w-0"><span className="block truncate">{memberText(member)}</span>{member.kind === 'node' && <NodeChainHint nodeSet={member.ref.nodeSet} />}</div>
+    <div className="min-w-0"><span className="block truncate">{memberText(member)}</span>{member.kind === 'node' && <NodeChainHint node={member.ref} />}</div>
     {handle ? <Button size="icon-sm" variant="ghost"  title={`移除 ${memberText(member)}`} aria-label={`移除 ${memberText(member)}`} onClick={() => onChange(members.filter((_, i) => i !== index))}><X size={14} /></Button> : <span />}
   </div>;
   return <div className="grid min-h-0 flex-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_360px] md:overflow-hidden">
@@ -104,9 +104,9 @@ function MemberPreview({ effective, sources, group, memberText, nodeSetName }: {
   </aside>;
 }
 
-function NodeChainHint({ nodeSet }: { nodeSet: NodeSetID }) {
+function NodeChainHint({ node }: { node: NodeRef }) {
   const { draft } = useProfile();
-  const chain = draft.chains.find(c => chainSources(c.landing.nodeSet, draft.nodeSets).some(s => nodeSetKey(s.ref) === nodeSetKey(nodeSet)));
+  const chain = chainForNode(draft.chains, node, draft.nodeSets);
   return chain ? <ChainHint chain={chain} /> : null;
 }
 function ChainHint({ chain }: { chain: import('@sub-forge/core').ChainRule }) {
