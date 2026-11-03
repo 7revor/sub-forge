@@ -23,7 +23,7 @@ fi
 repo="$1"
 tag="${2:-latest}"
 if [[ "${repo##*/}" == *:* ]]; then
-  echo "repo 不能带标签：$repo。标签通过第二个参数指定。" >&2
+  echo "repo 不能带标签：${repo}。标签通过第二个参数指定。" >&2
   exit 1
 fi
 
@@ -53,4 +53,4 @@ docker buildx build \
   --push \
   .
 
-echo "已推送 $repo:$tag 和 $repo:$revision（$platforms）"
+echo "已推送 ${repo}:${tag} 和 ${repo}:${revision}（${platforms}）"
