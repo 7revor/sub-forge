@@ -425,3 +425,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 规则出口单节点：出口菜单直接列出 inline 来源的节点，超长时选项区滚动，移除二级浮层；provider 节点不再自动创建隐藏组。前端对应 `RuleTargetSelect`、`RoutingTargetMenu`，core、server 已实现。画布 `V2ProfileRouting`（规则行出口示例为节点）、`V2ProfileDialogs`（「编辑第 N 项规则」绘制展开的出口菜单）已同步，无后端待实现项。
 
 2026-11-03 远程来源原生筛选：`V2ProfilePreview` 画板补上 `TabsChain` 预览页的说明文案，内容为「没有成员的策略组拒绝连接；筛选结果为空时按客户端默认行为处理。」。其余为服务端输出变化，无后端待实现项。
+
+2026-11-03 可清空下拉布局：`Select` 的 `clearable` 有值时，箭头固定在触发框最右侧，清空按钮紧贴箭头左侧，文字为按钮预留空间并在窄宽度下截断；此前触发框的右内边距把箭头挤到清空按钮左边。影响所有可清空下拉，含 `TabsChain` 预览页的客户端选择。画布 `V2Components` 的「可清空」项补上有值状态。只影响前端样式，无后端待实现项。

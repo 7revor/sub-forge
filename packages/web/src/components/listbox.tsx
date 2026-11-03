@@ -57,7 +57,7 @@ export function Select({ value, onChange, disabled, children, placeholder, clear
   const select = <ShadcnSelect value={selected ? `value:${current}` : ''} disabled={disabled}
     onValueChange={next => { const value = next.slice(6); if (value !== current) onChange?.({ target: { value } }); }}>
     <SelectTrigger {...rest} size={size} disabled={disabled} ref={triggerRef} title={selected?.text ?? placeholder} style={clearable ? undefined : style}
-      className={cx('w-full', clearable ? 'h-full min-h-9' : className, clearable && current !== '' && 'pr-16')}><SelectValue placeholder={placeholder}>{selected?.label}</SelectValue></SelectTrigger>
+      className={cx('w-full', clearable ? 'h-full min-h-9' : className, clearable && current !== '' && '*:data-[slot=select-value]:mr-7')}><SelectValue placeholder={placeholder}>{selected?.label}</SelectValue></SelectTrigger>
     <SelectContent aria-label={rest['aria-label']}>
       {groups.map((group, i) => <SelectGroup key={i}>
         {group.label && <SelectLabel>{group.label}</SelectLabel>}
@@ -70,7 +70,7 @@ export function Select({ value, onChange, disabled, children, placeholder, clear
   return clearable ? <div className={cx('relative w-full min-w-0', className)} style={style}>
     {select}
     {current !== '' && <Button type="button" variant="ghost" size="icon" disabled={disabled} title="清空"
-      aria-label={`清空${rest['aria-label'] ?? placeholder}`} className="absolute top-1/2 right-7 size-7 -translate-y-1/2"
+      aria-label={`清空${rest['aria-label'] ?? placeholder}`} className="absolute top-1/2 right-8 size-7 -translate-y-1/2"
       onClick={() => { onChange?.({ target: { value: '' } }); triggerRef.current?.focus(); }}><X aria-hidden="true" /></Button>}
   </div> : select;
 }
