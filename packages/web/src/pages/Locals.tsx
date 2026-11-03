@@ -12,7 +12,6 @@ import { NamedCreateDialog } from '../components/NamedCreateDialog.tsx';
 // 每个分组是一个节点集文档；节点子页直接保存整个分组。离开有未保存修改的页面前先确认。
 
 import type { LocalProxy, LocalProxyGroup } from '@sub-forge/core';
-import { NodeConnectivity, type ProbeResult } from '../components/NodeConnectivity.tsx';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -63,7 +62,6 @@ export function LocalEdit() {
   const route = useParams();
   const [selected, setSelected] = useState<number | 'new'>(() => route.index === 'new' ? 'new' : Number(route.index ?? 0));
   const [texts, setTexts] = useState<Record<string, string>>({});
-  const [probes, setProbes] = useState<Record<string, { text: string; result: ProbeResult }>>({});
   useEffect(() => { setTexts({}); setSelected(route.index === 'new' ? 'new' : Number(route.index ?? 0)); }, [route.id, route.index]);
   const d = e.draft;
   const proxies = d?.proxies.map((proxy, index) => {
@@ -96,16 +94,15 @@ export function LocalEdit() {
     <ErrorAlert error={e.save.error} />
     <PageScroll contained><div className="grid min-h-0 gap-5 lg:min-h-[calc(100dvh-178px)] lg:grid-cols-[minmax(320px,.933fr)_minmax(0,1.067fr)]">
       <Card title="节点" count={proxies.length} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto p-0!" actions={<Button size="sm" onClick={() => { setSelected('new'); setTexts(current => ({ ...current, new: current.new ?? '' })); }}><Plus size={16} />新增节点</Button>}>
-        <Table className="table-fixed" containerClassName="overflow-visible"><TableHeader><TableRow><TableHead>名称</TableHead><TableHead className="w-20">协议</TableHead><TableHead>服务器</TableHead><TableHead className="w-24">连通性</TableHead></TableRow></TableHeader><TableBody>
+        <Table className="table-fixed" containerClassName="overflow-visible"><TableHeader><TableRow><TableHead>名称</TableHead><TableHead className="w-20">协议</TableHead><TableHead>服务器</TableHead></TableRow></TableHeader><TableBody>
           {proxies.map((proxy, index) => <TableRow key={index} className={cx('hover:bg-accent', selected === index && 'bg-primary/10')}>
             <TableCell><button type="button" className="w-full cursor-pointer truncate text-left font-medium" onClick={() => setSelected(index)}>{proxy.name}</button></TableCell>
             <TableCell><span className="rounded bg-secondary font-mono text-xs px-1.5 py-0.5 text-xs">{proxy.type.toUpperCase()}</span></TableCell>
             <TableCell className="truncate font-mono text-xs" title={`${proxy.server}:${proxy.port}`}>{proxy.server}:{proxy.port}</TableCell>
-            <TableCell className="text-xs text-muted-foreground">{probes[index]?.text === (texts[index] ?? proxyToYaml(proxy)) ? probes[index]!.result.ok ? <span className="text-ok">{probes[index]!.result.delay} ms</span> : '失败' : '未测试'}</TableCell>
           </TableRow>)}
         </TableBody></Table>{!proxies.length && <Empty title="还没有节点" />}
       </Card>
-      <Card actions={(active || selected === 'new') && <><NodeConnectivity key={selected} compact node={result.ok ? result.value : undefined} text={text} onResult={result => setProbes(current => ({ ...current, [selected]: { text, result } }))} /><Button size="sm" variant="ghost" aria-label="删除当前节点" disabled={e.save.isPending || invalid || (selected !== 'new' && !!newResult)} onClick={() => { if (selected === 'new') { setTexts(current => { const next = { ...current }; delete next.new; return next; }); } else { e.setDraft({ ...d, proxies: proxies.filter((_, i) => i !== selected) }); setTexts({}); } setSelected(0); }}><Trash2 size={15} /></Button></>} title={active?.name ?? (selected === 'new' ? '新增节点' : '节点配置')} subtitle={active ? `${active.type.toUpperCase()} · ${active.server}:${active.port}` : undefined} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto px-5 pb-5">
+      <Card actions={(active || selected === 'new') && <Button size="sm" variant="ghost" aria-label="删除当前节点" disabled={e.save.isPending || invalid || (selected !== 'new' && !!newResult)} onClick={() => { if (selected === 'new') { setTexts(current => { const next = { ...current }; delete next.new; return next; }); } else { e.setDraft({ ...d, proxies: proxies.filter((_, i) => i !== selected) }); setTexts({}); } setSelected(0); }}><Trash2 size={15} /></Button>} title={active?.name ?? (selected === 'new' ? '新增节点' : '节点配置')} subtitle={active ? `${active.type.toUpperCase()} · ${active.server}:${active.port}` : undefined} className="flex min-h-0 flex-col overflow-hidden" bodyClass="min-h-0 flex-1 overflow-auto px-5 pb-5">
         {(active || selected === 'new') ? <LocalNodeYamlEditor key={selected} disabled={e.save.isPending} text={text} onChange={text => setTexts(current => ({ ...current, [selected]: text }))} result={result} checking={false} /> : <Empty title="选择左侧节点进行编辑" />}
       </Card>
     </div></PageScroll>

@@ -1,4 +1,4 @@
-import { TESTABLE_PROXY_TYPES, validateLocalProxy, type LocalProxy } from '@sub-forge/core';
+import { KNOWN_PROXY_TYPES, validateLocalProxy, type LocalProxy } from '@sub-forge/core';
 import { LineCounter } from 'yaml';
 import { parseYamlDocument } from './yamlDocument.ts';
 import type { RawResult } from './result.ts';
@@ -20,7 +20,7 @@ export function inspectLocalNodeYaml(text: string): RawResult<LocalProxy> {
       return { ok: false, error: issue.message, ...(offset === undefined ? {} : { line: lines.linePos(offset).line }) };
     }
     const node = value as LocalProxy;
-    return { ok: true, value: node, notes: (TESTABLE_PROXY_TYPES as readonly string[]).includes(node.type) ? [] : ['此协议仅完成基础字段校验，需在实际客户端验证兼容性。'] };
+    return { ok: true, value: node, notes: (KNOWN_PROXY_TYPES as readonly string[]).includes(node.type) ? [] : ['此协议仅完成基础字段校验，需在实际客户端验证兼容性。'] };
   } catch (error) {
     return { ok: false, error: error instanceof TypeError ? '配置包含循环引用，无法保存' : error instanceof Error ? error.message : String(error) };
   }

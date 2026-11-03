@@ -162,3 +162,5 @@ Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整�
 2026-11-02 当前订阅使用精简的 `RoutedProfile`，不携带 `overlay` 或 `refPolicy`。`Profile` 作为历史兼容输入接受可选旧字段，迁移后只保留 routing；历史合并与当前解析继续共享输出一致性验证。
 
 2026-11-03：内核无改动；服务端下发主配置时 `deferRuleBody` 恒为真，规则正文由规则文件请求单独转换，预览才传入全部正文。
+
+2026-11-03 移除本地节点连通性测试：`TESTABLE_PROXY_TYPES` 改名为 `KNOWN_PROXY_TYPES`，取值不变，只用于提示未知协议仅完成基础字段校验。渲染和节点模型不变。

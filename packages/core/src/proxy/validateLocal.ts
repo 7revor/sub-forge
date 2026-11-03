@@ -1,7 +1,7 @@
 import type { LocalProxy } from '../types.ts';
 
 export type NodeIssue = { field: string; message: string };
-export const TESTABLE_PROXY_TYPES = ['ss', 'vmess', 'vless', 'trojan', 'hysteria2', 'tuic', 'anytls', 'socks5', 'http'] as const;
+export const KNOWN_PROXY_TYPES = ['ss', 'vmess', 'vless', 'trojan', 'hysteria2', 'tuic', 'anytls', 'socks5', 'http'] as const;
 
 /** 不重建对象：编辑与保存保留所有扩展字段；仅检查已知字段与协议的必要条件。 */
 export function validateLocalProxy(value: unknown): NodeIssue[] {

@@ -21,7 +21,6 @@ import { GitRepoCache } from './rule-repos/git-cache.ts';
 import { join, dirname } from 'node:path';
 import { RuleRepoService } from './rule-repos/service.ts';
 import { Store } from './store.ts';
-import { createNodeProbe } from './node-probe.ts';
 import { mihomoVerifier } from './verify.ts';
 import { applyStagedRestore } from './backup/restore.ts';
 import { BackupService } from './backup/service.ts';
@@ -105,14 +104,13 @@ async function start(): Promise<void> {
     ...(env.MIHOMO_BIN ? { verify: mihomoVerifier(env.MIHOMO_BIN, env.MIHOMO_DIR) } : {}),
   });
   const ruleRepos = new RuleRepoService(store, fetcher, Date.now, new GitRepoCache(env.SUBFORGE_REPO_CACHE ?? join(dirname(dbPath), 'rule-repo-cache')), snapshots);
-  const nodeProbe = env.MIHOMO_BIN ? createNodeProbe(env.MIHOMO_BIN, { allow: parseAllowList((env.SSRF_ALLOW ?? '').split(',')) }) : undefined;
   const resources = new ResourceService(store,snapshots,renderer);
   const backups = new BackupService(store, {
     dbPath, masterKey, keyFromEnv: !!env.SUBFORGE_SECRET,
     onRestoreStaged: () => { setTimeout(restart, 200).unref(); },
   });
   const app = createApp({
-    store, renderer, snapshots, publicUrl, ruleRepos, nodeProbe, resources, backups, trustedProxies,
+    store, renderer, snapshots, publicUrl, ruleRepos, resources, backups, trustedProxies,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
     secureCookies: publicUrl.startsWith('https://'),
     allowedOrigins,
@@ -133,13 +131,13 @@ async function start(): Promise<void> {
     process.off('SIGTERM', onSignal);
     clearInterval(prune);
     store.closeEvents();
-    // 立即停止接收请求并取消探测；同时等待所有清理，避免先前未等待的 close 拒绝。
+    // 立即停止接收请求；同时等待所有清理，避免先前未等待的 close 拒绝。
     const closed = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     // SSE 已主动结束；仍未退出的连接最多保留 10 秒，避免僵持连接阻塞进程回收。
     const drainDeadline = setTimeout(() => {
       if ('closeAllConnections' in server) server.closeAllConnections();
     }, 10_000);
-    const results = await Promise.allSettled([closed, nodeProbe?.close(), ruleRepos.stop(), resources.stop(), backups.stop()]);
+    const results = await Promise.allSettled([closed, ruleRepos.stop(), resources.stop(), backups.stop()]);
     clearTimeout(drainDeadline);
     await snapshots.settled();
     store.close();

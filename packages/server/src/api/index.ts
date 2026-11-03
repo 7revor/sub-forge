@@ -11,8 +11,6 @@ import type { BackupService } from '../backup/service.ts';
 import { ruleConversionRoutes } from './rule-conversion.ts';
 // 管理接口 /api/* 统一使用登录会话；资源 token 不能调用管理接口。
 
-import { nodeProbeRoutes } from './node-probe.ts';
-import type { NodeProbe } from '../node-probe.ts';
 import { Hono } from 'hono';
 import type { RenderService } from '../render.ts';
 import type { SnapshotService } from '../snapshots.ts';
@@ -33,7 +31,6 @@ import { csrfGuard, HttpError, requireUser, sessionLoader, SESSION_COOKIE, type 
 export type ApiDeps = {
   store: Store;
   resources?: ResourceService;
-  nodeProbe?: NodeProbe;
   backups?: BackupService;
   ruleRepos?: RuleRepoService;
   renderer: RenderService;
@@ -78,7 +75,6 @@ export function createApi(deps: ApiDeps) {
   api.route('/', systemRoutes(deps.store, deps.now));
   if (deps.backups) api.route('/', backupRoutes(deps.backups));
   api.route('/', pendingRoutes());
-  api.route('/', nodeProbeRoutes(deps.nodeProbe));
   api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
   api.route('/', templateRoutes(deps.store, deps.renderer, deps.snapshots));
   api.route('/', accessLogRoutes(deps.store));

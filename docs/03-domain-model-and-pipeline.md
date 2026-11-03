@@ -613,3 +613,5 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 2026-11-02 懒加载与明文存储（v35）：`SnapshotService.get` 对过期且有旧内容的资源最多等待 3 秒（`STALE_WAIT_MS`），超时返回旧快照并标记 `stale`，刷新在后台完成；从未成功时等到上游结束。主配置不拉规则来源，节点来源并行拉取。`ResourceService.sweep` 只清理不拉取，周期等于系统缓存时间。`docs`、迁移备份、`snapshots`、`refresh_jobs` 和令牌原文（列 `token`）明文存储，`system_settings` 中的备份配置仍加密。
 
 2026-11-03 上游缓存分层（v35）：缓存只存在于上游，下游调用 `SnapshotService` 的 `getNodeSource`、`getRuleContent`、`refreshNodeSource`、`refreshRuleContent`，不关心内容来自缓存还是实时读取。`snapshots` 表身份分两类：节点 `owner_kind = 'source'`、`owner_id` 为订阅源 ID，最多 1 条成功加 1 条最新失败；规则 `owner_kind = 'ruleset'`、`owner_id` 为 `cipher.hmac(JSON.stringify([url, { ua, timeoutMs, format, behavior }]))`，最多 1 条成功，没有失败行，`behavior` 只在 `format === 'mrs'` 时进入键。缓存键不含用户、配置、模板或规则集 ID，读取权限在入口校验。过期判定用 `cacheCycleStart(now, ttlSec)`（`packages/server/src/cache-cycle.ts`）：按服务器本地时区对齐，快照拉取时间早于周期开始就算过期。删除 `resource_bindings` 表、`rule-binding.ts`、`repository-file:` 和 `repo-read:` 身份；`StoredRender.ruleBody` 移除，`deferRuleBody` 在非预览时恒为真。迁移并入 v35：节点快照按绑定改回订阅源 ID，对应不上的删除；规则快照全部清除。
+
+2026-11-03 移除本地节点连通性测试：领域模型和渲染管线不变。`TESTABLE_PROXY_TYPES` 改名为 `KNOWN_PROXY_TYPES`，取值不变。

@@ -187,21 +187,6 @@ SQLite v11 为 `rule_repos` 添加可空 `definition`；v10 原索引、文档�
 ### 按单文件创建规则集
 
 
-### 本地节点连通性测试
-
-配置 `MIHOMO_BIN` 为可执行 Mihomo 的绝对路径后，本地节点编辑页可测试当前未保存草稿。未配置或不可执行时显示「测试服务未配置」。生产镜像默认不包含内核，需由部署方安装或挂载；此功能目前支持 Linux/macOS。
-
-- `GET /api/node-probe`：返回测试服务是否可用。
-- `POST /api/node-probe`：登录后提交 `{ requestId, node }`；不会保存草稿或测试结果。
-- `DELETE /api/node-probe/:requestId`：仅发起用户可取消自己的测试。
-- 使用独立临时目录和 Unix socket 启动内核，不开启代理入站；通过节点实际请求 `https://www.gstatic.com/generate_204`，接受 HTTP 2xx 后返回耗时。结果反映 **Sub Forge 服务端** 的网络，不代表访问管理页面的设备。
-- 单用户最多一个测试，全服务最多两个；代理请求上限 10 秒，整个任务上限约 15 秒，退出时先终止、必要时强制结束内核，并删除临时配置。正常关闭服务会等待清理。
-- 沿用现有 `SSRF_ALLOW` 字面 IP 白名单策略（域名仍按系统解析）；代理链、文件证书、网卡绑定及非内置插件不支持服务端探测。支持 SS、VMess、VLESS、Trojan、Hysteria 2、TUIC、AnyTLS、SOCKS5 和 HTTP。
-- 原始内核日志不返回客户端，避免错误信息泄漏凭据。配置基础校验通过不等于连通性成功，测试失败不阻止保存。
-
-实现依据：[Mihomo 代理延迟 API](https://wiki.metacubex.one/api/#proxiesproxies_namedelay)、[Unix socket 控制器](https://wiki.metacubex.one/config/general/#外部控制-api)。
-
-
 ## 规则仓库 Git 缓存与编辑
 
 SQLite v13 将仓库当前配置与上次成功索引的配置分开保存。两个默认仓库仅在首次初始化时写入；之后与自定义仓库一样可编辑、停用或删除，重启不会恢复已删除的默认仓库。旧内置配置和自定义单分支配置自动迁移，已导入来源及其分支 URL 保持不变。
@@ -464,3 +449,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-02：上游内容改为懒加载，主配置只拉节点来源，到期内容最多等待 3 秒，超时先返回旧内容。定时任务只做清理，周期等于系统缓存时间。SQLite v35 把文档、快照、令牌原文和刷新任务改为明文，`token_enc` 列改名为 `token`；升级时需要原主密钥，之后主密钥仍用于备份凭据和 HMAC 索引。
 
 2026-11-03：上游缓存分层。新增 `cache-cycle.ts`，全局周期按本地 0 点对齐；`SnapshotService` 拆成 `getNodeSource`、`getRuleContent`、`refreshNodeSource`、`refreshRuleContent`，节点和规则共用并发上限 8。规则同一 URL 加读取参数只存一份，到期立刻失效，失败不写表；节点失败用旧内容并顺延到下个周期，从未成功时每次请求重试。删除 `resource_bindings`、`rule-binding.ts`、`refreshIfDue`；`/subs/ruleset` 不再渲染配置；仓库索引改为后台定时任务；`GET /api/system` 增加 `nextCacheExpiryAt`。迁移并入 SQLite v35。
+
+2026-11-03 移除本地节点连通性测试：删除 `/api/node-probe` 的 GET、POST、DELETE 接口和 `node-probe.ts`。`MIHOMO_BIN` 保留，只用于渲染时的 `mihomo -t` 校验。节点是否可用请在实际客户端验证。

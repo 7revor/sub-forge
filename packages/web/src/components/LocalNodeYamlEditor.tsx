@@ -65,7 +65,7 @@ export function LocalNodeYamlEditor({ text, onChange, result, checking, disabled
       </div>
       {errorText && <div role="alert" className="text-sm text-destructive whitespace-pre-wrap">{errorText}</div>}
       {node && result.ok && result.notes?.map(note => <div key={note} className="text-xs text-warn">{note}</div>)}
-      <p className="m-0 text-xs leading-relaxed text-muted-foreground">一次只粘贴一个节点；多个节点请用「编辑分组 YAML」。连通性从 Sub Forge 服务端发起，测试当前草稿，无需先保存。</p>
+      <p className="m-0 text-xs leading-relaxed text-muted-foreground">一次只粘贴一个节点；多个节点请用「编辑分组 YAML」。</p>
     </section>
   </div>;
 }
