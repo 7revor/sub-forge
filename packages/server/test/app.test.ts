@@ -63,7 +63,7 @@ function setup(responses: Record<string, string | Error> = {}) {
     return url.includes('air') ? { status: 200, body: b, userinfo: { upload: 1, download: 2, total: 100, expire: 1800000000 } } : { status: 200, body: b };
   };
   const snapshots = new SnapshotService(store, fetcher, now);
-  const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test/' });
+  const renderer = new RenderService(store, snapshots);
   const app = createApp({ store, renderer, snapshots, now });
   return { store, app, calls, bodies, snapshots, advance: (ms: number) => { t += ms; } };
 }

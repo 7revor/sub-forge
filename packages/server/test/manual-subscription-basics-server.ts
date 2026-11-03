@@ -30,8 +30,8 @@ store.putTemplate({ id: 'alternate', name: '备用模板', groups: [{ id: 'new-s
 const bound = store.get('profile', 'bound')!;
 store.put('profile', { ...bound, routing: { mode: 'bound', templateId: 'dialog-template', groupAdditions: { select: [{ kind: 'nodeset', ref: { type: 'local', id: 'dialog-nodes' } }] } } }, user.id);
 const publicUrl = 'http://127.0.0.1:18649';
-const renderer = new RenderService(store, snapshots, { publicUrl });
-const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(store, snapshots);
+const app = createApp({ store, snapshots, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18649 });
 console.log(`隔离验收：${publicUrl}；账号 dialog-admin，密码 dialog-test-2026`);
 let stopping = false;

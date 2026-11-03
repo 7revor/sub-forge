@@ -22,8 +22,8 @@ const profile: ProfileDoc = {
 env.store.put('profile', profile, user.id);
 env.store.put('profile', { ...profile, id: 'short', name: '短配置与空报告', nodeSets: [], routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }, user.id);
 env.store.put('profile', { ...profile, id: 'failed', name: '渲染失败', routing: { mode: 'independent', config: { groups: [{ id: 'collision', name: '验收节点 1', type: 'select', members: [{ kind: 'builtin', name: 'DIRECT' }] }], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } }, user.id);
-const renderer = new RenderService(env.store, env.snapshots, { publicUrl });
-const app = createApp({ ...env, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(env.store, env.snapshots);
+const app = createApp({ ...env, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5276 });
 console.log(`隔离验收：${publicUrl}；账号 preview-admin，密码 password-123`);
 let stopping = false;

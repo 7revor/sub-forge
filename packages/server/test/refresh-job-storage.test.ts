@@ -15,7 +15,7 @@ const putJob = (store: Store, id: string, kind: string, documentId: string) => s
   .run(id, 'owner', JSON.stringify({ id, owner: 'owner', kind, documentId, state: 'done', total: 0, completed: 0, results: [] }), 1);
 const service = (store: Store) => {
   const snapshots = new SnapshotService(store, vi.fn());
-  return new ResourceService(store, snapshots, new RenderService(store, snapshots, { publicUrl: 'https://test.local' }));
+  return new ResourceService(store, snapshots, new RenderService(store, snapshots));
 };
 
 describe('刷新任务存储', () => {

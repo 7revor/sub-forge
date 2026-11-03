@@ -1,5 +1,4 @@
 import { importSeedDocuments, migrateDatabase } from './store-migrations.ts';
-import type { ClientAddress } from './net/client-ip.ts';
 import { migrateProfile, profileTemplate } from './profile-routing.ts';
 // SQLite 存储。保存文档和上游快照；渲染结果不落库。
 // 文档、快照和令牌原文明文存储（2026-11-02 修订 SYS-04）；数据库文件权限为 0600，备份凭据和备份文件仍加密。
@@ -38,7 +37,8 @@ export const ACCESS_KINDS = ['subscription', 'nodes', 'rule-collection', 'enhanc
 export type AccessKind = typeof ACCESS_KINDS[number];
 export type UserAccessLogRow = Omit<AccessLogRow, 'token'> & { id: number; kind: AccessKind; resourceId: string; resourceName: string; method: string };
 
-export type AccessLogRow = Partial<ClientAddress> & {
+export type AccessLogRow = {
+  clientIp?: string | null;
   token: string;
   profileId: string;
   at: number;
@@ -417,9 +417,9 @@ export class Store {
   logAccess(r: AccessLogRow & { kind?: AccessKind; resourceId?: string; resourceName?: string; method?: string }): void {
     const user = this.getActiveToken(r.token);
     if (!user) return;
-    this.db.prepare('INSERT INTO access_log (token, profile_id, at, ua, client, platform, status, ms, warnings, source, user_id, kind, resource_id, resource_name, method, client_ip, peer_ip, ip_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    this.db.prepare('INSERT INTO access_log (token, profile_id, at, ua, client, platform, status, ms, warnings, source, user_id, kind, resource_id, resource_name, method, client_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run(this.cipher.hmac(r.token).slice(0, 8), r.profileId, r.at, r.ua.replaceAll(r.token, '[令牌]').slice(0, 512), r.client, r.platform ?? null, r.status, r.ms, r.warnings, r.source,
-        user.userId, r.kind ?? 'subscription', (r.resourceId ?? r.profileId).replaceAll(r.token, '[令牌]').slice(0, 512), (r.resourceName ?? '').replaceAll(r.token, '[令牌]').slice(0, 200), r.method ?? 'GET', r.clientIp ?? null, r.peerIp ?? null, r.ipSource ?? 'unknown');
+        user.userId, r.kind ?? 'subscription', (r.resourceId ?? r.profileId).replaceAll(r.token, '[令牌]').slice(0, 512), (r.resourceName ?? '').replaceAll(r.token, '[令牌]').slice(0, 200), r.method ?? 'GET', r.clientIp ?? null);
   }
 
   userAccessPage(userId: string, options: PageOptions, kind?: AccessKind): PageResult<UserAccessLogRow> {
@@ -427,15 +427,15 @@ export class Store {
     const args = [userId, this.now() - 30 * 86400_000, ...(kind ? [kind] : [])];
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM access_log WHERE ${where}`).get(...args) as { n: number }).n;
     const meta = pageMeta(total, options);
-    const rows = this.db.prepare(`SELECT id, profile_id AS profileId, at, ua, client, platform, status, ms, warnings, source, kind, resource_id AS resourceId, resource_name AS resourceName, method, client_ip AS clientIp, peer_ip AS peerIp, ip_source AS ipSource FROM access_log WHERE ${where} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`).all(...args, meta.pageSize, (meta.page - 1) * meta.pageSize) as UserAccessLogRow[];
+    const rows = this.db.prepare(`SELECT id, profile_id AS profileId, at, ua, client, platform, status, ms, warnings, source, kind, resource_id AS resourceId, resource_name AS resourceName, method, client_ip AS clientIp FROM access_log WHERE ${where} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`).all(...args, meta.pageSize, (meta.page - 1) * meta.pageSize) as UserAccessLogRow[];
     return { ...meta, items: rows };
   }
 
   recentAccess(profileId: string, limit = 50): AccessLogRow[] {
-    const rows = this.db.prepare("SELECT token, profile_id, at, ua, client, platform, status, ms, warnings, source, client_ip AS clientIp, peer_ip AS peerIp, ip_source AS ipSource FROM access_log WHERE profile_id = ? AND kind = 'subscription' ORDER BY at DESC, id DESC LIMIT ?")
-      .all(profileId, limit) as (ClientAddress & { token: string; profile_id: string; at: number; ua: string; client: string; platform: string | null; status: number; ms: number; warnings: number; source: string })[];
+    const rows = this.db.prepare("SELECT token, profile_id, at, ua, client, platform, status, ms, warnings, source, client_ip AS clientIp FROM access_log WHERE profile_id = ? AND kind = 'subscription' ORDER BY at DESC, id DESC LIMIT ?")
+      .all(profileId, limit) as ({ clientIp: string | null; token: string; profile_id: string; at: number; ua: string; client: string; platform: string | null; status: number; ms: number; warnings: number; source: string })[];
     return rows.map((r) => {
-      const row: AccessLogRow = { token: r.token, profileId: r.profile_id, at: r.at, ua: r.ua, client: r.client, status: r.status, ms: r.ms, warnings: r.warnings, source: r.source, clientIp: r.clientIp, peerIp: r.peerIp, ipSource: r.ipSource };
+      const row: AccessLogRow = { token: r.token, profileId: r.profile_id, at: r.at, ua: r.ua, client: r.client, status: r.status, ms: r.ms, warnings: r.warnings, source: r.source, clientIp: r.clientIp };
       if (r.platform !== null) row.platform = r.platform;
       return row;
     });

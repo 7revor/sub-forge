@@ -114,7 +114,7 @@ describe.skipIf(!MIHOMO || !RUNTIME)('端到端：订阅服务 → mihomo 客户
     store.importSeed(seed, user.id);
     // 机场在本机，用 localhost 验证生产路径上允许域名解析到回环地址。
     snapshots = new SnapshotService(store, createUpstreamFetcher({ allow: parseAllowList([]) }));
-    const renderer = new RenderService(store, snapshots, { publicUrl: `http://127.0.0.1:${ports.api}` });
+    const renderer = new RenderService(store, snapshots);
     const app = createApp({ store, renderer, snapshots });
     api = serve({ fetch: (req) => { served.push(new URL(req.url).pathname); return app.fetch(req); }, hostname: '127.0.0.1', port: ports.api });
 

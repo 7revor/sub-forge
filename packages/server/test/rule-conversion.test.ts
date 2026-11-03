@@ -26,7 +26,7 @@ describe('远程 YAML 转换为托管 LIST', () => {
       const output = parse(rendered.render.yaml);
       const providers = Object.values(output['rule-providers']) as {format:string;url:string}[];
       expect(providers).toHaveLength(1);
-      expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub.test/resources/ruleset?'))).toBe(true);
+      expect(providers.every(p=>p.format==='text' && p.url.startsWith('https://sub-forge-origin.invalid/resources/ruleset?'))).toBe(true);
       expect(rendered.render.yaml).not.toContain(source.url);
       expect(Object.values((await ruleBodies(h.renderer, 'profile'))).every(text => String(text).split('\n').filter(line => !line.startsWith('#')).every(line => !line.includes('payload:')))).toBe(true);
       expect(Object.values((await ruleBodies(h.renderer, 'profile'))).join('')).toContain('# [YAML 原文] payload:');

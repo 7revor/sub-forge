@@ -23,7 +23,7 @@ const template = { id: 'inline-hint', name: '规则布局验收', version: 1, gr
 env.store.putTemplate(template);
 env.store.put('profile', { id: 'inline-profile', name: '独立规则验收', nodeSets: [], overlay: {}, chains: [], refPolicy: { default: 'wrap' }, routing: { mode: 'independent', config: template } }, env.user.id);
 const publicUrl = 'http://127.0.0.1:5223';
-const app = createApp({ ...env, ruleRepos: env.repos, publicUrl, webDir: resolve('../web/dist') });
+const app = createApp({ ...env, ruleRepos: env.repos, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5223 });
 console.log(`隔离验收：${publicUrl}；账号 reference-admin，密码 password-123`);
 let stopping = false;

@@ -19,6 +19,10 @@ import type { Store, TrafficInfo, SnapshotRow } from './store.ts';
 import { resolveRuleSetReference } from './ruleset-reference.ts';
 
 export const TOKEN_PLACEHOLDER = '__SF_TOKEN__';
+/** 渲染结果里的地址前缀，输出时换成当前请求的来源，访问地址不进入配置和存储。 */
+export const ORIGIN_PLACEHOLDER = 'https://sub-forge-origin.invalid';
+
+export const fillLinks = (text: string, origin: string, token: string): string => text.replaceAll(ORIGIN_PLACEHOLDER, origin).replaceAll(TOKEN_PLACEHOLDER, token);
 
 export type Target = { client: Client; platform?: Platform; app?: ClientApp };
 
@@ -52,8 +56,6 @@ export type RenderOutcome =
 export type Verifier = (yaml: string) => Promise<{ ok: boolean; output: string }>;
 
 export type RenderServiceOptions = {
-  /** 对外地址，如 https://sub.example.com（不含末尾斜杠） */
-  publicUrl: string;
   /** 可选：渲染后用 mihomo -t 校验（REF-08 P1） */
   verify?: Verifier;
 };
@@ -96,13 +98,13 @@ export class RenderService {
   constructor(
     private readonly store: Store,
     private readonly snapshots: SnapshotService,
-    private readonly opts: RenderServiceOptions,
+    private readonly opts: RenderServiceOptions = {},
   ) { this.sharedRules = new SharedRuleService(store, snapshots); }
 
   /** 更新声明只属于已保存的主订阅；草稿和独立导出不绑定更新地址。 */
   private managedProfileYaml(yaml: string, profileId: string, target: Target): string {
     if (!profileId || (target.client !== 'surge' && target.client !== 'stash')) return yaml;
-    const url = queryUrl('/subs/profile', { id: profileId, target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER }, this.opts.publicUrl.replace(/\/$/, ''));
+    const url = queryUrl('/subs/profile', { id: profileId, target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER }, ORIGIN_PLACEHOLDER);
     const header = target.client === 'surge'
       ? `#!MANAGED-CONFIG ${url} interval=${this.store.resourceCacheTtlSec} strict=false`
       : `#SUBSCRIBED ${url}`;
@@ -152,9 +154,9 @@ export class RenderService {
     const contract = delivery.mode === 'managed' ? { format: delivery.format, ...(delivery.format === 'mrs' ? { behavior: delivery.behavior } : {}) } : {};
     const common = { target: target.client, ...contract, ...(reference.options?.src ? { src: '1' } : {}), token: TOKEN_PLACEHOLDER };
     const repository = reference.matcher.repository;
-    if (!repository) return queryUrl('/resources/ruleset', { id: reference.matcher.id, ...common }, this.opts.publicUrl.replace(/\/$/, ''));
+    if (!repository) return queryUrl('/resources/ruleset', { id: reference.matcher.id, ...common }, ORIGIN_PLACEHOLDER);
     const files = repository.sources.filter(source => source.enabled !== false).map(source => ({ ref: source.repository!.ref, path: source.repository!.path }));
-    return queryUrl('/resources/repo', { id: repository.repo, files: JSON.stringify(files), ...common }, this.opts.publicUrl.replace(/\/$/, ''));
+    return queryUrl('/resources/repo', { id: repository.repo, files: JSON.stringify(files), ...common }, ORIGIN_PLACEHOLDER);
   }
 
   /**
@@ -247,7 +249,6 @@ export class RenderService {
     const base = profile.base && profile.base.enabled !== false ? resolveNativeBase(target.client, target.app, profile.base) : undefined;
     const userinfo = this.userinfo(profile, userinfoBySource, nodeSets);
 
-    const publicUrl = this.opts.publicUrl.replace(/\/$/, '');
     const output = { target: target.client, platform: target.platform, app: target.app, token: TOKEN_PLACEHOLDER };
     const result = renderForClient({
       profile, nodeSets, rules, resourceIntervalSec:this.store.resourceCacheTtlSec,
@@ -257,11 +258,11 @@ export class RenderService {
       // 预览需要完整诊断和可导出的正文；主配置只写地址，正文由规则文件请求生成。
       ...(opts.dry ? {} : { deferRuleBody: () => true }),
       urls: {
-        provider: k => queryUrl('/subs/nodes', { kind: 'provider', profile: profile.id, id: k, ...output }, publicUrl),
+        provider: k => queryUrl('/subs/nodes', { kind: 'provider', profile: profile.id, id: k, ...output }, ORIGIN_PLACEHOLDER),
         ruleset: (k, reference) => {
           if (!reference) throw new Error('托管规则缺少资源定义');
           if (reference.matcher.kind === 'ruleset' && !reference.matcher.remote) return this.publicRuleUrl({ ...reference, matcher: reference.matcher }, rules.rulesets[reference.matcher.id] as RuleSetDoc, target);
-          return queryUrl('/subs/ruleset', { profile: profile.id, key: this.ruleKey(reference, target), ...output }, publicUrl);
+          return queryUrl('/subs/ruleset', { profile: profile.id, key: this.ruleKey(reference, target), ...output }, ORIGIN_PLACEHOLDER);
         },
       },
     }, target.client);

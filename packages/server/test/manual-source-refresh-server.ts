@@ -24,7 +24,7 @@ await env.snapshots.refreshNodeSource({ id: 'source-fixture', url: 'https://fixt
 
 const app = new Hono();
 app.get('/__fixture', c => c.json({ requests, records: env.store.snapshotHistory('source', 'source-fixture') }));
-app.route('/', createApp({ ...env, publicUrl: 'http://127.0.0.1:18879', webDir: resolve('../web/dist') }));
+app.route('/', createApp({ ...env, webDir: resolve('../web/dist') }));
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18879 });
 console.log('隔离验收：http://127.0.0.1:18879；账号 source-admin，密码 password-123');
 let stopping = false;

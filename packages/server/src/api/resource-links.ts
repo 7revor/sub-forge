@@ -6,7 +6,7 @@ import type { Store } from '../store.ts';
 import { notFound, requireUser, type ApiEnv } from './common.ts';
 
 /** 仅生成已保存对象的地址；不拉取上游、不预生成产物，不接受调用方指定 token。 */
-export function resourceLinkRoutes(store: Store, renderer: RenderService, publicUrl: string) {
+export function resourceLinkRoutes(store: Store, renderer: RenderService) {
   const app = new Hono<ApiEnv>();
   app.get('/resource-links', requireUser, c => {
     const kinds = { sources: 'source', collections: 'collection', locals: 'local', profiles: 'profile', rulesets: 'ruleset' } as const;
@@ -19,7 +19,7 @@ export function resourceLinkRoutes(store: Store, renderer: RenderService, public
     if (kind === 'source' || kind === 'collection' || kind === 'local') renderer.collectNodeSets([{ type: kind, id }], user.id);
     const token = store.createToken(user.id);
     const path = kind === 'profile' ? '/subs/profile' : kind === 'ruleset' ? '/resources/ruleset' : '/subs/nodes';
-    return c.json({ item: { ...token, url: queryUrl(path, { ...(kind !== 'profile' && kind !== 'ruleset' ? { kind } : {}), id, token: token.token }, publicUrl) } });
+    return c.json({ item: { ...token, url: queryUrl(path, { ...(kind !== 'profile' && kind !== 'ruleset' ? { kind } : {}), id, token: token.token }, new URL(c.req.url).origin) } });
   });
   return app;
 }

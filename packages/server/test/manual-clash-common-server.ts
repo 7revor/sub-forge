@@ -23,8 +23,8 @@ env.store.put('profile', { id: 'clash-common-profile', name: '公共 Clash 生�
   ],
   routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '科学上网', type: 'select', members: [{ kind: 'nodeset', ref }] }, { id: 'upstream', name: 'upstream-select', type: 'select', members: [{ kind: 'node', ref: { nodeSet: ref, match: { exact: '香港验收节点' } } }, { kind: 'builtin', name: 'DIRECT' }] }], rules: [], final: { kind: 'group', groupId: 'g' } } },
 }, user.id);
-const renderer = new RenderService(env.store, env.snapshots, { publicUrl });
-const app = createApp({ ...env, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(env.store, env.snapshots);
+const app = createApp({ ...env, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5249 });
 console.log(`隔离验收：${publicUrl}；账号 provider-admin，密码 password-123`);
 let stopping = false;

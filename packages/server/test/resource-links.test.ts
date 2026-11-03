@@ -37,12 +37,12 @@ it('五类复制链接使用当前用户 token，公共规则可复制他人定�
     expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ item: { userId: h.a.id, token: h.token, url: expect.stringContaining(`/${path}?`) } });
     expect((await h.api(`/resource-links?kind=${kind}&id=${id}`, 'b')).status).toBe(kind === 'rulesets' ? 200 : 404);
   }
-  expect(await (await h.api('/resource-links?kind=rulesets&id=r', 'b')).json()).toMatchObject({ item: { userId: h.b.id, token: h.other, url: `https://sub.test/resources/ruleset?id=r&token=${h.other}` } });
+  expect(await (await h.api('/resource-links?kind=rulesets&id=r', 'b')).json()).toMatchObject({ item: { userId: h.b.id, token: h.other, url: `http://localhost/resources/ruleset?id=r&token=${h.other}` } });
   expect((await h.app.request('/api/resource-links?kind=rulesets&id=r')).status).toBe(401);
   expect((await h.api('/resource-links?kind=__proto__&id=r')).status).toBe(404);
   expect(h.fetcher).not.toHaveBeenCalled();
   const next = h.store.resetToken(h.token)!;
-  expect(await (await h.api('/resource-links?kind=sources&id=a')).json()).toMatchObject({ item: { token: next.token, url: `https://sub.test/subs/nodes?kind=source&id=a&token=${next.token}` } });
+  expect(await (await h.api('/resource-links?kind=sources&id=a')).json()).toMatchObject({ item: { token: next.token, url: `http://localhost/subs/nodes?kind=source&id=a&token=${next.token}` } });
 });
 
 it('未被订阅引用的增强可独立下载，按 UA 转换，共享原文，不创建私有配置', async () => {

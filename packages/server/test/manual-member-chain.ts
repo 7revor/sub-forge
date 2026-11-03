@@ -38,8 +38,8 @@ store.put('profile', { id: 'auto-chain', name: '代理链自动处理验收', ov
 ], routing: { mode: 'independent', config: { groups: [{ id: 'loop', name: '循环前置组', type: 'select', members: [{ kind: 'nodeset', ref: { type: 'local', id: 'relay' } }] }], rules: [], final: direct } } }, user.id);
 const snapshots = new SnapshotService(store, async url => { throw new Error(`验收禁止访问上游：${url}`); });
 const publicUrl = 'http://member-chain.localhost:18952';
-const renderer = new RenderService(store, snapshots, { publicUrl });
-const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(store, snapshots);
+const app = createApp({ store, snapshots, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18951 });
 console.log(`隔离验收：${publicUrl}`);
 let stopping = false;

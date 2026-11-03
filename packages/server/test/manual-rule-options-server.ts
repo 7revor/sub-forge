@@ -16,7 +16,7 @@ const published = await env.admin.post('/api/templates', { name: '平铺模板',
 if (published.status !== 201) throw new Error(published.text);
 const profile = await env.admin.post('/api/profiles', { name: '平铺订阅', nodeSets: [], overlay: {}, routing: { mode: 'independent', config: { groups: [], rules: [], final: { kind: 'builtin', name: 'DIRECT' } } } });
 if (profile.status !== 201) throw new Error(profile.text);
-const app = createApp({ ...env, ruleRepos: env.repos, publicUrl: 'http://localhost:18837', webDir: resolve('../web/dist') });
+const app = createApp({ ...env, ruleRepos: env.repos, webDir: resolve('../web/dist') });
 const server = serve({ fetch: request => { const url = new URL(request.url); if (url.pathname.startsWith('/api/rule-options/')) console.log(url.pathname + url.search); return app.fetch(request); }, hostname: '127.0.0.1', port: 18837 });
 console.log(`隔离验收：http://localhost:18837；账号 reference-admin，密码 password-123；模板 ${published.json.item.id}；订阅 ${profile.json.item.id}`);
 let stopping = false;

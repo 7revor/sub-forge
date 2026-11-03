@@ -19,8 +19,8 @@ store.put('profile', { id: 'bound', name: '绑定订阅·前置规则验收', no
 }, user.id);
 const snapshots = new SnapshotService(store, async () => ({ status: 200, body: 'proxies:\n- { name: 远端香港节点, type: socks5, server: hk.example.test, port: 1080 }\n- { name: 远端日本节点, type: socks5, server: jp.example.test, port: 1080 }\n' }));
 const publicUrl = 'http://127.0.0.1:5196';
-const renderer = new RenderService(store, snapshots, { publicUrl });
-const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(store, snapshots);
+const app = createApp({ store, snapshots, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5196 });
 console.log(`隔离验收：${publicUrl}；账号 prepend-admin，密码 prepend-test-2026`);
 let stopping = false;

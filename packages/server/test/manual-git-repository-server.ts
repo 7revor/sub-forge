@@ -15,7 +15,7 @@ const env = setupApp({ fetcher, now: Date.now });
 const repos = new RuleRepoService(env.store, fetcher, Date.now, new GitRepoCache(root));
 for (const repo of repos.list()) repos.setEnabled(repo.id, false);
 await addUser(env.store, 'git-test-admin', 'admin', 'git-test-password');
-const app = createApp({ ...env, ruleRepos: repos, publicUrl: 'http://git-only.localhost:18744', webDir: resolve('../web/dist') });
+const app = createApp({ ...env, ruleRepos: repos, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18744 });
 console.log('Git 验收：http://git-only.localhost:18744；测试账号 git-test-admin，密码 git-test-password');
 let stopping = false;

@@ -9,7 +9,7 @@ const setup = () => {
   const store = new Store(':memory:');
   const fetcher = vi.fn(async () => ({ status: 200, body: 'trojan://p@a.test:1#节点' }));
   const snapshots = new SnapshotService(store, fetcher);
-  const resources = new ResourceService(store, snapshots, new RenderService(store, snapshots, { publicUrl: 'https://test.local' }));
+  const resources = new ResourceService(store, snapshots, new RenderService(store, snapshots));
   store.put('source', { id: 's', name: '来源', url: 'https://a.test/s', pipeline: [] }, 'u');
   return { store, fetcher, snapshots, resources };
 };

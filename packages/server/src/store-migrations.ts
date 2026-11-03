@@ -204,6 +204,10 @@ CREATE INDEX IF NOT EXISTS sub_tokens_profile ON sub_tokens (profile_id);
       this.db.exec('DROP TABLE IF EXISTS last_good; DROP TABLE IF EXISTS shared_rule_resources');
       this.decryptStoredData();
       this.retireResourceBindings();
+      // v37：只记录连接来源，不再解析转发头，代理相关字段一并删除。
+      for (const { name } of this.db.prepare("SELECT name FROM pragma_table_info('access_log') WHERE name IN ('peer_ip', 'ip_source')").all() as { name: string }[]) {
+        this.db.exec(`ALTER TABLE access_log DROP COLUMN ${name}`);
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
     });
     tx();

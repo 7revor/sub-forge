@@ -33,8 +33,8 @@ const cache: RepoCache = {
 const ruleRepos = new RuleRepoService(store, fetcher, Date.now, cache);
 await ruleRepos.refresh('blackmatrix7'); ruleRepos.setEnabled('zydou', false);
 const publicUrl = 'http://127.0.0.1:18727';
-const renderer = new RenderService(store, snapshots, { publicUrl });
-const app = createApp({ store, snapshots, renderer, ruleRepos, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(store, snapshots);
+const app = createApp({ store, snapshots, renderer, ruleRepos, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18727 });
 console.log(`隔离验收 ${publicUrl}，账号 route-admin / route-reader，密码 route-test-2026`);
 let stopping = false;

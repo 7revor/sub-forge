@@ -246,7 +246,7 @@ class LocalServiceTests(unittest.TestCase):
         root = SCRIPTS.parent
         process = subprocess.Popen([shutil.which("node"), "--import", "tsx", "src/cli.ts", "serve"],
             cwd=root / "packages/server", env={**self.env, "SUBFORGE_DB": str(self.runtime / "sub-forge.db"),
-                "PORT": str(self.port), "PUBLIC_URL": f"http://127.0.0.1:{self.port}"},
+                "PORT": str(self.port)},
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             deadline = time.monotonic() + 10

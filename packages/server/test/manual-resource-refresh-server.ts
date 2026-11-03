@@ -49,7 +49,7 @@ app.post('/__fixture/reset/:mode',c=>{
   pending.clear();releaseAll=false;failing=c.req.param('mode')==='failed';
   return c.json({ok:true});
 });
-app.route('/',createApp({...env,resources,publicUrl:'http://127.0.0.1:18893',webDir:fileURLToPath(new URL('../../web/dist',import.meta.url))}));
+app.route('/',createApp({...env,resources,webDir:fileURLToPath(new URL('../../web/dist',import.meta.url))}));
 const server=serve({fetch:app.fetch,hostname:'127.0.0.1',port:18893});
 console.log('隔离验收：http://127.0.0.1:18893；账号 refresh-admin，密码 password-123');
 let stopping=false;

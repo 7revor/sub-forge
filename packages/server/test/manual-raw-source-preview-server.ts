@@ -30,8 +30,8 @@ for (const bound of [false, true]) env.store.put('profile', {
   routing: bound ? { mode: 'bound', templateId: 'preview-template', groupAdditions: {} } : { mode: 'independent', config },
 }, env.user.id);
 const publicUrl = 'http://127.0.0.1:5248';
-const renderer = new RenderService(env.store, env.snapshots, { publicUrl });
-const app = createApp({ ...env, renderer, ruleRepos: env.repos, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(env.store, env.snapshots);
+const app = createApp({ ...env, renderer, ruleRepos: env.repos, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5248 });
 console.log(`源文件预览验收：${publicUrl}；账号 reference-admin，密码 password-123`);
 let stopping = false;

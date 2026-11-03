@@ -22,7 +22,7 @@ async function setup() {
   return { ...h, user, token: h.store.createToken(user.id).token, otherToken: h.store.createToken(other.id).token, update: (next: typeof nodes) => { nodes = next; h.advance(86400 * 1000 + 1); } };
 }
 const decodeNodes = (client: Client, body: string) => client === 'stash' ? parse(body).proxies : parseContent(body, ref).proxies;
-const links = (body: string) => [...body.matchAll(/https:\/\/sub\.test\/subs\/nodes\?[^\s,\n]+/g)].map(m => m[0]);
+const links = (body: string) => [...body.matchAll(/https?:\/\/[^\/\s,]+\/subs\/nodes\?[^\s,\n]+/g)].map(m => m[0]);
 for (const target of ['surge', 'loon', 'stash'] as const) describe(target + ' 远程节点接口', () => {
   it('主订阅使用原生远程入口，资源为处理后的指定节点，HEAD、流量头、鉴权与撤销有效', async () => {
     const h = await setup();

@@ -16,8 +16,8 @@ const pageJson = async (response: Response) => await response.json() as PageResu
 
 const envs: ReturnType<typeof setupApp>[] = [];
 afterEach(async () => { for (const h of envs.splice(0)) { await h.snapshots.settled(); h.store.close(); } });
-function setup(trustedProxies?: string) {
-  const h = setupApp({ trustedProxies, fetcher: async url => ({ status: 200, body: url.endsWith('/nodes') ? 'proxies:\n  - {name: 示例节点, type: ss, server: example.test, port: 443, cipher: aes-128-gcm, password: fixture}' : 'DOMAIN,example.test' }) }); envs.push(h);
+function setup() {
+  const h = setupApp({ fetcher: async url => ({ status: 200, body: url.endsWith('/nodes') ? 'proxies:\n  - {name: 示例节点, type: ss, server: example.test, port: 443, cipher: aes-128-gcm, password: fixture}' : 'DOMAIN,example.test' }) }); envs.push(h);
   const a = h.store.createUser({ username: '管理员', passwordHash: 'fixture', role: 'admin' });
   const b = h.store.createUser({ username: '普通用户', passwordHash: 'fixture', role: 'user' });
   const token = h.store.userToken(a.id)!.token, otherToken = h.store.userToken(b.id)!.token;
@@ -143,8 +143,8 @@ it('请求等待期间重置令牌，不把旧请求归入新令牌的访问记�
 });
 
 
-it.each([undefined, '127.0.0.1'])('真实 HTTP 连接记录 IP，透传信任配置：%s', async trustedProxies => {
-  const h = setup(trustedProxies);
+it('真实 HTTP 连接记录连接来源，忽略所有转发头', async () => {
+  const h = setup();
   const server = serve({ fetch: h.app.fetch, hostname: '127.0.0.1', port: 0 });
   try {
     if (!server.listening) await once(server, 'listening');
@@ -157,11 +157,11 @@ it.each([undefined, '127.0.0.1'])('真实 HTTP 连接记录 IP，透传信任配
     }
     const result = await rows(h);
     expect(result).toHaveLength(4);
-    for (const row of result) expect(row).toMatchObject({ clientIp: trustedProxies ? '2001:db8::7' : '127.0.0.1', peerIp: '127.0.0.1', ipSource: trustedProxies ? 'x-forwarded-for' : 'socket' });
-    expect(h.store.recentAccess('p')[0]).toMatchObject({ clientIp: trustedProxies ? '2001:db8::7' : '127.0.0.1' });
+    for (const row of result) expect(row).toMatchObject({ clientIp: '127.0.0.1' });
+    expect(h.store.recentAccess('p')[0]).toMatchObject({ clientIp: '127.0.0.1' });
     const response = await fetch(base + `/subs/profile?token=${h.token}&id=p`, { method: 'HEAD', headers: { 'x-real-ip': '192.0.2.88', 'cf-connecting-ip': '192.0.2.77', forwarded: 'for=192.0.2.66' } });
     await response.text();
-    expect((await rows(h))[0]).toMatchObject({ clientIp: '127.0.0.1', peerIp: '127.0.0.1', ipSource: 'socket', method: 'HEAD' });
+    expect((await rows(h))[0]).toMatchObject({ clientIp: '127.0.0.1', method: 'HEAD' });
   } finally {
     if ('closeAllConnections' in server) server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
@@ -177,15 +177,31 @@ it.each([24, 25])('v%s 升级保留原日志，旧记录 IP 为空，新记录�
     const token = store.userToken(user.id)!.token;
     const record = { token, profileId: 'p', at: Date.now(), ua: '', client: 'mihomo', status: 200, ms: 0, source: 'fresh', warnings: 0 };
     store.logAccess(record);
-    store.db.exec('ALTER TABLE access_log DROP COLUMN client_ip; ALTER TABLE access_log DROP COLUMN peer_ip; ALTER TABLE access_log DROP COLUMN ip_source');
+    store.db.exec('ALTER TABLE access_log DROP COLUMN client_ip');
     store.db.pragma(`user_version = ${version}`); store.close(); store = new Store(path, { cipher });
-    expect(store.recentAccess('p')[0]).toMatchObject({ clientIp: null, peerIp: null, ipSource: 'unknown' });
-    store.logAccess({ ...record, clientIp: '2001:db8::9', peerIp: '10.2.0.2', ipSource: 'x-forwarded-for' });
+    expect(store.recentAccess('p')[0]).toMatchObject({ clientIp: null });
+    store.logAccess({ ...record, clientIp: '2001:db8::9' });
     store.close(); store = new Store(path, { cipher });
     expect(store.db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
     const result = store.userAccessPage(user.id, { page: 1, pageSize: 20, q: '' });
     expect(result.total).toBe(2);
-    expect(result.items[0]).toMatchObject({ clientIp: '2001:db8::9', peerIp: '10.2.0.2', ipSource: 'x-forwarded-for' });
-    expect(result.items[1]).toMatchObject({ clientIp: null, peerIp: null, ipSource: 'unknown' });
+    expect(result.items[0]).toMatchObject({ clientIp: '2001:db8::9' });
+    expect(result.items[1]).toMatchObject({ clientIp: null });
+  } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+it('v36 升级删除代理字段，保留客户端 IP', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sf-access-ip-')), path = join(dir, 'test.db');
+  const cipher = new Cipher(randomBytes(32));
+  let store = new Store(path, { cipher });
+  try {
+    const user = store.createUser({ username: '迁移用户', passwordHash: 'fixture', role: 'user' });
+    store.logAccess({ token: store.userToken(user.id)!.token, profileId: 'p', at: Date.now(), ua: '', client: 'mihomo', status: 200, ms: 0, source: 'fresh', warnings: 0, clientIp: '192.0.2.1' });
+    store.db.exec("ALTER TABLE access_log ADD COLUMN peer_ip TEXT; ALTER TABLE access_log ADD COLUMN ip_source TEXT NOT NULL DEFAULT 'unknown'");
+    store.db.pragma('user_version = 36'); store.close(); store = new Store(path, { cipher });
+    const columns = (store.db.prepare('PRAGMA table_info(access_log)').all() as { name: string }[]).map(column => column.name);
+    expect(columns).not.toContain('peer_ip');
+    expect(columns).not.toContain('ip_source');
+    expect(store.recentAccess('p')[0]).toMatchObject({ clientIp: '192.0.2.1' });
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });

@@ -41,7 +41,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
       base('orphan', { groupPatches: { missing: { addMembers: [node] } }, extraRules: [{ anchor: { before: 'gone' }, rule: { ...template.rules[0]!, id: 'orphan-rule' } }] }),
     ];
     profiles.forEach(p => { store.db.prepare("INSERT INTO docs (kind,id,owner,data,updated_at) VALUES ('profile',?,?,?,?)").run(p.id, 'owner', JSON.stringify(p), 1234); issueProfileToken(store, { token: `${p.id}-secret-token`, profileId: p.id }); });
-    const renderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }), { publicUrl: 'https://test.local' });
+    const renderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }));
     // 旧库的渲染基线仍按历史表读取；迁移时恢复真实 Store 接口。
     const legacyRead = vi.spyOn(store, 'getTemplate').mockImplementation((id, version) => historical.find(t => t.id === id && t.version === (version ?? 2)));
     const before = new Map<string, string>();
@@ -60,7 +60,7 @@ it('v15 旧订阅事务迁移：全量覆盖、锁定版本、空白及孤儿项
     expect(JSON.stringify(plan)).not.toContain('secret-token');
     store.close();
     store = new Store(file, { cipher });
-    const nextRenderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }), { publicUrl: 'https://test.local' });
+    const nextRenderer = new RenderService(store, new SnapshotService(store, async () => { throw new Error('不应访问上游'); }));
     for (const old of profiles) {
       const row = store.getWithOwner('profile', old.id)!;
       expect(row.owner).toBe('owner'); expect(row.updatedAt).toBe(1234);

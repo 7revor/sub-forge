@@ -27,8 +27,8 @@ store.importSeed({ templates: [{ id: 'dialog-template', name: '弹窗隔离验�
 }, user.id);
 const snapshots = new SnapshotService(store, async () => { throw new Error('隔离验收不访问上游'); });
 const publicUrl = 'http://127.0.0.1:18643';
-const renderer = new RenderService(store, snapshots, { publicUrl });
-const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(store, snapshots);
+const app = createApp({ store, snapshots, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18643 });
 console.log(`隔离验收：${publicUrl}；账号 dialog-admin，密码 dialog-test-2026`);
 let stopping = false;

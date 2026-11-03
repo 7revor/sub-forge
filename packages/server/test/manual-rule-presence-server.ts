@@ -26,8 +26,8 @@ store.importSeed({ templates: [{ id: 'template', name: '存在即生效模板', 
 }, user.id);
 const snapshots = new SnapshotService(store, async () => { throw new Error('验收不应访问上游'); });
 const publicUrl = 'http://127.0.0.1:5197';
-const renderer = new RenderService(store, snapshots, { publicUrl });
-const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(store, snapshots);
+const app = createApp({ store, snapshots, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5197 });
 console.log(`隔离验收：${publicUrl}；账号 presence-admin，密码 presence-test-2026`);
 let stopping = false;

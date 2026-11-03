@@ -114,7 +114,7 @@ describe('资源刷新任务',()=>{
     expect((await h.api.get('/api/sources/cache?id=s')).json.items[0].lastSuccessAt).toBeGreaterThan(lastSuccess);
     const sub=await h.app.request('/subs/profile?token=t&id=p');const cfg=parse(await sub.text());
     expect(sub.headers.get('profile-update-interval')).toBe('24');
-    for(const p of Object.values(cfg['rule-providers']) as any[])expect(p.url).toContain('https://sub.test/resources/ruleset?');
+    for(const p of Object.values(cfg['rule-providers']) as any[])expect(p.url).toContain('http://localhost/resources/ruleset?');
     for(const p of Object.values(cfg['proxy-providers']) as any[])expect(p.interval).toBe(86400);
   });
   it('刷新任务及状态按用户隔离',async()=>{

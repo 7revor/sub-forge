@@ -17,7 +17,7 @@ afterAll(() => rmSync(base, { recursive: true, force: true }));
 
 const store = new Store(':memory:');
 const snapshots = new SnapshotService(store, async () => { throw new Error('no network'); });
-const app = createApp({ store, snapshots, renderer: new RenderService(store, snapshots, { publicUrl: 'https://sub.test' }), webDir: dir });
+const app = createApp({ store, snapshots, renderer: new RenderService(store, snapshots), webDir: dir });
 
 describe('托管前端', () => {
   it('静态资源带长缓存，前端路由回落到 index.html', async () => {

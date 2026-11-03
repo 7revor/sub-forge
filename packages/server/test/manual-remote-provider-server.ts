@@ -17,8 +17,8 @@ env.store.put('source', { id: ref.id, name: '花云（虚构验收）', url: 'ht
 env.store.put('profile', { id: 'fixture-profile', name: '公司拼车（验收样例）', nodeSets: [{ ref, output: 'provider' }], chains: [],
   routing: { mode: 'independent', config: { groups: [{ id: 'g', name: '科学上网', type: 'select', members: [{ kind: 'nodeset', ref }] }], rules: [], final: { kind: 'group', groupId: 'g' } } },
 }, user.id);
-const renderer = new RenderService(env.store, env.snapshots, { publicUrl });
-const app = createApp({ ...env, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(env.store, env.snapshots);
+const app = createApp({ ...env, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5248 });
 console.log(`隔离验收：${publicUrl}；账号 provider-admin，密码 password-123`);
 let stopping = false;

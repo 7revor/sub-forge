@@ -21,7 +21,7 @@ const upstream=async(url:string)=>{
   return {status:200,body:url.includes('nodes')?`trojan://fixture@node.example.test:443#节点${state.version}`:`DOMAIN,v${state.version}.example.test`};
 };
 const snapshots=new SnapshotService(store,upstream);
-const publicUrl='http://127.0.0.1:18769';const renderer=new RenderService(store,snapshots,{publicUrl});
+const publicUrl='http://127.0.0.1:18769';const renderer=new RenderService(store,snapshots);
 const cache:RepoCache={inspect:async()=>({defaultBranch:'main',branches:['main']}),sync:async repo=>Object.fromEntries(repo.refs.map(ref=>[ref,'a'.repeat(40)])),files:async()=>['rules/demo.list'],read:async()=> 'DOMAIN,fixture.example.test',remove:async()=>{},stop:async()=>{}};
 const repos=new RuleRepoService(store,upstream,Date.now,cache,snapshots);
 store.db.prepare('UPDATE rule_repos SET enabled = 0').run();
@@ -36,7 +36,7 @@ for(const owner of [admin.id,user.id]){
   store.put('profile',{id:`${prefix}-profile`,name:'统一缓存验收订阅',nodeSets:[{ref:{type:'collection',id:`${prefix}-collection`},output:'provider'}],refPolicy:{default:'wrap'},chains:[],overlay:{extraRules:[{anchor:'top',rule:{id:'r',matcher:{kind:'ruleset',id:`${prefix}-rules`},target:{kind:'builtin',name:'DIRECT'}}}]}},owner);
 }
 const resources=new ResourceService(store,snapshots,renderer);
-const app=createApp({store,snapshots,renderer,resources,ruleRepos:repos,publicUrl,webDir:resolve('../web/dist')});
+const app=createApp({store,snapshots,renderer,resources,ruleRepos:repos,webDir:resolve('../web/dist')});
 const server=serve({fetch:app.fetch,hostname:'127.0.0.1',port:18769});
 console.log(`隔离验收 ${publicUrl}，账号 cache-admin / cache-user，密码 cache-test-2026`);
 let stopping=false;

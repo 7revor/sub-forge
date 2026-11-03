@@ -197,7 +197,7 @@ class LocalService:
         # 仅本地开发入口提供初始账号；服务端只在数据库无用户时创建，不覆盖已有密码。
         env.setdefault("SUBFORGE_ADMIN_USERNAME", "admin")
         env.setdefault("SUBFORGE_ADMIN_PASSWORD", "password")
-        env.update(HOST="127.0.0.1", PORT=str(port), PUBLIC_URL=url,
+        env.update(HOST="127.0.0.1", PORT=str(port),
                    SUBFORGE_DB=str(database), SUBFORGE_API=api_url,
                    SUBFORGE_LOCAL_WEB_PORT=str(web_port), NODE_ENV="development")
         cwd = self.root

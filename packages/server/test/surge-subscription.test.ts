@@ -37,7 +37,7 @@ describe('Surge 主订阅和 API', () => {
     expect(res.status).toBe(200); expect(res.headers.get('content-type')).toContain('text/plain');
     const text = await res.text();
     expect(text.split('\n').slice(0, 2)).toEqual([
-      '#!MANAGED-CONFIG https://sub.test/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token=' + h.token + ' interval=86400 strict=false',
+      '#!MANAGED-CONFIG http://localhost/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token=' + h.token + ' interval=86400 strict=false',
       '#!FORBIDDEN-AUTO-UPGRADE smart-group',
     ]);
     expect(text).toContain('[General]\nipv6 = false\nloglevel = notify\ntest-timeout = 5');
@@ -64,7 +64,7 @@ describe('Surge 主订阅和 API', () => {
       const res = await h.alice.post(path, { profile: { ...h.profile, nodeSets: h.profile.nodeSets.map((s: any) => ({ ...s, output: 'inline' })) }, client: 'surge', platform: 'ios' });
       expect(res.json.ok, res.text).toBe(true); expect(res.json.format).toBe('ini');
       if (path === '/api/profiles/preview') expect(res.json.yaml).not.toContain('#!MANAGED-CONFIG');
-      else expect(res.json.yaml.split('\n')[0]).toBe('#!MANAGED-CONFIG https://sub.test/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token={token} interval=86400 strict=false');
+      else expect(res.json.yaml.split('\n')[0]).toBe('#!MANAGED-CONFIG http://localhost/subs/profile?id=' + h.profile.id + '&target=surge&platform=ios&app=surge-ios&token={token} interval=86400 strict=false');
       expect(res.json.exportYaml).not.toMatch(/__SF_|RULE-SET|#!MANAGED-CONFIG/);
       expect(res.json.exportYaml).toContain('DOMAIN,example.test,代理,extended-matching\nIP-CIDR,192.0.2.0/24,代理,no-resolve\nUSER-AGENT,Example*,代理');
     }
@@ -82,7 +82,7 @@ describe('Surge 主订阅和 API', () => {
   });
   it('失败时直接报错，不调用 Mihomo 校验器验证 INI', async () => {
     const h = await scenario(), verify = vi.fn(async () => ({ ok: true, output: '' }));
-    const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify });
+    const renderer = new RenderService(h.store, h.snapshots, { verify });
     const original = await renderer.render(h.profile.id, { client: 'surge', platform: 'ios' });
     expect(original.ok).toBe(true); expect(verify).not.toHaveBeenCalled();
     h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'vless', server: 'example.test', port: 443, uuid: 'example' }] }, h.user.id);

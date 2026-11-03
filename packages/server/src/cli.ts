@@ -13,7 +13,6 @@ import { createApp } from './app.ts';
 import { Cipher, hashPassword, loadMasterKey } from './crypto.ts';
 import type { Seed } from './docs.ts';
 import { parseAllowList } from './net/ssrf.ts';
-import { parseTrustedProxies } from './net/client-ip.ts';
 import { createUpstreamFetcher } from './net/upstream.ts';
 import { RenderService } from './render.ts';
 import { SnapshotService } from './snapshots.ts';
@@ -77,19 +76,13 @@ async function main(): Promise<void> {
 }
 
 async function start(): Promise<void> {
-  const trustedProxies = parseTrustedProxies(env.SUBFORGE_TRUSTED_PROXIES);
   const host = env.HOST ?? '127.0.0.1';
   const port = Number(env.PORT ?? 8080);
-  const publicUrl = env.PUBLIC_URL ?? `http://${host}:${port}`;
-  if (!env.PUBLIC_URL) console.warn(`未设置 PUBLIC_URL，订阅链接将使用 ${publicUrl}，客户端可能无法访问`);
   // 上次恢复已暂存（含重启中途崩溃）时，先替换数据库和密钥再打开。
   if (dbPath !== ':memory:' && applyStagedRestore(dbPath)) console.log(`已从备份恢复数据库，原文件保存为 ${dbPath}.before-restore`);
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
   const masterKey = loadMasterKey(dbPath, env.SUBFORGE_SECRET);
   const store = openStore(masterKey);
-  const allowedOrigins = (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  // TLS 在反向代理终止时应用只看到 http，来源不会被判为同源，必须显式配置，这里不自动信任 PUBLIC_URL。
-  if (publicUrl.startsWith('https://') && !allowedOrigins.includes(new URL(publicUrl).origin)) console.warn(`ALLOWED_ORIGINS 未包含 ${new URL(publicUrl).origin}，经 HTTPS 反向代理访问时登录和所有写操作都会被拒绝`);
 
   // 首次启动且没有任何用户时，可用环境变量创建管理员（便于容器部署）
   if (store.countUsers() === 0) {
@@ -100,7 +93,6 @@ async function start(): Promise<void> {
   const fetcher = createUpstreamFetcher({ allow: parseAllowList((env.SSRF_ALLOW ?? '').split(',')) });
   const snapshots = new SnapshotService(store, fetcher);
   const renderer = new RenderService(store, snapshots, {
-    publicUrl,
     ...(env.MIHOMO_BIN ? { verify: mihomoVerifier(env.MIHOMO_BIN, env.MIHOMO_DIR) } : {}),
   });
   const ruleRepos = new RuleRepoService(store, fetcher, Date.now, new GitRepoCache(env.SUBFORGE_REPO_CACHE ?? join(dirname(dbPath), 'rule-repo-cache')), snapshots);
@@ -110,10 +102,8 @@ async function start(): Promise<void> {
     onRestoreStaged: () => { setTimeout(restart, 200).unref(); },
   });
   const app = createApp({
-    store, renderer, snapshots, publicUrl, ruleRepos, resources, backups, trustedProxies,
+    store, renderer, snapshots, ruleRepos, resources, backups,
     ...(env.WEB_DIR ? { webDir: env.WEB_DIR } : {}),
-    secureCookies: publicUrl.startsWith('https://'),
-    allowedOrigins,
   });
   ruleRepos.start();
   resources.start();
@@ -123,7 +113,7 @@ async function start(): Promise<void> {
   prune.unref();
 
   const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
-    console.log(`Sub Forge 已启动：http://${info.address}:${info.port}（对外地址 ${publicUrl}，数据库 ${dbPath}）`);
+    console.log(`Sub Forge 已启动：http://${info.address}:${info.port}（数据库 ${dbPath}）`);
   });
   let shuttingDown = false;
   const stop = async () => {

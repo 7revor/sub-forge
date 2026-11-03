@@ -23,10 +23,10 @@ for (const id of ['first', 'second', 'unused']) store.put('profile', { id, name:
 const snapshots = new SnapshotService(store, async url => url.includes('nodes.example.test')
   ? { status: 200, body: 'proxies: [{ name: 流量测试节点, type: socks5, server: fixture.example.test, port: 1080 }]', userinfo: { upload: 0, download: 1073741824, total: 10737418240, expire: 2000000000 } }
   : { status: 200, body: 'DOMAIN,apple.example.test' });
-const renderer = new RenderService(store, snapshots, { publicUrl: 'http://127.0.0.1:5196' });
+const renderer = new RenderService(store, snapshots);
 for (const id of ['first', 'second', 'unused']) await renderer.render(id, { client: 'mihomo' });
 store.delete('profile', 'unused');
-const app = createApp({ store, snapshots, renderer, publicUrl: 'http://127.0.0.1:5196', webDir: resolve('../web/dist') });
+const app = createApp({ store, snapshots, renderer, webDir: resolve('../web/dist') });
 let resetAttempts = 0;
 const server = serve({ hostname: '127.0.0.1', port: 5196, fetch: async request => {
   if (request.method === 'POST' && new URL(request.url).pathname === '/api/me/token/reset') {

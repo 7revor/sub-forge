@@ -1,6 +1,5 @@
 import { accessLogger, type DownloadEnv } from './access-log.ts';
 import { randomId } from './crypto.ts';
-import type { BlockList } from 'node:net';
 // /subs 为用户私有订阅，/resources 为公共规则；动态值只使用查询参数。
 // 资源凭证与登录会话互不替代，失效或越权不暴露资源存在性。
 
@@ -18,7 +17,7 @@ import { Hono, type Context } from 'hono';
 import type { Platform } from '@sub-forge/core';
 import { createApi, type ApiDeps } from './api/index.ts';
 import { InvalidClientTarget, detectClient } from './client.ts';
-import { TOKEN_PLACEHOLDER, type RenderOutcome, type RenderService, type Target } from './render.ts';
+import { fillLinks, type RenderOutcome, type RenderService, type Target } from './render.ts';
 import type { Store, TrafficInfo } from './store.ts';
 
 const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
@@ -31,10 +30,9 @@ function userinfoHeader(u: TrafficInfo | undefined): string | undefined {
 
 const notFound = (c: Context) => c.body(null, 404);
 
-export type AppDeps = Omit<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'> & Partial<Pick<ApiDeps, 'now' | 'secureCookies' | 'allowedOrigins' | 'publicUrl'>> & {
+export type AppDeps = Omit<ApiDeps, 'now'> & Partial<Pick<ApiDeps, 'now'>> & {
   /** 前端构建产物目录（packages/web/dist）；设置后托管静态文件，其余路径回落到 index.html */
   webDir?: string;
-  trustedProxies?: BlockList;
 };
 
 const MIME: Record<string, string> = {
@@ -71,17 +69,17 @@ export function createApp(deps: AppDeps) {
   const { store, renderer } = deps;
   const now = deps.now ?? Date.now;
   const app = new Hono<DownloadEnv>();
-  app.use('*', accessLogger(store, now, deps.trustedProxies));
+  app.use('*', accessLogger(store, now));
 
   // 启动 ID 让前端区分“已重启”和“旧进程还没关闭”；进程内恢复重启可能短到观察不到下线。
   const bootId = randomId(9);
   app.get('/healthz', (c) => { c.header('x-boot-id', bootId); return c.text('ok'); });
   const ruleRepos = deps.ruleRepos ?? new RuleRepoService(store, createUpstreamFetcher({ allow: parseAllowList([]) }), now, undefined, deps.snapshots);
-  const apiDeps = { ...deps, ruleRepos, now, secureCookies: deps.secureCookies ?? false, allowedOrigins: deps.allowedOrigins ?? [], publicUrl: deps.publicUrl ?? '' };
+  const apiDeps = { ...deps, ruleRepos, now };
   app.route('/api', createApi(apiDeps));
   const auth = new Hono<ApiEnv>();
   auth.use('*', async (c, next) => { c.header('cache-control', 'no-store'); await next(); });
-  auth.use('*', csrfGuard(() => apiDeps.allowedOrigins));
+  auth.use('*', csrfGuard());
   auth.onError((error, c) => {
     if (error instanceof HttpError) return c.json({ error: error.message }, error.status);
     console.error('登录服务失败', error);
@@ -164,7 +162,7 @@ export function createApp(deps: AppDeps) {
     const ui = userinfoHeader(outcome.render.userinfo);
     if (ui) c.header('subscription-userinfo', ui);
     setAccessResult(outcome);
-    return c.body(outcome.render.yaml.replaceAll(TOKEN_PLACEHOLDER, token));
+    return c.body(fillLinks(outcome.render.yaml, new URL(c.req.url).origin, token));
   });
 
   /** 私有节点产物按当前配置生成，并检查用户归属。 */
@@ -196,7 +194,7 @@ export function createApp(deps: AppDeps) {
     c.header('content-type', 'text/plain; charset=utf-8');
     c.header('content-disposition', 'inline');
     c.header('x-content-type-options', 'nosniff');
-    return c.body(selected.providers[key]!.replaceAll(TOKEN_PLACEHOLDER, token));
+    return c.body(fillLinks(selected.providers[key]!, new URL(c.req.url).origin, token));
   });
 
   app.get('/subs/nodes', async c => {

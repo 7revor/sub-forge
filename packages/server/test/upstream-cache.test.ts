@@ -114,7 +114,7 @@ it('Loon 手写规则走 /subs/ruleset 也不渲染整个配置，地址失效�
   h.profile('p', h.a.id, { kind: 'rule', rule: { type: 'DOMAIN', value: 'loon.test' } } as Matcher);
   const res = await h.app.request(`/subs/profile?token=${h.tokenA}&id=p&target=loon&platform=ios`);
   expect(res.status).toBe(200);
-  const line = (await res.text()).match(/https:\/\/sub\.test\/subs\/ruleset[^\s,]+/)![0];
+  const line = (await res.text()).match(/http:\/\/localhost\/subs\/ruleset[^\s,]+/)![0];
   const file = await h.app.request(line);
   expect(file.status).toBe(200); expect(await file.text()).toContain('loon.test');
   expect(h.fetcher).not.toHaveBeenCalled();

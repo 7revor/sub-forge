@@ -22,13 +22,12 @@ export const notFound = (what = '资源') => new HttpError(404, `${what}不存�
  * 写操作的 CSRF 防护：会话 cookie 为 SameSite=Lax，另外要求 JSON 请求体，
  * 且带 Origin 时必须与本服务同源（浏览器跨站提交表单无法满足这两点）。
  */
-export function csrfGuard(allowedOrigins: () => string[]): MiddlewareHandler {
+export function csrfGuard(): MiddlewareHandler {
   return async (c, next) => {
     if (c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS') return next();
     const origin = c.req.header('origin');
     if (origin) {
-      const self = new URL(c.req.url).origin;
-      if (origin !== self && !allowedOrigins().includes(origin)) throw new HttpError(403, '跨站请求被拒绝');
+      if (origin !== new URL(c.req.url).origin) throw new HttpError(403, '跨站请求被拒绝');
     }
     const hasBody = (c.req.header('content-length') ?? '0') !== '0' || c.req.header('transfer-encoding');
     if (hasBody && !(c.req.header('content-type') ?? '').startsWith('application/json')) throw new HttpError(400, '请求体必须是 JSON');

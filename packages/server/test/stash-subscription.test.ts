@@ -63,7 +63,7 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     const updateUrl = text.split('\n')[0]!.slice('#SUBSCRIBED '.length);
-    expect(updateUrl).toBe(`https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token=${h.token}`);
+    expect(updateUrl).toBe(`http://localhost/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token=${h.token}`);
     expect(res.headers.get('profile-update-interval')).toBe('24');
     const updated = await h.app.request(updateUrl, { headers: { 'user-agent': 'curl' } });
     expect(updated.status).toBe(200);
@@ -85,7 +85,7 @@ describe('Stash 主订阅与资源隔离', () => {
     expect(file.status).toBe(200); expect(await file.text()).toContain('\nUSER-AGENT,PayPal*\n');
     expect((await h.app.request(`${provider.url}&target=mihomo`)).status).toBe(400);
     const macText = await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=stash&platform=macos`)).text();
-    expect(macText.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=macos&app=stash-macos&token=${h.token}`);
+    expect(macText.split('\n')[0]).toBe(`#SUBSCRIBED http://localhost/subs/profile?id=${h.profile.id}&target=stash&platform=macos&app=stash-macos&token=${h.token}`);
     const mac = parse(macText);
     expect(mac.rules).toContain('PROCESS-NAME,Example,代理');
     const mihomo = parse(await (await h.app.request(`/subs/profile?token=${h.token}&id=${h.profile.id}&target=mihomo&platform=ios`)).text());
@@ -114,7 +114,7 @@ describe('Stash 主订阅与资源隔离', () => {
       const preview = await h.alice.post(path, { profile: { ...h.profile, nodeSets: h.profile.nodeSets.map((s: any) => ({ ...s, output: 'inline' })) }, client: 'stash', platform: 'ios' });
       expect(preview.status).toBe(200); expect(preview.json.ok, preview.text).toBe(true);
       if (path === '/api/profiles/preview') expect(preview.json.yaml).not.toContain('#SUBSCRIBED');
-      else expect(preview.json.yaml.split('\n')[0]).toBe(`#SUBSCRIBED https://sub.test/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token={token}`);
+      else expect(preview.json.yaml.split('\n')[0]).toBe(`#SUBSCRIBED http://localhost/subs/profile?id=${h.profile.id}&target=stash&platform=ios&app=stash-ios&token={token}`);
       expect(preview.json.exportYaml).not.toMatch(/\{token\}|__SF_TOKEN__|#SUBSCRIBED/);
       const yaml = parse(preview.json.exportYaml);
       expect(yaml['mixed-port']).toBe(7890);
@@ -144,7 +144,7 @@ describe('Stash 主订阅与资源隔离', () => {
   it('失败时直接报错，不调用 Mihomo 校验器验证 Stash', async () => {
     const h = await scenario();
     const verify = vi.fn(async () => ({ ok: true, output: '' }));
-    const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify });
+    const renderer = new RenderService(h.store, h.snapshots, { verify });
     const original = await renderer.render(h.profile.id, { client: 'stash', platform: 'ios' });
     expect(original.ok).toBe(true);
     if (!original.ok) throw new Error(original.message);

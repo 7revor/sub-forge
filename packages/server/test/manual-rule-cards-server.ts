@@ -38,7 +38,7 @@ if (process.argv.includes('--icons')) {
   env.store.put('profile', { ...profile, nodeSets: [{ ref: nodeSet, output: 'inline' }], chains: [{ id: 'icon-chain', landing: { nodeSet }, via: direct }] }, env.user.id);
 }
 const publicUrl = 'http://127.0.0.1:5237';
-const app = createApp({ ...env, ruleRepos: env.repos, publicUrl, webDir: resolve('../web/dist') });
+const app = createApp({ ...env, ruleRepos: env.repos, webDir: resolve('../web/dist') });
 let checks = 0;
 const server = serve({ fetch: async request => {
   if (new URL(request.url).pathname === '/api/rule-options/match-urls') {

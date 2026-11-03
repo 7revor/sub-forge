@@ -24,7 +24,7 @@ function harness(store = new Store(':memory:')) {
   let now = 1000;
   const bodies = { source: 'proxies:\n  - { name: 落地 A, type: socks5, server: node.test, port: 1080 }\n', rules: 'DOMAIN,old.example.test' };
   const snapshots = new SnapshotService(store, async url => ({ status: 200, body: url.endsWith('/rules') ? bodies.rules : bodies.source }), () => now);
-  const renderer = new RenderService(store, snapshots, { publicUrl: 'https://sub.test' });
+  const renderer = new RenderService(store, snapshots);
   const app = createApp({ store, renderer, snapshots });
   const get = (url: string) => app.request(path(url));
   const main = async (suffix = '') => parse(await (await get(`/subs/profile?token=token&id=p${suffix.replace('?', '&')}`)).text());

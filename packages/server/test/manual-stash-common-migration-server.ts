@@ -28,8 +28,8 @@ try {
 store = new Store(file, { cipher });
 const publicUrl = 'http://127.0.0.1:5267';
 const snapshots = new SnapshotService(store, async () => { throw new Error('验收不使用远程上游'); });
-const renderer = new RenderService(store, snapshots, { publicUrl });
-const app = createApp({ store, snapshots, renderer, publicUrl, webDir: resolve('../web/dist') });
+const renderer = new RenderService(store, snapshots);
+const app = createApp({ store, snapshots, renderer, webDir: resolve('../web/dist') });
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 5267 });
 console.log(`隔离迁移验收：${publicUrl}；账号 migration-admin，密码 password-123`);
 let stopping = false;

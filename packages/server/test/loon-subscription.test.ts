@@ -126,7 +126,7 @@ describe('Loon 订阅与管理接口', () => {
   });
   it('不支持的协议直接失败，不调用 Mihomo 校验器', async () => {
     const h = await scenario(), verify = vi.fn(async () => ({ ok: true, output: '' }));
-    const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify });
+    const renderer = new RenderService(h.store, h.snapshots, { verify });
     const original = await renderer.render(h.profile.id, { client: 'loon', platform: 'ios' });
     expect(original.ok).toBe(true); expect(verify).not.toHaveBeenCalled();
     h.store.put('local', { id: 'nodes', name: '节点', proxies: [{ name: '节点', type: 'tuic', server: 'example.test', port: 443, uuid: '0233d11c-15a4-47d3-ade3-48ffca0ce119', password: 'example' }] }, h.user.id);

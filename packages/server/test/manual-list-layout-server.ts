@@ -68,7 +68,7 @@ app.use('/api/*', async (c, next) => {
   }
   await next();
 });
-app.route('/', createApp({ ...env, resources, ruleRepos: repos, publicUrl, webDir: fileURLToPath(new URL('../../web/dist', import.meta.url)) }));
+app.route('/', createApp({ ...env, resources, ruleRepos: repos, webDir: fileURLToPath(new URL('../../web/dist', import.meta.url)) }));
 const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 18947 });
 console.log(`隔离验收：${publicUrl}；虚构账号 layout-admin，密码 password-123`);
 async function stop() {

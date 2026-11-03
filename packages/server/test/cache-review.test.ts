@@ -31,7 +31,7 @@ it('隐式 MRS 格式采用相同拉取参数，文本不能伪装成 MRS', asyn
 it('渲染校验期间更新配置，旧任务按新配置重试', async () => {
   const entered = gate(), held = gate(); let verified = 0;
   const h = setup({ fetcher: async () => ({ status: 200, body: 'DOMAIN,new.test' }) }); h.store.put('profile', profile());
-  const renderer = new RenderService(h.store, h.snapshots, { publicUrl: 'https://sub.test', verify: async () => { if (++verified === 1) { entered.release(); await held.promise; } return { ok: true, output: '' }; } });
+  const renderer = new RenderService(h.store, h.snapshots, { verify: async () => { if (++verified === 1) { entered.release(); await held.promise; } return { ok: true, output: '' }; } });
   const old = renderer.render('p', { client: 'mihomo' }); await entered.promise;
   h.store.put('profile', { ...profile(), name: '新订阅' }); held.release();
   expect((await old).ok).toBe(true); expect(verified).toBe(2);

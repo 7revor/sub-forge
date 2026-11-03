@@ -28,7 +28,7 @@ it.each(['mihomo', 'stash', 'surge', 'loon'])('%s：预览选项直达源文件�
   const response = await h.app.request(`/subs/profile?${new URLSearchParams({ id: 'preview-boundary', token, target, platform: 'ios' })}`);
   const body = await response.text();
   expect(response.status, body).toBe(200);
-  const links = [...new Set(body.match(/https:\/\/sub\.test\/(?:resources|subs)\/[^\s"',]+/g))]
+  const links = [...new Set(body.match(/http:\/\/localhost\/(?:resources|subs)\/[^\s"',]+/g))]
     .map(link => new URL(link)).filter(url => url.pathname !== '/subs/profile');
   if (target === 'loon') expect(body).not.toMatch(/DOMAIN,|USER-AGENT,/);
   expect(links.map(url => url.pathname).sort()).toEqual(['/resources/repo', '/resources/ruleset', '/subs/ruleset']);

@@ -37,12 +37,6 @@ export type ApiDeps = {
   renderer: RenderService;
   snapshots: SnapshotService;
   now: () => number;
-  /** PUBLIC_URL 为 https 时启用 Secure cookie */
-  secureCookies: boolean;
-  /** 对外地址，用于返回完整的订阅链接 */
-  publicUrl: string;
-  /** 允许的跨源 Origin（前端开发服务器等），默认只允许同源 */
-  allowedOrigins: string[];
 };
 
 export function createApi(deps: ApiDeps) {
@@ -54,7 +48,7 @@ export function createApi(deps: ApiDeps) {
     return c.json({ error: '服务器内部错误' }, 500);
   });
   api.use('*', async (c,next)=>{c.header('cache-control','no-store');await next();if(c.res.status<400 && ['PUT','PATCH','DELETE'].includes(c.req.method))deps.store.changed();});
-  api.use('*', csrfGuard(() => deps.allowedOrigins));
+  api.use('*', csrfGuard());
   api.use('*', sessionLoader(deps.store));
   api.use('*', requireUser);
   api.use('*', uniqueQuery);
@@ -72,15 +66,15 @@ export function createApi(deps: ApiDeps) {
   api.route('/', ruleOptionRoutes(deps.store, repos));
 
   api.route('/', resourceRoutes(deps.store,resources,repos));
-  api.route('/', resourceLinkRoutes(deps.store, deps.renderer, deps.publicUrl));
+  api.route('/', resourceLinkRoutes(deps.store, deps.renderer));
   api.route('/', systemRoutes(deps.store, deps.now));
   if (deps.backups) api.route('/', backupRoutes(deps.backups));
   api.route('/', shareRoutes(deps.store));
   api.route('/', pendingRoutes());
-  api.route('/', authRoutes(deps.store, { secureCookies: deps.secureCookies, now: deps.now }));
+  api.route('/', authRoutes(deps.store, { now: deps.now }));
   api.route('/', templateRoutes(deps.store, deps.renderer, deps.snapshots));
   api.route('/', accessLogRoutes(deps.store));
-  api.route('/', profileRoutes(deps.store, deps.renderer, deps.publicUrl));
+  api.route('/', profileRoutes(deps.store, deps.renderer));
   api.route('/', ruleConversionRoutes(deps.store, deps.snapshots));
   api.route('/', previewRoutes(deps.store, deps.renderer, deps.snapshots));
   api.route('/', docRoutes(deps.store));

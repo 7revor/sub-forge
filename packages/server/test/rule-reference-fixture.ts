@@ -24,7 +24,7 @@ export async function setupRuleReferences(options: { cacheSnapshots?: boolean } 
   const repos = new RuleRepoService(env.store, async () => ({ status: 200, body }), Date.now, cache, options.cacheSnapshots ? env.snapshots : undefined);
   await repos.refresh('blackmatrix7');
   repos.setEnabled('zydou', false);
-  const app = createApp({ ...env, ruleRepos: repos, publicUrl: 'http://127.0.0.1:5186', allowedOrigins: ['http://127.0.0.1:5186'] });
+  const app = createApp({ ...env, ruleRepos: repos });
   const user = await addUser(env.store, 'reference-admin', 'admin');
   const privateUser = await addUser(env.store, 'reference-user');
   const local = { id: 'local-google', name: 'Google', sources: [{ id: 'local-source', kind: 'local' as const, format: 'auto' as const, content: 'DOMAIN,local.example.test' }] };
