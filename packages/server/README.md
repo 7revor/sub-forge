@@ -68,7 +68,8 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | 地址 | 说明 |
 | --- | --- |
 | `POST /auth/login`、`POST /auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
-| `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限 |
+| `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限；`username` 只能用于管理员账号，普通用户返回 403 |
+| `GET /api/users/deletion-impact?id=ID`、`DELETE /api/users/:id` | 管理员：查看删除影响（名下文档数量、会失效的他人引用）；级联删除用户及名下全部数据，不能删除自己 |
 | `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`。配置订阅必须带 `routing`；旧模板引用、覆盖层和规则集单来源写法只由存储迁移与种子导入处理，接口返回 400。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；被引用的文档不能删除（409 返回引用方） |
 | `GET /api/templates`、`GET /api/templates?id=ID` | 所有登录用户可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |

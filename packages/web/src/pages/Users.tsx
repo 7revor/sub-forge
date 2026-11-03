@@ -1,13 +1,13 @@
 import { ActionMenu } from '../components/ActionMenu.tsx';
 import { Frame } from '../modals/Frame.tsx';
-import { createModal, useModalDraft, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '../modals/index.tsx';
+import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalDescription, ModalFooter } from '../modals/index.tsx';
 import { formatRelativeTime } from '../utils/format.ts';
-// 用户管理（SYS-01，管理员）：创建、禁用、改角色、重置密码、脚本编写权限。
+// 用户管理（SYS-01，管理员）：创建、禁用、改角色、重置密码、修改管理员用户名、删除用户、脚本编写权限。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { notifySuccess } from '../feedback.ts';
-import { api, type Share, type User, type UserStats } from '../api.ts';
+import { api, type Share, type User, type UserDeletionImpact, type UserStats } from '../api.ts';
 import { shareSource } from '../components/ShareSourceModal.tsx';
 import { Badge, BooleanSegmented, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Segmented, Switch, listMono } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
@@ -62,7 +62,9 @@ export function Users() {
                     <TableCell>
                       <ListActions><ActionMenu label={`${u.username}更多操作`}>
                         <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `重置 ${u.username} 的密码`, label: '新密码', description: '至少 8 位；该用户的所有登录会失效', placeholder: '设置至少 8 位的新密码', type: 'password', minLength: 8, confirmLabel: '重置' }, { submit: async password => { await api('PATCH', `/users/${u.id}`, { password }); } }); if (result.status === 'confirmed') { notifySuccess('密码已重置'); void refresh(); } }}>重置密码</Button>
+                        {u.role === 'admin' && <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `修改 ${u.username} 的用户名`, label: '新用户名', description: '修改后用新用户名登录，已登录的设备和订阅链接不受影响。', placeholder: '填写 2–32 位字母、数字或 _ . -', initialValue: u.username, unchangedValue: u.username, minLength: 2 }, { submit: async username => { await api('PATCH', `/users/${u.id}`, { username }); } }); if (result.status === 'confirmed') { notifySuccess('用户名已修改'); void refresh(); void qc.invalidateQueries({ queryKey: ['me'] }); } }}>修改用户名</Button>}
                         {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
+                        {!self && <Button size="sm" variant="danger" onClick={async () => { const result = await DeleteUserModal.show({ id: u.id, username: u.username }); if (result.status === 'confirmed') { notifySuccess('用户已删除'); void qc.invalidateQueries(); } }}>删除用户</Button>}
                       </ActionMenu></ListActions>
                     </TableCell>
                   </TableRow>
@@ -93,6 +95,20 @@ export function Users() {
     </>
   );
 }
+
+const DeleteUserModal = createModal<{ id: string; username: string }>(function DeleteUser({ data, modal }) {
+  const query = useQuery({ queryKey: ['users', data.id, 'deletion-impact'], queryFn: () => api<UserDeletionImpact>('GET', `/users/deletion-impact?id=${encodeURIComponent(data.id)}`), staleTime: 0 });
+  const impact = useModalPresentation(query.data);
+  const counts = impact && [['订阅源', impact.counts.source], ['组合', impact.counts.collection], ['本地节点组', impact.counts.local], ['规则集', impact.counts.ruleset], ['配置订阅', impact.counts.profile]].map(([label, n]) => `${label} ${n}`).join(' · ');
+  return <ModalContent className="max-h-[85dvh] overflow-y-auto"><ModalHeader><ModalTitle>{`删除用户 ${data.username}？`}</ModalTitle><ModalDescription>该用户名下的全部数据会一起永久删除，无法撤销，订阅链接立即失效。</ModalDescription></ModalHeader>
+    <div className="flex min-h-0 flex-col gap-3 text-sm">
+      <ErrorAlert error={query.error} />
+      <p className="m-0">{counts ?? '正在统计名下数据…'}</p>
+      <p className="m-0 text-muted-foreground">同时删除访问令牌、登录会话、访问日志和分享记录。</p>
+      {!!impact?.affected.length && <div role="alert" className="flex flex-col gap-1 text-destructive"><p className="m-0 font-medium">以下内容引用了这些数据，删除后会无法使用，直到移除引用：</p><ul className="m-0 list-disc pl-5">{impact.affected.map(item => <li key={item}>{item}</li>)}</ul></div>}
+    </div>
+    <ModalFooter><Button disabled={modal.pending} onClick={modal.cancel}>取消</Button><Button variant="danger-solid" disabled={modal.pending || !impact} onClick={() => modal.submit(async () => { await api('DELETE', `/users/${data.id}`); })}>{modal.pending ? '删除中…' : '删除用户和全部数据'}</Button></ModalFooter></ModalContent>;
+});
 
 const CreateUserModal = createModal<Record<string, never>>(function CreateUser({ modal }) {
   const [form, setForm] = useModalDraft({ username: '', password: '', role: 'user' as User['role'], scriptAllowed: false });

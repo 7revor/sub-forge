@@ -70,6 +70,7 @@ export type RulesetSourceStatus = { format?: string; behavior?: string; conversi
 
 // ---------- 仓库与系统接口；Pending 标注的功能仍为占位（见 docs/11） ----------
 export type Pending = { pending?: boolean };
+export type UserDeletionImpact = { counts: Record<'source' | 'collection' | 'local' | 'ruleset' | 'profile', number>; affected: string[] };
 export type UserStats = Pending & { items: Record<string, { profiles: number; sources: number; lastRequestAt?: number }> };
 /** 已分享的订阅源及接收者（SYS-06） */
 export type Share = { id: string; name: string; to: string[] };

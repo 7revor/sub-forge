@@ -58,6 +58,85 @@ describe('登录与会话', () => {
   });
 });
 
+describe('修改用户名与删除用户', () => {
+  it('管理员可改管理员用户名，普通用户不可改名', async () => {
+    const { app, store } = setupApp();
+    const root = await addUser(store, 'root', 'admin');
+    const other = await addUser(store, 'other', 'admin');
+    const bob = await addUser(store, 'bob');
+    const admin = client(app); await admin.login('root');
+    const user = client(app); await user.login('bob');
+
+    expect((await user.patch(`/api/users/${bob.id}`, { username: 'bobby' })).status).toBe(403);
+    expect((await admin.patch(`/api/users/${bob.id}`, { username: 'bobby' })).status).toBe(403);
+    expect((await admin.patch(`/api/users/${root.id}`, { username: 'x' })).status).toBe(400);
+    expect((await admin.patch(`/api/users/${root.id}`, { username: 'other' })).status).toBe(409);
+    expect((await admin.patch(`/api/users/${other.id}`, { username: 'other2' })).json.user.username).toBe('other2');
+    expect((await admin.patch(`/api/users/${root.id}`, { username: 'root2' })).json.user.username).toBe('root2');
+
+    expect((await admin.get('/api/me')).json.user.username).toBe('root2');
+    expect((await client(app).login('root')).status).toBe(401);
+    expect((await client(app).login('root2')).status).toBe(200);
+  });
+
+  it('级联删除名下全部数据，不影响其他用户', async () => {
+    const { app, store } = setupApp();
+    await addUser(store, 'root', 'admin');
+    const bob = await addUser(store, 'bob');
+    const carol = await addUser(store, 'carol');
+    const local = { name: 'L', proxies: [{ name: 'A', type: 'socks5', server: 'host.test', port: 1080 }] };
+    store.put('local', { id: 'bob-l', ...local }, bob.id);
+    store.put('local', { id: 'carol-l', ...local }, carol.id);
+    store.put('source', { id: 'bob-s', name: 'S', url: 'https://up.test/a', pipeline: [] }, bob.id);
+    store.setSourceShares('bob-s', [carol.id]);
+    store.addSnapshot({ ownerKind: 'source', ownerId: 'bob-s', url: 'https://up.test/a', fetchedAt: 1, ok: true, body: 'x' });
+    store.put('ruleset', { id: 'bob-r', name: 'R', sources: [] }, bob.id);
+    store.db.prepare("INSERT INTO refresh_jobs VALUES ('j', ?, '{}', 1)").run(bob.id);
+    store.db.prepare("INSERT INTO native_migration_backups VALUES ('local', 'bob-l', '{}', 1)").run();
+    const token = store.createToken(bob.id).token;
+    store.createToken(carol.id);
+    store.logAccess({ token, profileId: 'p', at: 1, ua: 'u', client: 'mihomo', status: 200, ms: 1, warnings: 0, source: 'live' });
+    const admin = client(app); await admin.login('root');
+    const session = client(app); await session.login('bob');
+
+    expect((await admin.get(`/api/users/deletion-impact?id=${bob.id}`)).json.counts).toEqual({ source: 1, collection: 0, local: 1, ruleset: 1, profile: 0 });
+    expect((await session.del(`/api/users/${carol.id}`)).status).toBe(403);
+    expect((await admin.del('/api/users/nobody')).status).toBe(404);
+    expect((await admin.del(`/api/users/${bob.id}`)).status).toBe(200);
+
+    expect(store.getUser(bob.id)).toBeUndefined();
+    expect((await session.get('/api/me')).status).toBe(401);
+    expect((await client(app).login('bob')).status).toBe(401);
+    expect(store.getActiveToken(token)).toBeUndefined();
+    const count = (sql: string, ...args: string[]) => (store.db.prepare(`SELECT COUNT(*) n FROM ${sql}`).get(...args) as { n: number }).n;
+    expect(count('docs WHERE owner = ?', bob.id)).toBe(0);
+    expect(count('snapshots WHERE owner_id = ?', 'bob-s')).toBe(0);
+    expect(count('source_shares')).toBe(0);
+    expect(count('refresh_jobs WHERE owner = ?', bob.id)).toBe(0);
+    expect(count('access_log WHERE user_id = ?', bob.id)).toBe(0);
+    expect(count('native_migration_backups WHERE id = ?', 'bob-l')).toBe(0);
+    expect(store.get('local', 'carol-l')).toBeDefined();
+    expect(store.userToken(carol.id)).toBeDefined();
+    expect(store.canUseNodeSet('source', 'bob-s', carol.id)).toBe(false);
+  });
+
+  it('管理员不能删除自己；删除前列出会失效的他人引用', async () => {
+    const { app, store } = setupApp();
+    const root = await addUser(store, 'root', 'admin');
+    const bob = await addUser(store, 'bob');
+    const carol = await addUser(store, 'carol');
+    store.put('source', { id: 'bob-s', name: '机场', url: 'https://up.test/a', pipeline: [] }, bob.id);
+    store.setSourceShares('bob-s', [carol.id]);
+    store.put('collection', { id: 'carol-c', name: 'C', members: [{ ref: { type: 'source', id: 'bob-s' } }], pipeline: [] }, carol.id);
+    const admin = client(app); await admin.login('root');
+
+    expect((await admin.del(`/api/users/${root.id}`)).status).toBe(400);
+    expect(store.getUser(root.id)).toBeDefined();
+    expect((await admin.get(`/api/users/deletion-impact?id=${bob.id}`)).json.affected).toEqual(['订阅源「机场」：carol 的配置引用了它']);
+    expect((await admin.get('/api/users/deletion-impact?id=nobody')).status).toBe(404);
+  });
+});
+
 describe('CSRF 防护', () => {
   it('跨站 Origin 与非 JSON 请求体被拒绝', async () => {
     const { app, store } = setupApp();
