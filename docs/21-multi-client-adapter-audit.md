@@ -22,6 +22,8 @@
 
 失败策略保持：有成功正文时，重建失败继续返回旧正文并携带 `x-sub-forge-warning: last-good-rule`；旧内容哈希不升级，后续仍会重试。该修复不能主动清除客户端本地文件，须在合并并运行新代码后，由客户端再次请求资源才生效。
 
+2026-11-03 修订：上述失败策略已被替代，`last-good-rule` 告警头已移除。规则快照到期立刻失效，读源失败时规则文件返回 503，不返回旧正文，下次请求重试；只有节点订阅在失败时继续使用旧快照。详见 [上游缓存分层重构计划](23-upstream-cache-refactor-plan.md)。
+
 [升级回归测试](../packages/server/test/shared-rule-cache-version.test.ts) 固定预置 version 2 的旧正文，不用当前 `register` 伪造历史版本，覆盖：
 
 - 已发布 key 链接和 id 链接在来源不变时生成新的 `URL-REGEX` 正文。
