@@ -5,7 +5,7 @@ import { randomId } from './crypto.ts';
 
 import { resourceFileRoutes, subscriptionRuleRoutes } from './resource-files.ts';
 import { sessionRoutes } from './api/auth.ts';
-import { csrfGuard, HttpError, type ApiEnv } from './api/common.ts';
+import { csrfGuard, HttpError, requestOrigin, type ApiEnv } from './api/common.ts';
 import { allowedQuery, requiredQuery, uniqueQuery } from './query.ts';
 import { RuleRepoService } from './rule-repos/service.ts';
 import { createUpstreamFetcher } from './net/upstream.ts';
@@ -162,7 +162,7 @@ export function createApp(deps: AppDeps) {
     const ui = userinfoHeader(outcome.render.userinfo);
     if (ui) c.header('subscription-userinfo', ui);
     setAccessResult(outcome);
-    return c.body(fillLinks(outcome.render.yaml, new URL(c.req.url).origin, token));
+    return c.body(fillLinks(outcome.render.yaml, requestOrigin(c), token));
   });
 
   /** 私有节点产物按当前配置生成，并检查用户归属。 */
@@ -194,7 +194,7 @@ export function createApp(deps: AppDeps) {
     c.header('content-type', 'text/plain; charset=utf-8');
     c.header('content-disposition', 'inline');
     c.header('x-content-type-options', 'nosniff');
-    return c.body(fillLinks(selected.providers[key]!, new URL(c.req.url).origin, token));
+    return c.body(fillLinks(selected.providers[key]!, requestOrigin(c), token));
   });
 
   app.get('/subs/nodes', async c => {

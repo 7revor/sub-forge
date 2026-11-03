@@ -3,7 +3,7 @@ import { requiredQuery } from '../query.ts';
 import { Hono } from 'hono';
 import type { RenderService } from '../render.ts';
 import type { Store } from '../store.ts';
-import { notFound, requireUser, type ApiEnv } from './common.ts';
+import { notFound, requestOrigin, requireUser, type ApiEnv } from './common.ts';
 
 /** 仅生成已保存对象的地址；不拉取上游、不预生成产物，不接受调用方指定 token。 */
 export function resourceLinkRoutes(store: Store, renderer: RenderService) {
@@ -19,7 +19,7 @@ export function resourceLinkRoutes(store: Store, renderer: RenderService) {
     if (kind === 'source' || kind === 'collection' || kind === 'local') renderer.collectNodeSets([{ type: kind, id }], user.id);
     const token = store.createToken(user.id);
     const path = kind === 'profile' ? '/subs/profile' : kind === 'ruleset' ? '/resources/ruleset' : '/subs/nodes';
-    return c.json({ item: { ...token, url: queryUrl(path, { ...(kind !== 'profile' && kind !== 'ruleset' ? { kind } : {}), id, token: token.token }, new URL(c.req.url).origin) } });
+    return c.json({ item: { ...token, url: queryUrl(path, { ...(kind !== 'profile' && kind !== 'ruleset' ? { kind } : {}), id, token: token.token }, requestOrigin(c)) } });
   });
   return app;
 }

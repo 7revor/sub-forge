@@ -2,7 +2,7 @@
 
 Sub Forge 是一个 Docker 容器，前端、管理接口和订阅接口都走同一个端口。容器启动后开放端口就能访问，不需要其他组件。
 
-访问使用明文 HTTP，登录密码和订阅链接都不加密。
+容器本身使用明文 HTTP，直接暴露端口时登录密码和订阅链接都不加密。也可以由 Cloudflare Tunnel 等外部入口提供 HTTPS，容器不需要额外配置，但入口要保留原始 `Host`（Tunnel 不要设置 HTTP Host Header）。
 
 下文的 `your-name/sub-forge` 要换成实际的镜像名。
 
@@ -53,9 +53,9 @@ docker run -d --name sub-forge --restart unless-stopped -p 8080:8080 -v "$PWD/da
 
 ## 访问行为
 
-- **订阅链接：** 按当前访问的地址生成。用哪个地址打开页面，复制到的链接就是哪个地址。
-- **访问日志 IP：** 记录 TCP 连接来源。Docker Desktop 或部分网络模式下，这里可能是网关地址。
-- **写操作：** 只接受同源请求。
+- **订阅链接：** 按当前访问的地址生成。用哪个地址打开页面，复制到的链接就是哪个地址。入口发送 `X-Forwarded-Proto: https` 时链接使用 https。
+- **访问日志 IP：** 记录 TCP 连接来源。经外部入口访问时是入口的地址；Docker Desktop 或部分网络模式下可能是网关地址。
+- **写操作：** `Origin` 的主机必须与请求的 `Host` 一致。
 
 ## 备份
 

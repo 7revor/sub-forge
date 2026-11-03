@@ -32,7 +32,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 - 启动时授权 `/data` 后以非 root 用户运行；数据库与密钥文件 `secret.key`（0600）放在 `/data`，备份时两者一起备份，丢了密钥就无法解密数据。
 - 最终运行镜像在构建时通过 apt 安装 `git` 和 `ca-certificates`，宿主机无需安装 Git，容器启动时无需安装软件。可运行 `docker run --rm --entrypoint git sub-forge --version` 检查。默认 Git 缓存位于 `/data/rule-repo-cache`，上述 `/data` 卷会一并持久化；自定义 `SUBFORGE_REPO_CACHE` 时须保证该目录可由容器的 node 用户写入并单独挂载。
 - 首次启动且没有用户时按 `SUBFORGE_ADMIN_*` 创建管理员，之后可以去掉这两个变量。
-- 使用明文 HTTP；订阅链接按当前请求地址生成，访问日志记录 TCP 连接来源。
+- 使用明文 HTTP，可由保留 `Host` 的外部入口提供 HTTPS；订阅链接按当前请求地址生成，访问日志记录 TCP 连接来源。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -63,7 +63,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 ## 管理接口（`/api`）
 
-管理接口返回 JSON，错误格式 `{ error, details? }`。会话用 HttpOnly + SameSite=Lax cookie；写操作要求 `content-type: application/json`，带 Origin 时须同源。所有管理接口统一要求登录并拒绝资源 token；建立会话使用 `/auth/login`，退出使用 `/auth/logout`。
+管理接口返回 JSON，错误格式 `{ error, details? }`。会话用 HttpOnly + SameSite=Lax cookie；写操作要求 `content-type: application/json`，带 Origin 时主机须与请求一致。所有管理接口统一要求登录并拒绝资源 token；建立会话使用 `/auth/login`，退出使用 `/auth/logout`。
 
 | 地址 | 说明 |
 | --- | --- |

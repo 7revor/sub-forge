@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { CLIENT_APPS, type Platform } from '@sub-forge/core';
 import { fillLinks, type PreviewOutcome, type RenderService } from '../render.ts';
 import type { Store } from '../store.ts';
-import { bad, HttpError, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
+import { bad, HttpError, jsonBody, notFound, requestOrigin, requireUser, type ApiEnv } from './common.ts';
 import { validateDoc } from './validate.ts';
 
 const PLATFORMS: Platform[] = ['android', 'macos', 'windows', 'ios', 'linux'];
@@ -36,7 +36,7 @@ export function profileRoutes(store: Store, renderer: RenderService) {
     if ((client === 'stash' || client === 'surge' || client === 'loon') && platform && platform !== 'ios' && platform !== 'macos') throw bad('该客户端仅支持 ios 或 macos');
     const draft = validateDoc('profile', body.profile as Record<string, unknown>, '', c.get('user'), store);
     const res = await renderer.previewDraft(draft, { client, ...(platform ? { platform } : {}), ...(app ? { app: app.id } : {}) }, c.get('user').id);
-    return c.json(previewBody(res, new URL(c.req.url).origin));
+    return c.json(previewBody(res, requestOrigin(c)));
   });
   app.use('/profiles/:id/*', requireUser);
 
@@ -48,7 +48,7 @@ export function profileRoutes(store: Store, renderer: RenderService) {
   app.get('/profiles/link', c => {
     const profile = own(requiredQuery(c, 'id'), c.get('user').id);
     const token = store.createToken(c.get('user').id);
-    return c.json({ item: { ...token, url: queryUrl('/subs/profile', { id: profile.id, token: token.token }, new URL(c.req.url).origin) } });
+    return c.json({ item: { ...token, url: queryUrl('/subs/profile', { id: profile.id, token: token.token }, requestOrigin(c)) } });
   });
 
   // ---------- 预览（CR-05 / 4.9 第 7 步）----------
@@ -68,7 +68,7 @@ export function profileRoutes(store: Store, renderer: RenderService) {
     // 草稿同样要做归属校验，否则可以借预览读到别人的节点集
     const draft = body.profile && typeof body.profile === 'object' ? validateDoc('profile', body.profile as Record<string, unknown>, p.id, c.get('user'), store) : undefined;
     const res = await renderer.preview(p.id, { client, ...(platform ? { platform } : {}), ...(app ? { app: app.id } : {}) }, draft ? { profile: draft } : {});
-    return c.json(previewBody(res, new URL(c.req.url).origin));
+    return c.json(previewBody(res, requestOrigin(c)));
   });
 
   // ---------- 访问日志（PRF-07）----------
