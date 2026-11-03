@@ -135,4 +135,4 @@ Docker bridge、端口映射、IPv6 到 IPv4 的用户态代理、Docker Desktop
 
 ## 缓存周期的时区（2026-11-03）
 
-全局缓存周期按服务器本地时间对齐，24 小时周期落在每天 0 点。容器默认时区是 UTC，需要按本地 0 点切换时在 `docker/.env` 或 Compose 的 `environment` 设置 `TZ`，例如 `TZ=Asia/Shanghai`。规则快照在周期切换时同时失效，下一次请求重新读取。
+全局缓存周期按服务器本地时间对齐，24 小时周期落在每天 0 点。容器默认时区是 UTC，需要按本地 0 点切换时在 `docker/.env` 设置 `TZ`，例如 `TZ=Asia/Shanghai`，Compose 会传给容器。规则快照在周期切换时同时失效，下一次请求重新读取。
