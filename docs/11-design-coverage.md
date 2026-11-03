@@ -415,3 +415,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 用户改名与删除：`V2Settings` 用户表的操作统一收进更多菜单，新增菜单项「修改用户名」（仅管理员）和「删除用户」（仅普通用户），并补两个弹窗状态；管理员唯一，角色列改为只读文字，`V2MoreDialogs` 创建用户弹窗去掉角色选择。对应 `pages/Users.tsx`；后端 `PATCH /api/users/:id` 支持 `username`，新增 `GET /api/users/deletion-impact?id=ID` 和 `DELETE /api/users/:id`。`reset-admin-password` 只是命令行，不涉及画板。无后端待实现项。
 
 2026-11-03 规则来源名称收窄：`V2MoreDialogs` 的远程和规则仓库状态移除名称，新增本地规则状态并保留名称；`V2RuleSet` 来源卡片改为单行，与模板、订阅一致。对应 `components/RulesetSourceDialog.tsx`、`pages/Rulesets.tsx`；服务端已在 `api/validate.ts` 移除远程来源名称，无待实现项。
+
+2026-11-03 列表状态只反映节点来源：画板 `V2Lists` 的状态示例改为「1 项失败 · 使用旧内容」「正常」「无节点来源」，对应 `DocList.tsx`、`ResourceCache.tsx`、`domain/resourceStatus.ts`。规则集合列表移除状态列，取消“N 项可用”和规则“使用时拉取”徽标，取代上文上游缓存分层中“规则使用时拉取是中性状态”的说明。`V2Overview` 的状态来自访问日志，语义不同，不变。无新增后端待实现项。

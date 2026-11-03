@@ -448,3 +448,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-03 移除本地节点连通性测试：删除 `/api/node-probe` 的 GET、POST、DELETE 接口和 `node-probe.ts`。`MIHOMO_BIN` 保留，只用于渲染时的 `mihomo -t` 校验。节点是否可用请在实际客户端验证。
 
 2026-11-03 规则来源名称：`POST /api/rulesets`、`PUT /api/rulesets/:id` 保存时移除远程来源的 `name`；`/api/rule-options/resolve` 返回的来源 `name` 不变，供模板和订阅的规则展示。
+
+2026-11-03 列表状态只反映节点来源：`/{kind}/cache` 接口不变，仍返回节点和规则的缓存状态；前端状态徽标只读取节点项，规则项用于上次刷新时间。

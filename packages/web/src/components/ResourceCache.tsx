@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from '../api.ts';
 import { Badge, Button, ErrorAlert, formatTime } from './ui.tsx';
-import { resourceCacheHint, resourceCacheSummary, type ResourceState } from '../domain/resourceStatus.ts';
+import { nodeResources, resourceCacheHint, resourceCacheSummary, type ResourceState } from '../domain/resourceStatus.ts';
 export type { ResourceState };
 type RefreshItem={name:string;state?:'pending'|'running'|'done'|'interrupted';ok?:boolean;available:boolean;error?:string};
 type Job={id:string;state:'running'|'done'|'interrupted';total:number;completed:number;results:RefreshItem[];render?:{ok:boolean;error?:string};error?:string};
@@ -27,12 +27,13 @@ export function ResourceLastRefreshTime({kind,id}:{kind:string;id:string}) {
     {lastSuccessAt!==undefined?formatTime(lastSuccessAt):'—'}
   </span>;
 }
-export function ResourceCacheStatus({kind,id}:{kind:string;id:string}) {
+export function ResourceCacheStatus({kind,id,noNodeSets=false}:{kind:string;id:string;noNodeSets?:boolean}) {
   const state=useResourceCacheState(kind,id);
+  if(noNodeSets)return <Badge className="max-w-full" tone="warn"><span className="truncate">无节点来源</span></Badge>;
   if(state.error)return <span className="text-xs text-red-600">状态读取失败</span>;
   if(!state.data)return <span className="text-muted-foreground">读取中…</span>;
-  const summary=resourceCacheSummary(kind,state.data.items);
-  return <span title={state.data.items.map(r=>resourceCacheHint(r,formatTime)).join('\n')}>
+  const summary=resourceCacheSummary(state.data.items);
+  return <span title={nodeResources(state.data.items).map(r=>resourceCacheHint(r,formatTime)).join('\n')}>
     <Badge className="max-w-full" tone={summary.tone}><span className="truncate">{summary.label}</span></Badge>
   </span>;
 }

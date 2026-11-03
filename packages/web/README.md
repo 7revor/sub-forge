@@ -362,3 +362,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-03 弹窗不自动聚焦：`ModalContent` 打开时把焦点放到弹窗容器，不再聚焦第一个控件；显式 `autoFocus` 的字段不受影响。详见 [统一弹窗规范](../../docs/18-unified-modals.md)。
 
 2026-11-03 规则来源名称收窄：`RulesetSourceDialog` 只在本地规则下显示名称。来源卡片与模板、订阅一样只显示一行，仓库来源为「仓库名 · 路径」，仓库名来自 `GET /rule-repos`，读取不到时显示仓库 ID。
+
+2026-11-03 列表状态只反映节点来源：规则集合列表移除状态列；配置订阅和节点组合取消“N 项可用”，与订阅源统一显示节点状态，配置订阅没有节点来源时显示「无节点来源」。详见 `domain/resourceStatus.ts`。

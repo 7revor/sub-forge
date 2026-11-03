@@ -46,11 +46,14 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
   const rows = list.data?.items ?? [];
   const canWrite = (id: string) => (kind !== 'rulesets' && kind !== 'sources') || list.data?.writableIds?.includes(id) === true;
   const refreshable=['sources','collections','rulesets','profiles'].includes(kind);
+  // 规则不记录失败且到期即失效，状态给不出判断，规则集合只看上次刷新时间。
+  const hasStatus=refreshable&&kind!=='rulesets';
   const canRefresh=(d:DocMap[K])=>kind==='sources'?canWrite(d.id):kind!=='rulesets'||(d as DocMap['rulesets']).sources.some(s=>s.kind==='remote'&&s.enabled!==false);
   const shownColumns = columns.filter(column => column.header !== '备注');
   const tableColumns = [
     ...shownColumns.map(column => ({ header: column.header, width: column.width ?? 180 })),
-    ...(refreshable ? [{ header: '状态', width: 136 }, { header: kind === 'profiles' ? '最近访问' : '上次刷新时间', width: 140 }] : []),
+    ...(hasStatus ? [{ header: '状态', width: 136 }] : []),
+    ...(refreshable ? [{ header: kind === 'profiles' ? '最近访问' : '上次刷新时间', width: 140 }] : []),
     { header: actionHeader, width: 144 },
   ];
   return (
@@ -71,7 +74,7 @@ export function DocList<K extends Kind>({ kind, title, columns, intro, canCreate
                     {i === 0 ? <Link to={`/${kind}/${d.id}`} className={docNameLinkClass}><span className="block truncate">{c.cell(d)}</span><span className="block truncate text-xs font-normal text-muted-foreground" title={d.note}>{d.note || '无备注'}</span></Link> : c.cell(d)}
                   </TableCell>
                 ))}
-                {refreshable && <TableCell><ResourceCacheStatus kind={kind} id={d.id}/></TableCell>}
+                {hasStatus && <TableCell><ResourceCacheStatus kind={kind} id={d.id} noNodeSets={kind==='profiles'&&!(d as DocMap['profiles']).nodeSets.length}/></TableCell>}
                 {refreshable && <TableCell>{kind === 'profiles' ? <LastProfileAccess id={d.id} /> : <ResourceLastRefreshTime kind={kind} id={d.id}/>}</TableCell>}
                 <TableCell className="text-right whitespace-nowrap">
                   <ListActions>
