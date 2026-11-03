@@ -3,6 +3,7 @@
 # 推荐用 Compose 部署（见 docs/20-deployment-client-ip.md）：
 #   cp docker/.env.example docker/.env   # 填写对外地址和管理员
 #   docker compose -f docker/compose.yaml up -d --build
+# 更新：先备份，git pull 后重新执行上面的 Compose 命令（见 docs/24-first-deployment.md）
 #
 # 或直接运行：
 #   docker build -f docker/Dockerfile -t sub-forge .

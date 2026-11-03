@@ -16,6 +16,8 @@ cp docker/.env.example docker/.env
 docker compose -f docker/compose.yaml up -d --build
 ```
 
+之后更新时，先备份，再执行 `git pull` 和同一条 Compose 命令，详见[更新](24-first-deployment.md#更新)。
+
 不需要新增 Nginx 容器，使用服务器上现有的 Nginx 即可，Compose 只启动应用一个容器，并只绑定 `127.0.0.1:8080`（端口由 `SUBFORGE_PORT` 决定）：
 
 - **Nginx 装在宿主机：** 参考 [docker/nginx.conf.example](../docker/nginx.conf.example)，为域名新增 `server`，或把其中的 `upstream` 和两个 `location` 合入已有配置。

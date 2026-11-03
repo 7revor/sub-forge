@@ -1,6 +1,9 @@
 # 单容器部署。应用只绑定本机回环端口，由宿主机上的 Nginx 反向代理对外提供 HTTPS。
 #   cp docker/.env.example docker/.env
 #   docker compose -f docker/compose.yaml up -d --build
+# 更新（先备份，见 docs/24-first-deployment.md）：
+#   git pull
+#   docker compose -f docker/compose.yaml up -d --build
 services:
   sub-forge:
     image: sub-forge:latest

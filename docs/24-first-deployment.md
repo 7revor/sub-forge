@@ -109,11 +109,28 @@ sudo nginx -s reload
 
 完整的网络链路核验项见[上线核验](20-deployment-client-ip.md#上线核验)。
 
-## 之后升级
+## 更新
 
-升级前先做一次备份，然后：
+先在系统页「数据库备份」点一次立即备份，然后在仓库根目录执行：
 
 ```bash
 git pull
 docker compose -f docker/compose.yaml up -d --build
+```
+
+确认新版本正常：
+
+```bash
+curl -i http://127.0.0.1:8080/healthz
+docker compose -f docker/compose.yaml logs --tail=50 sub-forge
+```
+
+- **数据和配置：** 数据在 `sub-forge-data` 卷中，更新时保留。`docker/.env` 不受 `git pull` 影响，不需要重新填写。
+- **数据库结构：** 新版本启动时自动迁移，不需要手动操作。
+- **回退：** 切回旧代码不会回退数据库结构，旧程序不应继续使用已迁移的数据库。需要回退时，用更新前的备份恢复数据，详见[恢复流程](22-database-backup.md#恢复流程)。
+
+可选：清理构建留下的旧镜像层。
+
+```bash
+docker image prune -f
 ```
