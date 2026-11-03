@@ -9,7 +9,7 @@ import { Button, Field, Select } from '../../components/ui.tsx';
 import { chainPlaceholders } from '../../schemas/placeholders.ts';
 import { useProfile } from './context.ts';
 import { landingConstraintHint, viaConstraintHint } from './chainModel.ts';
-import { chainInputError, NO_NODE_FILTER, selectedNodeFilter, nodeSetKey, sameLanding, VIA_REQUIRED } from './memberModel.ts';
+import { chainInputError, LANDING_REQUIRED, NO_NODE_FILTER, selectedNodeFilter, nodeSetKey, sameLanding, VIA_REQUIRED } from './memberModel.ts';
 import { SelectIndicator } from '../../components/SelectIndicator.tsx';
 
 type SourceKind = 'inline' | 'provider';
@@ -24,7 +24,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
   const { draft, profileNodeSets, groupOptions, nodeSetName } = useProfile();
   const outputOf = (ref: ChainNodeSet) => ref.type === 'all' ? ref.id : draft.nodeSets.find(s => nodeSetKey(s.ref) === nodeSetKey(ref))?.output;
   const defaultKind = draft.nodeSets.some(source => source.output === 'provider') ? 'provider' : 'inline';
-  const [chain, setChain] = useModalDraft(() => ({ ...initial, landing: { ...initial.landing, nodeSet: initial.landing.nodeSet.id ? initial.landing.nodeSet : allSources(defaultKind) }, via: initial.via.kind === 'node' && !initial.via.ref.nodeSet.id ? { ...initial.via, ref: { ...initial.via.ref, nodeSet: allSources(defaultKind) } } : initial.via }));
+  const [chain, setChain] = useModalDraft(() => ({ ...initial, landing: initial.landing.nodeSet.id ? initial.landing : { nodeSet: allSources(defaultKind), filter: NO_NODE_FILTER }, via: initial.via.kind === 'node' && !initial.via.ref.nodeSet.id ? { ...initial.via, ref: { ...initial.via.ref, nodeSet: allSources(defaultKind) } } : initial.via }));
   const [viaSearch, setViaSearch] = useState('');
   const [landingSearch, setLandingSearch] = useState('');
   const sourcesFor = (output: SourceKind) => profileNodeSets.filter(s => outputOf(s.ref) === output);
@@ -36,7 +36,7 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
   const viaAuto = !!viaRef && 'regex' in viaRef.match && !viaRef.match.regex;
   const viaExact = viaRef && 'exact' in viaRef.match ? viaRef.match.exact : undefined;
   const overlapsLanding = !!viaRef && previewSources(viaRef.nodeSet).some(via => previewSources(chain.landing.nodeSet).some(landing => nodeSetKey(via.ref) === nodeSetKey(landing.ref)));
-  const error = (chain.landing.filter === NO_NODE_FILTER ? '请至少选择一个落地节点' : undefined) ?? (viaRef && !previewSources(viaRef.nodeSet).length ? '当前前置范围没有节点来源' : !previewSources(chain.landing.nodeSet).length ? '当前落地范围没有节点来源' : undefined) ?? chainInputError(chain) ?? (viaExact && overlapsLanding && names.landingNames.includes(viaExact) ? '前置节点也在落地范围内，会形成循环；请更换前置或取消勾选此节点' : undefined) ?? (viaRef && !viaExact && names.viaEmpty ? '前置范围内没有落地以外的节点，请更换前置或缩小落地范围' : undefined) ?? (draft.chains.some(c => c.id !== chain.id && sameLanding(c.landing, chain.landing)) ? '该落地范围已有代理链，请编辑已有规则' : undefined);
+  const error = (viaRef && !previewSources(viaRef.nodeSet).length ? '当前前置范围没有节点来源' : !previewSources(chain.landing.nodeSet).length ? '当前落地范围没有节点来源' : undefined) ?? chainInputError(chain) ?? (viaExact && overlapsLanding && names.landingNames.includes(viaExact) ? '前置节点也在落地范围内，会形成循环；请更换前置或取消勾选此节点' : undefined) ?? (viaRef && !viaExact && names.viaEmpty ? '前置范围内没有落地以外的节点，请更换前置或缩小落地范围' : undefined) ?? (draft.chains.some(c => c.id !== chain.id && sameLanding(c.landing, chain.landing)) ? '该落地范围已有代理链，请编辑已有规则' : undefined) ?? (chain.landing.filter === NO_NODE_FILTER ? LANDING_REQUIRED : undefined);
   const choose = (via: ChainTarget) => setChain({ ...chain, via });
   const chooseMatch = (match: NodeRef['match']) => { if (chain.via.kind === 'node') choose({ ...chain.via, ref: { ...chain.via.ref, match } }); };
   const landingText = names.landing;
@@ -64,17 +64,17 @@ export function ChainRuleEditor({ initial, fixedLanding = false, onApply, onCanc
       <section aria-label="落地节点" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-lg border border-border p-4">
         <div className="flex items-baseline gap-2"><h3 className="m-0 text-sm font-medium">② 落地</h3><p className="m-0 text-xs text-muted-foreground">由它访问目标</p></div>
         {fixedLanding ? <div className="rounded-md bg-muted p-3 text-sm">{landingText}</div> : <>
-          <Field label="来源">{id => <Select id={id} aria-label="落地来源" placeholder="选择落地节点来源" value={nodeSetKey(chain.landing.nodeSet)} onChange={event => setChain({ ...chain, landing: { nodeSet: pickSource(event.target.value) } })}>{sourceChoices}</Select>}</Field>
+          <Field label="来源">{id => <Select id={id} aria-label="落地来源" placeholder="选择落地节点来源" value={nodeSetKey(chain.landing.nodeSet)} onChange={event => setChain({ ...chain, landing: { nodeSet: pickSource(event.target.value), filter: NO_NODE_FILTER } })}>{sourceChoices}</Select>}</Field>
           <div className="chain-node-panel">
             <NodeSearch aria-label="查找落地节点" value={landingSearch} onChange={setLandingSearch} />
             <ChoiceRow checked={whole} label="全部节点" onClick={() => setChain({ ...chain, landing: { nodeSet: chain.landing.nodeSet, ...(whole ? { filter: selectedNodeFilter([]) } : {}) } })} />
-            <NodeSetPreview nodeSets={previewSources(chain.landing.nodeSet)} search={landingSearch} selection={{ filter: chain.landing.filter, excludeFilter: chain.landing.excludeFilter }} multiple label="落地节点" onSelect={(_name,_nodeSet,selectedNames) => setChain({ ...chain, landing: { nodeSet: chain.landing.nodeSet, filter: selectedNodeFilter(selectedNames) } })} />
+            <NodeSetPreview nodeSets={previewSources(chain.landing.nodeSet)} search={landingSearch} selection={chain.landing.filter === NO_NODE_FILTER ? undefined : { filter: chain.landing.filter, excludeFilter: chain.landing.excludeFilter }} multiple label="落地节点" onSelect={(_name,_nodeSet,selectedNames) => setChain({ ...chain, landing: { nodeSet: chain.landing.nodeSet, filter: selectedNodeFilter(selectedNames) } })} />
           </div>
           <ConstraintHint>{landingConstraintHint(scopeText(chain.landing.nodeSet), chain.landing)}</ConstraintHint>
         </>}
       </section>
     </div>
-    {error && error !== VIA_REQUIRED && <p role="alert" className="mx-6 mt-0 mb-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{error}</p>}
+    {error && error !== VIA_REQUIRED && error !== LANDING_REQUIRED && <p role="alert" className="mx-6 mt-0 mb-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{error}</p>}
     {footerTarget ? createPortal(actions, footerTarget) : <div data-slot="dialog-footer" className="flex min-h-[61px] shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-6 py-3">{actions}</div>}
   </section>;
 }

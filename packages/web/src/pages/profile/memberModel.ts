@@ -30,6 +30,8 @@ export function canReferenceGroup(groups: GroupSpec[], owner: string, target: st
 export const NO_NODE_FILTER = 'a^';
 /** 尚未点选前置是正常的待填状态：禁用保存，不显示错误提示。 */
 export const VIA_REQUIRED = '请选择前置节点';
+/** 落地同样由用户明确点选：新建和切换来源后为待填状态，只禁用保存。 */
+export const LANDING_REQUIRED = '请至少选择一个落地节点';
 /** 将勾选节点转成已有落地筛选格式；空集合不能误变为全部。 */
 export function selectedNodeFilter(names: string[]): string {
   return [...new Set(names)].map(exactNodeFilter).join('|') || NO_NODE_FILTER;

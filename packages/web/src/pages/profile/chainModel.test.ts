@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ChainRule, GroupMember, Profile, Target } from '@sub-forge/core';
-import { cascadeDescription, chainUsesNodeSet, hasCascade, landingConstraintHint, landingNodeName, landingNodeNames, planProfileChange, removeProfileNodeSet, viaConstraintHint } from './chainModel.ts';
+import type { ChainRule, GroupMember, NodeRef, Profile, Target } from '@sub-forge/core';
+import { cascadeDescription, chainForNode, chainUsesNodeSet, hasCascade, landingConstraintHint, landingNodeName, landingNodeNames, planProfileChange, removeProfileNodeSet, viaConstraintHint } from './chainModel.ts';
 import { chainInputError, exactNodeFilter, selectedNodeFilter } from './memberModel.ts';
 const landing = { type: 'local' as const, id: 'landing' };
 const relay = { type: 'local' as const, id: 'relay' };
@@ -65,6 +65,40 @@ describe('流量顺序代理链', () => {
     expect(next.chains).toEqual([unaffected]);
     expect(profile.nodeSets).toHaveLength(2);
     expect(profile.chains).toHaveLength(2);
+  });
+});
+
+describe('单节点成员实际经过的代理链', () => {
+  const nodeSets: Profile['nodeSets'] = [{ ref: landing, output: 'inline' }, { ref: relay, output: 'provider' }];
+  const node = (exact: string, nodeSet = landing): NodeRef => ({ nodeSet, match: { exact }, fallback: 'error' });
+  const partial = (id: string, ...names: string[]): ChainRule => ({ ...chain, id, landing: { nodeSet: landing, filter: selectedNodeFilter(names) } });
+  it('同组内未配置代理链的节点不算经过', () => {
+    const rule = partial('p', '甲');
+    expect(chainForNode([rule], node('甲'), nodeSets)).toBe(rule);
+    expect(chainForNode([rule], node('乙'), nodeSets)).toBeUndefined();
+  });
+  it('单节点规则优先，整集规则只作用于其余节点', () => {
+    const whole: ChainRule = { ...chain, id: 'whole' };
+    const rule = partial('p', '甲');
+    expect(chainForNode([rule, whole], node('甲'), nodeSets)).toBe(rule);
+    expect(chainForNode([whole, rule], node('乙'), nodeSets)).toBe(whole);
+  });
+  it('同一来源有多条链时按节点找到对应的链，排除条件同样生效', () => {
+    const a = partial('a', '甲'), b = partial('b', '乙');
+    expect(chainForNode([a, b], node('乙'), nodeSets)).toBe(b);
+    const excluded: ChainRule = { ...chain, id: 'x', landing: { nodeSet: landing, excludeFilter: '^甲$' } };
+    expect(chainForNode([excluded], node('甲'), nodeSets)).toBeUndefined();
+  });
+  it('全部来源范围按当前输出方式展开，其他来源不受影响', () => {
+    const all: ChainRule = { ...chain, id: 'all', landing: { nodeSet: { type: 'all', id: 'inline' }, filter: selectedNodeFilter(['甲']) } };
+    expect(chainForNode([all], node('甲'), nodeSets)).toBe(all);
+    expect(chainForNode([all], node('甲', relay), nodeSets)).toBeUndefined();
+  });
+  it('历史正则成员无法确定节点时，不断言经过单节点规则', () => {
+    const regex: NodeRef = { nodeSet: landing, match: { regex: '甲' } };
+    const whole: ChainRule = { ...chain, id: 'whole' };
+    expect(chainForNode([whole], regex, nodeSets)).toBe(whole);
+    expect(chainForNode([whole, partial('p', '甲')], regex, nodeSets)).toBeUndefined();
   });
 });
 
