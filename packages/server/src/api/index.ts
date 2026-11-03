@@ -75,7 +75,7 @@ export function createApi(deps: ApiDeps) {
 
   api.route('/', resourceRoutes(deps.store,resources,repos));
   api.route('/', resourceLinkRoutes(deps.store, deps.renderer, deps.publicUrl));
-  api.route('/', systemRoutes(deps.store));
+  api.route('/', systemRoutes(deps.store, deps.now));
   if (deps.backups) api.route('/', backupRoutes(deps.backups));
   api.route('/', pendingRoutes());
   api.route('/', nodeProbeRoutes(deps.nodeProbe));

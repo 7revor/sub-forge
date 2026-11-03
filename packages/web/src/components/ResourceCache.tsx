@@ -4,14 +4,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from '../api.ts';
 import { Badge, Button, ErrorAlert, formatTime } from './ui.tsx';
-export type ResourceState={resource?:string;repositoryId?:string;name:string;lastSuccessAt?:number;lastAttemptAt?:number;nextFetchAt?:number;refreshing:boolean;error?:string;available:boolean};
+import { resourceCacheHint, resourceCacheSummary, type ResourceState } from '../domain/resourceStatus.ts';
+export type { ResourceState };
 type RefreshItem={name:string;state?:'pending'|'running'|'done'|'interrupted';ok?:boolean;available:boolean;error?:string};
 type Job={id:string;state:'running'|'done'|'interrupted';total:number;completed:number;results:RefreshItem[];render?:{ok:boolean;error?:string};error?:string};
 function refreshItemStatus(item:RefreshItem) {
   if(item.state==='pending')return '等待刷新';
   if(item.state==='running')return '刷新中…';
   if(item.state==='interrupted')return '刷新已中断';
-  return item.ok?'拉取成功':`${item.error} · ${item.available?'继续使用上次成功内容':'没有可用缓存'}`;
+  return item.ok?'拉取成功':`${item.error} · ${item.available?'继续使用已有内容':'没有可用缓存'}`;
 }
 function useResourceCacheState(kind:string,id:string) {
   return useQuery({queryKey:['resource-status',kind,id],queryFn:()=>api<{items:ResourceState[]}>('GET',queryUrl(`/${kind}/cache`, { id }))});
@@ -30,9 +31,9 @@ export function ResourceCacheStatus({kind,id}:{kind:string;id:string}) {
   const state=useResourceCacheState(kind,id);
   if(state.error)return <span className="text-xs text-red-600">状态读取失败</span>;
   if(!state.data)return <span className="text-muted-foreground">读取中…</span>;
-  const items=state.data.items, failed=items.filter(r=>r.error), missing=items.filter(r=>!r.available), refreshing=items.some(r=>r.refreshing);
-  return <span title={items.map(r=>`${r.name}：最后成功 ${r.lastSuccessAt?formatTime(r.lastSuccessAt):'无'}；${r.nextFetchAt?`${formatTime(r.nextFetchAt)} 后下次使用时拉取`:'待首次使用时拉取'}${r.error?`；${r.error}`:''}`).join('\n')}>
-    <Badge className="max-w-full" tone={refreshing?'neutral':failed.length||missing.length?'warn':items.length?'ok':'neutral'}><span className="truncate">{!items.length?'本地资源':refreshing?'刷新中':failed.length?`${failed.length} 项失败${missing.length?' · 有资源不可用':' · 使用旧缓存'}`:missing.length?'待首次拉取':kind==='sources'?'正常':`${items.length} 项可用`}</span></Badge>
+  const summary=resourceCacheSummary(kind,state.data.items);
+  return <span title={state.data.items.map(r=>resourceCacheHint(r,formatTime)).join('\n')}>
+    <Badge className="max-w-full" tone={summary.tone}><span className="truncate">{summary.label}</span></Badge>
   </span>;
 }
 export function RefreshCacheButton({kind,id,name,endpoint,body,label,disabled=false}:{kind:string;id:string;name:string;endpoint?:string;body?:unknown;label?:string;disabled?:boolean}) {

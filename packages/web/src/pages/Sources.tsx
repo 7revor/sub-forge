@@ -71,7 +71,7 @@ function BasicSettings({ draft, set }: {
         }</Field>
       <NoteField compact value={draft.note} onChange={(note) => set({ note })} />
       </div>
-      <p className="m-0 text-xs text-muted-foreground">到期后下次使用时重新拉取（管理员在「系统」中统一设置）；失败时继续使用上次成功的内容。</p>
+      <p className="m-0 text-xs text-muted-foreground">新周期后下次使用时重新拉取（管理员在「系统」中统一设置周期）；失败时继续使用旧内容，下个周期再试。</p>
     </Card>
   );
 }
@@ -136,7 +136,7 @@ export function SourceEdit() {
           <ActionMenu size="md" items={[{ label: '删除订阅源', danger: true, onSelect: openDelete }]} />
         </>}>
         {state.snaps.data && (state.lastOk
-          ? <Badge tone={state.failing ? 'err' : 'ok'}>{state.failing ? '最近一次拉取失败 · 使用上次成功内容' : `${formatTime(state.lastOk.fetchedAt).slice(11)} 拉取成功`}</Badge>
+          ? <Badge tone={state.failing ? 'err' : 'ok'}>{state.failing ? '最近一次拉取失败 · 使用旧内容，下个周期再试' : `${formatTime(state.lastOk.fetchedAt).slice(11)} 拉取成功`}</Badge>
           : <Badge tone={state.failing ? 'err' : 'neutral'}>{state.failing ? '拉取失败 · 没有可用内容' : '还没有拉取过'}</Badge>)}
         {u?.total ? <Badge>{formatBytes((u.upload ?? 0) + (u.download ?? 0))} / {formatBytes(u.total)}{u.expire ? ` · ${formatTime(u.expire * 1000).slice(0, 10)} 到期` : ''}</Badge> : null}
         {dirty && <Badge tone="warn">有未保存的修改</Badge>}

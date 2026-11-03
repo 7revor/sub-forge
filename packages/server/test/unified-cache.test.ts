@@ -11,6 +11,10 @@ describe('统一资源缓存', () => {
     expect((await a.put('/api/system',{resourceCacheTtlSec:60})).status).toBe(400);
     expect((await a.put('/api/system',{resourceCacheTtlSec:3600})).status).toBe(200);
     expect(t.store.resourceCacheTtlSec).toBe(3600);
+    const { nextCacheExpiryAt } = (await a.get('/api/system')).json;
+    expect(nextCacheExpiryAt).toBeGreaterThan(1_700_000_000_000);
+    expect(nextCacheExpiryAt - 1_700_000_000_000).toBeLessThanOrEqual(3600_000);
+    expect(nextCacheExpiryAt % 60_000).toBe(0);
     t.store.close();
   });
   it('相同 URL 和参数跨用户共用一份内容，读取参数不同各存一份', async () => {
