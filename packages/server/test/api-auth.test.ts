@@ -1,6 +1,12 @@
+import Database from 'better-sqlite3';
+import { randomBytes } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { hashPassword, verifyPassword } from '../src/crypto.ts';
+import { Cipher, hashPassword, verifyPassword } from '../src/crypto.ts';
+import { Store } from '../src/store.ts';
 import { addUser, client, setupApp } from './helpers.ts';
 
 describe('密码', () => {
@@ -59,10 +65,9 @@ describe('登录与会话', () => {
 });
 
 describe('修改用户名与删除用户', () => {
-  it('管理员可改管理员用户名，普通用户不可改名', async () => {
+  it('管理员可改自己的用户名，普通用户不可改名', async () => {
     const { app, store } = setupApp();
     const root = await addUser(store, 'root', 'admin');
-    const other = await addUser(store, 'other', 'admin');
     const bob = await addUser(store, 'bob');
     const admin = client(app); await admin.login('root');
     const user = client(app); await user.login('bob');
@@ -70,13 +75,54 @@ describe('修改用户名与删除用户', () => {
     expect((await user.patch(`/api/users/${bob.id}`, { username: 'bobby' })).status).toBe(403);
     expect((await admin.patch(`/api/users/${bob.id}`, { username: 'bobby' })).status).toBe(403);
     expect((await admin.patch(`/api/users/${root.id}`, { username: 'x' })).status).toBe(400);
-    expect((await admin.patch(`/api/users/${root.id}`, { username: 'other' })).status).toBe(409);
-    expect((await admin.patch(`/api/users/${other.id}`, { username: 'other2' })).json.user.username).toBe('other2');
+    expect((await admin.patch(`/api/users/${root.id}`, { username: 'bob' })).status).toBe(409);
     expect((await admin.patch(`/api/users/${root.id}`, { username: 'root2' })).json.user.username).toBe('root2');
 
     expect((await admin.get('/api/me')).json.user.username).toBe('root2');
     expect((await client(app).login('root')).status).toBe(401);
     expect((await client(app).login('root2')).status).toBe(200);
+  });
+
+  it('管理员唯一：不能再创建、不能提升、不能禁用或删除', async () => {
+    const { app, store } = setupApp();
+    const root = await addUser(store, 'root', 'admin');
+    const bob = await addUser(store, 'bob');
+    const admin = client(app); await admin.login('root');
+
+    expect((await admin.post('/api/users', { username: 'carol', password: 'password-456', role: 'admin' })).status).toBe(400);
+    expect((await admin.post('/api/users', { username: 'carol', password: 'password-456' })).json.user.role).toBe('user');
+    expect((await admin.patch(`/api/users/${bob.id}`, { role: 'admin' })).status).toBe(400);
+    expect((await admin.patch(`/api/users/${root.id}`, { role: 'user' })).status).toBe(400);
+    expect((await admin.patch(`/api/users/${root.id}`, { disabled: true })).status).toBe(400);
+    expect((await admin.del(`/api/users/${root.id}`)).status).toBe(400);
+    expect(store.getUser(root.id)).toMatchObject({ role: 'admin', disabled: false });
+    expect(store.getUser(bob.id)?.role).toBe('user');
+    await expect(addUser(store, 'other', 'admin')).rejects.toThrow();
+  });
+
+  it('v39 只保留最早创建的可用管理员，其余降为普通用户', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-single-admin-'));
+    const file = join(dir, 'db.sqlite');
+    const cipher = new Cipher(randomBytes(32));
+    new Store(file, { cipher }).close();
+    const db = new Database(file);
+    db.exec('DROP INDEX users_single_admin; PRAGMA user_version = 38');
+    const insert = db.prepare("INSERT INTO users (id, username, password_hash, role, disabled, script_allowed, created_at) VALUES (?, ?, 'x', ?, ?, 0, ?)");
+    insert.run('off', 'off', 'admin', 1, 1);
+    insert.run('first', 'first', 'admin', 0, 2);
+    insert.run('second', 'second', 'admin', 0, 3);
+    insert.run('plain', 'plain', 'user', 0, 4);
+    db.close();
+    try {
+      const store = new Store(file, { cipher });
+      expect(store.listUsers().map(u => [u.id, u.role, u.disabled, u.scriptAllowed])).toEqual([
+        ['off', 'user', true, true],
+        ['first', 'admin', false, false],
+        ['second', 'user', false, true],
+        ['plain', 'user', false, false],
+      ]);
+      store.close();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('级联删除名下全部数据，不影响其他用户', async () => {
@@ -120,9 +166,9 @@ describe('修改用户名与删除用户', () => {
     expect(store.canUseNodeSet('source', 'bob-s', carol.id)).toBe(false);
   });
 
-  it('管理员不能删除自己；删除前列出会失效的他人引用', async () => {
+  it('删除前列出会失效的他人引用', async () => {
     const { app, store } = setupApp();
-    const root = await addUser(store, 'root', 'admin');
+    await addUser(store, 'root', 'admin');
     const bob = await addUser(store, 'bob');
     const carol = await addUser(store, 'carol');
     store.put('source', { id: 'bob-s', name: '机场', url: 'https://up.test/a', pipeline: [] }, bob.id);
@@ -130,8 +176,6 @@ describe('修改用户名与删除用户', () => {
     store.put('collection', { id: 'carol-c', name: 'C', members: [{ ref: { type: 'source', id: 'bob-s' } }], pipeline: [] }, carol.id);
     const admin = client(app); await admin.login('root');
 
-    expect((await admin.del(`/api/users/${root.id}`)).status).toBe(400);
-    expect(store.getUser(root.id)).toBeDefined();
     expect((await admin.get(`/api/users/deletion-impact?id=${bob.id}`)).json.affected).toEqual(['订阅源「机场」：carol 的配置引用了它']);
     expect((await admin.get('/api/users/deletion-impact?id=nobody')).status).toBe(404);
   });

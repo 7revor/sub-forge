@@ -31,7 +31,7 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 
 - 启动时授权 `/data` 后以非 root 用户运行；数据库与密钥文件 `secret.key`（0600）放在 `/data`，备份时两者一起备份，丢了密钥就无法解密数据。
 - 最终运行镜像在构建时通过 apt 安装 `git` 和 `ca-certificates`，宿主机无需安装 Git，容器启动时无需安装软件。可运行 `docker run --rm --entrypoint git sub-forge --version` 检查。默认 Git 缓存位于 `/data/rule-repo-cache`，上述 `/data` 卷会一并持久化；自定义 `SUBFORGE_REPO_CACHE` 时须保证该目录可由容器的 node 用户写入并单独挂载。
-- 首次启动且没有用户时按 `SUBFORGE_ADMIN_*` 创建管理员，之后可以去掉这两个变量。
+- 首次启动且没有用户时按 `SUBFORGE_ADMIN_*` 创建管理员，之后可以去掉这两个变量。系统只能有一个管理员，已有管理员时 `create-admin` 会报错。
 - 使用明文 HTTP，可由保留 `Host` 的外部入口提供 HTTPS；订阅链接按当前请求地址生成，访问日志记录 TCP 连接来源。
 
 | 环境变量 | 默认值 | 说明 |
@@ -68,8 +68,8 @@ docker run -d --name sub-forge -p 8080:8080 -v sub-forge-data:/data \
 | 地址 | 说明 |
 | --- | --- |
 | `POST /auth/login`、`POST /auth/logout`、`GET /api/me`、`POST /api/me/password` | 登录与账户；连续 5 次失败锁定 15 分钟，改密码后其他会话失效 |
-| `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建、禁用、改角色、重置密码、脚本权限；`username` 只能用于管理员账号，普通用户返回 403 |
-| `GET /api/users/deletion-impact?id=ID`、`DELETE /api/users/:id` | 管理员：查看删除影响（名下文档数量、会失效的他人引用）；级联删除用户及名下全部数据，不能删除自己 |
+| `GET/POST /api/users`、`PATCH /api/users/:id` | 管理员：创建普通用户、禁用、重置密码、脚本权限；`username` 只能用于管理员账号，普通用户返回 403。管理员只能有一个，不能禁用，角色不能修改 |
+| `GET /api/users/deletion-impact?id=ID`、`DELETE /api/users/:id` | 管理员：查看删除影响（名下文档数量、会失效的他人引用）；级联删除普通用户及名下全部数据，不能删除管理员 |
 | `GET/POST /api/{kind}`、`GET /api/{kind}?id=ID`、`PUT/DELETE /api/{kind}/:id` | kind 为 `sources` `collections` `locals` `rulesets` `profiles`（规则包已并入规则集，2026-10-29 起没有 `bundles`）。规则集为 `{ name, sources: [...], overrides?: [{ match, override }], noResolve? }`。配置订阅必须带 `routing`；旧模板引用、覆盖层和规则集单来源写法只由存储迁移与种子导入处理，接口返回 400。id 由服务端生成；节点与配置按用户隔离；规则增强所有用户可读、创建者或管理员可写；被引用的文档不能删除（409 返回引用方） |
 | `GET /api/templates`、`GET /api/templates?id=ID` | 所有登录用户可读 |
 | `POST /api/templates/validate` | 管理员：编辑器即时校验（TPL-11） |

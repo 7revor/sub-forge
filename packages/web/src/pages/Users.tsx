@@ -2,14 +2,14 @@ import { ActionMenu } from '../components/ActionMenu.tsx';
 import { Frame } from '../modals/Frame.tsx';
 import { createModal, useModalDraft, useModalPresentation, ModalContent, ModalHeader, ModalTitle, ModalDescription, ModalFooter } from '../modals/index.tsx';
 import { formatRelativeTime } from '../utils/format.ts';
-// 用户管理（SYS-01，管理员）：创建、禁用、改角色、重置密码、修改管理员用户名、删除用户、脚本编写权限。
+// 用户管理（SYS-01，管理员）：创建普通用户、禁用、重置密码、修改管理员用户名、删除用户、脚本编写权限。
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { notifySuccess } from '../feedback.ts';
 import { api, type Share, type User, type UserDeletionImpact, type UserStats } from '../api.ts';
 import { shareSource } from '../components/ShareSourceModal.tsx';
-import { Badge, BooleanSegmented, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Select, Segmented, Switch, listMono } from '../components/ui.tsx';
+import { Badge, BooleanSegmented, Button, Card, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, Switch, listMono } from '../components/ui.tsx';
 import { useList, useMe } from '../hooks.ts';
 import { ListActions } from '../components/ListActions.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table.tsx';
@@ -49,11 +49,7 @@ export function Users() {
                 return (
                   <TableRow key={u.id} className={u.disabled ? 'opacity-60' : ''}>
                     <TableCell className="font-medium whitespace-nowrap">{u.username}{self && <span className="ml-2 text-xs font-normal text-muted-foreground">（我）</span>}</TableCell>
-                    <TableCell>
-                      {self ? <span>管理员</span> : <Select placeholder="选择用户的权限角色" aria-label={`${u.username} 的角色`} size="sm" className="w-28" value={u.role} disabled={self} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
-                        <option value="user">用户</option><option value="admin">管理员</option>
-                      </Select>}
-                    </TableCell>
+                    <TableCell>{u.role === 'admin' ? '管理员' : '普通用户'}</TableCell>
                     <TableCell>{u.role === 'admin' ? <span className="text-sm text-muted-foreground">管理员默认可写</span> : <BooleanSegmented label={`${u.username} 的脚本编写权限`} on="允许" off="禁止" value={u.scriptAllowed} onChange={(v) => patch.mutate({ id: u.id, body: { scriptAllowed: v } })} />}</TableCell>
                     <TableCell className={listMono}>{s?.profiles ?? '—'}</TableCell>
                     <TableCell className="whitespace-nowrap text-foreground">{s?.lastRequestAt ? formatRelativeTime(s.lastRequestAt, { justNow: false }) : '—'}</TableCell>
@@ -63,8 +59,8 @@ export function Users() {
                       <ListActions><ActionMenu label={`${u.username}更多操作`}>
                         <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `重置 ${u.username} 的密码`, label: '新密码', description: '至少 8 位；该用户的所有登录会失效', placeholder: '设置至少 8 位的新密码', type: 'password', minLength: 8, confirmLabel: '重置' }, { submit: async password => { await api('PATCH', `/users/${u.id}`, { password }); } }); if (result.status === 'confirmed') { notifySuccess('密码已重置'); void refresh(); } }}>重置密码</Button>
                         {u.role === 'admin' && <Button size="sm" onClick={async () => { const result = await Frame.modal.prompt({ title: `修改 ${u.username} 的用户名`, label: '新用户名', description: '修改后用新用户名登录，已登录的设备和订阅链接不受影响。', placeholder: '填写 2–32 位字母、数字或 _ . -', initialValue: u.username, unchangedValue: u.username, minLength: 2 }, { submit: async username => { await api('PATCH', `/users/${u.id}`, { username }); } }); if (result.status === 'confirmed') { notifySuccess('用户名已修改'); void refresh(); void qc.invalidateQueries({ queryKey: ['me'] }); } }}>修改用户名</Button>}
-                        {!self && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
-                        {!self && <Button size="sm" variant="danger" onClick={async () => { const result = await DeleteUserModal.show({ id: u.id, username: u.username }); if (result.status === 'confirmed') { notifySuccess('用户已删除'); void qc.invalidateQueries(); } }}>删除用户</Button>}
+                        {u.role !== 'admin' && <Button size="sm" variant={u.disabled ? 'default' : 'danger'} onClick={() => patch.mutate({ id: u.id, body: { disabled: !u.disabled } })}>{u.disabled ? '启用' : '禁用'}</Button>}
+                        {u.role !== 'admin' && <Button size="sm" variant="danger" onClick={async () => { const result = await DeleteUserModal.show({ id: u.id, username: u.username }); if (result.status === 'confirmed') { notifySuccess('用户已删除'); void qc.invalidateQueries(); } }}>删除用户</Button>}
                       </ActionMenu></ListActions>
                     </TableCell>
                   </TableRow>
@@ -111,14 +107,11 @@ const DeleteUserModal = createModal<{ id: string; username: string }>(function D
 });
 
 const CreateUserModal = createModal<Record<string, never>>(function CreateUser({ modal }) {
-  const [form, setForm] = useModalDraft({ username: '', password: '', role: 'user' as User['role'], scriptAllowed: false });
+  const [form, setForm] = useModalDraft({ username: '', password: '', scriptAllowed: false });
   return <ModalContent className="max-h-[85dvh] overflow-y-auto" aria-describedby={undefined}><ModalHeader><ModalTitle>{"创建用户"}</ModalTitle></ModalHeader><div className="flex min-h-0 flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="用户名">{(id) => <Input placeholder="填写 2–32 位字母、数字或 _ . -" id={id} autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}</Field>
-          <Field label="角色">{id => <div id={id}><Segmented label="用户角色" value={form.role} options={[{ value: 'user', label: '普通用户' }, { value: 'admin', label: '管理员' }]} onChange={role => setForm({ ...form, role })} /></div>}</Field>
-          <Field label="初始密码" className="col-span-2">{(id) => <Input placeholder="设置至少 8 位的初始密码" id={id} type="password" autoComplete="new-password" className="font-mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />}</Field>
-        </div>
-        {form.role !== 'admin' && <label className="flex items-center gap-2 text-sm"><Switch label="允许编写脚本处理器" checked={form.scriptAllowed} onChange={scriptAllowed => setForm({ ...form, scriptAllowed })} />允许编写脚本处理器</label>}
+        <Field label="用户名">{(id) => <Input placeholder="填写 2–32 位字母、数字或 _ . -" id={id} autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}</Field>
+        <Field label="初始密码">{(id) => <Input placeholder="设置至少 8 位的初始密码" id={id} type="password" autoComplete="new-password" className="font-mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />}</Field>
+        <label className="flex items-center gap-2 text-sm"><Switch label="允许编写脚本处理器" checked={form.scriptAllowed} onChange={scriptAllowed => setForm({ ...form, scriptAllowed })} />允许编写脚本处理器</label>
 
-      </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={modal.pending} onClick={() => modal.submit(async () => { await api('POST', '/users', { ...form, scriptAllowed: form.role !== 'admin' && form.scriptAllowed }); })}>{modal.pending ? '创建中…' : '创建'}</Button></>}</ModalFooter></ModalContent>;
+      </div><ModalFooter>{<><Button onClick={modal.cancel}>取消</Button><Button variant="primary" disabled={modal.pending} onClick={() => modal.submit(async () => { await api('POST', '/users', form); })}>{modal.pending ? '创建中…' : '创建'}</Button></>}</ModalFooter></ModalContent>;
 });

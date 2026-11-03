@@ -1,18 +1,16 @@
-// 登录与用户管理（SYS-01）：管理员创建用户、重置密码、禁用、修改管理员用户名、删除用户；用户之间数据隔离。
+// 登录与用户管理（SYS-01）：唯一的管理员创建普通用户、重置密码、禁用、删除用户，并可修改自己的用户名；用户之间数据隔离。
 
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { hashPassword, verifyPassword } from '../crypto.ts';
 import { requiredQuery } from '../query.ts';
-import { OWNED_KINDS, type Role, type Store, type User } from '../store.ts';
+import { OWNED_KINDS, type Store, type User } from '../store.ts';
 import { bad, HttpError, isStr, jsonBody, requireAdmin, requireUser, SESSION_COOKIE, SESSION_TTL_MS, type ApiEnv } from './common.ts';
 import { findReferrers } from './validate.ts';
 
 const MIN_PASSWORD = 8;
 const MAX_FAILURES = 5;
 const LOCK_MS = 15 * 60_000;
-
-const ROLES: Role[] = ['admin', 'user'];
 
 function checkPassword(p: unknown): string {
   if (typeof p !== 'string' || p.length < MIN_PASSWORD) throw bad(`密码至少 ${MIN_PASSWORD} 位`);
@@ -110,10 +108,9 @@ export function authRoutes(store: Store, opts: { now: () => number }) {
   app.post('/users', requireAdmin, async (c) => {
     const { username, password, role, scriptAllowed } = await jsonBody<{ username?: unknown; password?: unknown; role?: unknown; scriptAllowed?: unknown }>(c);
     if (store.getUserAuth(checkUsername(username))) throw new HttpError(409, '用户名已存在');
-    const r = (role ?? 'user') as Role;
-    if (!ROLES.includes(r)) throw bad('角色只能是 admin 或 user');
+    if (role !== undefined && role !== 'user') throw bad('管理员只能有一个，只能创建普通用户');
     if (scriptAllowed !== undefined && typeof scriptAllowed !== 'boolean') throw bad('scriptAllowed 必须是布尔值');
-    const user = store.createUser({ username: username as string, passwordHash: await hashPassword(checkPassword(password)), role: r, scriptAllowed: scriptAllowed === true });
+    const user = store.createUser({ username: username as string, passwordHash: await hashPassword(checkPassword(password)), role: 'user', scriptAllowed: scriptAllowed === true });
     return c.json({ user }, 201);
   });
 
@@ -122,9 +119,8 @@ export function authRoutes(store: Store, opts: { now: () => number }) {
     const target = store.getUser(id);
     if (!target) throw new HttpError(404, '用户不存在');
     const body = await jsonBody<{ username?: unknown; role?: unknown; disabled?: unknown; scriptAllowed?: unknown; password?: unknown }>(c);
-    const me = c.get('user');
-    if (id === me.id && (body.disabled === true || (body.role !== undefined && body.role !== 'admin'))) throw bad('不能禁用自己或取消自己的管理员身份');
-    if (body.role !== undefined && !ROLES.includes(body.role as Role)) throw bad('角色只能是 admin 或 user');
+    if (target.role === 'admin' && body.disabled === true) throw bad('不能禁用管理员');
+    if (body.role !== undefined && body.role !== target.role) throw bad('管理员只能有一个，不能修改角色');
     for (const k of ['disabled', 'scriptAllowed'] as const) if (body[k] !== undefined && typeof body[k] !== 'boolean') throw bad(`${k} 必须是布尔值`);
     if (body.username !== undefined) {
       if (target.role !== 'admin') throw new HttpError(403, '普通用户不能修改用户名');
@@ -133,7 +129,6 @@ export function authRoutes(store: Store, opts: { now: () => number }) {
     }
     store.updateUser(id, {
       ...(body.username !== undefined ? { username: body.username as string } : {}),
-      ...(body.role !== undefined ? { role: body.role as Role } : {}),
       ...(body.disabled !== undefined ? { disabled: body.disabled as boolean } : {}),
       ...(body.scriptAllowed !== undefined ? { scriptAllowed: body.scriptAllowed as boolean } : {}),
       ...(body.password !== undefined ? { passwordHash: await hashPassword(checkPassword(body.password)) } : {}),
@@ -150,8 +145,9 @@ export function authRoutes(store: Store, opts: { now: () => number }) {
 
   app.delete('/users/:id', requireAdmin, (c) => {
     const id = c.req.param('id');
-    if (id === c.get('user').id) throw bad('不能删除自己');
-    if (!store.getUser(id)) throw new HttpError(404, '用户不存在');
+    const target = store.getUser(id);
+    if (!target) throw new HttpError(404, '用户不存在');
+    if (target.role === 'admin') throw bad('不能删除管理员');
     store.deleteUser(id);
     return c.json({ ok: true });
   });

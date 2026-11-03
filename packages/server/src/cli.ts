@@ -38,6 +38,7 @@ function openStore(masterKey?: Buffer): Store {
 
 async function createAdmin(store: Store, username: string, password: string | undefined): Promise<void> {
   if (!password || password.length < 8) throw new Error('请通过 SUBFORGE_ADMIN_PASSWORD 提供至少 8 位的密码');
+  if (store.listUsers().some(u => u.role === 'admin')) throw new Error('管理员已存在，系统只能有一个管理员');
   if (store.getUserAuth(username)) throw new Error(`用户 ${username} 已存在`);
   store.createUser({ username, passwordHash: await hashPassword(password), role: 'admin' });
   console.log(`已创建管理员 ${username}`);

@@ -82,7 +82,7 @@ it.each([28, 30, 32, 33])('v%d 升级和旧种子导入执行相同迁移，备�
     }
     store.db.pragma(`user_version = ${version}`); store.close(); store = new Store(file, { cipher });
     const saved = store.get('profile', 'sub')!;
-    expect(store.db.pragma('user_version', { simple: true })).toBe(38);
+    expect(store.db.pragma('user_version', { simple: true })).toBe(39);
     expect(saved.base?.kernels).not.toHaveProperty('stash');
     expect(parse(saved.base!.clients!['stash-ios']!)).toEqual({ dns: { ipv6: false }, mode: 'rule' });
     expect(saved.base!.clients!['stash-macos']).toBe('dns:\n  ipv6: false\n');
