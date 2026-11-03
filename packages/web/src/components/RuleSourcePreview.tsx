@@ -1,5 +1,5 @@
 import { createModal, useModalPresentation, ModalContent, ModalHeader, ModalTitle } from '../modals/index.tsx';
-import type { Matcher } from '@sub-forge/core';
+import { sourceLabel, type Matcher } from '@sub-forge/core';
 import type { RuleSetSourceDoc } from '../hooks.ts';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api.ts';
@@ -24,7 +24,7 @@ export const RuleSourcePreview = createModal<{ matcher?: Matcher; source?: Sourc
   const text = current.source ? loaded.data?.content ?? '' : current.matcher?.kind === 'local' ? current.matcher.content : current.matcher?.kind === 'rule' ? ruleToLine(current.matcher.rule) : reference.data?.content ?? '';
   const error = query.error ?? (current.source && (loaded.data?.status.error ?? (loaded.data?.status.binary ? '二进制规则无法展示文本源文件' : undefined)));
   const loading = !local && query.isPending;
-  const label = current.source ? current.source.source.name ?? current.source.source.url ?? '本地规则' : local ? '本地规则' : reference.data?.name ?? '正在读取规则源文件…';
+  const label = current.source ? sourceLabel(current.source.source) : local ? '本地规则' : reference.data?.name ?? '正在读取规则源文件…';
   return <ModalContent className="flex h-[min(640px,calc(100dvh-2rem))] min-w-0 flex-col overflow-hidden pb-12 sm:max-w-[800px] [&>*]:min-w-0" style={{ width: 'min(800px, calc(100vw - 2rem))' }} aria-describedby={undefined}>
     <ModalHeader className="shrink-0"><ModalTitle>规则预览</ModalTitle></ModalHeader>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-hidden">

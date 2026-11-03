@@ -263,6 +263,7 @@ export function validateDoc<K extends DocKind>(kind: K, body: Record<string, unk
         else if (src.kind === 'local') { if (typeof src.content !== 'string') throw bad(`${at}：本地来源需要 content`); delete src.url; delete src.fetch; }
         else throw bad(`${at}：kind 只能是 remote 或 local`);
         if (src.name !== undefined && typeof src.name !== 'string') throw bad(`${at}：name 必须是字符串`);
+        if (src.kind === 'remote') delete src.name;
         if (src.enabled !== undefined && typeof src.enabled !== 'boolean') throw bad(`${at}：enabled 必须是布尔值`);
         checkFetch(src.fetch);
         if (src.format === 'mrs' && src.behavior !== 'domain' && src.behavior !== 'ipcidr') throw bad(`${at}：mrs 需要声明 behavior 为 domain 或 ipcidr`);

@@ -446,3 +446,5 @@ SQLite v22 保留每个 Profile 最早创建的链接（时间相同时按原列
 2026-11-03：上游缓存分层。新增 `cache-cycle.ts`，全局周期按本地 0 点对齐；`SnapshotService` 拆成 `getNodeSource`、`getRuleContent`、`refreshNodeSource`、`refreshRuleContent`，节点和规则共用并发上限 8。规则同一 URL 加读取参数只存一份，到期立刻失效，失败不写表；节点失败用旧内容并顺延到下个周期，从未成功时每次请求重试。删除 `resource_bindings`、`rule-binding.ts`、`refreshIfDue`；`/subs/ruleset` 不再渲染配置；仓库索引改为后台定时任务；`GET /api/system` 增加 `nextCacheExpiryAt`。迁移并入 SQLite v35。
 
 2026-11-03 移除本地节点连通性测试：删除 `/api/node-probe` 的 GET、POST、DELETE 接口和 `node-probe.ts`。`MIHOMO_BIN` 保留，只用于渲染时的 `mihomo -t` 校验。节点是否可用请在实际客户端验证。
+
+2026-11-03 规则来源名称：`POST /api/rulesets`、`PUT /api/rulesets/:id` 保存时移除远程来源的 `name`；`/api/rule-options/resolve` 返回的来源 `name` 不变，供模板和订阅的规则展示。

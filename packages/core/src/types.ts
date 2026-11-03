@@ -132,7 +132,7 @@ export type RuleSetSource = {
   kind: 'remote' | 'local';
   /** 仓库关联：地址由索引中的文件定位决定，不允许改为自定义地址。 */
   repository?: { repo: string; entry: string; ref: string; path: string };
-  /** 显示名，缺省用 URL 或「本地规则」 */
+  /** 本地来源的显示名，缺省用「本地规则」；远程来源不使用，保存时移除 */
   name?: string;
   url?: string;
   content?: string;

@@ -12,8 +12,22 @@ export type RuleSetInputs = {
 /** 远程来源快照在渲染输入里的键 */
 export const sourceKey = (rulesetId: ID, sourceId: ID): string => `${rulesetId}/${sourceId}`;
 
-/** 来源的显示名：缺省用 URL 或「本地规则」 */
-export const sourceLabel = (src: RuleSetSource): string => src.name?.trim() || (src.kind === 'remote' ? src.url ?? '远程地址' : '本地规则');
+/** 诊断文案里的来源：远程用完整地址便于定位，本地用名称或「本地规则」 */
+export const sourceLabel = (src: RuleSetSource): string => src.kind === 'remote' ? src.url ?? '远程地址' : src.name?.trim() || '本地规则';
+
+/** 地址路径末段带扩展名时才算文件名；其他情况由调用方显示完整地址 */
+function urlFileName(url: string): string | undefined {
+  try {
+    const file = new URL(url).pathname.split('/').at(-1) ?? '';
+    return /\.[^./]+$/.test(file) ? decodeURIComponent(file) : undefined;
+  } catch { return undefined; } // 编辑中的地址可能不完整，或含无效百分号编码。
+}
+
+/** 列表里的来源名：仓库和远程用文件名，本地用名称或「本地规则」 */
+export function sourceDisplayName(src: RuleSetSource): string {
+  if (src.kind === 'local') return sourceLabel(src);
+  return src.repository?.path.split('/').at(-1) || (src.url && urlFileName(src.url)) || sourceLabel(src);
+}
 
 /**
  * 规则的 classical 文本（可被 parseRuleLine 读回，保留客户端专用规则）。

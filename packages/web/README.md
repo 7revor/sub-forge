@@ -360,3 +360,5 @@ useRepositoryUrlMatches 不自动订阅输入、不使用 React Query 缓存；�
 2026-11-03 规则来源名称独立：`RulesetSourceDialog` 和规则集合的关联操作通过 `linkRepositoryFile` 写入文件字段并保留用户名称；名称留空时卡片显示仓库文件名。
 
 2026-11-03 弹窗不自动聚焦：`ModalContent` 打开时把焦点放到弹窗容器，不再聚焦第一个控件；显式 `autoFocus` 的字段不受影响。详见 [统一弹窗规范](../../docs/18-unified-modals.md)。
+
+2026-11-03 规则来源名称收窄：`RulesetSourceDialog` 只在本地规则下显示名称。来源卡片与模板、订阅一样只显示一行，仓库来源为「仓库名 · 路径」，仓库名来自 `GET /rule-repos`，读取不到时显示仓库 ID。

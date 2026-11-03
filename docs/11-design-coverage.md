@@ -413,3 +413,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 弹窗打开时不自动聚焦控件：`modals/index.tsx` 的 `ModalContent` 阻止 Radix 自动聚焦并把焦点放到弹窗容器，修复页面加载后首次打开弹窗时选中的分段按钮出现焦点环的问题。静止状态的控件和文案没有变化，画板无需改动；不涉及服务端。
 
 2026-11-03 用户改名与删除：`V2Settings` 用户表的操作统一收进更多菜单，新增菜单项「修改用户名」（仅管理员）和「删除用户」（仅普通用户），并补两个弹窗状态；管理员唯一，角色列改为只读文字，`V2MoreDialogs` 创建用户弹窗去掉角色选择。对应 `pages/Users.tsx`；后端 `PATCH /api/users/:id` 支持 `username`，新增 `GET /api/users/deletion-impact?id=ID` 和 `DELETE /api/users/:id`。`reset-admin-password` 只是命令行，不涉及画板。无后端待实现项。
+
+2026-11-03 规则来源名称收窄：`V2MoreDialogs` 的远程和规则仓库状态移除名称，新增本地规则状态并保留名称；`V2RuleSet` 来源卡片改为单行，与模板、订阅一致。对应 `components/RulesetSourceDialog.tsx`、`pages/Rulesets.tsx`；服务端已在 `api/validate.ts` 移除远程来源名称，无待实现项。

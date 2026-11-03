@@ -50,7 +50,7 @@ describe('资源刷新任务',()=>{
     const user=await addUser(h.store,'progress');const api=client(h.app);await api.login('progress');
     const sources=Array.from({length:5},(_,i)=>({id:`s${i}`,name:`子规则 ${i}`,kind:'remote' as const,url:`https://rules.test/${i}`,format:'auto' as const}));
     h.store.put('ruleset',{id:'ordered',name:'有序规则',sources},user.id);
-    const names=sources.map(s=>`有序规则 / ${s.name}`);
+    const names=sources.map(s=>`有序规则 / ${s.url}`);
     const start=await api.post('/api/rulesets/ordered/refresh-cache');
     const id=start.json.job.id;
     try {

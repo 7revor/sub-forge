@@ -4,7 +4,7 @@ import { linkRepositoryFile } from '../domain/rulesetSources.ts';
 import { queryUrl } from '@sub-forge/core';
 import { useQuery } from '@tanstack/react-query';
 import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
-import { api } from '../api.ts';
+import { api, type RuleRepo } from '../api.ts';
 import { RuleCard } from '../components/RuleCard.tsx';
 import { RuleSourcePreview } from '../components/RuleSourcePreview.tsx';
 import { RulesetSourceDialog } from '../components/RulesetSourceDialog.tsx';
@@ -29,10 +29,11 @@ import { Badge, Button, Card, ErrorAlert, FieldError, Field, Input, buttonClass 
 import { useDocEditor } from '../components/useDocEditor.ts';
 import type { RuleSetDoc, RuleSetSourceDoc } from '../hooks.ts';
 import { newId } from '../convert/templateYaml.ts';
-import { localRuleLines } from '@sub-forge/core';
+import { localRuleLines, sourceDisplayName } from '@sub-forge/core';
 
 const isBinary = (s: RuleSetSourceDoc) => s.format === 'mrs' || s.format === 'srs';
-const sourceLabel = (s: RuleSetSourceDoc) => s.name?.trim() || s.repository?.path.split('/').at(-1) || (s.kind === 'remote' ? s.url || '远程地址' : localRuleLines(s.content ?? '').map(line => line.text).join(',') || '尚未填写');
+const sourceLabel = (s: RuleSetSourceDoc) => s.kind === 'remote' ? sourceDisplayName(s) : s.name?.trim() || localRuleLines(s.content ?? '').map(line => line.text).join(',') || '尚未填写';
+
 
 function sourceSummary(rs: RuleSetDoc): string {
   const remote = rs.sources.filter((s) => s.kind === 'remote').length;
@@ -74,6 +75,8 @@ export function RulesetEdit() {
   }, [e.id]);
   const permission = useQuery({ queryKey: ['ruleset-permission', e.id], enabled: !e.isNew && !!e.id, queryFn: () => api<{ writable: boolean }>('GET', queryUrl('/rulesets', { id: e.id })).then(r => r.writable) });
   const canEdit = e.isNew || permission.data === true;
+  const repos = useQuery({ queryKey: ['rule-repos'], queryFn: () => api<{ repos: RuleRepo[] }>('GET', '/rule-repos') });
+  const repoName = (id: string) => repos.data?.repos.find(repo => repo.id === id)?.name ?? id;
   const [linking, setLinking] = useState<string>();
   const [linkError, setLinkError] = useState<string>();
   const matches = useRepositoryUrlMatches();
@@ -153,7 +156,7 @@ export function RulesetEdit() {
         hint={s.kind === 'remote' && !s.repository && s.url && <RepositoryMatchHint matches={matches.matches[s.url] ?? []} busy={!!linking || matches.isLinkingAll} onLink={match => link(s.id, s.url!, match)} />}
         externalPreview={s.kind === 'remote'} previewLinks={sourcePreviewHref(s) ? [{ href: sourcePreviewHref(s)! }] : []}
         onPreview={() => void RuleSourcePreview.show({ source: { rulesetId: e.isNew ? undefined : e.id, source: s } })} onEdit={() => void edit({ source: s, adding: false })} onDelete={() => { set({ sources: d.sources.filter(x => x.id !== s.id) }); if (s.url) matches.clear([s.url]); }}>
-        <span className="block min-w-0" title={sourceLabel(s)}><span className="block truncate">{sourceLabel(s)}</span><span className="block truncate text-xs font-normal text-muted-foreground">{s.repository?.path ?? (s.kind === 'remote' ? s.url : s.content?.split('\n').filter(Boolean).join(' · '))}</span></span>
+        <span title={s.url ?? sourceLabel(s)}>{s.repository ? `${repoName(s.repository.repo)} · ${s.repository.path}` : sourceLabel(s)}</span>
       </RuleCard>} />
     </Card>
     </> : <Card title="来源（只读）"><div className="flex flex-col gap-2">{d.sources.map((source, i) => source.kind === 'remote' ? <a key={source.id} href={sourcePreviewHref(source)} target="_blank" rel="noreferrer noopener" className={buttonClass('default', 'sm')}>查看来源 {i + 1} · {sourceLabel(source)}</a> : <Button key={source.id} onClick={() => void RuleSourcePreview.show({ source: { rulesetId: e.id, source } })}>查看来源 {i + 1} · {sourceLabel(source)}</Button>)}</div></Card>}

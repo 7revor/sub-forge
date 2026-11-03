@@ -1,6 +1,6 @@
 import { ResourceAccessError } from './resource-access.ts';
 // 资源调度与手动刷新使用同一依赖收集和状态。任务持久化，重启后明确标记中断。
-import type { NodeSetID } from '@sub-forge/core';
+import { sourceDisplayName, type NodeSetID } from '@sub-forge/core';
 import { profileTemplate } from './profile-routing.ts';
 import type { RuleSetDoc } from './docs.ts';
 import { cacheCycleStart } from './cache-cycle.ts';
@@ -47,7 +47,7 @@ export class ResourceService {
     return row ? JSON.parse(row.data) : undefined;
   }
   ruleResources(rs:RuleSetDoc):Resource[] {
-    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',name:`${rs.name} / ${s.name || s.id}`,url:s.url!,params:{...s.fetch,format:s.format,behavior:s.behavior}}));
+    return rs.sources.filter(s=>s.enabled !== false && s.kind === 'remote' && s.url).map(s=>({kind:'ruleset',name:`${rs.name} / ${sourceDisplayName(s)}`,url:s.url!,params:{...s.fetch,format:s.format,behavior:s.behavior}}));
   }
   nodeResources(refs:NodeSetID[], owner?:string|null):Resource[] {
     return this.renderer.collectNodeSets(refs,owner).sources.map(s=>({kind:'source',id:s.id,name:s.name,url:s.url}));

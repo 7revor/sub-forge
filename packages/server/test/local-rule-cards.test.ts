@@ -41,7 +41,8 @@ describe('统一规则卡片服务契约', () => {
       const sources = [{ ...other.json.matcher.repository.sources[0], id: 'replacement' }, doc.sources[1]];
       const saved = await h.admin.put(`/api/rulesets/${doc.id}`, { ...doc, sources });
       expect(saved.status, saved.text).toBe(200);
-      expect(saved.json.item.sources).toEqual(sources);
+      const { name: _name, ...replacement } = sources[0];
+      expect(saved.json.item.sources).toEqual([replacement, sources[1]]);
       expect((await h.admin.put(`/api/rulesets/${doc.id}`, { ...doc, sources: [{ ...sources[0], url: 'https://invalid.test/list' }, sources[1]] })).status).toBe(400);
     } finally { await h.stop(); }
   });

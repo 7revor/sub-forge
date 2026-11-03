@@ -164,3 +164,5 @@ Matcher.local 以 content 保存一张卡片的多行原文，忽略空行/整�
 2026-11-03：内核无改动；服务端下发主配置时 `deferRuleBody` 恒为真，规则正文由规则文件请求单独转换，预览才传入全部正文。
 
 2026-11-03 移除本地节点连通性测试：`TESTABLE_PROXY_TYPES` 改名为 `KNOWN_PROXY_TYPES`，取值不变，只用于提示未知协议仅完成基础字段校验。渲染和节点模型不变。
+
+2026-11-03 规则来源名称：`RuleSetSource.name` 只对本地来源生效。新增 `sourceDisplayName` 供列表显示文件名；`sourceLabel` 用于诊断文案，远程来源固定为完整地址。渲染输出不变。

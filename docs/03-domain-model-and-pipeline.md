@@ -90,7 +90,7 @@ type ClientOverride = {
 type RuleSetSource = {
   id: ID;                        // 规则集内唯一；远程快照按 (规则集 id, URL) 定位
   kind: 'remote' | 'local';
-  name?: string;                 // 缺省显示 URL 或「本地规则」
+  name?: string;                 // 仅本地来源使用，缺省显示内容摘要或「本地规则」；远程来源显示文件名
   url?: string; content?: string; format: 'auto' | 'classical' | 'domain' | 'ipcidr' | 'domain-set' | 'yaml' | 'mrs' | 'srs';
   behavior?: 'domain' | 'ipcidr' | 'classical';   // MRS 二进制托管必须声明
   overrides?: { line?: number; match?: string; override: ClientOverride }[];  // 仅用于尚无法转换的旧配置兼容，不用于新建改写
@@ -622,3 +622,7 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 `RuleSetSource.name` 只保存用户填写的名称。前端关联仓库文件时只取 `url`、`format`、`repository` 等文件字段，保留原 `name`；未填写时保持缺省，由展示层回退到文件名。`POST /api/rule-options/resolve` 返回的来源 `name` 不变，模板和订阅的规则引用仍用它展示。数据结构、接口和示例种子无变化。
 
 2026-11-03 用户改名与删除（SYS-01）：文档、令牌、会话等一律按用户 id 关联，改名只更新 `users.username`；系统只有一个管理员（`users_single_admin` 唯一索引保证），只有它可改名，普通用户的用户名固定；管理员不能禁用或删除，角色不能修改。数据库 v39 把多余的管理员降为普通用户，保留最早创建的可用管理员，被降级的账号获得脚本编写权限以保持原有能力，名下数据不变。删除用户在一个事务内删除其名下文档（连带快照和迁移备份）、分享、刷新任务、访问日志、令牌、会话和用户本身。分享给别人的订阅源和公共规则集也一并删除：引用它们的他人配置和模板不会被自动改写，渲染会失败，直到移除引用，与取消分享的语义一致；删除前的确认弹窗会列出这些引用。
+
+## 2026-11-03：只有本地来源使用名称
+
+`RuleSetSource.name` 只对 `kind: 'local'` 生效。远程来源（含仓库关联）不再读取该字段，保存规则集时由服务端移除，已存数据在下次保存前保留但不显示；启动时按「仓库名 · 路径」和地址识别旧导入来源的回填逻辑继续读取旧值。核心导出 `sourceDisplayName`（列表显示名）和 `sourceLabel`（诊断文案，远程用完整地址）。类型结构、数据库和示例种子无需迁移。

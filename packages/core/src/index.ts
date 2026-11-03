@@ -17,7 +17,7 @@ export * from './rules/parse.ts';
 export * from './rules/raw.ts';
 export * from './rules/client.ts';
 export * from './rules/syntax.ts';
-export { sourceKey, sourceLabel, formatRuleLine, type RuleSetInputs } from './rules/expand.ts';
+export { sourceKey, sourceLabel, sourceDisplayName, formatRuleLine, type RuleSetInputs } from './rules/expand.ts';
 export * from './rules/delivery.ts';
 export * from './template/merge.ts';
 export * from './template/validate.ts';

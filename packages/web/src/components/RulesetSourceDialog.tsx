@@ -14,7 +14,7 @@ import { Field, Input, Segmented, Select, Button, Badge } from './ui.tsx';
 export const RulesetSourceDialog = createModal<{ source: RuleSetSourceDoc; repository?: boolean; adding: boolean }, RuleSetSourceDoc>(function RulesetSource({ data: { source, repository = !!source.repository, adding }, modal }) {
   const onApply = modal.confirm, onClose = modal.cancel;
   const [kind, setKind] = useModalDraft<'repository' | 'remote' | 'local'>(repository ? 'repository' : source.kind);
-  const [draft, setDraft] = useModalDraft(source);
+  const [draft, setDraft] = useModalDraft<RuleSetSourceDoc>(source.kind === 'local' ? source : { ...source, name: undefined });
   const [attempted, setAttempted] = useModalDraft(false);
   let error: string | undefined;
   if (kind === 'repository' && !draft.repository) error = '请选择关联的仓库文件';
@@ -26,9 +26,9 @@ export const RulesetSourceDialog = createModal<{ source: RuleSetSourceDoc; repos
   const presentation = useModalPresentation(read);
   const status = presentation.data?.status;
   return <RuleEditShell confirmLabel={adding ? '添加' : '保存'} footer={<Button variant="ghost" className="mr-auto" disabled={!!error} onClick={() => void RuleSourcePreview.show({ source: { source: draft } })}>预览原文</Button>} title={adding ? '添加规则来源' : '编辑规则来源'}  error={attempted ? error : undefined}
-    onClose={onClose} onApply={() => { setAttempted(true); if (!error) onApply(draft.kind === 'remote' ? { ...draft, url: normalizeRuleUrl(draft.url!) } : draft); }}>
+    onClose={onClose} onApply={() => { setAttempted(true); if (!error) onApply(draft.kind === 'remote' ? { ...draft, name: undefined, url: normalizeRuleUrl(draft.url!) } : draft); }}>
     <Segmented label="规则来源类型" value={kind} options={[{ value: 'repository', label: '规则仓库' }, { value: 'remote', label: '远程地址' }, { value: 'local', label: '本地规则' }]} onChange={kind => { setKind(kind); setAttempted(false); setDraft(current => ({ id: current.id, name: current.name, kind: kind === 'local' ? 'local' : 'remote', format: 'auto', ...(kind === 'local' ? { content: current.content ?? '' } : { url: '' }) })); }} />
-    <Field label="名称">{id => <Input id={id} placeholder="用于区分来源，可选" value={draft.name ?? ''} onChange={event => setDraft({ ...draft, name: event.target.value || undefined })} />}</Field>
+    {kind === 'local' && <Field label="名称">{id => <Input id={id} placeholder="用于区分本地规则，可选" value={draft.name ?? ''} onChange={event => setDraft({ ...draft, name: event.target.value || undefined })} />}</Field>}
     {kind === 'repository' ? <Field label="仓库文件">{id => <RuleSetPicker id={id} scope="repository" modal label="选择仓库文件" placeholder="搜索并选择要关联的仓库文件" valueLabel={draft.repository?.path} onSelect={matcher => {
       const next = matcher.repository?.sources[0];
       if (!next) return;
