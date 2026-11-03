@@ -8,18 +8,20 @@ import { ResourceLinkButton } from '../components/ResourceLinkButton.tsx';
 // 订阅源：列表与新建对话框；详情页内编辑基础设置、处理链并实时预览，展示最近拉取状态。
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api } from '../api.ts';
 import { NoteCell, NoteField } from '../components/DocNote.tsx';
 import { DocList } from '../components/DocList.tsx';
 import { PipelineEditor } from '../components/PipelineEditor.tsx';
-import { Badge, Button, Card, DraftInput, ErrorAlert, Field, Input, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
+import { Badge, Button, Card, DraftInput, Empty, ErrorAlert, Field, Input, PageHeader, PageScroll, formatBytes, formatTime, cx } from '../components/ui.tsx';
+import { shareSource } from '../components/ShareSourceModal.tsx';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table.tsx';
 import { Notice } from '../components/Notice.tsx';
-import { useDeleteDoc, useDoc, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
+import { useDeleteDoc, useDoc, useMe, useNodeList, useSaveDoc, useSourceFetchState, type SourceDoc } from '../hooks.ts';
 
-const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢复。';
+const SOURCE_DELETE_BODY = '处理链和拉取记录会一起删除，无法恢复。如已分享，接收者引用此订阅源的配置也会无法使用。';
 
 export function SourceList() {
   const location = useLocation();
@@ -36,7 +38,7 @@ export function SourceList() {
         columns={[
           { header: '名称', width: 160, cell: (s) => s.name },
           { header: '备注', width: 168, cell: (s) => <NoteCell note={s.note} /> },
-          { header: '地址', width: 200, cell: (s) => <span className="block max-w-[260px] truncate font-mono text-sm text-foreground">{s.url}</span> },
+          { header: '地址', width: 200, cell: (s) => s.sharedBy ? <SharedBy name={s.sharedBy} /> : <span className="block max-w-[260px] truncate font-mono text-sm text-foreground">{s.url}</span> },
           { header: '节点', width: 68, cell: (s) => <NodeSetCount nodeSet={{ type: 'source', id: s.id }} /> },
         ]} />
     </>
@@ -76,8 +78,60 @@ function BasicSettings({ draft, set }: {
   );
 }
 
+/** 分享给当前用户的订阅源只读，其他情况进入编辑页。 */
 export function SourceEdit() {
   const { id } = useParams();
+  const doc = useDoc('sources', id);
+  return doc.data?.sharedBy ? <SharedSourceDetail source={doc.data} /> : <SourceEditor />;
+}
+
+function SharedBy({ name }: { name: string }) {
+  return <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground" title={`${name} 分享`}><Badge className="shrink-0">只读</Badge><span className="truncate">{name} 分享</span></span>;
+}
+
+function SharedSourceDetail({ source }: { source: SourceDoc }) {
+  const state = useSourceFetchState(source);
+  const nodes = useNodeList({ type: 'source', id: source.id });
+  const u = state.lastOk?.userinfo;
+  return (
+    <>
+      <PageHeader crumbs={<><Link to="/sources" className="text-muted-foreground no-underline">订阅源</Link> / {source.name}</>}
+        title={source.name}
+        actions={<ResourceLinkButton kind="sources" id={source.id} name={source.name} />}>
+        <SharedBy name={source.sharedBy!} />
+        {state.snaps.data && (state.lastOk
+          ? <Badge tone={state.failing ? 'err' : 'ok'}>{state.failing ? '最近一次拉取失败 · 使用旧内容，下个周期再试' : `${formatTime(state.lastOk.fetchedAt).slice(11)} 拉取成功`}</Badge>
+          : <Badge tone={state.failing ? 'err' : 'neutral'}>{state.failing ? '拉取失败 · 没有可用内容' : '还没有拉取过'}</Badge>)}
+        {u?.total ? <Badge>{formatBytes((u.upload ?? 0) + (u.download ?? 0))} / {formatBytes(u.total)}{u.expire ? ` · ${formatTime(u.expire * 1000).slice(0, 10)} 到期` : ''}</Badge> : null}
+      </PageHeader>
+      <ErrorAlert error={nodes.error ?? state.snaps.error} />
+      <PageScroll>
+        <Notice tone="accent">这个订阅源由 {source.sharedBy} 分享，可以在配置订阅和组合中引用；地址和处理链不可见，也不能修改。</Notice>
+        <Card className="overflow-hidden" title="节点" subtitle={nodes.data ? `共 ${nodes.data.total} 个` : undefined} bodyClass="">
+          {nodes.data && !nodes.data.total ? <div className="p-4"><Empty title="还没有可用节点" /></div> : (
+            <Table>
+              <TableHeader><TableRow><TableHead>名称</TableHead><TableHead>类型</TableHead><TableHead>服务器</TableHead><TableHead>端口</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {(nodes.data?.nodes ?? []).map((node, index) => (
+                  <TableRow key={`${node.name}-${index}`}>
+                    <TableCell className="font-medium">{node.name}</TableCell>
+                    <TableCell>{node.type}</TableCell>
+                    <TableCell className="font-mono">{node.server}</TableCell>
+                    <TableCell className="font-mono">{node.port}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      </PageScroll>
+    </>
+  );
+}
+
+function SourceEditor() {
+  const { id } = useParams();
+  const me = useMe().data;
   const location = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -130,6 +184,7 @@ export function SourceEdit() {
       <PageHeader crumbs={<><Link to="/sources" className="text-muted-foreground no-underline">订阅源</Link> / {doc.data?.name}</>}
         title={draft.name || '未命名'}
         actions={<>
+          {me?.role === 'admin' && <Button onClick={() => void shareSource(qc, me.id, [{ id: draft.id, name: doc.data?.name ?? draft.name }], draft.id)}><Share2 size={15} />分享</Button>}
           <ResourceLinkButton kind="sources" id={draft.id} name={draft.name} disabled={dirty} />
           <Button onClick={saveAndRefresh} disabled={busy || !ready}><RefreshCw size={15} />{refresh.isPending ? '拉取中…' : dirty ? '保存并拉取' : '立即拉取'}</Button>
           <Button variant="primary" onClick={submit} disabled={busy || !dirty || !ready}>{save.isPending ? '保存中…' : dirty ? '保存修改' : '已保存'}</Button>

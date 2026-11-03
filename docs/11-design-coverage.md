@@ -31,7 +31,8 @@
 | 模板编辑器 `TemplateEditor`、发布前校验 `TemplatePublish` | `/templates/:id`、`/templates/:id/publish` | 草稿在两页之间共用；发布页自动试渲染；仅管理员可进入 |
 | 补充 `TemplateBrowse` | `/templates` | 2026-10-29 统一为唯一模板入口，仅管理员可见，可新建、编辑与发布；旧 `/templates/manage` 重定向到此页。普通用户在配置订阅向导中选择模板 |
 | 历史基础预设 `Presets` | 已移除路由 | 旧画板仅留档；当前在配置订阅中按内核／应用编辑原文，不再发布或引用预设。旧数据由 v28 升级与种子导入备份后展开 |
-| 用户 `Users` | `/users` | 统计列与共享走占位接口 |
+| 用户 `Users` | `/users` | 统计列走占位接口；分享的订阅源已接通 |
+| 订阅源分享 `V2SourceShare` | `/users`、`/sources`、`/sources/:id` | 分享卡片与弹窗、接收者列表行和只读详情 |
 | 系统 `System` | `/system` | 内置仓库状态、启停与更新已接通；其余仍为占位 |
 | 补充 `Dialogs` | 全部详情页 | 头部「更多」菜单与最右侧的独立删除按钮、删除确认、各类对话框、表单 / YAML 双视图、离开前保存（2026-10-29 删除从「更多」菜单移出） |
 | 补充 `Login`、`Account` | `/login`、`/account` | — |
@@ -60,7 +61,6 @@
 |---|---|---|
 | 规则仓库后续（RS-07，[08](08-rule-repository-index.md)） | `/rule-repo`、系统页仓库管理 | 内置索引/搜索/预览/文本导入已实现；自定义公开 GitHub 仓库增删及逐文件索引已实现，动态 repo 引用及 mrs 导入待实现 |
 | 系统设置 | `/system` | `GET /api/system` 返回空默认值；SSRF 白名单与 mihomo 校验仍由环境变量 `SSRF_ALLOW`、`MIHOMO_BIN` 控制。2026-11-02 备份与恢复已按 [22](22-database-backup.md) 实现（此前移除的是无界面调用的占位接口）；早先 `V2Settings` 不含该入口，需要时再按需求新增 |
-| 共享订阅源 / 组合（SYS-06） | 用户页「共享的订阅源与组合」 | `GET /api/shares` 返回空，写 501 |
 | 用户统计列 | 用户页「配置订阅 / 订阅源 / 最近订阅请求」 | `GET /api/users/stats` 返回空，显示「—」 |
 | 组合成员「拉取失败时」（COL-05） | 组合成员表 | 字段 `onFail` 随文档保存，渲染尚未读取，目前一律使用快照 |
 | 基础原文（BS-04，已实现） | 配置订阅原文编辑区 | kernels／clients 保存并参与生成；旧 base.raw 仅迁移读取，不属于待实现功能 |
@@ -398,3 +398,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 上游缓存分层：v2「系统 / 用户 / 账户」画板的资源缓存说明改为周期语义，并显示下次缓存失效时间；资源异常只列节点和仓库索引，示例数据去掉逐个资源的下次时间。v2「订阅源详情」的缓存提示同步。前端 `System.tsx`、`Sources.tsx`、`ResourceCache.tsx` 与画板一致，规则“使用时拉取”是中性状态。此前登记的规则集合琥珀色“正在显示上次成功内容”组件已不存在，语义也已取消。无新增后端待实现项。
 
 2026-11-03 移除本地节点连通性测试：画板 `V2LocalNode` 去掉「连通性」列、「测试连通性」按钮和相关说明，对应 `pages/Locals.tsx` 与 `LocalNodeYamlEditor`。服务端已删除 `/api/node-probe`，无新增后端待实现项。
+
+2026-11-03 节点订阅分享：`Users` 改为「分享的订阅源」并增加修改、取消操作，`V2Source` 页头增加「分享」，新增画板 `V2SourceShare`。对应 `pages/Users.tsx`、`pages/Sources.tsx`、`components/ShareSourceModal.tsx`；后端 `api/shares.ts`，无待实现项。示例种子不含分享关系，无需修改。

@@ -50,7 +50,8 @@ export type RulesetSourceStatus = { format?: string; behavior?: string; conversi
 // ---------- 仓库与系统接口；Pending 标注的功能仍为占位（见 docs/11） ----------
 export type Pending = { pending?: boolean };
 export type UserStats = Pending & { items: Record<string, { profiles: number; sources: number; lastRequestAt?: number }> };
-export type Share = { id: string; kind: 'source' | 'collection'; docId: string; name: string; to: string[] };
+/** 已分享的订阅源及接收者（SYS-06） */
+export type Share = { id: string; name: string; to: string[] };
 export type RepoScan = { ref: string; directory: string; include: string[]; exclude: string[]; format: string; client: 'any' | 'mihomo' | 'surge'; groupBy: 'path' | 'directory' | 'stem'; readme: boolean; preferred: string[] };
 export type RuleRepo = { id: string; name: string; url: string; refs: string[]; scans: RepoScan[]; license: string; configRevision: string; pending: boolean; enabled: boolean; entries: number; builtAt?: number; checkedAt?: number; error?: string; indexing: boolean };
 export type RuleOption = { value: string; label: string; hint: string; url?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };

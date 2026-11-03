@@ -11,7 +11,8 @@ import { api, type User } from './api.ts';
 export type FetchOptions = { ua?: string; timeoutMs?: number; ttlSec?: number };
 /** 节点订阅源仅配置自动更新间隔，拉取身份和超时固定。 */
 export type SourceFetchOptions = Pick<FetchOptions, 'ttlSec'>;
-export type SourceDoc = Source & { fetch?: SourceFetchOptions };
+/** sharedBy 只出现在别人分享给当前用户的订阅源上，此时地址和处理链已被服务端移除。 */
+export type SourceDoc = Source & { fetch?: SourceFetchOptions; sharedBy?: string };
 export type RuleSetSourceDoc = RuleSetSource & { fetch?: FetchOptions };
 export type RuleSetDoc = Omit<RuleSet, 'sources'> & { sources: RuleSetSourceDoc[] };
 export type TemplateDoc = Template & { name?: string };
