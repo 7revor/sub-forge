@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { FileCode2, FolderGit2, House, Layers, Link2, ListFilter, LogOut, Menu, Monitor, Rss, Settings2, UserRound, Users, X, type LucideIcon } from 'lucide-react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { api, onUnauthorized } from './api.ts';
+import { AppLoader } from './components/AppLoader.tsx';
 import { LogoMark } from './components/LogoMark.tsx';
 import { cx } from './components/ui.tsx';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarSeparator } from './components/ui/sidebar.tsx';
@@ -56,7 +57,7 @@ export function AppLayout() {
     return ()=>{clearTimeout(timer);events.close();};
   },[me.data?.id,qc]);
 
-  if (me.isLoading) return <div className="p-8 text-muted-foreground">加载中…</div>;
+  if (me.isLoading) return <AppLoader />;
   if (!me.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   const isAdmin = me.data.role === 'admin';
 

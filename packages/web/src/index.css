@@ -72,6 +72,55 @@ body {
   background: radial-gradient(60% 45% at 50% 0%, rgb(41 82 204 / .35), transparent 70%), var(--color-nav);
 }
 
+/* 全屏加载：线条描绘 → 节点点亮并扩散 → 线条收尾；底色与内容区一致，加载很快时不闪烁。 */
+.app-loader {
+  background: radial-gradient(50% 40% at 50% 42%, rgb(41 82 204 / .08), transparent 70%), var(--muted);
+  animation: app-loader-in .3s ease-out .2s both;
+}
+
+.logo-stroke {
+  stroke-dasharray: 1 1.2;
+  animation: logo-stroke 2.4s cubic-bezier(.65, 0, .35, 1) infinite;
+}
+
+.logo-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: logo-node 2.4s ease-out infinite;
+}
+
+.app-loader-ripple {
+  animation: app-loader-ripple 2.4s ease-out infinite;
+}
+
+@keyframes app-loader-in {
+  from { opacity: 0; }
+}
+
+@keyframes logo-stroke {
+  0% { stroke-dashoffset: 1.1; }
+  50%, 72% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -1.1; }
+}
+
+@keyframes logo-node {
+  0%, 44% { opacity: 0; transform: scale(.2); }
+  54% { opacity: 1; transform: scale(1.35); }
+  62%, 80% { opacity: 1; transform: scale(1); }
+  96%, 100% { opacity: 0; transform: scale(.2); }
+}
+
+@keyframes app-loader-ripple {
+  0%, 48% { opacity: 0; transform: scale(1); }
+  54% { opacity: .45; }
+  88%, 100% { opacity: 0; transform: scale(1.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-stroke, .logo-node { animation: none; }
+  .app-loader-ripple { display: none; }
+}
+
 /* 高度沿 flex 容器逐层传递；标题与操作区不收缩，只有内容区域滚动。 */
 .page-layout {
   --page-gutter: 1rem;
