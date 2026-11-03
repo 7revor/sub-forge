@@ -9,6 +9,8 @@ import type { DocKind } from '../docs.ts';
 import type { Store } from '../store.ts';
 import { HttpError, jsonBody, notFound, requireUser, type ApiEnv } from './common.ts';
 import { findReferrers, validateDoc } from './validate.ts';
+import { sharedSourceView } from '../source-share.ts';
+import type { SourceDoc } from '../docs.ts';
 
 const SEGMENTS: Record<string, DocKind> = {
   sources: 'source',
@@ -36,10 +38,19 @@ export function docRoutes(store: Store) {
 
     app.get(`/${seg}`, (c) => {
       if (c.req.query('id') !== undefined) {
-        const row = load(requiredQuery(c, 'id'), c.get('user').id);
+        const id = requiredQuery(c, 'id'), userId = c.get('user').id;
+        const shared = kind === 'source' ? store.getWithOwner('source', id) : undefined;
+        if (shared && shared.owner !== userId && store.isSourceSharedWith(id, userId)) return c.json({ item: sharedSourceView(store, shared.doc, shared.owner), updatedAt: shared.updatedAt, writable: false });
+        const row = load(id, userId);
         return c.json({ item: row.doc, updatedAt: row.updatedAt, writable: kind !== 'ruleset' || row.owner === c.get('user').id || c.get('user').role === 'admin' });
       }
       const options = readPagination(c.req.query());
+      if (kind === 'source') {
+        const userId = c.get('user').id;
+        const result = options ? store.listReadableSourcesPage(userId, options) : { items: store.listReadableSources(userId) };
+        const rows = result.items.map(doc => ({ doc, owner: store.getWithOwner('source', doc.id)?.owner ?? null }));
+        return c.json({ ...result, items: rows.map(({ doc, owner }) => owner === userId ? doc : sharedSourceView(store, doc as SourceDoc, owner)), writableIds: rows.filter(row => row.owner === userId).map(row => row.doc.id) });
+      }
       const owner = publicRead ? undefined : c.get('user').id;
       const result = options ? store.listPage(kind, options, owner) : { items: store.list(kind, owner) };
       return c.json(kind === 'ruleset' ? { ...result, writableIds: result.items.filter(doc => c.get('user').role === 'admin' || store.getWithOwner(kind, doc.id)?.owner === c.get('user').id).map(doc => doc.id) } : result);

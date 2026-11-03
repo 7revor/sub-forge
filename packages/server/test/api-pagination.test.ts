@@ -92,7 +92,7 @@ describe('列表分页', () => {
         for (const query of ['page=0', 'page=-1', 'page=1.5', 'page=abc', 'page=', 'page=9007199254740992', 'pageSize=0', 'pageSize=101', 'pageSize=1e2', 'pageSize=']) {
           expect((await admin.get(`${path}?${query}`)).status, query).toBe(400);
         }
-        expect((await admin.get(`${path}?page=10`)).json).toEqual({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 });
+        expect((await admin.get(`${path}?page=10`)).json).toMatchObject({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 });
         expect((await client(app).get(`${path}?page=1`)).status).toBe(401);
       }
     } finally { store.close(); }

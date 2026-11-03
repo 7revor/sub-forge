@@ -209,14 +209,14 @@ export function createApp(deps: AppDeps) {
     const id = requiredQuery(c, 'id');
     if (!user || !['source', 'collection', 'local'].includes(kind)) return notFound(c);
     const type = kind as 'source' | 'collection' | 'local';
-    if (store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+    if (!store.canUseNodeSet(type, id, user.userId)) return notFound(c);
     let target;
     try { target = detectClient(c.req.header('user-agent') ?? '', c.req.query()); }
     catch (error) { if (error instanceof InvalidClientTarget) return c.text(error.message, 400); throw error; }
     if (target.client !== 'mihomo' && target.platform && !['ios', 'macos'].includes(target.platform)) return c.text('该客户端平台仅支持 ios 或 macos', 400);
     try {
       const result = await renderer.nodeSet({ type, id }, user.userId, { client: target.client, ...(target.platform ? { platform: target.platform } : {}) });
-      if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+      if (store.getActiveToken(token)?.userId !== user.userId || !store.canUseNodeSet(type, id, user.userId)) return notFound(c);
       const traffic = userinfoHeader(result.userinfo);
       if (traffic) c.header('subscription-userinfo', traffic);
       c.header('profile-update-interval', String(Math.max(1, Math.round(store.resourceCacheTtlSec / 3600))));
@@ -225,7 +225,7 @@ export function createApp(deps: AppDeps) {
       c.header('x-content-type-options', 'nosniff');
       return c.body(result.yaml);
     } catch (error) {
-      if (store.getActiveToken(token)?.userId !== user.userId || store.getWithOwner(type, id)?.owner !== user.userId) return notFound(c);
+      if (store.getActiveToken(token)?.userId !== user.userId || !store.canUseNodeSet(type, id, user.userId)) return notFound(c);
       if (error instanceof ResourceAccessError) return notFound(c);
       return c.text(`节点资源暂时不可用：${error instanceof Error ? error.message : String(error)}`, 503);
     }

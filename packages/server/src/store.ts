@@ -196,7 +196,10 @@ export class Store {
   delete(kind: DocKind, id: string): boolean {
     this.configurationRevision++;
     const removed = this.db.transaction(() => {
-      if (kind === 'source') this.deleteSourceSnapshots(id);
+      if (kind === 'source') {
+        this.deleteSourceSnapshots(id);
+        this.db.prepare('DELETE FROM source_shares WHERE source_id = ?').run(id);
+      }
       const removed = this.db.prepare('DELETE FROM docs WHERE kind = ? AND id = ?').run(kind, id).changes > 0;
       for (const hook of this.documentDeleteHooks) hook(kind, id);
       if (kind === 'profile') this.deleteProfileData(id);
@@ -204,6 +207,50 @@ export class Store {
     })();
     for (const listener of this.invalidationListeners) listener(kind, id);
     return removed;
+  }
+
+  // ---------- 节点订阅分享 ----------
+
+  /** 节点集是否可被该用户读取和引用：自己的，或分享给他的订阅源。组合和本地节点组不能分享。 */
+  canUseNodeSet(type: 'source' | 'collection' | 'local', id: string, userId: string): boolean {
+    const owner = this.getWithOwner(type, id)?.owner;
+    if (owner === undefined) return false;
+    return owner === userId || (type === 'source' && this.isSourceSharedWith(id, userId));
+  }
+
+  isSourceSharedWith(sourceId: string, userId: string): boolean {
+    return !!this.db.prepare('SELECT 1 FROM source_shares WHERE source_id = ? AND user_id = ?').get(sourceId, userId);
+  }
+
+  /** 列出某用户名下已分享的订阅源及其接收者。 */
+  listSourceShares(owner: string): { id: string; name: string; to: string[] }[] {
+    const rows = this.db.prepare('SELECT s.source_id AS id, s.user_id AS userId FROM source_shares s JOIN docs d ON d.kind = \'source\' AND d.id = s.source_id WHERE d.owner = ? ORDER BY s.source_id, s.created_at, s.user_id').all(owner) as { id: string; userId: string }[];
+    const to = new Map<string, string[]>();
+    for (const row of rows) to.set(row.id, [...(to.get(row.id) ?? []), row.userId]);
+    return [...to].map(([id, users]) => ({ id, name: this.get('source', id)!.name, to: users }));
+  }
+
+  /** 整体替换接收者；空列表即取消分享。撤销后在途渲染按配置变化重试，不再下发节点。 */
+  setSourceShares(sourceId: string, to: string[]): void {
+    this.db.transaction(() => {
+      const keep = new Set(to);
+      const current = this.db.prepare('SELECT user_id FROM source_shares WHERE source_id = ?').all(sourceId) as { user_id: string }[];
+      for (const { user_id } of current) if (!keep.has(user_id)) this.db.prepare('DELETE FROM source_shares WHERE source_id = ? AND user_id = ?').run(sourceId, user_id);
+      for (const userId of keep) this.db.prepare('INSERT OR IGNORE INTO source_shares (source_id, user_id, created_at) VALUES (?, ?, ?)').run(sourceId, userId, this.now());
+    })();
+    this.configurationRevision++;
+    this.changed();
+  }
+
+  private readonly readableSourcesSql = "SELECT data FROM docs WHERE kind = 'source' AND (owner = ? OR id IN (SELECT source_id FROM source_shares WHERE user_id = ?)) ORDER BY id";
+
+  /** 自己的和分享给自己的订阅源，均为完整文档；返回接口前必须按归属脱敏。 */
+  listReadableSources(userId: string): SourceDoc[] {
+    return (this.db.prepare(this.readableSourcesSql).all(userId, userId) as { data: string }[]).map(row => JSON.parse(this.readText(row.data)) as SourceDoc);
+  }
+
+  listReadableSourcesPage(userId: string, options: PageOptions): PageResult<SourceDoc> {
+    return this.readPage(this.readableSourcesSql, [userId, userId], options, data => JSON.parse(this.readText(data)) as SourceDoc);
   }
 
   // ---------- 当前模板 ----------
