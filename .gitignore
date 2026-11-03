@@ -6,3 +6,4 @@ coverage/
 .claude
 .Codex
 .env
+packages/server/data/
