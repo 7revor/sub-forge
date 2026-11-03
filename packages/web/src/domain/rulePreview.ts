@@ -1,4 +1,4 @@
-import type { Matcher, RuleSetSource } from '@sub-forge/core';
+import { queryUrl, type Matcher, type RuleSetSource } from '@sub-forge/core';
 
 export type RulePreviewLink = { href: string; label?: string; title?: string };
 
@@ -11,7 +11,8 @@ export function sourcePreviewHref(source: Pick<RuleSetSource, 'kind' | 'url'>): 
   } catch { return undefined; }
 }
 
-export function rulePreviewLinks(matcher: Matcher): RulePreviewLink[] {
+/** 系统维护的规则集合没有上游地址，使用账户令牌打开托管的合并结果；令牌未就绪时不给链接。 */
+export function rulePreviewLinks(matcher: Matcher, token?: string): RulePreviewLink[] {
   if (matcher.kind !== 'ruleset') return [];
   if (matcher.repository) return matcher.repository.sources.flatMap(source => {
     const href = source.enabled !== false && sourcePreviewHref(source);
@@ -21,6 +22,5 @@ export function rulePreviewLinks(matcher: Matcher): RulePreviewLink[] {
     const href = sourcePreviewHref({ kind: 'remote', url: matcher.remote.url });
     return href ? [{ href }] : [];
   }
-  // 增强集合的合并、去重和客户端改写统一由详情页预览，不能拼接原文冒充结果。
-  return matcher.id ? [{ href: `/rulesets/${encodeURIComponent(matcher.id)}#preview`, title: '在新标签页查看增强集合的合并结果' }] : [];
+  return matcher.id && token ? [{ href: queryUrl('/resources/ruleset', { id: matcher.id, token }), title: '在新标签页查看规则集合的合并结果' }] : [];
 }

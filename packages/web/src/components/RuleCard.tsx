@@ -20,9 +20,9 @@ function RuleHead({ icon, type, muted, children }: { icon: ReactNode; type: stri
 }
 
 /** 规则增强、模板与订阅共用：正文预览，铅笔编辑，操作不会触发预览。 */
-export function RuleCard({ handle, kind, children, count, hint, target, readOnly, invalid, previewLinks = [], externalPreview, onPreview, onEdit, onDelete, label, id }: {
+export function RuleCard({ handle, kind, children, count, hint, target, readOnly, invalid, previewLinks = [], previewHint, externalPreview, onPreview, onEdit, onDelete, label, id }: {
   handle: ReactNode; kind: RuleKind; children: ReactNode; count?: ReactNode; hint?: ReactNode; target?: ReactNode;
-  readOnly?: boolean; invalid?: boolean; previewLinks?: RulePreviewLink[]; externalPreview?: boolean; onPreview: () => void; onEdit: () => void; onDelete: () => void; label: string; id?: string;
+  readOnly?: boolean; invalid?: boolean; previewLinks?: RulePreviewLink[]; previewHint?: string; externalPreview?: boolean; onPreview: () => void; onEdit: () => void; onDelete: () => void; label: string; id?: string;
 }) {
   const { label: type, icon: Icon } = RULE_KINDS[kind];
   return <RoutingCard id={id} invalid={invalid} className={layoutClass}>
@@ -30,7 +30,7 @@ export function RuleCard({ handle, kind, children, count, hint, target, readOnly
     {externalPreview ? <div className={`${contentClass} flex-col items-stretch`}>
       {(previewLinks.length ? previewLinks : [{ href: undefined, label: undefined, title: undefined }]).map((link, index) => <a key={index} href={link.href} target="_blank" rel="noreferrer noopener"
         aria-label={`打开${label}的文件${previewLinks.length > 1 ? ` ${index + 1}` : ''}`} aria-disabled={!link.href}
-        title={link.href ? link.title ?? '在新标签页查看源文件' : '请填写有效的源文件地址'} className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg no-underline">
+        title={link.href ? link.title ?? '在新标签页查看源文件' : previewHint ?? '请填写有效的源文件地址'} className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg no-underline">
         <RuleHead icon={<Icon />} type={type} muted={readOnly}>{previewLinks.length > 1 ? link.label : children}</RuleHead>
       </a>)}
     </div> : <button type="button" aria-label={`预览${label}`} onClick={onPreview} className={`cursor-pointer rounded-lg ${contentClass}`}>

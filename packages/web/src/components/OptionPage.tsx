@@ -1,7 +1,10 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { Eye } from 'lucide-react';
 import { useId } from 'react';
 import type { SearchMatch } from '@sub-forge/core';
+import { cx } from './cx.ts';
 import { HighlightedText } from './HighlightedText.tsx';
+import { Button } from './ui/button.tsx';
 import { CommandList, CommandItem } from './ui/command.tsx';
 
 export type PageOption = { value: string; label: string; hint?: string; url?: string; disabled?: boolean; matches?: { label: SearchMatch[]; hint: SearchMatch[] } };
@@ -41,11 +44,17 @@ export function PagedOptionList({ loadOptions, query, onSelect, selected, allowU
   const page = useOptionPages(loadOptions, query);
   return <>
     <CommandList id={id} aria-label={label} aria-busy={page.isFetching}>
-      {page.options.map(option => <CommandItem key={option.value} value={option.value} data-checked={selected === option.value}
-        disabled={!allowUnavailable && option.disabled} onSelect={() => onSelect(option.value)} className="flex flex-col items-start">
-        <span className="w-full truncate" title={option.label}><HighlightedText text={option.label} matches={option.matches?.label} /></span>
-        <span className="w-full truncate text-xs text-muted-foreground" title={option.hint}><HighlightedText text={option.hint ?? ''} matches={option.matches?.hint} /></span>
-      </CommandItem>)}
+      {page.options.map(option => <div key={option.value} className="relative">
+        <CommandItem value={option.value} data-checked={selected === option.value}
+          disabled={!allowUnavailable && option.disabled} onSelect={() => onSelect(option.value)} className={cx('flex flex-col items-start', option.url && 'pr-10')}>
+          <span className="w-full truncate" title={option.label}><HighlightedText text={option.label} matches={option.matches?.label} /></span>
+          <span className="w-full truncate text-xs text-muted-foreground" title={option.hint}><HighlightedText text={option.hint ?? ''} matches={option.matches?.hint} /></span>
+        </CommandItem>
+        {/* 与候选项同级，预览不触发选择，也不避开键盘 Tab。 */}
+        {option.url && <Button asChild variant="ghost" size="icon-sm" className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground">
+          <a href={option.url} target="_blank" rel="noreferrer noopener" aria-label={`预览 ${option.label} 的原文`} title="在新标签页查看原文"><Eye aria-hidden="true" /></a>
+        </Button>}
+      </div>)}
     </CommandList>
     <OptionPageStatus page={page} />
   </>;
