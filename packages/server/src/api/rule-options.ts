@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
-import { stableHash, type RuleSetSource } from '@sub-forge/core';
+import { queryUrl, stableHash, type RuleSetSource } from '@sub-forge/core';
 import type { RuleRepoService } from '../rule-repos/service.ts';
 import type { Store } from '../store.ts';
 import { repositoryMatcher } from '../ruleset-reference.ts';
-import { bad, HttpError, isStr, jsonBody, requireUser, type ApiEnv } from './common.ts';
+import { bad, HttpError, isStr, jsonBody, requestOrigin, requireUser, type ApiEnv } from './common.ts';
 import { RefChecker } from './validate.ts';
 
 import { matchRuleFileUrls, searchRuleOptions } from '../rule-repos/options.ts';
@@ -20,8 +20,10 @@ export function ruleOptionRoutes(store: Store, repos: RuleRepoService) {
     const { q = '', offset = '0', limit = '30', scope = 'all', repository } = c.req.query();
     if ((repository !== undefined && (!repository || repository.length > 200 || scope !== 'repository')) || q.length > 200 || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)) || !/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100 || !['all', 'repository'].includes(scope)) throw bad('规则集搜索参数不合法');
     const refs = new RefChecker(store, c.get('user'));
+    const token = scope === 'repository' ? '' : store.createToken(c.get('user').id).token;
     const local = scope === 'repository' ? [] : store.list('ruleset').filter(rs => refs.ruleVisible(rs.id)).map(rs => ({
       id: rs.id, name: rs.name, hint: rs.note || `${rs.sources.length} 个来源`,
+      url: queryUrl('/resources/ruleset', { id: rs.id, token }, requestOrigin(c)),
     }));
     const notices = repos.list().filter(r => r.enabled && (!repository || r.id === repository)).flatMap(r => {
       if (r.error || !r.builtAt) return [`${r.name}：${r.error ? '索引更新失败' : '索引尚未就绪'}${r.entries ? '，使用已有索引' : ''}`];

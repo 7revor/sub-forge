@@ -44,7 +44,7 @@ export function matchRuleFileUrls(db: Store['db'], input: string[]): Record<stri
   return matches;
 }
 
-type LocalOption = { id: string; name: string; hint: string };
+type LocalOption = { id: string; name: string; hint: string; url: string };
 type Option = { value: string; label: string; hint: string; url?: string; disabled: boolean; matches: { label: SearchMatch[]; hint: SearchMatch[] } };
 
 const projectMatches = (ranges: SearchMatch[], start: number, end: number, offset: number): SearchMatch[] => ranges
@@ -83,8 +83,9 @@ export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query:
     (Omit<Option, 'disabled' | 'matches'> & { disabled: number; filePath: string | null; repoName: string | null; ref: string | null; branches: number | null })[];
   const definitions = new Map((db.prepare('SELECT id, COALESCE(indexed_definition, definition) AS definition FROM rule_repos WHERE enabled = 1').all() as { id: string; definition: string }[])
     .map(row => [row.id, JSON.parse(row.definition) as RepoDefinition]));
+  const localUrls = new Map(locals.map(local => [local.id, local.url]));
   const items: Option[] = rows.map(({ filePath, repoName, ref, branches, disabled, ...row }) => {
-    if (filePath === null) return { ...row, disabled: !!disabled, matches: { label: nameSearchRanges(row.label, query), hint: nameSearchRanges(row.hint, query) } };
+    if (filePath === null) return { ...row, url: localUrls.get((JSON.parse(row.value) as { id: string }).id), disabled: !!disabled, matches: { label: nameSearchRanges(row.label, query), hint: nameSearchRanges(row.hint, query) } };
     const directoryLength = filePath.length - row.label.length;
     const ranges = nameSearchRanges(filePath, query);
     const separator = branches! > 1 ? ' * ' : ' · ';
@@ -92,7 +93,7 @@ export function searchRuleOptions(db: Store['db'], locals: LocalOption[], query:
     const directory = filePath.slice(0, directoryLength);
     const hint = directory ? `${origin}${separator}${directory}` : origin;
     const { repo } = JSON.parse(row.value) as { repo: string };
-    // 预览与复制直接使用索引所属公共仓库的分支原文地址，不发行托管链接。
+    // 预览与复制直接使用索引所属公共仓库的分支原文地址，不发行托管链接；规则集合没有上游地址，由调用方给出托管地址。
     const url = rawUrl(definitions.get(repo)!, { ref: ref!, path: filePath, format: 'auto' });
     return { ...row, hint, url, disabled: !!disabled, matches: {
       label: projectMatches(ranges, directoryLength, filePath.length, -directoryLength),

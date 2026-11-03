@@ -46,7 +46,13 @@ describe('物理文件平铺搜索与分页', () => {
     expect(h.reads).toEqual([]);
     expect(h.calls).toEqual([]);
     expect(h.store.list('ruleset')).toHaveLength(2);
-    expect((await h.admin.get('/api/rule-options/search?scope=all&q=Google')).json.items.every((item: { url?: string }) => item.url === undefined)).toBe(true);
+    const locals = (await h.admin.get('/api/rule-options/search?scope=all&q=Google')).json.items as { value: string; url: string }[];
+    expect(locals.length).toBeGreaterThan(0);
+    const token = (await h.admin.get('/api/me/token')).json.item.token;
+    for (const item of locals) {
+      const url = new URL(item.url);
+      expect(`${url.pathname}?${url.search.slice(1)}`).toBe(`/resources/ruleset?id=${encodeURIComponent(JSON.parse(item.value).id)}&token=${token}`);
+    }
   });
   it('按完整 URL 提示单个仓库文件，忽略未关联文件和停用仓库', async () => {
     const h = await setup();

@@ -22,10 +22,17 @@ it('仓库引用逐文件直达 raw 地址，旧多文件引用不丢失来源�
   expect(rulePreviewLinks(matcher).map(link => link.href)).toEqual([urls[1]]);
 });
 
-it('增强引用打开合并结果；本地正文不创建外部链接', () => {
-  expect(rulePreviewLinks({ kind: 'ruleset', id: '增强 / 一' })[0]?.href).toBe(`/rulesets/${encodeURIComponent('增强 / 一')}#preview`);
-  expect(rulePreviewLinks({ kind: 'local', content: 'DOMAIN,example.test' })).toEqual([]);
-  expect(rulePreviewLinks({ kind: 'ruleset', id: '' })).toEqual([]);
+it('系统规则集合带令牌打开托管原文，不跳配置页；本地正文不创建外部链接', () => {
+  expect(rulePreviewLinks({ kind: 'ruleset', id: '增强 / 一' }, 'tok')[0]?.href).toBe(`/resources/ruleset?${new URLSearchParams({ id: '增强 / 一', token: 'tok' })}`);
+  expect(rulePreviewLinks({ kind: 'ruleset', id: '增强' })).toEqual([]);
+  expect(rulePreviewLinks({ kind: 'local', content: 'DOMAIN,example.test' }, 'tok')).toEqual([]);
+  expect(rulePreviewLinks({ kind: 'ruleset', id: '' }, 'tok')).toEqual([]);
+});
+
+it('链接不可用时说明原因，不沿用地址校验文案', () => {
+  const props = { label: '规则', handle: null, kind: 'collection' as const, externalPreview: true, onPreview() {}, onEdit() {}, onDelete() {} };
+  expect(renderToStaticMarkup(<RuleCard {...props} previewHint="访问令牌读取失败：boom">集合</RuleCard>)).toContain('title="访问令牌读取失败：boom"');
+  expect(renderToStaticMarkup(<RuleCard {...props}>集合</RuleCard>)).toContain('title="请填写有效的源文件地址"');
 });
 
 it('源文件使用新标签页原生链接，本地规则保留预览按钮', () => {

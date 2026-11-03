@@ -638,3 +638,5 @@ v32 把 `refresh_jobs(id,owner,data,at)` 纳入当前结构，领域文档不变
 2026-11-03 规则出口单节点收窄：`Target`、`NodeRef` 类型与存储格式不变，示例种子无需修改。规则与 MATCH 出口（含嵌套 fallback）只接受 inline 来源：渲染不为 Provider 节点创建 `__ref_` 组，有 fallback 时告警并回退，无 fallback 时报 `ref.provider-rule-exit`，四端一致；服务端保存和草稿预览拒绝这类出口。组成员、代理链前置仍可引用 Provider 节点。来源由 inline 改为 provider 时，`planProfileChange` 把相关规则出口改为 REJECT 并在确认框列出。已保存的 inline 正则出口继续生效，点选节点可替换。
 
 2026-11-03 远程来源原生筛选：领域模型字段、存储格式和示例种子不变，只改变输出。Stash 输出 `use` + `filter`；Surge 输出 `include-other-group` + `policy-regex-filter`，每个被引用的来源对应一个隐藏内联组；Loon 输出 `[Remote Filter]` 的 `NameRegex`。`exclude-filter`、`exclude-type` 三端都无原生写法，继续由 `view:` 派生资源筛选。未被任何组引用的来源不再声明，但资源接口仍可读取。详见 [19](19-client-conversion.md#2026-11-03远程来源改用客户端原生筛选)。
+
+2026-11-03 候选原文地址：`GET /api/rule-options/search` 的 `url` 扩展到本地规则集合，值为 `/resources/ruleset?id=R&token=T`（当前用户令牌），仅 `scope=all` 时读取令牌；仓库文件仍为公共 raw 地址。领域模型不变。
