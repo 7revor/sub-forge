@@ -409,3 +409,5 @@ TemplateEdit、ProfileRules、RuleSets 的来源弹层统一为可搜索的两�
 2026-11-03 规则来源名称独立：`V2MoreDialogs` 新增「添加规则来源 · 规则仓库」状态，名称留空显示 placeholder，仓库文件选择框只显示文件路径。对应 `components/RulesetSourceDialog.tsx`、`pages/Rulesets.tsx`；后端无待实现项。
 
 2026-11-03 更多菜单项去掉残留阴影：`ActionMenu` 内的按钮和链接原来只清除了边框，`outline` 变体的 `shadow-xs` 仍然显示，看起来像每项带边框；现在同时清除阴影和链接背景。画板 `V2Lists`、`V2Components`、`V2ProfileRouting` 的菜单项本来就没有边框和阴影，无需修改。仅前端样式，领域模型与服务端无变化，无后端待实现项。
+
+2026-11-03 弹窗打开时不自动聚焦控件：`modals/index.tsx` 的 `ModalContent` 阻止 Radix 自动聚焦并把焦点放到弹窗容器，修复页面加载后首次打开弹窗时选中的分段按钮出现焦点环的问题。静止状态的控件和文案没有变化，画板无需改动；不涉及服务端。

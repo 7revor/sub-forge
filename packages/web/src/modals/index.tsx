@@ -42,7 +42,8 @@ export function ModalContent(props: React.ComponentProps<typeof DialogContent>) 
     attached.current = node;
     if (!node) queueMicrotask(() => { if (!attached.current) modalController.exited(session.id); });
   }).current;
-  return <DialogContent aria-describedby={undefined} {...props} data-modal-session={session.id} ref={ref} onCloseAutoFocus={event => { event.preventDefault(); props.onCloseAutoFocus?.(event); }}>
+  // 不自动聚焦内部控件，否则分段按钮等会显示键盘焦点环；焦点放到容器上，避免留在遮罩后的触发器。显式 autoFocus 的控件不受影响。
+  return <DialogContent aria-describedby={undefined} {...props} data-modal-session={session.id} ref={ref} onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement).focus(); props.onOpenAutoFocus?.(event); }} onCloseAutoFocus={event => { event.preventDefault(); props.onCloseAutoFocus?.(event); }}>
     <fieldset disabled={session.pending || session.phase === 'closing'} className="m-0 contents border-0 p-0">{props.children}</fieldset>
     {view.error && <p role="alert" className="m-0 whitespace-pre-wrap text-sm text-destructive">{view.error}</p>}
   </DialogContent>;
