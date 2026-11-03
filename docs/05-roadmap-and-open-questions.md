@@ -378,4 +378,4 @@ Docker 验证中发现并修复的问题：
 
 2026-11-03 节点订阅分享：已完成。数据库升级到 v36，服务端、前端和画板同步。
 
-2026-11-03 Cloudflare Tunnel 部署：已完成配置和文档。`docker/compose.tunnel.yaml` 由 `cloudflared` 连接 Cloudflare，应用不发布端口，只信任 `cloudflared` 的固定地址；见 [25](25-cloudflare-tunnel.md)。长请求超时和后端出站暴露 IP 的限制尚未处理。
+2026-11-03 Cloudflare Tunnel 部署：已完成配置和文档。Tunnel 由用户单独运行，Sub Forge 经 `SUBFORGE_BIND` 绑定内网 IP 供其访问；同日移除了内置 `cloudflared` 的 `docker/compose.tunnel.yaml`。见 [25](25-cloudflare-tunnel.md)。长请求超时和后端出站暴露 IP 的限制尚未处理。
