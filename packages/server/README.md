@@ -21,7 +21,7 @@ pnpm --filter @sub-forge/server start
 
 ### Docker（生产，SYS-08）
 
-推荐用 `docker/compose.yaml` 和 `docker/nginx.conf.example`，步骤见 [部署文档](../../docs/20-deployment-client-ip.md)。下面是直接运行的方式。
+推荐用 `docker/compose.yaml` 和 `docker/nginx.conf.example`，步骤见 [初次部署指引](../../docs/24-first-deployment.md)，其他拓扑见 [部署文档](../../docs/20-deployment-client-ip.md)。下面是直接运行的方式。
 
 ```bash
 docker build -f docker/Dockerfile -t sub-forge .
